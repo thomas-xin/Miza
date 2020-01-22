@@ -337,10 +337,10 @@ async def processMessage(message,responses):
                                 await ch.guild.ban(u_target,reason=msg,delete_message_days=0)
                             if is_banned:
                                 response = "Updated ban for **"+u_target.name+"** from \
-**"+expNum(is_banned/3600,16,5)+"** hours to **"+expNum(tm*24,16,5)+"** hours."
+**"+expNum(is_banned/3600,16,8)+"** hours to **"+expNum(tm,16,8)+"** hours."
                             elif tm >= 0:
                                 response = "**"+u_target.name+"** has been banned from \
-**"+message.channel.guild.name+"** for **"+expNum(tm*24,16,5)+"** hours."
+**"+message.channel.guild.name+"** for **"+expNum(tm,16,8)+"** hours."
                         elif command == "shutdown":
                             await ch.send("Shutting down... :wave:")
                             sys.exit()
