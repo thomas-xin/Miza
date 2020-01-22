@@ -1,5 +1,4 @@
 import math
-import easygui
 Char1 = ":RainbowCritterIdle:"
 Char2 = ":Critter:"
 box = [31,31,31,31,31]
@@ -103,6 +102,7 @@ def convertString(string,C_1,C_2):
         output += str(printed[order]) + "\n"
     return output
 if __name__ == "__main__":
+    import easygui
     while True:
         string = easygui.enterbox(msg='Please input a string: ',title='Text',default='HELLO WORLD',strip=True)
         if string == None:
