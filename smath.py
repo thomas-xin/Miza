@@ -1076,35 +1076,33 @@ def harmonics2Array(period,harmonics,func="sin(x)"):
         result += a*function((n+1)*t*2*pi/period+b)
     return result
 def floatPi(prec=64):
-    cont = decimal.getcontext()
+    cont = decimal.getContext()
     #temp = cont.prec
     cont.prec = prec+2
-    lasts,t,s,n,na,d,da = 0,dec(3),3,1,0,0,24
+    lasts,t,s,n,na,d,da = 0,dec(3,cont),3,1,0,0,24
     while s != lasts:
         lasts = s
         n,na = n+na,na+8
         d,da = d+da,da+32
         t = (t*n)/d
         s += t
-    cont.prec = prec
     return s
 def floatE(prec=64):
-    cont = decimal.getcontext()
+    cont = decimal.getContext()
     #temp = cont.prec
     cont.prec = prec+2
-    i,lasts,s,fact,num = 0,0,1,1,dec(1)
+    i,lasts,s,fact,num = 0,0,1,1,dec(1,cont)
     while s != lasts:
         lasts = s
         i += 1
         fact *= i
         s += num/fact
-    cont.prec = prec
     return s
 def floatSin(x,prec=64):
-    gcont = decimal.getcontext()
+    gcont = decimal.getContext()
     #temp = cont.prec
     cont.prec = prec+2
-    i,lasts,s,fact,num,sign = 1,0,x,1,x,1
+    i,lasts,s,fact,num,sign = 1,0,x,dec(1,cont),x,1
     while s != lasts:
         lasts = s
         i += 2
@@ -1112,13 +1110,12 @@ def floatSin(x,prec=64):
         num *= x*x
         sign *= -1
         s += num/fact*sign
-    cont.prec = prec
     return s
 def floatCos(x,prec=64):
-    cont = decimal.getcontext()
+    cont = decimal.getContext()
     #temp = cont.prec
     cont.prec = prec+2
-    i,lasts,s,fact,num,sign = 0,0,1,1,1,1
+    i,lasts,s,fact,num,sign = 0,0,dec(1,cont),1,1,1
     while s != lasts:
         lasts = s
         i += 2
@@ -1126,7 +1123,6 @@ def floatCos(x,prec=64):
         num *= x*x
         sign *= -1
         s += num/fact*sign
-    cont.prec = prec
     return s
 def floatTan(x,prec=64):
     return floatSin(x,prec)/floatCos(x,prec)

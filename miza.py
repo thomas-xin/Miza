@@ -1,4 +1,4 @@
-import discord,pygame,urllib.request,nekos,ast,sys,asyncio,datetime,signal
+import discord,pygame,urllib.request,nekos,ast,sys,asyncio,datetime,requests,json,aiohttp
 from matplotlib import pyplot as plt
 from googletrans import Translator
 from smath import *
@@ -6,12 +6,14 @@ import Char2Emoj
 import op_items_generator
 import mem2flag
 
-class MyOpener(urllib.request.FancyURLopener):
-    version = "Mozilla/5.0"
-
-translator = Translator(["translate.google.com"])
-opener = MyOpener()
 client = discord.Client()
+
+class _variables:
+    def __init__(self):
+        self.op = self.MyOpener()
+    class MyOpener(urllib.request.FancyURLopener):
+        version = "Mozilla/5.1"
+
 bar_plot = plt.bar
 plot_points = plt.scatter
 plot = plt.plot
@@ -21,13 +23,35 @@ plotXY = plt.loglog
 fig = plt.figure()
 
 owner_id = 201548633244565504
+TIMEOUT_DELAY = 10
 
+class PapagoTrans:
+    def __init__(self,c_id,c_sec):
+        self.id = c_id
+        self.secret = c_sec
+    def translate(self,string,source,dest):
+        url = "https://openapi.naver.com/v1/papago/n2mt"
+        enc = urllib.parse.quote(string)
+        data = "source="+source+"&target="+dest+"&text="+enc
+        req = urllib.request.Request(url)
+        req.add_header("X-Naver-Client-Id",self.id)
+        req.add_header("X-Naver-Client-Secret",self.secret)
+        resp = urllib.request.urlopen(req,data=data.encode("utf-8"),timeout=TIMEOUT_DELAY/2)
+        if resp.getcode() != 200:
+            raise ConnectionError("Error "+str(resp.getcode()))
+        output = json.loads(resp.read().decode("utf-8"))
+        return output["message"]["result"]["translatedText"]
+    
 commands = {
     "help":[-inf,"Shows a list of usable commands.","`~help l(0)`"],
     "math":[0,"Evaluates a math function or formula.","`~math f`"],
+    "join":[0,"Joins the current voice channel.","`~join`"],
     "play":[0,"Plays an audio file from a link, into a voice channel.","`~play l`"],
+    "q":[0,"Retrieves a list of currently playing audio.","`~q`"],
+    "rem":[0,"Removes an entry in the audio queue.","`~rem n(0)`"],
     "neko":[1,"",""],
     "lewd_neko":[1,"",""],
+    "lewd":[1,"",""],
     "uni2hex":[0,"Converts unicode text to hexadecimal numbers.","`~uni2hex a`"],
     "hex2uni":[0,"Converts hexadecimal numbers to unicode text.","`~hex2uni b`"],
     "translate":[0,"Translates a string into another language.","`~translate l(en) s`"],
@@ -42,27 +66,220 @@ corresponding to a certain memory address and value.","`~mem2flag m n(1)`"],
     "purge":[1,"Deletes a number of messages from bot in current channel.","`~purge c(1)`"],
     "purgeU":[3,"Deletes a number of messages from a user in current channel.","`~purgeU u c(1)`"],
     "purgeA":[3,"Deletes a number of messages from all users in current channel.","`~purgeA c(1)`"],
-    "ban":[3,"Bans a user for an amount of time, with an optional message.","`~ban u t(0) m()`"],
+    "ban":[3,"Bans a user for a certain amount of hours, with an optional message.","`~ban u t(0) m()`"],
     "shutdown":[3,"Shuts down the bot.","`~shutdown`"],
     
     "tr":[0,"",""],
     "tr2":[0,"",""],
 }
 
+image_forms = [
+    "gif",
+    "png",
+    "bmp",
+    "jpg",
+    "jpeg",
+    "tiff",
+    ]
+
+disabled = [
+    "__",
+    "pygame",
+    "open",
+    "import",
+    "urllib",
+    "discord",
+    "http",
+    "lastCheck",
+    "exec",
+    "eval",
+    "perms",
+    "bans",
+    "locals",
+    "globals",
+    "vars",
+    "client",
+    "queue",
+    "doMath",
+    "commands",
+    "sys",
+    "async",
+    "disabled",
+    "copyGlobals",
+    "image_forms",
+    ]
+
 def verifyCommand(func):
-    er = "ERR_NOT_ENABLED"
+    global disabled
     _f = func.lower()
-    _f = _f.replace("__",er).replace("pygame",er).replace("open",er).replace("import",er).replace("urllib",er)
-    _f = _f.replace("discord",er).replace("http",er).replace("lastCheck",er).replace("exec",er).replace("eval",er)
-    _f = _f.replace("perms",er).replace("bans",er).replace("locals",er).replace("globals",er).replace("vars",er)
-    _f = _f.replace("client",er).replace("doMath",er).replace("commands",er).replace("sys",er).replace("async",er)
-    if er in _f:
-        raise PermissionError("Issued command is not enabled.")
+    for d in disabled:
+        if d in _f:
+            raise PermissionError("Issued command is not enabled.")
     return func
 
 def verifyURL(_f):
     _f = _f.replace("<","").replace(">","").replace("|","").replace("*","").replace("_","").replace("`","")
     return _f
+
+def pull_e621(argv):
+    items = argv.replace(" ","%20").lower()
+    baseurl = "https://e621.net/post/index/"
+    url = baseurl+"1/"+items
+    resp = _vars.op.open(url)
+    if resp.getcode() != 200:
+        raise ConnectionError("Error "+str(resp.getcode()))
+    s = resp.read().decode("utf-8")
+    
+    ind = s.index('class="next_page" rel="next"')
+    s = s[ind-90:ind]
+    d = s.split(" ")
+    i = -1
+    while True:
+        if "</a>" in d[i]:
+            break
+        i -= 1
+    u = d[i][:-4]
+    u = u[u.index(">")+1:]
+    d = xrand(1,int(u))
+
+    url = baseurl+str(d)+"/"+items
+    resp = _vars.op.open(url)
+    if resp.getcode() != 200:
+        raise ConnectionError("Error "+str(resp.getcode()))
+    s = resp.read().decode("utf-8")
+
+    try:
+        limit = s.index('class="next_page" rel="next"')
+        s = s[:limit]
+    except:
+        pass
+
+    search = '<a href="/post/show/'
+    sources = []
+    while True:
+        try:
+            ind1 = s.index(search)
+            s = s[ind1+len(search):]
+            ind2 = s.index('"')
+            target = s[:ind2]
+            try:
+                sources.append(int(target))
+            except:
+                pass
+        except:
+            break
+    x = sources[xrand(len(sources))]
+    url = "https://e621.net/post/show/"+str(x)
+    resp = _vars.op.open(url)
+    if resp.getcode() != 200:
+        raise ConnectionError("Error "+str(resp.getcode()))
+    s = resp.read().decode("utf-8")
+
+    search = '<a href="https://static1.e621.net/data/'
+    ind1 = s.index(search)
+    s = s[ind1+9:]
+    ind2 = s.index('"')
+    s = s[:ind2]
+    url = s
+    return url
+
+def pull_rule34(argv):
+    items = argv.split("_")
+    for i in range(len(items)):
+        items[i] = items[i][0].upper()+items[i][1:]
+    items = "_".join(items)
+    items = argv.split(" ")
+    for i in range(len(items)):
+        items[i] = items[i][0].upper()+items[i][1:]
+    items = "%20".join(items)
+    baseurl = "https://rule34.paheal.net/post/list/"
+    try:
+        url = baseurl+items+"/1"
+        req = urllib.request.Request(url)
+        resp = urllib.request.urlopen(req,timeout=TIMEOUT_DELAY)
+    except:
+        url = baseurl+items.upper()+"/1"
+        req = urllib.request.Request(url)
+        resp = urllib.request.urlopen(req,timeout=TIMEOUT_DELAY)
+    if resp.getcode() != 200:
+        raise ConnectionError("Error "+str(resp.getcode()))
+    
+    s = resp.read().decode("utf-8")
+    try:
+        ind = s.index('">Last</a><br>')
+        s = s[ind-5:ind]
+        d = xrand(1,int(s.split("/")[-1]))
+        url = url[:-1]+str(d)
+        
+        req = urllib.request.Request(url)
+        resp = urllib.request.urlopen(req,timeout=TIMEOUT_DELAY)
+        if resp.getcode() != 200:
+            raise ConnectionError("Error "+str(resp.getcode()))
+        s = resp.read().decode("utf-8")
+    except:
+        pass
+    try:
+        limit = s.index("class=''>Images</h3><div class='blockbody'>")
+        s = s[limit:]
+        limit = s.index("</div></div></section>")
+        s = s[:limit]
+    except:
+        pass
+
+    search = 'href="'
+    sources = []
+    while True:
+        try:
+            ind1 = s.index(search)
+            s = s[ind1+len(search):]
+            ind2 = s.index('"')
+            target = s[:ind2]
+            if not "." in target:
+                continue
+            elif ".js" in target:
+                continue
+            found = False
+            for i in image_forms:
+                if i in target:
+                    found = True
+            if target[0]=="h" and found:
+                sources.append(target)
+        except:
+            break
+    url = sources[xrand(len(sources))]
+    return url
+
+def searchRandomNSFW(argv):
+    nsfw = {
+        0:pull_rule34,
+        1:pull_e621,
+        }
+    url = None
+    while True:
+        l = list(nsfw)
+        if not l:
+            break
+        r = xrand(len(l))
+        f = nsfw[r]
+        nsfw.pop(r)
+        try:
+            url = f(argv)
+        except:
+            continue
+        break
+    if url is None:
+        raise EOFError("Unable to locate any search results.")
+    return url
+
+def copyGlobals():
+    global disabled
+    g = dict(globals())
+    for i in disabled:
+        try:
+            g.pop(i)
+        except:
+            pass
+    return g
 
 def doMath(_f,returns):
     global stored_vars
@@ -80,7 +297,7 @@ def doMath(_f,returns):
     returns[0] = answer
 
 async def processMessage(message,responses):
-    global client,perms,bans,commands,translator,stored_vars
+    global client,queue,perms,bans,commands,translator,stored_vars
     msg = message.content
     if msg[:2] == "> ":
         msg = msg[2:]
@@ -122,8 +339,10 @@ async def processMessage(message,responses):
                                     comrep = commands[com]
                                     if com in argv:
                                         less = -1
-                                        show.append("\nCommand: `"+com+"`\nEffect: \
-"+comrep[1]+"\nUsage: "+comrep[2])
+                                        newstr = "\nCommand: `"+com+"`\nEffect: \
+"+comrep[1]+"\nUsage: "+comrep[2]+"\nRequired permission level: **"+str(comrep[0])+"**"
+                                        if (not len(show)) or len(show[-1])<len(newstr):
+                                            show = [newstr]
                             if less >= 0:
                                 for com in commands:
                                     comrep = commands[com]
@@ -138,7 +357,7 @@ async def processMessage(message,responses):
                             else:
                                 response = "\n".join(show)
                         elif command == "clear_cache":
-                            stored_vars = dict(globals())
+                            stored_vars = copyGlobals()
                             response = "Cache cleared!"
                         elif command == "math":
                             _tm = time.time()
@@ -146,7 +365,7 @@ async def processMessage(message,responses):
                             _f = verifyCommand(argv)
                             returns = [doMath]
                             doParallel(doMath,[_f,returns])
-                            while returns[0] == doMath and time.time() < _tm+5:
+                            while returns[0] == doMath and time.time() < _tm+TIMEOUT_DELAY:
                                 await asyncio.sleep(.1)
                             if fig.get_axes():
                                 fn = "cache/temp.png"
@@ -165,6 +384,19 @@ async def processMessage(message,responses):
                                 else:
                                     response = "```\n"+argv+" = "+str(answer)+"\n```"
                                 stored_vars.update(globals())
+                        elif command == "join":
+                            voice = message.author.voice
+                            vc = voice.channel
+                            await vc.connect(timeout=5,reconnect=True)
+                        elif command == "play":
+                            url = verifyURL(argv)
+                            queue.append(url)
+                            response = "```\nAdded "+url+" to the queue!\n```"
+                        elif command == "q":
+                            resp = ""
+                            for i in range(len(queue)):
+                                resp += "\n"+str(i)+": "+queue[i]
+                            response = "```\nQueue: "+resp+"\n```"
                         elif command == "changeperms":
                             _p1 = argv.index(" ")
                             _user = argv[:_p1]
@@ -194,28 +426,47 @@ async def processMessage(message,responses):
                         elif command == "hex2uni":
                             b = hex2Bytes(argv)
                             response = b.decode("utf-8")
-                        elif command=="translate" or command=="tr":
+                        elif command in ["translate","tr","translate2","tr2"]:
                             try:
                                 spl = argv.index(" ")
-                                language = argv[:spl+1].replace(" ","")
+                                dest = argv[:spl+1].replace(" ","")
                                 string = argv[spl+1:]
                             except:
-                                language = "en"
+                                dest = "en"
                                 string = argv
-                            tr = translator.translate(string,dest=language)
-                            response = user.name+": "+tr.text
-                        elif command == "translate2" or command=="tr2":
+                            if "?g " in string:
+                                skip = True
+                                string = string.replace("?g ","")
+                            else:
+                                skip = False
+                            source = _vars.tr[0].detect(string).lang
                             try:
-                                spl = argv.index(" ")
-                                language = argv[:spl+1].replace(" ","")
-                                string = argv[spl+1:]
+                                if skip:
+                                    raise
+                                if "-" in dest:
+                                    dest = dest[:-2]+dest[-2:].upper()
+                                tr = _vars.tr[1].translate(string,source,dest)
+                                m1 = "`Papago`"
                             except:
-                                language = "en"
-                                string = argv
-                            tr = translator.translate(string,dest=language)
-                            string2 = tr.text
-                            tr2 = translator.translate(string2,dest=tr.src)
-                            response = "**"+user.name+"**: "+string2+"\n**"+user.name+"**: "+tr2.text
+                                dest = dest.lower()
+                                tr = _vars.tr[0].translate(string,dest,source).text
+                                m1 = "`Google Translate`"
+                            if "2" in command:
+                                try:
+                                    if skip:
+                                        raise
+                                    if "-" in dest:
+                                        dest = dest[:-2]+dest[-2:].upper()
+                                    tr2 = _vars.tr[1].translate(tr,dest,source)
+                                    m2 = "`Papago`"
+                                except:
+                                    dest = dest.lower()
+                                    tr2 = _vars.tr[0].translate(tr,source,dest).text
+                                    m2 = "`Google Translate`"
+                            else:
+                                tr2 = ""
+                                m2 = ""
+                            response = "**"+user.name+"**:\n"+tr+"  "+m1+"\n"*(len(tr2)>0)+tr2+"  "+m2
                         elif command == "mem2flag":
                             try:
                                 spl = argv.index(" ")
@@ -253,21 +504,32 @@ async def processMessage(message,responses):
                             pygame.image.save(img2,fn)
                             _f = discord.File(fn)
                             await ch.send("Scaled image:",file=_f)
-                        elif command == "neko":
-                            url = nekos.img("neko")
-                            emb = discord.Embed(url=url)
-                            emb.set_image(url=url)
-                            await ch.send(embed=emb)
-                        elif command == "lewd_neko":
-                            valid = False
-                            try:
-                                valid = message.channel.is_nsfw()
-                            except AttributeError:
+                        elif command in ["neko","lewd_neko","lewd"]:
+                            if "lewd" in command:
+                                valid = False
+                                try:
+                                    valid = message.channel.is_nsfw()
+                                except AttributeError:
+                                    valid = True
+                            else:
                                 valid = True
                             if valid:
-                                url = nekos.img("lewd")
+                                if command == "neko":
+                                    if "gif" in argv:
+                                        url = nekos.img("ngif")
+                                    else:
+                                        url = nekos.img("neko")
+                                elif command == "lewd_neko":
+                                    if "gif" in argv:
+                                        url = nekos.img("nsfw_neko_gif")
+                                    else:
+                                        url = nekos.img("lewd")
+                                else:
+                                    url = searchRandomNSFW(argv)
                                 emb = discord.Embed(url=url)
                                 emb.set_image(url=url)
+                                print(url)
+                                #response = url
                                 await ch.send(embed=emb)
                             else:
                                 response = "Error: This command is only available in **NSFW** channels."
@@ -345,6 +607,9 @@ async def processMessage(message,responses):
 **"+message.channel.guild.name+"** for **"+expNum(tm,16,8)+"** hours."
                         elif command == "shutdown":
                             await ch.send("Shutting down... :wave:")
+                            for vc in client.voice_clients:
+                                await vc.disconnect(force=True)
+                            await client.close()
                             sys.exit()
                             quit()
                         else:
@@ -383,30 +648,39 @@ async def on_ready():
 ##    for guild in client.guilds:
 ##        print(guild.members)
 
-async def handleUpdate():
+async def handleUpdate(force=False):
     global client,lastCheck
-    if time.time()-lastCheck > 1:
+    if force or time.time()-lastCheck>.5:
         lastCheck = time.time()
         dtime = datetime.datetime.utcnow().timestamp()
-        for g in bans:
-            bl = list(bans[g])
-            for b in bl:
-                if dtime >= bans[g][b][0]:
-                    u_target = await client.fetch_user(b)
-                    g_target = await client.fetch_guild(g)
-                    c_target = await client.fetch_channel(bans[g][b][1])
-                    bans[g].pop(b)
-                    try:
-                        await g_target.unban(u_target)
-                        await c_target.send("**"+u_target.name+"** has been unbanned from **"+g_target.name+"**.")
-                    except:
-                        await c_target.send("Unable to unban **"+u_target.name+"** from **"+g_target.name+"**.")
-        f = open("bans.json","w")
-        f.write(str(bans))
-        f.close()
+        if bans:
+            for g in bans:
+                bl = list(bans[g])
+                for b in bl:
+                    if dtime >= bans[g][b][0]:
+                        u_target = await client.fetch_user(b)
+                        g_target = await client.fetch_guild(g)
+                        c_target = await client.fetch_channel(bans[g][b][1])
+                        bans[g].pop(b)
+                        try:
+                            await g_target.unban(u_target)
+                            await c_target.send("**"+u_target.name+"** has been unbanned from **"+g_target.name+"**.")
+                        except:
+                            await c_target.send("Unable to unban **"+u_target.name+"** from **"+g_target.name+"**.")
+            f = open("bans.json","w")
+            f.write(str(bans))
+            f.close()
+        for vc in client.voice_clients:
+            membs = vc.channel.members
+            cnt = len(membs)
+            if not cnt > 1:
+                await vc.disconnect(force=False)
         
 @client.event
 async def on_typing(channel,user,when):
+    await handleUpdate()
+
+async def on_voice_state_update(member,before,after):
     await handleUpdate()
 
 async def handleMessage(message):
@@ -418,20 +692,22 @@ async def handleMessage(message):
         return
     try:
         responses = []
-        await asyncio.wait_for(processMessage(message,responses),timeout=5)
+        await asyncio.wait_for(processMessage(message,responses),timeout=TIMEOUT_DELAY)
     except Exception as ex:
         await message.channel.send("```\nError: "+repr(ex)+"\n```")
     return
         
 @client.event
 async def on_message(message):
-    await handleMessage(message)
     await handleUpdate()
+    await handleMessage(message)
+    await handleUpdate(True)
 
 @client.event
 async def on_message_edit(before,after):
-    await handleMessage(after)
     await handleUpdate()
+    await handleMessage(after)
+    await handleUpdate(True)
 
 if __name__ == "__main__":
     try:
@@ -451,15 +727,24 @@ if __name__ == "__main__":
         _f = open("bans.json","w")
         _f.write(str(bans))
     _f.close()
-    
+    _vars = _variables()
     try:
         _f = open("auth.json")
-        token = ast.literal_eval(_f.read())["token"]
-        print("Attempting to authorize with token "+token+":")
+        data = ast.literal_eval(_f.read())
         _f.close()
-        stored_vars = dict(globals())
+        token = data["discord_token"]
+        print("Attempting to authorize with token "+token+":")
+        papago_id = data["papago_id"]
+        papago_secret = data["papago_secret"]
+        stored_vars = copyGlobals()
         lastCheck = time.time()
+        queue = []
+    except:
+        print("Unable to load bot tokens.")
+        raise
+    _vars.tr = [Translator(["translate.google.com"]),PapagoTrans(papago_id,papago_secret)]
+    try:
         client.run(token)
     except:
-        print("Unable to authorize bot token.")
+        print("Unable to authorize bot tokens.")
         raise
