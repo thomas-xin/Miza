@@ -1,4 +1,4 @@
-import discord,pygame,urllib.request,nekos,ast,sys,asyncio,datetime,requests,json,aiohttp
+import discord,pygame,urllib.request,nekos,ast,sys,asyncio,datetime,requests,json
 from matplotlib import pyplot as plt
 from googletrans import Translator
 from smath import *
