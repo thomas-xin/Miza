@@ -93,7 +93,10 @@ def ifibonacci(x,base=None):
     f = {}
     return fib(x)
 def factorial(x):
-    return roundMin(math.gamma(x+1))
+    try:
+        return roundMin(math.gamma(x+1))
+    except ValueError:
+        return inf
 def round(x,y=None):
     try:
         if isValid(x):
@@ -141,7 +144,7 @@ def tri(x):
 def sgn(x):
     return (((x>0)<<1)-1)*(x!=0)
 def frand(x=1,y=0):
-    return random.random()+xrand(x)+y
+    return (random.random()+xrand(x*2))%x+y
 def xrand(x,y=None,z=0):
     if y == None:
         y = 0
@@ -641,7 +644,7 @@ def expNum(num,maxlen=10,decimals=0):
     except:
         numlen = floor(math.log10(max(.001,num)))
     if log(max(.001,num),10) <= maxlen-decimals:
-        return roundX(num,min(maxlen-numlen-2-len(n),decimals))
+        return n+roundX(num,min(maxlen-numlen-2-len(n),decimals))
     else:
         if numlen > 0:
             try:
@@ -1072,6 +1075,61 @@ def harmonics2Array(period,harmonics,func="sin(x)"):
     for n,(a,b) in enumerate(harmonics):
         result += a*function((n+1)*t*2*pi/period+b)
     return result
+def floatPi(prec=64):
+    cont = decimal.getcontext()
+    #temp = cont.prec
+    cont.prec = prec+2
+    lasts,t,s,n,na,d,da = 0,dec(3),3,1,0,0,24
+    while s != lasts:
+        lasts = s
+        n,na = n+na,na+8
+        d,da = d+da,da+32
+        t = (t*n)/d
+        s += t
+    cont.prec = prec
+    return s
+def floatE(prec=64):
+    cont = decimal.getcontext()
+    #temp = cont.prec
+    cont.prec = prec+2
+    i,lasts,s,fact,num = 0,0,1,1,dec(1)
+    while s != lasts:
+        lasts = s
+        i += 1
+        fact *= i
+        s += num/fact
+    cont.prec = prec
+    return s
+def floatSin(x,prec=64):
+    gcont = decimal.getcontext()
+    #temp = cont.prec
+    cont.prec = prec+2
+    i,lasts,s,fact,num,sign = 1,0,x,1,x,1
+    while s != lasts:
+        lasts = s
+        i += 2
+        fact *= i*(i-1)
+        num *= x*x
+        sign *= -1
+        s += num/fact*sign
+    cont.prec = prec
+    return s
+def floatCos(x,prec=64):
+    cont = decimal.getcontext()
+    #temp = cont.prec
+    cont.prec = prec+2
+    i,lasts,s,fact,num,sign = 0,0,1,1,1,1
+    while s != lasts:
+        lasts = s
+        i += 2
+        fact *= i*(i-1)
+        num *= x*x
+        sign *= -1
+        s += num/fact*sign
+    cont.prec = prec
+    return s
+def floatTan(x,prec=64):
+    return floatSin(x,prec)/floatCos(x,prec)
 
 class dynamicFunc:
     def __init__(self,func):

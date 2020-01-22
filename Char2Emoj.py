@@ -2,6 +2,7 @@ import math
 import easygui
 Char1 = ":RainbowCritterIdle:"
 Char2 = ":Critter:"
+box = [31,31,31,31,31]
 space = [0,0,0,0,0]
 exclamation = [2,2,2,0,2]
 doublequote = [5,5,0,0,0]
@@ -59,6 +60,7 @@ symbols1 = [space,exclamation,doublequote,hashtag,dollar,percent,andsign,quote,l
 numbers = [zero,one,two,three,four,five,six,seven,eight,nine]
 letters = [at,A_,B_,C_,D_,E_,F_,G_,H_,I_,J_,K_,L_,M_,N_,O_,P_,Q_,R_,S_,T_,U_,V_,W_,X_,Y_,Z_]
 def convertString(string,C_1,C_2):
+    string = string.replace("_"," ")
     if C_1 != "":
         Char1 = C_1
     if C_2 != "":
@@ -67,14 +69,17 @@ def convertString(string,C_1,C_2):
     for index in range(0,len(string)):
         curr = string[index]
         delta = ord(curr)
-        if delta < 48:
-            dat = symbols1[delta-32]
-        else:
-            num = delta-48
-            if num <= 9:
-                dat = numbers[num]
+        try:
+            if delta < 48:
+                dat = symbols1[delta-32]
             else:
-                dat = letters[num-16]
+                num = delta-48
+                if num <= 9:
+                    dat = numbers[num]
+                else:
+                    dat = letters[num-16]
+        except:
+            dat = box
         maxi = max(dat)
         if maxi < 1:
             maxi = 1
