@@ -49,13 +49,16 @@ corresponding to a certain memory address and value.","`~mem2flag m n(1)`"],
     "tr2":[0,"",""],
 }
 
-def verifyCommand(_f):
+def verifyCommand(func):
     er = "ERR_NOT_ENABLED"
+    _f = func.lower()
     _f = _f.replace("__",er).replace("pygame",er).replace("open",er).replace("import",er).replace("urllib",er)
-    _f = _f.replace("discord",er).replace("sys",er)
+    _f = _f.replace("discord",er).replace("http",er).replace("lastCheck",er).replace("exec",er).replace("eval",er)
+    _f = _f.replace("perms",er).replace("bans",er).replace("locals",er).replace("globals",er).replace("vars",er)
+    _f = _f.replace("client",er).replace("doMath",er).replace("commands",er).replace("sys",er).replace("async",er)
     if er in _f:
         raise PermissionError("Issued command is not enabled.")
-    return _f
+    return func
 
 def verifyURL(_f):
     _f = _f.replace("<","").replace(">","").replace("|","").replace("*","").replace("_","").replace("`","")
@@ -77,7 +80,7 @@ def doMath(_f,returns):
     returns[0] = answer
 
 async def processMessage(message,responses):
-    global client,linkfile,perms,commands,translator,stored_vars
+    global client,perms,bans,commands,translator,stored_vars
     msg = message.content
     if msg[:2] == "> ":
         msg = msg[2:]
