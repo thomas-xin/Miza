@@ -14,7 +14,6 @@ opener = MyOpener()
 client = discord.Client()
 bar_plot = plt.bar
 plot_points = plt.scatter
-plot_spectrogram = plt.specgram
 plot = plt.plot
 plotY = plt.semilogy
 plotX = plt.semilogx
