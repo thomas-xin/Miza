@@ -59,7 +59,7 @@ def verifyCommand(_f):
     return _f
 
 def verifyURL(_f):
-    _f = _f.replace("<","").replace(">","").replace("|","").replace("*","").replace("_","")
+    _f = _f.replace("<","").replace(">","").replace("|","").replace("*","").replace("_","").replace("`","")
     return _f
 
 def doMath(_f,returns):
@@ -147,7 +147,7 @@ async def processMessage(message,responses):
                             while returns[0] == doMath and time.time() < _tm+5:
                                 await asyncio.sleep(.1)
                             if fig.get_axes():
-                                fn = "temp.png"
+                                fn = "cache/temp.png"
                                 plt.savefig(fn,bbox_inches="tight")
                                 _f = discord.File(fn)
                                 await ch.send(file=_f)
