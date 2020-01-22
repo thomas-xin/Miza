@@ -437,6 +437,9 @@ async def processMessage(message,responses):
                             if "?g " in string:
                                 skip = True
                                 string = string.replace("?g ","")
+                            elif " ?g" in string:
+                                skip = True
+                                string = string.replace(" ?g","")
                             else:
                                 skip = False
                             source = _vars.tr[0].detect(string).lang
