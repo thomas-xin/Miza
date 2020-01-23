@@ -107,6 +107,7 @@ disabled = [
     "disabled",
     "copyGlobals",
     "image_forms",
+    "_variables",
     "_f",
     ]
 
