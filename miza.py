@@ -63,9 +63,9 @@ corresponding to a certain memory address and value.","`~mem2flag m n(1)`"],
     "scale2x":[0,"Performs Scale2x on an image from an embed link.","`~scale2x l`"],
     "clear_cache":[1,"Clears all cached data.","`~clear_cache`"],
     "changeperms":[0,"Changes a user's permissions.","`~changeperms u n s(0)`"],
-    "purge":[1,"Deletes a number of messages from bot in current channel.","`~purge c(1)`"],
-    "purgeU":[3,"Deletes a number of messages from a user in current channel.","`~purgeU u c(1)`"],
-    "purgeA":[3,"Deletes a number of messages from all users in current channel.","`~purgeA c(1)`"],
+    "purge":[1,"Deletes a number of messages from bot in current channel.","`~purge c(1) h(?h)`"],
+    "purgeU":[3,"Deletes a number of messages from a user in current channel.","`~purgeU u c(1) h(?h)`"],
+    "purgeA":[3,"Deletes a number of messages from all users in current channel.","`~purgeA c(1) h(?h)`"],
     "ban":[3,"Bans a user for a certain amount of hours, with an optional message.","`~ban u t(0) m()`"],
     "shutdown":[3,"Shuts down the bot.","`~shutdown`"],
     
@@ -575,6 +575,14 @@ async def processMessage(message,responses):
                             else:
                                 response = "Error: This command is only available in **NSFW** channels."
                         elif command=="purge" or command=="purgeU" or command=="purgeA":
+                            if "?h " in argv:
+                                hidden = True
+                                argv = argv.replace("?h ","")
+                            elif " ?h" in argv:
+                                hidden = True
+                                argv = argv.replace(" ?h","")
+                            else:
+                                hidden = False
                             if command == "purge":
                                 cnt = argv
                                 target = client.user.id
@@ -594,19 +602,25 @@ async def processMessage(message,responses):
                                 cnt = 1
                             cnt = ceil(mpf(cnt))
                             hist = await message.channel.history(limit=64).flatten()
+                            delM = []
                             deleted = 0
                             for m in hist:
                                 if cnt <= 0:
                                     break
                                 m_id = m.author.id
                                 if m_id==target or target==None:
-                                    try:
-                                        await m.delete()
-                                        deleted += 1
-                                    except:
-                                        pass
-                                cnt -= 1
-                            response = "Deleted **__"+str(deleted)+"__** message"+"s"*(deleted!=1)+"!"
+                                    delM.append(m)
+                                    cnt -= 1
+                            try:
+                                await message.channel.delete_messages(delM)
+                                deleted = len(delM)
+                            except:
+                                deleted = 0
+                                for m in delM:
+                                    await m.delete()
+                                    deleted += 1
+                            if not hidden:
+                                response = "Deleted **__"+str(deleted)+"__** message"+"s"*(deleted!=1)+"!"
                         elif command == "ban":
                             try:
                                 spl = argv.index(" ")
