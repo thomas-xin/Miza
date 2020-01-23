@@ -62,7 +62,7 @@ corresponding to a certain memory address and value.","`~mem2flag m n(1)`"],
     "mcenchant":[0,"Returns a Minecraft command that generates an item with target enchants.","`~mcenchant i e`"],
     "scale2x":[0,"Performs Scale2x on an image from an embed link.","`~scale2x l`"],
     "clear_cache":[1,"Clears all cached data.","`~clear_cache`"],
-    "changeperms":[2,"Changes a user's permissions.","`~changeperms u n`"],
+    "changeperms":[0,"Changes a user's permissions.","`~changeperms u n`"],
     "purge":[1,"Deletes a number of messages from bot in current channel.","`~purge c(1)`"],
     "purgeU":[3,"Deletes a number of messages from a user in current channel.","`~purgeU u c(1)`"],
     "purgeA":[3,"Deletes a number of messages from all users in current channel.","`~purgeA c(1)`"],
@@ -71,6 +71,7 @@ corresponding to a certain memory address and value.","`~mem2flag m n(1)`"],
     
     "tr":[0,"",""],
     "tr2":[0,"",""],
+    "perms":[0,"",""],
 }
 
 image_forms = [
@@ -404,29 +405,38 @@ async def processMessage(message,responses):
                             for i in range(len(queue)):
                                 resp += "\n"+str(i)+": "+queue[i]
                             response = "```\nQueue: "+resp+"\n```"
-                        elif command == "changeperms":
-                            _p1 = argv.index(" ")
-                            _user = argv[:_p1]
+                        elif "perms" in command:
+                            try:
+                                _p1 = argv.index(" ")
+                                _user = argv[:_p1]
+                            except:
+                                _p1 = None
+                                _user = argv
                             try:
                                 _user = int(_user)
                             except:
                                 _user = int(_user[3:-1])
-                            _val = argv[_p1+1:]
-                            _val = float(eval(verifyCommand(_val),stored_vars))
-                            orig = perms.get(_user,0)
-                            requ = max(_val,orig)
-                            u_target = await client.fetch_user(_user)
-                            if u_perm>=requ+1:
-                                perms[_user] = _val
-                                _f = open("perms.json","w")
-                                _f.write(str(perms))
-                                _f.close()
-                                response = "Changed permissions for **"+u_target.name+"** from **\
+                            if _p1 is not None:
+                                _val = argv[_p1+1:]
+                                _val = float(eval(verifyCommand(_val),stored_vars))
+                                orig = perms.get(_user,0)
+                                requ = max(_val,orig,1)+1
+                                u_target = await client.fetch_user(_user)
+                                if u_perm>=requ:
+                                    perms[_user] = _val
+                                    _f = open("perms.json","w")
+                                    _f.write(str(perms))
+                                    _f.close()
+                                    response = "Changed permissions for **"+u_target.name+"** from **\
 "+expNum(orig,12,4)+"** to **"+expNum(_val,12,4)+"**."
-                            else:
-                                response = "Error: Insufficient priviliges to change permissions for \
+                                else:
+                                    response = "Error: Insufficient priviliges to change permissions for \
 **"+u_target.name+"** from **"+expNum(orig,12,4)+"** to **"+expNum(_val,12,4)+"**.\nRequired level: \
-**"+expNum(requ+1,12,4)+"\**, Current level: **"+expNum(u_perm,12,4)+"**"
+**"+expNum(requ,12,4)+"\**, Current level: **"+expNum(u_perm,12,4)+"**"
+                            else:
+                                u_target = await client.fetch_user(_user)
+                                _val = perms[_user]
+                                response = "Current permissions for **"+u_target.name+"**: **"+expNum(_val,12,4)+"**"
                         elif command == "uni2hex":
                             b = bytes(argv,"utf-8")
                             response = bytes2Hex(b)
