@@ -109,6 +109,7 @@ disabled = [
     "copyGlobals",
     "image_forms",
     "_variables",
+    "token",
     "_f",
     ]
 
