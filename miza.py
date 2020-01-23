@@ -62,7 +62,7 @@ corresponding to a certain memory address and value.","`~mem2flag m n(1)`"],
     "mcenchant":[0,"Returns a Minecraft command that generates an item with target enchants.","`~mcenchant i e`"],
     "scale2x":[0,"Performs Scale2x on an image from an embed link.","`~scale2x l`"],
     "clear_cache":[1,"Clears all cached data.","`~clear_cache`"],
-    "changeperms":[0,"Changes a user's permissions.","`~changeperms u n`"],
+    "changeperms":[0,"Changes a user's permissions.","`~changeperms u n s(0)`"],
     "purge":[1,"Deletes a number of messages from bot in current channel.","`~purge c(1)`"],
     "purgeU":[3,"Deletes a number of messages from a user in current channel.","`~purgeU u c(1)`"],
     "purgeA":[3,"Deletes a number of messages from all users in current channel.","`~purgeA c(1)`"],
@@ -311,11 +311,15 @@ async def processMessage(message,responses):
     msg = msg.replace("`","")
     user = message.author
     u_id = user.id
+    guild = message.guild
+    g_id = guild.id
+    g_perm = perms.get(g_id,{})
+    perms[g_id] = g_perm
     if u_id == owner_id:
         u_perm = inf
-        perms[u_id] = inf
+        g_perm[u_id] = inf
     else:
-        u_perm = perms.get(u_id,0)
+        u_perm = g_perm.get(u_id,0)
     ch = message.channel
     if msg[0]=="~" and msg[1]!="~":
         comm = msg[1:]
@@ -345,7 +349,7 @@ async def processMessage(message,responses):
                                     comrep = commands[com]
                                     if com in argv:
                                         less = -1
-                                        newstr = "\nCommand: `"+com+"`\nEffect: \
+                                        newstr = "\n`"+com+"`\nEffect: \
 "+comrep[1]+"\nUsage: "+comrep[2]+"\nRequired permission level: **"+str(comrep[0])+"**"
                                         if (not len(show)) or len(show[-1])<len(newstr):
                                             show = [newstr]
@@ -355,9 +359,9 @@ async def processMessage(message,responses):
                                     if comrep[0] <= u_perm:
                                         if comrep[1] != "":
                                             if less:
-                                                show.append("Command: `"+comrep[2]+"`")
+                                                show.append("`"+comrep[2]+"`")
                                             else:
-                                                show.append("\nCommand: `"+com+"`\nEffect: \
+                                                show.append("\n`"+com+"`\nEffect: \
 "+comrep[1]+"\nUsage: "+comrep[2])
                                 response = "Commands for **"+user.name+"**:\n"+"\n".join(show)
                             else:
@@ -412,6 +416,8 @@ async def processMessage(message,responses):
                             except:
                                 _p1 = None
                                 _user = argv
+                                if _user == "":
+                                    _user = u_id
                             try:
                                 _user = int(_user)
                             except:
@@ -419,24 +425,26 @@ async def processMessage(message,responses):
                             if _p1 is not None:
                                 _val = argv[_p1+1:]
                                 _val = float(eval(verifyCommand(_val),stored_vars))
-                                orig = perms.get(_user,0)
+                                orig = g_perm.get(_user,0)
                                 requ = max(_val,orig,1)+1
                                 u_target = await client.fetch_user(_user)
                                 if u_perm>=requ:
-                                    perms[_user] = _val
+                                    g_perm[_user] = _val
                                     _f = open("perms.json","w")
                                     _f.write(str(perms))
                                     _f.close()
-                                    response = "Changed permissions for **"+u_target.name+"** from **\
-"+expNum(orig,12,4)+"** to **"+expNum(_val,12,4)+"**."
+                                    response = "Changed permissions for **"+u_target.name+"** in \
+**"+guild.name+"** from **__"+expNum(orig,12,4)+"__** to **__"+expNum(_val,12,4)+"__**."
                                 else:
                                     response = "Error: Insufficient priviliges to change permissions for \
-**"+u_target.name+"** from **"+expNum(orig,12,4)+"** to **"+expNum(_val,12,4)+"**.\nRequired level: \
-**"+expNum(requ,12,4)+"\**, Current level: **"+expNum(u_perm,12,4)+"**"
+**"+u_target.name+"** in **"+guild.name+"** from **__"+expNum(orig,12,4)+"__** to \
+**__"+expNum(_val,12,4)+"__**.\nRequired level: \
+**__"+expNum(requ,12,4)+"__**, Current level: **__"+expNum(u_perm,12,4)+"__**"
                             else:
                                 u_target = await client.fetch_user(_user)
-                                _val = perms[_user]
-                                response = "Current permissions for **"+u_target.name+"**: **"+expNum(_val,12,4)+"**"
+                                _val = g_perm.get(_user,0)
+                                response = "Current permissions for **"+u_target.name+"** in \
+**"+guild.name+"**: **__"+expNum(_val,12,4)+"__**"
                         elif command == "uni2hex":
                             b = bytes(argv,"utf-8")
                             response = bytes2Hex(b)
@@ -556,7 +564,7 @@ async def processMessage(message,responses):
                                 else:
                                     objs = searchRandomNSFW(argv)
                                     if link:
-                                        text = "\nImage **"+str(objs[2])+"** on page **"+str(objs[1])+"**"
+                                        text = "\nImage **__"+str(objs[2])+"__** on page **__"+str(objs[1])+"__**"
                                     url = objs[0]
                                 if link:
                                     text = "Pulled from "+url+text
@@ -599,7 +607,7 @@ async def processMessage(message,responses):
                                     except:
                                         pass
                                 cnt -= 1
-                            response = "Deleted **"+str(deleted)+"** message"+"s"*(deleted!=1)+"!"
+                            response = "Deleted **__"+str(deleted)+"__** message"+"s"*(deleted!=1)+"!"
                         elif command == "ban":
                             try:
                                 spl = argv.index(" ")
@@ -635,10 +643,10 @@ async def processMessage(message,responses):
                                 await ch.guild.ban(u_target,reason=msg,delete_message_days=0)
                             if is_banned:
                                 response = "Updated ban for **"+u_target.name+"** from \
-**"+expNum(is_banned/3600,16,8)+"** hours to **"+expNum(tm,16,8)+"** hours."
+**__"+expNum(is_banned/3600,16,8)+"__** hours to **__"+expNum(tm,16,8)+"__** hours."
                             elif tm >= 0:
                                 response = "**"+u_target.name+"** has been banned from \
-**"+message.channel.guild.name+"** for **"+expNum(tm,16,8)+"** hours."
+**"+message.channel.guild.name+"** for **__"+expNum(tm,16,8)+"__** hours."
                         elif command == "shutdown":
                             await ch.send("Shutting down... :wave:")
                             for vc in client.voice_clients:
@@ -654,20 +662,24 @@ async def processMessage(message,responses):
                     except discord.HTTPException:
                         try:
                             fn = "cache/temp.txt"
-                            _f = open(fn,"w")
-                            _f.write(response)
+                            _f = open(fn,"wb")
+                            _f.write(bytes(response,"utf-8"))
                             _f.close()
                             _f = discord.File(fn)
                             await ch.send("Response too long for message.",file=_f)
                         except:
                             raise
                     except Exception as ex:
-                        await ch.send("```\nError: "+repr(ex)+"\n```")
+                        rep = repr(ex)
+                        if len(rep) > 1900:
+                            await ch.send("```\nError: Error message too long.\n```")
+                        else:
+                            await ch.send("```\nError: "+rep+"\n```")
                     return
                 else:
                     await ch.send(
                         "Error: Insufficient priviliges for command "+command+"\
-.\nRequred level: **"+expNum(req)+"**, Current level: **"+expNum(u_perm)+"**")
+.\nRequred level: **__"+expNum(req)+"__**, Current level: **__"+expNum(u_perm)+"__**")
                     return
     msg = message.content
     if "<@!"+str(client.user.id)+">" in msg:
