@@ -659,7 +659,7 @@ async def processMessage(message,responses):
 .\nRequred level: **"+expNum(req)+"**, Current level: **"+expNum(u_perm)+"**")
                     return
     msg = message.content
-    if "<@!668999031359537205>" in msg:
+    if "<@!"+str(client.user.id)+">" in msg:
         await ch.send("Hi, did you require my services for anything?")
 
 @client.event
