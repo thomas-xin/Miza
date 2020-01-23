@@ -39,7 +39,12 @@ class PapagoTrans:
         resp = urllib.request.urlopen(req,data=data.encode("utf-8"),timeout=TIMEOUT_DELAY/2)
         if resp.getcode() != 200:
             raise ConnectionError("Error "+str(resp.getcode()))
-        output = json.loads(resp.read().decode("utf-8"))
+        r = resp.read().decode("utf-8")
+        try:
+            r = json.loads(r)
+        except:
+            pass
+        output = r
         return output["message"]["result"]["translatedText"]
     
 commands = {
@@ -201,11 +206,11 @@ def pull_rule34(argv):
     try:
         url = baseurl+items+"/1"
         req = urllib.request.Request(url)
-        resp = urllib.request.urlopen(req,timeout=TIMEOUT_DELAY)
+        resp = urllib.request.urlopen(req,timeout=TIMEOUT_DELAY/2)
     except:
         url = baseurl+items.upper()+"/1"
         req = urllib.request.Request(url)
-        resp = urllib.request.urlopen(req,timeout=TIMEOUT_DELAY)
+        resp = urllib.request.urlopen(req,timeout=TIMEOUT_DELAY/2)
     if resp.getcode() != 200:
         raise ConnectionError("Error "+str(resp.getcode()))
     
@@ -217,7 +222,7 @@ def pull_rule34(argv):
         url = url[:-1]+str(v1)
         
         req = urllib.request.Request(url)
-        resp = urllib.request.urlopen(req,timeout=TIMEOUT_DELAY)
+        resp = urllib.request.urlopen(req,timeout=TIMEOUT_DELAY/2)
         if resp.getcode() != 200:
             raise ConnectionError("Error "+str(resp.getcode()))
         s = resp.read().decode("utf-8")
@@ -347,7 +352,7 @@ async def processMessage(message,responses):
                                 if com in argv:
                                     less = -1
                                     newstr = "\n`"+com+"`\nEffect: \
-"+comrep[1]+"\nUsage: "+comrep[2]+"\nRequired permission level: **"+str(comrep[0])+"**"
+"+comrep[1]+"\nUsage: "+comrep[2]+"\nRequired permission level: **__"+str(comrep[0])+"__**"
                                     if (not len(show)) or len(show[-1])<len(newstr):
                                         show = [newstr]
                             if less == 0:
@@ -401,7 +406,7 @@ async def processMessage(message,responses):
                         elif command == "join":
                             voice = message.author.voice
                             vc = voice.channel
-                            await vc.connect(timeout=5,reconnect=True)
+                            await vc.connect(timeout=TIMEOUT_DELAY,reconnect=True)
                         elif command == "play":
                             url = verifyURL(argv)
                             queue.append(url)
