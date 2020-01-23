@@ -339,19 +339,21 @@ async def processMessage(message,responses):
                     response = None
                     try:
                         if command == "help":
+                            less = 0
                             show = []
-                            if "l" in argv.lower():
-                                less = True
-                            else:
-                                less = False
-                                for com in commands:
-                                    comrep = commands[com]
-                                    if com in argv:
-                                        less = -1
-                                        newstr = "\n`"+com+"`\nEffect: \
+                            for com in commands:
+                                comrep = commands[com]
+                                if com in argv:
+                                    less = -1
+                                    newstr = "\n`"+com+"`\nEffect: \
 "+comrep[1]+"\nUsage: "+comrep[2]+"\nRequired permission level: **"+str(comrep[0])+"**"
-                                        if (not len(show)) or len(show[-1])<len(newstr):
-                                            show = [newstr]
+                                    if (not len(show)) or len(show[-1])<len(newstr):
+                                        show = [newstr]
+                            if less == 0:
+                                if "l" in argv.lower():
+                                    less = 1
+                                else:
+                                    less = 0
                             if less >= 0:
                                 for com in commands:
                                     comrep = commands[com]
