@@ -10,9 +10,7 @@ client = discord.Client()
 
 class _variables:
     def __init__(self):
-        self.op = self.MyOpener()
-    class MyOpener(urllib.request.FancyURLopener):
-        version = "Mozilla/5.1"
+        self.op = urllib.request.FancyURLopener(version="Mozilla/5.1")
 
 bar_plot = plt.bar
 plot_points = plt.scatter
@@ -305,7 +303,9 @@ def doMath(_f,returns):
             answer = None
     except Exception as ex:
         answer = "\nError: "+repr(ex)
-    returns[0] = str(answer)
+    if answer is not None:
+        answer = str(answer)
+    returns[0] = answer
 
 async def processMessage(message,responses):
     global client,queue,perms,bans,commands,translator,stored_vars
@@ -318,14 +318,18 @@ async def processMessage(message,responses):
     user = message.author
     u_id = user.id
     guild = message.guild
-    g_id = guild.id
-    g_perm = perms.get(g_id,{})
-    perms[g_id] = g_perm
-    if u_id == owner_id:
-        u_perm = inf
-        g_perm[u_id] = inf
+    if guild:
+        g_id = guild.id
+        g_perm = perms.get(g_id,{})
+        perms[g_id] = g_perm
+        if u_id == owner_id:
+            u_perm = inf
+            g_perm[u_id] = inf
+        else:
+            u_perm = g_perm.get(u_id,0)
     else:
-        u_perm = g_perm.get(u_id,0)
+        g_perm = {}
+        u_perm = 1
     ch = message.channel
     if msg[0]=="~" and msg[1]!="~":
         comm = msg[1:]
@@ -616,7 +620,7 @@ async def processMessage(message,responses):
                                 if cnt <= 0:
                                     break
                                 m_id = m.author.id
-                                if m_id==target or target==None:
+                                if target is None or m_id==target:
                                     delM.append(m)
                                     cnt -= 1
                             try:
@@ -625,8 +629,11 @@ async def processMessage(message,responses):
                             except:
                                 deleted = 0
                                 for m in delM:
-                                    await m.delete()
-                                    deleted += 1
+                                    try:
+                                        await m.delete()
+                                        deleted += 1
+                                    except:
+                                        pass
                             if not hidden:
                                 response = "Deleted **__"+str(deleted)+"__** message"+"s"*(deleted!=1)+"!"
                         elif command == "ban":
