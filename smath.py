@@ -1,48 +1,102 @@
 """
 Adds many useful math-related functions.
 """
-import math,cmath,fractions,decimal
+import math,cmath,fractions,mpmath,sympy
 import numpy,tinyarray
 array = tinyarray.array
 import colorsys,random,threading,time
 from scipy import interpolate,special
-cont = decimal.ExtendedContext
-cont.prec = 64
-cont.Emin = -2147483648
-cont.Emax = 2147483647
-decimal.setcontext(cont)
+
+sympy.init_printing(use_unicode=True)
+
+mp = mpmath.mp
+mp.dps = 128
+
 math.round = round
-pi = math.pi
-_e = math.e
-tau = math.tau
-d2r = pi/180
+c_ = 299792458
 inf = math.inf
 nan = math.nan
-dec = decimal.Decimal
+
+mpf = mpmath.mpf
+mpc = mpmath.mpc
+matrix = mpmath.matrix
+
+pi = mp.pi
+e_ = mp.e
+tau = pi*2
+d2r = mp.degree
+phi = mp.phi
+euler = mp.euler
+twinprime = mp.twinprime
+
+Function = sympy.Function
+Symbol = sympy.Symbol
+diff = differentiate = sympy.diff
+intg = integrate = sympy.integrate
+factorize = primefactors = sympy.ntheory.factorint
+mobius = sympy.ntheory.mobius
+
 def nop(*args):
     pass
 phase = cmath.phase
-sin = math.sin
-cos = math.cos
-tan = math.tan
-sinh = math.sinh
-cosh = math.cosh
-tanh = math.tanh
-asin = math.asin
-acos = math.acos
-atan = math.atan
-asinh = math.asinh
-acosh = math.acosh
-atanh = math.atanh
-def sinc(x):
-    if x == 0:
-        return 1
-    return math.sin(x)/x
-def si(x):
-    return roundMin(special.sici(x)[0])
-def ci(x):
-    return roundMin(special.sici(x)[1])
+sin = mpmath.sin
+cos = mpmath.cos
+tan = mpmath.tan
+sec = mpmath.sec
+csc = mpmath.csc
+cot = mpmath.cot
+sinh = mpmath.sinh
+cosh = mpmath.cosh
+tanh = mpmath.tanh
+sech = mpmath.sech
+csch = mpmath.csch
+coth = mpmath.coth
+asin = mpmath.asin
+acos = mpmath.acos
+atan = mpmath.atan
+asec = mpmath.asec
+acsc = mpmath.acsc
+acot = mpmath.acot
+asinh = mpmath.asinh
+acosh = mpmath.acosh
+atanh = mpmath.atanh
+asech = mpmath.asech
+acsch = mpmath.acsch
+acoth = mpmath.acoth
+sinc = mpmath.sinc
+ei = mpmath.ei
+e1 = mpmath.e1
+en = mpmath.expint
+li = mpmath.li
+si = mpmath.si
+ci = mpmath.ci
+shi = mpmath.shi
+chi = mpmath.chi
+erf = mpmath.erf
+erfc = mpmath.erfc
+erfi = mpmath.erfi
+aerf = mpmath.erfinv
+npdf = mpmath.npdf
+ncdf = mpmath.ncdf
+fac = factorial = mpmath.fac
+fib = fibonacci = mpmath.fib
+trib = tribonacci = sympy.tribonacci
+luc = lucas = sympy.lucas
+harm = harmonic = sympy.harmonic
+ber = bernoulli = mpmath.bernoulli
+eul = eulernum = mpmath.eulernum
+sqrt = mpmath.sqrt
+hypot = mpmath.hypot
+cbrt = mpmath.cbrt
+root = mpmath.root
+exp = mpmath.exp
+expi = expj = mpmath.expj
+log = mpmath.log
+ln = mpmath.ln
+frac = sympy.frac
+
 def isqrt(x):
+    x = int(x)
     y = (x<<2)//3
     b = y.bit_length()
     a = b>>1
@@ -59,44 +113,6 @@ def isqrt(x):
             c = d
             d = (c+x//c)>>1
     return c
-def sqrt(x):
-    try:
-        return math.sqrt(x)
-    except:
-        return cmath.sqrt(x)
-erf = math.erf
-erfc = math.erfc
-def ifibonacci(x,base=None):
-    def fib(n):
-        if n == 0:
-            return 0
-        if n <= 2:
-            f[n] = 1
-            return 1
-        if n in f:
-            return f[n]
-        k = (n+1)>>1
-        if n&1:
-            f[n] = fib(k)**2+fib(k-1)**2
-        else:
-            f[n] = (fib(k-1)*2+fib(k))*fib(k)
-        return f[n]
-    def fibM(x,y): 
-        pp = pisanoPeriod(y)
-        x = x%pp
-        a,b = 0,1
-        for i in range(x-1):
-            a,b = b,(a+b)%y
-        return b
-    if base is not None:
-        return fibM(x,base)
-    f = {}
-    return fib(x)
-def factorial(x):
-    try:
-        return roundMin(math.gamma(x+1))
-    except ValueError:
-        return inf
 def round(x,y=None):
     try:
         if isValid(x):
@@ -153,7 +169,7 @@ def xrand(x,y=None,z=0):
     return random.randint(floor(min(x,y)),ceil(max(x,y))-1)+z
 def rrand(x=1,y=0):
     return frand(x)**(1-y)
-def log(x,y=_e):
+def log(x,y=e_):
     try:
         return x.ln()/math.log(y)
     except:
@@ -295,128 +311,6 @@ def isPrime(n):
             return False
         return True
     return None
-def factorize(n):
-    def curveAdd(p1,p2,p,n):
-        x,z = p1
-        w,y = p2
-        r,s = p
-        t1,t2 = (x-z)*(w+y),(x+z)*(w-y)
-        return ((s*pow(t1+t2,2,n))%n,(r*pow(t1-t2,2,n))%n)
-    def curveDouble(p,a,n):
-        x,z = p
-        w,y = a
-        t1,t2 = pow(x+z,2,n),pow(x-z,2,n)
-        t = t1-t2
-        return ((t1*t2*y<<2)%n,((y*t2+t*w)*t<<2)%n)
-    def curveMult(m,p,a,n):
-        if m == 0:
-            return (0,0)
-        if m == 1:
-            return p
-        q = curveDouble(p,a,n)
-        if m == 2:
-            return q
-        b = 1
-        while b < m:
-            b <<= 1
-        b >>= 2
-        r = p
-        while b:
-            if m&b:
-                q,r = curveDouble(q,a,n),curveAdd(q,r,p,n)
-            else:
-                q,t = curveAdd(r,q,p,n),curveDouble(r,a,n)
-            b >>= 1
-        return r
-    def pollard(n,limit=64):
-        b1 = limit>>1
-        b2 = limit
-        z = 1
-        while z < limit:
-            for i in range(z):
-                s = xrand(6,n)
-                u = (s*s-5)%n
-                v = (4*s)%n
-                p = pow(u,3,n)
-                q = ((pow(v-u,3,n)*3*(u+v))%n,(4*p*v)%n)
-                c = (p,pow(v,3,n))
-                g = next6np()
-                p = next(g)
-                while True:
-                    p = next(g)
-                    if p > b1:
-                        break
-                    if isPrime(p):
-                        q = curveMult(p**floor(log(b1,p)),q,c,n)
-                        if q[1]>1 and n%q[1]==0 and n!=q[1]:
-                            return q[1]
-                d = gcd(q[1],n)
-                if d>1 and d!=n:
-                    return d
-                while True:
-                    if p > b2:
-                        break
-                    if isPrime(p):
-                        q = curveMult(p,q,c,n)
-                        d *= q[1]
-                        d %= n
-                    p = next(g)
-                d = gcd(d,n)
-                if d>1 and d!=n:
-                    return d
-            b1 *= 3
-            b2 *= 3
-            z <<= 1
-        print("Failed.")
-        return None
-    def lenstra(n,limit=1024):
-        g = n
-        while g == n:
-            a = xrand(n)
-            x = xrand(n)
-            y = xrand(n)
-            q = (y*y-x*x*x-x*a)%n
-            d = gcd((a*a*a<<2)+27*b*b,n)
-        if d > 1:
-            return d
-        g = next6np()
-        while True:
-            p = next(g)
-            m = p
-            while m < limit:
-                q = curveMult()
-    factors = {}
-    x = n
-    t = min(x,2+ceil(2*log(x)))
-    g = next6np()
-    p = next(g)
-    while True:
-        if p >= t:
-            break
-        if not x%p:
-            print("Divisibility: "+str(p))
-            factors[p] = factors.get(p,0)+1
-            x = x//p
-        else:
-            p = next(g)
-    while True:
-        if x <= 1:
-            break
-        if isPrime(x):
-            print("Prime Test: "+str(x))
-            factors[x] = factors.get(x,0)+1
-            break
-        while True:
-            f = pollard(x)
-            if f:
-                while x!=f and x%f == 0:
-                    print("ECM: "+str(f))
-                    factors = addDict(factors,factorize(f))
-                    x //= f
-                break
-    s = sorted(factors)
-    d = {i:factors[i] for i in s}
-    return d
 def generatePrimes(a=2,b=inf,c=1):
     primes = []
     a = round(a)
@@ -469,13 +363,13 @@ def closeRound(n):
     for i in range(0,len(rounds)):
         if abs(b-rounds[i]) < .02:
             c = rounds[i]
-    return(float(a+c))
+    return(mpf(a+c))
 def toFrac(num,limit=2147483647):
     if num >= limit:
         return([limit,1])
     if num <= 0:
         return([1,limit])
-    num = float(num)
+    num = mpf(num)
     f = fractions.Fraction(num).limit_denominator(limit)
     frac = [f.numerator,f.denominator]
     if frac[0] == 0:
@@ -1075,57 +969,6 @@ def harmonics2Array(period,harmonics,func="sin(x)"):
     for n,(a,b) in enumerate(harmonics):
         result += a*function((n+1)*t*2*pi/period+b)
     return result
-def floatPi(prec=64):
-    cont = decimal.getContext()
-    #temp = cont.prec
-    cont.prec = prec+2
-    lasts,t,s,n,na,d,da = 0,dec(3,cont),3,1,0,0,24
-    while s != lasts:
-        lasts = s
-        n,na = n+na,na+8
-        d,da = d+da,da+32
-        t = (t*n)/d
-        s += t
-    return s
-def floatE(prec=64):
-    cont = decimal.getContext()
-    #temp = cont.prec
-    cont.prec = prec+2
-    i,lasts,s,fact,num = 0,0,1,1,dec(1,cont)
-    while s != lasts:
-        lasts = s
-        i += 1
-        fact *= i
-        s += num/fact
-    return s
-def floatSin(x,prec=64):
-    gcont = decimal.getContext()
-    #temp = cont.prec
-    cont.prec = prec+2
-    i,lasts,s,fact,num,sign = 1,0,x,dec(1,cont),x,1
-    while s != lasts:
-        lasts = s
-        i += 2
-        fact *= i*(i-1)
-        num *= x*x
-        sign *= -1
-        s += num/fact*sign
-    return s
-def floatCos(x,prec=64):
-    cont = decimal.getContext()
-    #temp = cont.prec
-    cont.prec = prec+2
-    i,lasts,s,fact,num,sign = 0,0,dec(1,cont),1,1,1
-    while s != lasts:
-        lasts = s
-        i += 2
-        fact *= i*(i-1)
-        num *= x*x
-        sign *= -1
-        s += num/fact*sign
-    return s
-def floatTan(x,prec=64):
-    return floatSin(x,prec)/floatCos(x,prec)
 
 class dynamicFunc:
     def __init__(self,func):

@@ -107,6 +107,7 @@ disabled = [
     "disabled",
     "copyGlobals",
     "image_forms",
+    "_f",
     ]
 
 def verifyCommand(func):
@@ -140,9 +141,9 @@ def pull_e621(argv):
         i -= 1
     u = d[i][:-4]
     u = u[u.index(">")+1:]
-    d = xrand(1,int(u))
+    v1 = xrand(1,int(u))
 
-    url = baseurl+str(d)+"/"+items
+    url = baseurl+str(v1)+"/"+items
     resp = _vars.op.open(url)
     if resp.getcode() != 200:
         raise ConnectionError("Error "+str(resp.getcode()))
@@ -168,7 +169,8 @@ def pull_e621(argv):
                 pass
         except:
             break
-    x = sources[xrand(len(sources))]
+    v2 = xrand(len(sources))
+    x = sources[v2]
     url = "https://e621.net/post/show/"+str(x)
     resp = _vars.op.open(url)
     if resp.getcode() != 200:
@@ -181,7 +183,7 @@ def pull_e621(argv):
     ind2 = s.index('"')
     s = s[:ind2]
     url = s
-    return url
+    return [url,v1,v2]
 
 def pull_rule34(argv):
     items = argv.split("_")
@@ -208,8 +210,8 @@ def pull_rule34(argv):
     try:
         ind = s.index('">Last</a><br>')
         s = s[ind-5:ind]
-        d = xrand(1,int(s.split("/")[-1]))
-        url = url[:-1]+str(d)
+        v1 = xrand(1,int(s.split("/")[-1]))
+        url = url[:-1]+str(v1)
         
         req = urllib.request.Request(url)
         resp = urllib.request.urlopen(req,timeout=TIMEOUT_DELAY)
@@ -246,15 +248,16 @@ def pull_rule34(argv):
                 sources.append(target)
         except:
             break
-    url = sources[xrand(len(sources))]
-    return url
+    v2 = xrand(len(sources))
+    url = sources[v2]
+    return [url,v1,v2]
 
 def searchRandomNSFW(argv):
     nsfw = {
         0:pull_rule34,
         1:pull_e621,
         }
-    url = None
+    data = None
     while True:
         l = list(nsfw)
         if not l:
@@ -263,13 +266,13 @@ def searchRandomNSFW(argv):
         f = nsfw[r]
         nsfw.pop(r)
         try:
-            url = f(argv)
+            data = f(argv)
         except:
             continue
         break
-    if url is None:
+    if data is None:
         raise EOFError("Unable to locate any search results.")
-    return url
+    return data
 
 def copyGlobals():
     global disabled
@@ -294,7 +297,7 @@ def doMath(_f,returns):
             answer = None
     except Exception as ex:
         answer = "\nError: "+repr(ex)
-    returns[0] = answer
+    returns[0] = str(answer)
 
 async def processMessage(message,responses):
     global client,queue,perms,bans,commands,translator,stored_vars
@@ -331,6 +334,7 @@ async def processMessage(message,responses):
                     try:
                         if command == "help":
                             show = []
+                            argv = argv.replace("?","")
                             if argv.lower() == "less" or argv.lower() == "l":
                                 less = True
                             else:
@@ -358,14 +362,14 @@ async def processMessage(message,responses):
                                 response = "\n".join(show)
                         elif command == "clear_cache":
                             stored_vars = copyGlobals()
-                            response = "Cache cleared!"
+                            response = "```\nCache cleared!\n```"
                         elif command == "math":
                             _tm = time.time()
                             plt.clf()
                             _f = verifyCommand(argv)
                             returns = [doMath]
                             doParallel(doMath,[_f,returns])
-                            while returns[0] == doMath and time.time() < _tm+TIMEOUT_DELAY:
+                            while returns[0]==doMath and time.time()<_tm+TIMEOUT_DELAY:
                                 await asyncio.sleep(.1)
                             if fig.get_axes():
                                 fn = "cache/temp.png"
@@ -381,6 +385,8 @@ async def processMessage(message,responses):
                                         response = "```\n"+argv+" successfully executed!\n```"
                                     else:
                                         response = "```\nError: function is empty.\n```"
+                                elif answer[:6] == "\nError":
+                                    response = "```"+answer+"\n```"
                                 else:
                                     response = "```\n"+argv+" = "+str(answer)+"\n```"
                                 stored_vars.update(globals())
@@ -517,6 +523,15 @@ async def processMessage(message,responses):
                             else:
                                 valid = True
                             if valid:
+                                if "?l " in argv:
+                                    link = True
+                                    argv = argv.replace("?l ","")
+                                elif " ?l" in argv:
+                                    link = True
+                                    argv = argv.replace(" ?l","")
+                                else:
+                                    link = False
+                                text = ""
                                 if command == "neko":
                                     if "gif" in argv:
                                         url = nekos.img("ngif")
@@ -528,12 +543,17 @@ async def processMessage(message,responses):
                                     else:
                                         url = nekos.img("lewd")
                                 else:
-                                    url = searchRandomNSFW(argv)
+                                    objs = searchRandomNSFW(argv)
+                                    if link:
+                                        text = "\nImage **"+str(objs[2])+"** on page **"+str(objs[1])+"**"
+                                    url = objs[0]
+                                if link:
+                                    text = "Pulled from "+url+text
                                 emb = discord.Embed(url=url)
                                 emb.set_image(url=url)
                                 print(url)
                                 #response = url
-                                await ch.send(embed=emb)
+                                await ch.send(text,embed=emb)
                             else:
                                 response = "Error: This command is only available in **NSFW** channels."
                         elif command=="purge" or command=="purgeU" or command=="purgeA":
@@ -554,7 +574,7 @@ async def processMessage(message,responses):
                                 target = None
                             if not len(cnt):
                                 cnt = 1
-                            cnt = ceil(dec(cnt))
+                            cnt = ceil(mpf(cnt))
                             hist = await message.channel.history(limit=64).flatten()
                             deleted = 0
                             for m in hist:
@@ -638,7 +658,9 @@ async def processMessage(message,responses):
                         "Error: Insufficient priviliges for command "+command+"\
 .\nRequred level: **"+expNum(req)+"**, Current level: **"+expNum(u_perm)+"**")
                     return
-    responses.append(None)
+    msg = message.content
+    if "<@!668999031359537205>" in msg:
+        await ch.send("Hi, did you require my services for anything?")
 
 @client.event
 async def on_ready():
