@@ -188,7 +188,7 @@ def pull_e621(argv):
 def pull_rule34(argv):
     items = argv.split("_")
     for i in range(len(items)):
-        items[i] = items[i][0].upper()+items[i][1:]
+        items[i] = items[i][0].upper()+items[i][1:].lower()
     items = "_".join(items)
     items = argv.split(" ")
     for i in range(len(items)):
