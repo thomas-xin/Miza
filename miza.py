@@ -340,8 +340,7 @@ async def processMessage(message,responses):
                     try:
                         if command == "help":
                             show = []
-                            argv = argv.replace("?","")
-                            if argv.lower() == "less" or argv.lower() == "l":
+                            if "l" in argv.lower():
                                 less = True
                             else:
                                 less = False
