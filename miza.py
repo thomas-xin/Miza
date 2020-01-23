@@ -390,7 +390,7 @@ async def processMessage(message,responses):
                                         response = "```\n"+argv+" successfully executed!\n```"
                                     else:
                                         response = "```\nError: function is empty.\n```"
-                                elif answer[:6] == "\nError":
+                                elif "\nError" in answer:
                                     response = "```"+answer+"\n```"
                                 else:
                                     response = "```\n"+argv+" = "+str(answer)+"\n```"
@@ -435,7 +435,7 @@ async def processMessage(message,responses):
                                     response = "Changed permissions for **"+u_target.name+"** in \
 **"+guild.name+"** from **__"+expNum(orig,12,4)+"__** to **__"+expNum(_val,12,4)+"__**."
                                 else:
-                                    response = "Error: Insufficient priviliges to change permissions for \
+                                    response = "```\nError:\n```\nInsufficient priviliges to change permissions for \
 **"+u_target.name+"** in **"+guild.name+"** from **__"+expNum(orig,12,4)+"__** to \
 **__"+expNum(_val,12,4)+"__**.\nRequired level: \
 **__"+expNum(requ,12,4)+"__**, Current level: **__"+expNum(u_perm,12,4)+"__**"
@@ -573,7 +573,7 @@ async def processMessage(message,responses):
                                 #response = url
                                 await ch.send(text,embed=emb)
                             else:
-                                response = "Error: This command is only available in **NSFW** channels."
+                                response = "```\nError:\n```\nThis command is only available in **NSFW** channels."
                         elif command=="purge" or command=="purgeU" or command=="purgeA":
                             if "?h " in argv:
                                 hidden = True
@@ -691,7 +691,7 @@ async def processMessage(message,responses):
                     return
                 else:
                     await ch.send(
-                        "Error: Insufficient priviliges for command "+command+"\
+                        "```\nError:\n```\nInsufficient priviliges for command "+command+"\
 .\nRequred level: **__"+expNum(req)+"__**, Current level: **__"+expNum(u_perm)+"__**")
                     return
     msg = message.content
