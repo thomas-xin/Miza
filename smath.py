@@ -33,7 +33,7 @@ Function = sympy.Function
 Symbol = sympy.Symbol
 diff = differentiate = sympy.diff
 intg = integrate = sympy.integrate
-factorize = primefactors = sympy.ntheory.factorint
+factorize = factorint = primeFactors = sympy.ntheory.factorint
 mobius = sympy.ntheory.mobius
 
 def nop(*args):
@@ -969,6 +969,28 @@ def harmonics2Array(period,harmonics,func="sin(x)"):
     for n,(a,b) in enumerate(harmonics):
         result += a*function((n+1)*t*2*pi/period+b)
     return result
+def limLine(s,lim):
+    curr = s
+    if len(curr) > lim:
+        temp = curr.split(" ")
+        final = ""
+        string = ""
+        for t in temp:
+            if len(string)+len(t) > lim:
+                final += string[:-1]+"\n"
+                string = ""
+            string += t+" "
+        s = final+string[:-1]
+    return s
+def strGetRem(s,arg):
+    if arg+" " in s:
+        s = s.replace(arg+" ","")
+        return s,True
+    elif " "+arg in s:
+        s = s.replace(" "+arg,"")
+        return s,True
+    else:
+        return s,False
 
 class dynamicFunc:
     def __init__(self,func):
