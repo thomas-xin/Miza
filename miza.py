@@ -364,7 +364,6 @@ async def processMessage(message):
                                 await channel.send("```\nError: Error message too long.\n```")
                             else:
                                 await channel.send("```\nError: "+rep+"\n```")
-                            raise
                         return
                     else:
                         await channel.send(
@@ -481,12 +480,11 @@ async def handleMessage(message):
             try:
                 await message.add_reaction("❎")
             except:
-                raise
+                pass
     try:
         await asyncio.wait_for(processMessage(message),timeout=_vars.timeout)
     except Exception as ex:
         await message.channel.send("```\nError: "+repr(ex)+"\n```")
-        raise
     return
         
 @client.event
