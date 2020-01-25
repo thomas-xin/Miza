@@ -11,7 +11,7 @@ class help:
         try:
             enabled = _vars.enabled[guild.id]
         except:
-            enabled = _vars.enabled[guild.id] = ["math","admin"]
+            enabled = _vars.enabled[guild.id] = ["string","admin"]
             _vars.update()
         categories = _vars.categories
         commands = []

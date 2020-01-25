@@ -277,7 +277,7 @@ async def processMessage(message):
     try:
         enabled = _vars.enabled[g_id]
     except:
-        enabled = _vars.enabled[g_id] = ["math","admin"]
+        enabled = _vars.enabled[g_id] = ["string","admin"]
         _vars.update()
     u_perm = _vars.getPerms(user.id,guild)
     ch = channel = message.channel
