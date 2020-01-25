@@ -191,7 +191,7 @@ class neko:
             except AttributeError:
                 valid = True
             if not valid:
-                return "```\nError:\n```\nThis command is only available in **NSFW** channels."
+                return "Error: This command is only available in **NSFW** channels."
             if "gif" in argv:
                 url = nekos.img("nsfw_neko_gif")
             else:
@@ -223,7 +223,7 @@ class lewd:
         except AttributeError:
             valid = True
         if not valid:
-            return "```\nError:\n```\nThis command is only available in **NSFW** channels."
+            return "Error: This command is only available in **NSFW** channels."
         objs = searchRandomNSFW(" ".join(args),_vars.timeout)
         url = objs[0]
         if "v" in flags:
