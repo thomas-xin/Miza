@@ -307,6 +307,17 @@ async def processMessage(message):
                                 flag = "?"+char
                                 for r in (flag.lower(),flag.upper()):
                                     if len(argv)>=2 and r in argv:
+                                        if not char in flags:
+                                            i = argv.index(r)
+                                            if i==0 or argv[i-1]==" " or argv[i-2]=="?":
+                                                if argv[i+2]==" " or argv[i+2]=="?":
+                                                    argv = argv[:i]+argv[i+2:]
+                                                    flags[char] = True
+                            for c in range(26):
+                                char = chr(c+97)
+                                flag = "?"+char
+                                for r in (flag.lower(),flag.upper()):
+                                    if len(argv)>=2 and r in argv:
                                         for check in (r+" "," "+r):
                                             if check in argv:
                                                 argv = argv.replace(check,"")
@@ -314,13 +325,6 @@ async def processMessage(message):
                                         if argv == flag:
                                             argv = ""
                                             flags[char] = True
-                                        if len(argv)>=2:
-                                            if not char in flags:
-                                                i = argv.index(r)
-                                                if i==0 or argv[i-1]==" " or argv[i-2]=="?":
-                                                    if argv[i+2]==" " or argv[i+2]=="?":
-                                                        argv = argv[:i]+argv[i+2:]
-                                                        flags[char] = True
                             args = shlex.split(argv.replace("<","'").replace(">","'"))
                             response = await command(
                                 client=client,      #for interfacing with discord
