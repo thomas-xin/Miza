@@ -432,7 +432,7 @@ async def checkDelete(message,reaction,user):
         if user.id != client.user.id:
             if message.author.id == client.user.id:
                 s = str(reaction)
-                if s in "❌✖❎":
+                if s in "❌✖️🇽❎":
                     try:
                         temp = message.content
                         await message.delete()
