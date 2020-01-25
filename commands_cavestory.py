@@ -1,13 +1,51 @@
-import requests,csv
+import requests,csv,time,knackpy,ast
 from prettytable import PrettyTable as ptable
 from smath import *
 
+class DouClub:
+    def __init__(self,c_id,c_sec):
+        self.id = c_id
+        self.secret = c_sec
+        self.pull()
+    def pull(self):
+        kn = knackpy.Knack(
+            obj="object_1",
+            app_id=self.id,
+            api_key=self.secret,
+            )
+        self.data = [kn.data,time.time()]
+    def search(self,query,lim):
+        if time.time()-self.data[1] > 720:
+            self.pull()
+        output = []
+        query = query.lower()
+        qlist = query.split(" ")
+        for q in qlist:
+            for l in self.data[0]:
+                found = False
+                for k in l:
+                    i = str(l[k])
+                    if q in i.lower():
+                        found = True
+                if found:
+                    temp = [limLine(str(l[e]),lim) for e in l]
+                    output.append(temp)
+        return output
+f = open("auth.json")
+auth = ast.literal_eval(f.read())
+f.close()
+douclub = DouClub(auth["knack_id"],
+                  auth["knack_secret"])
 class SheetPull:
     def __init__(self,url):
+        self.url = url
+        self.pull()
+    def pull(self):
+        url = self.url
         text = requests.get(url).text
         data = text.split("\r\n")
         columns = 0
-        self.data = []
+        self.data = [[],time.time()]
         for i in range(len(data)):
             line = data[i]
             read = list(csv.reader(line))
@@ -24,11 +62,13 @@ class SheetPull:
                 reli.append(curr)
             if len(reli):
                 columns = max(columns,len(reli))
-                self.data.append(reli)
-            for line in range(len(self.data)):
-                while len(self.data[line]) < columns:
-                    self.data[line].append(" ")
+                self.data[0].append(reli)
+            for line in range(len(self.data[0])):
+                while len(self.data[0][line]) < columns:
+                    self.data[0][line].append(" ")
     def search(self,query,lim):
+        if time.time()-self.data[1] > 60:
+            self.pull()
         output = []
         query = query.lower()
         try:
@@ -37,22 +77,22 @@ class SheetPull:
         except:
             mode = 1
         if not mode:
-            for l in self.data:
+            for l in self.data[0]:
                 if l[0] == query:
                     temp = [limLine(e,lim) for e in l]
                     output.append(temp)
         else:
             qlist = query.split(" ")
             for q in qlist:
-                for l in self.data:
+                for l in self.data[0]:
                     if len(l) >= 3:
+                        found = False
                         for i in l:
-                            found = False
                             if q in i.lower():
                                 found = True
-                            if found:
-                                temp = [limLine(e,lim) for e in l]
-                                output.append(temp)
+                        if found:
+                            temp = [limLine(e,lim) for e in l]
+                            output.append(temp)
         return output
 entity_list = SheetPull("https://docs.google.com/spreadsheets/d/12iC9uRGNZ2MnrhpS4s_KvIRYH\
 hC56mPXCnCcsDjxit0/export?format=csv&id=12iC9uRGNZ2MnrhpS4s_KvIRYHhC56mPXCnCcsDjxit0&gid=0")
@@ -91,20 +131,6 @@ def _m2f(mem,val):
         val2 >>= 1
         curr += 1
     return result
-def pull_douclub(argv):
-    c_id = _vars.auth["knack_id"]
-    c_sec = _vars.auth["knack_secret"]
-    baseurl = "https://api.knack.com/v1/pages/"#scene_xx/views/view_yy/records"
-    items = argv.replace(" ","%20").lower()
-    baseurl = "https://doukutsuclub.knack.com/database#search-database/?view_22_search="
-    url = baseurl+items+"&view_22_page=1"
-    print(url)
-    resp = _vars.op.open(url)
-    if resp.getcode() != 200:
-        raise ConnectionError("Error "+str(resp.getcode()))
-    s = resp.read().decode("utf-8")
-
-    return s
 
 class cs_mem2flag:
     is_command = True
@@ -124,13 +150,13 @@ class cs_npc:
         self.name = []
         self.minm = 0
         self.desc = "Searches the Cave Story NPC list for an NPC by name or ID."
-        self.usag = '<0:query>'
+        self.usag = '<query>'
     async def __call__(self,_vars,args,flags,**void):
         lim = ("c" in flags)*40+20
         argv = " ".join(args)
         data = entity_list.search(argv,lim)
         if len(data):
-            head = entity_list.data[1]
+            head = entity_list.data[0][1]
             for i in range(len(head)):
                 if head[i] == "":
                     head[i] = i*" "
@@ -167,7 +193,7 @@ class cs_tsc:
         argv = " ".join(args)
         data = tsc_list.search(argv,lim)
         if len(data):
-            head = tsc_list.data[0]
+            head = tsc_list.data[0][0]
             for i in range(len(head)):
                 if head[i] == "":
                     head[i] = i*" "
@@ -195,9 +221,36 @@ class cs_tsc:
 class cs_mod:
     is_command = True
     def __init__(self):
-        self.name = []
+        self.name = ["cs_search"]
         self.minm = 0
         self.desc = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
-        self.usag = '<0:query>'
-    async def __call__(self,**void):
-        pass
+        self.usag = '<query>'
+    async def __call__(self,args,flags,**void):
+        lim = ("c" not in flags)*40+20
+        argv = " ".join(args)
+        data = douclub.search(argv,lim)
+        if len(data):
+            head = list(douclub.data[0][0])
+            for i in range(len(head)):
+                if head[i] == "":
+                    head[i] = i*" "
+            table = ptable(head)
+            for line in data:
+                table.add_row(line)
+            output = str(table)
+            if len(output)<50000 and len(output)>1900:
+                response = ["Search results for **"+argv+"**:"]
+                lines = output.split("\n")
+                curr = "```\n"
+                for line in lines:
+                    if len(curr)+len(line) > 1900:
+                        response.append(curr+"```")
+                        curr = "```\n"
+                    if len(line):
+                        curr += line+"\n"
+                response.append(curr+"```")
+                return response
+            else:
+                return "Search results for **"+argv+"**:\n```\n"+output+"```"
+        else:
+            return "No results found for **"+argv+"**."

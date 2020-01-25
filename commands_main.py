@@ -32,24 +32,30 @@ class help:
                     usag = com.usag
                     if minm>u_perm:
                         continue
-                    newstr = "\n`"+name+"`\nAliases: "+str(com.name)+"\nEffect: "+desc+"\nUsage: "+usag+"\nRequired permission level: **__"+str(minm)+"__**"
+                    newstr = "\n`"+name+"`\nAliases: "+str(com.name)+"\nEffect: "+desc+"\nUsage: \
+"+usag+"\nRequired permission level: **__"+str(minm)+"__**"
                     show.append(newstr)
         if not show:
-            for com in commands:
-                name = com.__name__
-                minm = com.minm
-                desc = com.desc
-                usag = com.usag
-                if minm>u_perm:
+            for c in categories:
+                catg = categories[c]
+                if not c in enabled:
                     continue
-                found = False
-                for n in com.name:
-                    if n in argv:
-                        found = True
-                if found:
-                    newstr = "\n`"+name+"`\nAliases: "+str(com.name)+"\nEffect: "+desc+"\nUsage: "+usag+"\nRequired permission level: **__"+str(minm)+"__**"
-                    if (not len(show)) or len(show[-1])<len(newstr):
-                        show = [newstr]
+                for com in catg:
+                    name = com.__name__
+                    minm = com.minm
+                    desc = com.desc
+                    usag = com.usag
+                    if minm>u_perm:
+                        continue
+                    found = False
+                    for n in com.name:
+                        if n in argv:
+                            found = True
+                    if found:
+                        newstr = "```\n"+name+"\nCategory: "+c+"\nAliases: "+str(com.name)+"\n\
+Effect: "+desc+"\nUsage: "+usag+"\nRequired permission level: "+str(minm)+"```"
+                        if (not len(show)) or len(show[-1])<len(newstr):
+                            show = [newstr]
         if not show:
             for com in commands:
                 name = com.__name__

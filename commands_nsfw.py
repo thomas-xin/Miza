@@ -10,6 +10,73 @@ image_forms = [
     "tiff",
     ]
 
+neko_tags = {
+    "feet":True,
+    "yuri":True,
+    "trap":True,
+    "futanari":True,
+    "hololewd":True,
+    "lewdkemo":True,
+    "solog":True,
+    "feetg":True,
+    "cum":True,
+    "erokemo":True,
+    "les":True,
+    "wallpaper":False,
+    "lewdk":True,
+    "ngif":False,
+    "tickle":False,
+    "lewd":True,
+    "feed":False,
+    "gecg":False,
+    "eroyuri":True,
+    "eron":True,
+    "cum_jpg":True,
+    "bj":True,
+    "nsfw_neko_gif":True,
+    "solo":True,
+    "kemonomimi":False,
+    "nsfw_avatar":True,
+    "gasm":True,
+    "poke":False,
+    "anal":True,
+    "slap":False,
+    "hentai":True,
+    "avatar":False,
+    "erofeet":True,
+    "holo":False,
+    "keta":True,
+    "blowjob":True,
+    "pussy":True,
+    "tits":True,
+    "holoero":True,
+    "lizard":False,
+    "pussy_jpg":True,
+    "pwankg":True,
+    "classic":True,
+    "kuni":True,
+    "waifu":False,
+    "pat":False,
+    "8ball":False,
+    "kiss":False,
+    "femdom":True,
+    "neko":False,
+    "spank":True,
+    "cuddle":False,
+    "erok":True,
+    "fox_girl":False,
+    "boobs":True,
+    "random_hentai_gif":True,
+    "smallboobs":True,
+    "hug":False,
+    "ero":True,
+    "smug":False,
+    "goose":False,
+    "baka":False,
+    "cat":False,
+    "gif":False,
+    }
+
 class urlBypass(urllib.request.FancyURLopener):
     version = "Mozilla/5."+str(xrand(1,10))
 
@@ -189,99 +256,50 @@ class neko:
         self.name = []
         self.minm = 1
         self.desc = "Pulls a random image from nekos.life and embeds it."
-        self.usag = '<0:tags(gif)(lewd)> <verbose:(?v)> <list:(?l)>'
-    cmds = {
-        "feet": True,
-        "yuri": True,
-        "trap": True,
-        "futanari": True,
-        "hololewd": True,
-        "lewdkemo": True,
-        "solog": True,
-        "feetg": True,
-        "cum": True,
-        "erokemo": True,
-        "les": True,
-        "wallpaper": False,
-        "lewdk": True,
-        "ngif": False,
-        "tickle": False,
-        "lewd": True,
-        "feed": False,
-        "gecg": False,
-        "eroyuri": True,
-        "eron": True,
-        "cum_jpg": True,
-        "bj": True,
-        "nsfw_neko_gif": True,
-        "solo": True,
-        "kemonomimi": False,
-        "nsfw_avatar": True,
-        "gasm": True,
-        "poke": False,
-        "anal": True,
-        "slap": False,
-        "hentai": True,
-        "avatar": False,
-        "erofeet": True,
-        "holo": False,
-        "keta": False,
-        "blowjob": True,
-        "pussy": True,
-        "tits": True,
-        "holoero": False,
-        "lizard": False,
-        "pussy_jpg": True,
-        "pwankg": True,
-        "classic": True,
-        "kuni": True,
-        "waifu": False,
-        "pat": False,
-        "8ball": False,
-        "kiss": False,
-        "femdom": True,
-        "neko": False,
-        "spank": True,
-        "cuddle": False,
-        "erok": False,
-        "fox_girl": False,
-        "boobs": True,
-        "random_hentai_gif": True,
-        "smallboobs": True,
-        "hug": False,
-        "ero": True,
-        "smug": False,
-        "goose": False,
-        "baka": False
-        }
-    
-    async def __call__(self,argv,flags,channel,**void):
+        self.usag = '<tags:[](?r)> <verbose:(?v)> <list:(?l)>'
+    async def __call__(self,args,flags,channel,**void):
         isNSFW = is_nsfw(channel)
-        
-        #List every argument overrides everything else
         if "l" in flags:
-            text = "Available commands:\n"
-            for key in cmds:
-                if not cmd[key] or isNSFW:
-                    text += cmd + ", "
-            await channel.send(text)
-            return
-
-        arg = argv.tolower()
-        if not arg in cmds:
-            return "Error: Unkown argument " + arg + ". See the help doc for more details"        
-        if not isNSFW and cmd[arg]:
-            return "Error: This command is only available in **NSFW** channels."
-        
-        url = nekos.img(arg)
+            text = "Available commands in **#"+channel.name+"**:\n`"
+            for key in neko_tags:
+                if isNSFW or not neko_tags[key]:
+                    text += key+", "
+            text = text[:-2]+"`"
+            return text
+        tagNSFW = False
+        selected = []
+        for tag in args:
+            if tag in neko_tags:
+                if neko_tags.get(tag,0):
+                    tagNSFW = True
+                    if not isNSFW:
+                        raise PermissionError("Error: This command is only available in NSFW channels.")
+                selected.append(tag)
+        if "r" in flags:
+            possible = [i for i in neko_tags if neko_tags[i]<=isNSFW]
+            selected.append(possible[xrand(len(possible))])
+        if not selected:
+            url = nekos.img("neko")
+        else:
+            v = xrand(len(selected))
+            get = selected[v]
+            if get == "gif":
+                if tagNSFW:
+                    url = nekos.img("nsfw_neko_gif")
+                else:
+                    url = nekos.img("ngif")
+            elif get == "cat":
+                url = nekos.cat()
+            else:
+                url = nekos.img(get)
         if "v" in flags:
             text = "Pulled from "+url
+            return text
         else:
-            text = None
-        emb = discord.Embed(url=url)
-        emb.set_image(url=url)
-        print(url)
-        await channel.send(text,embed=emb)
+            emb = discord.Embed(url=url)
+            emb.set_image(url=url)
+            print(url)
+            await channel.send(embed=emb)
 
 class lewd:
     is_command = True
@@ -289,17 +307,27 @@ class lewd:
         self.name = ["nsfw"]
         self.minm = 1
         self.desc = "Pulls a random image from a search on Rule34 and e621, and embeds it."
-        self.usag = '<0:query> <verbose:(?v)>'
+        self.usag = '<query> <verbose:(?v)>'
     async def __call__(self,_vars,args,flags,channel,**void):
         if not is_nsfw(channel):
-            return "Error: This command is only available in **NSFW** channels."
+            raise PermissionError("Error: This command is only available in NSFW channels.")
         objs = searchRandomNSFW(" ".join(args),_vars.timeout)
         url = objs[0]
         if "v" in flags:
             text = "Pulled from "+url+"\nImage **__"+str(objs[2])+"__** on page **__"+str(objs[1])+"__**"
+            return text
         else:
-            text = None
-        emb = discord.Embed(url=url)
-        emb.set_image(url=url)
-        print(url)
-        await channel.send(text,embed=emb)
+            emb = discord.Embed(url=url)
+            emb.set_image(url=url)
+            print(url)
+            await channel.send(embed=emb)
+
+class owoify:
+    is_command = True
+    def __init__(self):
+        self.name = ["owo"]
+        self.minm = 0
+        self.desc = "owo-ifies text."
+        self.usag = '<string>'
+    async def __call__(self,argv,**void):
+        return "```\n"+nekos.owoify(argv)+"```"

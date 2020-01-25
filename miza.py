@@ -1,7 +1,6 @@
 import discord,ast,os,sys,asyncio,datetime,json,shlex
 import urllib.request
 from matplotlib import pyplot as plt
-from googletrans import Translator
 from smath import *
 
 client = discord.Client(
@@ -22,7 +21,6 @@ class _globals:
     timeout = 10
     disabled = [
         "__",
-        "pygame",
         "open",
         "import",
         "urllib",
@@ -46,34 +44,9 @@ class _globals:
         "exit",
         "quit",
         "getattr",
-        "commands"
+        ".load",
+        ".save",
         ]
-    class PapagoTrans:
-        class PapagoOutput:
-            def __init__(self,text):
-                self.text = text
-        def __init__(self,c_id,c_sec):
-            self.id = c_id
-            self.secret = c_sec
-        def translate(self,string,dest,source="en"):
-            url = "https://openapi.naver.com/v1/papago/n2mt"
-            enc = urllib.parse.quote(string)
-            data = "source="+source+"&target="+dest+"&text="+enc
-            req = urllib.request.Request(url)
-            req.add_header("X-Naver-Client-Id",self.id)
-            req.add_header("X-Naver-Client-Secret",self.secret)
-            print(req,url,data)
-            resp = urllib.request.urlopen(req,data=data.encode("utf-8"),timeout=_globals.timeout/2)
-            if resp.getcode() != 200:
-                raise ConnectionError("Error "+str(resp.getcode()))
-            r = resp.read().decode("utf-8")
-            try:
-                r = json.loads(r)
-            except:
-                pass
-            text = r["message"]["result"]["translatedText"]
-            output = self.PapagoOutput(text)
-            return output
     def __init__(self):
         self.lastCheck = time.time()
         self.queue = []
@@ -98,16 +71,13 @@ class _globals:
         self.update()
         self.fig = fig
         self.plt = plt
-        self.auth = {}
         f = open("auth.json")
-        data = ast.literal_eval(f.read())
+        auth = ast.literal_eval(f.read())
         f.close()
-        self.token = data["discord_token"]
-        print("Attempting to authorize with token "+self.token+":")
-        self.auth["papago_id"] = data["papago_id"]
-        self.auth["papago_secret"] = data["papago_secret"]
-        self.translators = {"Google Translate":Translator(["translate.google.com"]),
-                            "Papago":self.PapagoTrans(self.auth["papago_id"],self.auth["papago_secret"])}
+        self.token = auth["discord_token"]
+        self.resetGlobals()
+        doParallel(self.getModules)
+    def getModules(self):
         comstr = "commands_"
         files = [f for f in os.listdir('.') if f[-3:]==".py" and comstr in f]
         self.categories = {}
@@ -128,7 +98,6 @@ class _globals:
                 except:
                     pass
             self.categories[category] = commands
-        self.resetGlobals()
     def update(self):
         f = open("perms.json","w")
         f.write(str(self.perms))
@@ -467,4 +436,5 @@ async def on_raw_message_edit(payload):
 
 if __name__ == "__main__":
     _vars = _globals()
+    print("Attempting to authorize with token "+_vars.token+":")
     client.run(_vars.token)

@@ -1,6 +1,39 @@
-import discord,asyncio
+import discord,asyncio,ast
+from googletrans import Translator
 from smath import *
 
+class PapagoTrans:
+    class PapagoOutput:
+        def __init__(self,text):
+            self.text = text
+    def __init__(self,c_id,c_sec):
+        self.id = c_id
+        self.secret = c_sec
+    def translate(self,string,dest,source="en"):
+        url = "https://openapi.naver.com/v1/papago/n2mt"
+        enc = urllib.parse.quote(string)
+        data = "source="+source+"&target="+dest+"&text="+enc
+        req = urllib.request.Request(url)
+        req.add_header("X-Naver-Client-Id",self.id)
+        req.add_header("X-Naver-Client-Secret",self.secret)
+        print(req,url,data)
+        resp = urllib.request.urlopen(req,data=data.encode("utf-8"),timeout=_globals.timeout/2)
+        if resp.getcode() != 200:
+            raise ConnectionError("Error "+str(resp.getcode()))
+        r = resp.read().decode("utf-8")
+        try:
+            r = json.loads(r)
+        except:
+            pass
+        text = r["message"]["result"]["translatedText"]
+        output = self.PapagoOutput(text)
+        return output
+f = open("auth.json")
+auth = ast.literal_eval(f.read())
+f.close()
+translators = {
+    "Google Translate":Translator(["translate.google.com"]),
+    "Papago":PapagoTrans(auth["papago_id"],auth["papago_secret"])}
 def _c2e(string,em1,em2):
     chars = {
         " ":[0,0,0,0,0],
@@ -83,7 +116,11 @@ def _c2e(string,em1,em2):
                         printed[y+1] += em2
         for x in range(len(printed)):
             printed[x] += em2
-    return "\n".join(printed)
+    output = "\n".join(printed)
+    print("["+em1+"]","["+em2+"]")
+    if len(em1)==len(em2)==1:
+        output = "```\n"+output+"```"
+    return output
         
 class math:
     is_command = True
