@@ -11,7 +11,7 @@ class text2048:
         self.minm = 1
         self.desc = "Plays a game of 2048 using reactions."
         self.usag = '<board_size[4]> <public:(?p)> <easy_mode:(?e)>'
-    async def nextIter(self,message,gamestate,u_id,direction):
+    async def nextIter(self,message,gamestate,username,direction):
         width = len(gamestate[-1])
         a = 0
         i = direction
@@ -72,7 +72,7 @@ class text2048:
                     else:
                         text += "|   "
                 text += "|\n"
-            text += "+"+"---+"*width+"\nPlayer: "+str(u_id)+"\nScore: "+str(score)+"```"
+            text += "+"+"---+"*width+"\nPlayer: "+username+"\nScore: "+str(score)+"```"
             print(text)
             await message.edit(content=text)
     def spawn(self,gamestate,count=1):
@@ -87,7 +87,7 @@ class text2048:
                 i += 1
     async def _callback_(self,message,reaction,argv,user,vals,**void):
         u_id,mode = [int(x) for x in vals.split("_")]
-        if reaction is not None and (u_id!=user.id and u_id!=0):
+        if reaction is not None and u_id!=user.id and u_id!=0:
             return
         gamestate = ast.literal_eval(argv.replace("A","[").replace("B","]").replace("C",","))
         if reaction is not None:
@@ -97,6 +97,10 @@ class text2048:
                 if mode==1 or react!="↩":
                     await message.add_reaction(react)
             self.spawn(gamestate[0],1)
+        if u_id == 0:
+            username = "@everyone"
+        else:
+            username = user.name
         await self.nextIter(message,gamestate,u_id,reaction)
     async def __call__(self,_vars,argv,user,flags,**void):
         try:
