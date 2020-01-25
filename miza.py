@@ -74,7 +74,7 @@ class _globals:
                     self.data.append(reli)
                 for line in range(len(self.data)):
                     while len(self.data[line]) < columns:
-                        self.data[line].append(" "*line)
+                        self.data[line].append(" ")
         def search(self,query,lim):
             output = []
             query = query.lower()
