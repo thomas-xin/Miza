@@ -7,9 +7,9 @@ client = discord.Client(
     activity=discord.Activity(name="Magic"),
     )
 
-from matplotlib import pyplot as plt
 from matplotlib import use as plot_sys
 plot_sys("Agg")
+from matplotlib import pyplot as plt
 bar_plot = plt.bar
 plot_points = plt.scatter
 plot = plt.plot
