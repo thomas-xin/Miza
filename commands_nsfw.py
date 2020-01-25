@@ -11,7 +11,7 @@ image_forms = [
     ]
 
 class urlBypass(urllib.request.FancyURLopener):
-    version = "Mozilla/5.2"
+    version = "Mozilla/5."+str(xrand(1,10))
 
 def pull_e621(argv,delay=5):
     opener = urlBypass()

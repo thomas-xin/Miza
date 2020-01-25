@@ -1,4 +1,4 @@
-import discord,ast,os,sys,asyncio,datetime,requests,json,csv,shlex
+import discord,ast,os,sys,asyncio,datetime,json,shlex
 import urllib.request
 from matplotlib import pyplot as plt
 from googletrans import Translator
@@ -46,61 +46,8 @@ class _globals:
         "exit",
         "quit",
         "getattr",
-        "requests",
         "commands"
         ]
-    class SheetPull:
-        def __init__(self,url):
-            text = requests.get(url).text
-            data = text.split("\r\n")
-            columns = 0
-            self.data = []
-            for i in range(len(data)):
-                line = data[i]
-                read = list(csv.reader(line))
-                reli = []
-                curr = ""
-                for j in read:
-                    if len(j)>=2 and j[0]==j[1]=="":
-                        if curr != "":
-                            reli.append(curr)
-                            curr = ""
-                    else:
-                        curr += "".join(j)
-                if curr != "":
-                    reli.append(curr)
-                if len(reli):
-                    columns = max(columns,len(reli))
-                    self.data.append(reli)
-                for line in range(len(self.data)):
-                    while len(self.data[line]) < columns:
-                        self.data[line].append(" ")
-        def search(self,query,lim):
-            output = []
-            query = query.lower()
-            try:
-                int(query)
-                mode = 0
-            except:
-                mode = 1
-            if not mode:
-                for l in self.data:
-                    if l[0] == query:
-                        temp = [limLine(e,lim) for e in l]
-                        output.append(temp)
-            else:
-                qlist = query.split(" ")
-                for q in qlist:
-                    for l in self.data:
-                        if len(l) >= 3:
-                            for i in l:
-                                found = False
-                                if q in i.lower():
-                                    found = True
-                                if found:
-                                    temp = [limLine(e,lim) for e in l]
-                                    output.append(temp)
-            return output
     class PapagoTrans:
         class PapagoOutput:
             def __init__(self,text):
@@ -161,10 +108,6 @@ class _globals:
         self.auth["papago_secret"] = data["papago_secret"]
         self.translators = {"Google Translate":Translator(["translate.google.com"]),
                             "Papago":self.PapagoTrans(self.auth["papago_id"],self.auth["papago_secret"])}
-        self.ent = self.SheetPull("https://docs.google.com/spreadsheets/d/12iC9uRGNZ2MnrhpS4s_KvIRYH\
-hC56mPXCnCcsDjxit0/export?format=csv&id=12iC9uRGNZ2MnrhpS4s_KvIRYHhC56mPXCnCcsDjxit0&gid=0")
-        self.tsc = self.SheetPull("https://docs.google.com/spreadsheets/d/11LL7T_jDPcWuhkJycsEoBGa9i\
--rjRjgMW04Gdz9EO6U/export?format=csv&id=11LL7T_jDPcWuhkJycsEoBGa9i-rjRjgMW04Gdz9EO6U&gid=0")
         comstr = "commands_"
         files = [f for f in os.listdir('.') if f[-3:]==".py" and comstr in f]
         self.categories = {}

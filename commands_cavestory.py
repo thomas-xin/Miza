@@ -1,5 +1,63 @@
+import requests,csv
 from prettytable import PrettyTable as ptable
+from smath import *
 
+class SheetPull:
+    def __init__(self,url):
+        text = requests.get(url).text
+        data = text.split("\r\n")
+        columns = 0
+        self.data = []
+        for i in range(len(data)):
+            line = data[i]
+            read = list(csv.reader(line))
+            reli = []
+            curr = ""
+            for j in read:
+                if len(j)>=2 and j[0]==j[1]=="":
+                    if curr != "":
+                        reli.append(curr)
+                        curr = ""
+                else:
+                    curr += "".join(j)
+            if curr != "":
+                reli.append(curr)
+            if len(reli):
+                columns = max(columns,len(reli))
+                self.data.append(reli)
+            for line in range(len(self.data)):
+                while len(self.data[line]) < columns:
+                    self.data[line].append(" ")
+    def search(self,query,lim):
+        output = []
+        query = query.lower()
+        try:
+            int(query)
+            mode = 0
+        except:
+            mode = 1
+        if not mode:
+            for l in self.data:
+                if l[0] == query:
+                    temp = [limLine(e,lim) for e in l]
+                    output.append(temp)
+        else:
+            qlist = query.split(" ")
+            for q in qlist:
+                for l in self.data:
+                    if len(l) >= 3:
+                        for i in l:
+                            found = False
+                            if q in i.lower():
+                                found = True
+                            if found:
+                                temp = [limLine(e,lim) for e in l]
+                                output.append(temp)
+        return output
+entity_list = SheetPull("https://docs.google.com/spreadsheets/d/12iC9uRGNZ2MnrhpS4s_KvIRYH\
+hC56mPXCnCcsDjxit0/export?format=csv&id=12iC9uRGNZ2MnrhpS4s_KvIRYHhC56mPXCnCcsDjxit0&gid=0")
+tsc_list = SheetPull("https://docs.google.com/spreadsheets/d/11LL7T_jDPcWuhkJycsEoBGa9i\
+-rjRjgMW04Gdz9EO6U/export?format=csv&id=11LL7T_jDPcWuhkJycsEoBGa9i-rjRjgMW04Gdz9EO6U&gid=0")
 def _m2f(mem,val):
     val1 = mem
     val2 = val
@@ -70,9 +128,9 @@ class cs_npc:
     async def __call__(self,_vars,args,flags,**void):
         lim = ("c" in flags)*40+20
         argv = " ".join(args)
-        data = _vars.ent.search(argv,lim)
+        data = entity_list.search(argv,lim)
         if len(data):
-            head = _vars.ent.data[1]
+            head = entity_list.data[1]
             for i in range(len(head)):
                 if head[i] == "":
                     head[i] = i*" "
@@ -104,12 +162,12 @@ class cs_tsc:
         self.minm = 0
         self.desc = "Searches the Cave Story OOB flags list for a memory variable."
         self.usag = '<0:query>'
-    async def __call__(self,_vars,args,flags,**void):
+    async def __call__(self,args,flags,**void):
         lim = ("c" not in flags)*40+20
         argv = " ".join(args)
-        data = _vars.tsc.search(argv,lim)
+        data = tsc_list.search(argv,lim)
         if len(data):
-            head = _vars.tsc.data[0]
+            head = tsc_list.data[0]
             for i in range(len(head)):
                 if head[i] == "":
                     head[i] = i*" "
