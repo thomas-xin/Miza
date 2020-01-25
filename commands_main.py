@@ -20,7 +20,7 @@ class help:
                 commands += categories[catg]
         u_perm = _vars.getPerms(user,guild)
         verb = "v" in flags
-        argv = " ".join(args)
+        argv = " ".join(args).lower()
         show = []
         for a in args:
             if a in categories and (a in enabled or a=="main"):
@@ -49,6 +49,7 @@ class help:
                         continue
                     found = False
                     for n in com.name:
+                        n = n.lower()
                         if n in argv:
                             found = True
                     if found:
@@ -86,7 +87,7 @@ class clearCache:
 class changePerms:
     is_command = True
     def __init__(self):
-        self.name = ["perms","perm","changeperm","changePerm","changeperms"]
+        self.name = ["perms","perm","changeperm"]
         self.minm = -inf
         self.desc = "Shows or changes a user's permission level."
         self.usag = '<0:user:{self}> <1:value{curr}> <hide:(?h)>'

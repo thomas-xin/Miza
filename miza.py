@@ -205,6 +205,7 @@ async def processMessage(message):
                 commands += categories[catg]
         for command in commands:
             for alias in command.name:
+                alias = alias.lower()
                 length = len(alias)
                 check = comm[:length].lower()
                 argv = comm[length:]
