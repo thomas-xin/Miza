@@ -56,7 +56,9 @@ class cs_mem2flag:
         self.desc = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
         self.usag = '<0:address> <1:value[1]>'
     async def __call__(self,_vars,args,**void):
-        return _m2f(args[0],_vars.evalMath(args[1:]))
+        if len(args) < 2:
+            return _m2f(args[0],1)
+        return _m2f(args[0],_vars.evalMath(" ".join(args[1:])))
 
 class cs_npc:
     is_command = True
@@ -86,7 +88,8 @@ class cs_npc:
                     if len(curr)+len(line) > 1900:
                         response.append(curr+"```")
                         curr = "```\n"
-                    curr += line+"\n"
+                    if len(line):
+                        curr += line+"\n"
                 response.append(curr+"```")
                 return response
             else:
@@ -122,7 +125,8 @@ class cs_tsc:
                     if len(curr)+len(line) > 1900:
                         response.append(curr+"```")
                         curr = "```\n"
-                    curr += line+"\n"
+                    if len(line):
+                        curr += line+"\n"
                 response.append(curr+"```")
                 return response
             else:
