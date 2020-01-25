@@ -9,83 +9,8 @@ image_forms = [
     "jpeg",
     "tiff",
     ]
-
-neko_tags = {
-    "feet":True,
-    "yuri":True,
-    "trap":True,
-    "futanari":True,
-    "hololewd":True,
-    "lewdkemo":True,
-    "solog":True,
-    "feetg":True,
-    "cum":True,
-    "erokemo":True,
-    "les":True,
-    "wallpaper":False,
-    "lewdk":True,
-    "ngif":False,
-    "tickle":False,
-    "lewd":True,
-    "feed":False,
-    "gecg":False,
-    "eroyuri":True,
-    "eron":True,
-    "cum_jpg":True,
-    "bj":True,
-    "nsfw_neko_gif":True,
-    "solo":True,
-    "kemonomimi":False,
-    "nsfw_avatar":True,
-    "gasm":True,
-    "poke":False,
-    "anal":True,
-    "slap":False,
-    "hentai":True,
-    "avatar":False,
-    "erofeet":True,
-    "holo":False,
-    "keta":True,
-    "blowjob":True,
-    "pussy":True,
-    "tits":True,
-    "holoero":True,
-    "lizard":False,
-    "pussy_jpg":True,
-    "pwankg":True,
-    "classic":True,
-    "kuni":True,
-    "waifu":False,
-    "pat":False,
-    "8ball":False,
-    "kiss":False,
-    "femdom":True,
-    "neko":False,
-    "spank":True,
-    "cuddle":False,
-    "erok":True,
-    "fox_girl":False,
-    "boobs":True,
-    "random_hentai_gif":True,
-    "smallboobs":True,
-    "hug":False,
-    "ero":True,
-    "smug":False,
-    "goose":False,
-    "baka":False,
-    "cat":False,
-    "gif":False,
-    }
-
 class urlBypass(urllib.request.FancyURLopener):
     version = "Mozilla/5."+str(xrand(1,10))
-
-def is_nsfw(channel):
-    try:
-        return channel.is_nsfw()
-    except AttributeError:
-        return True
-
 def pull_e621(argv,delay=5):
     opener = urlBypass()
     items = argv.replace(" ","%20").lower()
@@ -236,8 +161,8 @@ def searchRandomNSFW(argv,delay=10):
         if not l:
             break
         r = xrand(len(l))
-        f = nsfw[r]
         try:
+            f = nsfw[r]
             nsfw.pop(r)
         except:
             break
@@ -250,6 +175,77 @@ def searchRandomNSFW(argv,delay=10):
         raise EOFError("Unable to locate any search results.")
     return data
 
+neko_tags = {
+    "feet":True,
+    "yuri":True,
+    "trap":True,
+    "futanari":True,
+    "hololewd":True,
+    "lewdkemo":True,
+    "solog":True,
+    "feetg":True,
+    "cum":True,
+    "erokemo":True,
+    "les":True,
+    "wallpaper":True,
+    "lewdk":True,
+    "ngif":False,
+    "tickle":False,
+    "lewd":True,
+    "feed":False,
+    "gecg":False,
+    "eroyuri":True,
+    "eron":True,
+    "cum_jpg":True,
+    "bj":True,
+    "nsfw_neko_gif":True,
+    "solo":True,
+    "kemonomimi":True,
+    "nsfw_avatar":True,
+    "gasm":False,
+    "poke":False,
+    "anal":True,
+    "slap":False,
+    "hentai":True,
+    "avatar":False,
+    "erofeet":True,
+    "holo":True,
+    "keta":True,
+    "blowjob":True,
+    "pussy":True,
+    "tits":True,
+    "holoero":True,
+    "lizard":False,
+    "pussy_jpg":True,
+    "pwankg":True,
+    "classic":True,
+    "kuni":True,
+    "waifu":False,
+    "pat":False,
+    "8ball":False,
+    "kiss":False,
+    "femdom":True,
+    "neko":False,
+    "spank":True,
+    "cuddle":False,
+    "erok":True,
+    "fox_girl":False,
+    "boobs":True,
+    "random_hentai_gif":True,
+    "smallboobs":True,
+    "hug":False,
+    "ero":True,
+    "smug":False,
+    "goose":False,
+    "baka":False,
+    "cat":False,
+    "gif":False,
+    }
+def is_nsfw(channel):
+    try:
+        return channel.is_nsfw()
+    except AttributeError:
+        return True
 class neko:
     is_command = True
     def __init__(self):
@@ -269,13 +265,14 @@ class neko:
         tagNSFW = False
         selected = []
         for tag in args:
+            tag = tag.replace(",","").lower()
             if tag in neko_tags:
                 if neko_tags.get(tag,0):
                     tagNSFW = True
                     if not isNSFW:
                         raise PermissionError("Error: This command is only available in NSFW channels.")
                 selected.append(tag)
-        if "r" in flags:
+        for x in range(flags.get("r",0)):
             possible = [i for i in neko_tags if neko_tags[i]<=isNSFW]
             selected.append(possible[xrand(len(possible))])
         if not selected:

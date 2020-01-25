@@ -105,7 +105,7 @@ class changePerms:
             t_user = await client.fetch_user(_vars.verifyID(args[0]))
             t_perm = _vars.getPerms(t_user.id,guild)
             m_perm = max(t_perm,c_perm,1)+1
-            if not(s_perm==m_perm) and not(s_perm<m_perm):
+            if not(s_perm==m_perm) and s_perm>=m_perm:
                 g_perm = _vars.perms.get(guild.id,{})
                 g_perm.update({t_user.id:c_perm})
                 _vars.perms[guild.id] = g_perm

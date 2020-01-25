@@ -32,11 +32,9 @@ class _globals:
         "globals",
         "vars",
         "client",
-        "doMath",
         "os",
         "sys",
         "async",
-        "copyGlobals",
         "_init",
         "compile",
         "threading",
@@ -219,15 +217,14 @@ async def processMessage(message):
                                 flag = "?"+char
                                 for r in (flag.lower(),flag.upper()):
                                     if len(argv)>=4 and r in argv:
-                                        if not char in flags:
-                                            i = argv.index(r)
-                                            if i==0 or argv[i-1]==" " or argv[i-2]=="?":
-                                                try:
-                                                    if argv[i+2]==" " or argv[i+2]=="?":
-                                                        argv = argv[:i]+argv[i+2:]
-                                                        flags[char] = True
-                                                except:
-                                                    pass
+                                        i = argv.index(r)
+                                        if i==0 or argv[i-1]==" " or argv[i-2]=="?":
+                                            try:
+                                                if argv[i+2]==" " or argv[i+2]=="?":
+                                                    argv = argv[:i]+argv[i+2:]
+                                                    addDict(flags,{char:1})
+                                            except:
+                                                pass
                             for c in range(26):
                                 char = chr(c+97)
                                 flag = "?"+char
@@ -236,11 +233,17 @@ async def processMessage(message):
                                         for check in (r+" "," "+r):
                                             if check in argv:
                                                 argv = argv.replace(check,"")
-                                                flags[char] = True
+                                                addDict(flags,{char:1})
                                         if argv == flag:
                                             argv = ""
-                                            flags[char] = True
-                            args = shlex.split(argv.replace("<","'").replace(">","'"))
+                                            addDict(flags,{char:1})
+                            a = argv.replace('"',"\0")
+                            b = a.replace("'","")
+                            c = b.replace("<","'")
+                            d = c.replace(">","'")
+                            args = shlex.split(d)
+                            for a in range(len(args)):
+                                args[a] = args[a].replace("","'").replace("\0",'"')
                             response = await command(
                                 client=client,      #for interfacing with discord
                                 _vars=_vars,        #for interfacing with bot's database
@@ -282,7 +285,7 @@ async def processMessage(message):
                         return
                     else:
                         await channel.send(
-                            "```\nError:\n```\nInsufficient priviliges for command "+command+"\
+                            "Error: Insufficient priviliges for command "+command+"\
     .\nRequred level: **__"+expNum(req)+"__**, Current level: **__"+expNum(u_perm)+"__**")
                         return
     msg = message.content
@@ -333,18 +336,18 @@ async def handleUpdate(force=False):
                 await vc.disconnect(force=False)
 
 async def checkDelete(message,reaction,user):
-    u_perm = _vars.getPerms(user.id,message.guild)
-    check = False
-    if not u_perm < 1:
-        check = True
-    else:
-        for reaction in message.reactions:
-            async for u in reaction.users():
-                if u.id == client.user.id:
-                    check = True
-    if check:
-        if user.id != client.user.id:
-            if message.author.id == client.user.id:
+    if message.author.id == client.user.id:
+        u_perm = _vars.getPerms(user.id,message.guild)
+        check = False
+        if not u_perm < 1:
+            check = True
+        else:
+            for reaction in message.reactions:
+                async for u in reaction.users():
+                    if u.id == client.user.id:
+                        check = True
+        if check:
+            if user.id != client.user.id:
                 s = str(reaction)
                 if s in "❌✖️🇽❎":
                     try:
@@ -354,11 +357,41 @@ async def checkDelete(message,reaction,user):
                     except:
                         pass
             await handleUpdate()
+                            
+async def reactCallback(message,reaction,user):
+    if message.author.id == client.user.id:
+        u_perm = _vars.getPerms(user.id,message.guild)
+        check = "```callback-"
+        msg = message.content.split("\n")[0]
+        if msg[:len(check)] == check:
+            try:
+                msg = msg[len(check):]
+                args = msg.split("-")
+                catx = args[0]
+                func = args[1]
+                vals = args[2]
+                argv = "-".join(args[3:])
+                catg = _vars.categories[catx]
+                for f in catg:
+                    if f.__name__ == func:
+                        await f._callback_(message=message,reaction=reaction,user=user,vals=vals,argv=argv)
+                        return
+            except:
+                raise
 
 @client.event
 async def on_reaction_add(reaction,user):
     message = reaction.message
-    await checkDelete(message,reaction,user)
+    if user.id != client.user.id:
+        await checkDelete(message,reaction,user)
+        await reactCallback(message,reaction,user)
+
+@client.event
+async def on_reaction_remove(reaction,user):
+    message = reaction.message
+    if user.id != client.user.id:
+        await checkDelete(message,reaction,user)
+        await reactCallback(message,reaction,user)
         
 @client.event
 async def on_raw_reaction_add(payload):
@@ -368,8 +401,9 @@ async def on_raw_reaction_add(payload):
         message = await channel.fetch_message(payload.message_id)
     except:
         return
-    reaction = payload.emoji
-    await checkDelete(message,reaction,user)
+    if user.id != client.user.id:
+        reaction = payload.emoji
+        await checkDelete(message,reaction,user)
 
 @client.event
 async def on_raw_message_delete(payload):
@@ -404,6 +438,7 @@ async def handleMessage(message):
         
 @client.event
 async def on_message(message):
+    await reactCallback(message,None,message.author)
     await handleUpdate()
     await handleMessage(message)
     await handleUpdate(True)

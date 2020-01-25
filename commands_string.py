@@ -1,4 +1,4 @@
-import discord,asyncio,ast
+import discord,asyncio,ast,urllib,json
 from googletrans import Translator
 from smath import *
 
@@ -17,16 +17,16 @@ class PapagoTrans:
         req.add_header("X-Naver-Client-Id",self.id)
         req.add_header("X-Naver-Client-Secret",self.secret)
         print(req,url,data)
-        resp = urllib.request.urlopen(req,data=data.encode("utf-8"),timeout=_globals.timeout/2)
+        resp = urllib.request.urlopen(req,data=data.encode("utf-8"))
         if resp.getcode() != 200:
             raise ConnectionError("Error "+str(resp.getcode()))
-        r = resp.read().decode("utf-8")
+        read = resp.read().decode("utf-8")
         try:
-            r = json.loads(r)
+            r = json.loads(read)
         except:
-            pass
-        text = r["message"]["result"]["translatedText"]
-        output = self.PapagoOutput(text)
+            raise
+        t = r["message"]["result"]["translatedText"]
+        output = self.PapagoOutput(t)
         return output
 f = open("auth.json")
 auth = ast.literal_eval(f.read())
@@ -134,8 +134,8 @@ class math:
         f = argv
         _vars.plt.clf()
         if not len(f):
-            return "```\nError: function is empty.```"
-        terr = "```\nError: Timed out.```"
+            raise EOFError("Function is empty.")
+        terr = "Error: Timed out."
         returns = [terr]
         doParallel(_vars.doMath,[f,returns])
         while returns[0]==terr and time.time()<tm+_vars.timeout:
@@ -195,10 +195,10 @@ class translate:
         self.minm = 0
         self.desc = "Translates a string into another language."
         self.usag = '<0:language> <1:string> <verbose:(?v)> <translator:(?g)>'
-    async def __call__(self,args,_vars,flags,user,**extra):
+    async def __call__(self,args,flags,user,**extra):
         dest = args[0]
         string = " ".join(args[1:])
-        detected = _vars.translators["Google Translate"].detect(string)
+        detected = translators["Google Translate"].detect(string)
         source = detected.lang
         trans = ["Papago","Google Translate"]
         if "g" in flags:
@@ -217,8 +217,9 @@ class translate:
                             dest = dest[:-2]+dest[-2:].upper()
                     else:
                         dest = dest.lower()
-                    output = _vars.translators[t].translate(string,dest,source)
+                    output = translators[t].translate(string,dest,source)
                     output = output.text
+                    print(output+"\n\n")
                     response += "\n"+output+"  `"+t+"`"
                     source,dest = dest,source
                     break

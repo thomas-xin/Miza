@@ -28,7 +28,7 @@ class purge:
         if t_user != client.user:
             s_perm = _vars.getPerms(user,guild)
             if s_perm < 3:
-                return "```\nError:```\nInsufficient priviliges for command "+name+" "+args[1]+"\
+                return "Error: Insufficient priviliges for command "+name+" "+args[1]+"\
 .\nRequred level: **__"+expNum(3,12,4)+"__**, Current level: **__"+expNum(s_perm,12,4)+"__**"
         hist = await channel.history(limit=128).flatten()
         delM = []
@@ -65,8 +65,8 @@ class ban:
         t_user = await client.fetch_user(_vars.verifyID(a1))
         s_perm = _vars.getPerms(user,guild)
         t_perm = _vars.getPerms(t_user,guild)
-        if t_perm+1 > s_perm:
-            return "```\nError:```\nInsufficient priviliges to ban **"+t_user.name+"** from \
+        if not s_perm>=t_perm+1:
+            return "Error: Insufficient priviliges to ban **"+t_user.name+"** from \
 **"+guild.name+"**.\nRequired level: **__"+expNum(t_perm+1,12,4)+"__**, Current level: **__"+expNum(s_perm,12,4)+"__**"
         if len(args) < 2:
             tm = 0
