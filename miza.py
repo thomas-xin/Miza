@@ -87,6 +87,7 @@ class _globals:
             try:
                 exec("import "+module+" as _vars_",globals())
             except:
+                print("Failed to import "+module+" as command category.")
                 continue
             commands = []
             vd = _vars_.__dict__
