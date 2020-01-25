@@ -374,7 +374,14 @@ async def reactCallback(message,reaction,user):
                 catg = _vars.categories[catx]
                 for f in catg:
                     if f.__name__ == func:
-                        await f._callback_(message=message,reaction=reaction,user=user,vals=vals,argv=argv)
+                        await f._callback_(
+                            client=client,
+                            message=message,
+                            reaction=reaction,
+                            user=user,
+                            perm=u_perm,
+                            vals=vals,
+                            argv=argv)
                         return
             except:
                 raise

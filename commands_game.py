@@ -11,11 +11,13 @@ class text2048:
         self.minm = 1
         self.desc = "Plays a game of 2048 using reactions."
         self.usag = '<board_size[4]> <public:(?p)> <easy_mode:(?e)>'
-    async def nextIter(self,message,gamestate,username,direction):
+    async def nextIter(self,message,gamestate,username,direction,mode):
         width = len(gamestate[-1])
         a = 0
         i = direction
         if i == 4:
+            if mode != 1:
+                return
             gamestate = gamestate[::-1]
         gamestate[1] = copy.deepcopy(gamestate[0])
         if i!=4 and i is not None:
@@ -85,13 +87,16 @@ class text2048:
             if gamestate[x][y] == 0:
                 gamestate[x][y] = v
                 i += 1
-    async def _callback_(self,message,reaction,argv,user,vals,**void):
+    async def _callback_(self,client,message,reaction,argv,user,perm,vals,**void):
         u_id,mode = [int(x) for x in vals.split("_")]
-        if reaction is not None and u_id!=user.id and u_id!=0:
+        if reaction is not None and u_id!=user.id and u_id!=0 and perm<3:
             return
         gamestate = ast.literal_eval(argv.replace("A","[").replace("B","]").replace("C",","))
         if reaction is not None:
-            reaction = lurd.index(str(reaction))
+            try:
+                reaction = lurd.index(str(reaction))
+            except:
+                return
         else:
             for react in lurd:
                 if mode==1 or react!="↩":
@@ -100,13 +105,23 @@ class text2048:
         if u_id == 0:
             username = "@everyone"
         else:
-            username = user.name
-        await self.nextIter(message,gamestate,u_id,reaction)
+            if user.id != u_id:
+                u = await client.fetch_user(u_id)
+                username = u.name
+            else:
+                username = user.name
+        await self.nextIter(message,gamestate,username,reaction,mode)
     async def __call__(self,_vars,argv,user,flags,**void):
         try:
-            size = int(_vars.evalMath(argv))
+            if not len(argv.replace(" ","")):
+                size = 4
+            else:
+                size = int(_vars.evalMath(argv))
+                assert(size>1)
         except:
-            size = 4
+            raise ValueError("Invalid board size.")
+        if size > 12:
+            raise OverflowError("Board size too large.")
         if "p" in flags:
             u_id = 0
         else:
@@ -115,10 +130,6 @@ class text2048:
             mode = 1
         else:
             mode = 0
-        if size > inf:
-            raise OverflowError("Board size too large.")
-        elif size <= 1:
-            raise ValueError("Invalid board size.")
         gamestate = [[[0 for y in range(size)] for x in range(size)]]*2
         gsr = str(gamestate).replace("[","A").replace("]","B").replace(",","C").replace(" ","")
         text = "```callback-game-text2048-"+str(u_id)+"_"+str(mode)+"-"+gsr+"\nStarting Game...```"
