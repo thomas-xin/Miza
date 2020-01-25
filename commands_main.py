@@ -83,8 +83,8 @@ class changePerms:
         self.name = ["perms","perm","changeperm","changePerm","changeperms"]
         self.minm = -inf
         self.desc = "Shows or changes a user's permission level."
-        self.usag = '<0:user:{self}> <1:value{curr}>'
-    async def __call__(self,client,_vars,args,user,guild,**void):
+        self.usag = '<0:user:{self}> <1:value{curr}> <hide:(?h)>'
+    async def __call__(self,client,_vars,args,user,guild,flags,**void):
         if len(args) < 2:
             if len(args) < 1:
                 t_user = user
@@ -104,6 +104,8 @@ class changePerms:
                 g_perm.update({t_user.id:c_perm})
                 _vars.perms[guild.id] = g_perm
                 _vars.update()
+                if "h" in flags:
+                    return
                 return "Changed permissions for **"+t_user.name+"** in **"+guild.name+"** from \
 **__"+expNum(t_perm,12,4)+"__** to **__"+expNum(c_perm,12,4)+"__**."
             else:
@@ -119,7 +121,7 @@ class enableCommand:
         self.name = ["ec","enable"]
         self.minm = 3
         self.desc = "Shows, enables, or disables a command category in the current server."
-        self.usag = '<command:{all}> <show:[?s]> <enable:(?e)> <disable:(?d)>'
+        self.usag = '<command:{all}> <enable:(?e)> <disable:(?d)> <hide:(?h)>'
     async def __call__(self,client,_vars,argv,flags,guild,**void):
         catg = argv.lower()
         print(catg)
@@ -129,10 +131,14 @@ class enableCommand:
                 categories.remove("main")
                 _vars.enabled[guild.id] = categories
                 _vars.update()
+                if "h" in flags:
+                    return
                 return "Enabled all command categories in **"+guild.name+"**."
             if "d" in flags:
                 _vars.enabled[guild.id] = []
                 _vars.update()
+                if "h" in flags:
+                    return
                 return "Disabled all command categories in **"+guild.name+"**."
             return "Currently enabled command categories in **"+guild.name+"**:\n\
 ```\n"+str(["main"]+_vars.enabled.get(guild.id,["math","admin"]))+"```"
@@ -151,6 +157,8 @@ class enableCommand:
 ** is already enabled in **"+guild.name+"**."
                     enabled.append(catg)
                     _vars.update()
+                    if "h" in flags:
+                        return
                     return "Enabled command category **"+catg+"** in **"+guild.name+"**."
                 if "d" in flags:
                     if catg not in enabled:
@@ -158,6 +166,8 @@ class enableCommand:
 ** is not currently enabled in **"+guild.name+"**."
                     enabled.remove(catg)
                     _vars.update()
+                    if "h" in flags:
+                        return
                     return "Disabled command category **"+catg+"** in **"+guild.name+"**."
                 return "Command category **"+catg+"** is currently\
 "+" not"*(catg not in enabled)+" enabled in **"+guild.name+"**."

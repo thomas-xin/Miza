@@ -7,7 +7,7 @@ class purge:
         self.name = ["del","delete"]
         self.minm = 1
         self.desc = "Deletes a number of messages from a certain user in current channel."
-        self.usag = '<1:user:{bot}(?a)> <0:count:[1]>'
+        self.usag = '<1:user:{bot}(?a)> <0:count:[1]> <hide:(?h)>'
     async def __call__(self,client,_vars,argv,args,channel,user,guild,name,flags,**void):
         t_user = -1
         if "a" in flags or "@everyone" in argv or "@here" in argv:
@@ -49,7 +49,8 @@ class purge:
                     deleted += 1
                 except:
                     pass
-        return "Deleted **__"+str(deleted)+"__** message"+"s"*(deleted!=1)+"!"
+        if not "h" in flags:
+            return "Deleted **__"+str(deleted)+"__** message"+"s"*(deleted!=1)+"!"
     
 class ban:
     is_command = True
@@ -57,8 +58,8 @@ class ban:
         self.name = []
         self.minm = 3
         self.desc = "Bans a user for a certain amount of hours, with an optional reason."
-        self.usag = '<0:user> <1:hours[]> <2:reason[]>'
-    async def __call__(self,client,_vars,args,user,channel,guild,**void):
+        self.usag = '<0:user> <1:hours[]> <2:reason[]> <hide:(?h)>'
+    async def __call__(self,client,_vars,args,user,channel,guild,flags,**void):
         dtime = datetime.datetime.utcnow().timestamp()
         a1 = args[0]
         t_user = await client.fetch_user(_vars.verifyID(a1))
@@ -98,4 +99,5 @@ class ban:
 **"+guild.name+"** for **__"+expNum(tm,16,8)+"__** hours."
         if msg:
             response += " Reason: **"+msg+"**."
-        return response
+        if "h" not in flags:
+            return response
