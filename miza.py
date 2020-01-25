@@ -476,7 +476,7 @@ async def handleMessage(message):
     if not len(msg)>1:
         return
     elif u_id==client.user.id:
-        if "Error: " in msg or "Commands for " in msg:
+        if "Error: " in msg or "Commands for " in msg or msg=="Response too long for message.":
             try:
                 await message.add_reaction("❎")
             except:
