@@ -84,7 +84,10 @@ class _globals:
         for f in files:
             module = f[:-3]
             category = module.replace(comstr,"")
-            exec("import "+module+" as _vars_",globals())
+            try:
+                exec("import "+module+" as _vars_",globals())
+            except:
+                continue
             commands = []
             vd = _vars_.__dict__
             for k in vd:
