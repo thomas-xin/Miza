@@ -208,8 +208,8 @@ hC56mPXCnCcsDjxit0/export?format=csv&id=12iC9uRGNZ2MnrhpS4s_KvIRYHhC56mPXCnCcsDj
             g_perm = self.perms.get(g_id,{})
             self.perms[g_id] = g_perm
             if u_id == self.owner_id:
-                u_perm = inf
-                g_perm[u_id] = inf
+                u_perm = nan
+                g_perm[u_id] = nan
             else:
                 u_perm = g_perm.get(u_id,0)
         else:
@@ -290,14 +290,14 @@ async def processMessage(message):
         for command in commands:
             for alias in command.name:
                 length = len(alias)
-                check = comm[:length]
+                check = comm[:length].lower()
                 argv = comm[length:]
-                print(alias)
                 if check==alias and (len(comm)==length or comm[length]==" " or comm[length]=="?"):
                     print(user.name+" ("+str(u_id)+") issued command "+msg)
                     req = command.minm
                     if not req > u_perm:
                         try:
+                            await channel.trigger_typing()
                             if argv:
                                 while argv[0] == " ":
                                     argv = argv[1:]
@@ -306,7 +306,7 @@ async def processMessage(message):
                                 char = chr(c+97)
                                 flag = "?"+char
                                 for r in (flag.lower(),flag.upper()):
-                                    if len(argv)>=2 and r in argv:
+                                    if len(argv)>=4 and r in argv:
                                         if not char in flags:
                                             i = argv.index(r)
                                             if i==0 or argv[i-1]==" " or argv[i-2]=="?":

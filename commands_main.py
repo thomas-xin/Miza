@@ -22,21 +22,34 @@ class help:
         verb = "v" in flags
         argv = " ".join(args)
         show = []
-        for com in commands:
-            name = com.__name__
-            minm = com.minm
-            desc = com.desc
-            usag = com.usag
-            if minm>u_perm:
-                continue
-            found = False
-            for n in com.name:
-                if n in argv:
-                    found = True
-            if found:
-                newstr = "\n`"+name+"`\nAliases: "+str(com.name)+"\nEffect: "+desc+"\nUsage: "+usag+"\nRequired permission level: **__"+str(minm)+"__**"
-                if (not len(show)) or len(show[-1])<len(newstr):
-                    show = [newstr]
+        for a in args:
+            if a in categories and (a in enabled or a=="main"):
+                show.append("\nCommands for **"+user.name+"** in **"+guild.name+"** in category **"+a+"**:")
+                for com in categories[a]:
+                    name = com.__name__
+                    minm = com.minm
+                    desc = com.desc
+                    usag = com.usag
+                    if minm>u_perm:
+                        continue
+                    newstr = "\n`"+name+"`\nAliases: "+str(com.name)+"\nEffect: "+desc+"\nUsage: "+usag+"\nRequired permission level: **__"+str(minm)+"__**"
+                    show.append(newstr)
+        if not show:
+            for com in commands:
+                name = com.__name__
+                minm = com.minm
+                desc = com.desc
+                usag = com.usag
+                if minm>u_perm:
+                    continue
+                found = False
+                for n in com.name:
+                    if n in argv:
+                        found = True
+                if found:
+                    newstr = "\n`"+name+"`\nAliases: "+str(com.name)+"\nEffect: "+desc+"\nUsage: "+usag+"\nRequired permission level: **__"+str(minm)+"__**"
+                    if (not len(show)) or len(show[-1])<len(newstr):
+                        show = [newstr]
         if not show:
             for com in commands:
                 name = com.__name__
@@ -50,8 +63,7 @@ class help:
                         else:
                             show.append("\n`"+com.__name__+"`\nEffect: "+com.desc+"\nUsage: "+name+" "+usag)
             return "Commands for **"+user.name+"** in **"+guild.name+"**:\n"+"\n".join(show)
-        else:
-            return "\n".join(show)
+        return "\n".join(show)
         
 class clearCache:
     is_command = True
@@ -122,7 +134,7 @@ class enableCommand:
                 _vars.enabled[guild.id] = []
                 _vars.update()
                 return "Disabled all command categories in **"+guild.name+"**."
-            return "Currently enabled commands in **"+guild.name+"**:\n\
+            return "Currently enabled command categories in **"+guild.name+"**:\n\
 ```\n"+str(["main"]+_vars.enabled.get(guild.id,["math","admin"]))+"```"
         else:
             if not catg in _vars.categories:
@@ -150,3 +162,17 @@ class enableCommand:
                 return "Command category **"+catg+"** is currently\
 "+" not"*(catg not in enabled)+" enabled in **"+guild.name+"**."
         
+class shutdown:
+    is_command = True
+    def __init__(self):
+        self.name = ["gtfo"]
+        self.minm = inf
+        self.desc = "Shuts down the bot."
+        self.usag = ''
+    async def __call__(self,client,channel,**void):
+        await channel.send("Shutting down... :wave:")
+        for vc in client.voice_clients:
+            await vc.disconnect(force=True)
+        await client.close()
+        sys.exit()
+        quit()
