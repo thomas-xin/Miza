@@ -13,6 +13,12 @@ image_forms = [
 class urlBypass(urllib.request.FancyURLopener):
     version = "Mozilla/5."+str(xrand(1,10))
 
+def is_nsfw(channel):
+    try:
+        return channel.is_nsfw()
+    except AttributeError:
+        return True
+
 def pull_e621(argv,delay=5):
     opener = urlBypass()
     items = argv.replace(" ","%20").lower()
@@ -183,24 +189,91 @@ class neko:
         self.name = []
         self.minm = 1
         self.desc = "Pulls a random image from nekos.life and embeds it."
-        self.usag = '<0:tags(gif)(lewd)> <verbose:(?v)>'
+        self.usag = '<0:tags(gif)(lewd)> <verbose:(?v)> <list:(?l)>'
+    cmds = {
+        "feet": True,
+        "yuri": True,
+        "trap": True,
+        "futanari": True,
+        "hololewd": True,
+        "lewdkemo": True,
+        "solog": True,
+        "feetg": True,
+        "cum": True,
+        "erokemo": True,
+        "les": True,
+        "wallpaper": False,
+        "lewdk": True,
+        "ngif": False,
+        "tickle": False,
+        "lewd": True,
+        "feed": False,
+        "gecg": False,
+        "eroyuri": True,
+        "eron": True,
+        "cum_jpg": True,
+        "bj": True,
+        "nsfw_neko_gif": True,
+        "solo": True,
+        "kemonomimi": False,
+        "nsfw_avatar": True,
+        "gasm": True,
+        "poke": False,
+        "anal": True,
+        "slap": False,
+        "hentai": True,
+        "avatar": False,
+        "erofeet": True,
+        "holo": False,
+        "keta": False,
+        "blowjob": True,
+        "pussy": True,
+        "tits": True,
+        "holoero": False,
+        "lizard": False,
+        "pussy_jpg": True,
+        "pwankg": True,
+        "classic": True,
+        "kuni": True,
+        "waifu": False,
+        "pat": False,
+        "8ball": False,
+        "kiss": False,
+        "femdom": True,
+        "neko": False,
+        "spank": True,
+        "cuddle": False,
+        "erok": False,
+        "fox_girl": False,
+        "boobs": True,
+        "random_hentai_gif": True,
+        "smallboobs": True,
+        "hug": False,
+        "ero": True,
+        "smug": False,
+        "goose": False,
+        "baka": False
+        }
+    
     async def __call__(self,argv,flags,channel,**void):
-        if "lewd" in argv:
-            try:
-                valid = channel.is_nsfw()
-            except AttributeError:
-                valid = True
-            if not valid:
-                return "Error: This command is only available in **NSFW** channels."
-            if "gif" in argv:
-                url = nekos.img("nsfw_neko_gif")
-            else:
-                url = nekos.img("lewd")
-        else:
-            if "gif" in argv:
-                url = nekos.img("ngif")
-            else:
-                url = nekos.img("neko")
+        isNSFW = is_nsfw(channel)
+        
+        #List every argument overrides everything else
+        if "l" in flags:
+            text = "Available commands:\n"
+            for key in cmds:
+                if not cmd[key] or isNSFW:
+                    text += cmd + ", "
+            await channel.send(text)
+            return
+
+        arg = argv.tolower()
+        if not arg in cmds:
+            return "Error: Unkown argument " + arg + ". See the help doc for more details"        
+        if not isNSFW and cmd[arg]:
+            return "Error: This command is only available in **NSFW** channels."
+        
+        url = nekos.img(arg)
         if "v" in flags:
             text = "Pulled from "+url
         else:
@@ -218,11 +291,7 @@ class lewd:
         self.desc = "Pulls a random image from a search on Rule34 and e621, and embeds it."
         self.usag = '<0:query> <verbose:(?v)>'
     async def __call__(self,_vars,args,flags,channel,**void):
-        try:
-            valid = channel.is_nsfw()
-        except AttributeError:
-            valid = True
-        if not valid:
+        if not is_nsfw(channel):
             return "Error: This command is only available in **NSFW** channels."
         objs = searchRandomNSFW(" ".join(args),_vars.timeout)
         url = objs[0]
