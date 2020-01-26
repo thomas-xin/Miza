@@ -1030,6 +1030,7 @@ class _parallel:
             self.actions = []
             self.state = 0
             self.daemon = True
+            self._stop = threading.Event()
         def __call__(self,*action):
             self.actions.append(action)
             self.state = 1
@@ -1054,8 +1055,7 @@ class _parallel:
                 thread_id,ctypes.py_object(BaseException)) 
             if res > 1: 
                 ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                    thread_id,0) 
-                print('Exception raise failure')
+                    thread_id,ctypes.py_object(Exception))
             self.stop()
 def doParallel(func,data_in=None,data_out=[0],start=0,end=None,per=1,delay=0,maxq=64,name=False):
     global processes
@@ -1088,6 +1088,8 @@ def killThreads():
         if type(i) is int and i in processes.running:
             p = processes.running[i]
             p.kill()
+            del(p)
+    processes = _parallel()
 def waitParallel(delay):
     global processes
     t = time.time()

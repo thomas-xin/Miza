@@ -70,7 +70,7 @@ class _globals:
             f.close()
         except:
             self.enabled = {}            
-        self.update()
+        doParallel(self.update,[])
         self.fig = fig
         self.plt = plt
         f = open("auth.json")
@@ -79,6 +79,21 @@ class _globals:
         self.token = auth["discord_token"]
         self.resetGlobals()
         doParallel(self.getModules)
+    def getModule(self,module,category):
+        exec("import "+module+" as _vars_",globals())
+        commands = []
+        vd = _vars_.__dict__
+        for k in vd:
+            var = vd[k]
+            try:
+                assert(var.is_command)
+                obj = var()
+                obj.__name__ = var.__name__
+                obj.name.append(obj.__name__)
+                commands.append(obj)
+            except AttributeError:
+                pass
+        self.categories[category] = commands
     def getModules(self):
         comstr = "commands_"
         files = [f for f in os.listdir('.') if f[-3:]==".py" and comstr in f]
@@ -86,25 +101,7 @@ class _globals:
         for f in files:
             module = f[:-3]
             category = module.replace(comstr,"")
-            try:
-                exec("import "+module+" as _vars_",globals())
-            except:
-                print("Failed to import "+module+" as command category.")
-                raise
-                continue
-            commands = []
-            vd = _vars_.__dict__
-            for k in vd:
-                var = vd[k]
-                try:
-                    assert(var.is_command)
-                    obj = var()
-                    obj.__name__ = var.__name__
-                    obj.name.append(obj.__name__)
-                    commands.append(obj)
-                except:
-                    pass
-            self.categories[category] = commands
+            doParallel(self.getModule,[module,category])
     def update(self):
         f = open("perms.json","w")
         f.write(str(self.perms))
