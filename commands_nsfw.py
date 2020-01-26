@@ -1,4 +1,4 @@
-import nekos,discord,urllib
+import nekos,rule34,discord,urllib,asyncio
 from smath import *
 
 image_forms = [
@@ -11,169 +11,205 @@ image_forms = [
     ]
 class urlBypass(urllib.request.FancyURLopener):
     version = "Mozilla/5."+str(xrand(1,10))
-def pull_e621(argv,delay=5):
-    opener = urlBypass()
-    items = argv.replace(" ","%20").lower()
-    baseurl = "https://e621.net/post/index/"
-    url = baseurl+"1/"+items
-    resp = opener.open(url)
-    if resp.getcode() != 200:
-        raise ConnectionError("Error "+str(resp.getcode()))
-    s = resp.read().decode("utf-8")
-
-    ind = s.index('class="next_page" rel="next"')
-    s = s[ind-90:ind]
-    d = s.split(" ")
-    i = -1
-    while True:
-        if "</a>" in d[i]:
-            break
-        i -= 1
-    u = d[i][:-4]
-    u = u[u.index(">")+1:]
-    v1 = xrand(1,int(u))
-
-    url = baseurl+str(v1)+"/"+items
-    resp = opener.open(url)
-    if resp.getcode() != 200:
-        raise ConnectionError("Error "+str(resp.getcode()))
-    s = resp.read().decode("utf-8")
-
+def pull_e621(argv,data,thr,delay=5):
     try:
-        limit = s.index('class="next_page" rel="next"')
-        s = s[:limit]
-    except:
-        pass
+        v1,v2 = 1,1
+        opener = urlBypass()
+        items = argv.replace(" ","%20").lower()
+        baseurl = "https://e621.net/post/index/"
+        url = baseurl+"1/"+items
+        resp = opener.open(url)
+        if resp.getcode() != 200:
+            raise ConnectionError("Error "+str(resp.getcode()))
+        s = resp.read().decode("utf-8")
 
-    search = '<a href="/post/show/'
-    sources = []
-    while True:
+        ind = s.index('class="next_page" rel="next"')
+        s = s[ind-90:ind]
+        d = s.split(" ")
+        i = -1
+        while True:
+            if "</a>" in d[i]:
+                break
+            i -= 1
+        u = d[i][:-4]
+        u = u[u.index(">")+1:]
+        v1 = xrand(1,int(u))
+
+        url = baseurl+str(v1)+"/"+items
+        resp = opener.open(url)
+        if resp.getcode() != 200:
+            raise ConnectionError("Error "+str(resp.getcode()))
+        s = resp.read().decode("utf-8")
+
         try:
-            ind1 = s.index(search)
-            s = s[ind1+len(search):]
-            ind2 = s.index('"')
-            target = s[:ind2]
+            limit = s.index('class="next_page" rel="next"')
+            s = s[:limit]
+        except IndexError:
+            pass
+
+        search = '<a href="/post/show/'
+        sources = []
+        while True:
             try:
-                sources.append(int(target))
-            except:
-                pass
-        except:
-            break
-    x = None
-    while not x:
-        v2 = xrand(len(sources))
-        x = sources[v2]
-        found = False
-        for i in image_forms:
-            if i in x:
-                found = True
-        if not found:
-            x = None
-    url = "https://e621.net/post/show/"+str(x)
-    resp = opener.open(url)
-    if resp.getcode() != 200:
-        raise ConnectionError("Error "+str(resp.getcode()))
-    s = resp.read().decode("utf-8")
-
-    search = '<a href="https://static1.e621.net/data/'
-    ind1 = s.index(search)
-    s = s[ind1+9:]
-    ind2 = s.index('"')
-    s = s[:ind2]
-    url = s
-    return [url,v1,v2]
-
-def pull_rule34(argv,delay=5):
-    items = argv.split("_")
-    for i in range(len(items)):
-        items[i] = items[i][0].upper()+items[i][1:].lower()
-    items = "_".join(items)
-    items = argv.split(" ")
-    for i in range(len(items)):
-        items[i] = items[i][0].upper()+items[i][1:]
-    items = "%20".join(items)
-    baseurl = "https://rule34.paheal.net/post/list/"
-    try:
-        url = baseurl+items+"/1"
-        req = urllib.request.Request(url)
-        resp = urllib.request.urlopen(req,timeout=delay)
+                ind1 = s.index(search)
+                s = s[ind1+len(search):]
+                ind2 = s.index('"')
+                target = s[:ind2]
+                try:
+                    sources.append(int(target))
+                except ValueError:
+                    pass
+            except IndexError:
+                break
+        x = None
+        while not x:
+            v2 = xrand(len(sources))
+            x = sources[v2]
+            found = False
+            url = "https://e621.net/post/show/"+str(x)
+            resp = opener.open(url)
+            if resp.getcode() != 200:
+                raise ConnectionError("Error "+str(resp.getcode()))
+            s = resp.read().decode("utf-8")
+            search = '<a href="https://static1.e621.net/data/'
+            ind1 = s.index(search)
+            s = s[ind1+9:]
+            ind2 = s.index('"')
+            s = s[:ind2]
+            url = s
+            for i in image_forms:
+                if i in url:
+                    found = True
+            if not found:
+                x = None
+        data[thr] = [url,v1,v2]
     except:
-        url = baseurl+items.upper()+"/1"
-        req = urllib.request.Request(url)
-        resp = urllib.request.urlopen(req,timeout=delay)
-    if resp.getcode() != 200:
-        raise ConnectionError("Error "+str(resp.getcode()))
-    
-    s = resp.read().decode("utf-8")
+        data[thr] = 0
+    print(data)
+
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+rule34_sync = rule34.Sync()
+def pull_rule34_xxx(argv,data,thr,delay=5):
+    v1,v2 = 1,1
     try:
-        ind = s.index('">Last</a><br>')
-        s = s[ind-5:ind]
-        v1 = xrand(1,int(s.split("/")[-1]))
-        url = url[:-1]+str(v1)
-        
+        sources = rule34_sync.getImages(tags=argv,fuzzy=True,randomPID=True,singlePage=True)
+        if sources:
+            v2 = xrand(len(sources))
+            url = sources[v2].file_url
+            v1 = max(1,sources[v2].score)
+            data[thr] = [url,v1,v2]
+        else:
+            raise
+    except:
+        data[thr] = 0
+    print(data)
+
+def pull_rule34_paheal(argv,data,thr,delay=5):
+    try:
+        v1,v2 = 1,1
+        items = argv.split(" ")
+        if not len(argv.replace(" ","")):
+            tagsearch = [chr(i+65) for i in range(26)]
+        else:
+            tagsearch = []
+            for i in items:
+                if i[0] not in tagsearch:
+                    tagsearch.append(i[0])
+        rx = xrand(len(tagsearch))
+        baseurl = "https://rule34.paheal.net/tags?starts_with="
+        url = baseurl+tagsearch[rx]
         req = urllib.request.Request(url)
         resp = urllib.request.urlopen(req,timeout=delay)
         if resp.getcode() != 200:
             raise ConnectionError("Error "+str(resp.getcode()))
         s = resp.read().decode("utf-8")
-    except:
-        pass
-    try:
-        limit = s.index("class=''>Images</h3><div class='blockbody'>")
-        s = s[limit:]
-        limit = s.index("</div></div></section>")
-        s = s[:limit]
-    except:
-        pass
+        tags = s.split("em\' href=\'/post/list/")[1:]
+        valid = []
+        for i in range(len(tags)):
+            ind = tags[i].index("/")
+            tags[i] = tags[i][:ind]
+            t = tags[i].lower()
+            for a in items:
+                if a in t:
+                    valid.append(tags[i])
+        rx = xrand(len(valid))
+        items = valid[rx]
 
-    search = 'href="'
-    sources = []
-    while True:
+        baseurl = "https://rule34.paheal.net/post/list/"
         try:
-            ind1 = s.index(search)
-            s = s[ind1+len(search):]
-            ind2 = s.index('"')
-            target = s[:ind2]
-            if not "." in target:
-                continue
-            elif ".js" in target:
-                continue
-            found = False
-            for i in image_forms:
-                if i in target:
-                    found = True
-            if target[0]=="h" and found:
-                sources.append(target)
-        except:
-            break
-    v2 = xrand(len(sources))
-    url = sources[v2]
-    return [url,v1,v2]
+            url = baseurl+items+"/1"
+            req = urllib.request.Request(url)
+            resp = urllib.request.urlopen(req,timeout=delay)
+        except ConnectionError:
+            url = baseurl+items.upper()+"/1"
+            req = urllib.request.Request(url)
+            resp = urllib.request.urlopen(req,timeout=delay)
+        if resp.getcode() != 200:
+            raise ConnectionError("Error "+str(resp.getcode()))
+        
+        s = resp.read().decode("utf-8")
+        try:
+            ind = s.index('">Last</a><br>')
+            s = s[ind-5:ind]
+            v1 = xrand(1,int(s.split("/")[-1]))
+            url = url[:-1]+str(v1)
+            
+            req = urllib.request.Request(url)
+            resp = urllib.request.urlopen(req,timeout=delay)
+            if resp.getcode() != 200:
+                raise ConnectionError("Error "+str(resp.getcode()))
+            s = resp.read().decode("utf-8")
+        except IndexError:
+            pass
+        try:
+            limit = s.index("class=''>Images</h3><div class='blockbody'>")
+            s = s[limit:]
+            limit = s.index("</div></div></section>")
+            s = s[:limit]
+        except IndexError:
+            pass
 
-def searchRandomNSFW(argv,delay=10):
-    nsfw = {
-        0:pull_rule34,
-        1:pull_e621,
-        }
-    data = None
-    while True:
-        l = list(nsfw)
-        if not l:
-            break
-        r = xrand(len(l))
-        try:
-            f = nsfw[r]
-            nsfw.pop(r)
-        except:
-            break
-        try:
-            data = f(argv,delay/2)
-        except:
-            continue
-        break
-    if data is None:
+        search = 'href="'
+        sources = []
+        while True:
+            try:
+                ind1 = s.index(search)
+                s = s[ind1+len(search):]
+                ind2 = s.index('"')
+                target = s[:ind2]
+                if not "." in target:
+                    continue
+                elif ".js" in target:
+                    continue
+                found = False
+                for i in image_forms:
+                    if i in target:
+                        found = True
+                if target[0]=="h" and found:
+                    sources.append(target)
+            except IndexError:
+                break
+        v2 = xrand(len(sources))
+        url = sources[v2]
+        data[thr] = [url,v1,v2]
+    except:
+        data[thr] = 0
+    print(data)
+
+async def searchRandomNSFW(argv,delay=8):
+    t = time.time()
+    funcs = [pull_e621,pull_rule34_paheal,pull_rule34_xxx]
+    data = [None for i in funcs]
+    for i in range(len(funcs)):
+        doParallel(funcs[i],[argv,data,i,delay-2])
+    while None in data and time.time()-t<delay:
+        await asyncio.sleep(.1)
+    data = [i for i in data if i]
+    i = xrand(len(data))
+    if not len(data) or data[i] is None:
         raise EOFError("Unable to locate any search results.")
-    return data
+    return data[i]
 
 neko_tags = {
     "feet":True,
@@ -232,7 +268,6 @@ neko_tags = {
     "fox_girl":False,
     "boobs":True,
     "random_hentai_gif":True,
-    "smallboobs":True,
     "hug":False,
     "ero":True,
     "smug":False,
@@ -240,6 +275,9 @@ neko_tags = {
     "baka":False,
     "cat":False,
     "gif":False,
+    "how":2,
+    "ded":2,
+    "404":2,
     }
 def is_nsfw(channel):
     try:
@@ -253,30 +291,34 @@ class neko:
         self.minm = 1
         self.desc = "Pulls a random image from nekos.life and embeds it."
         self.usag = '<tags:[](?r)> <verbose:(?v)> <list:(?l)>'
-    async def __call__(self,args,flags,channel,**void):
+    async def __call__(self,args,argv,flags,channel,**void):
         isNSFW = is_nsfw(channel)
         if "l" in flags:
+            available = []
             text = "Available commands in **#"+channel.name+"**:\n`"
             for key in neko_tags:
-                if isNSFW or not neko_tags[key]:
-                    text += key+", "
-            text = text[:-2]+"`"
+                if isNSFW or not neko_tags[key]==True:
+                    available.append(key)
+            text += ", ".join(sorted(available))+"`"
             return text
         tagNSFW = False
         selected = []
         for tag in args:
             tag = tag.replace(",","").lower()
             if tag in neko_tags:
-                if neko_tags.get(tag,0):
+                if neko_tags.get(tag,0) == True:
                     tagNSFW = True
                     if not isNSFW:
-                        raise PermissionError("Error: This command is only available in NSFW channels.")
+                        raise PermissionError("This command is only available in NSFW channels.")
                 selected.append(tag)
         for x in range(flags.get("r",0)):
             possible = [i for i in neko_tags if neko_tags[i]<=isNSFW]
             selected.append(possible[xrand(len(possible))])
         if not selected:
-            url = nekos.img("neko")
+            if not len(argv.replace(" ","")):
+                url = nekos.img("neko")
+            else:
+                raise EOFError("Search tag not found.")
         else:
             v = xrand(len(selected))
             get = selected[v]
@@ -287,6 +329,12 @@ class neko:
                     url = nekos.img("ngif")
             elif get == "cat":
                 url = nekos.cat()
+            elif get == "how":
+                url = "https://media.discordapp.net/attachments/500919580596764673/642515924578205696/HOW.gif"
+            elif get == "ded":
+                url = "https://cdn.discordapp.com/attachments/430005329984487434/654326757654134785/4aa217e.gif"
+            elif get == "404":
+                url = nekos.img("smallboobs")
             else:
                 url = nekos.img(get)
         if "v" in flags:
@@ -307,8 +355,8 @@ class lewd:
         self.usag = '<query> <verbose:(?v)>'
     async def __call__(self,_vars,args,flags,channel,**void):
         if not is_nsfw(channel):
-            raise PermissionError("Error: This command is only available in NSFW channels.")
-        objs = searchRandomNSFW(" ".join(args),_vars.timeout)
+            raise PermissionError("This command is only available in NSFW channels.")
+        objs = await searchRandomNSFW(" ".join(args),_vars.timeout)
         url = objs[0]
         if "v" in flags:
             text = "Pulled from "+url+"\nImage **__"+str(objs[2])+"__** on page **__"+str(objs[1])+"__**"

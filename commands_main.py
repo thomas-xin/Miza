@@ -7,12 +7,21 @@ class help:
         self.minm = -inf
         self.desc = "Shows a list of usable commands."
         self.usag = '<command:[]> <verbose:(?v)>'
-    async def __call__(self,_vars,args,user,guild,flags,**void):
-        try:
-            enabled = _vars.enabled[guild.id]
-        except:
-            enabled = _vars.enabled[guild.id] = ["string","admin"]
-            _vars.update()
+    async def __call__(self,_vars,client,args,user,guild,flags,**void):
+        if guild:
+            g_id = guild.id
+            g_name = guild.name
+        else:
+            g_id = 0
+            g_name = client.user.name
+        if g_id:
+            try:
+                enabled = _vars.enabled[g_id]
+            except KeyError:
+                enabled = _vars.enabled[g_id] = ["string","admin"]
+                _vars.update()
+        else:
+            enabled = list(_vars.categories)
         categories = _vars.categories
         commands = []
         for catg in categories:
@@ -24,13 +33,13 @@ class help:
         show = []
         for a in args:
             if a in categories and (a in enabled or a=="main"):
-                show.append("\nCommands for **"+user.name+"** in **"+guild.name+"** in category **"+a+"**:")
+                show.append("\nCommands for **"+user.name+"** in **"+g_name+"** in category **"+a+"**:")
                 for com in categories[a]:
                     name = com.__name__
                     minm = com.minm
                     desc = com.desc
                     usag = com.usag
-                    if minm>u_perm:
+                    if minm>u_perm or (u_perm is not nan and minm is nan):
                         continue
                     newstr = "\n`"+name+"`\nAliases: "+str(com.name)+"\nEffect: "+desc+"\nUsage: \
 "+usag+"\nRequired permission level: **__"+str(minm)+"__**"
@@ -45,7 +54,7 @@ class help:
                     minm = com.minm
                     desc = com.desc
                     usag = com.usag
-                    if minm>u_perm:
+                    if minm>u_perm or (u_perm is not nan and minm is nan):
                         continue
                     found = False
                     for n in com.name:
@@ -63,13 +72,14 @@ Effect: "+desc+"\nUsage: "+usag+"\nRequired permission level: "+str(minm)+"```"
                 minm = com.minm
                 desc = com.desc
                 usag = com.usag
-                if not minm>u_perm:
-                    if desc != "":
-                        if not verb:
-                            show.append("`"+name+" "+usag+"`")
-                        else:
-                            show.append("\n`"+com.__name__+"`\nEffect: "+com.desc+"\nUsage: "+name+" "+usag)
-            return "Commands for **"+user.name+"** in **"+guild.name+"**:\n"+"\n".join(show)
+                if minm>u_perm or (u_perm is not nan and minm is nan):
+                    continue
+                if desc != "":
+                    if not verb:
+                        show.append("`"+name+" "+usag+"`")
+                    else:
+                        show.append("\n`"+com.__name__+"`\nEffect: "+com.desc+"\nUsage: "+name+" "+usag)
+            return "Commands for **"+user.name+"** in **"+g_name+"**:\n"+"\n".join(show)
         return "\n".join(show)
         
 class clearCache:
@@ -92,6 +102,8 @@ class changePerms:
         self.desc = "Shows or changes a user's permission level."
         self.usag = '<0:user:{self}> <1:value{curr}> <hide:(?h)>'
     async def __call__(self,client,_vars,args,user,guild,flags,**void):
+        if guild is None:
+            raise ReferenceError("This command is only available in servers.")
         if len(args) < 2:
             if len(args) < 1:
                 t_user = user
@@ -105,8 +117,11 @@ class changePerms:
             s_perm = _vars.getPerms(s_user.id,guild)
             t_user = await client.fetch_user(_vars.verifyID(args[0]))
             t_perm = _vars.getPerms(t_user.id,guild)
-            m_perm = max(t_perm,c_perm,1)+1
-            if not(s_perm==m_perm) and s_perm>=m_perm:
+            if t_perm == nan:
+                m_perm = nan
+            else:
+                m_perm = max(t_perm,c_perm,1)+1
+            if not s_perm<=m_perm and isValid(m_perm):
                 g_perm = _vars.perms.get(guild.id,{})
                 g_perm.update({t_user.id:c_perm})
                 _vars.perms[guild.id] = g_perm
@@ -114,13 +129,13 @@ class changePerms:
                 if "h" in flags:
                     return
                 return "Changed permissions for **"+t_user.name+"** in **"+guild.name+"** from \
-**__"+expNum(t_perm,12,4)+"__** to **__"+expNum(c_perm,12,4)+"__**."
+**__"+str(t_perm)+"__** to **__"+str(c_perm)+"__**."
             else:
-                return "```\nError:\n```\nInsufficient priviliges to change permissions for \
-**"+t_user.name+"** in **"+guild.name+"** from **__"+expNum(t_perm,12,4)+"__** to \
-**__"+expNum(c_perm,12,4)+"__**.\nRequired level: \
-**__"+expNum(m_perm,12,4)+"__**, Current level: **__"+expNum(s_perm,12,4)+"__**"
-        return "Current permissions for **"+t_user.name+"** in **"+guild.name+"**: **__"+expNum(t_perm,12,4)+"__**"
+                return "Error: Insufficient priviliges to change permissions for \
+**"+t_user.name+"** in **"+guild.name+"** from **__"+str(t_perm)+"__** to \
+**__"+str(c_perm)+"__**.\nRequired level: \
+**__"+str(m_perm)+"__**, Current level: **__"+str(s_perm)+"__**"
+        return "Current permissions for **"+t_user.name+"** in **"+guild.name+"**: **__"+str(t_perm)+"__**"
     
 class enableCommand:
     is_command = True
@@ -155,7 +170,7 @@ class enableCommand:
             else:
                 try:
                     enabled = _vars.enabled[guild.id]
-                except:
+                except KeyError:
                     enabled = {}
                     _vars.enabled[guild.id] = enabled
                 if "e" in flags:
@@ -193,3 +208,22 @@ class shutdown:
         await client.close()
         sys.exit()
         quit()
+
+class suspend:
+    is_command = True
+    def __init__(self):
+        self.name = []
+        self.minm = nan
+        self.desc = "Prevents a user from accessing the bot's commands. Overrides ~perms."
+        self.usag = '<0:user> <1:value:[]>'
+    async def __call__(self,_vars,client,user,guild,args,**void):
+        if len(args) < 2:
+            if len(args) >= 1:
+                user = await client.fetch_user(_vars.verifyID(args[0]))
+            return "Current suspension status of **"+user.name+"**: **__"+str(_vars.bans[0].get(user.id,None))+"__**."
+        else:
+            user = await client.fetch_user(_vars.verifyID(args[0]))
+            change = _vars.evalMath(args[1])
+            _vars.bans[0][user.id] = change
+            _vars.update()
+            return "Changed suspension status of **"+user.name+"** to **__"+str(change)+"__**."

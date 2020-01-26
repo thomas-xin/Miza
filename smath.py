@@ -1,7 +1,7 @@
 """
 Adds many useful math-related functions.
 """
-import math,cmath,fractions,mpmath,sympy
+import math,cmath,fractions,mpmath,sympy,ctypes
 import numpy,tinyarray
 array = tinyarray.array
 import colorsys,random,threading,time
@@ -160,7 +160,7 @@ def tri(x):
 def sgn(x):
     return (((x>0)<<1)-1)*(x!=0)
 def frand(x=1,y=0):
-    return (random.random()+xrand(x*2))%x+y
+    return (random.random()/mpf(random.random()))%x+y
 def xrand(x,y=None,z=0):
     if y == None:
         y = 0
@@ -1030,16 +1030,37 @@ class _parallel:
             self.actions = []
             self.state = 0
             self.daemon = True
+            self._stop = threading.Event()
         def __call__(self,*action):
             self.actions.append(action)
             self.state = 1
         def run(self):
             while True:
-                while self.actions:
-                    performAction(self.actions[0])
-                    self.actions = self.actions[1:]
-                self.state = -1
-                time.sleep(.007)
+                try:
+                    while self.actions:
+                        action = self.actions[0]
+                        self.actions = self.actions[1:]
+                        performAction(action)
+                    self.state = -1
+                    time.sleep(.007)
+                except TimeoutError:
+                    pass
+        def stop(self): 
+            self._stop.set()
+        def get_id(self):
+            if hasattr(self,'_thread_id'): 
+                return self._thread_id 
+            for t_id, thread in threading._active.items(): 
+                if thread is self: 
+                    return t_id
+        def kill(self): 
+            thread_id = self.get_id() 
+            res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                thread_id,ctypes.py_object(TimeoutError)) 
+            if res > 1: 
+                ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                    thread_id,ctypes.py_object(BaseException))
+                self.stop()
 def doParallel(func,data_in=None,data_out=[0],start=0,end=None,per=1,delay=0,maxq=64,name=False):
     global processes
     if end == None:
@@ -1064,6 +1085,15 @@ def doParallel(func,data_in=None,data_out=[0],start=0,end=None,per=1,delay=0,max
                 d = xrand(processes.max)
                 p = ps[d]
         p(func,data_in,data_out,i,delay)
+def killThreads():
+    global processes
+    running = tuple(processes.running)
+    for i in running:
+        if type(i) is int and i in processes.running:
+            p = processes.running[i]
+            p.kill()
+            del(p)
+    processes = _parallel()
 def waitParallel(delay):
     global processes
     t = time.time()

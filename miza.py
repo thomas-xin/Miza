@@ -19,7 +19,6 @@ plotXY = plt.loglog
 fig = plt.figure()
 
 class _globals:
-    owner_id = 201548633244565504
     timeout = 10
     disabled = [
         "__",
@@ -27,7 +26,6 @@ class _globals:
         "import",
         "urllib",
         "discord",
-        "http",
         "exec",
         "eval",
         "locals",
@@ -37,7 +35,6 @@ class _globals:
         "os",
         "sys",
         "async",
-        "_init",
         "compile",
         "threading",
         "input",
@@ -46,10 +43,12 @@ class _globals:
         "getattr",
         ".load",
         ".save",
+        ".fromfile",
+        "ctypes",
         ]
     def __init__(self):
         self.lastCheck = time.time()
-        self.queue = []
+        self.queue = {}
         try:
             f = open("perms.json")
             self.perms = eval(f.read())
@@ -61,22 +60,38 @@ class _globals:
             self.bans = eval(f.read())
             f.close()
         except:
-            self.bans = {}
+            self.bans = {0:{}}
         try:
             f = open("enabled.json")
             self.enabled = eval(f.read())
             f.close()
         except:
             self.enabled = {}            
-        self.update()
+        doParallel(self.update,[])
         self.fig = fig
         self.plt = plt
         f = open("auth.json")
         auth = ast.literal_eval(f.read())
         f.close()
+        self.owner_id = auth["owner_id"]
         self.token = auth["discord_token"]
         self.resetGlobals()
         doParallel(self.getModules)
+    def getModule(self,module,category):
+        exec("import "+module+" as _vars_",globals())
+        commands = []
+        vd = _vars_.__dict__
+        for k in vd:
+            var = vd[k]
+            try:
+                assert(var.is_command)
+                obj = var()
+                obj.__name__ = var.__name__
+                obj.name.append(obj.__name__)
+                commands.append(obj)
+            except AttributeError:
+                pass
+        self.categories[category] = commands
     def getModules(self):
         comstr = "commands_"
         files = [f for f in os.listdir('.') if f[-3:]==".py" and comstr in f]
@@ -84,24 +99,7 @@ class _globals:
         for f in files:
             module = f[:-3]
             category = module.replace(comstr,"")
-            try:
-                exec("import "+module+" as _vars_",globals())
-            except:
-                print("Failed to import "+module+" as command category.")
-                continue
-            commands = []
-            vd = _vars_.__dict__
-            for k in vd:
-                var = vd[k]
-                try:
-                    assert(var.is_command)
-                    obj = var()
-                    obj.__name__ = var.__name__
-                    obj.name.append(obj.__name__)
-                    commands.append(obj)
-                except:
-                    pass
-            self.categories[category] = commands
+            doParallel(self.getModule,[module,category])
     def update(self):
         f = open("perms.json","w")
         f.write(str(self.perms))
@@ -188,17 +186,42 @@ async def processMessage(message):
     msg = msg.replace("`","")
     user = message.author
     guild = message.guild
-    g_id = guild.id
     u_id = user.id
-    try:
-        enabled = _vars.enabled[g_id]
-    except:
-        enabled = _vars.enabled[g_id] = ["string","admin"]
-        _vars.update()
+    if guild:
+        g_id = guild.id
+    else:
+        g_id = 0
+    if g_id:
+        try:
+            enabled = _vars.enabled[g_id]
+        except KeyError:
+            enabled = _vars.enabled[g_id] = ["string","admin"]
+            _vars.update()
+    else:
+        enabled = list(_vars.categories)
     u_perm = _vars.getPerms(user.id,guild)
     ch = channel = message.channel
+    
+    check = "<@!"+str(client.user.id)+">"
+    suspended = _vars.bans[0].get(u_id,False)
+    if suspended or msg.replace(" ","")==check:
+        if not u_perm<0 and not suspended:
+            await channel.send("Hi, did you require my services for anything? Use ~? or ~help for help.")
+        else:
+            doParallel(print,["Ignoring command from suspended user "+user.name+" ("+str(u_id)+")."])
+            await channel.send("Sorry, you are currently not permitted to request my services.")
+        return
     if msg[0]=="~" and msg[1]!="~":
         comm = msg[1:]
+        op = True
+    elif msg[:len(check)] == check:
+        comm = msg[len(check):]
+        while comm[0] == " ":
+            comm = comm[1:]
+        op = True
+    else:
+        op = False
+    if op:
         commands = []
         for catg in categories:
             if catg in enabled or catg == "main":
@@ -210,104 +233,97 @@ async def processMessage(message):
                 check = comm[:length].lower()
                 argv = comm[length:]
                 if check==alias and (len(comm)==length or comm[length]==" " or comm[length]=="?"):
-                    print(user.name+" ("+str(u_id)+") issued command "+msg)
+                    doParallel(print,[user.name+" ("+str(u_id)+") issued command "+msg])
                     req = command.minm
-                    if not req > u_perm:
-                        try:
-                            await channel.trigger_typing()
-                            if argv:
-                                while argv[0] == " ":
-                                    argv = argv[1:]
-                            flags = {}
-                            for c in range(26):
-                                char = chr(c+97)
-                                flag = "?"+char
-                                for r in (flag.lower(),flag.upper()):
-                                    if len(argv)>=4 and r in argv:
-                                        i = argv.index(r)
-                                        if i==0 or argv[i-1]==" " or argv[i-2]=="?":
-                                            try:
-                                                if argv[i+2]==" " or argv[i+2]=="?":
-                                                    argv = argv[:i]+argv[i+2:]
-                                                    addDict(flags,{char:1})
-                                            except:
-                                                pass
-                            for c in range(26):
-                                char = chr(c+97)
-                                flag = "?"+char
-                                for r in (flag.lower(),flag.upper()):
-                                    if len(argv)>=2 and r in argv:
-                                        for check in (r+" "," "+r):
-                                            if check in argv:
-                                                argv = argv.replace(check,"")
-                                                addDict(flags,{char:1})
-                                        if argv == flag:
-                                            argv = ""
-                                            addDict(flags,{char:1})
-                            a = argv.replace('"',"\0")
-                            b = a.replace("'","")
-                            c = b.replace("<","'")
-                            d = c.replace(">","'")
-                            args = shlex.split(d)
-                            for a in range(len(args)):
-                                args[a] = args[a].replace("","'").replace("\0",'"')
-                            response = await command(
-                                client=client,      #for interfacing with discord
-                                _vars=_vars,        #for interfacing with bot's database
-                                argv=argv,          #raw text arguments
-                                args=args,          #split text arguments
-                                flags=flags,        #special flags
-                                user=user,          #user that invoked the command
-                                message=message,    #message data
-                                channel=channel,    #channel data
-                                guild=guild,        #guild data
-                                name=alias,         #alias the command was called as
-                                )
-                            if response is not None:
-                                if len(response) < 65536:
-                                    print(response)
-                                else:
-                                    print("[RESPONSE OVER 64KB]")
-                                if type(response) is list:
-                                    for r in response:
-                                        await channel.send(r)
-                                else:
-                                    await channel.send(response)
-                        except discord.HTTPException:
-                            try:
-                                fn = "cache/temp.txt"
-                                _f = open(fn,"wb")
-                                _f.write(bytes(response,"utf-8"))
-                                _f.close()
-                                _f = discord.File(fn)
-                                await channel.send("Response too long for message.",file=_f)
-                            except:
-                                raise
-                        except Exception as ex:
-                            rep = repr(ex)
-                            if len(rep) > 1900:
-                                await channel.send("```\nError: Error message too long.\n```")
-                            else:
-                                await channel.send("```\nError: "+rep+"\n```")
-                        return
-                    else:
+                    if req>u_perm or (u_perm is not nan and req is nan):
                         await channel.send(
-                            "Error: Insufficient priviliges for command "+command+"\
-    .\nRequred level: **__"+expNum(req)+"__**, Current level: **__"+expNum(u_perm)+"__**")
+                            "Error: Insufficient priviliges for command "+alias+"\
+.\nRequred level: **__"+str(req)+"__**, Current level: **__"+str(u_perm)+"__**")
                         return
-    msg = message.content
-    if msg == "<@!"+str(client.user.id)+">":
-        if not u_perm < 0:
-            await channel.send("Hi, did you require my services for anything?")
-        else:
-            await channel.send("Sorry, you are currently not permitted to request my services.")
+                    try:
+                        await channel.trigger_typing()
+                        if argv:
+                            while argv[0] == " ":
+                                argv = argv[1:]
+                        flags = {}
+                        for c in range(26):
+                            char = chr(c+97)
+                            flag = "?"+char
+                            for r in (flag.lower(),flag.upper()):
+                                if len(argv)>=4 and r in argv:
+                                    i = argv.index(r)
+                                    if i==0 or argv[i-1]==" " or argv[i-2]=="?":
+                                        try:
+                                            if argv[i+2]==" " or argv[i+2]=="?":
+                                                argv = argv[:i]+argv[i+2:]
+                                                addDict(flags,{char:1})
+                                        except:
+                                            pass
+                        for c in range(26):
+                            char = chr(c+97)
+                            flag = "?"+char
+                            for r in (flag.lower(),flag.upper()):
+                                if len(argv)>=2 and r in argv:
+                                    for check in (r+" "," "+r):
+                                        if check in argv:
+                                            argv = argv.replace(check,"")
+                                            addDict(flags,{char:1})
+                                    if argv == flag:
+                                        argv = ""
+                                        addDict(flags,{char:1})
+                        a = argv.replace('"',"\0")
+                        b = a.replace("'","")
+                        c = b.replace("<","'")
+                        d = c.replace(">","'")
+                        args = shlex.split(d)
+                        for a in range(len(args)):
+                            args[a] = args[a].replace("","'").replace("\0",'"')
+                        response = await command(
+                            client=client,      #for interfacing with discord
+                            _vars=_vars,        #for interfacing with bot's database
+                            argv=argv,          #raw text arguments
+                            args=args,          #split text arguments
+                            flags=flags,        #special flags
+                            user=user,          #user that invoked the command
+                            message=message,    #message data
+                            channel=channel,    #channel data
+                            guild=guild,        #guild data
+                            name=alias,         #alias the command was called as
+                            )
+                        if response is not None:
+                            if len(response) < 65536:
+                                doParallel(print,[response])
+                            else:
+                                print("[RESPONSE OVER 64KB]")
+                            if type(response) is list:
+                                for r in response:
+                                    await channel.send(r)
+                            else:
+                                await channel.send(response)
+                    except discord.HTTPException:
+                        fn = "cache/temp.txt"
+                        _f = open(fn,"wb")
+                        _f.write(bytes(response,"utf-8"))
+                        _f.close()
+                        _f = discord.File(fn)
+                        await channel.send("Response too long for message.",file=_f)
+                    except Exception as ex:
+                        rep = repr(ex)
+                        if len(rep) > 1900:
+                            await channel.send("```\nError: Error message too long.\n```")
+                        else:
+                            await channel.send("```\nError: "+rep+"\n```")
+                    return
 
 @client.event
 async def on_ready():
     print("Successfully connected as "+str(client.user))
     print("Servers: ")
     for guild in client.guilds:
-        print(guild)
+        if guild.unavailable:
+            print(str(guild.id)+" is not available.")
+        else:
+            print(guild.name)
     await handleUpdate()
 ##    print("Users: ")
 ##    for guild in client.guilds:
@@ -323,7 +339,7 @@ async def handleUpdate(force=False):
             for g in bans:
                 bl = list(bans[g])
                 for b in bl:
-                    if dtime >= bans[g][b][0]:
+                    if type(bans[g][b]) is list and dtime>=bans[g][b][0]:
                         u_target = await client.fetch_user(b)
                         g_target = await client.fetch_guild(g)
                         c_target = await client.fetch_channel(bans[g][b][1])
@@ -361,40 +377,41 @@ async def checkDelete(message,reaction,user):
                         temp = message.content
                         await message.delete()
                         print(temp+" deleted by "+user.name)
-                    except:
-                        pass
+                    except Exception as ex:
+                        print(repr(ex))
             await handleUpdate()
                             
 async def reactCallback(message,reaction,user):
     if message.author.id == client.user.id:
+        suspended = _vars.bans[0].get(user.id,False)
+        if suspended:
+            return
         u_perm = _vars.getPerms(user.id,message.guild)
         check = "```callback-"
         msg = message.content.split("\n")[0]
         if msg[:len(check)] == check:
-            try:
-                msg = msg[len(check):]
-                args = msg.split("-")
-                catx = args[0]
-                func = args[1]
-                vals = args[2]
-                argv = "-".join(args[3:])
-                catg = _vars.categories[catx]
-                for f in catg:
-                    if f.__name__ == func:
-                        try:
-                            await asyncio.wait_for(f._callback_(
-                                client=client,
-                                message=message,
-                                reaction=reaction,
-                                user=user,
-                                perm=u_perm,
-                                vals=vals,
-                                argv=argv),timeout=_vars.timeout)
-                            return
-                        except Exception as ex:
-                            await message.channel.send("```\nError: "+repr(ex)+"\n```")
-            except:
-                raise
+            msg = msg[len(check):]
+            args = msg.split("-")
+            catx = args[0]
+            func = args[1]
+            vals = args[2]
+            argv = "-".join(args[3:])
+            catg = _vars.categories[catx]
+            for f in catg:
+                if f.__name__ == func:
+                    try:
+                        await asyncio.wait_for(f._callback_(
+                            client=client,
+                            message=message,
+                            reaction=reaction,
+                            user=user,
+                            perm=u_perm,
+                            vals=vals,
+                            argv=argv),timeout=_vars.timeout)
+                        return
+                    except Exception as ex:
+                        killThreads()
+                        await message.channel.send("```\nError: "+repr(ex)+"\n```")
 
 @client.event
 async def on_reaction_add(reaction,user):
@@ -416,7 +433,8 @@ async def on_raw_reaction_add(payload):
         channel = await client.fetch_channel(payload.channel_id)
         user = await client.fetch_user(payload.user_id)
         message = await channel.fetch_message(payload.message_id)
-    except:
+    except Exception as ex:
+        print(repr(ex))
         return
     if user.id != client.user.id:
         reaction = payload.emoji
@@ -445,11 +463,12 @@ async def handleMessage(message):
         if "Error: " in msg or "Commands for " in msg or msg=="Response too long for message.":
             try:
                 await message.add_reaction("❎")
-            except:
-                pass
+            except Exception as ex:
+                print(repr(ex))
     try:
         await asyncio.wait_for(processMessage(message),timeout=_vars.timeout)
     except Exception as ex:
+        killThreads()
         await message.channel.send("```\nError: "+repr(ex)+"\n```")
     return
         
@@ -479,8 +498,8 @@ async def on_raw_message_edit(payload):
                 for channel in guild.text_channels:
                     try:
                         message = await channel.fetch_message(payload.message_id)
-                    except:
-                        pass
+                    except Exception as ex:
+                        print(repr(ex))
     if message:
         await handleUpdate()
         await handleMessage(message)

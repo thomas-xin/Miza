@@ -74,7 +74,7 @@ class SheetPull:
         try:
             int(query)
             mode = 0
-        except:
+        except ValueError:
             mode = 1
         if not mode:
             for l in self.data[0]:
@@ -125,7 +125,7 @@ def _m2f(mem,val):
         try:
             output += chr(char)
             output = "<FL"+operation+output[::-1]
-        except:
+        except TypeError:
             output = "<FL"+operation+"(0x"+hex((char+256)&255).upper()[2:]+")"+output[::-1]
         result += output
         val2 >>= 1

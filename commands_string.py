@@ -21,10 +21,7 @@ class PapagoTrans:
         if resp.getcode() != 200:
             raise ConnectionError("Error "+str(resp.getcode()))
         read = resp.read().decode("utf-8")
-        try:
-            r = json.loads(read)
-        except:
-            raise
+        r = json.loads(read)
         t = r["message"]["result"]["translatedText"]
         output = self.PapagoOutput(t)
         return output
@@ -135,11 +132,13 @@ class math:
         _vars.plt.clf()
         if not len(f):
             raise EOFError("Function is empty.")
-        terr = "Error: Timed out."
+        terr = TimeoutError
         returns = [terr]
         doParallel(_vars.doMath,[f,returns])
         while returns[0]==terr and time.time()<tm+_vars.timeout:
             time.sleep(.1)
+        if returns[0] == terr:
+            raise TimeoutError("Request timed out.")
         _vars.updateGlobals()
         if _vars.fig.get_axes():
             fn = "cache/temp.png"
