@@ -1040,8 +1040,10 @@ class _parallel:
                     self.actions = self.actions[1:]
                 self.state = -1
                 time.sleep(.007)
+        def stop(self): 
+            self._stop.set()
         def get_id(self):
-            if hasattr(self, '_thread_id'): 
+            if hasattr(self,'_thread_id'): 
                 return self._thread_id 
             for t_id, thread in threading._active.items(): 
                 if thread is self: 
@@ -1051,8 +1053,10 @@ class _parallel:
             res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
                 thread_id,ctypes.py_object(BaseException)) 
             if res > 1: 
-                ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id,0) 
+                ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                    thread_id,0) 
                 print('Exception raise failure')
+            self.stop()
 def doParallel(func,data_in=None,data_out=[0],start=0,end=None,per=1,delay=0,maxq=64,name=False):
     global processes
     if end == None:
