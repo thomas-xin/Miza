@@ -138,14 +138,7 @@ def _m2f(mem, val):
             output += chr(char)
             output = "<FL" + operation + output[::-1]
         except TypeError:
-            output = (
-                "<FL"
-                + operation
-                + "(0x"
-                + hex((char + 256) & 255).upper()[2:]
-                + ")"
-                + output[::-1]
-            )
+            output = "<FL" + operation + "(0x" + hex((char + 256) & 255).upper()[2:] + ")" + output[::-1]
         result += output
         val2 >>= 1
         curr += 1
@@ -253,9 +246,7 @@ class cs_mod:
     def __init__(self):
         self.name = ["cs_search"]
         self.minm = 0
-        self.desc = (
-            "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
-        )
+        self.desc = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
         self.usag = "<query>"
 
     async def __call__(self, args, flags, **void):

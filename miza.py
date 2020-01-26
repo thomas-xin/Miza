@@ -116,13 +116,7 @@ class _globals:
         f.close()
 
     def verifyID(self, value):
-        return int(
-            str(value)
-            .replace("<", "")
-            .replace(">", "")
-            .replace("@", "")
-            .replace("!", "")
-        )
+        return int(str(value).replace("<", "").replace(">", "").replace("@", "").replace("!", ""))
 
     def getPerms(self, user, guild):
         try:
@@ -169,14 +163,7 @@ class _globals:
         return func
 
     def verifyURL(self, _f):
-        _f = (
-            _f.replace("<", "")
-            .replace(">", "")
-            .replace("|", "")
-            .replace("*", "")
-            .replace("_", "")
-            .replace("`", "")
-        )
+        _f = _f.replace("<", "").replace(">", "").replace("|", "").replace("*", "").replace("_", "").replace("`", "")
         return _f
 
     def doMath(self, f, returns):
@@ -232,23 +219,12 @@ async def processMessage(message):
     suspended = _vars.bans[0].get(u_id, False)
     if suspended or msg.replace(" ", "") == check:
         if not u_perm < 0 and not suspended:
-            await channel.send(
-                "Hi, did you require my services for anything? Use ~? or ~help for help."
-            )
+            await channel.send("Hi, did you require my services for anything? Use ~? or ~help for help.")
         else:
             doParallel(
-                print,
-                [
-                    "Ignoring command from suspended user "
-                    + user.name
-                    + " ("
-                    + str(u_id)
-                    + ")."
-                ],
+                print, ["Ignoring command from suspended user " + user.name + " (" + str(u_id) + ")."],
             )
-            await channel.send(
-                "Sorry, you are currently not permitted to request my services."
-            )
+            await channel.send("Sorry, you are currently not permitted to request my services.")
         return
     if msg[0] == "~" and msg[1] != "~":
         comm = msg[1:]
@@ -271,12 +247,9 @@ async def processMessage(message):
                 length = len(alias)
                 check = comm[:length].lower()
                 argv = comm[length:]
-                if check == alias and (
-                    len(comm) == length or comm[length] == " " or comm[length] == "?"
-                ):
+                if check == alias and (len(comm) == length or comm[length] == " " or comm[length] == "?"):
                     doParallel(
-                        print,
-                        [user.name + " (" + str(u_id) + ") issued command " + msg],
+                        print, [user.name + " (" + str(u_id) + ") issued command " + msg],
                     )
                     req = command.minm
                     if req > u_perm or (u_perm is not nan and req is nan):
@@ -303,11 +276,7 @@ async def processMessage(message):
                             for r in (flag.lower(), flag.upper()):
                                 if len(argv) >= 4 and r in argv:
                                     i = argv.index(r)
-                                    if (
-                                        i == 0
-                                        or argv[i - 1] == " "
-                                        or argv[i - 2] == "?"
-                                    ):
+                                    if i == 0 or argv[i - 1] == " " or argv[i - 2] == "?":
                                         try:
                                             if argv[i + 2] == " " or argv[i + 2] == "?":
                                                 argv = argv[:i] + argv[i + 2 :]
@@ -333,18 +302,7 @@ async def processMessage(message):
                         args = shlex.split(d)
                         for a in range(len(args)):
                             args[a] = args[a].replace("", "'").replace("\0", '"')
-                        response = await command(
-                            client=client,  # for interfacing with discord
-                            _vars=_vars,  # for interfacing with bot's database
-                            argv=argv,  # raw text arguments
-                            args=args,  # split text arguments
-                            flags=flags,  # special flags
-                            user=user,  # user that invoked the command
-                            message=message,  # message data
-                            channel=channel,  # channel data
-                            guild=guild,  # guild data
-                            name=alias,  # alias the command was called as
-                        )
+                        response = await command(client=client, _vars=_vars, argv=argv, args=args, flags=flags, user=user, message=message, channel=channel, guild=guild, name=alias,)  # for interfacing with discord  # for interfacing with bot's database  # raw text arguments  # split text arguments  # special flags  # user that invoked the command  # message data  # channel data  # guild data  # alias the command was called as
                         if response is not None:
                             if len(response) < 65536:
                                 doParallel(print, [response])
@@ -365,9 +323,7 @@ async def processMessage(message):
                     except Exception as ex:
                         rep = repr(ex)
                         if len(rep) > 1900:
-                            await channel.send(
-                                "```\nError: Error message too long.\n```"
-                            )
+                            await channel.send("```\nError: Error message too long.\n```")
                         else:
                             await channel.send("```\nError: " + rep + "\n```")
                     return
@@ -407,21 +363,9 @@ async def handleUpdate(force=False):
                         bans[g].pop(b)
                         try:
                             await g_target.unban(u_target)
-                            await c_target.send(
-                                "**"
-                                + u_target.name
-                                + "** has been unbanned from **"
-                                + g_target.name
-                                + "**."
-                            )
+                            await c_target.send("**" + u_target.name + "** has been unbanned from **" + g_target.name + "**.")
                         except:
-                            await c_target.send(
-                                "Unable to unban **"
-                                + u_target.name
-                                + "** from **"
-                                + g_target.name
-                                + "**."
-                            )
+                            await c_target.send("Unable to unban **" + u_target.name + "** from **" + g_target.name + "**.")
             f = open("bans.json", "w")
             f.write(str(bans))
             f.close()
@@ -476,16 +420,7 @@ async def reactCallback(message, reaction, user):
                 if f.__name__ == func:
                     try:
                         await asyncio.wait_for(
-                            f._callback_(
-                                client=client,
-                                message=message,
-                                reaction=reaction,
-                                user=user,
-                                perm=u_perm,
-                                vals=vals,
-                                argv=argv,
-                            ),
-                            timeout=_vars.timeout,
+                            f._callback_(client=client, message=message, reaction=reaction, user=user, perm=u_perm, vals=vals, argv=argv,), timeout=_vars.timeout,
                         )
                         return
                     except Exception as ex:
@@ -546,11 +481,7 @@ async def handleMessage(message):
     if not len(msg) > 1:
         return
     elif u_id == client.user.id:
-        if (
-            "Error: " in msg
-            or "Commands for " in msg
-            or msg == "Response too long for message."
-        ):
+        if "Error: " in msg or "Commands for " in msg or msg == "Response too long for message.":
             try:
                 await message.add_reaction("❎")
             except Exception as ex:

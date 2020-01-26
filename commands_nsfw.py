@@ -100,9 +100,7 @@ rule34_sync = rule34.Sync()
 def pull_rule34_xxx(argv, data, thr, delay=5):
     v1, v2 = 1, 1
     try:
-        sources = rule34_sync.getImages(
-            tags=argv, fuzzy=True, randomPID=True, singlePage=True
-        )
+        sources = rule34_sync.getImages(tags=argv, fuzzy=True, randomPID=True, singlePage=True)
         if sources:
             v2 = xrand(len(sources))
             url = sources[v2].file_url
@@ -327,9 +325,7 @@ class neko:
                 if neko_tags.get(tag, 0) == True:
                     tagNSFW = True
                     if not isNSFW:
-                        raise PermissionError(
-                            "This command is only available in NSFW channels."
-                        )
+                        raise PermissionError("This command is only available in NSFW channels.")
                 selected.append(tag)
         for x in range(flags.get("r", 0)):
             possible = [i for i in neko_tags if neko_tags[i] <= isNSFW]
@@ -373,9 +369,7 @@ class lewd:
     def __init__(self):
         self.name = ["nsfw"]
         self.minm = 1
-        self.desc = (
-            "Pulls a random image from a search on Rule34 and e621, and embeds it."
-        )
+        self.desc = "Pulls a random image from a search on Rule34 and e621, and embeds it."
         self.usag = "<query> <verbose:(?v)>"
 
     async def __call__(self, _vars, args, flags, channel, **void):
@@ -384,15 +378,7 @@ class lewd:
         objs = await searchRandomNSFW(" ".join(args), _vars.timeout)
         url = objs[0]
         if "v" in flags:
-            text = (
-                "Pulled from "
-                + url
-                + "\nImage **__"
-                + str(objs[2])
-                + "__** on page **__"
-                + str(objs[1])
-                + "__**"
-            )
+            text = "Pulled from " + url + "\nImage **__" + str(objs[2]) + "__** on page **__" + str(objs[1]) + "__**"
             return text
         else:
             emb = discord.Embed(url=url)

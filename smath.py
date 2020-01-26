@@ -632,9 +632,7 @@ def expNum(num, maxlen=10, decimals=0):
                 loglen = floor(math.log10(numlen)) + len(n)
         else:
             loglen = 0
-        s = roundX(num / 10 ** numlen, maxlen - loglen - 5)[
-            : max(1, maxlen - loglen - 2)
-        ]
+        s = roundX(num / 10 ** numlen, maxlen - loglen - 5)[: max(1, maxlen - loglen - 2)]
         if s[:3] == "10.":
             s = "9." + "9" * (maxlen - loglen - 4)
         return n + s + "e+" + str(numlen)
@@ -822,28 +820,16 @@ def resizeVector(v, length, mode=5):
     elif mode == 0:
         resized = numpy.array([v[round(i / new * size) % size] for i in range(new)])
     elif mode <= 5 and mode == int(mode):
-        spl = interpolate.splrep(
-            numpy.arange(1 + size), numpy.append(v, v[0]), k=int(min(size, mode))
-        )
-        resized = numpy.array(
-            [interpolate.splev((i / new * size) % size, spl) for i in range(new)]
-        )
+        spl = interpolate.splrep(numpy.arange(1 + size), numpy.append(v, v[0]), k=int(min(size, mode)))
+        resized = numpy.array([interpolate.splev((i / new * size) % size, spl) for i in range(new)])
     elif mode <= 5:
         if math.floor(mode) == 0:
             resized1 = resizeVector(v, new, 0)
         else:
-            spl1 = interpolate.splrep(
-                numpy.arange(1 + size), numpy.append(v, v[0]), k=floor(min(size, mode))
-            )
-            resized1 = numpy.array(
-                [interpolate.splev((i / new * size) % size, spl1) for i in range(new)]
-            )
-        spl2 = interpolate.splrep(
-            numpy.arange(1 + size), numpy.append(v, v[0]), k=ceil(min(size, mode))
-        )
-        resized2 = numpy.array(
-            [interpolate.splev((i / new * size) % size, spl2) for i in range(new)]
-        )
+            spl1 = interpolate.splrep(numpy.arange(1 + size), numpy.append(v, v[0]), k=floor(min(size, mode)))
+            resized1 = numpy.array([interpolate.splev((i / new * size) % size, spl1) for i in range(new)])
+        spl2 = interpolate.splrep(numpy.arange(1 + size), numpy.append(v, v[0]), k=ceil(min(size, mode)))
+        resized2 = numpy.array([interpolate.splev((i / new * size) % size, spl2) for i in range(new)])
         resized = resized1 * (1 - mode % 1) + (mode % 1) * resized2
     else:
         resizing = []
@@ -863,20 +849,9 @@ def get(v, i, mode=5):
     elif mode == 1:
         return v[floor(i) % size] * (1 - i % 1) + v[ceil(i) % size] * (i % 1)
     elif mode == int(mode):
-        return roundMin(
-            interpolate.splev(
-                i,
-                interpolate.splrep(
-                    numpy.arange(1 + size),
-                    numpy.append(v, v[0]),
-                    k=int(min(size, mode)),
-                ),
-            )
-        )
+        return roundMin(interpolate.splev(i, interpolate.splrep(numpy.arange(1 + size), numpy.append(v, v[0]), k=int(min(size, mode)),),))
     else:
-        return get(v, i, floor(mode)) * (1 - mode % 1) + (mode % 1) * get(
-            v, i, ceil(mode)
-        )
+        return get(v, i, floor(mode)) * (1 - mode % 1) + (mode % 1) * get(v, i, ceil(mode))
 
 
 def product(*nums):
@@ -1271,26 +1246,14 @@ class _parallel:
 
         def kill(self):
             thread_id = self.get_id()
-            res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                thread_id, ctypes.py_object(TimeoutError)
-            )
+            res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(TimeoutError))
             if res > 1:
-                ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                    thread_id, ctypes.py_object(BaseException)
-                )
+                ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(BaseException))
                 self.stop()
 
 
 def doParallel(
-    func,
-    data_in=None,
-    data_out=[0],
-    start=0,
-    end=None,
-    per=1,
-    delay=0,
-    maxq=64,
-    name=False,
+    func, data_in=None, data_out=[0], start=0, end=None, per=1, delay=0, maxq=64, name=False,
 ):
     global processes
     if end == None:

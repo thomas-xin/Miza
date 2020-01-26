@@ -36,15 +36,7 @@ class help:
         show = []
         for a in args:
             if a in categories and (a in enabled or a == "main"):
-                show.append(
-                    "\nCommands for **"
-                    + user.name
-                    + "** in **"
-                    + g_name
-                    + "** in category **"
-                    + a
-                    + "**:"
-                )
+                show.append("\nCommands for **" + user.name + "** in **" + g_name + "** in category **" + a + "**:")
                 for com in categories[a]:
                     name = com.__name__
                     minm = com.minm
@@ -115,24 +107,8 @@ Effect: "
                     if not verb:
                         show.append("`" + name + " " + usag + "`")
                     else:
-                        show.append(
-                            "\n`"
-                            + com.__name__
-                            + "`\nEffect: "
-                            + com.desc
-                            + "\nUsage: "
-                            + name
-                            + " "
-                            + usag
-                        )
-            return (
-                "Commands for **"
-                + user.name
-                + "** in **"
-                + g_name
-                + "**:\n"
-                + "\n".join(show)
-            )
+                        show.append("\n`" + com.__name__ + "`\nEffect: " + com.desc + "\nUsage: " + name + " " + usag)
+            return "Commands for **" + user.name + "** in **" + g_name + "**:\n" + "\n".join(show)
         return "\n".join(show)
 
 
@@ -218,15 +194,7 @@ class changePerms:
                     + str(s_perm)
                     + "__**"
                 )
-        return (
-            "Current permissions for **"
-            + t_user.name
-            + "** in **"
-            + guild.name
-            + "**: **__"
-            + str(t_perm)
-            + "__**"
-        )
+        return "Current permissions for **" + t_user.name + "** in **" + guild.name + "**: **__" + str(t_perm) + "__**"
 
 
 class enableCommand:
@@ -235,9 +203,7 @@ class enableCommand:
     def __init__(self):
         self.name = ["ec", "enable"]
         self.minm = 3
-        self.desc = (
-            "Shows, enables, or disables a command category in the current server."
-        )
+        self.desc = "Shows, enables, or disables a command category in the current server."
         self.usag = "<command:{all}> <enable:(?e)> <disable:(?d)> <hide:(?h)>"
 
     async def __call__(self, client, _vars, argv, flags, guild, **void):
@@ -289,13 +255,7 @@ class enableCommand:
                     _vars.update()
                     if "h" in flags:
                         return
-                    return (
-                        "Enabled command category **"
-                        + catg
-                        + "** in **"
-                        + guild.name
-                        + "**."
-                    )
+                    return "Enabled command category **" + catg + "** in **" + guild.name + "**."
                 if "d" in flags:
                     if catg not in enabled:
                         return (
@@ -310,13 +270,7 @@ class enableCommand:
                     _vars.update()
                     if "h" in flags:
                         return
-                    return (
-                        "Disabled command category **"
-                        + catg
-                        + "** in **"
-                        + guild.name
-                        + "**."
-                    )
+                    return "Disabled command category **" + catg + "** in **" + guild.name + "**."
                 return (
                     "Command category **"
                     + catg
@@ -353,31 +307,17 @@ class suspend:
     def __init__(self):
         self.name = []
         self.minm = nan
-        self.desc = (
-            "Prevents a user from accessing the bot's commands. Overrides ~perms."
-        )
+        self.desc = "Prevents a user from accessing the bot's commands. Overrides ~perms."
         self.usag = "<0:user> <1:value:[]>"
 
     async def __call__(self, _vars, client, user, guild, args, **void):
         if len(args) < 2:
             if len(args) >= 1:
                 user = await client.fetch_user(_vars.verifyID(args[0]))
-            return (
-                "Current suspension status of **"
-                + user.name
-                + "**: **__"
-                + str(_vars.bans[0].get(user.id, None))
-                + "__**."
-            )
+            return "Current suspension status of **" + user.name + "**: **__" + str(_vars.bans[0].get(user.id, None)) + "__**."
         else:
             user = await client.fetch_user(_vars.verifyID(args[0]))
             change = _vars.evalMath(args[1])
             _vars.bans[0][user.id] = change
             _vars.update()
-            return (
-                "Changed suspension status of **"
-                + user.name
-                + "** to **__"
-                + str(change)
-                + "__**."
-            )
+            return "Changed suspension status of **" + user.name + "** to **__" + str(change) + "__**."

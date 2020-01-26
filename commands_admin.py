@@ -8,14 +8,10 @@ class purge:
     def __init__(self):
         self.name = ["del", "delete"]
         self.minm = 1
-        self.desc = (
-            "Deletes a number of messages from a certain user in current channel."
-        )
+        self.desc = "Deletes a number of messages from a certain user in current channel."
         self.usag = "<1:user:{bot}(?a)> <0:count:[1]> <hide:(?h)>"
 
-    async def __call__(
-        self, client, _vars, argv, args, channel, user, guild, name, flags, **void
-    ):
+    async def __call__(self, client, _vars, argv, args, channel, user, guild, name, flags, **void):
         t_user = -1
         if "a" in flags or "@everyone" in argv or "@here" in argv:
             t_user = None
@@ -65,13 +61,7 @@ class purge:
                 except Exception as ex:
                     print(repr(ex))
         if not "h" in flags:
-            return (
-                "Deleted **__"
-                + str(deleted)
-                + "__** message"
-                + "s" * (deleted != 1)
-                + "!"
-            )
+            return "Deleted **__" + str(deleted) + "__** message" + "s" * (deleted != 1) + "!"
 
 
 class ban:
@@ -80,9 +70,7 @@ class ban:
     def __init__(self):
         self.name = []
         self.minm = 3
-        self.desc = (
-            "Bans a user for a certain amount of hours, with an optional reason."
-        )
+        self.desc = "Bans a user for a certain amount of hours, with an optional reason."
         self.usag = "<0:user> <1:hours[]> <2:reason[]> <hide:(?h)>"
 
     async def __call__(self, client, _vars, args, user, channel, guild, flags, **void):
@@ -134,13 +122,7 @@ class ban:
                     + "."
                 )
         elif len(args) < 2:
-            return (
-                "**"
-                + t_user.name
-                + "** is currently not banned from **"
-                + guild.name
-                + "**."
-            )
+            return "**" + t_user.name + "** is currently not banned from **" + guild.name + "**."
         g_bans[t_user.id] = [tm * 3600 + dtime, channel.id]
         _vars.bans[g_id] = g_bans
         _vars.update()

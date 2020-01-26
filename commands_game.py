@@ -42,19 +42,14 @@ class text2048:
                                         a = 0
                                     elif type(gamestate[0][x][y]) is float:
                                         if type(gamestate[0][x - z][y]) is int:
-                                            gamestate[0][x - z][y] += round(
-                                                gamestate[0][x][y] * 10
-                                            )
+                                            gamestate[0][x - z][y] += round(gamestate[0][x][y] * 10)
                                             gamestate[0][x][y] = 0
                                         else:
                                             gamestate[0][x - z][y] += gamestate[0][x][y]
                                             gamestate[0][x][y] = 0
                                         a = 0
                                     elif type(gamestate[0][x - z][y]) is float:
-                                        gamestate[0][x - z][y] = (
-                                            round(gamestate[0][x - z][y] * 10)
-                                            + gamestate[0][x][y]
-                                        )
+                                        gamestate[0][x - z][y] = round(gamestate[0][x - z][y] * 10) + gamestate[0][x][y]
                                         gamestate[0][x][y] = 0
                                         a = 0
                                     elif gamestate[0][x - z][y] == gamestate[0][x][y]:
@@ -73,19 +68,14 @@ class text2048:
                                         a = 0
                                     elif type(gamestate[0][x][y]) is float:
                                         if type(gamestate[0][x][y - z]) is int:
-                                            gamestate[0][x][y - z] += round(
-                                                gamestate[0][x][y] * 10
-                                            )
+                                            gamestate[0][x][y - z] += round(gamestate[0][x][y] * 10)
                                             gamestate[0][x][y] = 0
                                         else:
                                             gamestate[0][x][y - z] += gamestate[0][x][y]
                                             gamestate[0][x][y] = 0
                                         a = 0
                                     elif type(gamestate[0][x][y - z]) is float:
-                                        gamestate[0][x][y - z] = (
-                                            round(gamestate[0][x][y - z] * 10)
-                                            + gamestate[0][x][y]
-                                        )
+                                        gamestate[0][x][y - z] = round(gamestate[0][x][y - z] * 10) + gamestate[0][x][y]
                                         gamestate[0][x][y] = 0
                                         a = 0
                                     elif gamestate[0][x][y - z] == gamestate[0][x][y]:
@@ -95,14 +85,7 @@ class text2048:
         if not a:
             if i != 4:
                 self.spawn(gamestate[0], mode, 1)
-            gsr = (
-                str(gamestate)
-                .replace("[", "A")
-                .replace("]", "B")
-                .replace(",", "C")
-                .replace("-", "D")
-                .replace(" ", "")
-            )
+            gsr = str(gamestate).replace("[", "A").replace("]", "B").replace(",", "C").replace("-", "D").replace(" ", "")
             orig = message.content.split("\n")[0].split("-")
             last = "-".join(orig[:-1])
             text = last + "-" + gsr + "\n"
@@ -124,15 +107,7 @@ class text2048:
                     empty = size - len(num)
                     text += "|" + " " * (empty + 1 >> 1) + num + " " * (empty >> 1)
                 text += "|\n"
-            text += (
-                ("+" + "-" * size) * width
-                + "+"
-                + "\nPlayer: "
-                + username
-                + "\nScore: "
-                + str(score)
-                + "```"
-            )
+            text += ("+" + "-" * size) * width + "+" + "\nPlayer: " + username + "\nScore: " + str(score) + "```"
             doParallel(print, [text])
             await message.edit(content=text)
 
@@ -160,15 +135,11 @@ class text2048:
                 gamestate[x][y] = v
                 i += 1
 
-    async def _callback_(
-        self, client, message, reaction, argv, user, perm, vals, **void
-    ):
+    async def _callback_(self, client, message, reaction, argv, user, perm, vals, **void):
         u_id, mode = [int(x) for x in vals.split("_")]
         if reaction is not None and u_id != user.id and u_id != 0 and perm < 3:
             return
-        gamestate = ast.literal_eval(
-            argv.replace("A", "[").replace("B", "]").replace("C", ",").replace("D", "-")
-        )
+        gamestate = ast.literal_eval(argv.replace("A", "[").replace("B", "]").replace("C", ",").replace("D", "-"))
         if reaction is not None:
             try:
                 reaction = self.directions.index(str(reaction))
@@ -213,21 +184,6 @@ class text2048:
         if "e" in flags:
             mode |= 1
         gamestate = [[[0 for y in range(size)] for x in range(size)]] * 2
-        gsr = (
-            str(gamestate)
-            .replace("[", "A")
-            .replace("]", "B")
-            .replace(",", "C")
-            .replace("-", "D")
-            .replace(" ", "")
-        )
-        text = (
-            "```callback-game-text2048-"
-            + str(u_id)
-            + "_"
-            + str(mode)
-            + "-"
-            + gsr
-            + "\nStarting Game...```"
-        )
+        gsr = str(gamestate).replace("[", "A").replace("]", "B").replace(",", "C").replace("-", "D").replace(" ", "")
+        text = "```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + gsr + "\nStarting Game...```"
         return text
