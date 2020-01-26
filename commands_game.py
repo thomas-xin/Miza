@@ -44,9 +44,11 @@ class text2048:
                                         else:
                                             gamestate[0][x-z][y] += gamestate[0][x][y]
                                             gamestate[0][x][y] = 0
+                                        a = 0
                                     elif type(gamestate[0][x-z][y]) is float:
                                         gamestate[0][x-z][y] = round(gamestate[0][x-z][y]*10)+gamestate[0][x][y]
                                         gamestate[0][x][y] = 0
+                                        a = 0
                                     elif gamestate[0][x-z][y]==gamestate[0][x][y]:
                                         gamestate[0][x-z][y] += 1
                                         gamestate[0][x][y] = 0
@@ -68,9 +70,11 @@ class text2048:
                                         else:
                                             gamestate[0][x][y-z] += gamestate[0][x][y]
                                             gamestate[0][x][y] = 0
+                                        a = 0
                                     elif type(gamestate[0][x][y-z]) is float:
                                         gamestate[0][x][y-z] = round(gamestate[0][x][y-z]*10)+gamestate[0][x][y]
                                         gamestate[0][x][y] = 0
+                                        a = 0
                                     elif gamestate[0][x][y-z]==gamestate[0][x][y]:
                                         gamestate[0][x][y-z] += 1
                                         gamestate[0][x][y] = 0
