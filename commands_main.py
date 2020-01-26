@@ -105,8 +105,11 @@ class changePerms:
             s_perm = _vars.getPerms(s_user.id,guild)
             t_user = await client.fetch_user(_vars.verifyID(args[0]))
             t_perm = _vars.getPerms(t_user.id,guild)
-            m_perm = max(t_perm,c_perm,1)+1
-            if not(s_perm==m_perm) and s_perm>=m_perm:
+            if t_perm == nan:
+                m_perm = nan
+            else:
+                m_perm = max(t_perm,c_perm,1)+1
+            if not s_perm<=m_perm and isValid(m_perm):
                 g_perm = _vars.perms.get(guild.id,{})
                 g_perm.update({t_user.id:c_perm})
                 _vars.perms[guild.id] = g_perm
@@ -114,13 +117,13 @@ class changePerms:
                 if "h" in flags:
                     return
                 return "Changed permissions for **"+t_user.name+"** in **"+guild.name+"** from \
-**__"+expNum(t_perm,12,4)+"__** to **__"+expNum(c_perm,12,4)+"__**."
+**__"+str(t_perm)+"__** to **__"+str(c_perm)+"__**."
             else:
-                return "```\nError:\n```\nInsufficient priviliges to change permissions for \
-**"+t_user.name+"** in **"+guild.name+"** from **__"+expNum(t_perm,12,4)+"__** to \
-**__"+expNum(c_perm,12,4)+"__**.\nRequired level: \
-**__"+expNum(m_perm,12,4)+"__**, Current level: **__"+expNum(s_perm,12,4)+"__**"
-        return "Current permissions for **"+t_user.name+"** in **"+guild.name+"**: **__"+expNum(t_perm,12,4)+"__**"
+                return "Error: Insufficient priviliges to change permissions for \
+**"+t_user.name+"** in **"+guild.name+"** from **__"+str(t_perm)+"__** to \
+**__"+str(c_perm)+"__**.\nRequired level: \
+**__"+str(m_perm)+"__**, Current level: **__"+str(s_perm)+"__**"
+        return "Current permissions for **"+t_user.name+"** in **"+guild.name+"**: **__"+str(t_perm)+"__**"
     
 class enableCommand:
     is_command = True

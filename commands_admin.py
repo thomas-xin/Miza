@@ -29,7 +29,7 @@ class purge:
             s_perm = _vars.getPerms(user,guild)
             if s_perm < 3:
                 return "Error: Insufficient priviliges for command "+name+" "+args[1]+"\
-.\nRequred level: **__"+expNum(3,12,4)+"__**, Current level: **__"+expNum(s_perm,12,4)+"__**"
+.\nRequred level: **__"+'3'+"__**, Current level: **__"+str(s_perm)+"__**"
         hist = await channel.history(limit=128).flatten()
         delM = []
         deleted = 0
@@ -65,9 +65,10 @@ class ban:
         t_user = await client.fetch_user(_vars.verifyID(a1))
         s_perm = _vars.getPerms(user,guild)
         t_perm = _vars.getPerms(t_user,guild)
-        if not s_perm>=t_perm+1:
-            return "Error: Insufficient priviliges to ban **"+t_user.name+"** from \
-**"+guild.name+"**.\nRequired level: **__"+expNum(t_perm+1,12,4)+"__**, Current level: **__"+expNum(s_perm,12,4)+"__**"
+        if t_perm+1>=s_perm or not isValid(t_perm):
+            if len(args) > 1:
+                return "Error: Insufficient priviliges to ban **"+t_user.name+"** from \
+**"+guild.name+"**.\nRequired level: **__"+str(t_perm+1)+"__**, Current level: **__"+str(s_perm)+"__**"
         if len(args) < 2:
             tm = 0
         else:
@@ -83,7 +84,7 @@ class ban:
             is_banned = is_banned[0]-dtime
             if len(args) < 2:
                 return "Current ban for **"+t_user.name+"** from \
-**"+guild.name+"**: **__"+expNum(is_banned/3600,16,8)+"__** hours."
+**"+guild.name+"**: **__"+str(is_banned/3600)+"__** hours."
         elif len(args) < 2:
             return "**"+t_user.name+"** is currently not banned from **"+guild.name+"**."
         g_bans[t_user.id] = [tm*3600+dtime,channel.id]
@@ -91,12 +92,13 @@ class ban:
         _vars.update()
         if tm >= 0:
             await guild.ban(t_user,reason=msg,delete_message_days=0)
+        response = None
         if is_banned:
             response = "Updated ban for **"+t_user.name+"** from \
-**__"+expNum(is_banned/3600,16,8)+"__** hours to **__"+expNum(tm,16,8)+"__** hours."
+**__"+str(is_banned/3600)+"__** hours to **__"+str(tm)+"__** hours."
         elif tm >= 0:
             response = "**"+t_user.name+"** has been banned from \
-**"+guild.name+"** for **__"+expNum(tm,16,8)+"__** hours."
+**"+guild.name+"** for **__"+str(tm)+"__** hours."
         if msg:
             response += " Reason: **"+msg+"**."
         if "h" not in flags:

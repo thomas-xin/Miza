@@ -49,7 +49,7 @@ class _globals:
         ]
     def __init__(self):
         self.lastCheck = time.time()
-        self.queue = []
+        self.queue = {}
         try:
             f = open("perms.json")
             self.perms = eval(f.read())
@@ -88,6 +88,7 @@ class _globals:
                 exec("import "+module+" as _vars_",globals())
             except:
                 print("Failed to import "+module+" as command category.")
+                raise
                 continue
             commands = []
             vd = _vars_.__dict__
@@ -210,7 +211,7 @@ async def processMessage(message):
                 check = comm[:length].lower()
                 argv = comm[length:]
                 if check==alias and (len(comm)==length or comm[length]==" " or comm[length]=="?"):
-                    print(user.name+" ("+str(u_id)+") issued command "+msg)
+                    doParallel(print,[user.name+" ("+str(u_id)+") issued command "+msg])
                     req = command.minm
                     if not req > u_perm:
                         try:
@@ -265,7 +266,7 @@ async def processMessage(message):
                                 )
                             if response is not None:
                                 if len(response) < 65536:
-                                    print(response)
+                                    doParallel(print,[response])
                                 else:
                                     print("[RESPONSE OVER 64KB]")
                                 if type(response) is list:
@@ -292,13 +293,14 @@ async def processMessage(message):
                         return
                     else:
                         await channel.send(
-                            "Error: Insufficient priviliges for command "+command+"\
-    .\nRequred level: **__"+expNum(req)+"__**, Current level: **__"+expNum(u_perm)+"__**")
+                            "Error: Insufficient priviliges for command "+alias+"\
+.\nRequred level: **__"+str(req)+"__**, Current level: **__"+str(u_perm)+"__**")
                         return
     msg = message.content
-    if msg == "<@!"+str(client.user.id)+">":
+    check = "<@!"+str(client.user.id)+">"
+    if msg[:len(check)] == check:
         if not u_perm < 0:
-            await channel.send("Hi, did you require my services for anything?")
+            await channel.send("Hi, did you require my services for anything? Use ~? or ~help for help.")
         else:
             await channel.send("Sorry, you are currently not permitted to request my services.")
 

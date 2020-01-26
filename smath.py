@@ -160,7 +160,7 @@ def tri(x):
 def sgn(x):
     return (((x>0)<<1)-1)*(x!=0)
 def frand(x=1,y=0):
-    return (random.random()+xrand(x*2))%x+y
+    return (random.random()/mpf(random.random()))%x+y
 def xrand(x,y=None,z=0):
     if y == None:
         y = 0
