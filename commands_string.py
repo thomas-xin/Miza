@@ -33,10 +33,7 @@ class PapagoTrans:
 f = open("auth.json")
 auth = ast.literal_eval(f.read())
 f.close()
-translators = {
-    "Google Translate": Translator(["translate.google.com"]),
-    "Papago": PapagoTrans(auth["papago_id"], auth["papago_secret"]),
-}
+translators = {"Google Translate": Translator(["translate.google.com"]), "Papago": PapagoTrans(auth["papago_id"], auth["papago_secret"])}
 
 
 def _c2e(string, em1, em2):

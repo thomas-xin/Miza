@@ -221,9 +221,7 @@ async def processMessage(message):
         if not u_perm < 0 and not suspended:
             await channel.send("Hi, did you require my services for anything? Use ~? or ~help for help.")
         else:
-            doParallel(
-                print, ["Ignoring command from suspended user " + user.name + " (" + str(u_id) + ")."],
-            )
+            doParallel(print, ["Ignoring command from suspended user " + user.name + " (" + str(u_id) + ")."])
             await channel.send("Sorry, you are currently not permitted to request my services.")
         return
     if msg[0] == "~" and msg[1] != "~":
@@ -248,9 +246,7 @@ async def processMessage(message):
                 check = comm[:length].lower()
                 argv = comm[length:]
                 if check == alias and (len(comm) == length or comm[length] == " " or comm[length] == "?"):
-                    doParallel(
-                        print, [user.name + " (" + str(u_id) + ") issued command " + msg],
-                    )
+                    doParallel(print, [user.name + " (" + str(u_id) + ") issued command " + msg])
                     req = command.minm
                     if req > u_perm or (u_perm is not nan and req is nan):
                         await channel.send(
@@ -419,9 +415,7 @@ async def reactCallback(message, reaction, user):
             for f in catg:
                 if f.__name__ == func:
                     try:
-                        await asyncio.wait_for(
-                            f._callback_(client=client, message=message, reaction=reaction, user=user, perm=u_perm, vals=vals, argv=argv,), timeout=_vars.timeout,
-                        )
+                        await asyncio.wait_for(f._callback_(client=client, message=message, reaction=reaction, user=user, perm=u_perm, vals=vals, argv=argv), timeout=_vars.timeout)
                         return
                     except Exception as ex:
                         killThreads()
