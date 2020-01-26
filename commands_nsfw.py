@@ -109,10 +109,13 @@ def pull_rule34_paheal(argv,data,thr,delay=5):
     try:
         v1,v2 = 1,1
         items = argv.split(" ")
-        tagsearch = []
-        for i in items:
-            if i[0] not in tagsearch:
-                tagsearch.append(i[0])
+        if not len(argv.replace(" ","")):
+            tagsearch = [chr(i+65) for i in range(26)]
+        else:
+            tagsearch = []
+            for i in items:
+                if i[0] not in tagsearch:
+                    tagsearch.append(i[0])
         rx = xrand(len(tagsearch))
         baseurl = "https://rule34.paheal.net/tags?starts_with="
         url = baseurl+tagsearch[rx]
@@ -291,11 +294,12 @@ class neko:
     async def __call__(self,args,argv,flags,channel,**void):
         isNSFW = is_nsfw(channel)
         if "l" in flags:
+            available = []
             text = "Available commands in **#"+channel.name+"**:\n`"
             for key in neko_tags:
                 if isNSFW or not neko_tags[key]==True:
-                    text += key+", "
-            text = text[:-2]+"`"
+                    available.append(key)
+            text += ", ".join(sorted(available))+"`"
             return text
         tagNSFW = False
         selected = []

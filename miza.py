@@ -46,6 +46,8 @@ class _globals:
         "getattr",
         ".load",
         ".save",
+        ".fromfile",
+        "ctypes",
         ]
     def __init__(self):
         self.lastCheck = time.time()
@@ -309,7 +311,10 @@ async def on_ready():
     print("Successfully connected as "+str(client.user))
     print("Servers: ")
     for guild in client.guilds:
-        print(guild.name)
+        if guild.unavailable:
+            print(str(guild.id)+" is not available.")
+        else:
+            print(guild.name)
     await handleUpdate()
 ##    print("Users: ")
 ##    for guild in client.guilds:
@@ -394,6 +399,7 @@ async def reactCallback(message,reaction,user):
                                 argv=argv),timeout=_vars.timeout)
                             return
                         except Exception as ex:
+                            killThreads()
                             await message.channel.send("```\nError: "+repr(ex)+"\n```")
             except:
                 raise
@@ -452,6 +458,7 @@ async def handleMessage(message):
     try:
         await asyncio.wait_for(processMessage(message),timeout=_vars.timeout)
     except Exception as ex:
+        killThreads()
         await message.channel.send("```\nError: "+repr(ex)+"\n```")
     return
         
