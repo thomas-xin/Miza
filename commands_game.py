@@ -1,16 +1,15 @@
 import ast,copy
 from smath import *
 
-lurd = ["⬅","⬆","➡","⬇️","↩"]
-numScore = lambda x: x*2**(x+1)
-
 class text2048:
     is_command = True
+    directions = ["⬅","⬆","➡","⬇️","↩"]
+    numScore = lambda x: x*2**(x+1)
     def __init__(self):
         self.name = ["2048","text_2048"]
         self.minm = 1
         self.desc = "Plays a game of 2048 using reactions."
-        self.usag = '<board_size[4]> <public:(?p)> <easy_mode:(?e)>'
+        self.usag = '<board_size:[4]> <public:(?p)> <easy_mode:(?e)>'
     async def nextIter(self,message,gamestate,username,direction,mode):
         width = len(gamestate[-1])
         a = 0
@@ -64,7 +63,7 @@ class text2048:
                 for x in range(width):
                     n = gamestate[0][x][y]
                     if n:
-                        score += numScore(n-1)
+                        score += self.numScore(n-1)
                     if n > 6:
                         text += "|"+str(1<<n)
                     elif n > 3:
@@ -94,11 +93,11 @@ class text2048:
         gamestate = ast.literal_eval(argv.replace("A","[").replace("B","]").replace("C",","))
         if reaction is not None:
             try:
-                reaction = lurd.index(str(reaction))
+                reaction = self.directions.index(str(reaction))
             except:
                 return
         else:
-            for react in lurd:
+            for react in self.directions:
                 if mode==1 or react!="↩":
                     await message.add_reaction(react)
             self.spawn(gamestate[0],1)
@@ -134,3 +133,4 @@ class text2048:
         gsr = str(gamestate).replace("[","A").replace("]","B").replace(",","C").replace(" ","")
         text = "```callback-game-text2048-"+str(u_id)+"_"+str(mode)+"-"+gsr+"\nStarting Game...```"
         return text
+        

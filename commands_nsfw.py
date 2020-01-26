@@ -327,4 +327,8 @@ class owoify:
         self.desc = "owo-ifies text."
         self.usag = '<string>'
     async def __call__(self,argv,**void):
-        return "```\n"+nekos.owoify(argv)+"```"
+        output = ""
+        while argv:
+            output += nekos.owoify(argv[:200])
+            argv = argv[200:]
+        return "```\n"+output+"```"

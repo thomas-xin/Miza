@@ -381,15 +381,18 @@ async def reactCallback(message,reaction,user):
                 catg = _vars.categories[catx]
                 for f in catg:
                     if f.__name__ == func:
-                        await f._callback_(
-                            client=client,
-                            message=message,
-                            reaction=reaction,
-                            user=user,
-                            perm=u_perm,
-                            vals=vals,
-                            argv=argv)
-                        return
+                        try:
+                            await asyncio.wait_for(f._callback_(
+                                client=client,
+                                message=message,
+                                reaction=reaction,
+                                user=user,
+                                perm=u_perm,
+                                vals=vals,
+                                argv=argv),timeout=_vars.timeout)
+                            return
+                        except Exception as ex:
+                            await message.channel.send("```\nError: "+repr(ex)+"\n```")
             except:
                 raise
 
