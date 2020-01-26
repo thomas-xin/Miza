@@ -44,7 +44,7 @@ def pull_e621(argv,data,thr,delay=5):
         try:
             limit = s.index('class="next_page" rel="next"')
             s = s[:limit]
-        except:
+        except IndexError:
             pass
 
         search = '<a href="/post/show/'
@@ -57,9 +57,9 @@ def pull_e621(argv,data,thr,delay=5):
                 target = s[:ind2]
                 try:
                     sources.append(int(target))
-                except:
+                except ValueError:
                     pass
-            except:
+            except IndexError:
                 break
         x = None
         while not x:
@@ -141,7 +141,7 @@ def pull_rule34_paheal(argv,data,thr,delay=5):
             url = baseurl+items+"/1"
             req = urllib.request.Request(url)
             resp = urllib.request.urlopen(req,timeout=delay)
-        except:
+        except ConnectionError:
             url = baseurl+items.upper()+"/1"
             req = urllib.request.Request(url)
             resp = urllib.request.urlopen(req,timeout=delay)
@@ -160,14 +160,14 @@ def pull_rule34_paheal(argv,data,thr,delay=5):
             if resp.getcode() != 200:
                 raise ConnectionError("Error "+str(resp.getcode()))
             s = resp.read().decode("utf-8")
-        except:
+        except IndexError:
             pass
         try:
             limit = s.index("class=''>Images</h3><div class='blockbody'>")
             s = s[limit:]
             limit = s.index("</div></div></section>")
             s = s[:limit]
-        except:
+        except IndexError:
             pass
 
         search = 'href="'
@@ -188,7 +188,7 @@ def pull_rule34_paheal(argv,data,thr,delay=5):
                         found = True
                 if target[0]=="h" and found:
                     sources.append(target)
-            except:
+            except IndexError:
                 break
         v2 = xrand(len(sources))
         url = sources[v2]

@@ -138,7 +138,7 @@ class text2048:
         if reaction is not None:
             try:
                 reaction = self.directions.index(str(reaction))
-            except:
+            except IndexError:
                 return
         else:
             for react in self.directions:

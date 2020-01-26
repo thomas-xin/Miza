@@ -39,7 +39,7 @@ class help:
                     minm = com.minm
                     desc = com.desc
                     usag = com.usag
-                    if minm>u_perm:
+                    if minm>u_perm or (u_perm is not nan and minm is nan):
                         continue
                     newstr = "\n`"+name+"`\nAliases: "+str(com.name)+"\nEffect: "+desc+"\nUsage: \
 "+usag+"\nRequired permission level: **__"+str(minm)+"__**"
@@ -54,7 +54,7 @@ class help:
                     minm = com.minm
                     desc = com.desc
                     usag = com.usag
-                    if minm>u_perm:
+                    if minm>u_perm or (u_perm is not nan and minm is nan):
                         continue
                     found = False
                     for n in com.name:
@@ -72,12 +72,13 @@ Effect: "+desc+"\nUsage: "+usag+"\nRequired permission level: "+str(minm)+"```"
                 minm = com.minm
                 desc = com.desc
                 usag = com.usag
-                if not minm>u_perm:
-                    if desc != "":
-                        if not verb:
-                            show.append("`"+name+" "+usag+"`")
-                        else:
-                            show.append("\n`"+com.__name__+"`\nEffect: "+com.desc+"\nUsage: "+name+" "+usag)
+                if minm>u_perm or (u_perm is not nan and minm is nan):
+                    continue
+                if desc != "":
+                    if not verb:
+                        show.append("`"+name+" "+usag+"`")
+                    else:
+                        show.append("\n`"+com.__name__+"`\nEffect: "+com.desc+"\nUsage: "+name+" "+usag)
             return "Commands for **"+user.name+"** in **"+g_name+"**:\n"+"\n".join(show)
         return "\n".join(show)
         
@@ -169,7 +170,7 @@ class enableCommand:
             else:
                 try:
                     enabled = _vars.enabled[guild.id]
-                except:
+                except KeyError:
                     enabled = {}
                     _vars.enabled[guild.id] = enabled
                 if "e" in flags:
@@ -207,3 +208,22 @@ class shutdown:
         await client.close()
         sys.exit()
         quit()
+
+class suspend:
+    is_command = True
+    def __init__(self):
+        self.name = []
+        self.minm = nan
+        self.desc = "Prevents a user from accessing the bot's commands. Overrides ~perms."
+        self.usag = '<0:user> <1:value:[]>'
+    async def __call__(self,_vars,client,user,guild,args,**void):
+        if len(args) < 2:
+            if len(args) >= 1:
+                user = await client.fetch_user(_vars.verifyID(args[0]))
+            return "Current suspension status of **"+user.name+"**: **__"+str(_vars.bans[0].get(user.id,None))+"__**."
+        else:
+            user = await client.fetch_user(_vars.verifyID(args[0]))
+            change = _vars.evalMath(args[1])
+            _vars.bans[0][user.id] = change
+            _vars.update()
+            return "Changed suspension status of **"+user.name+"** to **__"+str(change)+"__**."

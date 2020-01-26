@@ -47,8 +47,8 @@ class purge:
                 try:
                     await m.delete()
                     deleted += 1
-                except:
-                    pass
+                except Exception as ex:
+                    print(repr(ex))
         if not "h" in flags:
             return "Deleted **__"+str(deleted)+"__** message"+"s"*(deleted!=1)+"!"
     

@@ -21,10 +21,7 @@ class PapagoTrans:
         if resp.getcode() != 200:
             raise ConnectionError("Error "+str(resp.getcode()))
         read = resp.read().decode("utf-8")
-        try:
-            r = json.loads(read)
-        except:
-            raise
+        r = json.loads(read)
         t = r["message"]["result"]["translatedText"]
         output = self.PapagoOutput(t)
         return output
