@@ -309,7 +309,7 @@ async def on_ready():
     print("Successfully connected as "+str(client.user))
     print("Servers: ")
     for guild in client.guilds:
-        print(guild)
+        print(guild.name)
     await handleUpdate()
 ##    print("Users: ")
 ##    for guild in client.guilds:
