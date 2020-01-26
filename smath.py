@@ -1,11 +1,12 @@
 """
 Adds many useful math-related functions.
 """
-import math,cmath,fractions,mpmath,sympy,ctypes
-import numpy,tinyarray
+import math, cmath, fractions, mpmath, sympy, ctypes
+import numpy, tinyarray
+
 array = tinyarray.array
-import colorsys,random,threading,time
-from scipy import interpolate,special
+import colorsys, random, threading, time
+from scipy import interpolate, special
 
 sympy.init_printing(use_unicode=True)
 
@@ -23,7 +24,7 @@ matrix = mpmath.matrix
 
 pi = mp.pi
 e_ = mp.e
-tau = pi*2
+tau = pi * 2
 d2r = mp.degree
 phi = mp.phi
 euler = mp.euler
@@ -36,8 +37,11 @@ intg = integrate = sympy.integrate
 factorize = factorint = primeFactors = sympy.ntheory.factorint
 mobius = sympy.ntheory.mobius
 
+
 def nop(*args):
     pass
+
+
 phase = cmath.phase
 sin = mpmath.sin
 cos = mpmath.cos
@@ -95,25 +99,28 @@ log = mpmath.log
 ln = mpmath.ln
 frac = sympy.frac
 
+
 def isqrt(x):
     x = int(x)
-    y = (x<<2)//3
+    y = (x << 2) // 3
     b = y.bit_length()
-    a = b>>1
-    if b&1:
-        c = 1<<a
-        d = (c+(x>>a))>>1
+    a = b >> 1
+    if b & 1:
+        c = 1 << a
+        d = (c + (x >> a)) >> 1
     else:
-        c = (3<<a)>>2
-        d = (c+(y>>a))>>1
+        c = (3 << a) >> 2
+        d = (c + (y >> a)) >> 1
     if c != d:
         c = d
-        d = (c+x//c)>>1
+        d = (c + x // c) >> 1
         while d < c:
             c = d
-            d = (c+x//c)>>1
+            d = (c + x // c) >> 1
     return c
-def round(x,y=None):
+
+
+def round(x, y=None):
     try:
         if isValid(x):
             try:
@@ -123,174 +130,212 @@ def round(x,y=None):
                     return int(math.round(x))
             except:
                 pass
-            return roundMin(math.round(x,y))
+            return roundMin(math.round(x, y))
         else:
             return x
     except:
         if type(x) is complex:
-            return round(x.real,y)+round(x.imag,y)*1j
+            return round(x.real, y) + round(x.imag, y) * 1j
     return x
+
+
 def ceil(x):
     try:
         return math.ceil(x)
     except:
         if type(x) is complex:
-            return ceil(x.real)+ceil(x.imag)*1j
+            return ceil(x.real) + ceil(x.imag) * 1j
     return x
+
+
 def floor(x):
     try:
         return math.floor(x)
     except:
         if type(x) is complex:
-            return floor(x.real)+floor(x.imag)*1j
+            return floor(x.real) + floor(x.imag) * 1j
     return x
+
+
 def trunc(x):
     try:
         return math.trunc(x)
     except:
         if type(x) is complex:
-            return trunc(x.real)+trunc(x.imag)*1j
+            return trunc(x.real) + trunc(x.imag) * 1j
     return x
+
+
 def sqr(x):
-    return ((sin(x)>=0)<<1)-1
+    return ((sin(x) >= 0) << 1) - 1
+
+
 def saw(x):
-    return (x/pi+1)%2-1
+    return (x / pi + 1) % 2 - 1
+
+
 def tri(x):
-    return (abs((.5-x/pi)%2-1))*2-1
+    return (abs((0.5 - x / pi) % 2 - 1)) * 2 - 1
+
+
 def sgn(x):
-    return (((x>0)<<1)-1)*(x!=0)
-def frand(x=1,y=0):
-    return (random.random()/mpf(random.random()))%x+y
-def xrand(x,y=None,z=0):
+    return (((x > 0) << 1) - 1) * (x != 0)
+
+
+def frand(x=1, y=0):
+    return (random.random() / mpf(random.random())) % x + y
+
+
+def xrand(x, y=None, z=0):
     if y == None:
         y = 0
     if x == y:
         return x
-    return random.randint(floor(min(x,y)),ceil(max(x,y))-1)+z
-def rrand(x=1,y=0):
-    return frand(x)**(1-y)
-def log(x,y=e_):
+    return random.randint(floor(min(x, y)), ceil(max(x, y)) - 1) + z
+
+
+def rrand(x=1, y=0):
+    return frand(x) ** (1 - y)
+
+
+def log(x, y=e_):
     try:
-        return x.ln()/math.log(y)
+        return x.ln() / math.log(y)
     except:
-        return math.log(x,y)
-def atan2(y,x=1):
-    return math.atan2(y,x)
-def modularInv(a,b):
+        return math.log(x, y)
+
+
+def atan2(y, x=1):
+    return math.atan2(y, x)
+
+
+def modularInv(a, b):
     if b == 0:
-        return (1,a)
+        return (1, a)
     a %= b
     x = 0
     y = 1
     while a:
-        d = divmod(b,a)
-        a,b = d[1],a
-        x,y = y,x-(d[0])*y
-    return (x,1)
+        d = divmod(b, a)
+        a, b = d[1], a
+        x, y = y, x - (d[0]) * y
+    return (x, 1)
+
+
 def pisanoPeriod(x):
-    a,b = 0,1
-    for i in range(0,x*x):
-        a,b = b,(a+b)%x
-        if a==0 and b==1:
-            return i+1
-def jacobi(a,n):  
-    if a == 0 or n < 0:  
+    a, b = 0, 1
+    for i in range(0, x * x):
+        a, b = b, (a + b) % x
+        if a == 0 and b == 1:
+            return i + 1
+
+
+def jacobi(a, n):
+    if a == 0 or n < 0:
         return 0
     x = 1
     if a < 0:
         a = -a
-        if n&3 == 3:
+        if n & 3 == 3:
             x = -x
     if a == 1:
         return x
     while a:
         if a < 0:
             a = -a
-            if n&3 == 3:
+            if n & 3 == 3:
                 x = -x
-        while not a&1:
+        while not a & 1:
             a >>= 1
-            if n&7==3 or n&7==5:
+            if n & 7 == 3 or n & 7 == 5:
                 x = -x
-        a,n = n,a
-        if a&3==3 and n&3==3:
+        a, n = n, a
+        if a & 3 == 3 and n & 3 == 3:
             x = -x
         a %= n
-        if a > n>>1:  
+        if a > n >> 1:
             a -= n
     if n == 1:
         return x
     return 0
+
+
 def next6np(start=0):
     if start <= 2:
         yield 2
     if start <= 3:
         yield 3
-    x = start-start%6+6
-    if x>6 and x-start >= 5:
-        yield x-5
+    x = start - start % 6 + 6
+    if x > 6 and x - start >= 5:
+        yield x - 5
     while True:
-        yield x-1
-        yield x+1
+        yield x - 1
+        yield x + 1
         x += 6
+
+
 def isPrime(n):
     def divisibility(n):
-        t = min(n,2+ceil(log(n)**2))
+        t = min(n, 2 + ceil(log(n) ** 2))
         g = next6np()
         while True:
             p = next(g)
             if p >= t:
                 break
-            if n%p == 0:
+            if n % p == 0:
                 return False
         return True
+
     def fermat(n):
-        t = min(n,2+ceil(log(n)))
+        t = min(n, 2 + ceil(log(n)))
         g = next6np()
         while True:
             p = next(g)
             if p >= t:
                 break
-            if pow(p,n-1,n) != 1:
+            if pow(p, n - 1, n) != 1:
                 return False
         return True
+
     def miller(n):
-        d = n-1
-        while d&1 == 0:
+        d = n - 1
+        while d & 1 == 0:
             d >>= 1
-        t = min(n,2+ceil(log(n)))
+        t = min(n, 2 + ceil(log(n)))
         g = next6np()
         while True:
             p = next(g)
             if p >= t:
                 break
-            x = pow(p,d,n)
-            if x==1 or x==n-1:
+            x = pow(p, d, n)
+            if x == 1 or x == n - 1:
                 continue
-            while n != d+1:
-                x = (x*x)%n
+            while n != d + 1:
+                x = (x * x) % n
                 d <<= 1
                 if x == 1:
                     return False
-                if x == n-1:
+                if x == n - 1:
                     break
-            if n == d+1:
+            if n == d + 1:
                 return False
         return True
+
     def solovoyStrassen(n):
-        t = min(n,2+ceil(log(n)))
+        t = min(n, 2 + ceil(log(n)))
         g = next6np()
         while True:
             p = next(g)
             if p >= t:
                 break
-            j = (n+jacobi(p,n))%n
+            j = (n + jacobi(p, n)) % n
             if j == 0:
                 return False
-            m = pow(p,(n-1)>>1,n)
+            m = pow(p, (n - 1) >> 1, n)
             if m != j:
                 return False
         return True
+
     i = int(n)
     if n == i:
         n = i
@@ -298,7 +343,7 @@ def isPrime(n):
             return False
         if n <= 3:
             return True
-        t = n%6
+        t = n % 6
         if t != 1 and t != 5:
             return False
         if not divisibility(n):
@@ -311,15 +356,17 @@ def isPrime(n):
             return False
         return True
     return None
-def generatePrimes(a=2,b=inf,c=1):
+
+
+def generatePrimes(a=2, b=inf, c=1):
     primes = []
     a = round(a)
     b = round(b)
     if b is None:
-        a,b = 0,a
+        a, b = 0, a
     if a > b:
-        a,b = b,a
-    a = max(1,a)
+        a, b = b, a
+    a = max(1, a)
     g = next6np(a)
     while c:
         p = next(g)
@@ -329,23 +376,29 @@ def generatePrimes(a=2,b=inf,c=1):
             c -= 1
             primes.append(p)
     return primes
+
+
 def getFactors(x):
     f = factorize(x)
     f.append(1)
     s = {}
     l = len(f)
     print(s)
-def addDict(a,b,replace=True):
+
+
+def addDict(a, b, replace=True):
     if replace:
         r = a
     else:
         r = dict(a)
     for k in b:
-        r[k] = b[k]+a.get(k,0)
+        r[k] = b[k] + a.get(k, 0)
     return r
+
+
 def roundMin(x):
     if type(x) is not complex:
-        if isValid(x) and x==int(x):
+        if isValid(x) and x == int(x):
             return int(x)
         else:
             return x
@@ -354,34 +407,42 @@ def roundMin(x):
         if x.imag == 0:
             return roundMin(x.real)
         else:
-            return roundMin(complex(x).real)+roundMin(complex(x).imag)*(1j)
+            return roundMin(complex(x).real) + roundMin(complex(x).imag) * (1j)
+
+
 def closeRound(n):
-    rounds = [.125,.375,.625,.875,.25,.5,.75,1/3,2/3]
+    rounds = [0.125, 0.375, 0.625, 0.875, 0.25, 0.5, 0.75, 1 / 3, 2 / 3]
     a = math.floor(n)
-    b = n%1
-    c = round(b,1)
-    for i in range(0,len(rounds)):
-        if abs(b-rounds[i]) < .02:
+    b = n % 1
+    c = round(b, 1)
+    for i in range(0, len(rounds)):
+        if abs(b - rounds[i]) < 0.02:
             c = rounds[i]
-    return(mpf(a+c))
-def toFrac(num,limit=2147483647):
+    return mpf(a + c)
+
+
+def toFrac(num, limit=2147483647):
     if num >= limit:
-        return([limit,1])
+        return [limit, 1]
     if num <= 0:
-        return([1,limit])
+        return [1, limit]
     num = mpf(num)
     f = fractions.Fraction(num).limit_denominator(limit)
-    frac = [f.numerator,f.denominator]
+    frac = [f.numerator, f.denominator]
     if frac[0] == 0:
-        return([1,limit])
-    return(frac)
-def gcd(x,y=1):
+        return [1, limit]
+    return frac
+
+
+def gcd(x, y=1):
     if y != 1:
         while y > 0:
-            x,y = y,x%y
+            x, y = y, x % y
         return x
     return x
-def lcm2(x,y=1):
+
+
+def lcm2(x, y=1):
     if x != y:
         x = abs(x)
         y = abs(y)
@@ -393,10 +454,12 @@ def lcm2(x,y=1):
             i = False
             y = toFrac(y)[0]
         if i:
-            return x*y//gcd(x,y)
+            return x * y // gcd(x, y)
         else:
-            return toFrac(x/y)[0]
+            return toFrac(x / y)[0]
     return x
+
+
 def lcm(*x):
     try:
         while True:
@@ -406,45 +469,61 @@ def lcm(*x):
         if 0 in x:
             raise ValueError("Cannot find LCM of zero.")
         while len(x) > 1:
-            x = [lcm2(x[i],x[-i-1]) for i in range(ceil(len(x)/2))]
+            x = [lcm2(x[i], x[-i - 1]) for i in range(ceil(len(x) / 2))]
     return x[-1]
+
+
 def lcmRange(x):
-    primes = generatePrimes(1,x,-1)
+    primes = generatePrimes(1, x, -1)
     y = 1
     for p in primes:
-        y *= p**floor(log(x,p))
+        y *= p ** floor(log(x, p))
     return y
+
+
 def mean(*nums):
     return roundMin(numpy.mean(numpy.array(nums)))
-def pwr(x,power=2):
+
+
+def pwr(x, power=2):
     if number.real >= 0:
-        return roundMin(number**power)
+        return roundMin(number ** power)
     else:
-        return roundMin(-(-number)**power)
-def pulse(x,y=.5):
-    p = y*tau
-    x = x*(.5/length*(x<p)+.5/(1-length)*(x>=p))
-    return(x)
+        return roundMin(-((-number) ** power))
+
+
+def pulse(x, y=0.5):
+    p = y * tau
+    x = x * (0.5 / length * (x < p) + 0.5 / (1 - length) * (x >= p))
+    return x
+
+
 def hypot(*coordinates):
     return math.hypot(*coordinates)
+
+
 def isValid(x):
     if type(x) is complex:
-        return not(cmath.isinf(x) or cmath.isnan(x))
+        return not (cmath.isinf(x) or cmath.isnan(x))
     try:
         if type(x) is int:
             return True
         return x.is_finite()
     except:
         return math.isfinite(x)
-def approach(x,y,z,threshold=.125):
+
+
+def approach(x, y, z, threshold=0.125):
     if z <= 1:
         x = y
     else:
-        x = (x*(z-1)+y)/z
-        if abs(x-y) <= threshold/z:
+        x = (x * (z - 1) + y) / z
+        if abs(x - y) <= threshold / z:
             x = y
-    return(x)
-def xrange(a,b=None,c=None):
+    return x
+
+
+def xrange(a, b=None, c=None):
     if b == None:
         b = ceil(a.real)
         a = 0
@@ -453,8 +532,10 @@ def xrange(a,b=None,c=None):
             c = -1
         else:
             c = 1
-    return range(floor(a.real),ceil(b.real),c)
-def romanNumerals(num,order=0):
+    return range(floor(a.real), ceil(b.real), c)
+
+
+def romanNumerals(num, order=0):
     num = int(num)
     carry = 0
     over = ""
@@ -463,7 +544,7 @@ def romanNumerals(num,order=0):
     if num >= 4000:
         carry //= 1000
         num %= 1000
-        over = romanNumerals(carry,order+1)
+        over = romanNumerals(carry, order + 1)
     while num >= 1000:
         num -= 1000
         output += "M"
@@ -508,15 +589,19 @@ def romanNumerals(num,order=0):
             sym = "ᴍ"
         elif order == 2:
             sym = "ᴍᴹ"
-    return over+output+sym
-def limStr(s,maxlen=10):
+    return over + output + sym
+
+
+def limStr(s, maxlen=10):
     s = str(s)
-    over = (len(s)-maxlen)/2
+    over = (len(s) - maxlen) / 2
     if over > 0:
-        half = len(s)/2
-        s = s[:ceil(half-over-1)]+".."+s[ceil(half+over+1):]
+        half = len(s) / 2
+        s = s[: ceil(half - over - 1)] + ".." + s[ceil(half + over + 1) :]
     return s
-def expNum(num,maxlen=10,decimals=0):
+
+
+def expNum(num, maxlen=10, decimals=0):
     if not isValid(num):
         if num.real > 0:
             return "inf"
@@ -525,9 +610,9 @@ def expNum(num,maxlen=10,decimals=0):
         else:
             return "NaN"
     if type(num) is complex:
-        i = expNum(num.imag,maxlen//2-1,decimals)
+        i = expNum(num.imag, maxlen // 2 - 1, decimals)
         p = "+" if num.imag > 0 else ""
-        return expNum(num.real,ceil(maxlen/2)-1,decimals)+p+i+"i"
+        return expNum(num.real, ceil(maxlen / 2) - 1, decimals) + p + i + "i"
     if num < 0:
         n = "-"
         num = -num
@@ -536,67 +621,89 @@ def expNum(num,maxlen=10,decimals=0):
     try:
         numlen = floor(num.log10())
     except:
-        numlen = floor(math.log10(max(.001,num)))
-    if log(max(.001,num),10) <= maxlen-decimals:
-        return n+roundX(num,min(maxlen-numlen-2-len(n),decimals))
+        numlen = floor(math.log10(max(0.001, num)))
+    if log(max(0.001, num), 10) <= maxlen - decimals:
+        return n + roundX(num, min(maxlen - numlen - 2 - len(n), decimals))
     else:
         if numlen > 0:
             try:
                 loglen = floor(numlen.log10())
             except:
-                loglen = floor(math.log10(numlen))+len(n)
+                loglen = floor(math.log10(numlen)) + len(n)
         else:
             loglen = 0
-        s = roundX(num/10**numlen,maxlen-loglen-5)[:max(1,maxlen-loglen-2)]
+        s = roundX(num / 10 ** numlen, maxlen - loglen - 5)[
+            : max(1, maxlen - loglen - 2)
+        ]
         if s[:3] == "10.":
-            s = "9."+"9"*(maxlen-loglen-4)
-        return n+s+"e+"+str(numlen)
-def roundX(num,prec):
+            s = "9." + "9" * (maxlen - loglen - 4)
+        return n + s + "e+" + str(numlen)
+
+
+def roundX(num, prec):
     if prec > 0:
-        s = str(round(num.real,round(prec)))
+        s = str(round(num.real, round(prec)))
         if "." in s:
-            while len(s)-s.index(".") <= prec:
+            while len(s) - s.index(".") <= prec:
                 s += "0"
         else:
-            s += "."+"0"*prec
+            s += "." + "0" * prec
         return s
     else:
         return str(round(num.real))
+
+
 def verifyString(string):
     if type(string) is list or type(string) is tuple:
-        return("".join([str(c) for c in string]))
+        return "".join([str(c) for c in string])
     else:
-        return(str(string))
+        return str(string)
+
+
 def bytes2Hex(b):
     o = ""
     for a in b:
         c = hex(a).upper()[2:]
         if len(c) < 2:
-            c = '0'+c
-        o += c+" "
-    return(o[:-1])
+            c = "0" + c
+        o += c + " "
+    return o[:-1]
+
+
 def hex2Bytes(h):
     o = []
-    h = h.replace(" ","")
-    for a in range(0,len(h),2):
-        o.append(int(h[a:a+2],16))
-    return(bytes(o))
-def colourCalculation(a,offset=0):
-    return(adjColour(colorsys.hsv_to_rgb((a/1536)%1,1,1),offset,255))
+    h = h.replace(" ", "")
+    for a in range(0, len(h), 2):
+        o.append(int(h[a : a + 2], 16))
+    return bytes(o)
+
+
+def colourCalculation(a, offset=0):
+    return adjColour(colorsys.hsv_to_rgb((a / 1536) % 1, 1, 1), offset, 255)
+
+
 def colour2Raw(c):
     if len(c) == 3:
-        return (c[0]<<16)+(c[1]<<8)+c[2]
+        return (c[0] << 16) + (c[1] << 8) + c[2]
     else:
-        return (c[0]<<16)+(c[1]<<8)+c[2]+(c[3]<<24)
+        return (c[0] << 16) + (c[1] << 8) + c[2] + (c[3] << 24)
+
+
 def raw2Colour(x):
-    if x > 1<<24:
-        return verifyColour(((x>>16)&255,(x>>8)&255,x&255,(x>>24)&255))
+    if x > 1 << 24:
+        return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255, (x >> 24) & 255))
     else:
-        return verifyColour(((x>>16)&255,(x>>8)&255,x&255))
+        return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255))
+
+
 def hex2Colour(h):
     return verifyColour(hex2Bytes(h))
+
+
 def luma(c):
-    return(0.2126*c[0]+0.7152*c[1]+0.0722*c[2])
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+
 def verifyColour(c):
     c = list(c)
     for i in range(len(c)):
@@ -605,7 +712,9 @@ def verifyColour(c):
         elif c[i] < 0:
             c[i] = 0
         c[i] = int(abs(c[i]))
-    return(c)
+    return c
+
+
 def fillColour(a):
     if type(a) is complex:
         a = a.real
@@ -614,129 +723,177 @@ def fillColour(a):
     elif a < 0:
         a = 0
     a = round(a)
-    return verifyColour([a,a,a])
-def negColour(c,t=127):
+    return verifyColour([a, a, a])
+
+
+def negColour(c, t=127):
     i = luma(c)
     if i > t:
         return fillColour(0)
     else:
         return fillColour(255)
+
+
 def invColour(c):
-    return [255-i for i in c]
-def adjColour(colour,brightness=0,intensity=1,hue=0,bits=0,scale=False):
+    return [255 - i for i in c]
+
+
+def adjColour(colour, brightness=0, intensity=1, hue=0, bits=0, scale=False):
     if hue != 0:
-        h = list(colorsys.rgb_to_hsv(*(array(colour)/255)))
-        c = adjColour(colorsys.hsv_to_rgb((h[0]+hue)%1,h[1],h[2]),intensity=255)
+        h = list(colorsys.rgb_to_hsv(*(array(colour) / 255)))
+        c = adjColour(colorsys.hsv_to_rgb((h[0] + hue) % 1, h[1], h[2]), intensity=255)
     else:
         c = list(colour)
     for i in range(len(c)):
-        c[i] = round(c[i]*intensity+brightness)
+        c[i] = round(c[i] * intensity + brightness)
     if scale:
         for i in range(len(c)):
             if c[i] > 255:
                 for j in range(len(c)):
                     if i != j:
-                        c[j] += c[i]-255
+                        c[j] += c[i] - 255
                 c[i] = 255
-    c = bitCrush(c,bits)
+    c = bitCrush(c, bits)
     return verifyColour(c)
-def bitCrush(dest,b=0,f=round):
+
+
+def bitCrush(dest, b=0, f=round):
     try:
-        a = 1<<b
+        a = 1 << b
     except:
-        a = 2**b
+        a = 2 ** b
     try:
         len(dest)
         dest = list(dest)
         for i in range(len(dest)):
-            dest[i] = f(dest[i]/a)*a
+            dest[i] = f(dest[i] / a) * a
     except TypeError:
         try:
-            dest = f(dest/a)*a
+            dest = f(dest / a) * a
         except:
             raise
     return dest
+
+
 def listPermutation(dest):
     order = [0 for i in range(len(dest))]
     for i in range(len(dest)):
-        for j in range(i,len(dest)):
+        for j in range(i, len(dest)):
             if dest[i] > dest[j]:
                 order[i] += 1
             elif dest[i] < dest[j]:
                 order[j] += 1
     return order
-def multiVectorScalarOp(dest,operator):
-    expression = "a"+operator+"b"
-    function = eval('lambda a,b: '+expression)
+
+
+def multiVectorScalarOp(dest, operator):
+    expression = "a" + operator + "b"
+    function = eval("lambda a,b: " + expression)
     output = []
     for i in range(len(dest[0])):
         s = 0
         for j in range(len(dest)):
-            s = function(s,dest[j][i])
+            s = function(s, dest[j][i])
         output.append(s)
     return output
-def vectorVectorOp(dest,source,operator):
-    expression = "dest[i]"+operator+"source[i]"
-    function = eval('lambda dest,source,i: '+expression)
+
+
+def vectorVectorOp(dest, source, operator):
+    expression = "dest[i]" + operator + "source[i]"
+    function = eval("lambda dest,source,i: " + expression)
     for i in range(len(source)):
-        dest[i] = function(dest,source,i)
+        dest[i] = function(dest, source, i)
     return dest
-def vectorScalarOp(dest,source,operator):
-    expression = "dest[i]"+operator+str(source)
-    function = eval('lambda dest,i: '+expression)
+
+
+def vectorScalarOp(dest, source, operator):
+    expression = "dest[i]" + operator + str(source)
+    function = eval("lambda dest,i: " + expression)
     for i in range(len(dest)):
-        dest[i] = function(dest,i)
+        dest[i] = function(dest, i)
     return dest
-def resizeVector(v,length,mode=5):
+
+
+def resizeVector(v, length, mode=5):
     size = len(v)
     new = round(length)
     if new == size:
         resized = v
     elif mode == 0:
-        resized = numpy.array([v[round(i/new*size)%size] for i in range(new)])
+        resized = numpy.array([v[round(i / new * size) % size] for i in range(new)])
     elif mode <= 5 and mode == int(mode):
-        spl = interpolate.splrep(numpy.arange(1+size),numpy.append(v,v[0]),k=int(min(size,mode)))
-        resized = numpy.array([interpolate.splev((i/new*size)%size,spl) for i in range(new)])
+        spl = interpolate.splrep(
+            numpy.arange(1 + size), numpy.append(v, v[0]), k=int(min(size, mode))
+        )
+        resized = numpy.array(
+            [interpolate.splev((i / new * size) % size, spl) for i in range(new)]
+        )
     elif mode <= 5:
         if math.floor(mode) == 0:
-            resized1 = resizeVector(v,new,0)
+            resized1 = resizeVector(v, new, 0)
         else:
-            spl1 = interpolate.splrep(numpy.arange(1+size),numpy.append(v,v[0]),k=floor(min(size,mode)))
-            resized1 = numpy.array([interpolate.splev((i/new*size)%size,spl1) for i in range(new)])
-        spl2 = interpolate.splrep(numpy.arange(1+size),numpy.append(v,v[0]),k=ceil(min(size,mode)))
-        resized2 = numpy.array([interpolate.splev((i/new*size)%size,spl2) for i in range(new)])
-        resized = (resized1*(1-mode%1)+(mode%1)*resized2)
+            spl1 = interpolate.splrep(
+                numpy.arange(1 + size), numpy.append(v, v[0]), k=floor(min(size, mode))
+            )
+            resized1 = numpy.array(
+                [interpolate.splev((i / new * size) % size, spl1) for i in range(new)]
+            )
+        spl2 = interpolate.splrep(
+            numpy.arange(1 + size), numpy.append(v, v[0]), k=ceil(min(size, mode))
+        )
+        resized2 = numpy.array(
+            [interpolate.splev((i / new * size) % size, spl2) for i in range(new)]
+        )
+        resized = resized1 * (1 - mode % 1) + (mode % 1) * resized2
     else:
         resizing = []
-        for i in range(1,floor(mode)):
-            resizing.append(resizeVector(v,new,i/floor(mode)*5))
-        resized = numpy.mean(resizing,0)
+        for i in range(1, floor(mode)):
+            resizing.append(resizeVector(v, new, i / floor(mode) * 5))
+        resized = numpy.mean(resizing, 0)
     return resized
-def get(v,i,mode=5):
+
+
+def get(v, i, mode=5):
     size = len(v)
-    i = i.real+i.imag*size
+    i = i.real + i.imag * size
     if i == int(i) or mode == 0:
-        return v[round(i)%size]
+        return v[round(i) % size]
     elif mode > 0 and mode < 1:
-        return get(v,i,0)*(1-mode)+mode*get(v,i,1)
+        return get(v, i, 0) * (1 - mode) + mode * get(v, i, 1)
     elif mode == 1:
-        return v[floor(i)%size]*(1-i%1)+v[ceil(i)%size]*(i%1)
+        return v[floor(i) % size] * (1 - i % 1) + v[ceil(i) % size] * (i % 1)
     elif mode == int(mode):
-        return roundMin(interpolate.splev(i,interpolate.splrep(numpy.arange(1+size),
-                        numpy.append(v,v[0]),k=int(min(size,mode)))))
+        return roundMin(
+            interpolate.splev(
+                i,
+                interpolate.splrep(
+                    numpy.arange(1 + size),
+                    numpy.append(v, v[0]),
+                    k=int(min(size, mode)),
+                ),
+            )
+        )
     else:
-        return get(v,i,floor(mode))*(1-mode%1)+(mode%1)*get(v,i,ceil(mode))
+        return get(v, i, floor(mode)) * (1 - mode % 1) + (mode % 1) * get(
+            v, i, ceil(mode)
+        )
+
+
 def product(*nums):
     p = 1
     for i in nums:
         p *= i
     return p
+
+
 def dotProduct(*vects):
     if len(vects) > 1:
         return sum(product(*(array(v) for v in vects)))
     else:
-        return sum((i**2 for i in vects[-1]))
-def limitList(source,dest,direction=False):
+        return sum((i ** 2 for i in vects[-1]))
+
+
+def limitList(source, dest, direction=False):
     for i in range(len(source)):
         if direction:
             if source[i] < dest[i]:
@@ -745,261 +902,312 @@ def limitList(source,dest,direction=False):
             if source[i] > dest[i]:
                 source[i] = dest[i]
     return source
+
+
 def randomPolarCoord(x=1):
-    return polarCoords(frand(x),frand(tau))
-def polarCoords(dist,angle,pos=None):
-    p = dist*array([math.cos(angle),math.sin(angle)])
+    return polarCoords(frand(x), frand(tau))
+
+
+def polarCoords(dist, angle, pos=None):
+    p = dist * array([math.cos(angle), math.sin(angle)])
     if pos is None:
         return p
-    return p+pos
-def cartesianCoords(x,y,pos=None):
+    return p + pos
+
+
+def cartesianCoords(x, y, pos=None):
     if pos is None:
-        d = array(x,y)
+        d = array(x, y)
     else:
-        d = array(x,y)-array(pos)
-    return array([hypot(d),atan2(*reversed(d))])
-def convertRect(rect,edge=0):
-    dest_rect = [rect[0],rect[1],rect[0]+rect[2],rect[1]+rect[3]]
+        d = array(x, y) - array(pos)
+    return array([hypot(d), atan2(*reversed(d))])
+
+
+def convertRect(rect, edge=0):
+    dest_rect = [rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3]]
     if dest_rect[0] > dest_rect[2]:
-        dest_rect[0],dest_rect[2] = dest_rect[2],dest_rect[0]
+        dest_rect[0], dest_rect[2] = dest_rect[2], dest_rect[0]
     if dest_rect[1] > dest_rect[3]:
-        dest_rect[1],dest_rect[3] = dest_rect[3],dest_rect[1]
+        dest_rect[1], dest_rect[3] = dest_rect[3], dest_rect[1]
     dest_rect[0] += edge
     dest_rect[1] += edge
     dest_rect[2] -= edge
     dest_rect[3] -= edge
     return dest_rect
-def inRect(pos,rect,edge=0):
-    dest_rect = convertRect(rect,edge)
-    if pos[0]-dest_rect[0] <= 0:
+
+
+def inRect(pos, rect, edge=0):
+    dest_rect = convertRect(rect, edge)
+    if pos[0] - dest_rect[0] <= 0:
         return False
-    if pos[1]-dest_rect[1] <= 0:
+    if pos[1] - dest_rect[1] <= 0:
         return False
-    if pos[0]-dest_rect[2] > 0:
+    if pos[0] - dest_rect[2] > 0:
         return False
-    if pos[1]-dest_rect[3] > 0:
+    if pos[1] - dest_rect[3] > 0:
         return False
     return True
-def toRect(pos,rect,edge=0):
+
+
+def toRect(pos, rect, edge=0):
     p = list(pos)
     if not all(isValid(i) for i in pos):
-        return p,True,True
-    dest_rect = convertRect(rect,0)
-    lr,ud = False,False
+        return p, True, True
+    dest_rect = convertRect(rect, 0)
+    lr, ud = False, False
     for i in range(4):
-        diff = p[0]-dest_rect[0]-edge
+        diff = p[0] - dest_rect[0] - edge
         if diff <= 0:
-            p[0] = dest_rect[0]-diff+edge
+            p[0] = dest_rect[0] - diff + edge
             lr = True
             continue
-        diff = p[1]-dest_rect[1]-edge
+        diff = p[1] - dest_rect[1] - edge
         if diff <= 0:
-            p[1] = dest_rect[1]-diff+edge
+            p[1] = dest_rect[1] - diff + edge
             ud = True
             continue
-        diff = p[0]-dest_rect[2]+edge
+        diff = p[0] - dest_rect[2] + edge
         if diff > 0:
-            p[0] = dest_rect[2]-diff-edge
+            p[0] = dest_rect[2] - diff - edge
             lr = True
             continue
-        diff = p[1]-dest_rect[3]+edge
+        diff = p[1] - dest_rect[3] + edge
         if diff > 0:
-            p[1] = dest_rect[3]-diff-edge
+            p[1] = dest_rect[3] - diff - edge
             ud = True
             continue
-    return p,lr,ud
-def rdRect(pos,rect,edge=0):
-    dest_rect = convertRect(rect,edge)
-    if not inRect(pos,rect,edge):
+    return p, lr, ud
+
+
+def rdRect(pos, rect, edge=0):
+    dest_rect = convertRect(rect, edge)
+    if not inRect(pos, rect, edge):
         s = array(dest_rect[:2])
         t = array(pos)
-        p = array(dest_rect[2:])-s
-        m = p/2
-        diff = t-s-m
+        p = array(dest_rect[2:]) - s
+        m = p / 2
+        diff = t - s - m
         angle = atan2(*reversed(diff))
-        vel = polarCoords(hypot(*m),angle)
-        pos = vel+s+m
+        vel = polarCoords(hypot(*m), angle)
+        pos = vel + s + m
     return pos
-def diffExpD(r,s,t):
+
+
+def diffExpD(r, s, t):
     if r == 1:
-        return s*t
+        return s * t
     else:
-        return log(s*(r**t-1),r)
-def diffExpT(r,s,d):
-    coeff = d*log(r)/s+1
+        return log(s * (r ** t - 1), r)
+
+
+def diffExpT(r, s, d):
+    coeff = d * log(r) / s + 1
     if coeff < 0:
         return inf
     else:
-        return log(coeff,r)
-def predictTrajectory(src,dest,vel,spd,dec=1,boundary=None,edge=0):
+        return log(coeff, r)
+
+
+def predictTrajectory(src, dest, vel, spd, dec=1, boundary=None, edge=0):
     pos = array(dest)
-    dist = hypot(*(src-dest))
-    for x in range(0,64):
-        time = diffExpT(dec,spd,dist)
-        new_pos = dest+vel*min(time,1<<32)
+    dist = hypot(*(src - dest))
+    for x in range(0, 64):
+        time = diffExpT(dec, spd, dist)
+        new_pos = dest + vel * min(time, 1 << 32)
         if boundary:
-            new_pos = array(toRect(new_pos,boundary,edge)[0])
-        new_dist = hypot(*(new_pos-pos))
+            new_pos = array(toRect(new_pos, boundary, edge)[0])
+        new_dist = hypot(*(new_pos - pos))
         pos = new_pos
-        dist = hypot(*(src-pos))
-        if new_dist < .0625:
+        dist = hypot(*(src - pos))
+        if new_dist < 0.0625:
             break
     return pos
-def collisionCheck(pos1,pos2,vel1,vel2,mass1,mass2,radius1,radius2):
-    diff = pos1-pos2
-    dist = frameDistance(pos1,pos2,-vel1,-vel2)
-    mindist = radius1+radius2
+
+
+def collisionCheck(pos1, pos2, vel1, vel2, mass1, mass2, radius1, radius2):
+    diff = pos1 - pos2
+    dist = frameDistance(pos1, pos2, -vel1, -vel2)
+    mindist = radius1 + radius2
     if dist < mindist:
-        pos1,pos2 = array(pos1),array(pos2)
-        vel1,vel2 = array(vel1),array(vel2)
+        pos1, pos2 = array(pos1), array(pos2)
+        vel1, vel2 = array(vel1), array(vel2)
         dist -= 1
         angle = atan2(*reversed(diff))
-        mov = polarCoords(mindist-dist+1,angle)
-        p1 = mass1*hypot(*vel1)
-        p2 = mass2*hypot(*vel2)
-        r = p1/max((p1+p2),.1)
-        v1 = mov*(1-r)
-        v2 = mov*-r
-        totalmass = mass1+mass2
-        coeff1 = mass2/totalmass*2
-        coeff2 = mass1/totalmass*2
+        mov = polarCoords(mindist - dist + 1, angle)
+        p1 = mass1 * hypot(*vel1)
+        p2 = mass2 * hypot(*vel2)
+        r = p1 / max((p1 + p2), 0.1)
+        v1 = mov * (1 - r)
+        v2 = mov * -r
+        totalmass = mass1 + mass2
+        coeff1 = mass2 / totalmass * 2
+        coeff2 = mass1 / totalmass * 2
         vect1 = diff
         vect2 = -vect1
         pos1 += v1
         pos2 += v2
-        veld1 = vel1-vel2
+        veld1 = vel1 - vel2
         veld2 = -veld1
-        arg1 = dotProduct(veld1,vect1)/dotProduct(vect1)
-        arg2 = dotProduct(veld2,vect2)/dotProduct(vect2)
-        vect1 *= coeff1*arg1
-        vect2 *= coeff2*arg2
+        arg1 = dotProduct(veld1, vect1) / dotProduct(vect1)
+        arg2 = dotProduct(veld2, vect2) / dotProduct(vect2)
+        vect1 *= coeff1 * arg1
+        vect2 *= coeff2 * arg2
         vel1 -= vect1
         vel2 -= vect2
         hit = True
     else:
         hit = False
-    return hit,pos1,pos2,vel1,vel2
-def angleDifference(angle1,angle2,unit=tau):
+    return hit, pos1, pos2, vel1, vel2
+
+
+def angleDifference(angle1, angle2, unit=tau):
     angle1 %= unit
     angle2 %= unit
     if angle1 > angle2:
-        angle1,angle2 = angle2,angle1
-    a = abs(angle2-angle1)
-    b = abs(angle2-unit-angle1)
-    return min(a,b)
-def angleDistance(angle1,angle2,unit=tau):
+        angle1, angle2 = angle2, angle1
+    a = abs(angle2 - angle1)
+    b = abs(angle2 - unit - angle1)
+    return min(a, b)
+
+
+def angleDistance(angle1, angle2, unit=tau):
     angle1 %= unit
     angle2 %= unit
-    a = angle2-angle1
-    b = angle2-unit-angle1
-    c = angle2+unit-angle1
-    return sorted((a,b,c),key=lambda x: abs(x))[0]
-def frameDistance(pos1,pos2,vel1,vel2):
-    line1 = [pos1-vel1,pos1]
-    line2 = [pos2-vel2,pos2]
-    return intervalIntervalDist(line1,line2)
-def intervalIntervalDist(line1,line2):
-    if intervalsIntersect(line1,line2):
+    a = angle2 - angle1
+    b = angle2 - unit - angle1
+    c = angle2 + unit - angle1
+    return sorted((a, b, c), key=lambda x: abs(x))[0]
+
+
+def frameDistance(pos1, pos2, vel1, vel2):
+    line1 = [pos1 - vel1, pos1]
+    line2 = [pos2 - vel2, pos2]
+    return intervalIntervalDist(line1, line2)
+
+
+def intervalIntervalDist(line1, line2):
+    if intervalsIntersect(line1, line2):
         return 0
-    distances = [pointIntervalDist(line1[0],line2),
-                 pointIntervalDist(line1[1],line2),
-                 pointIntervalDist(line2[0],line1),
-                 pointIntervalDist(line2[1],line1)]
+    distances = [
+        pointIntervalDist(line1[0], line2),
+        pointIntervalDist(line1[1], line2),
+        pointIntervalDist(line2[0], line1),
+        pointIntervalDist(line2[1], line1),
+    ]
     return min(distances)
-def pointIntervalDist(point,line):
-    px,py = point
-    x1,x2 = line[0][0],line[1][0]
-    y1,y2 = line[0][1],line[1][1]
-    dx = x2-x1
-    dy = y2-y1
+
+
+def pointIntervalDist(point, line):
+    px, py = point
+    x1, x2 = line[0][0], line[1][0]
+    y1, y2 = line[0][1], line[1][1]
+    dx = x2 - x1
+    dy = y2 - y1
     if dx == dy == 0:
-        return hypot(px-x1,py-y1)
-    t = ((px-x1)*dx+(py-y1)*dy)/(dx*dx+dy*dy)
+        return hypot(px - x1, py - y1)
+    t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)
     if t < 0:
-        dx = px-x1
-        dy = py-y1
+        dx = px - x1
+        dy = py - y1
     elif t > 1:
-        dx = px-x2
-        dy = py-y2
+        dx = px - x2
+        dy = py - y2
     else:
-        dx = px-x1-t*dx
-        dy = py-y1-t*dy
-    return hypot(dx,dy)
-def intervalsIntersect(line1,line2):
-    x11,y11 = line1[0]
-    x12,y12 = line1[1]
-    x21,y21 = line2[0]
-    x22,y22 = line2[1]
+        dx = px - x1 - t * dx
+        dy = py - y1 - t * dy
+    return hypot(dx, dy)
+
+
+def intervalsIntersect(line1, line2):
+    x11, y11 = line1[0]
+    x12, y12 = line1[1]
+    x21, y21 = line2[0]
+    x22, y22 = line2[1]
     dx1 = x12 - x11
     dy1 = y12 - y11
     dx2 = x22 - x21
     dy2 = y22 - y21
-    delta = dx2*dy1-dy2*dx1
+    delta = dx2 * dy1 - dy2 * dx1
     if delta == 0:
         return False
-    s = (dx1*(y21-y11)+dy1*(x11-x21))/delta
-    t = (dx2*(y11-y21)+dy2*(x21-x11))/(-delta)
-    return (0<=s<=1) and (0<=t<=1)
-def func2Array(func,size=4096):
-    function = eval('lambda x: '+str(func))
-    period = 2*pi
-    array = function(numpy.arange(0,period,1/(size+1)*period))
-    return(array)
-def array2Harmonics(data,precision=1024):
+    s = (dx1 * (y21 - y11) + dy1 * (x11 - x21)) / delta
+    t = (dx2 * (y11 - y21) + dy2 * (x21 - x11)) / (-delta)
+    return (0 <= s <= 1) and (0 <= t <= 1)
+
+
+def func2Array(func, size=4096):
+    function = eval("lambda x: " + str(func))
+    period = 2 * pi
+    array = function(numpy.arange(0, period, 1 / (size + 1) * period))
+    return array
+
+
+def array2Harmonics(data, precision=1024):
     output = []
     T = len(data)
     t = numpy.arange(T)
-    for n in range(precision+1):
-        if n > T/2+1:
-            output.append(numpy.array((0,0)))
+    for n in range(precision + 1):
+        if n > T / 2 + 1:
+            output.append(numpy.array((0, 0)))
         else:
-            bn = 2/T*(data*numpy.cos(2*pi*n*t/T)).sum()
-            an = 2/T*(data*numpy.sin(2*pi*n*t/T)).sum()
-            R = numpy.sqrt(an**2+bn**2)
-            p = numpy.arctan2(bn,an)
+            bn = 2 / T * (data * numpy.cos(2 * pi * n * t / T)).sum()
+            an = 2 / T * (data * numpy.sin(2 * pi * n * t / T)).sum()
+            R = numpy.sqrt(an ** 2 + bn ** 2)
+            p = numpy.arctan2(bn, an)
             if R == 0:
                 p = 0
-            output.append(numpy.array((R,p)))
-    return numpy.array(output[1:precision+1])
-def harmonics2Array(period,harmonics,func="sin(x)"):
+            output.append(numpy.array((R, p)))
+    return numpy.array(output[1 : precision + 1])
+
+
+def harmonics2Array(period, harmonics, func="sin(x)"):
     expression = func
-    function = eval('lambda x: '+expression)
+    function = eval("lambda x: " + expression)
     result = 0
     t = numpy.arange(period)
-    for n,(a,b) in enumerate(harmonics):
-        result += a*function((n+1)*t*2*pi/period+b)
+    for n, (a, b) in enumerate(harmonics):
+        result += a * function((n + 1) * t * 2 * pi / period + b)
     return result
-def limLine(s,lim):
+
+
+def limLine(s, lim):
     curr = s
     if len(curr) > lim:
         temp = curr.split(" ")
         final = ""
         string = ""
         for t in temp:
-            if len(string)+len(t) > lim:
-                final += string[:-1]+"\n"
+            if len(string) + len(t) > lim:
+                final += string[:-1] + "\n"
                 string = ""
-            string += t+" "
-        s = final+string[:-1]
+            string += t + " "
+        s = final + string[:-1]
     return s
-def strGetRem(s,arg):
-    if arg+" " in s:
-        s = s.replace(arg+" ","")
-        return s,True
-    elif " "+arg in s:
-        s = s.replace(" "+arg,"")
-        return s,True
+
+
+def strGetRem(s, arg):
+    if arg + " " in s:
+        s = s.replace(arg + " ", "")
+        return s, True
+    elif " " + arg in s:
+        s = s.replace(" " + arg, "")
+        return s, True
     else:
-        return s,False
+        return s, False
+
 
 class dynamicFunc:
-    def __init__(self,func):
+    def __init__(self, func):
         self.text = func
         self.func = eval(func)
-    def __call__(self,*args,**kwargs):
-        return self.func(*args,**kwargs)
+
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
+
     def __repr__(self):
         return self.text
+
+
 def performAction(action):
     try:
         time.sleep(action[-1])
@@ -1013,17 +1221,20 @@ def performAction(action):
         if type(x) is list:
             y = action[0](*x)
         else:
-            y = action[0](*x[0],**x[1])
+            y = action[0](*x[0], **x[1])
     else:
         y = action[0]()
     if len(action) > 4:
         action[2][action[3]] = y
+
+
 class _parallel:
     def __init__(self):
         self.max = 32
-        self.running = {i:self.new() for i in range(self.max)}
+        self.running = {i: self.new() for i in range(self.max)}
         for i in self.running:
             self.running[i].start()
+
     class new(threading.Thread):
         def __init__(self):
             threading.Thread.__init__(self)
@@ -1031,9 +1242,11 @@ class _parallel:
             self.state = 0
             self.daemon = True
             self._stop = threading.Event()
-        def __call__(self,*action):
+
+        def __call__(self, *action):
             self.actions.append(action)
             self.state = 1
+
         def run(self):
             while True:
                 try:
@@ -1042,31 +1255,48 @@ class _parallel:
                         self.actions = self.actions[1:]
                         performAction(action)
                     self.state = -1
-                    time.sleep(.007)
+                    time.sleep(0.007)
                 except TimeoutError:
                     pass
-        def stop(self): 
+
+        def stop(self):
             self._stop.set()
+
         def get_id(self):
-            if hasattr(self,'_thread_id'): 
-                return self._thread_id 
-            for t_id, thread in threading._active.items(): 
-                if thread is self: 
+            if hasattr(self, "_thread_id"):
+                return self._thread_id
+            for t_id, thread in threading._active.items():
+                if thread is self:
                     return t_id
-        def kill(self): 
-            thread_id = self.get_id() 
+
+        def kill(self):
+            thread_id = self.get_id()
             res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                thread_id,ctypes.py_object(TimeoutError)) 
-            if res > 1: 
+                thread_id, ctypes.py_object(TimeoutError)
+            )
+            if res > 1:
                 ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                    thread_id,ctypes.py_object(BaseException))
+                    thread_id, ctypes.py_object(BaseException)
+                )
                 self.stop()
-def doParallel(func,data_in=None,data_out=[0],start=0,end=None,per=1,delay=0,maxq=64,name=False):
+
+
+def doParallel(
+    func,
+    data_in=None,
+    data_out=[0],
+    start=0,
+    end=None,
+    per=1,
+    delay=0,
+    maxq=64,
+    name=False,
+):
     global processes
     if end == None:
         end = len(data_out)
     ps = processes.running
-    for i in range(start,end):
+    for i in range(start, end):
         if name:
             d = name
             ps[d] = processes.new()
@@ -1084,7 +1314,9 @@ def doParallel(func,data_in=None,data_out=[0],start=0,end=None,per=1,delay=0,max
             while p.state > 1 or len(p.actions) >= maxq:
                 d = xrand(processes.max)
                 p = ps[d]
-        p(func,data_in,data_out,i,delay)
+        p(func, data_in, data_out, i, delay)
+
+
 def killThreads():
     global processes
     running = tuple(processes.running)
@@ -1092,8 +1324,10 @@ def killThreads():
         if type(i) is int and i in processes.running:
             p = processes.running[i]
             p.kill()
-            del(p)
+            del p
     processes = _parallel()
+
+
 def waitParallel(delay):
     global processes
     t = time.time()
@@ -1101,6 +1335,8 @@ def waitParallel(delay):
     for i in running:
         if type(i) is int and i in processes.running:
             p = processes.running[i]
-            while p.state > 0 and time.time()-t < delay:
-                time.sleep(.001)
+            while p.state > 0 and time.time() - t < delay:
+                time.sleep(0.001)
+
+
 processes = _parallel()
