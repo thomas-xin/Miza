@@ -98,7 +98,7 @@ class ban:
 **__"+str(is_banned/3600)+"__** hours to **__"+str(tm)+"__** hours."
         elif tm >= 0:
             response = "**"+t_user.name+"** has been banned from \
-**"+guild.name+"** for **__"+str(tm)+"__** hours."
+**"+guild.name+"** for **__"+str(tm)+"__** hour"+"s"*(tm!=1)+"."
         if msg:
             response += " Reason: **"+msg+"**."
         if "h" not in flags:
