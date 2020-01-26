@@ -9,7 +9,7 @@ class text2048:
         self.name = ["2048","text_2048"]
         self.minm = 1
         self.desc = "Plays a game of 2048 using reactions."
-        self.usag = '<board_size:[4]> <public:(?p)> <mode:(?e)(?s)>'
+        self.usag = '<board_size:[4]> <public:(?p)> <easy:(?e)> <insanity:(?i)> <specials_enabled:(?s)>'
     async def nextIter(self,message,gamestate,username,direction,mode):
         width = len(gamestate[-1])
         a = 0
