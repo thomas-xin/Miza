@@ -210,6 +210,7 @@ async def processMessage(message):
         if not u_perm<0 and not suspended:
             await channel.send("Hi, did you require my services for anything? Use ~? or ~help for help.")
         else:
+            doParallel(print,["Ignoring command from suspended user "+user.name+" ("+str(u_id)+")."])
             await channel.send("Sorry, you are currently not permitted to request my services.")
         return
     if msg[0]=="~" and msg[1]!="~":
