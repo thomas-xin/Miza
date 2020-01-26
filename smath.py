@@ -1036,11 +1036,15 @@ class _parallel:
             self.state = 1
         def run(self):
             while True:
-                while self.actions:
-                    performAction(self.actions[0])
-                    self.actions = self.actions[1:]
-                self.state = -1
-                time.sleep(.007)
+                try:
+                    while self.actions:
+                        action = self.actions[0]
+                        self.actions = self.actions[1:]
+                        performAction(action)
+                    self.state = -1
+                    time.sleep(.007)
+                except TimeoutError:
+                    pass
         def stop(self): 
             self._stop.set()
         def get_id(self):
@@ -1052,11 +1056,11 @@ class _parallel:
         def kill(self): 
             thread_id = self.get_id() 
             res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                thread_id,ctypes.py_object(BaseException)) 
+                thread_id,ctypes.py_object(TimeoutError)) 
             if res > 1: 
                 ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                    thread_id,ctypes.py_object(Exception))
-            self.stop()
+                    thread_id,ctypes.py_object(BaseException))
+                self.stop()
 def doParallel(func,data_in=None,data_out=[0],start=0,end=None,per=1,delay=0,maxq=64,name=False):
     global processes
     if end == None:

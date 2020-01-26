@@ -28,7 +28,7 @@ class purge:
         if t_user != client.user:
             s_perm = _vars.getPerms(user,guild)
             if s_perm < 3:
-                return "Error: Insufficient priviliges for command "+name+" "+args[1]+"\
+                return "Error: Insufficient priviliges for command "+name+" for target user\
 .\nRequred level: **__"+'3'+"__**, Current level: **__"+str(s_perm)+"__**"
         hist = await channel.history(limit=128).flatten()
         delM = []
@@ -60,6 +60,8 @@ class ban:
         self.desc = "Bans a user for a certain amount of hours, with an optional reason."
         self.usag = '<0:user> <1:hours[]> <2:reason[]> <hide:(?h)>'
     async def __call__(self,client,_vars,args,user,channel,guild,flags,**void):
+        if guild is None:
+            raise ReferenceError("This command is only available in servers.")
         dtime = datetime.datetime.utcnow().timestamp()
         a1 = args[0]
         t_user = await client.fetch_user(_vars.verifyID(a1))

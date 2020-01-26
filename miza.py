@@ -188,17 +188,40 @@ async def processMessage(message):
     msg = msg.replace("`","")
     user = message.author
     guild = message.guild
-    g_id = guild.id
     u_id = user.id
-    try:
-        enabled = _vars.enabled[g_id]
-    except:
-        enabled = _vars.enabled[g_id] = ["string","admin"]
-        _vars.update()
+    if guild:
+        g_id = guild.id
+    else:
+        g_id = 0
+    if g_id:
+        try:
+            enabled = _vars.enabled[g_id]
+        except KeyError:
+            enabled = _vars.enabled[g_id] = ["string","admin"]
+            _vars.update()
+    else:
+        enabled = list(_vars.categories)
     u_perm = _vars.getPerms(user.id,guild)
     ch = channel = message.channel
+    
+    check = "<@!"+str(client.user.id)+">"
+    if msg.replace(" ","") == check:
+        if not u_perm < 0:
+            await channel.send("Hi, did you require my services for anything? Use ~? or ~help for help.")
+        else:
+            await channel.send("Sorry, you are currently not permitted to request my services.")
+        return
     if msg[0]=="~" and msg[1]!="~":
         comm = msg[1:]
+        op = True
+    elif msg[:len(check)] == check:
+        comm = msg[len(check):]
+        while comm[0] == " ":
+            comm = comm[1:]
+        op = True
+    else:
+        op = False
+    if op:
         commands = []
         for catg in categories:
             if catg in enabled or catg == "main":
@@ -289,19 +312,13 @@ async def processMessage(message):
                                 await channel.send("```\nError: Error message too long.\n```")
                             else:
                                 await channel.send("```\nError: "+rep+"\n```")
+                            raise
                         return
                     else:
                         await channel.send(
                             "Error: Insufficient priviliges for command "+alias+"\
 .\nRequred level: **__"+str(req)+"__**, Current level: **__"+str(u_perm)+"__**")
                         return
-    msg = message.content
-    check = "<@!"+str(client.user.id)+">"
-    if msg[:len(check)] == check:
-        if not u_perm < 0:
-            await channel.send("Hi, did you require my services for anything? Use ~? or ~help for help.")
-        else:
-            await channel.send("Sorry, you are currently not permitted to request my services.")
 
 @client.event
 async def on_ready():
@@ -398,6 +415,7 @@ async def reactCallback(message,reaction,user):
                         except Exception as ex:
                             killThreads()
                             await message.channel.send("```\nError: "+repr(ex)+"\n```")
+                            raise
             except:
                 raise
 
@@ -457,6 +475,7 @@ async def handleMessage(message):
     except Exception as ex:
         killThreads()
         await message.channel.send("```\nError: "+repr(ex)+"\n```")
+        raise
     return
         
 @client.event
