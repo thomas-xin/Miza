@@ -84,7 +84,7 @@ class ban:
             is_banned = is_banned[0]-dtime
             if len(args) < 2:
                 return "Current ban for **"+t_user.name+"** from \
-**"+guild.name+"**: **__"+str(is_banned/3600)+"__** hours."
+**"+guild.name+"**: **__"+str(is_banned/3600)+"__** hour"+"s"*(tm!=1)+"."
         elif len(args) < 2:
             return "**"+t_user.name+"** is currently not banned from **"+guild.name+"**."
         g_bans[t_user.id] = [tm*3600+dtime,channel.id]
