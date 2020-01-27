@@ -1,6 +1,8 @@
 import asyncio
 from smath import *
 
+default_commands = ["string", "admin"]
+
 
 class help:
     is_command = True
@@ -22,10 +24,10 @@ class help:
             try:
                 enabled = _vars.enabled[g_id]
             except KeyError:
-                enabled = _vars.enabled[g_id] = ["string", "admin"]
+                enabled = _vars.enabled[g_id] = default_commands
                 _vars.update()
         else:
-            enabled = list(_vars.categories)
+            enabled = default_commands
         categories = _vars.categories
         commands = []
         for catg in categories:
@@ -209,7 +211,7 @@ class enableCommand:
             return (
                 "Currently enabled command categories in **" + guild.name
                 + "**:\n```\n"
-                + str(["main"] + _vars.enabled.get(guild.id, ["math", "admin"])) + "```"
+                + str(["main"] + _vars.enabled.get(guild.id, default_commands)) + "```"
             )
         else:
             if not catg in _vars.categories:
