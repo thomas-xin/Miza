@@ -146,7 +146,7 @@ class math:
         returns = [terr]
         doParallel(_vars.doMath, [f, returns])
         while returns[0] == terr and time.time() < tm + _vars.timeout-1:
-            await asyncio.sleep(0.1)
+            time.sleep(0.1)
         if returns[0] == terr:
             raise TimeoutError("Request timed out.")
         _vars.updateGlobals()
