@@ -306,4 +306,5 @@ class loop:
             func += " ?" + "?".join(flags)
         for i in range(iters):
             asyncio.create_task(callback(message, func + " ?h" * (i != iters - 1)))
-        return "```\nLooping <" + func + "> " + str(iters) + " times...```"
+        if not "h" in flags:
+            return "```\nLooping <" + func + "> " + str(iters) + " times...```"
