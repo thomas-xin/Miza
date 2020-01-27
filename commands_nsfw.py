@@ -378,7 +378,12 @@ class lewd:
         objs = await searchRandomNSFW(" ".join(args), _vars.timeout)
         url = objs[0]
         if "v" in flags:
-            text = "Pulled from " + url + "\nImage **__" + str(objs[2]) + "__** on page **__" + str(objs[1]) + "__**"
+            text = (
+                "Pulled from " + url
+                + "\nImage **__" + str(objs[2])
+                + "__** on page **__" + str(objs[1])
+                + "__**"
+                )
             return text
         else:
             emb = discord.Embed(url=url)

@@ -34,8 +34,7 @@ class purge:
                 return (
                     "Error: Insufficient priviliges for command "
                     + name
-                    + " for target user\
-.\nRequred level: **__"
+                    + " for target user.\nRequred level: **__"
                     + "3"
                     + "__**, Current level: **__"
                     + str(s_perm)
@@ -61,7 +60,10 @@ class purge:
                 except Exception as ex:
                     print(repr(ex))
         if not "h" in flags:
-            return "Deleted **__" + str(deleted) + "__** message" + "s" * (deleted != 1) + "!"
+            return (
+                "Deleted **__" + str(deleted)
+                + "__** message" + "s" * (deleted != 1) + "!"
+                )
 
 
 class ban:
@@ -86,8 +88,7 @@ class ban:
                 return (
                     "Error: Insufficient priviliges to ban **"
                     + t_user.name
-                    + "** from \
-**"
+                    + "** from **"
                     + guild.name
                     + "**.\nRequired level: **__"
                     + str(t_perm + 1)
@@ -110,19 +111,16 @@ class ban:
             is_banned = is_banned[0] - dtime
             if len(args) < 2:
                 return (
-                    "Current ban for **"
-                    + t_user.name
-                    + "** from \
-**"
-                    + guild.name
-                    + "**: **__"
+                    "Current ban for **" + t_user.name
+                    + "** from **" + guild.name + "**: **__"
                     + str(is_banned / 3600)
-                    + "__** hour"
-                    + "s" * (tm != 1)
-                    + "."
+                    + "__** hour" + "s" * (tm != 1) + "."
                 )
         elif len(args) < 2:
-            return "**" + t_user.name + "** is currently not banned from **" + guild.name + "**."
+            return (
+                "**" + t_user.name
+                + "** is currently not banned from **" + guild.name + "**."
+                )
         g_bans[t_user.id] = [tm * 3600 + dtime, channel.id]
         _vars.bans[g_id] = g_bans
         _vars.update()
@@ -131,27 +129,17 @@ class ban:
         response = None
         if is_banned:
             response = (
-                "Updated ban for **"
-                + t_user.name
-                + "** from \
-**__"
-                + str(is_banned / 3600)
-                + "__** hours to **__"
-                + str(tm)
+                "Updated ban for **" + t_user.name
+                + "** from **__" + str(is_banned / 3600)
+                + "__** hours to **__" + str(tm)
                 + "__** hours."
             )
         elif tm >= 0:
             response = (
-                "**"
-                + t_user.name
-                + "** has been banned from \
-**"
-                + guild.name
-                + "** for **__"
-                + str(tm)
-                + "__** hour"
-                + "s" * (tm != 1)
-                + "."
+                "**" + t_user.name
+                + "** has been banned from **" + guild.name
+                + "** for **__" + str(tm)
+                + "__** hour" + "s" * (tm != 1) + "."
             )
         if msg:
             response += " Reason: **" + msg + "**."

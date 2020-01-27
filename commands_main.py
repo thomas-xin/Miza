@@ -36,7 +36,11 @@ class help:
         show = []
         for a in args:
             if a in categories and (a in enabled or a == "main"):
-                show.append("\nCommands for **" + user.name + "** in **" + g_name + "** in category **" + a + "**:")
+                show.append(
+                    "\nCommands for **" + user.name
+                    + "** in **" + g_name
+                    + "** in category **" + a
+                    + "**:")
                 for com in categories[a]:
                     name = com.__name__
                     minm = com.minm
@@ -45,17 +49,11 @@ class help:
                     if minm > u_perm or (u_perm is not nan and minm is nan):
                         continue
                     newstr = (
-                        "\n`"
-                        + name
-                        + "`\nAliases: "
-                        + str(com.name)
-                        + "\nEffect: "
-                        + desc
-                        + "\nUsage: \
-"
-                        + usag
-                        + "\nRequired permission level: **__"
-                        + str(minm)
+                        "\n`" + name
+                        + "`\nAliases: " + str(com.name)
+                        + "\nEffect: " + desc
+                        + "\nUsage: " + usag
+                        + "\nRequired permission level: **__" + str(minm)
                         + "__**"
                     )
                     show.append(newstr)
@@ -78,19 +76,12 @@ class help:
                             found = True
                     if found:
                         newstr = (
-                            "```\n"
-                            + name
-                            + "\nCategory: "
-                            + c
-                            + "\nAliases: "
-                            + str(com.name)
-                            + "\n\
-Effect: "
-                            + desc
-                            + "\nUsage: "
-                            + usag
-                            + "\nRequired permission level: "
-                            + str(minm)
+                            "```\n" + name
+                            + "\nCategory: " + c
+                            + "\nAliases: " + str(com.name)
+                            + "\nEffect: " + desc
+                            + "\nUsage: " + usag
+                            + "\nRequired permission level: " + str(minm)
                             + "```"
                         )
                         if (not len(show)) or len(show[-1]) < len(newstr):
@@ -107,7 +98,10 @@ Effect: "
                     if not verb:
                         show.append("`" + name + " " + usag + "`")
                     else:
-                        show.append("\n`" + com.__name__ + "`\nEffect: " + com.desc + "\nUsage: " + name + " " + usag)
+                        show.append(
+                            "\n`" + com.__name__
+                            + "`\nEffect: " + com.desc
+                            + "\nUsage: " + name + " " + usag)
             return "Commands for **" + user.name + "** in **" + g_name + "**:\n" + "\n".join(show)
         return "\n".join(show)
 

@@ -2,7 +2,10 @@ import discord, ast, os, sys, asyncio, datetime, json, shlex
 import urllib.request
 from smath import *
 
-client = discord.Client(max_messages=2000, activity=discord.Activity(name="Magic"),)
+client = discord.Client(
+    max_messages=2000,
+    activity=discord.Activity(name="Magic"),
+    )
 
 from matplotlib import use as plot_sys
 
@@ -252,8 +255,7 @@ async def processMessage(message):
                         await channel.send(
                             "Error: Insufficient priviliges for command "
                             + alias
-                            + "\
-.\nRequred level: **__"
+                            + ".\nRequred level: **__"
                             + str(req)
                             + "__**, Current level: **__"
                             + str(u_perm)
@@ -298,7 +300,18 @@ async def processMessage(message):
                         args = shlex.split(d)
                         for a in range(len(args)):
                             args[a] = args[a].replace("", "'").replace("\0", '"')
-                        response = await command(client=client, _vars=_vars, argv=argv, args=args, flags=flags, user=user, message=message, channel=channel, guild=guild, name=alias,)  # for interfacing with discord  # for interfacing with bot's database  # raw text arguments  # split text arguments  # special flags  # user that invoked the command  # message data  # channel data  # guild data  # alias the command was called as
+                        response = await command(
+                            client=client,      # for interfacing with discord
+                            _vars=_vars,        # for interfacing with bot's database
+                            argv=argv,          # raw text argument
+                            args=args,          # split text arguments
+                            flags=flags,        # special flags
+                            user=user,          # user that invoked the command
+                            message=message,    # message data
+                            channel=channel,    # channel data
+                            guild=guild,        # guild data
+                            name=alias          # alias the command was called as
+                            )
                         if response is not None:
                             if len(response) < 65536:
                                 doParallel(print, [response])
@@ -335,8 +348,6 @@ async def on_ready():
         else:
             print(guild.name)
     await handleUpdate()
-
-
 ##    print("Users: ")
 ##    for guild in client.guilds:
 ##        print(guild.members)

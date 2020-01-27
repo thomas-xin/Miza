@@ -13,7 +13,10 @@ class join:
         await vc.connect(timeout=_vars.timeout, reconnect=True)
         if vc.id not in _vars.queue:
             _vars.queue[vc.id] = []
-        return "Successfully connected to **" + vc.name + "** in **" + guild + "**."
+        return (
+            "Successfully connected to **" + vc.name
+            + "** in **" + guild + "**."
+            )
 
 
 class queue:
