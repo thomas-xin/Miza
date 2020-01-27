@@ -297,7 +297,7 @@ class loop:
         self.name = ["for", "rep", "repeat", "while"]
         self.minm = 2
         self.desc = "Loops a command."
-        self.usag = "<0:iterations> <1:command>"
+        self.usag = "<0:iterations> <1:command> <hide:(?h)>"
 
     async def __call__(self, args, argv, message, callback, _vars, flags, **void):
         iters = _vars.evalMath(args[0])
