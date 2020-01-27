@@ -457,6 +457,7 @@ async def handleUpdate(force=False):
         dtime = datetime.datetime.utcnow().timestamp()
         bans = _vars.bans
         if bans:
+            changed = False
             for g in bans:
                 bl = list(bans[g])
                 for b in bl:
@@ -471,14 +472,14 @@ async def handleUpdate(force=False):
                                 "**" + u_target.name
                                 + "** has been unbanned from **" + g_target.name + "**."
                                 )
+                            changed = True
                         except:
                             await c_target.send(
                                 "Unable to unban **" + u_target.name
                                 + "** from **" + g_target.name + "**."
                                 )
-            f = open("bans.json", "w")
-            f.write(str(bans))
-            f.close()
+            if changed:
+                _vars.update()
         for vc in client.voice_clients:
             membs = vc.channel.members
             cnt = len(membs)
