@@ -136,6 +136,8 @@ class _globals:
                 g_perm[u_id] = nan
             else:
                 u_perm = g_perm.get(u_id, 0)
+        elif u_id == self.owner_id:
+            u_perm = nan
         else:
             u_perm = 1
         return u_perm
