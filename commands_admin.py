@@ -161,6 +161,7 @@ class roleGiver:
             raise ReferenceError("This command is only available in servers.")
         if "r" in flags:
             _vars.scheduled[channel.id] = {}
+            _vars.update()
             return "Removed all automated role givers from channel **" + channel.name + "**."
         currentSchedule = _vars.scheduled.get(channel.id, {})
         if not len(argv.replace(" ","")):
