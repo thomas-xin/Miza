@@ -341,6 +341,13 @@ async def processMessage(message):
                     return
 
 
+async def updateLoop():
+    print("Update Routine Initiated.")
+    while True:
+        await handleUpdate()
+        await asyncio.sleep(3)
+
+
 @client.event
 async def on_ready():
     print("Successfully connected as " + str(client.user))
@@ -351,6 +358,7 @@ async def on_ready():
         else:
             print(guild.name)
     await handleUpdate()
+    asyncio.create_task(updateLoop())
 ##    print("Users: ")
 ##    for guild in client.guilds:
 ##        print(guild.members)
@@ -456,7 +464,7 @@ async def reactCallback(message, reaction, user):
 async def on_reaction_add(reaction, user):
     message = reaction.message
     if user.id != client.user.id:
-        await checkDelete(message, reaction, user)
+        asyncio.create_task(checkDelete(message, reaction, user))
         await reactCallback(message, reaction, user)
 
 
@@ -464,7 +472,7 @@ async def on_reaction_add(reaction, user):
 async def on_reaction_remove(reaction, user):
     message = reaction.message
     if user.id != client.user.id:
-        await checkDelete(message, reaction, user)
+        asyncio.create_task(checkDelete(message, reaction, user))
         await reactCallback(message, reaction, user)
 
 
@@ -479,7 +487,7 @@ async def on_raw_reaction_add(payload):
         return
     if user.id != client.user.id:
         reaction = payload.emoji
-        await checkDelete(message, reaction, user)
+        asyncio.create_task(checkDelete(message, reaction, user))
 
 
 @client.event
