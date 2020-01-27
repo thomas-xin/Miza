@@ -230,8 +230,8 @@ async def processMessage(message):
     if msg[0] == "~" and msg[1] != "~":
         comm = msg[1:]
         op = True
-    elif msg[: len(check)] == check:
-        comm = msg[len(check) :]
+    elif msg[:len(check)] == check:
+        comm = msg[len(check):]
         while comm[0] == " ":
             comm = comm[1:]
         op = True
@@ -293,6 +293,9 @@ async def processMessage(message):
                                     if argv == flag:
                                         argv = ""
                                         addDict(flags, {char: 1})
+                        if argv:
+                            while argv[0] == " ":
+                                argv = argv[1:]
                         a = argv.replace('"', "\0")
                         b = a.replace("'", "")
                         c = b.replace("<", "'")
