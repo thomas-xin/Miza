@@ -252,6 +252,34 @@ async def processMessage(message, msg):
         op = True
     else:
         op = False
+    if u_id != client.user.id:
+        currentSchedule = _vars.scheduled.get(channel.id, {})
+        checker = message.content.lower()
+        for k in currentSchedule:
+            if k in checker:
+                curr = currentSchedule[k]
+                role = curr["role"]
+                deleter = curr["deleter"]
+                try:
+                    perm = float(role)
+                    currPerm = _vars.getPerms(user, guild)
+                    if perm > currPerm:
+                        _vars.setPerms(user, guild, perm)
+                    print("Granted perm " + str(perm) + " to " + user.name + ".")
+                except ValueError:
+                    for r in guild.roles:
+                        if r.name.lower() == role:
+                            await user.add_roles(
+                                r,
+                                reason="Verified.",
+                                atomic=True,
+                                )
+                            print("Granted role " + r.name + " to " + user.name + ".")
+                if deleter:
+                    try:
+                        await message.delete()
+                    except discord.errors.NotFound:
+                        pass
     if op:
         commands = []
         for catg in categories:
@@ -356,34 +384,6 @@ async def processMessage(message, msg):
                             errmsg = "```\nError: " + rep + "\n```"
                         print(errmsg)
                         await channel.send(errmsg)
-    if u_id != client.user.id:
-        currentSchedule = _vars.scheduled.get(channel.id, {})
-        checker = message.content.lower()
-        for k in currentSchedule:
-            if k in checker:
-                curr = currentSchedule[k]
-                role = curr["role"]
-                deleter = curr["deleter"]
-                try:
-                    perm = float(role)
-                    currPerm = _vars.getPerms(user, guild)
-                    if perm > currPerm:
-                        _vars.setPerms(user, guild, perm)
-                    print("Granted perm " + str(perm) + " to " + user.name + ".")
-                except ValueError:
-                    for r in guild.roles:
-                        if r.name.lower() == role:
-                            await user.add_roles(
-                                r,
-                                reason="Verified.",
-                                atomic=True,
-                                )
-                            print("Granted role " + r.name + " to " + user.name + ".")
-                if deleter:
-                    try:
-                        await message.delete()
-                    except discord.errors.NotFound:
-                        pass
 
 
 async def fastLoop():
