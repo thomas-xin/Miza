@@ -27,6 +27,7 @@ class text2048:
                     if gamestate[z][x][y] < 0:
                         gamestate[z][x][y] = 0
         gamestate[1] = copy.deepcopy(gamestate[0])
+        tiles = gamestate[0]
         if i != 4 and i is not None:
             a = 1
             for w in range(width - 1):
@@ -35,52 +36,52 @@ class text2048:
                     for x in range(width):
                         for y in range(width):
                             if x - z >= 0 and x - z < width:
-                                if gamestate[0][x][y] > 0:
-                                    if gamestate[0][x - z][y] <= 0:
-                                        gamestate[0][x - z][y] = gamestate[0][x][y]
-                                        gamestate[0][x][y] = 0
+                                if tiles[x][y] > 0:
+                                    if tiles[x - z][y] <= 0:
+                                        tiles[x - z][y] = tiles[x][y]
+                                        tiles[x][y] = 0
                                         a = 0
-                                    elif type(gamestate[0][x][y]) is float:
-                                        if type(gamestate[0][x - z][y]) is int:
-                                            gamestate[0][x - z][y] += round(gamestate[0][x][y] * 10)
-                                            gamestate[0][x][y] = 0
+                                    elif type(tiles[x][y]) is float:
+                                        if type(tiles[x - z][y]) is int:
+                                            tiles[x - z][y] += round(tiles[x][y] * 10)
+                                            tiles[x][y] = 0
                                         else:
-                                            gamestate[0][x - z][y] += gamestate[0][x][y]
-                                            gamestate[0][x][y] = 0
+                                            tiles[x - z][y] += tiles[x][y]
+                                            tiles[x][y] = 0
                                         a = 0
-                                    elif type(gamestate[0][x - z][y]) is float:
-                                        gamestate[0][x - z][y] = round(gamestate[0][x - z][y] * 10) + gamestate[0][x][y]
-                                        gamestate[0][x][y] = 0
+                                    elif type(tiles[x - z][y]) is float:
+                                        tiles[x - z][y] = round(tiles[x - z][y] * 10) + tiles[x][y]
+                                        tiles[x][y] = 0
                                         a = 0
-                                    elif gamestate[0][x - z][y] == gamestate[0][x][y]:
-                                        gamestate[0][x - z][y] += 1
-                                        gamestate[0][x][y] = 0
+                                    elif tiles[x - z][y] == tiles[x][y]:
+                                        tiles[x - z][y] += 1
+                                        tiles[x][y] = 0
                                         a = 0
                 else:
                     z = (i ^ 2) - 2
                     for x in range(width):
                         for y in range(width):
                             if y - z >= 0 and y - z < width:
-                                if gamestate[0][x][y] > 0:
-                                    if gamestate[0][x][y - z] <= 0:
-                                        gamestate[0][x][y - z] = gamestate[0][x][y]
-                                        gamestate[0][x][y] = 0
+                                if tiles[x][y] > 0:
+                                    if tiles[x][y - z] <= 0:
+                                        tiles[x][y - z] = tiles[x][y]
+                                        tiles[x][y] = 0
                                         a = 0
-                                    elif type(gamestate[0][x][y]) is float:
-                                        if type(gamestate[0][x][y - z]) is int:
-                                            gamestate[0][x][y - z] += round(gamestate[0][x][y] * 10)
-                                            gamestate[0][x][y] = 0
+                                    elif type(tiles[x][y]) is float:
+                                        if type(tiles[x][y - z]) is int:
+                                            tiles[x][y - z] += round(tiles[x][y] * 10)
+                                            tiles[x][y] = 0
                                         else:
-                                            gamestate[0][x][y - z] += gamestate[0][x][y]
-                                            gamestate[0][x][y] = 0
+                                            tiles[x][y - z] += tiles[x][y]
+                                            tiles[x][y] = 0
                                         a = 0
-                                    elif type(gamestate[0][x][y - z]) is float:
-                                        gamestate[0][x][y - z] = round(gamestate[0][x][y - z] * 10) + gamestate[0][x][y]
-                                        gamestate[0][x][y] = 0
+                                    elif type(tiles[x][y - z]) is float:
+                                        tiles[x][y - z] = round(tiles[x][y - z] * 10) + tiles[x][y]
+                                        tiles[x][y] = 0
                                         a = 0
-                                    elif gamestate[0][x][y - z] == gamestate[0][x][y]:
-                                        gamestate[0][x][y - z] += 1
-                                        gamestate[0][x][y] = 0
+                                    elif tiles[x][y - z] == tiles[x][y]:
+                                        tiles[x][y - z] += 1
+                                        tiles[x][y] = 0
                                         a = 0
         if not a:
             if i != 4:
