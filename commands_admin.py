@@ -170,7 +170,7 @@ class roleGiver:
                 )
         react = args[0].lower()
         try:
-            role = mpf(args[1])
+            role = float(args[1])
             s_perm = _vars.getPerms(user, guild)
             if s_perm < role + 1 or role is nan:
                 raise PermissionError("Insufficient permissions to assign permission giver.")

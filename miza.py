@@ -365,7 +365,7 @@ async def processMessage(message, msg):
                 role = curr["role"]
                 deleter = curr["deleter"]
                 try:
-                    perm = mpf(role)
+                    perm = float(role)
                     currPerm = _vars.getPerms(user, guild)
                     if perm > currPerm:
                         _vars.setPerms(user, guild, perm)
