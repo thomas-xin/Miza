@@ -1304,4 +1304,38 @@ def waitParallel(delay):
                 time.sleep(0.001)
 
 
+def updatePrint():
+    global printGlobals, printLocals, printVars, origPrint
+    while True:
+        if printLocals:
+            printLocals += printVars
+            origPrint(printLocals,end="")
+            printGlobals += printLocals
+            printLocals = ""
+        time.sleep(0.1)
+
+
+def logPrint(*args, sep=" ", end="\n"):
+    global printLocals
+    printLocals += str(sep).join((str(i) for i in args)) + str(end)
+
+
+def setPrint(string):
+    global printVars
+    printVars = string
+
+
+def dumpLogData():
+    global printGlobals
+    f = open("cache/log.txt", "w")
+    f.write(printGlobals)
+    f.close()
+
+
 processes = _parallel()
+printVars = ""
+printLocals = ""
+printGlobals = ""
+origPrint = print
+print = logPrint
+doParallel(updatePrint, name="printer")

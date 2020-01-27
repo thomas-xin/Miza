@@ -1,4 +1,4 @@
-import discord, ast, os, sys, asyncio, datetime, json, shlex
+import discord, ast, os, sys, asyncio, datetime, json, shlex, easygui
 import urllib.request
 from smath import *
 
@@ -81,6 +81,7 @@ class _globals:
         self.token = auth["discord_token"]
         self.resetGlobals()
         doParallel(self.getModules)
+        self.current_channel = None
 
     def getModule(self, module, category):
         exec("import " + module + " as _vars_", globals())
@@ -188,13 +189,12 @@ class _globals:
         return eval(f)
 
 
-async def processMessage(message):
+async def processMessage(message, msg):
     global client
     perms = _vars.perms
     bans = _vars.bans
     categories = _vars.categories
     stored_vars = _vars.stored_vars
-    msg = message.content
     if msg[:2] == "> ":
         msg = msg[2:]
     elif msg[:2] == "||" and msg[-2:] == "||":
@@ -224,7 +224,7 @@ async def processMessage(message):
         if not u_perm < 0 and not suspended:
             await channel.send("Hi, did you require my services for anything? Use ~? or ~help for help.")
         else:
-            doParallel(print, ["Ignoring command from suspended user " + user.name + " (" + str(u_id) + ")."])
+            print("Ignoring command from suspended user " + user.name + " (" + str(u_id) + ").")
             await channel.send("Sorry, you are currently not permitted to request my services.")
         return
     if msg[0] == "~" and msg[1] != "~":
@@ -249,7 +249,7 @@ async def processMessage(message):
                 check = comm[:length].lower()
                 argv = comm[length:]
                 if check == alias and (len(comm) == length or comm[length] == " " or comm[length] == "?"):
-                    doParallel(print, [user.name + " (" + str(u_id) + ") issued command " + msg])
+                    print(user.name + " (" + str(u_id) + ") issued command " + msg)
                     req = command.minm
                     if req > u_perm or (u_perm is not nan and req is nan):
                         await channel.send(
@@ -263,7 +263,6 @@ async def processMessage(message):
                         )
                         return
                     try:
-                        await channel.trigger_typing()
                         if argv:
                             while argv[0] == " ":
                                 argv = argv[1:]
@@ -301,37 +300,40 @@ async def processMessage(message):
                         c = b.replace("<", "'")
                         d = c.replace(">", "'")
                         args = shlex.split(d)
+                        await channel.trigger_typing()
                         for a in range(len(args)):
                             args[a] = args[a].replace("", "'").replace("\0", '"')
                         response = await command(
-                            client=client,      # for interfacing with discord
-                            _vars=_vars,        # for interfacing with bot's database
-                            argv=argv,          # raw text argument
-                            args=args,          # split text arguments
-                            flags=flags,        # special flags
-                            user=user,          # user that invoked the command
-                            message=message,    # message data
-                            channel=channel,    # channel data
-                            guild=guild,        # guild data
-                            name=alias          # alias the command was called as
+                            client=client,          # for interfacing with discord
+                            _vars=_vars,            # for interfacing with bot's database
+                            argv=argv,              # raw text argument
+                            args=args,              # split text arguments
+                            flags=flags,            # special flags
+                            user=user,              # user that invoked the command
+                            message=message,        # message data
+                            channel=channel,        # channel data
+                            guild=guild,            # guild data
+                            name=alias,             # alias the command was called as
+                            callback=processMessage,# function that called the command
                             )
                         if response is not None:
                             if len(response) < 65536:
-                                doParallel(print, [response])
+                                print(response)
                             else:
                                 print("[RESPONSE OVER 64KB]")
                             if type(response) is list:
                                 for r in response:
                                     await channel.send(r)
                             else:
-                                await channel.send(response)
-                    except discord.HTTPException:
-                        fn = "cache/temp.txt"
-                        _f = open(fn, "wb")
-                        _f.write(bytes(response, "utf-8"))
-                        _f.close()
-                        _f = discord.File(fn)
-                        await channel.send("Response too long for message.", file=_f)
+                                try:
+                                    asyncio.create_task(channel.send(response))
+                                except discord.HTTPException:
+                                    fn = "cache/temp.txt"
+                                    _f = open(fn, "wb")
+                                    _f.write(bytes(response, "utf-8"))
+                                    _f.close()
+                                    _f = discord.File(fn)
+                                    await channel.send("Response too long for message.", file=_f)
                     except Exception as ex:
                         rep = repr(ex)
                         if len(rep) > 1900:
@@ -343,12 +345,51 @@ async def processMessage(message):
                     return
 
 
-async def updateLoop():
-    print("Update Routine Initiated.")
+async def fastLoop():
+    global client, _vars
+    print("Fast Loop initiated.")
+    while True:
+        msg = [None]
+        ch = _vars.current_channel
+        if ch is not None:
+            chan = str(ch.id)
+        else:
+            chan = ""
+        printed = chan + ">>> "
+        setPrint(printed)
+        doParallel(input, [printed], msg, name="inputter")
+        while msg[0] is None:
+            await asyncio.sleep(0.2)
+        proc = msg[0]
+        if not proc:
+            continue
+        if proc[0] == "!":
+            proc = proc[1:]
+            try:
+                chanID = int(proc)
+                _vars.current_channel = await client.fetch_channel(chanID)
+            except ValueError:
+                sent = await ch.send("*** ***")
+                await processMessage(sent, proc)
+                try:
+                    await sent.delete()
+                except discord.errors.NotFound:
+                    pass
+            except Exception as ex:
+                print(ex)
+        else:
+            if ch is not None:
+                await ch.send(proc)
+            else:
+                print("Channel does not exist.")
+
+
+async def slowLoop():
+    global _vars
+    print("Slow loop initiated.")
     while True:
         await handleUpdate()
-        #print("Active threads: "+str(threading.active_count()))
-        await asyncio.sleep(3)
+        await asyncio.sleep(2.5)
 
 
 @client.event
@@ -357,11 +398,12 @@ async def on_ready():
     print("Servers: ")
     for guild in client.guilds:
         if guild.unavailable:
-            print(str(guild.id) + " is not available.")
+            print("> " + str(guild.id) + " is not available.")
         else:
-            print(guild.name)
+            print("> " + guild.name)
     await handleUpdate()
-    asyncio.create_task(updateLoop())
+    asyncio.create_task(slowLoop())
+    asyncio.create_task(fastLoop())
 ##    print("Users: ")
 ##    for guild in client.guilds:
 ##        print(guild.members)
@@ -516,13 +558,23 @@ async def handleMessage(message):
     if not len(msg) > 1:
         return
     elif u_id == client.user.id:
-        if "Error: " in msg or "Commands for " in msg or msg == "Response too long for message.":
+        checked = [
+            "```\nLooping ",
+            "Error: ",
+            "Commands for ",
+            "Response too long for message.",
+            ]
+        found = False
+        for i in checked:
+            if i in msg:
+                found = True
+        if found:
             try:
                 await message.add_reaction("❎")
             except Exception as ex:
                 print(repr(ex))
     try:
-        await asyncio.wait_for(processMessage(message), timeout=_vars.timeout)
+        await asyncio.wait_for(processMessage(message, msg), timeout=_vars.timeout)
     except Exception as ex:
         killThreads()
         errmsg = "```\nError: " + repr(ex) + "\n```"

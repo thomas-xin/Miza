@@ -48,7 +48,7 @@ def pull_e621(argv, data, thr, delay=5):
         try:
             limit = s.index('class="next_page" rel="next"')
             s = s[:limit]
-        except IndexError:
+        except ValueError:
             pass
 
         search = '<a href="/post/show/'
@@ -63,7 +63,7 @@ def pull_e621(argv, data, thr, delay=5):
                     sources.append(int(target))
                 except ValueError:
                     pass
-            except IndexError:
+            except ValueError:
                 break
         x = None
         while not x:
@@ -100,7 +100,14 @@ rule34_sync = rule34.Sync()
 def pull_rule34_xxx(argv, data, thr, delay=5):
     v1, v2 = 1, 1
     try:
-        sources = rule34_sync.getImages(tags=argv, fuzzy=True, randomPID=True, singlePage=True)
+        t = time.time()
+        while time.time() - t < delay:
+            try:
+                sources = rule34_sync.getImages(tags=argv, fuzzy=True,
+                                                randomPID=True, singlePage=True)
+                break
+            except TimeoutError:
+                pass
         if sources:
             v2 = xrand(len(sources))
             url = sources[v2].file_url
@@ -132,14 +139,14 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
         if resp.getcode() != 200:
             raise ConnectionError("Error " + str(resp.getcode()))
         s = resp.read().decode("utf-8")
-        tags = s.split("em' href='/post/list/")[1:]
+        tags = s.split("href='/post/list/")[1:]
         valid = []
         for i in range(len(tags)):
             ind = tags[i].index("/")
             tags[i] = tags[i][:ind]
             t = tags[i].lower()
             for a in items:
-                if a in t:
+                if a in t or a[:-1] == t:
                     valid.append(tags[i])
         rx = xrand(len(valid))
         items = valid[rx]
@@ -168,14 +175,14 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
             if resp.getcode() != 200:
                 raise ConnectionError("Error " + str(resp.getcode()))
             s = resp.read().decode("utf-8")
-        except IndexError:
+        except ValueError:
             pass
         try:
             limit = s.index("class=''>Images</h3><div class='blockbody'>")
             s = s[limit:]
             limit = s.index("</div></div></section>")
             s = s[:limit]
-        except IndexError:
+        except ValueError:
             pass
 
         search = 'href="'
@@ -196,7 +203,7 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
                         found = True
                 if target[0] == "h" and found:
                     sources.append(target)
-            except IndexError:
+            except ValueError:
                 break
         v2 = xrand(len(sources))
         url = sources[v2]
@@ -206,12 +213,12 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
     print(data)
 
 
-async def searchRandomNSFW(argv, delay=8):
+async def searchRandomNSFW(argv, delay=9):
     t = time.time()
     funcs = [pull_e621, pull_rule34_paheal, pull_rule34_xxx]
     data = [None for i in funcs]
     for i in range(len(funcs)):
-        doParallel(funcs[i], [argv, data, i, delay - 2])
+        doParallel(funcs[i], [argv, data, i, delay - 3])
     while None in data and time.time() - t < delay:
         await asyncio.sleep(0.1)
     data = [i for i in data if i]
@@ -353,7 +360,7 @@ class neko:
         emb = discord.Embed(url=url)
         emb.set_image(url=url)
         print(url)
-        await channel.send(embed=emb)
+        asyncio.create_task(channel.send(embed=emb))
 
 
 class lewd:
@@ -381,7 +388,7 @@ class lewd:
         emb = discord.Embed(url=url)
         emb.set_image(url=url)
         print(url)
-        await channel.send(embed=emb)
+        asyncio.create_task(channel.send(embed=emb))
 
 
 class owoify:

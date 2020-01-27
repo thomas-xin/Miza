@@ -1,4 +1,5 @@
 import discord
+from smath import *
 
 
 class how:

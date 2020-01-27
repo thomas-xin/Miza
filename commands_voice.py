@@ -1,3 +1,6 @@
+from smath import *
+
+
 class join:
     is_command = True
 

@@ -136,7 +136,7 @@ class math:
         self.desc = "Evaluates a math formula using Python syntax."
         self.usag = "<function>"
 
-    async def __call__(self, _vars, argv, channel, **extra):
+    async def __call__(self, _vars, argv, channel, flags, **extra):
         tm = time.time()
         f = argv
         _vars.plt.clf()
@@ -146,7 +146,7 @@ class math:
         returns = [terr]
         doParallel(_vars.doMath, [f, returns])
         while returns[0] == terr and time.time() < tm + _vars.timeout-1:
-            await asyncio.sleep(0.08)
+            await asyncio.sleep(0.03)
         if returns[0] == terr:
             raise TimeoutError("Request timed out.")
         _vars.updateGlobals()
@@ -159,6 +159,8 @@ class math:
         else:
             answer = returns[0]
             if answer is None:
+                if "h" in flags:
+                    return
                 return "```\n" + argv + " successfully executed!```"
             elif "\nError" in answer:
                 return "```" + answer + "\n```"

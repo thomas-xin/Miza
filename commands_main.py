@@ -1,3 +1,4 @@
+import asyncio
 from smath import *
 
 
@@ -35,7 +36,7 @@ class help:
         argv = " ".join(args).lower()
         show = []
         for a in args:
-            if a in categories and (a in enabled or a == "main"):
+            if (a in categories and a in enabled) or a == "main":
                 show.append(
                     "\nCommands for **" + user.name
                     + "** in **" + g_name
@@ -158,37 +159,25 @@ class changePerms:
                 if "h" in flags:
                     return
                 return (
-                    "Changed permissions for **"
-                    + t_user.name
-                    + "** in **"
-                    + guild.name
-                    + "** from \
-**__"
-                    + str(t_perm)
-                    + "__** to **__"
-                    + str(c_perm)
-                    + "__**."
+                    "Changed permissions for **"+ t_user.name
+                    + "** in **" + guild.name
+                    + "** from **__" + str(t_perm)
+                    + "__** to **__" + str(c_perm) + "__**."
                 )
             else:
                 return (
-                    "Error: Insufficient priviliges to change permissions for \
-**"
-                    + t_user.name
-                    + "** in **"
-                    + guild.name
-                    + "** from **__"
-                    + str(t_perm)
-                    + "__** to \
-**__"
-                    + str(c_perm)
-                    + "__**.\nRequired level: \
-**__"
-                    + str(m_perm)
-                    + "__**, Current level: **__"
-                    + str(s_perm)
-                    + "__**"
+                    "Error: Insufficient priviliges to change permissions for **" + t_user.name
+                    + "** in **" + guild.name
+                    + "** from **__" + str(t_perm)
+                    + "__** to **__" + str(c_perm)
+                    + "__**.\nRequired level: **__" + str(m_perm)
+                    + "__**, Current level: **__" + str(s_perm) + "__**"
                 )
-        return "Current permissions for **" + t_user.name + "** in **" + guild.name + "**: **__" + str(t_perm) + "__**"
+        return (
+            "Current permissions for **" + t_user.name
+            + "** in **" + guild.name
+            + "**: **__" + str(t_perm) + "__**"
+            )
 
 
 class enableCommand:
@@ -219,12 +208,9 @@ class enableCommand:
                     return
                 return "Disabled all command categories in **" + guild.name + "**."
             return (
-                "Currently enabled command categories in **"
-                + guild.name
-                + "**:\n\
-```\n"
-                + str(["main"] + _vars.enabled.get(guild.id, ["math", "admin"]))
-                + "```"
+                "Currently enabled command categories in **" + guild.name
+                + "**:\n```\n"
+                + str(["main"] + _vars.enabled.get(guild.id, ["math", "admin"])) + "```"
             )
         else:
             if not catg in _vars.categories:
@@ -238,12 +224,8 @@ class enableCommand:
                 if "e" in flags:
                     if catg in enabled:
                         return (
-                            "Error: command category **"
-                            + catg
-                            + "\
-** is already enabled in **"
-                            + guild.name
-                            + "**."
+                            "Error: command category **" + catg
+                            + "** is already enabled in **" + guild.name + "**."
                         )
                     enabled.append(catg)
                     _vars.update()
@@ -253,12 +235,8 @@ class enableCommand:
                 if "d" in flags:
                     if catg not in enabled:
                         return (
-                            "Error: command category **"
-                            + catg
-                            + "\
-** is not currently enabled in **"
-                            + guild.name
-                            + "**."
+                            "Error: command category **" + catg
+                            + "** is not currently enabled in **" + guild.name + "**."
                         )
                     enabled.remove(catg)
                     _vars.update()
@@ -266,14 +244,9 @@ class enableCommand:
                         return
                     return "Disabled command category **" + catg + "** in **" + guild.name + "**."
                 return (
-                    "Command category **"
-                    + catg
-                    + "** is currently\
-"
-                    + " not" * (catg not in enabled)
-                    + " enabled in **"
-                    + guild.name
-                    + "**."
+                    "Command category **" + catg
+                    + "** is currently" + " not" * (catg not in enabled)
+                    + " enabled in **" + guild.name + "**."
                 )
 
 
@@ -315,3 +288,22 @@ class suspend:
             _vars.bans[0][user.id] = change
             _vars.update()
             return "Changed suspension status of **" + user.name + "** to **__" + str(change) + "__**."
+
+
+class loop:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["for", "rep", "repeat", "while"]
+        self.minm = 2
+        self.desc = "Loops a command."
+        self.usag = "<0:iterations> <1:command>"
+
+    async def __call__(self, args, argv, message, callback, _vars, flags, **void):
+        iters = _vars.evalMath(args[0])
+        func = " ".join(args[1:])
+        if flags:
+            func += " ?" + "?".join(flags)
+        for i in range(iters):
+            asyncio.create_task(callback(message, func + " ?h" * (i != iters - 1)))
+        return "```\nLooping <" + func + "> " + str(iters) + " times...```"
