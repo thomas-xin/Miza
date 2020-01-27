@@ -565,6 +565,8 @@ async def handleMessage(message):
             "Error: ",
             "Commands for ",
             "Response too long for message.",
+            "Hi, did you require my services for anything? Use ~? or ~help for help.",
+            "Sorry, you are currently not permitted to request my services.",
             ]
         found = False
         for i in checked:
