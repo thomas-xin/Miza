@@ -49,32 +49,16 @@ class _globals:
         ".fromfile",
         "ctypes",
     ]
+    savedata = "data.json"
+    authdata = "auth.json"
 
     def __init__(self):
         self.lastCheck = time.time()
         self.queue = {}
-        try:
-            f = open("perms.json")
-            self.perms = eval(f.read())
-            f.close()
-        except:
-            self.perms = {}
-        try:
-            f = open("bans.json")
-            self.bans = eval(f.read())
-            f.close()
-        except:
-            self.bans = {0: {}}
-        try:
-            f = open("enabled.json")
-            self.enabled = eval(f.read())
-            f.close()
-        except:
-            self.enabled = {}
-        doParallel(self.update, [])
+        self.loadSave()
         self.fig = fig
         self.plt = plt
-        f = open("auth.json")
+        f = open(self.authdata)
         auth = ast.literal_eval(f.read())
         f.close()
         self.owner_id = auth["owner_id"]
@@ -82,6 +66,25 @@ class _globals:
         self.resetGlobals()
         doParallel(self.getModules)
         self.current_channel = None
+
+    def loadSave(self):
+        try:
+            f = open(self.savedata)
+        except:
+            print("Creating new save data...")
+            self.perms = {}
+            self.bans = {}
+            self.enabled = {}
+            self.scheduled = {}
+            self.update()
+            f = open(self.savedata)
+            
+        savedata = eval(f.read())
+        f.close()
+        self.perms = savedata["perms"]
+        self.bans = savedata["bans"]
+        self.enabled = savedata["enabled"]
+        self.scheduled = savedata["scheduled"]
 
     def getModule(self, module, category):
         exec("import " + module + " as _vars_", globals())
@@ -109,14 +112,14 @@ class _globals:
             doParallel(self.getModule, [module, category])
 
     def update(self):
-        f = open("perms.json", "w")
-        f.write(str(self.perms))
-        f.close()
-        f = open("bans.json", "w")
-        f.write(str(self.bans))
-        f.close()
-        f = open("enabled.json", "w")
-        f.write(str(self.enabled))
+        f = open(self.savedata, "w")
+        savedata = {
+            "perms": self.perms,
+            "bans": self.bans,
+            "enabled": self.enabled,
+            "scheduled": self.scheduled,
+            }
+        f.write(repr(savedata))
         f.close()
 
     def verifyID(self, value):
@@ -141,6 +144,16 @@ class _globals:
         else:
             u_perm = 1
         return u_perm
+
+    def setPerms(self, user, guild, value):
+        try:
+            u_id = user.id
+        except AttributeError:
+            u_id = user
+        g_perm = self.perms.get(guild.id, {})
+        g_perm.update({u_id: value})
+        self.perms[guild.id] = g_perm
+        self.update()
 
     def resetGlobals(self):
         self.stored_vars = dict(globals())
@@ -218,7 +231,7 @@ async def processMessage(message, msg):
     else:
         enabled = list(_vars.categories)
     u_perm = _vars.getPerms(u_id, guild)
-    ch = channel = message.channel
+    channel = message.channel
 
     check = "<@!" + str(client.user.id) + ">"
     suspended = _vars.bans[0].get(u_id, False)
@@ -255,13 +268,9 @@ async def processMessage(message, msg):
                     req = command.minm
                     if req > u_perm or (u_perm is not nan and req is nan):
                         await channel.send(
-                            "Error: Insufficient priviliges for command "
-                            + alias
-                            + ".\nRequred level: **__"
-                            + str(req)
-                            + "__**, Current level: **__"
-                            + str(u_perm)
-                            + "__**"
+                            "Error: Insufficient priviliges for command " + alias
+                            + ".\nRequred level: **__" + str(req)
+                            + "__**, Current level: **__" + str(u_perm) + "__**"
                         )
                         return
                     try:
@@ -301,7 +310,10 @@ async def processMessage(message, msg):
                         b = a.replace("'", "")
                         c = b.replace("<", "'")
                         d = c.replace(">", "'")
-                        args = shlex.split(d)
+                        try:
+                            args = shlex.split(d)
+                        except ValueError:
+                            args = d.split(" ")
                         await channel.trigger_typing()
                         for a in range(len(args)):
                             args[a] = args[a].replace("", "'").replace("\0", '"')
@@ -344,7 +356,34 @@ async def processMessage(message, msg):
                             errmsg = "```\nError: " + rep + "\n```"
                         print(errmsg)
                         await channel.send(errmsg)
-                    return
+    if u_id != client.user.id:
+        currentSchedule = _vars.scheduled.get(channel.id, {})
+        checker = message.content.lower()
+        for k in currentSchedule:
+            if k in checker:
+                curr = currentSchedule[k]
+                role = curr["role"]
+                deleter = curr["deleter"]
+                try:
+                    perm = mpf(role)
+                    currPerm = _vars.getPerms(user, guild)
+                    if perm > currPerm:
+                        _vars.setPerms(user, guild, perm)
+                    print("Granted perm " + str(perm) + " to " + user.name + ".")
+                except ValueError:
+                    for r in guild.roles:
+                        if r.name.lower() == role:
+                            await user.add_roles(
+                                r,
+                                reason="Verified.",
+                                atomic=True,
+                                )
+                            print("Granted role " + r.name + " to " + user.name + ".")
+                if deleter:
+                    try:
+                        await message.delete()
+                    except discord.errors.NotFound:
+                        pass
 
 
 async def fastLoop():

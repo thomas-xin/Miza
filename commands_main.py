@@ -123,11 +123,11 @@ class clearCache:
         return "```\nCache cleared!```"
 
 
-class changePerms:
+class perms:
     is_command = True
 
     def __init__(self):
-        self.name = ["perms", "perm", "changeperm"]
+        self.name = ["changePerms", "perm", "changePerm"]
         self.minm = -inf
         self.desc = "Shows or changes a user's permission level."
         self.usag = "<0:user:{self}> <1:value{curr}> <hide:(?h)>"
@@ -148,15 +148,12 @@ class changePerms:
             s_perm = _vars.getPerms(s_user.id, guild)
             t_user = await client.fetch_user(_vars.verifyID(args[0]))
             t_perm = _vars.getPerms(t_user.id, guild)
-            if t_perm == nan:
+            if t_perm is nan or c_perm is nan:
                 m_perm = nan
             else:
                 m_perm = max(t_perm, c_perm, 1) + 1
-            if not s_perm <= m_perm and isValid(m_perm):
-                g_perm = _vars.perms.get(guild.id, {})
-                g_perm.update({t_user.id: c_perm})
-                _vars.perms[guild.id] = g_perm
-                _vars.update()
+            if not s_perm <= m_perm and m_perm is not nan:
+                _vars.setPerms(t_user.id, guild, c_perm)
                 if "h" in flags:
                     return
                 return (

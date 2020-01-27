@@ -145,3 +145,45 @@ class ban:
             response += " Reason: **" + msg + "**."
         if "h" not in flags:
             return response
+
+
+class roleGiver:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["verifier"]
+        self.minm = 3
+        self.desc = "Adds an automated role giver to the current channel."
+        self.usag = "<0:react_to> <1:role/perm> <disable:(?r)> <deleter:(?d)>"
+
+    async def __call__(self, _vars, argv, args, user, channel, guild, flags, **void):
+        if guild is None:
+            raise ReferenceError("This command is only available in servers.")
+        if "r" in flags:
+            _vars.scheduled[channel.id] = {}
+            return "Removed all automated role givers from channel **" + channel.name + "**."
+        currentSchedule = _vars.scheduled.get(channel.id, {})
+        if not len(argv.replace(" ","")):
+            return (
+                "Currently active permission givers in channel **" + channel.name
+                + "**:\n```\n" + repr(currentSchedule) + "```"
+                )
+        react = args[0].lower()
+        try:
+            role = mpf(args[1])
+            s_perm = _vars.getPerms(user, guild)
+            if s_perm < role + 1 or role is nan:
+                raise PermissionError("Insufficient permissions to assign permission giver.")
+            r_type = "perm"
+        except ValueError:
+            role = args[1].lower()
+            r_type = "role"
+        currentSchedule[react] = {"role": role, "deleter": "d" in flags}
+        _vars.scheduled[channel.id] = currentSchedule
+        _vars.update()
+        return (
+            "Added role giver with reaction to **" + react
+            + "** and " + r_type + " **" + str(role)
+            + "** to channel **" + channel.name + "**."
+            )
+        
