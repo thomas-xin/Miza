@@ -117,7 +117,6 @@ class clearCache:
         self.usag = ""
 
     async def __call__(self, client, _vars, **void):
-        client.clear()
         _vars.resetGlobals()
         return "```\nCache cleared!```"
 

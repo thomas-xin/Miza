@@ -125,7 +125,7 @@ class _globals:
     def getPerms(self, user, guild):
         try:
             u_id = user.id
-        except:
+        except AttributeError:
             u_id = user
         if guild:
             g_id = guild.id
@@ -217,7 +217,7 @@ async def processMessage(message, msg):
             _vars.update()
     else:
         enabled = list(_vars.categories)
-    u_perm = _vars.getPerms(user.id, guild)
+    u_perm = _vars.getPerms(u_id, guild)
     ch = channel = message.channel
 
     check = "<@!" + str(client.user.id) + ">"
