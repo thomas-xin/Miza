@@ -368,7 +368,7 @@ class lewd:
     async def __call__(self, _vars, args, flags, channel, **void):
         if not is_nsfw(channel):
             raise PermissionError("This command is only available in NSFW channels.")
-        objs = await searchRandomNSFW(" ".join(args), _vars.timeout)
+        objs = await searchRandomNSFW(" ".join(args), _vars.timeout-1)
         url = objs[0]
         if "v" in flags:
             text = (

@@ -335,9 +335,11 @@ async def processMessage(message):
                     except Exception as ex:
                         rep = repr(ex)
                         if len(rep) > 1900:
-                            await channel.send("```\nError: Error message too long.\n```")
+                            errmsg = "```\nError: Error message too long.\n```"
                         else:
-                            await channel.send("```\nError: " + rep + "\n```")
+                            errmsg = "```\nError: " + rep + "\n```"
+                        print(errmsg)
+                        await channel.send(errmsg)
                     return
 
 
@@ -345,6 +347,7 @@ async def updateLoop():
     print("Update Routine Initiated.")
     while True:
         await handleUpdate()
+        #print("Active threads: "+str(threading.active_count()))
         await asyncio.sleep(3)
 
 
@@ -522,7 +525,9 @@ async def handleMessage(message):
         await asyncio.wait_for(processMessage(message), timeout=_vars.timeout)
     except Exception as ex:
         killThreads()
-        await message.channel.send("```\nError: " + repr(ex) + "\n```")
+        errmsg = "```\nError: " + repr(ex) + "\n```"
+        print(errmsg)
+        await message.channel.send(errmsg)
     return
 
 

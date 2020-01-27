@@ -142,11 +142,11 @@ class math:
         _vars.plt.clf()
         if not len(f):
             raise EOFError("Function is empty.")
-        terr = TimeoutError
+        terr = self
         returns = [terr]
         doParallel(_vars.doMath, [f, returns])
         while returns[0] == terr and time.time() < tm + _vars.timeout-1:
-            time.sleep(0.1)
+            await asyncio.sleep(0.08)
         if returns[0] == terr:
             raise TimeoutError("Request timed out.")
         _vars.updateGlobals()

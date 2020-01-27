@@ -1063,7 +1063,11 @@ def frameDistance(pos1, pos2, vel1, vel2):
 def intervalIntervalDist(line1, line2):
     if intervalsIntersect(line1, line2):
         return 0
-    distances = [pointIntervalDist(line1[0], line2), pointIntervalDist(line1[1], line2), pointIntervalDist(line2[0], line1), pointIntervalDist(line2[1], line1)]
+    distances = [
+        pointIntervalDist(line1[0], line2),
+        pointIntervalDist(line1[1], line2),
+        pointIntervalDist(line2[0], line1),
+        pointIntervalDist(line2[1], line1)]
     return min(distances)
 
 
@@ -1241,13 +1245,18 @@ class _parallel:
 
         def kill(self):
             thread_id = self.get_id()
-            res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(TimeoutError))
+            res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                thread_id, ctypes.py_object(TimeoutError)
+                )
             if res > 1:
-                ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(BaseException))
+                ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                    thread_id, ctypes.py_object(BaseException)
+                    )
                 self.stop()
 
 
-def doParallel(func, data_in=None, data_out=[0], start=0, end=None, per=1, delay=0, maxq=64, name=False):
+def doParallel(func, data_in=None, data_out=[0], start=0, end=None,
+               per=1, delay=0, maxq=64, name=False):
     global processes
     if end == None:
         end = len(data_out)
