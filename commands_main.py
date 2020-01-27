@@ -120,6 +120,7 @@ class clearCache:
 
     async def __call__(self, client, _vars, **void):
         _vars.resetGlobals()
+        _vars.loadSave()
         return "```\nCache cleared!```"
 
 
