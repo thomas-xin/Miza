@@ -373,9 +373,15 @@ async def handleUpdate(force=False):
                         bans[g].pop(b)
                         try:
                             await g_target.unban(u_target)
-                            await c_target.send("**" + u_target.name + "** has been unbanned from **" + g_target.name + "**.")
+                            await c_target.send(
+                                "**" + u_target.name
+                                + "** has been unbanned from **" + g_target.name + "**."
+                                )
                         except:
-                            await c_target.send("Unable to unban **" + u_target.name + "** from **" + g_target.name + "**.")
+                            await c_target.send(
+                                "Unable to unban **" + u_target.name
+                                + "** from **" + g_target.name + "**."
+                                )
             f = open("bans.json", "w")
             f.write(str(bans))
             f.close()
@@ -429,7 +435,17 @@ async def reactCallback(message, reaction, user):
             for f in catg:
                 if f.__name__ == func:
                     try:
-                        await asyncio.wait_for(f._callback_(client=client, message=message, reaction=reaction, user=user, perm=u_perm, vals=vals, argv=argv), timeout=_vars.timeout)
+                        await asyncio.wait_for(
+                            f._callback_(
+                                client=client,
+                                message=message,
+                                reaction=reaction,
+                                user=user,
+                                perm=u_perm,
+                                vals=vals,
+                                argv=argv
+                                ),
+                            timeout=_vars.timeout)
                         return
                     except Exception as ex:
                         killThreads()

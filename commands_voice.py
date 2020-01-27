@@ -15,8 +15,30 @@ class join:
             _vars.queue[vc.id] = []
         return (
             "Successfully connected to **" + vc.name
-            + "** in **" + guild + "**."
+            + "** in **" + guild.name + "**."
             )
+
+
+class leave:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["quit","dc","disconnect"]
+        self.minm = 1
+        self.desc = "Leaves a voice channel."
+        self.usag = ""
+
+    async def __call__(self, user, client, _vars, **void):
+        voice = user.voice
+        vchannel = voice.channel
+        found = False
+        for vclient in client.voice_clients:
+            v_id = vclient.channel.id
+            if vchannel.id == v_id:
+                _vars.queue[v_id] = []
+                await vclient.disconnect(force=False)
+                return "Successfully disconnected from **" + vchannel.name + "**."
+        raise EOFError("Unable to find connected channel.")
 
 
 class queue:

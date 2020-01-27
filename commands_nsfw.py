@@ -11,11 +11,11 @@ image_forms = [
 ]
 
 
-class urlBypass(urllib.request.FancyURLopener):
-    version = "Mozilla/5." + str(xrand(1, 10))
-
-
 def pull_e621(argv, data, thr, delay=5):
+
+    class urlBypass(urllib.request.FancyURLopener):
+        version = "Mozilla/5." + str(xrand(1, 10))
+    
     try:
         v1, v2 = 1, 1
         opener = urlBypass()
@@ -285,8 +285,6 @@ neko_tags = {
     "baka": False,
     "cat": False,
     "gif": False,
-    "how": 2,
-    "ded": 2,
     "404": 2,
 }
 
@@ -345,10 +343,6 @@ class neko:
                     url = nekos.img("ngif")
             elif get == "cat":
                 url = nekos.cat()
-            elif get == "how":
-                url = "https://media.discordapp.net/attachments/500919580596764673/642515924578205696/HOW.gif"
-            elif get == "ded":
-                url = "https://cdn.discordapp.com/attachments/430005329984487434/654326757654134785/4aa217e.gif"
             elif get == "404":
                 url = nekos.img("smallboobs")
             else:
@@ -356,11 +350,10 @@ class neko:
         if "v" in flags:
             text = "Pulled from " + url
             return text
-        else:
-            emb = discord.Embed(url=url)
-            emb.set_image(url=url)
-            print(url)
-            await channel.send(embed=emb)
+        emb = discord.Embed(url=url)
+        emb.set_image(url=url)
+        print(url)
+        await channel.send(embed=emb)
 
 
 class lewd:
@@ -385,11 +378,10 @@ class lewd:
                 + "__**"
                 )
             return text
-        else:
-            emb = discord.Embed(url=url)
-            emb.set_image(url=url)
-            print(url)
-            await channel.send(embed=emb)
+        emb = discord.Embed(url=url)
+        emb.set_image(url=url)
+        print(url)
+        await channel.send(embed=emb)
 
 
 class owoify:
