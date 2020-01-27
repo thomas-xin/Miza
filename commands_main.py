@@ -63,7 +63,7 @@ class help:
         if not show:
             for c in categories:
                 catg = categories[c]
-                if not c in enabled:
+                if not (c in enabled or c == "main"):
                     continue
                 for com in catg:
                     name = com.__name__
