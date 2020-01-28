@@ -50,7 +50,9 @@ class purge:
                 delM.append(m)
                 count -= 1
         try:
-            await channel.delete_messages(delM)
+            while len(delM):
+                await channel.delete_messages(delM[:100])
+                delM = delM[100:]
             deleted = len(delM)
         except:
             for m in delM:
