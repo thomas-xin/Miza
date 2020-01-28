@@ -6,9 +6,9 @@ class join:
 
     def __init__(self):
         self.name = ["summon"]
-        self.minm = 1
-        self.desc = "Summons the bot into a voice channel."
-        self.usag = ""
+        self.min_level = 1
+        self.description = "Summons the bot into a voice channel."
+        self.usage = ""
 
     async def __call__(self, user, _vars, guild, **void):
         voice = user.voice
@@ -27,9 +27,9 @@ class leave:
 
     def __init__(self):
         self.name = ["quit","dc","disconnect"]
-        self.minm = 1
-        self.desc = "Leaves a voice channel."
-        self.usag = ""
+        self.min_level = 1
+        self.description = "Leaves a voice channel."
+        self.usage = ""
 
     async def __call__(self, user, client, _vars, **void):
         voice = user.voice
@@ -49,9 +49,9 @@ class queue:
 
     def __init__(self):
         self.name = ["q", "qlist", "play"]
-        self.minm = 0
-        self.desc = "Shows the queue, or plays a song in voice."
-        self.usag = "<link:[]> <verbose:(?v)>"
+        self.min_level = 0
+        self.description = "Shows the queue, or plays a song in voice."
+        self.usage = "<link:[]> <verbose:(?v)>"
 
     async def __call__(self, user, _vars, args, guild, **void):
         voice = user.voice

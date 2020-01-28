@@ -7,9 +7,9 @@ class purge:
 
     def __init__(self):
         self.name = ["del", "delete"]
-        self.minm = 1
-        self.desc = "Deletes a number of messages from a certain user in current channel."
-        self.usag = "<1:user:{bot}(?a)> <0:count:[1]> <hide:(?h)>"
+        self.min_level = 1
+        self.description = "Deletes a number of messages from a certain user in current channel."
+        self.usage = "<1:user:{bot}(?a)> <0:count:[1]> <hide:(?h)>"
 
     async def __call__(self, client, _vars, argv, args, channel, user, guild, name, flags, **void):
         t_user = -1
@@ -71,9 +71,9 @@ class ban:
 
     def __init__(self):
         self.name = []
-        self.minm = 3
-        self.desc = "Bans a user for a certain amount of hours, with an optional reason."
-        self.usag = "<0:user> <1:hours[]> <2:reason[]> <hide:(?h)>"
+        self.min_level = 3
+        self.description = "Bans a user for a certain amount of hours, with an optional reason."
+        self.usage = "<0:user> <1:hours[]> <2:reason[]> <hide:(?h)>"
 
     async def __call__(self, client, _vars, args, user, channel, guild, flags, **void):
         if guild is None:
@@ -152,9 +152,9 @@ class roleGiver:
 
     def __init__(self):
         self.name = ["verifier"]
-        self.minm = 3
-        self.desc = "Adds an automated role giver to the current channel."
-        self.usag = "<0:react_to> <1:role/perm> <disable:(?r)> <deleter:(?d)>"
+        self.min_level = 3
+        self.description = "Adds an automated role giver to the current channel."
+        self.usage = "<0:react_to> <1:role/perm> <disable:(?r)> <deleter:(?d)>"
 
     async def __call__(self, _vars, argv, args, user, channel, guild, flags, **void):
         if guild is None:
@@ -194,9 +194,9 @@ class defaultPerms:
 
     def __init__(self):
         self.name = ["defaultPerm"]
-        self.minm = 3
-        self.desc = "Sets the default bot permission levels for all users in current server."
-        self.usag = "<level:[]>"
+        self.min_level = 3
+        self.description = "Sets the default bot permission levels for all users in current server."
+        self.usage = "<level:[]>"
 
     async def __call__(self, _vars, argv, user, guild, **void):
         if guild is None:
@@ -219,3 +219,44 @@ class defaultPerms:
             "Changed default permission level of **" + guild.name
             + "** to **" + str(c_perm) + "**."
             )
+
+
+class rainbowRole:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["colourRole"]
+        self.min_level = 3
+        self.description = "Causes target role to randomly change colour."
+        self.usage = "<0:role> <mim_delay:[6]> <cancel:[](?c)>"
+
+    async def __call__(self, _vars, flags, args, argv, guild, **void):
+        if guild is None:
+            raise ReferenceError("This command is only available in servers.")
+        guild_special = _vars.special.get(guild.id, {})
+        if not len(argv.replace(" ","")):
+            return (
+                "Currently active dynamic role colours in **" + guild.name
+                + "**:\n```\n" + str(guild_special) + "```"
+                )
+        role = args[0].lower()
+        if len(args) < 2:
+            delay = 6
+        else:
+            delay = _vars.evalMath(" ".join(args[1:]))
+        for r in guild.roles:
+            if role in r.name.lower():
+                if "c" in flags:
+                    try:
+                        guild_special.pop(r.id)
+                    except KeyError:
+                        pass
+                else:
+                    guild_special[r.id] = delay
+        _vars.special[guild.id] = guild_special
+        _vars.update()
+        return (
+            "Changed dynamic role colours for **" + guild.name
+            + "** to:\n```\n" + str(guild_special) + "```"
+            )
+        

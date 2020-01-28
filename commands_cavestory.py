@@ -150,9 +150,9 @@ class cs_mem2flag:
 
     def __init__(self):
         self.name = ["cs_m2f"]
-        self.minm = 0
-        self.desc = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
-        self.usag = "<0:address> <1:value[1]>"
+        self.min_level = 0
+        self.description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
+        self.usage = "<0:address> <1:value[1]>"
 
     async def __call__(self, _vars, args, **void):
         if len(args) < 2:
@@ -165,9 +165,9 @@ class cs_npc:
 
     def __init__(self):
         self.name = []
-        self.minm = 0
-        self.desc = "Searches the Cave Story NPC list for an NPC by name or ID."
-        self.usag = "<query>"
+        self.min_level = 0
+        self.description = "Searches the Cave Story NPC list for an NPC by name or ID."
+        self.usage = "<query>"
 
     async def __call__(self, _vars, args, flags, **void):
         lim = ("c" in flags) * 40 + 20
@@ -205,9 +205,9 @@ class cs_tsc:
 
     def __init__(self):
         self.name = []
-        self.minm = 0
-        self.desc = "Searches the Cave Story OOB flags list for a memory variable."
-        self.usag = "<0:query>"
+        self.min_level = 0
+        self.description = "Searches the Cave Story OOB flags list for a memory variable."
+        self.usage = "<query>"
 
     async def __call__(self, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
@@ -245,9 +245,9 @@ class cs_mod:
 
     def __init__(self):
         self.name = ["cs_search"]
-        self.minm = 0
-        self.desc = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
-        self.usag = "<query>"
+        self.min_level = 0
+        self.description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
+        self.usage = "<query>"
 
     async def __call__(self, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20

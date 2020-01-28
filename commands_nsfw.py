@@ -311,19 +311,19 @@ class neko:
 
     def __init__(self):
         self.name = []
-        self.minm = 1
-        self.desc = "Pulls a random image from nekos.life and embeds it."
-        self.usag = "<tags:[](?r)> <verbose:(?v)> <list:(?l)>"
+        self.min_level = 1
+        self.description = "Pulls a random image from nekos.life and embeds it."
+        self.usage = "<tags:[](?r)> <verbose:(?v)> <list:(?l)>"
 
     async def __call__(self, args, argv, flags, channel, **void):
         isNSFW = is_nsfw(channel)
         if "l" in flags:
             available = []
-            text = "Available commands in **#" + channel.name + "**:\n`"
+            text = "Available commands in **#" + channel.name + "**:\n```"
             for key in neko_tags:
                 if isNSFW or not neko_tags[key] == True:
                     available.append(key)
-            text += ", ".join(sorted(available)) + "`"
+            text += str(sorted(available)) + "```"
             return text
         tagNSFW = False
         selected = []
@@ -371,9 +371,9 @@ class lewd:
 
     def __init__(self):
         self.name = ["nsfw"]
-        self.minm = 1
-        self.desc = "Pulls a random image from a search on Rule34 and e621, and embeds it."
-        self.usag = "<query> <verbose:(?v)>"
+        self.min_level = 1
+        self.description = "Pulls a random image from a search on Rule34 and e621, and embeds it."
+        self.usage = "<query> <verbose:(?v)>"
 
     async def __call__(self, _vars, args, flags, channel, **void):
         if not is_nsfw(channel):
@@ -399,9 +399,9 @@ class owoify:
 
     def __init__(self):
         self.name = ["owo"]
-        self.minm = 0
-        self.desc = "owo-ifies text."
-        self.usag = "<string>"
+        self.min_level = 0
+        self.description = "owo-ifies text."
+        self.usage = "<string>"
 
     async def __call__(self, argv, **void):
         output = ""

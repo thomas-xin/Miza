@@ -16,9 +16,9 @@ class img:
 
     def __init__(self):
         self.name = []
-        self.minm = 0
-        self.desc = "Sends an image in the current chat from a list."
-        self.usag = "<target> <verbose:(?v)> <list:(?l)>"
+        self.min_level = 0
+        self.description = "Sends an image in the current chat from a list."
+        self.usage = "<target> <verbose:(?v)> <list:(?l)>"
 
     async def __call__(self, flags, channel, argv, **void):
         if "l" in flags:

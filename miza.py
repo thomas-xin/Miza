@@ -67,6 +67,7 @@ class _globals:
         self.resetGlobals()
         doParallel(self.getModules)
         self.current_channel = None
+        self.blocked = 0
 
     def loadSave(self):
         try:
@@ -77,15 +78,17 @@ class _globals:
             self.bans = {}
             self.enabled = {}
             self.scheduled = {}
+            self.special = {}
             self.update()
             f = open(self.savedata)
             
         savedata = eval(f.read())
         f.close()
-        self.perms = savedata["perms"]
-        self.bans = savedata["bans"]
-        self.enabled = savedata["enabled"]
-        self.scheduled = savedata["scheduled"]
+        self.perms = savedata.get("perms", {})
+        self.bans = savedata.get("bans", {})
+        self.enabled = savedata.get("enabled", {})
+        self.scheduled = savedata.get("scheduled", {})
+        self.special = savedata.get("special", {})
 
     def getModule(self, module, category):
         exec("import " + module + " as _vars_", globals())
@@ -119,6 +122,7 @@ class _globals:
             "bans": self.bans,
             "enabled": self.enabled,
             "scheduled": self.scheduled,
+            "special": self.special,
             }
         f.write(repr(savedata))
         f.close()
@@ -295,7 +299,7 @@ async def processMessage(message, msg):
                 argv = comm[length:]
                 if check == alias and (len(comm) == length or comm[length] == " " or comm[length] == "?"):
                     print(user.name + " (" + str(u_id) + ") issued command " + msg)
-                    req = command.minm
+                    req = command.min_level
                     if req > u_perm or (u_perm is not nan and req is nan):
                         await channel.send(
                             "Error: Insufficient priviliges for command " + alias
@@ -344,40 +348,40 @@ async def processMessage(message, msg):
                             args = shlex.split(d)
                         except ValueError:
                             args = d.split(" ")
-                        await channel.trigger_typing()
-                        for a in range(len(args)):
-                            args[a] = args[a].replace("", "'").replace("\0", '"')
-                        response = await command(
-                            client=client,          # for interfacing with discord
-                            _vars=_vars,            # for interfacing with bot's database
-                            argv=argv,              # raw text argument
-                            args=args,              # split text arguments
-                            flags=flags,            # special flags
-                            user=user,              # user that invoked the command
-                            message=message,        # message data
-                            channel=channel,        # channel data
-                            guild=guild,            # guild data
-                            name=alias,             # alias the command was called as
-                            callback=processMessage,# function that called the command
-                            )
-                        if response is not None:
-                            if len(response) < 65536:
-                                print(response)
-                            else:
-                                print("[RESPONSE OVER 64KB]")
-                            if type(response) is list:
-                                for r in response:
-                                    await channel.send(r)
-                            else:
-                                try:
-                                    asyncio.create_task(channel.send(response))
-                                except discord.HTTPException:
-                                    fn = "cache/temp.txt"
-                                    _f = open(fn, "wb")
-                                    _f.write(bytes(response, "utf-8"))
-                                    _f.close()
-                                    _f = discord.File(fn)
-                                    await channel.send("Response too long for message.", file=_f)
+                        async with channel.typing():
+                            for a in range(len(args)):
+                                args[a] = args[a].replace("", "'").replace("\0", '"')
+                            response = await command(
+                                client=client,          # for interfacing with discord
+                                _vars=_vars,            # for interfacing with bot's database
+                                argv=argv,              # raw text argument
+                                args=args,              # split text arguments
+                                flags=flags,            # special flags
+                                user=user,              # user that invoked the command
+                                message=message,        # message data
+                                channel=channel,        # channel data
+                                guild=guild,            # guild data
+                                name=alias,             # alias the command was called as
+                                callback=processMessage,# function that called the command
+                                )
+                            if response is not None:
+                                if len(response) < 65536:
+                                    print(response)
+                                else:
+                                    print("[RESPONSE OVER 64KB]")
+                                if type(response) is list:
+                                    for r in response:
+                                        await channel.send(r)
+                                else:
+                                    try:
+                                        await channel.send(response)
+                                    except discord.HTTPException:
+                                        fn = "cache/temp.txt"
+                                        _f = open(fn, "wb")
+                                        _f.write(bytes(response, "utf-8"))
+                                        _f.close()
+                                        _f = discord.File(fn)
+                                        await channel.send("Response too long for message.", file=_f)
                     except Exception as ex:
                         rep = repr(ex)
                         if len(rep) > 1900:
@@ -430,9 +434,34 @@ async def fastLoop():
 async def slowLoop():
     global _vars
     print("Slow loop initiated.")
+    counter = 0
     while True:
+        while _vars.blocked > 0:
+            _vars.blocked -= 1
+            await asyncio.sleep(1)
+        for g in _vars.special:
+            asyncio.create_task(changeColour(g, _vars.special[g], counter))
         await handleUpdate()
-        await asyncio.sleep(2.5)
+        await asyncio.sleep(frand(1) + 1)
+        counter = counter + 1 & 65535
+
+
+async def changeColour(g_id, roles, counter):
+    guild = await client.fetch_guild(g_id)
+    colTime = 12
+    for r in roles:
+        try:
+            role = guild.get_role(r)
+            delay = roles[r]
+            if not (counter + r) % delay:
+                col = colour2Raw(colourCalculation(xrand(1536)))
+                await role.edit(colour=discord.Colour(col))
+                #print("Edited role " + role.name)
+            await asyncio.sleep(1)
+        except discord.errors.HTTPException as ex:
+            print(ex)
+            _vars.blocked += 20
+            break
 
 
 @client.event

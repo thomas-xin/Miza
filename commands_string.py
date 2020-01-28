@@ -132,9 +132,9 @@ class math:
 
     def __init__(self):
         self.name = ["python"]
-        self.minm = 0
-        self.desc = "Evaluates a math formula using Python syntax."
-        self.usag = "<function>"
+        self.min_level = 0
+        self.description = "Evaluates a math formula using Python syntax."
+        self.usage = "<function>"
 
     async def __call__(self, _vars, argv, channel, flags, **extra):
         tm = time.time()
@@ -173,9 +173,9 @@ class uni2hex:
 
     def __init__(self):
         self.name = ["u2h"]
-        self.minm = 0
-        self.desc = "Converts unicode text to hexadecimal numbers."
-        self.usag = "<string>"
+        self.min_level = 0
+        self.description = "Converts unicode text to hexadecimal numbers."
+        self.usage = "<string>"
 
     async def __call__(self, argv, **extra):
         b = bytes(argv, "utf-8")
@@ -187,9 +187,9 @@ class hex2uni:
 
     def __init__(self):
         self.name = ["h2u"]
-        self.minm = 0
-        self.desc = "Converts hexadecimal numbers to unicode text."
-        self.usag = "<string>"
+        self.min_level = 0
+        self.description = "Converts hexadecimal numbers to unicode text."
+        self.usage = "<string>"
 
     async def __call__(self, argv, **extra):
         b = hex2Bytes(argv.replace("0x", "").replace(" ", ""))
@@ -201,9 +201,9 @@ class char2emoj:
 
     def __init__(self):
         self.name = ["c2e"]
-        self.minm = 0
-        self.desc = "Makes emoji blocks using a string."
-        self.usag = "<string>"
+        self.min_level = 0
+        self.description = "Makes emoji blocks using a string."
+        self.usage = "<string>"
 
     async def __call__(self, args, **extra):
         return _c2e(*args[:3])
@@ -214,9 +214,9 @@ class translate:
 
     def __init__(self):
         self.name = ["tr"]
-        self.minm = 0
-        self.desc = "Translates a string into another language."
-        self.usag = "<0:language> <1:string> <verbose:(?v)> <translator:(?g)>"
+        self.min_level = 0
+        self.description = "Translates a string into another language."
+        self.usage = "<0:language> <1:string> <verbose:(?v)> <translator:(?g)>"
 
     async def __call__(self, args, flags, user, **extra):
         dest = args[0]

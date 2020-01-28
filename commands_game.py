@@ -9,9 +9,9 @@ class text2048:
 
     def __init__(self):
         self.name = ["2048", "text_2048"]
-        self.minm = 1
-        self.desc = "Plays a game of 2048 using reactions."
-        self.usag = "<board_size:[4]> <public:(?p)> <insanity_mode:(?i)> <easy_mode:(?e)> <specials_enabled:(?s)>"
+        self.min_level = 1
+        self.description = "Plays a game of 2048 using reactions."
+        self.usage = "<board_size:[4]> <public:(?p)> <insanity_mode:(?i)> <easy_mode:(?e)> <specials_enabled:(?s)>"
 
     async def nextIter(self, message, gamestate, username, direction, mode):
         width = len(gamestate[-1])

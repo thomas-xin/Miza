@@ -9,9 +9,9 @@ class help:
 
     def __init__(self):
         self.name = ["?"]
-        self.minm = -inf
-        self.desc = "Shows a list of usable commands."
-        self.usag = "<command:[]> <verbose:(?v)>"
+        self.min_level = -inf
+        self.description = "Shows a list of usable commands."
+        self.usage = "<command:[]> <verbose:(?v)>"
 
     async def __call__(self, _vars, client, args, user, channel, guild, flags, **void):
         if guild:
@@ -41,21 +41,21 @@ class help:
                     "\nCommands for **" + user.name
                     + "** in **" + channel.name
                     + "** in category **" + a
-                    + "**:")
+                    + "**:\n")
                 for com in categories[a]:
                     name = com.__name__
-                    minm = com.minm
-                    desc = com.desc
-                    usag = com.usag
-                    if minm > u_perm or (u_perm is not nan and minm is nan):
+                    min_level = com.min_level
+                    description = com.description
+                    usage = com.usage
+                    if min_level > u_perm or (u_perm is not nan and min_level is nan):
                         continue
                     newstr = (
-                        "\n`" + name
+                        "```\n" + name
                         + "`\nAliases: " + str(com.name)
-                        + "\nEffect: " + desc
-                        + "\nUsage: " + usag
-                        + "\nRequired permission level: **__" + str(minm)
-                        + "__**"
+                        + "\nEffect: " + description
+                        + "\nUsage: " + usage
+                        + "\nRequired permission level: " + str(min_level)
+                        + "```"
                     )
                     show.append(newstr)
         if not show:
@@ -65,10 +65,10 @@ class help:
                     continue
                 for com in catg:
                     name = com.__name__
-                    minm = com.minm
-                    desc = com.desc
-                    usag = com.usag
-                    if minm > u_perm or (u_perm is not nan and minm is nan):
+                    min_level = com.min_level
+                    description = com.description
+                    usage = com.usage
+                    if min_level > u_perm or (u_perm is not nan and min_level is nan):
                         continue
                     found = False
                     for n in com.name:
@@ -80,9 +80,9 @@ class help:
                             "```\n" + name
                             + "\nCategory: " + c
                             + "\nAliases: " + str(com.name)
-                            + "\nEffect: " + desc
-                            + "\nUsage: " + usag
-                            + "\nRequired permission level: " + str(minm)
+                            + "\nEffect: " + description
+                            + "\nUsage: " + usage
+                            + "\nRequired permission level: " + str(min_level)
                             + "```"
                         )
                         if (not len(show)) or len(show[-1]) < len(newstr):
@@ -90,20 +90,20 @@ class help:
         if not show:
             for com in commands:
                 name = com.__name__
-                minm = com.minm
-                desc = com.desc
-                usag = com.usag
-                if minm > u_perm or (u_perm is not nan and minm is nan):
+                min_level = com.min_level
+                description = com.description
+                usage = com.usage
+                if min_level > u_perm or (u_perm is not nan and min_level is nan):
                     continue
-                if desc != "":
+                if description != "":
                     if not verb:
-                        show.append("`" + name + " " + usag + "`")
+                        show.append(name + " " + usage)
                     else:
                         show.append(
-                            "\n`" + com.__name__
-                            + "`\nEffect: " + com.desc
-                            + "\nUsage: " + name + " " + usag)
-            return "Commands for **" + user.name + "** in **" + channel.name + "**:\n" + "\n".join(show)
+                            "\n" + com.__name__
+                            + "\nEffect: " + com.description
+                            + "\nUsage: " + name + " " + usage)
+            return "Commands for **" + user.name + "** in **" + channel.name + "**:\n```\n" + "\n".join(show) + "```"
         return "\n".join(show)
 
 
@@ -112,9 +112,9 @@ class clearCache:
 
     def __init__(self):
         self.name = ["cc"]
-        self.minm = 1
-        self.desc = "Clears all cached data."
-        self.usag = ""
+        self.min_level = 1
+        self.description = "Clears all cached data."
+        self.usage = ""
 
     async def __call__(self, client, _vars, **void):
         _vars.resetGlobals()
@@ -127,9 +127,9 @@ class perms:
 
     def __init__(self):
         self.name = ["changePerms", "perm", "changePerm"]
-        self.minm = -inf
-        self.desc = "Shows or changes a user's permission level."
-        self.usag = "<0:user:{self}> <1:level{curr}> <hide:(?h)>"
+        self.min_level = -inf
+        self.description = "Shows or changes a user's permission level."
+        self.usage = "<0:user:{self}> <1:level{curr}> <hide:(?h)>"
 
     async def __call__(self, client, _vars, args, user, guild, flags, **void):
         if guild is None:
@@ -192,9 +192,9 @@ class enableCommand:
 
     def __init__(self):
         self.name = ["ec", "enable"]
-        self.minm = 3
-        self.desc = "Shows, enables, or disables a command category in the current channel."
-        self.usag = "<command:{all}> <enable:(?e)> <disable:(?d)> <hide:(?h)>"
+        self.min_level = 3
+        self.description = "Shows, enables, or disables a command category in the current channel."
+        self.usage = "<command:{all}> <enable:(?e)> <disable:(?d)> <hide:(?h)>"
 
     async def __call__(self, client, _vars, argv, flags, channel, **void):
         catg = argv.lower()
@@ -262,9 +262,9 @@ class shutdown:
 
     def __init__(self):
         self.name = ["gtfo"]
-        self.minm = inf
-        self.desc = "Shuts down the bot."
-        self.usag = ""
+        self.min_level = inf
+        self.description = "Shuts down the bot."
+        self.usage = ""
 
     async def __call__(self, client, channel, **void):
         await channel.send("Shutting down... :wave:")
@@ -280,9 +280,9 @@ class suspend:
 
     def __init__(self):
         self.name = []
-        self.minm = nan
-        self.desc = "Prevents a user from accessing the bot's commands. Overrides ~perms."
-        self.usag = "<0:user> <1:value:[]>"
+        self.min_level = nan
+        self.description = "Prevents a user from accessing the bot's commands. Overrides ~perms."
+        self.usage = "<0:user> <1:value:[]>"
 
     async def __call__(self, _vars, client, user, guild, args, **void):
         if len(args) < 2:
@@ -302,9 +302,9 @@ class loop:
 
     def __init__(self):
         self.name = ["for", "rep", "repeat", "while"]
-        self.minm = 2
-        self.desc = "Loops a command."
-        self.usag = "<0:iterations> <1:command> <hide:(?h)>"
+        self.min_level = 2
+        self.description = "Loops a command."
+        self.usage = "<0:iterations> <1:command> <hide:(?h)>"
 
     async def __call__(self, args, argv, message, callback, _vars, flags, **void):
         iters = _vars.evalMath(args[0])
