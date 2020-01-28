@@ -48,6 +48,7 @@ class _globals:
         ".save",
         ".fromfile",
         "ctypes",
+        "parallel",
     ]
     savedata = "data.json"
     authdata = "auth.json"
@@ -138,7 +139,7 @@ class _globals:
                 u_perm = nan
                 g_perm[u_id] = nan
             else:
-                u_perm = g_perm.get(u_id, 0)
+                u_perm = g_perm.get(u_id, self.perms.get("defaults", {}).get(g_id, 0))
         elif u_id == self.owner_id:
             u_perm = nan
         else:

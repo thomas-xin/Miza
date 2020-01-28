@@ -187,4 +187,35 @@ class roleGiver:
             + "** and " + r_type + " **" + str(role)
             + "** to channel **" + channel.name + "**."
             )
+
         
+class defaultPerms:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["defaultPerm"]
+        self.minm = 3
+        self.desc = "Sets the default bot permission levels for all users in current server."
+        self.usag = "<level:[]>"
+
+    async def __call__(self, _vars, argv, user, guild, **void):
+        if guild is None:
+            raise ReferenceError("This command is only available in servers.")
+        currPerm = _vars.perms.get("defaults", {}).get(guild.id, 0)
+        if not len(argv.replace(" ","")):
+            return (
+                "Current default permission level for **" + guild.name
+                + "**: **" + str(currPerm) + "**."
+                )
+        s_perm = _vars.getPerms(user, guild)
+        c_perm = _vars.evalMath(argv)
+        if s_perm < c_perm + 1 or c_perm is nan:
+            raise PermissionError("Insufficient permissions to assign selected permission level.")
+        if not "defaults" in _vars.perms:
+            _vars.perms["defaults"] = {}
+        _vars.perms["defaults"][guild.id] = c_perm
+        _vars.update()
+        return (
+            "Changed default permission level of **" + guild.name
+            + "** to **" + str(c_perm) + "**."
+            )

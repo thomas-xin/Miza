@@ -131,7 +131,7 @@ class perms:
         self.name = ["changePerms", "perm", "changePerm"]
         self.minm = -inf
         self.desc = "Shows or changes a user's permission level."
-        self.usag = "<0:user:{self}> <1:value{curr}> <hide:(?h)>"
+        self.usag = "<0:user:{self}> <1:level{curr}> <hide:(?h)>"
 
     async def __call__(self, client, _vars, args, user, guild, flags, **void):
         if guild is None:

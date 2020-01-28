@@ -339,7 +339,7 @@ class neko:
             if not len(argv.replace(" ", "")):
                 url = nekos.img("neko")
             else:
-                raise EOFError("Search tag not found.")
+                raise EOFError("Search tag not found. Use ?l for list.")
         else:
             v = xrand(len(selected))
             get = selected[v]
