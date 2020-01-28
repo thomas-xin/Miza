@@ -13,18 +13,16 @@ class help:
         self.desc = "Shows a list of usable commands."
         self.usag = "<command:[]> <verbose:(?v)>"
 
-    async def __call__(self, _vars, client, args, user, guild, flags, **void):
+    async def __call__(self, _vars, client, args, user, channel, guild, flags, **void):
         if guild:
             g_id = guild.id
-            g_name = guild.name
         else:
             g_id = 0
-            g_name = client.user.name
         if g_id:
             try:
-                enabled = _vars.enabled[g_id]
+                enabled = _vars.enabled[channel.id]
             except KeyError:
-                enabled = _vars.enabled[g_id] = default_commands
+                enabled = _vars.enabled[channel.id] = default_commands
                 _vars.update()
         else:
             enabled = default_commands
@@ -41,7 +39,7 @@ class help:
             if (a in categories and a in enabled) or a == "main":
                 show.append(
                     "\nCommands for **" + user.name
-                    + "** in **" + g_name
+                    + "** in **" + channel.name
                     + "** in category **" + a
                     + "**:")
                 for com in categories[a]:
@@ -105,7 +103,7 @@ class help:
                             "\n`" + com.__name__
                             + "`\nEffect: " + com.desc
                             + "\nUsage: " + name + " " + usag)
-            return "Commands for **" + user.name + "** in **" + g_name + "**:\n" + "\n".join(show)
+            return "Commands for **" + user.name + "** in **" + channel.name + "**:\n" + "\n".join(show)
         return "\n".join(show)
 
 
@@ -185,67 +183,67 @@ class enableCommand:
     def __init__(self):
         self.name = ["ec", "enable"]
         self.minm = 3
-        self.desc = "Shows, enables, or disables a command category in the current server."
+        self.desc = "Shows, enables, or disables a command category in the current channel."
         self.usag = "<command:{all}> <enable:(?e)> <disable:(?d)> <hide:(?h)>"
 
-    async def __call__(self, client, _vars, argv, flags, guild, **void):
+    async def __call__(self, client, _vars, argv, flags, channel, **void):
         catg = argv.lower()
         print(catg)
         if not catg:
             if "e" in flags:
                 categories = list(_vars.categories)
                 categories.remove("main")
-                _vars.enabled[guild.id] = categories
+                _vars.enabled[channel.id] = categories
                 _vars.update()
                 if "h" in flags:
                     return
-                return "Enabled all command categories in **" + guild.name + "**."
+                return "Enabled all command categories in **" + channel.name + "**."
             if "d" in flags:
-                _vars.enabled[guild.id] = []
+                _vars.enabled[channel.id] = []
                 _vars.update()
                 if "h" in flags:
                     return
-                return "Disabled all command categories in **" + guild.name + "**."
+                return "Disabled all command categories in **" + channel.name + "**."
             return (
-                "Currently enabled command categories in **" + guild.name
+                "Currently enabled command categories in **" + channel.name
                 + "**:\n```\n"
-                + str(["main"] + _vars.enabled.get(guild.id, default_commands)) + "```"
+                + str(["main"] + _vars.enabled.get(channel.id, default_commands)) + "```"
             )
         else:
             if not catg in _vars.categories:
                 return "Error: Unknown command category **" + argv + "**."
             else:
                 try:
-                    enabled = _vars.enabled[guild.id]
+                    enabled = _vars.enabled[channel.id]
                 except KeyError:
                     enabled = {}
-                    _vars.enabled[guild.id] = enabled
+                    _vars.enabled[channel.id] = enabled
                 if "e" in flags:
                     if catg in enabled:
                         return (
                             "Error: command category **" + catg
-                            + "** is already enabled in **" + guild.name + "**."
+                            + "** is already enabled in **" + channel.name + "**."
                         )
                     enabled.append(catg)
                     _vars.update()
                     if "h" in flags:
                         return
-                    return "Enabled command category **" + catg + "** in **" + guild.name + "**."
+                    return "Enabled command category **" + catg + "** in **" + channel.name + "**."
                 if "d" in flags:
                     if catg not in enabled:
                         return (
                             "Error: command category **" + catg
-                            + "** is not currently enabled in **" + guild.name + "**."
+                            + "** is not currently enabled in **" + channel.name + "**."
                         )
                     enabled.remove(catg)
                     _vars.update()
                     if "h" in flags:
                         return
-                    return "Disabled command category **" + catg + "** in **" + guild.name + "**."
+                    return "Disabled command category **" + catg + "** in **" + channel.name + "**."
                 return (
                     "Command category **" + catg
                     + "** is currently" + " not" * (catg not in enabled)
-                    + " enabled in **" + guild.name + "**."
+                    + " enabled in **" + channel.name + "**."
                 )
 
 

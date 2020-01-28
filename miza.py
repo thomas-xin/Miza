@@ -62,7 +62,7 @@ class _globals:
         f = open(self.authdata)
         auth = ast.literal_eval(f.read())
         f.close()
-        self.owner_id = auth["owner_id"]
+        self.owner_id = int(auth["owner_id"])
         self.token = auth["discord_token"]
         self.resetGlobals()
         doParallel(self.getModules)
@@ -128,18 +128,17 @@ class _globals:
 
     def getPerms(self, user, guild):
         try:
-            u_id = user.id
+            u_id = int(user.id)
         except AttributeError:
-            u_id = user
+            u_id = int(user)
         if guild:
             g_id = guild.id
             g_perm = self.perms.get(g_id, {})
-            self.perms[g_id] = g_perm
             if u_id == self.owner_id:
                 u_perm = nan
-                g_perm[u_id] = nan
             else:
                 u_perm = g_perm.get(u_id, self.perms.get("defaults", {}).get(g_id, 0))
+            self.perms[g_id] = g_perm
         elif u_id == self.owner_id:
             u_perm = nan
         else:
@@ -223,11 +222,13 @@ async def processMessage(message, msg):
         g_id = guild.id
     else:
         g_id = 0
+    channel = message.channel
+    c_id = channel.id
     if g_id:
         try:
-            enabled = _vars.enabled[g_id]
+            enabled = _vars.enabled[c_id]
         except KeyError:
-            enabled = _vars.enabled[g_id] = ["string", "admin"]
+            enabled = _vars.enabled[c_id] = ["string", "admin"]
             _vars.update()
     else:
         enabled = list(_vars.categories)
