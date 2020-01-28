@@ -609,6 +609,15 @@ async def handleMessage(message):
             "Response too long for message.",
             "Hi, did you require my services for anything? Use ~? or ~help for help.",
             "Sorry, you are currently not permitted to request my services.",
+            "Currently enabled command categories in ",
+            "Current permissions for ",
+            "Current suspension status of ",
+            " is currently not banned from ",
+            "Cache cleared!",
+            "Currently active permission givers in channel ",
+            "Available commands in ",
+            "Successfully connected to ",
+            "Successfully disconnected from ",
             ]
         found = False
         for i in checked:
