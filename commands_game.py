@@ -111,15 +111,17 @@ class text2048:
         moved = {}
         shuffle(pool)
         while pool:
-            gamestate[0], b = self.moveTiles(gamestate, pool[0])
-            self.spawn(gamestate[0], mode, 1)
-            a &= b
-            if b:
-                moved[pool[0]] = True
-                if len(moved) >= 4:
-                    break
-            else:
-                moved = {}
+            move = pool[0]
+            if not move in moved:
+                gamestate[0], b = self.moveTiles(gamestate, move)
+                self.spawn(gamestate[0], mode, 1)
+                a &= b
+                if b:
+                    moved[pool[0]] = True
+                    if len(moved) >= 4:
+                        break
+                else:
+                    moved = {}
             pool = pool[1:]
         returns[0] = (gamestate, a)
                                         
