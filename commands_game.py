@@ -1,93 +1,159 @@
-import ast, copy
+import ast, copy, asyncio
 from smath import *
+from random import shuffle
 
 
 class text2048:
     is_command = True
-    directions = ["⬅", "⬆", "➡", "⬇️", "↩"]
+    directions = {
+        "⬅": [0, 0],
+        "⬆": [0, 1],
+        "➡": [0, 2],
+        "⬇️": [0, 3],
+        "↩": [1, 4],
+        "↖️": [16, 5],
+        "↗": [16, 6],
+        "↘": [16, 7],
+        "↙": [16, 8],
+        "↔": [16, 9],
+        "↕": [16, 10],
+        "🔄": [16, 11],
+        "💠": [16, 12],
+        "💯": [16, 13],
+        "🔢": [16, 14],
+        }
+    multis = {
+        5: [0, 1],
+        6: [1, 2],
+        7: [2, 3],
+        8: [3, 0],
+        9: [0, 2],
+        10: [1, 3],
+        11: [0,1,2,3],
+        12: [i for i in range(16)],
+        13: [i for i in range(100)],
+        14: [i for i in range(1234)],
+        }
     numScore = lambda self, x: x * 2 ** (x + 1)
 
     def __init__(self):
         self.name = ["2048", "text_2048"]
         self.min_level = 1
         self.description = "Plays a game of 2048 using reactions."
-        self.usage = "<board_size:[4]> <public:(?p)> <insanity_mode:(?i)> <easy_mode:(?e)> <specials_enabled:(?s)>"
+        self.usage = (
+            "<board_size:[4]> <verbose:(?v)> <special_tiles:(?s)> <public:(?p)> "
+            + "<insanity_mode:(?i)> <special_controls:(?c)> <easy_mode:(?e)>"
+            )
 
+    def moveTiles(self, gamestate, direction):
+        tiles = copy.deepcopy(gamestate[0])
+        width = len(tiles)
+        i = direction & 3
+        a = 1
+        for w in range(width - 1):
+            if i & 1 == 0:
+                z = (i ^ 2) - 1
+                for x in range(width):
+                    for y in range(width):
+                        if x - z >= 0 and x - z < width:
+                            if tiles[x][y] > 0:
+                                if tiles[x - z][y] <= 0:
+                                    tiles[x - z][y] = tiles[x][y]
+                                    tiles[x][y] = 0
+                                    a = 0
+                                elif type(tiles[x][y]) is float:
+                                    if type(tiles[x - z][y]) is int:
+                                        tiles[x - z][y] += round(tiles[x][y] * 10)
+                                        tiles[x][y] = 0
+                                    else:
+                                        tiles[x - z][y] += tiles[x][y]
+                                        tiles[x][y] = 0
+                                    a = 0
+                                elif type(tiles[x - z][y]) is float:
+                                    tiles[x - z][y] = round(tiles[x - z][y] * 10) + tiles[x][y]
+                                    tiles[x][y] = 0
+                                    a = 0
+                                elif tiles[x - z][y] == tiles[x][y]:
+                                    tiles[x - z][y] += 1
+                                    tiles[x][y] = 0
+                                    a = 0
+            else:
+                z = (i ^ 2) - 2
+                for x in range(width):
+                    for y in range(width):
+                        if y - z >= 0 and y - z < width:
+                            if tiles[x][y] > 0:
+                                if tiles[x][y - z] <= 0:
+                                    tiles[x][y - z] = tiles[x][y]
+                                    tiles[x][y] = 0
+                                    a = 0
+                                elif type(tiles[x][y]) is float:
+                                    if type(tiles[x][y - z]) is int:
+                                        tiles[x][y - z] += round(tiles[x][y] * 10)
+                                        tiles[x][y] = 0
+                                    else:
+                                        tiles[x][y - z] += tiles[x][y]
+                                        tiles[x][y] = 0
+                                    a = 0
+                                elif type(tiles[x][y - z]) is float:
+                                    tiles[x][y - z] = round(tiles[x][y - z] * 10) + tiles[x][y]
+                                    tiles[x][y] = 0
+                                    a = 0
+                                elif tiles[x][y - z] == tiles[x][y]:
+                                    tiles[x][y - z] += 1
+                                    tiles[x][y] = 0
+                                    a = 0
+        return tiles, a
+
+    def randomSpam(self, gamestate, mode, pool, returns):
+        gamestate[1] = gamestate[0]
+        a = 1
+        moved = {}
+        shuffle(pool)
+        while pool:
+            gamestate[0], b = self.moveTiles(gamestate, pool[0])
+            self.spawn(gamestate[0], mode, 1)
+            a &= b
+            if b:
+                moved[pool[0]] = True
+                if len(moved) >= 4:
+                    break
+            else:
+                moved = {}
+            pool = pool[1:]
+        returns[0] = (gamestate, a)
+                                        
     async def nextIter(self, message, gamestate, username, direction, mode):
         width = len(gamestate[-1])
-        a = 0
         i = direction
-        if i == 4:
-            if not mode & 1:
-                return
-            gamestate = gamestate[::-1]
         for z in range(len(gamestate)):
             for x in range(width):
                 for y in range(width):
                     if gamestate[z][x][y] < 0:
                         gamestate[z][x][y] = 0
-        gamestate[1] = copy.deepcopy(gamestate[0])
-        tiles = gamestate[0]
-        if i != 4 and i is not None:
-            a = 1
-            for w in range(width - 1):
-                if i & 1 == 0:
-                    z = (i ^ 2) - 1
-                    for x in range(width):
-                        for y in range(width):
-                            if x - z >= 0 and x - z < width:
-                                if tiles[x][y] > 0:
-                                    if tiles[x - z][y] <= 0:
-                                        tiles[x - z][y] = tiles[x][y]
-                                        tiles[x][y] = 0
-                                        a = 0
-                                    elif type(tiles[x][y]) is float:
-                                        if type(tiles[x - z][y]) is int:
-                                            tiles[x - z][y] += round(tiles[x][y] * 10)
-                                            tiles[x][y] = 0
-                                        else:
-                                            tiles[x - z][y] += tiles[x][y]
-                                            tiles[x][y] = 0
-                                        a = 0
-                                    elif type(tiles[x - z][y]) is float:
-                                        tiles[x - z][y] = round(tiles[x - z][y] * 10) + tiles[x][y]
-                                        tiles[x][y] = 0
-                                        a = 0
-                                    elif tiles[x - z][y] == tiles[x][y]:
-                                        tiles[x - z][y] += 1
-                                        tiles[x][y] = 0
-                                        a = 0
-                else:
-                    z = (i ^ 2) - 2
-                    for x in range(width):
-                        for y in range(width):
-                            if y - z >= 0 and y - z < width:
-                                if tiles[x][y] > 0:
-                                    if tiles[x][y - z] <= 0:
-                                        tiles[x][y - z] = tiles[x][y]
-                                        tiles[x][y] = 0
-                                        a = 0
-                                    elif type(tiles[x][y]) is float:
-                                        if type(tiles[x][y - z]) is int:
-                                            tiles[x][y - z] += round(tiles[x][y] * 10)
-                                            tiles[x][y] = 0
-                                        else:
-                                            tiles[x][y - z] += tiles[x][y]
-                                            tiles[x][y] = 0
-                                        a = 0
-                                    elif type(tiles[x][y - z]) is float:
-                                        tiles[x][y - z] = round(tiles[x][y - z] * 10) + tiles[x][y]
-                                        tiles[x][y] = 0
-                                        a = 0
-                                    elif tiles[x][y - z] == tiles[x][y]:
-                                        tiles[x][y - z] += 1
-                                        tiles[x][y] = 0
-                                        a = 0
-        if not a:
-            if i != 4:
+        if i == 4:
+            gamestate = gamestate[::-1]
+            a = 0
+        elif i is None:
+            a = 0
+        else:
+            if i < 4:
+                gamestate[1] = gamestate[0]
+                gamestate[0], a = self.moveTiles(gamestate, i)
                 self.spawn(gamestate[0], mode, 1)
+            else:
+                pool = list(self.multis[i])
+                returns = [None]
+                t = time.time()
+                doParallel(self.randomSpam, [gamestate, mode, pool, returns])
+                while returns[0] is None and time.time() - t < 5:
+                    await asyncio.sleep(.2)
+                if returns[0] is None:
+                    return
+                self.gamestate, a = returns[0]
+        if not a:
             gsr = str(gamestate).replace("[", "A").replace("]", "B").replace(",", "C").replace("-", "D").replace(" ", "")
-            orig = message.content.split("\n")[0].split("-")
+            orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]).split("-")
             last = "-".join(orig[:-1])
             text = last + "-" + gsr + "\n"
             score = 0
@@ -109,17 +175,33 @@ class text2048:
                     text += "|" + " " * (empty + 1 >> 1) + num + " " * (empty >> 1)
                 text += "|\n"
             text += ("+" + "-" * size) * width + "+" + "\nPlayer: " + username + "\nScore: " + str(score) + "```"
-            doParallel(print, [text])
+            print(text)
             await message.edit(content=text)
+        elif not mode & 1:
+            count = 0
+            for x in range(width):
+                for y in range(width):
+                    if gamestate[0][x][y] > 0:
+                        count += 1
+            if count == width ** 2:
+                a = 1
+                for i in range(4):
+                    dump, b = self.moveTiles(gamestate, i)
+                    a &= b
+                if a:
+                    await message.clear_reactions()
+                    gameover = ["🇬","🇦","🇲","🇪","⬛","🇴","🇻","3️⃣","🇷"]
+                    for g in gameover:
+                        await message.add_reaction(g)
 
     def spawn(self, gamestate, mode, count=1):
         width = len(gamestate)
-        isZero = count <= 0
+        if count <= 0:
+            return
         count *= width ** 2 / 16
         if count != int(count):
             count = int(count) + round(frand(count - int(count)))
-        if count < 1 and not isZero:
-            count = 1
+        count = max(count, 1)
         largest = numpy.max(gamestate[0])
         attempts = 0
         i = 0
@@ -142,13 +224,17 @@ class text2048:
             return
         gamestate = ast.literal_eval(argv.replace("A", "[").replace("B", "]").replace("C", ",").replace("D", "-"))
         if reaction is not None:
-            try:
-                reaction = self.directions.index(str(reaction))
-            except IndexError:
+            reac = str(reaction)
+            if not reac in self.directions:
                 return
+            r = self.directions[reac]
+            if not (r[0] & mode or r[0] == 0):
+                return
+            reaction = r[1]
         else:
             for react in self.directions:
-                if mode & 1 or react != "↩":
+                rval = self.directions[react][0]
+                if rval & mode or rval == 0:
                     await message.add_reaction(react)
             self.spawn(gamestate[0], mode, 1)
         if u_id == 0:
@@ -178,6 +264,10 @@ class text2048:
         else:
             u_id = user.id
         mode = 0
+        if "c" in flags:
+            mode |= 16
+        if "v" in flags:
+            mode |= 8
         if "i" in flags:
             mode |= 4
         if "s" in flags:
@@ -186,5 +276,8 @@ class text2048:
             mode |= 1
         gamestate = [[[0 for y in range(size)] for x in range(size)]] * 2
         gsr = str(gamestate).replace("[", "A").replace("]", "B").replace(",", "C").replace("-", "D").replace(" ", "")
-        text = "```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + gsr + "\nStarting Game...```"
+        text = (
+            "```" + "\n" * (mode & 8 != 0) + "callback-game-text2048-"
+            + str(u_id) + "_" + str(mode) + "-" + gsr + "\nStarting Game...```"
+            )
         return text

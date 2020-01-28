@@ -348,40 +348,41 @@ async def processMessage(message, msg):
                             args = shlex.split(d)
                         except ValueError:
                             args = d.split(" ")
-                        async with channel.typing():
-                            for a in range(len(args)):
-                                args[a] = args[a].replace("", "'").replace("\0", '"')
-                            response = await command(
-                                client=client,          # for interfacing with discord
-                                _vars=_vars,            # for interfacing with bot's database
-                                argv=argv,              # raw text argument
-                                args=args,              # split text arguments
-                                flags=flags,            # special flags
-                                user=user,              # user that invoked the command
-                                message=message,        # message data
-                                channel=channel,        # channel data
-                                guild=guild,            # guild data
-                                name=alias,             # alias the command was called as
-                                callback=processMessage,# function that called the command
-                                )
-                            if response is not None:
-                                if len(response) < 65536:
-                                    print(response)
-                                else:
-                                    print("[RESPONSE OVER 64KB]")
-                                if type(response) is list:
-                                    for r in response:
-                                        await channel.send(r)
-                                else:
-                                    try:
-                                        await channel.send(response)
-                                    except discord.HTTPException:
-                                        fn = "cache/temp.txt"
-                                        _f = open(fn, "wb")
-                                        _f.write(bytes(response, "utf-8"))
-                                        _f.close()
-                                        _f = discord.File(fn)
-                                        await channel.send("Response too long for message.", file=_f)
+                        await channel.trigger_typing()
+                        #async with channel.typing():
+                        for a in range(len(args)):
+                            args[a] = args[a].replace("", "'").replace("\0", '"')
+                        response = await command(
+                            client=client,          # for interfacing with discord
+                            _vars=_vars,            # for interfacing with bot's database
+                            argv=argv,              # raw text argument
+                            args=args,              # split text arguments
+                            flags=flags,            # special flags
+                            user=user,              # user that invoked the command
+                            message=message,        # message data
+                            channel=channel,        # channel data
+                            guild=guild,            # guild data
+                            name=alias,             # alias the command was called as
+                            callback=processMessage,# function that called the command
+                            )
+                        if response is not None:
+                            if len(response) < 65536:
+                                print(response)
+                            else:
+                                print("[RESPONSE OVER 64KB]")
+                            if type(response) is list:
+                                for r in response:
+                                    await channel.send(r)
+                            else:
+                                try:
+                                    await channel.send(response)
+                                except discord.HTTPException:
+                                    fn = "cache/temp.txt"
+                                    _f = open(fn, "wb")
+                                    _f.write(bytes(response, "utf-8"))
+                                    _f.close()
+                                    _f = discord.File(fn)
+                                    await channel.send("Response too long for message.", file=_f)
                     except Exception as ex:
                         rep = repr(ex)
                         if len(rep) > 1900:
@@ -548,10 +549,16 @@ async def reactCallback(message, reaction, user):
         if suspended:
             return
         u_perm = _vars.getPerms(user.id, message.guild)
-        check = "```callback-"
-        msg = message.content.split("\n")[0]
-        if msg[: len(check)] == check:
-            msg = msg[len(check) :]
+        msg = message.content
+        if msg[:3] != "```" or len(msg) <= 3:
+            return
+        msg = msg[3:]
+        while msg[0] == "\n":
+            msg = msg[1:]
+        check = "callback-"
+        msg = msg.split("\n")[0]
+        if msg[:len(check)] == check:
+            msg = msg[len(check):]
             args = msg.split("-")
             catx = args[0]
             func = args[1]
