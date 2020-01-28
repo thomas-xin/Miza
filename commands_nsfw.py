@@ -27,23 +27,26 @@ def pull_e621(argv, data, thr, delay=5):
             raise ConnectionError("Error " + str(resp.getcode()))
         s = resp.read().decode("utf-8")
 
-        ind = s.index('class="next_page" rel="next"')
-        s = s[ind - 90 : ind]
-        d = s.split(" ")
-        i = -1
-        while True:
-            if "</a>" in d[i]:
-                break
-            i -= 1
-        u = d[i][:-4]
-        u = u[u.index(">") + 1 :]
-        v1 = xrand(1, int(u))
+        try:
+            ind = s.index('class="next_page" rel="next"')
+            s = s[ind - 90 : ind]
+            d = s.split(" ")
+            i = -1
+            while True:
+                if "</a>" in d[i]:
+                    break
+                i -= 1
+            u = d[i][:-4]
+            u = u[u.index(">") + 1 :]
+            v1 = xrand(1, int(u))
 
-        url = baseurl + str(v1) + "/" + items
-        resp = opener.open(url)
-        if resp.getcode() != 200:
-            raise ConnectionError("Error " + str(resp.getcode()))
-        s = resp.read().decode("utf-8")
+            url = baseurl + str(v1) + "/" + items
+            resp = opener.open(url)
+            if resp.getcode() != 200:
+                raise ConnectionError("Error " + str(resp.getcode()))
+            s = resp.read().decode("utf-8")
+        except ValueError:
+            pass
 
         try:
             limit = s.index('class="next_page" rel="next"')
@@ -89,6 +92,7 @@ def pull_e621(argv, data, thr, delay=5):
         data[thr] = [url, v1, v2]
     except:
         data[thr] = 0
+        raise
     print(data)
 
 
@@ -117,6 +121,7 @@ def pull_rule34_xxx(argv, data, thr, delay=5):
             raise
     except:
         data[thr] = 0
+        raise
     print(data)
 
 
@@ -132,8 +137,8 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
                 if i[0] not in tagsearch:
                     tagsearch.append(i[0])
         rx = xrand(len(tagsearch))
-        baseurl = "https://rule34.paheal.net/tags?starts_with="
-        url = baseurl + tagsearch[rx]
+        baseurl = "https://rule34.paheal.net/tags/alphabetic?starts_with="
+        url = baseurl + tagsearch[rx] + "&mincount=1"
         req = urllib.request.Request(url)
         resp = urllib.request.urlopen(req, timeout=delay)
         if resp.getcode() != 200:
@@ -210,6 +215,7 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
         data[thr] = [url, v1, v2]
     except:
         data[thr] = 0
+        raise
     print(data)
 
 
