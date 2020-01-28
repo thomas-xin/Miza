@@ -40,7 +40,7 @@ class purge:
                     + str(s_perm)
                     + "__**"
                 )
-        lim = count*2
+        lim = count*2+16
         if not isValid(lim):
             lim = None
         hist = await channel.history(limit=lim).flatten()
