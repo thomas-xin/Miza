@@ -89,7 +89,7 @@ def pull_e621(argv, data, thr, delay=5):
                     found = True
             if not found:
                 x = None
-        data[thr] = [url, v1, v2]
+        data[thr] = [url, v1, v2 + 1]
     except:
         data[thr] = 0
         raise
@@ -116,7 +116,7 @@ def pull_rule34_xxx(argv, data, thr, delay=5):
             v2 = xrand(len(sources))
             url = sources[v2].file_url
             v1 = max(1, sources[v2].score)
-            data[thr] = [url, v1, v2]
+            data[thr] = [url, v1, v2 + 1]
         else:
             raise
     except:
@@ -128,7 +128,7 @@ def pull_rule34_xxx(argv, data, thr, delay=5):
 def pull_rule34_paheal(argv, data, thr, delay=5):
     try:
         v1, v2 = 1, 1
-        items = argv.split(" ")
+        items = argv.lower().split(" ")
         if not len(argv.replace(" ", "")):
             tagsearch = [chr(i + 65) for i in range(26)]
         else:
@@ -212,7 +212,7 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
                 break
         v2 = xrand(len(sources))
         url = sources[v2]
-        data[thr] = [url, v1, v2]
+        data[thr] = [url, v1, v2 + 1]
     except:
         data[thr] = 0
         raise
