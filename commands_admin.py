@@ -40,7 +40,10 @@ class purge:
                     + str(s_perm)
                     + "__**"
                 )
-        hist = await channel.history(limit=128).flatten()
+        lim = count*2
+        if not isValid(lim):
+            lim = None
+        hist = await channel.history(limit=lim).flatten()
         delM = []
         deleted = 0
         for m in hist:
