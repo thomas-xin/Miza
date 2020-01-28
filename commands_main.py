@@ -145,25 +145,35 @@ class perms:
             c_perm = _vars.evalMath(" ".join(args[1:]))
             s_user = user
             s_perm = _vars.getPerms(s_user.id, guild)
-            t_user = await client.fetch_user(_vars.verifyID(args[0]))
-            t_perm = _vars.getPerms(t_user.id, guild)
+            if "everyone" in args[0] or "here" in args[0]:
+                t_user = None
+                t_perm = inf
+                name = "everyone"
+            else:
+                t_user = await client.fetch_user(_vars.verifyID(args[0]))
+                t_perm = _vars.getPerms(t_user.id, guild)
+                name = t_user.name
             if t_perm is nan or c_perm is nan:
                 m_perm = nan
             else:
                 m_perm = max(t_perm, c_perm, 1) + 1
             if not s_perm <= m_perm and m_perm is not nan:
-                _vars.setPerms(t_user.id, guild, c_perm)
+                if t_user is None:
+                    for u in guild.members:
+                        _vars.setPerms(u.id, guild, c_perm)
+                else:
+                    _vars.setPerms(t_user.id, guild, c_perm)
                 if "h" in flags:
                     return
                 return (
-                    "Changed permissions for **"+ t_user.name
+                    "Changed permissions for **"+ name
                     + "** in **" + guild.name
                     + "** from **__" + str(t_perm)
                     + "__** to **__" + str(c_perm) + "__**."
                 )
             else:
                 return (
-                    "Error: Insufficient priviliges to change permissions for **" + t_user.name
+                    "Error: Insufficient priviliges to change permissions for **" + name
                     + "** in **" + guild.name
                     + "** from **__" + str(t_perm)
                     + "__** to **__" + str(c_perm)
