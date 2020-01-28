@@ -92,7 +92,6 @@ def pull_e621(argv, data, thr, delay=5):
         data[thr] = [url, v1, v2 + 1]
     except:
         data[thr] = 0
-        raise
     print(data)
 
 
@@ -115,13 +114,12 @@ def pull_rule34_xxx(argv, data, thr, delay=5):
         if sources:
             v2 = xrand(len(sources))
             url = sources[v2].file_url
-            v1 = max(1, sources[v2].score)
+            v1 = 1
             data[thr] = [url, v1, v2 + 1]
         else:
             raise
     except:
         data[thr] = 0
-        raise
     print(data)
 
 
@@ -215,7 +213,6 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
         data[thr] = [url, v1, v2 + 1]
     except:
         data[thr] = 0
-        raise
     print(data)
 
 

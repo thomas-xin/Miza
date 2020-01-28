@@ -9,7 +9,6 @@ images = {
     "https://cdn.discordapp.com/attachments/320915703102177293/671169395019612170/dolphino.gif": ["dolphin"],
     "https://cdn.discordapp.com/attachments/320915703102177293/671167411914801182/curiouseal.gif": ["seal"],
     }
-    
 
 
 class img:
@@ -29,7 +28,7 @@ class img:
         for url in images:
             for alias in images[url]:
                 counter = check.split(alias)
-                sources += [url for i in range(len(counter)-1)]
+                sources += [url for i in range(len(counter) - 1)]
         if not len(sources):
             raise EOFError("Target image not found. Use ?l for list.")
         v = xrand(len(sources))
