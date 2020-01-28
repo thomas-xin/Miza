@@ -29,7 +29,7 @@ class img:
         for url in images:
             for alias in images[url]:
                 counter = check.split(alias)
-                sources += [url for i in range(counter-1)]
+                sources += [url for i in range(len(counter)-1)]
         if not len(sources):
             raise EOFError("Target image not found. Use ?l for list.")
         v = xrand(len(sources))
