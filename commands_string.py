@@ -203,7 +203,7 @@ class char2emoj:
         self.name = ["c2e"]
         self.min_level = 0
         self.description = "Makes emoji blocks using a string."
-        self.usage = "<string>"
+        self.usage = "<0:string> <1:emoji1> <2:emoji2>"
 
     async def __call__(self, args, **extra):
         return _c2e(*args[:3])
