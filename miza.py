@@ -75,7 +75,7 @@ class _globals:
         except:
             print("Creating new save data...")
             self.perms = {}
-            self.bans = {0:{}}
+            self.bans = {0: {}}
             self.enabled = {}
             self.scheduled = {}
             self.special = {}
