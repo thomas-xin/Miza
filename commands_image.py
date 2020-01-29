@@ -6,8 +6,8 @@ images = {
     "https://media.discordapp.net/attachments/500919580596764673/642515924578205696/HOW.gif": ["how"],
     "https://cdn.discordapp.com/attachments/430005329984487434/654326757654134785/4aa217e.gif": ["ded", "4aa217e"],
     "https://media.discordapp.net/attachments/543449246221860885/651594997925281803/parrot.gif": ["parrot"],
-    "https://cdn.discordapp.com/attachments/320915703102177293/671169395019612170/dolphino.gif": ["dolphin"],
-    "https://cdn.discordapp.com/attachments/320915703102177293/671167411914801182/curiouseal.gif": ["seal"],
+    "https://cdn.discordapp.com/attachments/313292557603962881/671873663120703508/dolphino.gif": ["dolphin"],
+    "https://cdn.discordapp.com/attachments/313292557603962881/671873485722746890/curiouseal.gif": ["seal"],
     }
 
 
@@ -27,8 +27,8 @@ class img:
         sources = []
         for url in images:
             for alias in images[url]:
-                counter = check.split(alias)
-                sources += [url for i in range(len(counter) - 1)]
+                counter = len(check.split(alias)) - 1 + ("r" in flags)
+                sources += [url for i in range(counter)]
         if not len(sources):
             raise EOFError("Target image not found. Use ?l for list.")
         v = xrand(len(sources))
