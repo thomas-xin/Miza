@@ -206,6 +206,9 @@ class char2emoj:
         self.usage = "<0:string> <1:emoji1> <2:emoji2>"
 
     async def __call__(self, args, **extra):
+        for i in range(1,3):
+            if args[i][0] == ":" and args[i][-1] != ":":
+                args[i] = "<" + args[i] + ">"
         return _c2e(*args[:3])
 
 
