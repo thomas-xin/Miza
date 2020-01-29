@@ -1,4 +1,4 @@
-import discord, ast, os, sys, asyncio, datetime, json, shlex, easygui
+import discord, ast, os, sys, asyncio, datetime, json, shlex
 import urllib.request
 from smath import *
 
@@ -75,7 +75,7 @@ class _globals:
         except:
             print("Creating new save data...")
             self.perms = {}
-            self.bans = {}
+            self.bans = {0:{}}
             self.enabled = {}
             self.scheduled = {}
             self.special = {}
