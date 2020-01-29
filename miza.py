@@ -491,25 +491,26 @@ async def handleUpdate(force=False):
         if bans:
             changed = False
             for g in bans:
-                bl = list(bans[g])
-                for b in bl:
-                    if type(bans[g][b]) is list and dtime >= bans[g][b][0]:
-                        u_target = await client.fetch_user(b)
-                        g_target = await client.fetch_guild(g)
-                        c_target = await client.fetch_channel(bans[g][b][1])
-                        bans[g].pop(b)
-                        try:
-                            await g_target.unban(u_target)
-                            await c_target.send(
-                                "**" + u_target.name
-                                + "** has been unbanned from **" + g_target.name + "**."
-                                )
-                            changed = True
-                        except:
-                            await c_target.send(
-                                "Unable to unban **" + u_target.name
-                                + "** from **" + g_target.name + "**."
-                                )
+                if g:
+                    bl = list(bans[g])
+                    for b in bl:
+                        if type(bans[g][b]) is list and dtime >= bans[g][b][0]:
+                            u_target = await client.fetch_user(b)
+                            g_target = await client.fetch_guild(g)
+                            c_target = await client.fetch_channel(bans[g][b][1])
+                            bans[g].pop(b)
+                            try:
+                                await g_target.unban(u_target)
+                                await c_target.send(
+                                    "**" + u_target.name
+                                    + "** has been unbanned from **" + g_target.name + "**."
+                                    )
+                                changed = True
+                            except:
+                                await c_target.send(
+                                    "Unable to unban **" + u_target.name
+                                    + "** from **" + g_target.name + "**."
+                                    )
             if changed:
                 _vars.update()
         for vc in client.voice_clients:
