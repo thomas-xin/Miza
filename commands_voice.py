@@ -97,7 +97,7 @@ class queue:
                     curr += ", Remaining time: " + uniStr(" ".join(timeConv(estim + e["duration"])))
                 show += curr
             return (
-                "Currently playing in " + uniStr(guild.name) + ":\n"
+                "Currently playing in **" + guild.name + "**:\n"
                 + "```\n" + show + "```"
                 )
         else:
@@ -143,11 +143,11 @@ class queue:
                 names = [self.dictRemove(i, "id") for i in added]
             elif len(names) == 1:
                 names = names[0]
-            return (
-                "```\n🎶 Added " + str(names) + " to the queue! Estimated time until playing: "
-                + uniStr(" ".join(timeConv(total_duration))) + ". 🎶```"
-                )
-        return
+            if not "h" in flags:
+                return (
+                    "```\n🎶 Added " + str(names) + " to the queue! Estimated time until playing: "
+                    + uniStr(" ".join(timeConv(total_duration))) + ". 🎶```"
+                    )
 
 
 class join:

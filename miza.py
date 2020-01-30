@@ -305,6 +305,8 @@ class _globals:
             u_perm = nan
         else:
             u_perm = 1
+        if u_perm is not nan and u_id == guild.owner_id:
+            u_perm = inf
         return u_perm
 
     def setPerms(self, user, guild, value):
@@ -739,7 +741,11 @@ async def handleUpdate(force=False):
                                 try:
                                     path = "cache/temp." + q[0]["id"].replace("@", "") + ".mp3"
                                     f = open(path, "rb")
+                                    minl = 32
+                                    b = f.read(minl)
                                     f.close()
+                                    if len(b) < minl:
+                                        raise FileNotFoundError
                                     q[0]["id"] = "@" + q[0]["id"]
                                     auds = discord.FFmpegPCMAudio(path)
                                     vc.play(auds)
@@ -763,6 +769,8 @@ async def handleUpdate(force=False):
                         _vars.audiocache.remove(i)
                     except PermissionError:
                         pass
+                    except FileNotFoundError:
+                        _vars.audiocache.remove(i)
 
 
 async def checkDelete(message, reaction, user):
