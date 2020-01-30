@@ -199,11 +199,18 @@ class enableCommand:
 
     def __init__(self):
         self.name = ["ec", "enable"]
-        self.min_level = 3
+        self.min_level = 0
         self.description = "Shows, enables, or disables a command category in the current channel."
         self.usage = "<command:{all}> <enable:(?e)> <disable:(?d)> <hide:(?h)>"
 
-    async def __call__(self, client, _vars, argv, flags, channel, **void):
+    async def __call__(self, client, _vars, argv, flags, user, channel, guild, **void):
+        if "e" in flags or "d" in flags:
+            s_perm = _vars.getPerms(user, guild)
+            if s_perm < 3:
+                raise PermissionError(
+                    "Insufficient priviliges to modify enabled commands in "
+                    + uniStr(channel.name) + "."
+                    )
         catg = argv.lower()
         print(catg)
         if not catg:
@@ -214,13 +221,13 @@ class enableCommand:
                 _vars.update()
                 if "h" in flags:
                     return
-                return "Enabled all command categories in **" + channel.name + "**."
+                return "```\nEnabled all command categories in " + uniStr(channel.name) + ".```"
             if "d" in flags:
                 _vars.enabled[channel.id] = []
                 _vars.update()
                 if "h" in flags:
                     return
-                return "Disabled all command categories in **" + channel.name + "**."
+                return "```\nDisabled all command categories in " + uniStr(channel.name) + ".```"
             return (
                 "Currently enabled command categories in **" + channel.name
                 + "**:\n```\n"
