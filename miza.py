@@ -4,7 +4,7 @@ from smath import *
 
 client = discord.Client(
     max_messages=2000,
-    activity=discord.Activity(name="Magic"),
+    activity=discord.Activity(name=uniStr("Magic")),
     )
 
 from matplotlib import use as plot_sys
@@ -12,44 +12,191 @@ from matplotlib import use as plot_sys
 plot_sys("Agg")
 from matplotlib import pyplot as plt
 
-bar_plot = plt.bar
-plot_points = plt.scatter
-plot = plt.plot
-plotY = plt.semilogy
-plotX = plt.semilogx
-plotXY = plt.loglog
+def tryFunc(func, *args, force=False, amax, **kwargs):
+    try:
+        ans = nan
+        ans = func(*args, **kwargs)
+        if not (ans > -amax and ans < amax):
+            raise OverflowError
+    except:
+        if force:
+            ans = 0
+        else:
+            if ans.imag:
+                ans = nan
+            elif ans > amax:
+                ans = inf
+            elif ans < amax:
+                ans = -inf
+            else:
+                ans = nan
+    return ans
+
+def plot(*args,**kwargs):
+    if type(args[0]) is str:
+        s = args[0]
+        if s[0] == "y":
+            try:
+                t = s.index("=")
+                s = s[t + 1:]
+            except ValueError:
+                pass
+        f = _vars.evalMath("lambda x: " + s)
+        try:
+            f(0)
+        except ArithmeticError:
+            pass
+        except NameError as ex1:
+            if s[0] == "x":
+                try:
+                    t = s.index("=")
+                    s = s[t + 1:]
+                except ValueError:
+                    pass
+            f = _vars.evalMath("lambda y: " + s)
+            try:
+                f(0)
+            except ArithmeticError:
+                pass
+            except NameError as ex2:
+                raise NameError(str(ex1) + ", " + str(ex2))
+            flip = True
+        args = (f,) + args[1:]
+    if callable(args[0]):
+        amax = 100
+        if len(args) < 2:
+            r = float(2 * tau)
+            c = float(-tau)
+        elif len(args) < 3:
+            r = args[1]*2
+            c = -args[1]
+        else:
+            r = abs(args[2]-args[1])
+            c = min(args[2], args[1])
+            if len(args) >= 4:
+                amax = args[3]
+        size = 1024
+        array1 = array(range(size)) / size * r + c
+        array2 = [tryFunc(args[0], array1[i], force=(i == 0 or i == len(array1) - 1), amax=amax) for i in range(len(array1))]
+        if flip:
+            args = [array2, array1]
+        else:
+            args = [array1, array2]
+    if len(args) < 3:
+        cols = "rgbcmy"
+        args.append("-" + cols[xrand(len(cols))])
+    return plt.plot(*args)
+
+
 fig = plt.figure()
 
 
 class _globals:
     timeout = 10
-    disabled = [
-        "__",
-        "open",
-        "import",
-        "urllib",
+    deleted = [
         "discord",
-        "exec",
-        "eval",
-        "locals",
-        "globals",
-        "vars",
         "client",
+        "urllib",
         "os",
         "sys",
-        "async",
-        "compile",
+        "asyncio",
+        "ast",
         "threading",
-        "input",
-        "exit",
-        "quit",
-        "getattr",
+        "processes",
+        "printVars",
+        "printGlobals",
+        "printLocals",
+        "origPrint",
+        "logPrint",
+        "doParallel",
+        "updatePrint",
+        "waitParallel",
+        "killThreads",
+        "performAction",
+        "dynamicFunc",
+        "dumpLogData",
+        "setPrint",
+        "processMessage",
+        "updateLoop",
+        "outputLoop",
+        "handleMessage",
+        "handleUpdate",
+        "changeColour",
+        "checkDelete",
+        "reactCallback",
+        "on_ready",
+        "on_reaction_add",
+        "on_reaction_remove",
+        "on_message",
+        "on_message_edit",
+        "on_raw_reaction_add",
+        "on_raw_message_edit",
+        "on_voice_state_update",
+        "on_raw_message_delete",
+        "on_typing",
+        "_vars",
+        "fig",
+        "plt",
+    ]
+    disabled = [
+        "__",
         ".load",
         ".save",
         ".fromfile",
-        "ctypes",
-        "parallel",
     ]
+    builtins_list = [
+        "abs",
+        "all",
+        "any",
+        "ascii",
+        "bin",
+        "bool",
+        "bytearray",
+        "bytes",
+        "chr",
+        "complex",
+        "dict",
+        "divmod",
+        "enumerate",
+        "filter",
+        "float",
+        "format",
+        "frozenset",
+        "hash",
+        "hex",
+        "id",
+        "int",
+        "isinstance",
+        "issubclass",
+        "iter",
+        "len",
+        "list",
+        "map",
+        "max",
+        "memoryview",
+        "min",
+        "next",
+        "object",
+        "oct",
+        "ord",
+        "pow",
+        "print",
+        "property",
+        "range",
+        "repr",
+        "reversed",
+        "round",
+        "set",
+        "slice",
+        "sorted",
+        "str",
+        "sum",
+        "super",
+        "tuple",
+        "type",
+        "zip",
+    ]
+    builtins = {i: getattr(__builtins__, i) for i in builtins_list}
     savedata = "data.json"
     authdata = "auth.json"
 
@@ -68,6 +215,8 @@ class _globals:
         doParallel(self.getModules)
         self.current_channel = None
         self.blocked = 0
+        self.msgFollow = {}
+        self.audiocache = []
 
     def loadSave(self):
         try:
@@ -79,6 +228,7 @@ class _globals:
             self.enabled = {}
             self.scheduled = {}
             self.special = {}
+            self.following = {}
             self.update()
             f = open(self.savedata)
             
@@ -89,6 +239,7 @@ class _globals:
         self.enabled = savedata.get("enabled", {})
         self.scheduled = savedata.get("scheduled", {})
         self.special = savedata.get("special", {})
+        self.following = savedata.get("following", {})
 
     def getModule(self, module, category):
         exec("import " + module + " as _vars_", globals())
@@ -123,6 +274,7 @@ class _globals:
             "enabled": self.enabled,
             "scheduled": self.scheduled,
             "special": self.special,
+            "following": self.following,
             }
         f.write(repr(savedata))
         f.close()
@@ -161,28 +313,28 @@ class _globals:
 
     def resetGlobals(self):
         self.stored_vars = dict(globals())
-        for i in self.disabled:
-            try:
-                self.stored_vars.pop(i)
-            except:
-                pass
+        self.verifyGlobals()
         return self.stored_vars
 
     def updateGlobals(self):
-        temp = dict(globals())
-        for i in self.disabled:
+        self.stored_vars.update(dict(globals()))
+        self.verifyGlobals()
+        return self.stored_vars
+
+    def verifyGlobals(self):
+        for i in self.deleted:
             try:
-                temp.pop(i)
-            except:
+                self.stored_vars.pop(i)
+            except KeyError:
                 pass
-        self.stored_vars.update(temp)
+        self.stored_vars["__builtins__"] = self.builtins
         return self.stored_vars
 
     def verifyCommand(self, func):
         f = func.lower()
         for d in self.disabled:
             if d in f:
-                raise PermissionError("Issued command is not enabled.")
+                raise PermissionError("\"" + d + "\" is not enabled.")
         return func
 
     def verifyURL(self, _f):
@@ -205,10 +357,10 @@ class _globals:
 
     def evalMath(self, f):
         self.verifyCommand(f)
-        return eval(f)
+        return eval(f, self.stored_vars)
 
 
-async def processMessage(message, msg):
+async def processMessage(message, msg, edit=True):
     global client
     perms = _vars.perms
     bans = _vars.bans
@@ -243,7 +395,9 @@ async def processMessage(message, msg):
     suspended = _vars.bans[0].get(u_id, False)
     if suspended or msg.replace(" ", "") == check:
         if not u_perm < 0 and not suspended:
-            await channel.send("Hi, did you require my services for anything? Use ~? or ~help for help.")
+            await channel.send(
+		"Hi, did you require my services for anything? Use `~?` or `~help` for help."
+		)
         else:
             print("Ignoring command from suspended user " + user.name + " (" + str(u_id) + ").")
             await channel.send("Sorry, you are currently not permitted to request my services.")
@@ -302,9 +456,9 @@ async def processMessage(message, msg):
                     req = command.min_level
                     if req > u_perm or (u_perm is not nan and req is nan):
                         await channel.send(
-                            "Error: Insufficient priviliges for command " + alias
-                            + ".\nRequred level: **__" + str(req)
-                            + "__**, Current level: **__" + str(u_perm) + "__**"
+                            "```\nError: Insufficient priviliges for command " + alias
+                            + ".\nRequred level: " + uniStr(req)
+                            + ", Current level: " + uniStr(u_perm) + ".```"
                         )
                         return
                     try:
@@ -352,6 +506,8 @@ async def processMessage(message, msg):
                         #async with channel.typing():
                         for a in range(len(args)):
                             args[a] = args[a].replace("", "'").replace("\0", '"')
+                        if guild is None and getattr(command, server_only, False):
+                            raise ReferenceError("This command is only available in servers.")
                         response = await command(
                             client=client,          # for interfacing with discord
                             _vars=_vars,            # for interfacing with bot's database
@@ -391,11 +547,30 @@ async def processMessage(message, msg):
                             errmsg = "```\nError: " + rep + "\n```"
                         print(errmsg)
                         await channel.send(errmsg)
+    elif not edit and u_id != client.user.id and g_id in _vars.following:
+        checker = message.content
+        curr = _vars.msgFollow.get(g_id)
+        if curr is None:
+            curr = [checker, 1, 0]
+            _vars.msgFollow[g_id] = curr
+        elif checker == curr[0] and u_id != curr[2]:
+            curr[1] += 1
+            if curr[1] >= 3:
+                curr[1] = xrand(-3) + 1
+                if len(checker):
+                    asyncio.create_task(channel.send(checker))
+        else:
+            if len(checker) > 100:
+                checker = ""
+            curr[0] = checker
+            curr[1] = 1
+        curr[2] = u_id
+        print(curr)
 
 
-async def fastLoop():
+async def outputLoop():
     global client, _vars
-    print("Fast Loop initiated.")
+    print("Output Loop initiated.")
     while True:
         msg = [None]
         ch = _vars.current_channel
@@ -432,9 +607,9 @@ async def fastLoop():
                 print("Channel does not exist.")
 
 
-async def slowLoop():
+async def updateLoop():
     global _vars
-    print("Slow loop initiated.")
+    print("Update loop initiated.")
     counter = 0
     while True:
         while _vars.blocked > 0:
@@ -475,8 +650,8 @@ async def on_ready():
         else:
             print("> " + guild.name)
     await handleUpdate()
-    asyncio.create_task(slowLoop())
-    asyncio.create_task(fastLoop())
+    asyncio.create_task(updateLoop())
+    asyncio.create_task(outputLoop())
 ##    print("Users: ")
 ##    for guild in client.guilds:
 ##        print(guild.members)
@@ -502,22 +677,80 @@ async def handleUpdate(force=False):
                             try:
                                 await g_target.unban(u_target)
                                 await c_target.send(
-                                    "**" + u_target.name
-                                    + "** has been unbanned from **" + g_target.name + "**."
+                                    "```\n" + uniStr(u_target.name)
+                                    + " has been unbanned from " + uniStr(g_target.name) + "."
                                     )
                                 changed = True
                             except:
                                 await c_target.send(
-                                    "Unable to unban **" + u_target.name
-                                    + "** from **" + g_target.name + "**."
+                                    "```\nUnable to unban " + uniStr(u_target.name)
+                                    + " from " + uniStr(g_target.name) + ".```"
                                     )
             if changed:
                 _vars.update()
-        for vc in client.voice_clients:
-            membs = vc.channel.members
-            cnt = len(membs)
-            if not cnt > 1:
-                await vc.disconnect(force=False)
+        ytdl = None
+        for func in _vars.categories.get("voice", []):
+            if "queue" in func.name:
+                ytdl = func.ytdl
+        if ytdl is not None:
+            should_cache = []
+            for vc in client.voice_clients:
+                channel = vc.channel
+                guild = channel.guild
+                membs = channel.members
+                cnt = len(membs)
+                if not cnt > 1:
+                    try:
+                        channel = await client.fetch_channel(_vars.queue[guild.id]["channel"])
+                        _vars.queue.pop(guild.id)
+                        msg = "```\n🎵 Successfully disconnected from "+ uniStr(guild.name) + ". 🎵```"
+                        await channel.send(
+                            msg
+                            )
+                        print(msg)
+                    except KeyError:
+                        pass
+                    await vc.disconnect(force=False)
+                else:
+                    try:
+                        q = _vars.queue[guild.id]["queue"]
+                        if len(q):
+                            for i in range(2):
+                                if i < len(q):
+                                    e_id = q[i]["id"].replace("@", "")
+                                    should_cache.append(e_id)
+                                    if q[i]["id"][-1] != "@":
+                                        q[i]["id"] = e_id + "@"
+                                        if e_id not in _vars.audiocache:
+                                            _vars.audiocache.append(e_id)
+                                            doParallel(ytdl.download, [q[i]["url"]])
+                            if q[0]["id"][0] != "@" and not vc.is_playing():
+                                try:
+                                    path = "cache/temp." + q[0]["id"].replace("@", "") + ".mp3"
+                                    f = open(path, "rb")
+                                    f.close()
+                                    q[0]["id"] = "@" + q[0]["id"]
+                                    auds = discord.FFmpegPCMAudio(path)
+                                    vc.play(auds)
+                                    channel = await client.fetch_channel(_vars.queue[guild.id]["channel"])
+                                    await channel.send(
+                                        "```\n🎵 Now playing " + uniStr(q[0]["name"])
+                                        + ", added by " + uniStr(q[0]["added by"]) + "! 🎵```"
+                                        )
+                                except FileNotFoundError:
+                                    pass
+                            elif not vc.is_playing():
+                                q.pop(0)
+                    except KeyError as ex:
+                        print("Error: " + repr(ex))
+            for i in _vars.audiocache:
+                if not i in should_cache:
+                    path = "cache/temp." + i + ".mp3"
+                    try:
+                        os.remove(path)
+                        _vars.audiocache.remove(i)
+                    except PermissionError:
+                        pass
 
 
 async def checkDelete(message, reaction, user):
@@ -631,7 +864,7 @@ async def on_voice_state_update(member, before, after):
     await handleUpdate()
 
 
-async def handleMessage(message):
+async def handleMessage(message, edit=True):
     msg = message.content
     user = message.author
     u_id = user.id
@@ -655,6 +888,11 @@ async def handleMessage(message):
             "Available commands in ",
             "Successfully connected to ",
             "Successfully disconnected from ",
+            "Currently playing in ",
+            " to the queue!",
+            "Successfully voted to remove ",
+            "has been forcefully removed from the queue.",
+            "Now playing",
             ]
         found = False
         for i in checked:
@@ -666,7 +904,7 @@ async def handleMessage(message):
             except Exception as ex:
                 print(repr(ex))
     try:
-        await asyncio.wait_for(processMessage(message, msg), timeout=_vars.timeout)
+        await asyncio.wait_for(processMessage(message, msg, edit), timeout=_vars.timeout)
     except Exception as ex:
         killThreads()
         errmsg = "```\nError: " + repr(ex) + "\n```"
@@ -679,7 +917,7 @@ async def handleMessage(message):
 async def on_message(message):
     await reactCallback(message, None, message.author)
     await handleUpdate()
-    await handleMessage(message)
+    await handleMessage(message, False)
     await handleUpdate(True)
 
 

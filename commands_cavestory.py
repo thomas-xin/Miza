@@ -197,7 +197,7 @@ class cs_npc:
             else:
                 return "Search results for **" + argv + "**:\n```\n" + output + "```"
         else:
-            return "No results found for **" + argv + "**."
+            return "```\nNo results found for " + uniStr(argv) + ".```"
 
 
 class cs_tsc:
@@ -237,7 +237,7 @@ class cs_tsc:
             else:
                 return "Search results for **" + argv + "**:\n```\n" + output + "```"
         else:
-            return "No results found for **" + argv + "**."
+            return "```\nNo results found for " + uniStr(argv) + ".```"
 
 
 class cs_mod:
@@ -277,4 +277,4 @@ class cs_mod:
             else:
                 return "Search results for **" + argv + "**:\n```\n" + output + "```"
         else:
-            return "No results found for **" + argv + "**."
+            return "```\nNo results found for " + uniStr(argv) + ".```"

@@ -31,14 +31,14 @@ class purge:
         if t_user != client.user:
             s_perm = _vars.getPerms(user, guild)
             if s_perm < 3:
-                return (
-                    "Error: Insufficient priviliges for command "
-                    + name
-                    + " for target user.\nRequred level: **__"
-                    + "3"
-                    + "__**, Current level: **__"
-                    + str(s_perm)
-                    + "__**"
+                raise PermissionError (
+                    "Insufficient priviliges for command "
+                    + uniStr(name)
+                    + " for target user.\nRequred level: "
+                    + uniStr(3)
+                    + ", Current level: "
+                    + uniStr(s_perm)
+                    + "."
                 )
         lim = count*2+16
         if not isValid(lim):
@@ -66,13 +66,14 @@ class purge:
                     print(repr(ex))
         if not "h" in flags:
             return (
-                "Deleted **__" + str(deleted)
-                + "__** message" + "s" * (deleted != 1) + "!"
+                "```\nDeleted " + uniStr(deleted)
+                + " message" + "s" * (deleted != 1) + "!```"
                 )
 
 
 class ban:
     is_command = True
+    server_only = True
 
     def __init__(self):
         self.name = []
@@ -81,8 +82,6 @@ class ban:
         self.usage = "<0:user> <1:hours[]> <2:reason[]> <hide:(?h)>"
 
     async def __call__(self, client, _vars, args, user, channel, guild, flags, **void):
-        if guild is None:
-            raise ReferenceError("This command is only available in servers.")
         dtime = datetime.datetime.utcnow().timestamp()
         a1 = args[0]
         t_user = await client.fetch_user(_vars.verifyID(a1))
@@ -90,16 +89,16 @@ class ban:
         t_perm = _vars.getPerms(t_user, guild)
         if t_perm + 1 >= s_perm or not isValid(t_perm):
             if len(args) > 1:
-                return (
-                    "Error: Insufficient priviliges to ban **"
-                    + t_user.name
-                    + "** from **"
-                    + guild.name
-                    + "**.\nRequired level: **__"
-                    + str(t_perm + 1)
-                    + "__**, Current level: **__"
-                    + str(s_perm)
-                    + "__**"
+                raise PermissionError (
+                    "Insufficient priviliges to ban "
+                    + uniStr(t_user.name)
+                    + " from "
+                    + uniStr(guild.name)
+                    + ".\nRequired level: "
+                    + uniStr(t_perm + 1)
+                    + ", Current level: "
+                    + uniStr(s_perm)
+                    + "."
                 )
         if len(args) < 2:
             tm = 0
@@ -116,15 +115,15 @@ class ban:
             is_banned = is_banned[0] - dtime
             if len(args) < 2:
                 return (
-                    "Current ban for **" + t_user.name
-                    + "** from **" + guild.name + "**: **__"
-                    + str(is_banned / 3600)
-                    + "__** hour" + "s" * (tm != 1) + "."
+                    "```\nCurrent ban for " + uniStr(t_user.name)
+                    + " from " + uniStr(guild.name) + ": "
+                    + uniStr(is_banned / 3600)
+                    + " hour" + "s" * (tm != 1) + ".```"
                 )
         elif len(args) < 2:
             return (
-                "**" + t_user.name
-                + "** is currently not banned from **" + guild.name + "**."
+                "```\n" + uniStr(t_user.name)
+                + " is currently not banned from " + uniStr(guild.name) + ".```"
                 )
         g_bans[t_user.id] = [tm * 3600 + dtime, channel.id]
         _vars.bans[g_id] = g_bans
@@ -134,26 +133,27 @@ class ban:
         response = None
         if is_banned:
             response = (
-                "Updated ban for **" + t_user.name
-                + "** from **__" + str(is_banned / 3600)
-                + "__** hours to **__" + str(tm)
-                + "__** hours."
+                "```\nUpdated ban for " + uniStr(t_user.name)
+                + " from " + uniStr(is_banned / 3600)
+                + " hours to " + uniStr(tm)
+                + " hours."
             )
         elif tm >= 0:
             response = (
-                "**" + t_user.name
-                + "** has been banned from **" + guild.name
-                + "** for **__" + str(tm)
-                + "__** hour" + "s" * (tm != 1) + "."
+                "```\n" + uniStr(t_user.name)
+                + " has been banned from " + uniStr(guild.name)
+                + " for " + uniStr(tm)
+                + " hour" + "s" * (tm != 1) + "."
             )
         if msg:
-            response += " Reason: **" + msg + "**."
+            response += " Reason: " + uniStr(msg) + "."
         if "h" not in flags:
-            return response
+            return response + "```"
 
 
 class roleGiver:
     is_command = True
+    server_only = True
 
     def __init__(self):
         self.name = ["verifier"]
@@ -162,12 +162,10 @@ class roleGiver:
         self.usage = "<0:react_to> <1:role/perm> <disable:(?r)> <deleter:(?d)>"
 
     async def __call__(self, _vars, argv, args, user, channel, guild, flags, **void):
-        if guild is None:
-            raise ReferenceError("This command is only available in servers.")
         if "r" in flags:
             _vars.scheduled[channel.id] = {}
             _vars.update()
-            return "Removed all automated role givers from channel **" + channel.name + "**."
+            return "```\nRemoved all automated role givers from channel " + uniStr(channel.name) + ".```"
         currentSchedule = _vars.scheduled.get(channel.id, {})
         if not len(argv.replace(" ","")):
             return (
@@ -179,7 +177,9 @@ class roleGiver:
             role = float(args[1])
             s_perm = _vars.getPerms(user, guild)
             if s_perm < role + 1 or role is nan:
-                raise PermissionError("Insufficient permissions to assign permission giver.")
+                raise PermissionError(
+                    "Insufficient permissions to assign permission giver with value " + uniStr(role) + "."
+                    )
             r_type = "perm"
         except ValueError:
             role = args[1].lower()
@@ -188,14 +188,15 @@ class roleGiver:
         _vars.scheduled[channel.id] = currentSchedule
         _vars.update()
         return (
-            "Added role giver with reaction to **" + react
-            + "** and " + r_type + " **" + str(role)
-            + "** to channel **" + channel.name + "**."
+            "```\nAdded role giver with reaction to " + uniStr(react)
+            + " and " + r_type + " " + uniStr(role)
+            + " to channel " + uniStr(channel.name) + ".```"
             )
 
         
 class defaultPerms:
     is_command = True
+    server_only = True
 
     def __init__(self):
         self.name = ["defaultPerm"]
@@ -204,30 +205,30 @@ class defaultPerms:
         self.usage = "<level:[]>"
 
     async def __call__(self, _vars, argv, user, guild, **void):
-        if guild is None:
-            raise ReferenceError("This command is only available in servers.")
         currPerm = _vars.perms.get("defaults", {}).get(guild.id, 0)
         if not len(argv.replace(" ","")):
             return (
-                "Current default permission level for **" + guild.name
-                + "**: **" + str(currPerm) + "**."
+                "```\nCurrent default permission level for " + uniStr(guild.name)
+                + ": " + uniStr(currPerm) + ".```"
                 )
         s_perm = _vars.getPerms(user, guild)
         c_perm = _vars.evalMath(argv)
         if s_perm < c_perm + 1 or c_perm is nan:
-            raise PermissionError("Insufficient permissions to assign selected permission level.")
+            raise PermissionError(
+                "Insufficient permissions to assign default permission level " + uniStr(c_perm) + ".")
         if not "defaults" in _vars.perms:
             _vars.perms["defaults"] = {}
         _vars.perms["defaults"][guild.id] = c_perm
         _vars.update()
         return (
-            "Changed default permission level of **" + guild.name
-            + "** to **" + str(c_perm) + "**."
+            "```\nChanged default permission level of " + uniStr(guild.name)
+            + " to " + uniStr(c_perm) + ".```"
             )
 
 
 class rainbowRole:
     is_command = True
+    server_only = True
 
     def __init__(self):
         self.name = ["colourRole"]
@@ -236,8 +237,6 @@ class rainbowRole:
         self.usage = "<0:role> <mim_delay:[6]> <cancel:[](?c)>"
 
     async def __call__(self, _vars, flags, args, argv, guild, **void):
-        if guild is None:
-            raise ReferenceError("This command is only available in servers.")
         guild_special = _vars.special.get(guild.id, {})
         if not len(argv.replace(" ","")):
             return (
@@ -265,3 +264,28 @@ class rainbowRole:
             + "** to:\n```\n" + str(guild_special) + "```"
             )
         
+
+class follow:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = ["dogpile"]
+        self.min_level = 3
+        self.description = "Causes Miza to automatically imitate users when 3 of the same message is posted in a row."
+        self.usage = "<state:(?e)(?d)>"
+
+    async def __call__(self, _vars, flags, guild, **void):
+        if "d" in flags:
+            _vars.following.pop(guild.id)
+            _vars.update()
+            return "```\nDisabled follow imitating for " + uniStr(guild.name) + ".```"
+        elif "e" in flags:
+            _vars.following[guild.id] = False
+            _vars.update()
+            return "```\nEnabled follow imitating for " + uniStr(guild.name) + ".```"
+        else:
+            return (
+                "```\nCurrently " + uniStr("not " * _vars.following.get(guild.id, 1))
+                + "follow imitating in " + uniStr(guild.name) + ".```"
+                )

@@ -1,0 +1,2 @@
+python miza.py
+pause

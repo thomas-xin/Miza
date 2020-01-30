@@ -231,25 +231,22 @@ class translate:
             trans = trans[::-1]
         if "v" in flags:
             count = 2
+            end = "\nDetected language: **" + str(source) + "**"
         else:
             count = 1
+            end = ""
         response = "**" + user.name + "**:"
-        print(string, dest, source)
+        #print(string, dest, source)
         for i in range(count):
             for t in trans:
                 try:
-                    if "papago" in t:
-                        if "-" in dest:
-                            dest = dest[:-2] + dest[-2:].upper()
-                    else:
-                        dest = dest.lower()
+                    dest = dest[:-2] + dest[-2:].upper()
                     output = translators[t].translate(string, dest, source)
                     output = output.text
-                    print(output + "\n\n")
                     response += "\n" + output + "  `" + t + "`"
                     source, dest = dest, source
                     break
                 except:
                     if t == trans[-1]:
                         raise
-        return response
+        return response + end

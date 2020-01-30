@@ -51,10 +51,10 @@ class help:
                         continue
                     newstr = (
                         "```\n" + name
-                        + "`\nAliases: " + str(com.name)
+                        + "\nAliases: " + str(com.name)
                         + "\nEffect: " + description
                         + "\nUsage: " + usage
-                        + "\nRequired permission level: " + str(min_level)
+                        + "\nRequired permission level: " + uniStr(min_level)
                         + "```"
                     )
                     show.append(newstr)
@@ -82,7 +82,7 @@ class help:
                             + "\nAliases: " + str(com.name)
                             + "\nEffect: " + description
                             + "\nUsage: " + usage
-                            + "\nRequired permission level: " + str(min_level)
+                            + "\nRequired permission level: " + uniStr(min_level)
                             + "```"
                         )
                         if (not len(show)) or len(show[-1]) < len(newstr):
@@ -124,6 +124,7 @@ class clearCache:
 
 class perms:
     is_command = True
+    server_only = True
 
     def __init__(self):
         self.name = ["changePerms", "perm", "changePerm"]
@@ -132,8 +133,6 @@ class perms:
         self.usage = "<0:user:{self}> <1:level{curr}> <hide:(?h)>"
 
     async def __call__(self, client, _vars, args, user, guild, flags, **void):
-        if guild is None:
-            raise ReferenceError("This command is only available in servers.")
         if len(args) < 2:
             if len(args) < 1:
                 t_user = user
@@ -166,29 +165,30 @@ class perms:
                 if "h" in flags:
                     return
                 return (
-                    "Changed permissions for **"+ name
-                    + "** in **" + guild.name
-                    + "** from **__" + str(t_perm)
-                    + "__** to **__" + str(c_perm) + "__**."
+                    "```\nChanged permissions for "+ uniStr(name)
+                    + " in " + uniStr(guild.name)
+                    + " from " + uniStr(t_perm)
+                    + " to " + uniStr(c_perm) + ".```"
                 )
             else:
                 return (
-                    "Error: Insufficient priviliges to change permissions for **" + name
-                    + "** in **" + guild.name
-                    + "** from **__" + str(t_perm)
-                    + "__** to **__" + str(c_perm)
-                    + "__**.\nRequired level: **__" + str(m_perm)
-                    + "__**, Current level: **__" + str(s_perm) + "__**"
+                    "```\nError: Insufficient priviliges to change permissions for " + uniStr(name)
+                    + " in " + uniStr(guild.name)
+                    + " from " + uniStr(t_perm)
+                    + " to " + uniStr(c_perm)
+                    + ".\nRequired level: " + uniStr(m_perm)
+                    + ", Current level: " + uniStr(s_perm) + ".```"
                 )
         return (
-            "Current permissions for **" + t_user.name
-            + "** in **" + guild.name
-            + "**: **__" + str(t_perm) + "__**"
+            "```\nCurrent permissions for " + uniStr(t_user.name)
+            + " in " + uniStr(guild.name)
+            + ": " + uniStr(t_perm) + ".```"
             )
 
 
 class enableCommand:
     is_command = True
+    server_only = True
 
     def __init__(self):
         self.name = ["ec", "enable"]
@@ -221,7 +221,7 @@ class enableCommand:
             )
         else:
             if not catg in _vars.categories:
-                return "Error: Unknown command category **" + argv + "**."
+                raise EOFError("Error: Unknown command category " + uniStr(argv) + ".")
             else:
                 try:
                     enabled = _vars.enabled[channel.id]
@@ -230,30 +230,30 @@ class enableCommand:
                     _vars.enabled[channel.id] = enabled
                 if "e" in flags:
                     if catg in enabled:
-                        return (
-                            "Error: command category **" + catg
-                            + "** is already enabled in **" + channel.name + "**."
+                        raise IndexError(
+                            "Command category " + uniStr(catg)
+                            + " is already enabled in " + uniStr(channel.name) + "."
                         )
                     enabled.append(catg)
                     _vars.update()
                     if "h" in flags:
                         return
-                    return "Enabled command category **" + catg + "** in **" + channel.name + "**."
+                    return "```\nEnabled command category " + uniStr(catg) + " in " + uniStr(channel.name) + ".```"
                 if "d" in flags:
                     if catg not in enabled:
-                        return (
-                            "Error: command category **" + catg
-                            + "** is not currently enabled in **" + channel.name + "**."
+                        raise IndexError(
+                            "Command category " + uniStr(catg)
+                            + " is not currently enabled in " + uniStr(channel.name) + "."
                         )
                     enabled.remove(catg)
                     _vars.update()
                     if "h" in flags:
                         return
-                    return "Disabled command category **" + catg + "** in **" + channel.name + "**."
+                    return "```\nDisabled command category " + uniStr(catg) + " in " + uniStr(channel.name) + ".```"
                 return (
-                    "Command category **" + catg
-                    + "** is currently" + " not" * (catg not in enabled)
-                    + " enabled in **" + channel.name + "**."
+                    "```\nCommand category " + uniStr(catg)
+                    + " is currently" + uniStr(" not" * (catg not in enabled))
+                    + " enabled in " + uniStr(channel.name) + ".```"
                 )
 
 
@@ -288,13 +288,19 @@ class suspend:
         if len(args) < 2:
             if len(args) >= 1:
                 user = await client.fetch_user(_vars.verifyID(args[0]))
-            return "Current suspension status of **" + user.name + "**: **__" + str(_vars.bans[0].get(user.id, None)) + "__**."
+            return (
+                "```\nCurrent suspension status of " + uniStr(user.name) + ": "
+                + uniStr(_vars.bans[0].get(user.id, None)) + ".```"
+                )
         else:
             user = await client.fetch_user(_vars.verifyID(args[0]))
             change = _vars.evalMath(args[1])
             _vars.bans[0][user.id] = change
             _vars.update()
-            return "Changed suspension status of **" + user.name + "** to **__" + str(change) + "__**."
+            return (
+                "```\nChanged suspension status of " + uniStr(user.name) + " to "
+                + uniStr(change) + ".```"
+                )
 
 
 class loop:
@@ -314,4 +320,4 @@ class loop:
         for i in range(iters):
             asyncio.create_task(callback(message, func + " ?h" * (i != iters - 1)))
         if not "h" in flags:
-            return "```\nLooping <" + func + "> " + str(iters) + " times...```"
+            return "```\nLooping <" + func + "> " + uniStr(iters) + " times...```"

@@ -227,7 +227,7 @@ async def searchRandomNSFW(argv, delay=9):
     data = [i for i in data if i]
     i = xrand(len(data))
     if not len(data) or data[i] is None:
-        raise EOFError("Unable to locate any search results.")
+        raise EOFError("Unable to locate any search results for " + uniStr(argv) + ".")
     return data[i]
 
 
@@ -333,7 +333,9 @@ class neko:
                 if neko_tags.get(tag, 0) == True:
                     tagNSFW = True
                     if not isNSFW:
-                        raise PermissionError("This command is only available in NSFW channels.")
+                        raise PermissionError(
+                            "This command is only available in " + uniStr("NSFW") + " channels."
+                            )
                 selected.append(tag)
         for x in range(flags.get("r", 0)):
             possible = [i for i in neko_tags if neko_tags[i] <= isNSFW]
@@ -342,7 +344,8 @@ class neko:
             if not len(argv.replace(" ", "")):
                 url = nekos.img("neko")
             else:
-                raise EOFError("Search tag not found. Use ?l for list.")
+                raise EOFError(
+                    "Search tag " + uniStr(argv) + " not found. Use ?l for list.")
         else:
             v = xrand(len(selected))
             get = selected[v]
