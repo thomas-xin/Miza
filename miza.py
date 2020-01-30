@@ -217,6 +217,11 @@ class _globals:
         self.blocked = 0
         self.msgFollow = {}
         self.audiocache = []
+        for path in os.listdir("cache/"):
+            try:
+                os.remove(path)
+            except:
+                print("Failed to remove cached file " + path + ".")
 
     def loadSave(self):
         try:
@@ -539,6 +544,7 @@ async def processMessage(message, msg, edit=True):
                                     _f.write(bytes(response, "utf-8"))
                                     _f.close()
                                     _f = discord.File(fn)
+                                    print(fn)
                                     await channel.send("Response too long for message.", file=_f)
                     except Exception as ex:
                         rep = repr(ex)
@@ -870,9 +876,7 @@ async def handleMessage(message, edit=True):
     user = message.author
     u_id = user.id
     u_perm = _vars.perms.get(u_id, 0)
-    if not len(msg) > 1:
-        return
-    elif u_id == client.user.id:
+    if u_id == client.user.id:
         checked = [
             "```\nLooping ",
             "Error: ",
@@ -896,9 +900,10 @@ async def handleMessage(message, edit=True):
             "Now playing",
             ]
         found = False
-        for i in checked:
-            if i in msg:
-                found = True
+        if len(msg) >= 7:
+            for i in checked:
+                if i in msg:
+                    found = True
         if found:
             try:
                 await message.add_reaction("❎")
