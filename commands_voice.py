@@ -88,7 +88,7 @@ class queue:
                 e = q[i]
                 curr += "【" + uniStr(i) + "】 " + uniStr(e["name"])
                 if "v" in flags:
-                    curr += ", URL: " + e["url"] + ", Duration: " + uniStr(" ".join(timeConv(e["duration"]))) + ", Added by: " + uniStr(e["added_by"])
+                    curr += ", URL: " + e["url"] + ", Duration: " + uniStr(" ".join(timeConv(e["duration"]))) + ", Added by: " + uniStr(e["added by"])
                 estim = currTime + origTime - time.time()
                 currTime += e["duration"]
                 if estim > 0:

@@ -33,6 +33,7 @@ def tryFunc(func, *args, force=False, amax, **kwargs):
     return ans
 
 def plot(*args,**kwargs):
+    flip = False
     if type(args[0]) is str:
         s = args[0]
         if s[0] == "y":
