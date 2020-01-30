@@ -53,7 +53,7 @@ class help:
                         "```\n" + name
                         + "\nAliases: " + str(com.name)
                         + "\nEffect: " + description
-                        + "\nUsage: " + usage
+                        + "\nUsage: " + name + " " + usage
                         + "\nRequired permission level: " + uniStr(min_level)
                         + "```"
                     )
@@ -81,7 +81,7 @@ class help:
                             + "\nCategory: " + c
                             + "\nAliases: " + str(com.name)
                             + "\nEffect: " + description
-                            + "\nUsage: " + usage
+                            + "\nUsage: " + name + " " + usage
                             + "\nRequired permission level: " + uniStr(min_level)
                             + "```"
                         )
