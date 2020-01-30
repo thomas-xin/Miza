@@ -10,12 +10,12 @@ class DouClub:
         self.pull()
 
     def pull(self):
-        kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret,)
+        kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret)
         self.data = [kn.data, time.time()]
 
     def search(self, query, lim):
         if time.time() - self.data[1] > 720:
-            self.pull()
+            doParallel(self.pull)
         output = []
         query = query.lower()
         qlist = query.split(" ")
@@ -47,7 +47,7 @@ class SheetPull:
         text = requests.get(url).text
         data = text.split("\r\n")
         columns = 0
-        self.data = [[], time.time()]
+        sdata = [[], time.time()]
         for i in range(len(data)):
             line = data[i]
             read = list(csv.reader(line))
@@ -64,14 +64,15 @@ class SheetPull:
                 reli.append(curr)
             if len(reli):
                 columns = max(columns, len(reli))
-                self.data[0].append(reli)
-            for line in range(len(self.data[0])):
-                while len(self.data[0][line]) < columns:
-                    self.data[0][line].append(" ")
+                sdata[0].append(reli)
+            for line in range(len(sdata[0])):
+                while len(sdata[0][line]) < columns:
+                    sdata[0][line].append(" ")
+        self.data = sdata
 
     def search(self, query, lim):
         if time.time() - self.data[1] > 60:
-            self.pull()
+            doParallel(self.pull)
         output = []
         query = query.lower()
         try:
