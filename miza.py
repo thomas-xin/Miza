@@ -407,7 +407,7 @@ async def processMessage(message, msg, edit=True):
             print("Ignoring command from suspended user " + user.name + " (" + str(u_id) + ").")
             await channel.send("Sorry, you are currently not permitted to request my services.")
         return
-    if msg[0] == "~" and msg[1] != "~":
+    if len(msg) >= 2 and msg[0] == "~" and msg[1] != "~":
         comm = msg[1:]
         op = True
     elif msg[:len(check)] == check:
@@ -677,22 +677,25 @@ async def handleUpdate(force=False):
                     bl = list(bans[g])
                     for b in bl:
                         if type(bans[g][b]) is list and dtime >= bans[g][b][0]:
-                            u_target = await client.fetch_user(b)
-                            g_target = await client.fetch_guild(g)
-                            c_target = await client.fetch_channel(bans[g][b][1])
-                            bans[g].pop(b)
                             try:
-                                await g_target.unban(u_target)
-                                await c_target.send(
-                                    "```\n" + uniStr(u_target.name)
-                                    + " has been unbanned from " + uniStr(g_target.name) + "."
-                                    )
-                                changed = True
-                            except:
-                                await c_target.send(
-                                    "```\nUnable to unban " + uniStr(u_target.name)
-                                    + " from " + uniStr(g_target.name) + ".```"
-                                    )
+                                u_target = await client.fetch_user(b)
+                                g_target = await client.fetch_guild(g)
+                                c_target = await client.fetch_channel(bans[g][b][1])
+                                bans[g].pop(b)
+                                try:
+                                    await g_target.unban(u_target)
+                                    await c_target.send(
+                                        "```\n" + uniStr(u_target.name)
+                                        + " has been unbanned from " + uniStr(g_target.name) + ".```"
+                                        )
+                                    changed = True
+                                except:
+                                    await c_target.send(
+                                        "```\nUnable to unban " + uniStr(u_target.name)
+                                        + " from " + uniStr(g_target.name) + ".```"
+                                        )
+                            except KeyError:
+                                pass
             if changed:
                 _vars.update()
         ytdl = None
@@ -739,6 +742,7 @@ async def handleUpdate(force=False):
                                     q[0]["id"] = "@" + q[0]["id"]
                                     auds = discord.FFmpegPCMAudio(path)
                                     vc.play(auds)
+                                    q[0]["start_time"] = time.time()
                                     channel = await client.fetch_channel(_vars.queue[guild.id]["channel"])
                                     await channel.send(
                                         "```\n🎵 Now playing " + uniStr(q[0]["name"])

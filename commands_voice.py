@@ -1,4 +1,4 @@
-import youtube_dl, asyncio, discord
+import youtube_dl, asyncio, discord, time
 from smath import *
 
 
@@ -78,10 +78,24 @@ class queue:
         _vars.queue[guild.id]["channel"] = channel.id
         if not len(argv.replace(" ", "")):
             q = _vars.queue[guild.id]["queue"]
-            if "v" in flags:
-                show = "\n".join([str(i) + ": " + str(self.dictRemove(q[i], ("id", "skips"))) for i in range(len(q))])
-            else:
-                show = "\n".join([str(i) + ": " + str(q[i]["name"]) for i in range(len(q))])
+            if not len(q):
+                return "```\nQueue for " + uniStr(guild.name) + " is currently empty. ```"
+            origTime = q[0].get("start_time", time.time())
+            currTime = 0
+            show = ""
+            for i in range(len(q)):
+                curr = "\n"
+                e = q[i]
+                curr += "【" + uniStr(i) + "】 " + uniStr(e["name"])
+                if "v" in flags:
+                    curr += ", URL: " + e["url"] + ", Duration: " + uniStr(" ".join(timeConv(e["duration"]))) + ", Added by: " + uniStr(e["added_by"])
+                estim = currTime + origTime - time.time()
+                currTime += e["duration"]
+                if estim > 0:
+                    curr += ", Time until playing: " + uniStr(" ".join(timeConv(estim)))
+                else:
+                    curr += ", Remaining time: " + uniStr(" ".join(timeConv(estim + e["duration"])))
+                show += curr
             return (
                 "Currently playing in " + uniStr(guild.name) + ":\n"
                 + "```\n" + show + "```"
@@ -107,8 +121,21 @@ class queue:
                 url = e["webpage_url"]
                 duration = e["duration"]
                 v_id = e["id"]
-                added.append({"name": name, "url": url, "duration": duration, "added by": user.name, "id": v_id, "skips": []})
+                added.append({
+                    "name": name,
+                    "url": url,
+                    "duration": duration,
+                    "added by": user.name,
+                    "id": v_id,
+                    "skips": []
+                    })
                 names.append(name)
+            total_duration = 0
+            for e in _vars.queue[guild.id]["queue"]:
+                if "start_time" in e:
+                    total_duration += e["duration"] + e["start_time"] - time.time()
+                else:
+                    total_duration += e["duration"]
             _vars.queue[guild.id]["queue"] += added
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")
@@ -117,7 +144,8 @@ class queue:
             elif len(names) == 1:
                 names = names[0]
             return (
-                "```\n🎶 Added " + str(names) + " to the queue! 🎶```"
+                "```\n🎶 Added " + str(names) + " to the queue! Estimated time until playing: "
+                + uniStr(" ".join(timeConv(total_duration))) + ". 🎶```"
                 )
         return
 
