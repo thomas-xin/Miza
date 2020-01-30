@@ -13,7 +13,7 @@ class youtubeDownloader:
     ydl_opts_2 = {
         "quiet": 1,
         "format": "bestaudio/best",
-        "outtmpl": "/cache/temp.%(id)s.%(ext)s",
+        "outtmpl": "/cache/%(id)s.%(ext)s",
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
@@ -45,26 +45,13 @@ class queue:
     server_only = True
     ytdl = youtubeDownloader()
 
-    def dictRemove(self, d, key):
-        output = dict(d)
-        try:
-            key[0]
-        except TypeError:
-            key = [key]
-        for k in key:
-            try:
-                output.pop(k)
-            except KeyError:
-                pass
-        return output
-
     def __init__(self):
         self.name = ["q", "qlist", "play", "playing", "np"]
         self.min_level = 0
         self.description = "Shows the music queue, or plays a song in voice."
         self.usage = "<link:[]> <verbose:(?v)>"
 
-    async def __call__(self, client, user, _vars, argv, channel, guild, flags, **void):
+    async def __call__(self, user, _vars, argv, channel, guild, flags, **void):
         found = False
         if guild.id not in _vars.queue:
             for func in _vars.categories["voice"]:
@@ -75,7 +62,10 @@ class queue:
                         pass
                     except AttributeError:
                         pass
-        _vars.queue[guild.id]["channel"] = channel.id
+        try:
+            _vars.queue[guild.id]["channel"] = channel.id
+        except KeyError:
+            raise KeyError("Voice channel not found.")
         if not len(argv.replace(" ", "")):
             q = _vars.queue[guild.id]["queue"]
             if not len(q):
@@ -89,13 +79,17 @@ class queue:
                 curr += "【" + uniStr(i) + "】 " + uniStr(e["name"])
                 if "v" in flags:
                     curr += ", URL: " + e["url"] + ", Duration: " + uniStr(" ".join(timeConv(e["duration"]))) + ", Added by: " + uniStr(e["added by"])
-                estim = currTime + origTime - time.time()
+                estim = currTime + origTime - time.time() - frand(1)
                 currTime += e["duration"]
                 if estim > 0:
                     curr += ", Time until playing: " + uniStr(" ".join(timeConv(estim)))
                 else:
                     curr += ", Remaining time: " + uniStr(" ".join(timeConv(estim + e["duration"])))
-                show += curr
+                if len(show) + len(curr) < 1900:
+                    show += curr
+                else:
+                    show += uniStr("\nAnd more...", 1)
+                    break
             return (
                 "Currently playing in **" + guild.name + "**:\n"
                 + "```\n" + show + "```"
@@ -114,6 +108,7 @@ class queue:
                     entries = [res]
                 else:
                     entries = []
+            dur = 0
             added = []
             names = []
             for e in entries:
@@ -127,8 +122,10 @@ class queue:
                     "duration": duration,
                     "added by": user.name,
                     "id": v_id,
-                    "skips": []
+                    "skips": [],
                     })
+                if not dur:
+                    dur = duration
                 names.append(name)
             total_duration = 0
             for e in _vars.queue[guild.id]["queue"]:
@@ -136,11 +133,12 @@ class queue:
                     total_duration += e["duration"] + e["start_time"] - time.time()
                 else:
                     total_duration += e["duration"]
+            total_duration = max(total_duration + dur/8192, dur/1024 + frand(1) + 2)
             _vars.queue[guild.id]["queue"] += added
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")
             if "v" in flags:
-                names = [self.dictRemove(i, "id") for i in added]
+                names = [subDict(i, "id") for i in added]
             elif len(names) == 1:
                 names = names[0]
             if not "h" in flags:
@@ -149,6 +147,64 @@ class queue:
                     + uniStr(" ".join(timeConv(total_duration))) + ". 🎶```"
                     )
 
+
+class playlist:
+    is_command = True
+    server_only = True
+    ytdl = youtubeDownloader()
+
+    def __init__(self):
+        self.name = ["defaultplaylist"]
+        self.min_level = 2
+        self.description = "Shows, appends, or removes from the default playlist."
+        self.usage = "<link:[]> <remove:(?r)>"
+
+    async def __call__(self, user, argv, _vars, guild, flags, **void):
+        if not len(argv.replace(" ","")):
+            if "r" in flags:
+                _vars.playlists[guild.id] = []
+                _vars.update()
+                return "```\nRemoved all entries from the default playlist for " + uniStr(guild.name) + ".```"
+            return (
+                "```\nCurrent default playlist for " + uniStr(guild.name) + ": "
+                + str(_vars.playlists.get(guild.id, [])) + ".```"
+                )
+        output = [None]
+        doParallel(self.ytdl.search, [argv], output)
+        while output[0] is None:
+            await asyncio.sleep(0.2)
+        res = output[0]
+        #print(res)
+        try:
+            entries = res["entries"]
+        except KeyError:
+            if "uploader" in res:
+                entries = [res]
+            else:
+                entries = []
+        curr = _vars.playlists.get(guild.id, [])
+        names = []
+        for e in entries:
+            names.append(e["title"])
+            url = e["webpage_url"]
+            if "r" in flags:
+                for p in curr:
+                    if p["url"] == url:
+                        curr.remove(p)
+                        break
+            else:
+                curr.append({
+                    "name": e["title"],
+                    "url": url,
+                    "duration": e["duration"],
+                    "id": e["id"],
+                    })
+        if len(names):
+            _vars.playlists[guild.id] = curr
+            _vars.update()
+            if "r" in flags:
+                return "```\nRemoved " + str(names) + " from the default playlist for " + uniStr(guild.name) + ".```"
+            return "```\nAdded " + str(names) + " to the default playlist for " + uniStr(guild.name) + ".```"
 
 class join:
     is_command = True
@@ -216,8 +272,16 @@ class remove:
             pos = 0
         else:
             pos = _vars.evalMath(argv)
-        curr = _vars.queue[guild.id]["queue"][pos]
-        if user.id not in curr["skips"]:
+        try:
+            if not isValid(pos):
+                if "f" in flags:
+                    _vars.queue[guild.id]["queue"] = []
+                    return "```\nRemoved all items from the queue.```"
+                raise LookupError
+            curr = _vars.queue[guild.id]["queue"][pos]
+        except LookupError:
+            raise IndexError("Entry " + uniStr(pos) + " is out of range.")
+        if user.id not in curr["skips"] and type(curr["skips"]) is not tuple:
             if "f" in flags:
                 curr["skips"] = ()
             else:
@@ -230,10 +294,10 @@ class remove:
                         members += 1
         required = 1 + members >> 1
         if type(curr["skips"]) is tuple:
-            response = "```\n" + uniStr(curr["name"]) + " has been forcefully removed from the queue."
+            response = "```\n"
         else:
             response = (
-                "```\nSuccessfully voted to remove " + uniStr(curr["name"]) + " from the queue.\nCurrent vote count: "
+                "```\nVoted to remove " + uniStr(curr["name"]) + " from the queue.\nCurrent vote count: "
                 + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + "."
                 )
         skipped = False

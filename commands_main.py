@@ -31,6 +31,7 @@ class help:
         for catg in categories:
             if catg in enabled or catg == "main":
                 commands += categories[catg]
+        c_name = getattr(channel, "name", "DM")
         u_perm = _vars.getPerms(user, guild)
         verb = "v" in flags
         argv = " ".join(args).lower()
@@ -48,6 +49,8 @@ class help:
                     description = com.description
                     usage = com.usage
                     if min_level > u_perm or (u_perm is not nan and min_level is nan):
+                        continue
+                    if c_name == "DM" and getattr(com, "server_only", False):
                         continue
                     newstr = (
                         "```\n" + name
@@ -69,6 +72,8 @@ class help:
                     description = com.description
                     usage = com.usage
                     if min_level > u_perm or (u_perm is not nan and min_level is nan):
+                        continue
+                    if c_name == "DM" and getattr(com, "server_only", False):
                         continue
                     found = False
                     for n in com.name:
@@ -95,6 +100,8 @@ class help:
                 usage = com.usage
                 if min_level > u_perm or (u_perm is not nan and min_level is nan):
                     continue
+                if c_name == "DM" and getattr(com, "server_only", False):
+                        continue
                 if description != "":
                     if not verb:
                         show.append(name + " " + usage)
@@ -103,7 +110,7 @@ class help:
                             "\n" + com.__name__
                             + "\nEffect: " + com.description
                             + "\nUsage: ~" + name + " " + usage)
-            return "Commands for **" + user.name + "** in **" + channel.name + "**:\n```\n" + "\n".join(show) + "```"
+            return "Commands for **" + user.name + "** in **" + c_name + "**:\n```\n" + "\n".join(show) + "```"
         return "\n".join(show)
 
 

@@ -31,12 +31,11 @@ class DouClub:
                     output.append(temp)
         return output
 
-
 f = open("auth.json")
 auth = ast.literal_eval(f.read())
 f.close()
 douclub = DouClub(auth["knack_id"], auth["knack_secret"])
-
+    
 
 class SheetPull:
     def __init__(self, url):
@@ -123,7 +122,7 @@ def _m2f(mem, val):
         output = ""
         for i in range(0, 3):
             a = 10 ** i
-            b = flag // a
+            b = int(flag / a)
             char = b % 10
             char += 48
             output += chr(char)
@@ -137,7 +136,7 @@ def _m2f(mem, val):
         try:
             output += chr(char)
             output = "<FL" + operation + output[::-1]
-        except TypeError:
+        except ValueError:
             output = "<FL" + operation + "(0x" + hex((char + 256) & 255).upper()[2:] + ")" + output[::-1]
         result += output
         val2 >>= 1
@@ -156,8 +155,8 @@ class cs_mem2flag:
 
     async def __call__(self, _vars, args, **void):
         if len(args) < 2:
-            return _m2f(args[0], 1)
-        return _m2f(args[0], _vars.evalMath(" ".join(args[1:])))
+            return "```\n" + _m2f(args[0], 1) + "```"
+        return "```\n" + _m2f(args[0], _vars.evalMath(" ".join(args[1:]))) + "```"
 
 
 class cs_npc:

@@ -35,7 +35,10 @@ class img:
         url = sources[v]
         if "v" in flags:
             return url
-        emb = discord.Embed(url=url)
+        emb = discord.Embed(
+            url=url,
+            colour=colour2Raw(colourCalculation(xrand(1536))),
+            )
         emb.set_image(url=url)
         print(url)
         await channel.send(embed=emb)

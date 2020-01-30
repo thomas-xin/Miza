@@ -218,11 +218,22 @@ class _globals:
         self.blocked = 0
         self.msgFollow = {}
         self.audiocache = []
+        should_cache = []
+        for g in self.playlists:
+            for i in self.playlists[g]:
+                s = i["id"] + ".mp3"
+                should_cache.append(s)
         for path in os.listdir("cache/"):
-            try:
-                os.remove(path)
-            except:
-                print("Failed to remove cached file " + path + ".")
+            found = False
+            for i in should_cache:
+                if i in path:
+                    found = True
+                    break
+            if not found:
+                try:
+                    os.remove("cache/" + path)
+                except Exception as ex:
+                    print(ex)
 
     def loadSave(self):
         try:
@@ -235,6 +246,7 @@ class _globals:
             self.scheduled = {}
             self.special = {}
             self.following = {}
+            self.playlists = {}
             self.update()
             f = open(self.savedata)
             
@@ -246,6 +258,7 @@ class _globals:
         self.scheduled = savedata.get("scheduled", {})
         self.special = savedata.get("special", {})
         self.following = savedata.get("following", {})
+        self.playlists = savedata.get("playlists", {})
 
     def getModule(self, module, category):
         exec("import " + module + " as _vars_", globals())
@@ -281,6 +294,7 @@ class _globals:
             "scheduled": self.scheduled,
             "special": self.special,
             "following": self.following,
+            "playlists": self.playlists,
             }
         f.write(repr(savedata))
         f.close()
@@ -305,7 +319,7 @@ class _globals:
             u_perm = nan
         else:
             u_perm = 1
-        if u_perm is not nan and u_id == guild.owner_id:
+        if u_perm is not nan and u_id == getattr(guild, "owner_id", 0):
             u_perm = inf
         return u_perm
 
@@ -515,7 +529,7 @@ async def processMessage(message, msg, edit=True):
                         #async with channel.typing():
                         for a in range(len(args)):
                             args[a] = args[a].replace("", "'").replace("\0", '"')
-                        if guild is None and getattr(command, server_only, False):
+                        if guild is None and getattr(command, "server_only", False):
                             raise ReferenceError("This command is only available in servers.")
                         response = await command(
                             client=client,          # for interfacing with discord
@@ -530,7 +544,7 @@ async def processMessage(message, msg, edit=True):
                             name=alias,             # alias the command was called as
                             callback=processMessage,# function that called the command
                             )
-                        if response is not None:
+                        if response is not None and len(response):
                             if len(response) < 65536:
                                 print(response)
                             else:
@@ -539,9 +553,9 @@ async def processMessage(message, msg, edit=True):
                                 for r in response:
                                     await channel.send(r)
                             else:
-                                try:
+                                if len(response) <= 2000:
                                     await channel.send(response)
-                                except discord.HTTPException:
+                                else:
                                     fn = "cache/temp.txt"
                                     _f = open(fn, "wb")
                                     _f.write(bytes(response, "utf-8"))
@@ -551,7 +565,7 @@ async def processMessage(message, msg, edit=True):
                                     await channel.send("Response too long for message.", file=_f)
                     except Exception as ex:
                         rep = repr(ex)
-                        if len(rep) > 1900:
+                        if len(rep) > 1950:
                             errmsg = "```\nError: Error message too long.\n```"
                         else:
                             errmsg = "```\nError: " + rep + "\n```"
@@ -707,6 +721,9 @@ async def handleUpdate(force=False):
                 ytdl = func.ytdl
         if ytdl is not None:
             should_cache = []
+            for g in _vars.playlists:
+                for i in _vars.playlists[g]:
+                    should_cache.append(i["id"])
             for vc in client.voice_clients:
                 channel = vc.channel
                 guild = channel.guild
@@ -735,11 +752,17 @@ async def handleUpdate(force=False):
                                     if q[i]["id"][-1] != "@":
                                         q[i]["id"] = e_id + "@"
                                         if e_id not in _vars.audiocache:
-                                            _vars.audiocache.append(e_id)
-                                            doParallel(ytdl.download, [q[i]["url"]])
+                                            search = e_id + ".mp3"
+                                            found = False
+                                            for path in os.listdir("cache"):
+                                                if search in path:
+                                                    found = True
+                                            if not found:
+                                                _vars.audiocache.append(e_id)
+                                                doParallel(ytdl.download, [q[i]["url"]])
                             if q[0]["id"][0] != "@" and not vc.is_playing():
                                 try:
-                                    path = "cache/temp." + q[0]["id"].replace("@", "") + ".mp3"
+                                    path = "cache/" + q[0]["id"].replace("@", "") + ".mp3"
                                     f = open(path, "rb")
                                     minl = 32
                                     b = f.read(minl)
@@ -759,11 +782,23 @@ async def handleUpdate(force=False):
                                     pass
                             elif not vc.is_playing():
                                 q.pop(0)
+                                if not len(q):
+                                    t = _vars.playlists.get(guild.id, ())
+                                    if len(t):
+                                        p = t[xrand(len(t))]
+                                        q.append({
+                                            "name": p["name"],
+                                            "url": p["url"],
+                                            "duration": p["duration"],
+                                            "added by": client.user.name,
+                                            "id": p["id"],
+                                            "skips": (),
+                                            })
                     except KeyError as ex:
                         print("Error: " + repr(ex))
             for i in _vars.audiocache:
                 if not i in should_cache:
-                    path = "cache/temp." + i + ".mp3"
+                    path = "cache/" + i + ".mp3"
                     try:
                         os.remove(path)
                         _vars.audiocache.remove(i)
@@ -898,6 +933,7 @@ async def handleMessage(message, edit=True):
             "Hi, did you require my services for anything? Use ~? or ~help for help.",
             "Sorry, you are currently not permitted to request my services.",
             "Currently enabled command categories in ",
+            "Required permission level: ",
             "Current permissions for ",
             "Current suspension status of ",
             " is currently not banned from ",
@@ -908,7 +944,7 @@ async def handleMessage(message, edit=True):
             "Successfully disconnected from ",
             "Currently playing in ",
             " to the queue!",
-            "Successfully voted to remove ",
+            "Voted to remove ",
             "has been forcefully removed from the queue.",
             "Now playing",
             ]

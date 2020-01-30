@@ -396,6 +396,20 @@ def addDict(a, b, replace=True):
     return r
 
 
+def subDict(d, key):
+    output = dict(d)
+    try:
+        key[0]
+    except TypeError:
+        key = [key]
+    for k in key:
+        try:
+            output.pop(k)
+        except KeyError:
+            pass
+    return output
+
+
 def roundMin(x):
     if type(x) is not complex:
         if isValid(x) and x == int(x):
@@ -1195,7 +1209,7 @@ def timeConv(s):
         if type(t) is int:
             a = round(s, 3)
         elif s >= t:
-            a = s // t
+            a = int(s / t)
             s = s % t
         if a is not None:
             if a != 1:
