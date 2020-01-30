@@ -494,6 +494,7 @@ async def processMessage(message, msg, edit=True):
                         if argv:
                             while argv[0] == " ":
                                 argv = argv[1:]
+                        argv = reconstitute(argv)
                         a = argv.replace('"', "\0")
                         b = a.replace("'", "")
                         c = b.replace("<", "'")
