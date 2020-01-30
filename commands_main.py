@@ -53,7 +53,7 @@ class help:
                         "```\n" + name
                         + "\nAliases: " + str(com.name)
                         + "\nEffect: " + description
-                        + "\nUsage: " + name + " " + usage
+                        + "\nUsage: ~" + name + " " + usage
                         + "\nRequired permission level: " + uniStr(min_level)
                         + "```"
                     )
@@ -81,7 +81,7 @@ class help:
                             + "\nCategory: " + c
                             + "\nAliases: " + str(com.name)
                             + "\nEffect: " + description
-                            + "\nUsage: " + name + " " + usage
+                            + "\nUsage: ~" + name + " " + usage
                             + "\nRequired permission level: " + uniStr(min_level)
                             + "```"
                         )
@@ -102,7 +102,7 @@ class help:
                         show.append(
                             "\n" + com.__name__
                             + "\nEffect: " + com.description
-                            + "\nUsage: " + name + " " + usage)
+                            + "\nUsage: ~" + name + " " + usage)
             return "Commands for **" + user.name + "** in **" + channel.name + "**:\n```\n" + "\n".join(show) + "```"
         return "\n".join(show)
 
