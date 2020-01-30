@@ -1188,15 +1188,16 @@ def timeConv(s):
         return [str(s) + " millenia"]
     taken = []
     for i in __units:
+        a = None
         t = m = __units[i]
         if type(t) is list:
             t = t[0]
-        if s >= t:
-            if type(t) is int:
-                a = round(s, 3)
-            else:
-                a = s // t
-                s = s % t
+        if type(t) is int:
+            a = round(s, 3)
+        elif s >= t:
+            a = s // t
+            s = s % t
+        if a is not None:
             if a != 1:
                 if type(m) is list:
                     i = m[1]
