@@ -654,6 +654,7 @@ async def updateLoop():
             await asyncio.sleep(0.001)
             if _vars.doUpdate:
                 await handleUpdate(True)
+                _vars.doUpdate = False
         counter = counter + 1 & 65535
 
 

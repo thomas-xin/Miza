@@ -235,7 +235,7 @@ async def searchRandomNSFW(argv, delay=9):
     for i in range(len(funcs)):
         doParallel(funcs[i], [argv, data, i, delay - 3])
     while None in data and time.time() - t < delay:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
     data = [i for i in data if i]
     i = xrand(len(data))
     if not len(data) or data[i] is None:

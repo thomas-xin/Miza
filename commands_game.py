@@ -149,7 +149,7 @@ class text2048:
                 t = time.time()
                 doParallel(self.randomSpam, [gamestate, mode, pool, returns])
                 while returns[0] is None and time.time() - t < 5:
-                    await asyncio.sleep(.2)
+                    await asyncio.sleep(0.01)
                 if returns[0] is None:
                     return
                 self.gamestate, a = returns[0]

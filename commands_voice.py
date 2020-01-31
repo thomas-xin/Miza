@@ -9,12 +9,12 @@ class youtubeDownloader:
         "default_search": "auto",
         "skip_download": 1,
         "writeinfojson": 1,
-    }
+        }
     ydl_opts_2 = {
         "quiet": 1,
         "format": "bestaudio/best",
         "outtmpl": "/cache/%(id)s.mp3",
-    }
+        }
 
     def __init__(self):
         self.searcher = youtube_dl.YoutubeDL(self.ydl_opts_1)
@@ -99,7 +99,7 @@ class queue:
             output = [None]
             doParallel(self.ytdl.search, [argv], output)
             while output[0] is None:
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.01)
             res = output[0]
             #print(res)
             try:
@@ -173,7 +173,7 @@ class playlist:
         output = [None]
         doParallel(self.ytdl.search, [argv], output)
         while output[0] is None:
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.01)
         res = output[0]
         #print(res)
         try:
@@ -207,6 +207,7 @@ class playlist:
             if "r" in flags:
                 return "```\nRemoved " + str(names) + " from the default playlist for " + uniStr(guild.name) + ".```"
             return "```\nAdded " + str(names) + " to the default playlist for " + uniStr(guild.name) + ".```"
+        
 
 class join:
     is_command = True
@@ -221,16 +222,21 @@ class join:
     async def __call__(self, client, user, _vars, channel, guild, **void):
         voice = user.voice
         vc = voice.channel
-        await vc.connect(timeout=_vars.timeout, reconnect=True)
+        try:
+            joined = True
+            await vc.connect(timeout=_vars.timeout, reconnect=True)
+        except discord.ClientException:
+            joined = False
         for user in guild.members:
             if user.id == client.user.id:
                 asyncio.create_task(user.edit(mute=False,deafen=False))
         if guild.id not in _vars.queue:
             _vars.queue[guild.id] = {"channel": channel.id, "queue": []}
-        return (
-            "```\n🎵 Successfully connected to " + uniStr(vc.name)
-            + " in " + uniStr(guild.name) + ". 🎵```"
-        )
+        if joined:
+            return (
+                "```\n🎵 Successfully connected to " + uniStr(vc.name)
+                + " in " + uniStr(guild.name) + ". 🎵```"
+                )
 
 
 class leave:
@@ -320,3 +326,20 @@ class remove:
                 continue
             i += 1
         return response + "```"
+
+
+class unmute:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = ["unmuteall"]
+        self.min_level = 3
+        self.description = "Disables server mute for all members."
+        self.usage = "<link:[]> <verbose:(?v)>"
+
+    async def __call__(self, guild, **void):
+        for vc in guild.voice_channels:
+            for user in vc.members:
+                asyncio.create_task(user.edit(mute=False,deafen=False))
+        return "```\nSuccessfully unmuted all users in voice channels in " + uniStr(guild.name) + ".```"
