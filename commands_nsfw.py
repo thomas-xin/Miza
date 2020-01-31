@@ -2,12 +2,12 @@ import nekos, rule34, discord, urllib, asyncio
 from smath import *
 
 image_forms = [
-    "gif",
-    "png",
-    "bmp",
-    "jpg",
-    "jpeg",
-    "tiff",
+    ".gif",
+    ".png",
+    ".bmp",
+    ".jpg",
+    ".jpeg",
+    ".tiff",
 ]
 
 
@@ -112,8 +112,20 @@ def pull_rule34_xxx(argv, data, thr, delay=5):
             except TimeoutError:
                 pass
         if sources:
-            v2 = xrand(len(sources))
-            url = sources[v2].file_url
+            attempts = 0
+            while attempts < 1000:
+                v2 = xrand(len(sources))
+                url = sources[v2].file_url
+                found = False
+                for i in image_forms:
+                    if i in url:
+                        found = True
+                        break
+                if found:
+                    break
+                attempts += 1
+            if attempts >= 1000:
+                raise
             v1 = 1
             data[thr] = [url, v1, v2 + 1]
         else:

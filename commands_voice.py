@@ -84,7 +84,7 @@ class queue:
                         + ", Added by: " + uniStr(e["added by"])
                         )
                 else:
-                    curr += limStr(uniStr(e["name"]), 32)
+                    curr += limStr(uniStr(e["name"]), 48)
                 estim = currTime + origTime - time.time() - e["duration"] / 4096
                 currTime += e["duration"] * 4097 / 4096
                 if estim > 0:
@@ -316,7 +316,7 @@ class remove:
             song = _vars.queue[guild.id]["queue"][i]
             if len(song["skips"]) >= required or type(song["skips"]) is tuple:
                 _vars.queue[guild.id]["queue"].pop(i)
-                response += "\n" + uniStr(curr["name"]) + " has been removed from the queue."
+                response += "\n" + uniStr(song["name"]) + " has been removed from the queue."
                 if i == 0:
                     print("Stopped audio playback in " + guild.name)
                     for vc in client.voice_clients:

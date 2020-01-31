@@ -1,4 +1,4 @@
-import requests, csv, time, knackpy, ast
+import requests, csv, time, knackpy, ast, discord
 from prettytable import PrettyTable as ptable
 from smath import *
 
@@ -13,7 +13,7 @@ class DouClub:
         kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret)
         self.data = [kn.data, time.time()]
 
-    def search(self, query, lim):
+    def search(self, query):
         if time.time() - self.data[1] > 720:
             doParallel(self.pull)
         output = []
@@ -27,8 +27,7 @@ class DouClub:
                     if q in i.lower():
                         found = True
                 if found:
-                    temp = [limLine(str(l[e]), lim) for e in l]
-                    output.append(temp)
+                    output.append(l)
         return output
 
 f = open("auth.json")
@@ -160,6 +159,78 @@ class cs_mem2flag:
         return "```\n" + _m2f(args[0], _vars.evalMath(" ".join(args[1:]))) + "```"
 
 
+class cs_hex2xml:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["cs_h2x"]
+        self.min_level = 0
+        self.description = "Converts a given Cave Story hex patch to an xml file readable by Booster's Lab."
+        self.usage = "<hex_data>"
+
+    async def __call__(self, argv, channel, **void):
+        hacks = {}
+        hack = argv.replace(" ", "").replace("`", "")
+        while len(hack):
+            try:
+                i = hack.index("0x")
+            except ValueError:
+                break
+            hack = hack[i:]
+            i = hack.index("\n")
+            offs = hack[:i]
+            hack = hack[i+1:]
+            try:
+                i = hack.index("0x")
+                curr = hack[:i]
+                hack = hack[i:]
+            except ValueError:
+                curr = hack
+                hack = ""
+            curr = curr.replace(" ", "").replace("\n", "").replace("\r", "")
+            n = 2
+            curr = " ".join([curr[i:i + n] for i in range(0, len(curr), n)])
+            if offs in hacks:
+                hacks[offs] = curr + hacks[offs][len(curr):]
+            else:
+                hacks[offs] = curr
+        output = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n<hack name="HEX PATCH">\n'
+            + '\t<panel>\n'
+            + '\t\t<panel title="Description">\n'
+            + '\t\t</panel>\n'
+            + '\t\t<field type="info">\n'
+            + '\t\t\tHex patch converted by Miza.\n'
+            + '\t\t</field>\n'
+            + '\t\t<panel title="Data">\n'
+            + '\t\t</panel>\n'
+            + '\t\t<panel>\n'
+            )
+        col = 0
+        for hack in sorted(hacks):
+            n = 63
+            p = hacks[hack]
+            p = '\n\t\t\t\t'.join([p[i:i + n] for i in range(0, len(p), n)])
+            output += (
+                '\t\t\t<field type="data" offset="' + hack + '" col="' + str(col) + '">\n'
+                + '\t\t\t\t' + p + '\n'
+                + '\t\t\t</field>\n'
+                )
+            col = 1 + col & 3
+        output += (
+            '\t\t</panel>\n'
+            + '\t</panel>\n'
+            + '</hack>'
+            )
+        fn = "cache/temp.xml"
+        f = open(fn, "w")
+        f.write(output)
+        f.close()
+        f = discord.File(fn)
+        print(fn)
+        await channel.send("Hack successfully converted!", file=f)
+
+
 class cs_npc:
     is_command = True
 
@@ -182,7 +253,7 @@ class cs_npc:
             for line in data:
                 table.add_row(line)
             output = str(table)
-            if len(output) < 10000 and len(output) > 1900:
+            if len(output) < 20000 and len(output) > 1900:
                 response = ["Search results for **" + argv + "**:"]
                 lines = output.split("\n")
                 curr = "```\n"
@@ -197,7 +268,7 @@ class cs_npc:
             else:
                 return "Search results for **" + argv + "**:\n```\n" + output + "```"
         else:
-            return "```\nNo results found for " + uniStr(argv) + ".```"
+            raise EOFError("No results found for " + uniStr(argv) + ".")
 
 
 class cs_tsc:
@@ -222,7 +293,7 @@ class cs_tsc:
             for line in data:
                 table.add_row(line)
             output = str(table)
-            if len(output) < 10000 and len(output) > 1900:
+            if len(output) < 20000 and len(output) > 1900:
                 response = ["Search results for **" + argv + "**:"]
                 lines = output.split("\n")
                 curr = "```\n"
@@ -237,7 +308,7 @@ class cs_tsc:
             else:
                 return "Search results for **" + argv + "**:\n```\n" + output + "```"
         else:
-            return "```\nNo results found for " + uniStr(argv) + ".```"
+            raise EOFError("No results found for " + uniStr(argv) + ".")
 
 
 class cs_mod:
@@ -249,32 +320,31 @@ class cs_mod:
         self.description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
         self.usage = "<query>"
 
-    async def __call__(self, args, flags, **void):
-        lim = ("c" not in flags) * 40 + 20
+    async def __call__(self, args, **void):
         argv = " ".join(args)
-        data = douclub.search(argv, lim)
+        data = douclub.search(argv)
+        print(data)
         if len(data):
-            head = list(douclub.data[0][0])
-            for i in range(len(head)):
-                if head[i] == "":
-                    head[i] = i * " "
-            table = ptable(head)
-            for line in data:
-                table.add_row(line)
-            output = str(table)
-            if len(output) < 50000 and len(output) > 1900:
-                response = ["Search results for **" + argv + "**:"]
-                lines = output.split("\n")
-                curr = "```\n"
-                for line in lines:
+            response = "Search results for **" + argv + "**:\n"
+            for l in data:
+                line = (
+                    "\n" + str(l["Initial File Upload"]) + "\n"
+                    + "```\nName: " + uniStr(l["Title"])
+                    + "\nAuthor: " + uniStr(l["Author"])
+                    + "\n" + limStr(l["Description"].replace("\n", " "), 128)
+                    + "```\r"
+                    )
+                response += line
+            if len(response) < 20000 and len(response) > 1900:
+                output = response.split("\r")
+                response = []
+                curr = ""
+                for line in output:
                     if len(curr) + len(line) > 1900:
-                        response.append(curr + "```")
-                        curr = "```\n"
-                    if len(line):
-                        curr += line + "\n"
-                response.append(curr + "```")
-                return response
-            else:
-                return "Search results for **" + argv + "**:\n```\n" + output + "```"
+                        response.append(curr)
+                        curr = line
+                    else:
+                        curr += line
+            return response
         else:
-            return "```\nNo results found for " + uniStr(argv) + ".```"
+            raise EOFError("No results found for " + uniStr(argv) + ".")

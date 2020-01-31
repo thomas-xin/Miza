@@ -125,6 +125,7 @@ class _globals:
         "changeColour",
         "checkDelete",
         "reactCallback",
+        "sendUpdateRequest",
         "on_ready",
         "on_reaction_add",
         "on_reaction_remove",
@@ -216,6 +217,7 @@ class _globals:
         doParallel(self.getModules)
         self.current_channel = None
         self.blocked = 0
+        self.doUpdate = False
         self.msgFollow = {}
         self.audiocache = []
         should_cache = []
@@ -557,12 +559,12 @@ async def processMessage(message, msg, edit=True):
                                     await channel.send(response)
                                 else:
                                     fn = "cache/temp.txt"
-                                    _f = open(fn, "wb")
-                                    _f.write(bytes(response, "utf-8"))
-                                    _f.close()
-                                    _f = discord.File(fn)
+                                    f = open(fn, "wb")
+                                    f.write(bytes(response, "utf-8"))
+                                    f.close()
+                                    f = discord.File(fn)
                                     print(fn)
-                                    await channel.send("Response too long for message.", file=_f)
+                                    await channel.send("Response too long for message.", file=f)
                     except Exception as ex:
                         rep = repr(ex)
                         if len(rep) > 1950:
@@ -575,7 +577,7 @@ async def processMessage(message, msg, edit=True):
         checker = message.content
         curr = _vars.msgFollow.get(g_id)
         if curr is None:
-            curr = [checker, 1, 0]
+            curr = [checker, xrand(-1, 2), 0]
             _vars.msgFollow[g_id] = curr
         elif checker == curr[0] and u_id != curr[2]:
             curr[1] += 1
@@ -642,9 +644,11 @@ async def updateLoop():
         for g in _vars.special:
             asyncio.create_task(changeColour(g, _vars.special[g], counter))
         await handleUpdate()
-        await asyncio.sleep(frand(1))
-        await handleUpdate()
-        await asyncio.sleep(1)
+        t = time.time()
+        while time.time() - t < frand(1) + 1:
+            await asyncio.sleep(0.06)
+            if _vars.doUpdate:
+                await handleUpdate(True)
         counter = counter + 1 & 65535
 
 
@@ -681,6 +685,10 @@ async def on_ready():
 ##    print("Users: ")
 ##    for guild in client.guilds:
 ##        print(guild.members)
+
+
+def sendUpdateRequest(error=False):
+    _vars.doUpdate = True
 
 
 async def handleUpdate(force=False):
@@ -773,7 +781,7 @@ async def handleUpdate(force=False):
                                         raise FileNotFoundError
                                     q[0]["id"] = "@" + q[0]["id"]
                                     auds = discord.FFmpegPCMAudio(path)
-                                    vc.play(auds)
+                                    vc.play(auds, after=sendUpdateRequest)
                                     q[0]["start_time"] = time.time()
                                     channel = await client.fetch_channel(_vars.queue[guild.id]["channel"])
                                     await channel.send(
