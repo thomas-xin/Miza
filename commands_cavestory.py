@@ -1,9 +1,10 @@
-import requests, csv, time, knackpy, ast, discord
+import requests, csv, time, knackpy, ast, discord, urllib, asyncio
 from prettytable import PrettyTable as ptable
 from smath import *
 
 
 class DouClub:
+    
     def __init__(self, c_id, c_sec):
         self.id = c_id
         self.secret = c_sec
@@ -27,16 +28,66 @@ class DouClub:
                     if q in i.lower():
                         found = True
                 if found:
-                    output.append(l)
+                    output.append({
+                        "author": l["Author"],
+                        "name": l["Title"],
+                        "description": l["Description"],
+                        "url": (
+                            "https://doukutsuclub.knack.com/database#search-database/mod-details/"
+                            + l["id"] + "/"
+                            ),
+                        })
         return output
 
 f = open("auth.json")
 auth = ast.literal_eval(f.read())
 f.close()
 douclub = DouClub(auth["knack_id"], auth["knack_secret"])
+
+
+def searchForums(query):
+    
+    class urlBypass(urllib.request.FancyURLopener):
+        version = "Mozilla/5." + str(xrand(1, 10))
+        
+    url = (
+        "https://www.cavestory.org/forums/search/1/?q=" + query.replace(" ", "+")
+        + "&t=post&c[child_nodes]=1&c[nodes][0]=33&o=date&g=1"
+        )
+    opener = urlBypass()
+    resp = opener.open(url)
+    if resp.getcode() != 200:
+        raise ConnectionError("Error " + str(resp.getcode()))
+    s = resp.read().decode("utf-8")
+
+    output = []
+    i = 0
+    while i < len(s):
+        try:
+            search = '<li class="block-row block-row--separated  js-inlineModContainer" data-author="'
+            s = s[s.index(search) + len(search):]
+        except ValueError:
+            break
+        j = s.index('">')
+        curr = {"author": s[:j]}
+        s = s[s.index('<h3 class="contentRow-title">'):]
+        search = '<a href="/forums/'
+        s = s[s.index(search) + len(search):]
+        j = s.index('">')
+        curr["url"] = 'https://www.cavestory.org/forums/' + s[:j]
+        s = s[j + 2:]
+        j = s.index('</a>')
+        curr["name"] = s[:j]
+        search = '<div class="contentRow-snippet">'
+        s = s[s.index(search) + len(search):]
+        j = s.index('</div>')
+        curr["description"] = s[:j]
+        output.append(curr)
+    return output
     
 
 class SheetPull:
+    
     def __init__(self, url):
         self.url = url
         self.pull()
@@ -322,16 +373,21 @@ class cs_mod:
 
     async def __call__(self, args, **void):
         argv = " ".join(args)
+        resp = [None]
+        doParallel(searchForums, [argv], resp)
         data = douclub.search(argv)
+        while resp[0] is None:
+            await asyncio.sleep(0.01)
+        data += resp[0]
         print(data)
         if len(data):
             response = "Search results for **" + argv + "**:\n"
             for l in data:
                 line = (
-                    "\n" + str(l["Initial File Upload"]) + "\n"
-                    + "```\nName: " + uniStr(l["Title"])
-                    + "\nAuthor: " + uniStr(l["Author"])
-                    + "\n" + limStr(l["Description"].replace("\n", " "), 128)
+                    "\n<" + str(l["url"]) + ">\n"
+                    + "```\nName: " + uniStr(l["name"])
+                    + "\nAuthor: " + uniStr(l["author"])
+                    + "\n" + limStr(l["description"].replace("\n", " "), 128)
                     + "```\r"
                     )
                 response += line
