@@ -396,7 +396,7 @@ class customAudio(discord.AudioSource):
     def read(self):
         try:
             volume = _vars.volumes.get(self.guild_id, 1)
-            static = min(65536, max(1024, abs(volume) * 64) - 1024)
+            static = min(65535, max(1024, abs(volume) * 64) - 1024)
             valid = isValid(volume)
             temp = self.source.read()
             rest = []
@@ -406,12 +406,12 @@ class customAudio(discord.AudioSource):
                     i -= 65536
                 if valid:
                     i = round(i * volume)
-                    if i >= 32768:
+                    if i > 32767:
                         i = 32767
                         if static:
                             i -= xrand(static)
-                    elif i <= -32768:
-                        i = -32768
+                    elif i < -32767:
+                        i = -32767
                         if static:
                             i += xrand(static)
                     if i < 0:
@@ -432,7 +432,7 @@ class customAudio(discord.AudioSource):
         return self.source.cleanup()
 
 
-async def processMessage(message, msg, edit=True, orig=None):
+async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_flags=None, loop=False):
     global client
     perms = _vars.perms
     bans = _vars.bans
@@ -484,7 +484,7 @@ async def processMessage(message, msg, edit=True, orig=None):
         op = True
     else:
         op = False
-    if u_id != client.user.id:
+    if not op and u_id != client.user.id:
         currentSchedule = _vars.scheduled.get(channel.id, {})
         checker = message.content.lower()
         for k in currentSchedule:
@@ -534,37 +534,43 @@ async def processMessage(message, msg, edit=True, orig=None):
                         )
                         return
                     try:
-                        if argv:
-                            while argv[0] == " ":
-                                argv = argv[1:]
-                        flags = {}
-                        if "?" in argv:
-                            for c in range(26):
-                                char = chr(c + 97)
-                                flag = "?" + char
-                                for r in (flag.lower(), flag.upper()):
-                                    if len(argv) >= 4 and r in argv:
-                                        i = argv.index(r)
-                                        if i == 0 or argv[i - 1] == " " or argv[i - 2] == "?":
-                                            try:
-                                                if argv[i + 2] == " " or argv[i + 2] == "?":
-                                                    argv = argv[:i] + argv[i + 2 :]
+                        if cb_argv is not None:
+                            argv = cb_argv
+                            flags = cb_flags
+                            if loop:
+                                addDict(flags, {"h": 1})
+                        else:
+                            flags = {}
+                            if argv:
+                                while argv[0] == " ":
+                                    argv = argv[1:]
+                            if "?" in argv:
+                                for c in range(26):
+                                    char = chr(c + 97)
+                                    flag = "?" + char
+                                    for r in (flag.lower(), flag.upper()):
+                                        if len(argv) >= 4 and r in argv:
+                                            i = argv.index(r)
+                                            if i == 0 or argv[i - 1] == " " or argv[i - 2] == "?":
+                                                try:
+                                                    if argv[i + 2] == " " or argv[i + 2] == "?":
+                                                        argv = argv[:i] + argv[i + 2:]
+                                                        addDict(flags, {char: 1})
+                                                except:
+                                                    pass
+                            if "?" in argv:
+                                for c in range(26):
+                                    char = chr(c + 97)
+                                    flag = "?" + char
+                                    for r in (flag.lower(), flag.upper()):
+                                        if len(argv) >= 2 and r in argv:
+                                            for check in (r + " ", " " + r):
+                                                if check in argv:
+                                                    argv = argv.replace(check, "")
                                                     addDict(flags, {char: 1})
-                                            except:
-                                                pass
-                        if "?" in argv:
-                            for c in range(26):
-                                char = chr(c + 97)
-                                flag = "?" + char
-                                for r in (flag.lower(), flag.upper()):
-                                    if len(argv) >= 2 and r in argv:
-                                        for check in (r + " ", " " + r):
-                                            if check in argv:
-                                                argv = argv.replace(check, "")
+                                            if argv == flag:
+                                                argv = ""
                                                 addDict(flags, {char: 1})
-                                        if argv == flag:
-                                            argv = ""
-                                            addDict(flags, {char: 1})
                         if argv:
                             while argv[0] == " ":
                                 argv = argv[1:]
@@ -576,7 +582,8 @@ async def processMessage(message, msg, edit=True, orig=None):
                             args = shlex.split(d)
                         except ValueError:
                             args = d.split(" ")
-                        await channel.trigger_typing()
+                        if not loop:
+                            await channel.trigger_typing()
                         #async with channel.typing():
                         for a in range(len(args)):
                             args[a] = args[a].replace("", "'").replace("\0", '"')
