@@ -68,6 +68,7 @@ asech = mpmath.asech
 acsch = mpmath.acsch
 acoth = mpmath.acoth
 sinc = mpmath.sinc
+atan2 = mpmath.atan2
 ei = mpmath.ei
 e1 = mpmath.e1
 en = mpmath.expint
@@ -196,17 +197,6 @@ def xrand(x, y=None, z=0):
 
 def rrand(x=1, y=0):
     return frand(x) ** (1 - y)
-
-
-def log(x, y=e_):
-    try:
-        return x.ln() / math.log(y)
-    except:
-        return math.log(x, y)
-
-
-def atan2(y, x=1):
-    return math.atan2(y, x)
 
 
 def modularInv(a, b):

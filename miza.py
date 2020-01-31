@@ -626,6 +626,11 @@ async def outputLoop():
                     pass
             except Exception as ex:
                 print(ex)
+        elif proc[0] == "&":
+            proc = proc[1:]
+            hist = await ch.history(limit=1).flatten()
+            message = hist[0]
+            await message.add_reaction(proc)
         else:
             if ch is not None:
                 await ch.send(proc)
