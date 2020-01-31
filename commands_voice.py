@@ -92,8 +92,13 @@ class queue:
                 else:
                     show += uniStr("\nAnd more...", 1)
                     break
+            if "v" in flags:
+                info = "`" + uniStr(len(q)) + " items, estimated total duration: " + uniStr(" ".join(timeConv(estim))) + "`"
+            else:
+                info = ""
             return (
-                "Currently playing in **" + guild.name + "**:\n"
+                "Currently playing in **" + guild.name + "**: "
+                + info + "\n"
                 + "```\n" + show + "```"
                 )
         else:
