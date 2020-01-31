@@ -394,26 +394,34 @@ class customAudio(discord.AudioSource):
         self.guild_id = guild_id
         
     def read(self):
-        volume = _vars.volumes.get(self.guild_id, 1)
-        valid = isValid(volume)
-        temp = self.source.read()
-        rest = []
-        for p in range(0, len(temp), 2):
-            i = temp[p] + 256 * temp[p + 1]
-            if i >= 32768:
-                i -= 65536
-            if valid:
-                i = round(i * volume)
+        try:
+            volume = _vars.volumes.get(self.guild_id, 1)
+            static = min(65536, max(1024, abs(volume) * 64) - 1024)
+            valid = isValid(volume)
+            temp = self.source.read()
+            rest = []
+            for p in range(0, len(temp), 2):
+                i = temp[p] + 256 * temp[p + 1]
                 if i >= 32768:
-                    i = 32767
-                elif i <= -32768:
-                    i = -32767
-                if i < 0:
-                    i += 65536
-            else:
-                i = xrand(65536)
-            rest.append(i & 255)
-            rest.append(i >> 8)
+                    i -= 65536
+                if valid:
+                    i = round(i * volume)
+                    if i >= 32768:
+                        i = 32767
+                        if static:
+                            i -= xrand(static)
+                    elif i <= -32768:
+                        i = -32768
+                        if static:
+                            i += xrand(static)
+                    if i < 0:
+                        i += 65536
+                else:
+                    i = xrand(65536)
+                rest.append(i & 255)
+                rest.append(i >> 8)
+        except Exception as ex:
+            print(ex)
         #print(rest)
         return bytes(rest)
 
