@@ -65,7 +65,8 @@ class queue:
             q = _vars.queue[guild.id]["queue"]
             if not len(q):
                 return "```\nQueue for " + uniStr(guild.name) + " is currently empty. ```"
-            origTime = q[0].get("start_time", time.time())
+            t = time.time()
+            origTime = q[0].get("start_time", t)
             currTime = 0
             show = ""
             for i in range(len(q)):
@@ -80,7 +81,7 @@ class queue:
                         )
                 else:
                     curr += limStr(uniStr(e["name"]), 48)
-                estim = currTime + origTime - time.time()
+                estim = currTime + origTime - t
                 currTime += e["duration"]
                 if estim > 0:
                     curr += ", Time until playing: " + uniStr(" ".join(timeConv(estim)))
@@ -326,6 +327,32 @@ class remove:
                 continue
             i += 1
         return response + "```"
+
+
+class volume:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = ["vol"]
+        self.min_level = 1
+        self.description = "Changes the current playing volume in this server."
+        self.usage = "<volume>"
+
+    async def __call__(self, guild, _vars, argv, **void):
+        if not len(argv.replace(" ", "")):
+            return (
+                "```\nCurrent playing volume in " + uniStr(guild.name)
+                + ": " + uniStr(100. * _vars.volumes.get(guild.id, 1)) + ".```"
+                )
+        origVol = _vars.volumes.get(guild.id, 1)
+        val = roundMin(_vars.evalMath(argv) / 100)
+        _vars.volumes[guild.id] = val
+        return (
+            "```\nChanged playing volume in " + uniStr(guild.name)
+            + " from " + uniStr(100. * origVol)
+            + " to " + uniStr(100. * val) + ".```"
+            )
 
 
 class unmute:

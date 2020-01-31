@@ -114,6 +114,7 @@ class _globals:
         "waitParallel",
         "killThreads",
         "performAction",
+        "customAudio",
         "dynamicFunc",
         "dumpLogData",
         "setPrint",
@@ -136,6 +137,7 @@ class _globals:
         "on_voice_state_update",
         "on_raw_message_delete",
         "on_typing",
+        "_globals",
         "_vars",
         "fig",
         "plt",
@@ -219,6 +221,7 @@ class _globals:
         self.blocked = 0
         self.doUpdate = False
         self.msgFollow = {}
+        self.volumes = {}
         self.audiocache = []
         should_cache = []
         for g in self.playlists:
@@ -384,7 +387,44 @@ class _globals:
         return eval(f, self.stored_vars)
 
 
-async def processMessage(message, msg, edit=True):
+class customAudio(discord.AudioSource):
+
+    def __init__(self, source, guild_id):
+        self.source = discord.FFmpegPCMAudio(source)
+        self.guild_id = guild_id
+        
+    def read(self):
+        volume = _vars.volumes.get(self.guild_id, 1)
+        valid = isValid(volume)
+        temp = self.source.read()
+        conv = [temp[i] + 256 * temp[i+1] for i in range(0, len(temp), 2)]
+        rest = []
+        for i in conv:
+            if i >= 32768:
+                i -= 65536
+            if valid:
+                i = round(i * volume)
+                if i >= 32768:
+                    i = 32767
+                elif i <= -32768:
+                    i = -32767
+                if i < 0:
+                    i += 65536
+            else:
+                i = xrand(65536)
+            rest.append(i & 255)
+            rest.append(i // 256)
+        #print(rest)
+        return bytes(rest)
+
+    def is_opus(self):
+        return self.source.is_opus()
+
+    def cleanup(self):
+        return self.source.cleanup()
+
+
+async def processMessage(message, msg, edit=True, orig=None):
     global client
     perms = _vars.perms
     bans = _vars.bans
@@ -490,35 +530,36 @@ async def processMessage(message, msg, edit=True):
                             while argv[0] == " ":
                                 argv = argv[1:]
                         flags = {}
-                        for c in range(26):
-                            char = chr(c + 97)
-                            flag = "?" + char
-                            for r in (flag.lower(), flag.upper()):
-                                if len(argv) >= 4 and r in argv:
-                                    i = argv.index(r)
-                                    if i == 0 or argv[i - 1] == " " or argv[i - 2] == "?":
-                                        try:
-                                            if argv[i + 2] == " " or argv[i + 2] == "?":
-                                                argv = argv[:i] + argv[i + 2 :]
+                        if "?" in argv:
+                            for c in range(26):
+                                char = chr(c + 97)
+                                flag = "?" + char
+                                for r in (flag.lower(), flag.upper()):
+                                    if len(argv) >= 4 and r in argv:
+                                        i = argv.index(r)
+                                        if i == 0 or argv[i - 1] == " " or argv[i - 2] == "?":
+                                            try:
+                                                if argv[i + 2] == " " or argv[i + 2] == "?":
+                                                    argv = argv[:i] + argv[i + 2 :]
+                                                    addDict(flags, {char: 1})
+                                            except:
+                                                pass
+                        if "?" in argv:
+                            for c in range(26):
+                                char = chr(c + 97)
+                                flag = "?" + char
+                                for r in (flag.lower(), flag.upper()):
+                                    if len(argv) >= 2 and r in argv:
+                                        for check in (r + " ", " " + r):
+                                            if check in argv:
+                                                argv = argv.replace(check, "")
                                                 addDict(flags, {char: 1})
-                                        except:
-                                            pass
-                        for c in range(26):
-                            char = chr(c + 97)
-                            flag = "?" + char
-                            for r in (flag.lower(), flag.upper()):
-                                if len(argv) >= 2 and r in argv:
-                                    for check in (r + " ", " " + r):
-                                        if check in argv:
-                                            argv = argv.replace(check, "")
+                                        if argv == flag:
+                                            argv = ""
                                             addDict(flags, {char: 1})
-                                    if argv == flag:
-                                        argv = ""
-                                        addDict(flags, {char: 1})
                         if argv:
                             while argv[0] == " ":
                                 argv = argv[1:]
-                        argv = reconstitute(argv)
                         a = argv.replace('"', "\0")
                         b = a.replace("'", "")
                         c = b.replace("<", "'")
@@ -574,7 +615,7 @@ async def processMessage(message, msg, edit=True):
                         print(errmsg)
                         await channel.send(errmsg)
     elif not edit and u_id != client.user.id and g_id in _vars.following:
-        checker = message.content
+        checker = orig
         curr = _vars.msgFollow.get(g_id)
         if curr is None:
             curr = [checker, 1, 0]
@@ -608,7 +649,7 @@ async def outputLoop():
         setPrint(printed)
         doParallel(input, [printed], msg, name="inputter")
         while msg[0] is None:
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.1)
         proc = msg[0]
         if not proc:
             continue
@@ -619,7 +660,7 @@ async def outputLoop():
                 _vars.current_channel = await client.fetch_channel(chanID)
             except ValueError:
                 sent = await ch.send("*** ***")
-                await processMessage(sent, proc)
+                await processMessage(sent, reconstitute(proc))
                 try:
                     await sent.delete()
                 except discord.errors.NotFound:
@@ -787,7 +828,7 @@ async def handleUpdate(force=False):
                                     if len(b) < minl:
                                         raise FileNotFoundError
                                     q[0]["id"] = "@" + q[0]["id"]
-                                    auds = discord.FFmpegPCMAudio(path)
+                                    auds = customAudio(path, guild.id)
                                     vc.play(auds, after=sendUpdateRequest)
                                     q[0]["start_time"] = time.time()
                                     channel = await client.fetch_channel(_vars.queue[guild.id]["channel"])
@@ -964,6 +1005,7 @@ async def handleMessage(message, edit=True):
             "Voted to remove ",
             "has been removed from the queue.",
             "Now playing",
+            "Changed playing volume in ",
             ]
         found = False
         if len(msg) >= 7:
@@ -976,7 +1018,7 @@ async def handleMessage(message, edit=True):
             except Exception as ex:
                 print(repr(ex))
     try:
-        await asyncio.wait_for(processMessage(message, msg, edit), timeout=_vars.timeout)
+        await asyncio.wait_for(processMessage(message, reconstitute(msg), edit, msg), timeout=_vars.timeout)
     except Exception as ex:
         killThreads()
         errmsg = "```\nError: " + repr(ex) + "\n```"
