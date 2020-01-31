@@ -642,7 +642,9 @@ async def updateLoop():
         for g in _vars.special:
             asyncio.create_task(changeColour(g, _vars.special[g], counter))
         await handleUpdate()
-        await asyncio.sleep(frand(1) + 1)
+        await asyncio.sleep(frand(1))
+        await handleUpdate()
+        await asyncio.sleep(1)
         counter = counter + 1 & 65535
 
 
@@ -657,7 +659,7 @@ async def changeColour(g_id, roles, counter):
                 col = colour2Raw(colourCalculation(xrand(1536)))
                 await role.edit(colour=discord.Colour(col))
                 #print("Edited role " + role.name)
-            await asyncio.sleep(1)
+            await asyncio.sleep(frand(2))
         except discord.errors.HTTPException as ex:
             print(ex)
             _vars.blocked += 20
@@ -945,7 +947,7 @@ async def handleMessage(message, edit=True):
             "Currently playing in ",
             " to the queue!",
             "Voted to remove ",
-            "has been forcefully removed from the queue.",
+            "has been removed from the queue.",
             "Now playing",
             ]
         found = False
@@ -978,10 +980,11 @@ async def on_message(message):
 
 @client.event
 async def on_message_edit(before, after):
-    message = after
     await handleUpdate()
-    await handleMessage(message)
-    await handleUpdate(True)
+    if before.content != after.content:
+        message = after
+        await handleMessage(message)
+        await handleUpdate(True)
 
 
 @client.event

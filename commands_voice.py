@@ -29,7 +29,7 @@ class youtubeDownloader:
 
     def search(self, item):
         try:
-            return self.searcher.extract_info(item)
+            return self.searcher.extract_info(item.strip("<>"))
         except youtube_dl.utils.DownloadError:
             return {}
         
@@ -51,13 +51,13 @@ class queue:
         self.description = "Shows the music queue, or plays a song in voice."
         self.usage = "<link:[]> <verbose:(?v)>"
 
-    async def __call__(self, user, _vars, argv, channel, guild, flags, **void):
+    async def __call__(self, client, user, _vars, argv, channel, guild, flags, **void):
         found = False
         if guild.id not in _vars.queue:
             for func in _vars.categories["voice"]:
                 if "join" in func.name:
                     try:
-                        await func(user=user, _vars=_vars, channel=channel, guild=guild)
+                        await func(client=client, user=user, _vars=_vars, channel=channel, guild=guild)
                     except discord.ClientException:
                         pass
                     except AttributeError:
@@ -76,11 +76,17 @@ class queue:
             for i in range(len(q)):
                 curr = "\n"
                 e = q[i]
-                curr += "【" + uniStr(i) + "】 " + uniStr(e["name"])
+                curr += "【" + uniStr(i) + "】 "
                 if "v" in flags:
-                    curr += ", URL: " + e["url"] + ", Duration: " + uniStr(" ".join(timeConv(e["duration"]))) + ", Added by: " + uniStr(e["added by"])
-                estim = currTime + origTime - time.time() - frand(1)
-                currTime += e["duration"]
+                    curr += (
+                        uniStr(e["name"]) + ", URL: " + e["url"]
+                        + ", Duration: " + uniStr(" ".join(timeConv(e["duration"])))
+                        + ", Added by: " + uniStr(e["added by"])
+                        )
+                else:
+                    curr += limStr(uniStr(e["name"]), 32)
+                estim = currTime + origTime - time.time() - e["duration"] / 4096
+                currTime += e["duration"] * 4097 / 4096
                 if estim > 0:
                     curr += ", Time until playing: " + uniStr(" ".join(timeConv(estim)))
                 else:
@@ -133,7 +139,7 @@ class queue:
                     total_duration += e["duration"] + e["start_time"] - time.time()
                 else:
                     total_duration += e["duration"]
-            total_duration = max(total_duration + dur/8192, dur/1024 + frand(1) + 2)
+            total_duration = max(total_duration + dur / 4096, dur / 128 + frand(1) + 2)
             _vars.queue[guild.id]["queue"] += added
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")
@@ -185,7 +191,8 @@ class playlist:
         curr = _vars.playlists.get(guild.id, [])
         names = []
         for e in entries:
-            names.append(e["title"])
+            name = e["title"]
+            names.append(name)
             url = e["webpage_url"]
             if "r" in flags:
                 for p in curr:
@@ -216,10 +223,13 @@ class join:
         self.description = "Summons the bot into a voice channel."
         self.usage = ""
 
-    async def __call__(self, user, _vars, channel, guild, **void):
+    async def __call__(self, client, user, _vars, channel, guild, **void):
         voice = user.voice
         vc = voice.channel
         await vc.connect(timeout=_vars.timeout, reconnect=True)
+        for user in guild.members:
+            if user.id == client.user.id:
+                asyncio.create_task(user.edit(mute=False,deafen=False))
         if guild.id not in _vars.queue:
             _vars.queue[guild.id] = {"channel": channel.id, "queue": []}
         return (
