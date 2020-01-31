@@ -13,12 +13,7 @@ class youtubeDownloader:
     ydl_opts_2 = {
         "quiet": 1,
         "format": "bestaudio/best",
-        "outtmpl": "/cache/%(id)s.%(ext)s",
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
+        "outtmpl": "/cache/%(id)s.mp3",
     }
 
     def __init__(self):
@@ -85,8 +80,8 @@ class queue:
                         )
                 else:
                     curr += limStr(uniStr(e["name"]), 48)
-                estim = currTime + origTime - time.time() - e["duration"] / 4096
-                currTime += e["duration"] * 4097 / 4096
+                estim = currTime + origTime - time.time()
+                currTime += e["duration"]
                 if estim > 0:
                     curr += ", Time until playing: " + uniStr(" ".join(timeConv(estim)))
                 else:
@@ -139,7 +134,7 @@ class queue:
                     total_duration += e["duration"] + e["start_time"] - time.time()
                 else:
                     total_duration += e["duration"]
-            total_duration = max(total_duration + dur / 4096, dur / 128 + frand(1) + 2)
+            total_duration = max(total_duration, dur / 128 + frand(0.5) + 2.5)
             _vars.queue[guild.id]["queue"] += added
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")

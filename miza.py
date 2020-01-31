@@ -577,7 +577,7 @@ async def processMessage(message, msg, edit=True):
         checker = message.content
         curr = _vars.msgFollow.get(g_id)
         if curr is None:
-            curr = [checker, xrand(-1, 2), 0]
+            curr = [checker, 1, 0]
             _vars.msgFollow[g_id] = curr
         elif checker == curr[0] and u_id != curr[2]:
             curr[1] += 1
@@ -589,7 +589,7 @@ async def processMessage(message, msg, edit=True):
             if len(checker) > 100:
                 checker = ""
             curr[0] = checker
-            curr[1] = 1
+            curr[1] = xrand(-1, 2)
         curr[2] = u_id
         print(curr)
 
@@ -645,8 +645,8 @@ async def updateLoop():
             asyncio.create_task(changeColour(g, _vars.special[g], counter))
         await handleUpdate()
         t = time.time()
-        while time.time() - t < frand(1) + 1:
-            await asyncio.sleep(0.06)
+        while time.time() - t < frand(2) + 1:
+            await asyncio.sleep(0.001)
             if _vars.doUpdate:
                 await handleUpdate(True)
         counter = counter + 1 & 65535
@@ -689,6 +689,7 @@ async def on_ready():
 
 def sendUpdateRequest(error=False):
     _vars.doUpdate = True
+    #asyncio.create_task(handleUpdate(True))
 
 
 async def handleUpdate(force=False):
