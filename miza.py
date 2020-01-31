@@ -228,6 +228,8 @@ class _globals:
             for i in self.playlists[g]:
                 s = i["id"] + ".mp3"
                 should_cache.append(s)
+        if not os.path.exists("cache/"):
+            os.mkdir("cache/")
         for path in os.listdir("cache/"):
             found = False
             for i in should_cache:

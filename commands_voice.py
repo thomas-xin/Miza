@@ -288,6 +288,10 @@ class remove:
             if not isValid(pos):
                 if "f" in flags:
                     _vars.queue[guild.id]["queue"] = []
+                    print("Stopped audio playback in " + guild.name)
+                    for vc in client.voice_clients:
+                        if vc.channel.guild.id == guild.id:
+                            vc.stop()
                     return "```\nRemoved all items from the queue.```"
                 raise LookupError
             curr = _vars.queue[guild.id]["queue"][pos]
@@ -335,18 +339,24 @@ class volume:
 
     def __init__(self):
         self.name = ["vol"]
-        self.min_level = 1
+        self.min_level = 0
         self.description = "Changes the current playing volume in this server."
         self.usage = "<volume>"
 
-    async def __call__(self, guild, _vars, argv, **void):
+    async def __call__(self, user, guild, _vars, argv, **void):
         if not len(argv.replace(" ", "")):
             return (
                 "```\nCurrent playing volume in " + uniStr(guild.name)
                 + ": " + uniStr(100. * _vars.volumes.get(guild.id, 1)) + ".```"
                 )
+        s_perm = _vars.getPerms(user, guild)
+        if s_perm < 1:
+            raise PermissionError(
+                "Insufficient permissions to change volume. Current permission level: " + uniStr(s_perm)
+                + ", required permission level: " + uniStr(1) + "."
+                )
         origVol = _vars.volumes.get(guild.id, 1)
-        val = roundMin(_vars.evalMath(argv) / 100)
+        val = roundMin(float(_vars.evalMath(argv) / 100))
         _vars.volumes[guild.id] = val
         return (
             "```\nChanged playing volume in " + uniStr(guild.name)
