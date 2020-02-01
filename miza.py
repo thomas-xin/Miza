@@ -1,11 +1,84 @@
 import discord, ast, os, sys, asyncio, datetime, json, shlex
 import urllib.request
+from scipy.signal import butter, sosfilt, resample
 from smath import *
 
 client = discord.Client(
     max_messages=2000,
     activity=discord.Activity(name=uniStr("Magic")),
     )
+
+
+class customAudio(discord.AudioSource):
+
+    def __init__(self, source, guild_id):
+        self.source = discord.FFmpegPCMAudio(source)
+        self.guild_id = guild_id
+        self.buffer = []
+        self.feedback = None
+        self.bassadj = None
+        self.bass = butter(2, 1/6, btype="low", output="sos")
+        self.filt = butter(1, 1/3, btype="low", output="sos")
+        self.defaults = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0}
+        
+    def read(self):
+        try:
+            temp = self.source.read()
+            sndset = _vars.volumes.get(self.guild_id, self.defaults)
+            volume = sndset["volume"]
+            reverb = sndset["reverb"]
+            pitch = sndset["pitch"]
+            bassboost = sndset["bassboost"]
+            if volume == 1 and reverb == pitch == bassboost == 0:
+                return temp
+            elif not isValid(volume) or not isValid(reverb):
+                return (numpy.random.rand(len(temp)) * 65536).astype(numpy.uint16).tobytes()
+            array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
+            size = len(array)
+            array *= volume
+            if bassboost:
+                if self.bassadj is not None:
+                    array += sosfilt(self.bass, numpy.concatenate((self.bassadj, array)))[size:]
+                self.bassadj = numpy.array(array) * bassboost
+            if pitch:
+                dft = numpy.fft.fft(array)
+                cft = numpy.roll(dft, round(pitch))
+                array = numpy.fft.ifft(cft)
+            if reverb:
+                try:
+                    p1 = round(size * 0.375)
+                    p2 = round(size * 0.4375)
+                    p3 = round(size * 0.5)
+                    p4 = round(size * 0.5625)
+                    p5 = round(size * 0.625)
+                    feedback = (
+                        numpy.concatenate((self.buffer[0][p1:], self.buffer[1][:p1])) / 24
+                        + numpy.concatenate((self.buffer[0][p2:], self.buffer[1][:p2])) / 12
+                        + numpy.concatenate((self.buffer[0][p3:], self.buffer[1][:p3])) * 0.75
+                        + numpy.concatenate((self.buffer[0][p4:], self.buffer[1][:p4])) / 12
+                        + numpy.concatenate((self.buffer[0][p5:], self.buffer[1][:p5])) / 24
+                        ) * reverb
+                    if self.feedback is not None:
+                        array += sosfilt(self.filt, numpy.concatenate((self.feedback, feedback)))[size:]
+                    self.feedback = feedback
+                    #array = numpy.convolve(array, resizeVector(self.buffer[0], len(array) * 2))
+                    self.buffer = self.buffer[-16:]
+                except IndexError:
+                    pass
+                self.buffer.append(numpy.array(array))
+            numpy.clip(array, -32767, 32767, out=array)
+            temp = array.astype(numpy.int16).tobytes()
+        except Exception as ex:
+            print(ex)
+        return temp
+
+    def is_opus(self):
+        return False
+        #return self.source.is_opus()
+
+    def cleanup(self):
+        return self.source.cleanup()
+    
 
 from matplotlib import use as plot_sys
 
@@ -387,51 +460,6 @@ class _globals:
     def evalMath(self, f):
         self.verifyCommand(f)
         return eval(f, self.stored_vars)
-
-
-class customAudio(discord.AudioSource):
-
-    def __init__(self, source, guild_id):
-        self.source = discord.FFmpegPCMAudio(source)
-        self.guild_id = guild_id
-        
-    def read(self):
-        try:
-            volume = _vars.volumes.get(self.guild_id, 1)
-            static = min(65535, max(1024, abs(volume) * 64) - 1024)
-            valid = isValid(volume)
-            temp = self.source.read()
-            rest = []
-            for p in range(0, len(temp), 2):
-                i = temp[p] + 256 * temp[p + 1]
-                if i >= 32768:
-                    i -= 65536
-                if valid:
-                    i = round(i * volume)
-                    if i > 32767:
-                        i = 32767
-                        if static:
-                            i -= xrand(static)
-                    elif i < -32767:
-                        i = -32767
-                        if static:
-                            i += xrand(static)
-                    if i < 0:
-                        i += 65536
-                else:
-                    i = xrand(65536)
-                rest.append(i & 255)
-                rest.append(i >> 8)
-        except Exception as ex:
-            print(ex)
-        #print(rest)
-        return bytes(rest)
-
-    def is_opus(self):
-        return self.source.is_opus()
-
-    def cleanup(self):
-        return self.source.cleanup()
 
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_flags=None, loop=False):
@@ -842,7 +870,7 @@ async def handleUpdate(force=False):
                                 try:
                                     path = "cache/" + q[0]["id"].replace("@", "") + ".mp3"
                                     f = open(path, "rb")
-                                    minl = 32
+                                    minl = 64
                                     b = f.read(minl)
                                     f.close()
                                     if len(b) < minl:
@@ -1025,7 +1053,7 @@ async def handleMessage(message, edit=True):
             "Voted to remove ",
             "has been removed from the queue.",
             "Now playing",
-            "Changed playing volume in ",
+            "Current audio",
             ]
         found = False
         if len(msg) >= 7:

@@ -8,7 +8,7 @@ class youtubeDownloader:
         "simulate": 1,
         "default_search": "auto",
         "skip_download": 1,
-        "writeinfojson": 1,
+        "nocheckcertificate": 1,
         }
     ydl_opts_2 = {
         "quiet": 1,
@@ -93,7 +93,10 @@ class queue:
                     show += uniStr("\nAnd more...", 1)
                     break
             if "v" in flags:
-                info = "`" + uniStr(len(q)) + " items, estimated total duration: " + uniStr(" ".join(timeConv(estim))) + "`"
+                info = (
+                    "`" + uniStr(len(q)) + " items, estimated total duration: "
+                    + uniStr(" ".join(timeConv(currTime + origTime - t))) + "`"
+                    )
             else:
                 info = ""
             return (
@@ -341,18 +344,27 @@ class remove:
 class volume:
     is_command = True
     server_only = True
+    defaults = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0}
 
     def __init__(self):
-        self.name = ["vol"]
+        self.name = ["vol", "audio"]
         self.min_level = 0
         self.description = "Changes the current playing volume in this server."
-        self.usage = "<volume>"
+        self.usage = "<value> <reverb(?r)> <pitch(?p)>"
 
-    async def __call__(self, user, guild, _vars, argv, **void):
+    async def __call__(self, user, guild, _vars, flags, argv, **void):
+        if "p" in flags:
+            op = "pitch"
+        elif "b" in flags:
+            op = "bassboost"
+        elif "r" in flags:
+            op = "reverb"
+        else:
+            op = "volume"
         if not len(argv.replace(" ", "")):
             return (
-                "```\nCurrent playing volume in " + uniStr(guild.name)
-                + ": " + uniStr(100. * _vars.volumes.get(guild.id, 1)) + ".```"
+                "```\nCurrent audio " + op + " in " + uniStr(guild.name)
+                + ": " + uniStr(100. * _vars.volumes.get(guild.id, self.defaults)[op]) + ".```"
                 )
         s_perm = _vars.getPerms(user, guild)
         if s_perm < 1:
@@ -360,12 +372,14 @@ class volume:
                 "Insufficient permissions to change volume. Current permission level: " + uniStr(s_perm)
                 + ", required permission level: " + uniStr(1) + "."
                 )
-        origVol = _vars.volumes.get(guild.id, 1)
+        origVol = _vars.volumes.get(guild.id, self.defaults)
         val = roundMin(float(_vars.evalMath(argv) / 100))
-        _vars.volumes[guild.id] = val
+        orig = origVol[op]
+        origVol[op] = val
+        _vars.volumes[guild.id] = origVol
         return (
-            "```\nChanged playing volume in " + uniStr(guild.name)
-            + " from " + uniStr(100. * origVol)
+            "```\nChanged audio " + op + " in " + uniStr(guild.name)
+            + " from " + uniStr(100. * orig)
             + " to " + uniStr(100. * val) + ".```"
             )
 
