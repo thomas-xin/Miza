@@ -46,11 +46,12 @@ class customAudio(discord.AudioSource):
                 array = numpy.fft.ifft(cft)
             if reverb:
                 try:
-                    p1 = round(size * 0.375)
-                    p2 = round(size * 0.4375)
+                    r = 18
+                    p1 = round(size * (0.5 - 2 / r))
+                    p2 = round(size * (0.5 - 1 / r))
                     p3 = round(size * 0.5)
-                    p4 = round(size * 0.5625)
-                    p5 = round(size * 0.625)
+                    p4 = round(size * (0.5 + 1 / r))
+                    p5 = round(size * (0.5 + 2 / r))
                     feedback = (
                         numpy.concatenate((self.buffer[0][p1:], self.buffer[1][:p1])) / 24
                         + numpy.concatenate((self.buffer[0][p2:], self.buffer[1][:p2])) / 12

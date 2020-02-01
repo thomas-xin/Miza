@@ -143,7 +143,7 @@ class queue:
                     total_duration += e["duration"] + e["start_time"] - time.time()
                 else:
                     total_duration += e["duration"]
-            total_duration = max(total_duration, dur / 128 + frand(0.5) + 1.5)
+            total_duration = max(total_duration, dur / 128 + frand(0.5) + 2)
             _vars.queue[guild.id]["queue"] += added
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")
