@@ -152,8 +152,9 @@ class queue:
                     show += uniStr("\nAnd more...", 1)
                     break
             if "v" in flags:
+                cnt = uniStr(len(q))
                 info = (
-                    "`" + uniStr(len(q)) + " items, estimated total duration: "
+                    "`" + cnt + " item" + "s" * (cnt != 1) + ", estimated total duration: "
                     + uniStr(" ".join(timeConv(currTime + origTime - t))) + "`"
                     )
             else:

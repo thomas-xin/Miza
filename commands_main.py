@@ -1,4 +1,4 @@
-import asyncio
+import asyncio, os
 from smath import *
 
 default_commands = ["string", "admin"]
@@ -271,13 +271,13 @@ class enableCommand:
                 )
 
 
-class shutdown:
+class restart:
     is_command = True
 
     def __init__(self):
-        self.name = ["gtfo"]
+        self.name = ["shutdown"]
         self.min_level = inf
-        self.description = "Shuts down the bot."
+        self.description = "Restarts down the bot."
         self.usage = ""
 
     async def __call__(self, client, channel, **void):
