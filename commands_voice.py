@@ -1,7 +1,31 @@
-import youtube_dl, asyncio, discord, time
+import youtube_dl, asyncio, discord, time, os, urllib
+from subprocess import check_output, CalledProcessError, STDOUT
 from smath import *
 
 
+def getDuration(filename):
+    command = [
+        'ffprobe', 
+        '-v', 
+        'error', 
+        '-show_entries', 
+        'format=duration', 
+        '-of', 
+        'default=noprint_wrappers=1:nokey=1', 
+        filename
+      ]
+    try:
+        output = check_output(command, stderr=STDOUT).decode()
+    except CalledProcessError as e:
+        output = e.output.decode()
+    try:
+        i = output.index("\r")
+        output = output[:i]
+    except ValueError:
+        pass
+    return output
+
+    
 class youtubeDownloader:
     ydl_opts_1 = {
         "quiet": 1,
@@ -15,6 +39,11 @@ class youtubeDownloader:
         "format": "bestaudio/best",
         "outtmpl": "/cache/%(id)s.mp3",
         }
+    
+    class urlBypass(urllib.request.FancyURLopener):
+        version = "Mozilla/6.0"
+
+    opener = urlBypass()
 
     def __init__(self):
         self.searcher = youtube_dl.YoutubeDL(self.ydl_opts_1)
@@ -23,10 +52,38 @@ class youtubeDownloader:
         self.downloader.add_default_info_extractors()
 
     def search(self, item):
+        item = item.strip("<>")
         try:
-            return self.searcher.extract_info(item.strip("<>"))
-        except youtube_dl.utils.DownloadError:
-            return {}
+            resp = self.opener.open(item)
+            if resp.getcode() != 200:
+                raise
+            cont = resp.read()
+            check = "<!DOCTYPE html>"
+            if cont[:len(check)] == check:
+                raise
+            name = item.split("/")[-1]
+            try:
+                i = name.index(".")
+                name = name[:i]
+            except ValueError:
+                pass
+            key = "&" + str(hash(item))
+            fn = "cache/" + key + ".mp3"
+            if fn not in os.listdir("cache/"):
+                f = open(fn, "wb")
+                f.write(cont)
+                f.close()
+            return {"entries": [{
+                "title": name,
+                "webpage_url": item,
+                "duration": float(getDuration(fn)),
+                "id": key,
+                }]}
+        except:
+            try:
+                return self.searcher.extract_info(item)
+            except youtube_dl.utils.DownloadError:
+                return {}
         
     def download(self, item):
         try:

@@ -22,8 +22,8 @@ class customAudio(discord.AudioSource):
         self.defaults = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0}
         
     def read(self):
+        temp = self.source.read()
         try:
-            temp = self.source.read()
             sndset = _vars.volumes.get(self.guild_id, self.defaults)
             volume = sndset["volume"]
             reverb = sndset["reverb"]
@@ -856,7 +856,7 @@ async def handleUpdate(force=False):
                                 if i < len(q):
                                     e_id = q[i]["id"].replace("@", "")
                                     should_cache.append(e_id)
-                                    if q[i]["id"][-1] != "@":
+                                    if q[i]["id"][0] != "&" and q[i]["id"][-1] != "@":
                                         q[i]["id"] = e_id + "@"
                                         if e_id not in _vars.audiocache:
                                             search = e_id + ".mp3"
