@@ -51,7 +51,7 @@ class youtubeDownloader:
         self.downloader = youtube_dl.YoutubeDL(self.ydl_opts_2)
         self.downloader.add_default_info_extractors()
 
-    def search(self, item):
+    def search(self, item, _vars):
         item = item.strip("<>")
         try:
             resp = self.opener.open(item)
@@ -73,16 +73,18 @@ class youtubeDownloader:
                 f = open(fn, "wb")
                 f.write(cont)
                 f.close()
+            _vars.audiocache.append(key)
+            dur = float(getDuration(fn))
             return {"entries": [{
                 "title": name,
                 "webpage_url": item,
-                "duration": float(getDuration(fn)),
+                "duration": dur,
                 "id": key,
                 }]}
         except:
             try:
                 return self.searcher.extract_info(item)
-            except youtube_dl.utils.DownloadError:
+            except:
                 return {}
         
     def download(self, item):
@@ -163,7 +165,7 @@ class queue:
                 )
         else:
             output = [None]
-            doParallel(self.ytdl.search, [argv], output)
+            doParallel(self.ytdl.search, [argv, _vars], output)
             while output[0] is None:
                 await asyncio.sleep(0.01)
             res = output[0]
