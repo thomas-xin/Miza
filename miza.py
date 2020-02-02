@@ -20,9 +20,11 @@ class customAudio(discord.AudioSource):
         self.bass = butter(2, 1/6, btype="low", output="sos")
         self.filt = butter(1, 1/3, btype="low", output="sos")
         self.defaults = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0}
+        self.readpos = 0
         
     def read(self):
         temp = self.source.read()
+        self.readpos += 1
         try:
             sndset = _vars.volumes.get(self.guild_id, self.defaults)
             volume = sndset["volume"]
@@ -41,9 +43,18 @@ class customAudio(discord.AudioSource):
                     array += sosfilt(self.bass, numpy.concatenate((self.bassadj, array)))[size:]
                 self.bassadj = numpy.array(array) * bassboost
             if pitch:
-                dft = numpy.fft.fft(array)
-                cft = numpy.roll(dft, round(pitch))
-                array = numpy.fft.ifft(cft)
+                left, right = array[::2], array[1::2]
+                lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
+                n = max(len(lft), len(rft))
+                lsh, rsh = numpy.zeros(n, lft.dtype), numpy.zeros(n, rft.dtype)
+                s = pitch
+                if s < 0:
+                    s += n
+                t = round(n - s)
+                lsh[:s], rsh[:s] = lft[t:], rft[t:]
+                lsh[s:], rsh[s:] = lft[:t], rft[:t]
+                left, right = numpy.fft.irfft(lsh, len(left)), numpy.fft.irfft(rsh, len(right))
+                array = numpy.stack((left, right), axis=-1).flatten()
             if reverb:
                 try:
                     r = 18
@@ -66,7 +77,11 @@ class customAudio(discord.AudioSource):
                     self.buffer = self.buffer[-16:]
                 except IndexError:
                     pass
-                self.buffer.append(numpy.array(array))
+                left, right = array[::2], array[1::2]
+                flipped = numpy.stack((right, left), axis=-1).flatten()
+                self.buffer.append(flipped)
+            else:
+                self.buffer = []
             numpy.clip(array, -32767, 32767, out=array)
             temp = array.astype(numpy.int16).tobytes()
         except Exception as ex:

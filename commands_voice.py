@@ -12,7 +12,7 @@ def getDuration(filename):
         'format=duration', 
         '-of', 
         'default=noprint_wrappers=1:nokey=1', 
-        filename
+        filename,
       ]
     try:
         output = check_output(command, stderr=STDOUT).decode()
@@ -124,41 +124,47 @@ class queue:
             q = _vars.queue[guild.id]["queue"]
             if not len(q):
                 return "```\nQueue for " + uniStr(guild.name) + " is currently empty. ```"
-            t = time.time()
-            origTime = q[0].get("start_time", t)
-            currTime = 0
-            show = ""
-            for i in range(len(q)):
-                curr = "\n"
-                e = q[i]
-                curr += "【" + uniStr(i) + "】 "
-                if "v" in flags:
-                    curr += (
-                        uniStr(e["name"]) + ", URL: " + e["url"]
-                        + ", Duration: " + uniStr(" ".join(timeConv(e["duration"])))
-                        + ", Added by: " + uniStr(e["added by"])
-                        )
-                else:
-                    curr += limStr(uniStr(e["name"]), 48)
-                estim = currTime + origTime - t
-                currTime += e["duration"]
-                if estim > 0:
-                    curr += ", Time until playing: " + uniStr(" ".join(timeConv(estim)))
-                else:
-                    curr += ", Remaining time: " + uniStr(" ".join(timeConv(estim + e["duration"])))
-                if len(show) + len(curr) < 1900:
-                    show += curr
-                else:
-                    show += uniStr("\nAnd more...", 1)
-                    break
+            totalTime = 0
+            for e in q:
+                totalTime += e["duration"]
             if "v" in flags:
                 cnt = uniStr(len(q))
                 info = (
                     "`" + cnt + " item" + "s" * (cnt != 1) + ", estimated total duration: "
-                    + uniStr(" ".join(timeConv(currTime + origTime - t))) + "`"
+                    + uniStr(" ".join(timeConv(totalTime))) + "`"
                     )
             else:
                 info = ""
+            t = time.time()
+            origTime = q[0].get("start_time", t)
+            currTime = 0
+            showing = True
+            show = ""
+            for i in range(len(q)):
+                if showing:
+                    curr = "\n"
+                    e = q[i]
+                    curr += " " * int(math.log10(len(q)))
+                    curr += "【" + uniStr(i) + "】 "
+                    if "v" in flags:
+                        curr += (
+                            uniStr(e["name"]) + ", URL: " + e["url"]
+                            + ", Duration: " + uniStr(" ".join(timeConv(e["duration"])))
+                            + ", Added by: " + uniStr(e["added by"])
+                            )
+                    else:
+                        curr += limStr(uniStr(e["name"]), 48)
+                    estim = currTime + origTime - t
+                    if estim > 0:
+                        curr += ", Time until playing: " + uniStr(" ".join(timeConv(estim)))
+                    else:
+                        curr += ", Remaining time: " + uniStr(" ".join(timeConv(estim + e["duration"])))
+                    if len(show) + len(info) + len(curr) < 1920:
+                        show += curr
+                    else:
+                        show += uniStr("\nAnd " + str(len(q) - i) + " more...", 1)
+                        showing = False
+                currTime += e["duration"]
             return (
                 "Currently playing in **" + guild.name + "**: "
                 + info + "\n"
@@ -240,7 +246,7 @@ class playlist:
                 + str(_vars.playlists.get(guild.id, [])) + ".```"
                 )
         output = [None]
-        doParallel(self.ytdl.search, [argv], output)
+        doParallel(self.ytdl.search, [argv, _vars], output)
         while output[0] is None:
             await asyncio.sleep(0.01)
         res = output[0]
