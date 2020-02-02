@@ -328,10 +328,10 @@ class loop:
 
     async def __call__(self, args, argv, message, callback, _vars, flags, **void):
         iters = _vars.evalMath(args[0])
-        func = " ".join(args[1:])
+        func = func2 = " ".join(args[1:])
         if flags:
             func += " ?" + "?".join(flags)
         for i in range(iters):
-            asyncio.create_task(callback(message, func, cb_argv=argv, cb_flags=flags, loop=i != iters - 1))
+            asyncio.create_task(callback(message, func, cb_argv=func2, cb_flags=flags, loop=i != iters - 1))
         if not "h" in flags:
             return "```\nLooping <" + func + "> " + uniStr(iters) + " times...```"

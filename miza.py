@@ -19,7 +19,7 @@ class customAudio(discord.AudioSource):
         self.bassadj = None
         self.bass = butter(2, 1/6, btype="low", output="sos")
         self.filt = butter(1, 1/3, btype="low", output="sos")
-        self.defaults = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0}
+        self.defaults = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0, "bitdepth": 16 / 100}
         self.readpos = 0
         
     def read(self):
@@ -31,13 +31,18 @@ class customAudio(discord.AudioSource):
             reverb = sndset["reverb"]
             pitch = sndset["pitch"]
             bassboost = sndset["bassboost"]
-            if volume == 1 and reverb == pitch == bassboost == 0:
+            bitdepth = round(sndset["bitdepth"] * 100)
+            if volume == 1 and reverb == pitch == bassboost == 0 and bitdepth == 16:
                 return temp
-            elif not isValid(volume) or not isValid(reverb):
-                return (numpy.random.rand(len(temp)) * 65536).astype(numpy.uint16).tobytes()
             array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
             size = len(array)
-            array *= volume
+            if 0 < bitdepth < 16:
+                bd = 2 ** (bitdepth - 16)
+                array = numpy.round(array * bd) / bd
+            if not isValid(volume):
+                array = numpy.random.rand(len(temp)) * 65536 - 32768
+            else:
+                array *= volume
             if bassboost:
                 if self.bassadj is not None:
                     array += sosfilt(self.bass, numpy.concatenate((self.bassadj, array)))[size:]
@@ -47,13 +52,16 @@ class customAudio(discord.AudioSource):
                 lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
                 n = max(len(lft), len(rft))
                 lsh, rsh = numpy.zeros(n, lft.dtype), numpy.zeros(n, rft.dtype)
-                s = pitch
+                s = round(pitch)
                 if s < 0:
                     s += n
-                t = round(n - s)
+                t = n - s
                 lsh[:s], rsh[:s] = lft[t:], rft[t:]
                 lsh[s:], rsh[s:] = lft[:t], rft[:t]
-                left, right = numpy.fft.irfft(lsh, len(left)), numpy.fft.irfft(rsh, len(right))
+                left, right = (
+                    numpy.fft.irfft(lsh, len(left)),
+                    numpy.fft.irfft(rsh, len(right))
+                    )
                 array = numpy.stack((left, right), axis=-1).flatten()
             if reverb:
                 try:
@@ -71,7 +79,7 @@ class customAudio(discord.AudioSource):
                         + numpy.concatenate((self.buffer[0][p5:], self.buffer[1][:p5])) / 24
                         ) * reverb
                     if self.feedback is not None:
-                        array += sosfilt(self.filt, numpy.concatenate((self.feedback, feedback)))[size:]
+                        array -= sosfilt(self.filt, numpy.concatenate((self.feedback, feedback)))[size:]
                     self.feedback = feedback
                     #array = numpy.convolve(array, resizeVector(self.buffer[0], len(array) * 2))
                     self.buffer = self.buffer[-16:]
@@ -182,7 +190,7 @@ fig = plt.figure()
 
 
 class _globals:
-    timeout = 10
+    timeout = 20
     deleted = [
         "discord",
         "client",
@@ -333,7 +341,8 @@ class _globals:
 
     def loadSave(self):
         try:
-            f = open(self.savedata)
+            f = open(self.savedata, "rb")
+            savedata = eval(f.read())
         except:
             print("Creating new save data...")
             self.perms = {}
@@ -345,8 +354,8 @@ class _globals:
             self.playlists = {}
             self.update()
             f = open(self.savedata)
+            savedata = eval(f.read())
             
-        savedata = eval(f.read())
         f.close()
         self.perms = savedata.get("perms", {})
         self.bans = savedata.get("bans", {})
@@ -368,6 +377,7 @@ class _globals:
                 obj.__name__ = var.__name__
                 obj.name.append(obj.__name__)
                 commands.append(obj)
+                #print("Successfully loaded function " + obj.__name__ + ".")
             except AttributeError:
                 pass
         self.categories[category] = commands
@@ -382,18 +392,23 @@ class _globals:
             doParallel(self.getModule, [module, category])
 
     def update(self):
-        f = open(self.savedata, "w")
-        savedata = {
-            "perms": self.perms,
-            "bans": self.bans,
-            "enabled": self.enabled,
-            "scheduled": self.scheduled,
-            "special": self.special,
-            "following": self.following,
-            "playlists": self.playlists,
-            }
-        f.write(repr(savedata))
-        f.close()
+        try:
+            f = open(self.savedata, "wb")
+            savedata = {
+                "perms": self.perms,
+                "bans": self.bans,
+                "enabled": self.enabled,
+                "scheduled": self.scheduled,
+                "special": self.special,
+                "following": self.following,
+                "playlists": self.playlists,
+                }
+            s = bytes(repr(savedata), "utf-8")
+            print(s)
+            f.write(s)
+            f.close()
+        except Exception as ex:
+            print(ex)
 
     def verifyID(self, value):
         return int(str(value).replace("<", "").replace(">", "").replace("@", "").replace("!", ""))

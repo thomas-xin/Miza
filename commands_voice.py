@@ -26,18 +26,17 @@ def getDuration(filename):
     return output
 
     
-class youtubeDownloader:
-    ydl_opts_1 = {
-        "quiet": 1,
-        "simulate": 1,
-        "default_search": "auto",
-        "skip_download": 1,
-        "nocheckcertificate": 1,
-        }
-    ydl_opts_2 = {
+class videoDownloader:
+    ydl_opts = {
         "quiet": 1,
         "format": "bestaudio/best",
         "outtmpl": "/cache/%(id)s.mp3",
+        "noplaylist": 1,
+        "nocheckcertificate": 1,
+        "nooverwrites": 1,
+        "ignoreerrors": 1,
+        "source_address": "0.0.0.0",
+        "default_search": "auto",
         }
     
     class urlBypass(urllib.request.FancyURLopener):
@@ -46,10 +45,7 @@ class youtubeDownloader:
     opener = urlBypass()
 
     def __init__(self):
-        self.searcher = youtube_dl.YoutubeDL(self.ydl_opts_1)
-        self.searcher.add_default_info_extractors()
-        self.downloader = youtube_dl.YoutubeDL(self.ydl_opts_2)
-        self.downloader.add_default_info_extractors()
+        self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
 
     def search(self, item, _vars):
         item = item.strip("<>")
@@ -83,7 +79,9 @@ class youtubeDownloader:
                 }]}
         except:
             try:
-                return self.searcher.extract_info(item)
+                print("Direct download failed, retrying with youtube_dl...")
+                pl = self.downloader.extract_info(item, False)
+                return pl
             except:
                 return {}
         
@@ -97,7 +95,7 @@ class youtubeDownloader:
 class queue:
     is_command = True
     server_only = True
-    ytdl = youtubeDownloader()
+    ytdl = videoDownloader()
 
     def __init__(self):
         self.name = ["q", "qlist", "play", "playing", "np"]
@@ -228,10 +226,10 @@ class queue:
 class playlist:
     is_command = True
     server_only = True
-    ytdl = youtubeDownloader()
+    ytdl = videoDownloader()
 
     def __init__(self):
-        self.name = ["defaultplaylist"]
+        self.name = ["defaultplaylist", "pl"]
         self.min_level = 2
         self.description = "Shows, appends, or removes from the default playlist."
         self.usage = "<link:[]> <remove:(?r)>"
@@ -246,12 +244,19 @@ class playlist:
                 "```\nCurrent default playlist for " + uniStr(guild.name) + ": "
                 + str(_vars.playlists.get(guild.id, [])) + ".```"
                 )
+        curr = _vars.playlists.get(guild.id, [])
+        if "r" in flags:
+            i = _vars.evalMath(argv)
+            temp = curr[i]
+            curr.pop(i)
+            _vars.playlists[guild.id] = curr
+            _vars.update()
+            return "```\nRemoved " + str(temp["name"]) + " from the default playlist for " + uniStr(guild.name) + ".```"
         output = [None]
         doParallel(self.ytdl.search, [argv, _vars], output)
         while output[0] is None:
             await asyncio.sleep(0.01)
         res = output[0]
-        #print(res)
         try:
             entries = res["entries"]
         except KeyError:
@@ -259,7 +264,6 @@ class playlist:
                 entries = [res]
             else:
                 entries = []
-        curr = _vars.playlists.get(guild.id, [])
         names = []
         for e in entries:
             name = e["title"]
@@ -280,8 +284,6 @@ class playlist:
         if len(names):
             _vars.playlists[guild.id] = curr
             _vars.update()
-            if "r" in flags:
-                return "```\nRemoved " + str(names) + " from the default playlist for " + uniStr(guild.name) + ".```"
             return "```\nAdded " + str(names) + " to the default playlist for " + uniStr(guild.name) + ".```"
         
 
@@ -411,7 +413,7 @@ class remove:
 class volume:
     is_command = True
     server_only = True
-    defaults = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0}
+    defaults = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0, "bitdepth": 16 / 100}
 
     def __init__(self):
         self.name = ["vol", "audio"]
@@ -424,14 +426,17 @@ class volume:
             op = "pitch"
         elif "b" in flags:
             op = "bassboost"
+        elif "d" in flags:
+            op = "bitdepth"
         elif "r" in flags:
             op = "reverb"
         else:
             op = "volume"
         if not len(argv.replace(" ", "")):
+            num = round(100. * _vars.volumes.get(guild.id, self.defaults)[op], 8)
             return (
                 "```\nCurrent audio " + op + " in " + uniStr(guild.name)
-                + ": " + uniStr(100. * _vars.volumes.get(guild.id, self.defaults)[op]) + ".```"
+                + ": " + uniStr(num) + ".```"
                 )
         s_perm = _vars.getPerms(user, guild)
         if s_perm < 1:
@@ -446,8 +451,8 @@ class volume:
         _vars.volumes[guild.id] = origVol
         return (
             "```\nChanged audio " + op + " in " + uniStr(guild.name)
-            + " from " + uniStr(100. * orig)
-            + " to " + uniStr(100. * val) + ".```"
+            + " from " + uniStr(round(100. * orig, 8))
+            + " to " + uniStr(round(100. * val, 8)) + ".```"
             )
 
 
@@ -457,7 +462,7 @@ class unmute:
 
     def __init__(self):
         self.name = ["unmuteall"]
-        self.min_level = 3
+        self.min_level = 2
         self.description = "Disables server mute for all members."
         self.usage = "<link:[]> <verbose:(?v)>"
 
