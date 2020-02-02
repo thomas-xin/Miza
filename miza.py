@@ -913,6 +913,7 @@ async def handleUpdate(force=False):
                                             "url": p["url"],
                                             "duration": p["duration"],
                                             "added by": client.user.name,
+                                            "u_id": client.user.id,
                                             "id": p["id"],
                                             "skips": (),
                                             })

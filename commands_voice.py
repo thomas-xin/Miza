@@ -197,6 +197,7 @@ class queue:
                     "url": url,
                     "duration": duration,
                     "added by": user.name,
+                    "u_id": user.id,
                     "id": v_id,
                     "skips": [],
                     })
@@ -371,10 +372,10 @@ class remove:
             curr = _vars.queue[guild.id]["queue"][pos]
         except LookupError:
             raise IndexError("Entry " + uniStr(pos) + " is out of range.")
-        if user.id not in curr["skips"] and type(curr["skips"]) is not tuple:
-            if "f" in flags:
+        if type(curr["skips"]) is not tuple:
+            if "f" in flags or user.id == curr["u_id"]:
                 curr["skips"] = ()
-            else:
+            elif user.id not in curr["skips"]:
                 curr["skips"].append(user.id)
         members = 0
         for vc in client.voice_clients:
