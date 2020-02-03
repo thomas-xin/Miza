@@ -3,6 +3,7 @@ import urllib.request
 from scipy.signal import butter, sosfilt, resample
 from smath import *
 
+
 client = discord.Client(
     max_messages=2000,
     activity=discord.Activity(name=uniStr("Magic")),
@@ -11,22 +12,41 @@ client = discord.Client(
 
 class customAudio(discord.AudioSource):
 
-    def __init__(self, source, guild_id):
-        self.source = discord.FFmpegPCMAudio(source)
-        self.guild_id = guild_id
+    def __init__(self, c_id):
+        self.queue = []
+        self.channel = c_id
+        self.is_playing = False
         self.buffer = []
         self.feedback = None
         self.bassadj = None
         self.bass = butter(2, 1/6, btype="low", output="sos")
         self.filt = butter(1, 1/3, btype="low", output="sos")
-        self.defaults = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0, "bitdepth": 16 / 100}
+        self.stats = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0, "bitdepth": 16 / 100}
+
+    def change(self, source):
         self.readpos = 0
+        if getattr(self, "source", None) is not None:
+            self.source.cleanup()
+        self.source = discord.FFmpegPCMAudio(source)
+
+    def new(self, source):
+        doParallel(self.change, [source])
         
     def read(self):
-        temp = self.source.read()
-        self.readpos += 1
         try:
-            sndset = _vars.volumes.get(self.guild_id, self.defaults)
+            temp = self.source.read()
+            if not len(temp):
+                raise EOFError
+            self.readpos += 1
+            self.is_playing = True
+        except:
+            self.readpos = 0
+            if self.is_playing:
+                sendUpdateRequest(True)
+            self.is_playing = False
+            temp = numpy.zeros(1920, numpy.int16).tobytes()
+        try:
+            sndset = self.stats
             volume = sndset["volume"]
             reverb = sndset["reverb"]
             pitch = sndset["pitch"]
@@ -98,7 +118,6 @@ class customAudio(discord.AudioSource):
 
     def is_opus(self):
         return False
-        #return self.source.is_opus()
 
     def cleanup(self):
         return self.source.cleanup()
@@ -318,7 +337,6 @@ class _globals:
         self.blocked = 0
         self.doUpdate = False
         self.msgFollow = {}
-        self.volumes = {}
         self.audiocache = {}
         should_cache = []
         for g in self.playlists:
@@ -409,6 +427,9 @@ class _globals:
             f.close()
         except Exception as ex:
             print(ex)
+
+    def createPlayer(self, c_id):
+        return customAudio(c_id)
 
     def verifyID(self, value):
         return int(str(value).replace("<", "").replace(">", "").replace("@", "").replace("!", ""))
@@ -812,7 +833,6 @@ async def on_ready():
 
 def sendUpdateRequest(error=False):
     _vars.doUpdate = True
-    #asyncio.create_task(handleUpdate(True))
 
 
 async def handleUpdate(force=False):
@@ -861,6 +881,8 @@ async def handleUpdate(force=False):
             for vc in client.voice_clients:
                 channel = vc.channel
                 guild = channel.guild
+                auds = _vars.queue[guild.id]
+                playing = auds.is_playing
                 membs = channel.members
                 for memb in membs:
                     if memb.id == client.user.id:
@@ -868,7 +890,7 @@ async def handleUpdate(force=False):
                 cnt = len(membs)
                 if not cnt:
                     try:
-                        channel = await client.fetch_channel(_vars.queue[guild.id]["channel"])
+                        channel = await client.fetch_channel(auds.channel)
                         _vars.queue.pop(guild.id)
                         msg = "```\n🎵 Successfully disconnected from "+ uniStr(guild.name) + ". 🎵```"
                         await channel.send(
@@ -880,7 +902,7 @@ async def handleUpdate(force=False):
                     await vc.disconnect(force=False)
                 else:
                     try:
-                        q = _vars.queue[guild.id]["queue"]
+                        q = _vars.queue[guild.id].queue
                         for e in q:
                             e_id = e["id"]
                             if e_id in _vars.audiocache:
@@ -905,7 +927,9 @@ async def handleUpdate(force=False):
                                                     ytdl.download,
                                                     [q[i]["url"], q[i]["id"], durc],
                                                     )
-                            if q[0]["id"][0] != "@" and not vc.is_playing():
+                                            else:
+                                                q[i]["duration"] = ytdl.getDuration("cache/" + search)
+                            if q[0]["id"][0] != "@" and not playing:
                                 try:
                                     path = "cache/" + q[0]["id"].replace("@", "") + ".mp3"
                                     f = open(path, "rb")
@@ -915,17 +939,19 @@ async def handleUpdate(force=False):
                                     if len(b) < minl:
                                         raise FileNotFoundError
                                     q[0]["id"] = "@" + q[0]["id"]
-                                    auds = customAudio(path, guild.id)
-                                    vc.play(auds, after=sendUpdateRequest)
+                                    auds = _vars.queue[guild.id]
+                                    auds.new(path)
+                                    if not vc.is_playing():
+                                        vc.play(auds, after=sendUpdateRequest)
                                     q[0]["start_time"] = time.time()
-                                    channel = await client.fetch_channel(_vars.queue[guild.id]["channel"])
+                                    channel = await client.fetch_channel(auds.channel)
                                     await channel.send(
                                         "```\n🎵 Now playing " + uniStr(q[0]["name"])
                                         + ", added by " + uniStr(q[0]["added by"]) + "! 🎵```"
                                         )
                                 except FileNotFoundError:
                                     pass
-                            elif not vc.is_playing():
+                            elif not playing:
                                 q.pop(0)
                                 if not len(q):
                                     t = _vars.playlists.get(guild.id, ())

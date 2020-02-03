@@ -23,7 +23,9 @@ def getDuration(filename):
         output = output[:i]
     except ValueError:
         pass
-    return float(output)
+    n = float(output)
+    print(n)
+    return n
 
 
 class urlBypass(urllib.request.FancyURLopener):
@@ -48,7 +50,7 @@ class videoDownloader:
         self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
 
     def search(self, item):
-        item = item.strip("<>")
+        item = item.strip("<>").replace("\n", "")
         try:
             pl = self.downloader.extract_info(item, False)
             if "direct" in pl:
@@ -88,16 +90,17 @@ class videoDownloader:
     def download(self, item, i_id, durc=None):
         new_opts = dict(self.ydl_opts)
         fn = "cache/" + i_id.replace("@", "") + ".mp3"
-        print(fn)
         new_opts["outtmpl"] = fn
         downloader = youtube_dl.YoutubeDL(new_opts)
         try:
             downloader.download([item])
             if durc is not None:
                 durc[0] = getDuration(fn)
-                print(durc)
         except Exception as ex:
             print(repr(ex))
+
+    def getDuration(self, filename):
+        return getDuration(filename)
 
 
 class queue:
@@ -123,11 +126,12 @@ class queue:
                     except AttributeError:
                         pass
         try:
-            _vars.queue[guild.id]["channel"] = channel.id
+            auds = _vars.queue[guild.id]
+            auds.channel = channel.id
         except KeyError:
             raise KeyError("Voice channel not found.")
+        q = _vars.queue[guild.id].queue
         if not len(argv.replace(" ", "")):
-            q = _vars.queue[guild.id]["queue"]
             if not len(q):
                 return "```\nQueue for " + uniStr(guild.name) + " is currently empty. ```"
             t = time.time()
@@ -205,13 +209,13 @@ class queue:
                     dur = duration
                 names.append(name)
             total_duration = 0
-            for e in _vars.queue[guild.id]["queue"]:
+            for e in q:
                 if "start_time" in e:
                     total_duration += e["duration"] + e["start_time"] - time.time()
                 else:
                     total_duration += e["duration"]
             total_duration = max(total_duration, dur / 128 + frand(0.5) + 2)
-            _vars.queue[guild.id]["queue"] += added
+            q += added
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")
             if "v" in flags:
@@ -306,7 +310,7 @@ class join:
             if user.id == client.user.id:
                 asyncio.create_task(user.edit(mute=False,deafen=False))
         if guild.id not in _vars.queue:
-            _vars.queue[guild.id] = {"channel": channel.id, "queue": []}
+            _vars.queue[guild.id] = _vars.createPlayer(channel.id)
         if joined:
             return (
                 "```\n🎵 Successfully connected to " + uniStr(vc.name)
@@ -361,14 +365,14 @@ class remove:
         try:
             if not isValid(pos):
                 if "f" in flags:
-                    _vars.queue[guild.id]["queue"] = []
+                    _vars.queue[guild.id].queue = []
                     print("Stopped audio playback in " + guild.name)
                     for vc in client.voice_clients:
                         if vc.channel.guild.id == guild.id:
                             vc.stop()
                     return "```\nRemoved all items from the queue.```"
                 raise LookupError
-            curr = _vars.queue[guild.id]["queue"][pos]
+            curr = _vars.queue[guild.id].queue[pos]
         except LookupError:
             raise IndexError("Entry " + uniStr(pos) + " is out of range.")
         if type(curr["skips"]) is not tuple:
@@ -391,11 +395,12 @@ class remove:
                 + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + "."
                 )
         skipped = False
+        q = _vars.queue[guild.id].queue
         i = 0
-        while i < len(_vars.queue[guild.id]["queue"]):
-            song = _vars.queue[guild.id]["queue"][i]
+        while i < len(q):
+            song = q[i]
             if len(song["skips"]) >= required or type(song["skips"]) is tuple:
-                _vars.queue[guild.id]["queue"].pop(i)
+                q.pop(i)
                 response += "\n" + uniStr(song["name"]) + " has been removed from the queue."
                 if i == 0:
                     print("Stopped audio playback in " + guild.name)
@@ -418,7 +423,22 @@ class volume:
         self.description = "Changes the current playing volume in this server."
         self.usage = "<value> <reverb(?r)> <pitch(?p)>"
 
-    async def __call__(self, user, guild, _vars, flags, argv, **void):
+    async def __call__(self, client, channel, user, guild, _vars, flags, argv, **void):
+        found = False
+        if guild.id not in _vars.queue:
+            for func in _vars.categories["voice"]:
+                if "join" in func.name:
+                    try:
+                        await func(client=client, user=user, _vars=_vars, channel=channel, guild=guild)
+                    except discord.ClientException:
+                        pass
+                    except AttributeError:
+                        pass
+        try:
+            auds = _vars.queue[guild.id]
+            auds.channel = channel.id
+        except KeyError:
+            raise KeyError("Voice channel not found.")
         if "p" in flags:
             op = "pitch"
         elif "b" in flags:
@@ -430,7 +450,7 @@ class volume:
         else:
             op = "volume"
         if not len(argv.replace(" ", "")):
-            num = round(100. * _vars.volumes.get(guild.id, self.defaults)[op], 8)
+            num = round(100. * _vars.queue[guild.id].stats[op], 8)
             return (
                 "```\nCurrent audio " + op + " in " + uniStr(guild.name)
                 + ": " + uniStr(num) + ".```"
@@ -441,11 +461,10 @@ class volume:
                 "Insufficient permissions to change volume. Current permission level: " + uniStr(s_perm)
                 + ", required permission level: " + uniStr(1) + "."
                 )
-        origVol = _vars.volumes.get(guild.id, dict(self.defaults))
+        origVol = _vars.queue[guild.id].stats
         val = roundMin(float(_vars.evalMath(argv) / 100))
         orig = origVol[op]
         origVol[op] = val
-        _vars.volumes[guild.id] = origVol
         return (
             "```\nChanged audio " + op + " in " + uniStr(guild.name)
             + " from " + uniStr(round(100. * orig, 8))

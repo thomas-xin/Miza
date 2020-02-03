@@ -277,13 +277,15 @@ class restart:
     def __init__(self):
         self.name = ["shutdown"]
         self.min_level = inf
-        self.description = "Restarts down the bot."
+        self.description = "Restarts the bot."
         self.usage = ""
 
     async def __call__(self, client, channel, **void):
-        await channel.send("Shutting down... :wave:")
+        await channel.send("Restarting... :wave:")
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
+        os.system("python miza.py")
+        print("Shutting down...")
         await client.close()
         sys.exit()
         quit()
