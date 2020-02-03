@@ -127,6 +127,7 @@ class queue:
                         pass
         try:
             auds = _vars.queue[guild.id]
+            elapsed = auds.readpos / 50
             auds.channel = channel.id
         except KeyError:
             raise KeyError("Voice channel not found.")
@@ -134,9 +135,7 @@ class queue:
         if not len(argv.replace(" ", "")):
             if not len(q):
                 return "```\nQueue for " + uniStr(guild.name) + " is currently empty. ```"
-            t = time.time()
-            origTime = q[0].get("start_time", t)
-            totalTime = origTime - t
+            totalTime = -elapsed
             for e in q:
                 totalTime += e["duration"]
             if "v" in flags:
@@ -164,7 +163,7 @@ class queue:
                             )
                     else:
                         curr += limStr(uniStr(e["name"]), 48)
-                    estim = currTime + origTime - t
+                    estim = currTime - elapsed
                     if estim > 0:
                         curr += ", Time until playing: " + uniStr(" ".join(timeConv(estim)))
                     else:
@@ -210,11 +209,8 @@ class queue:
                 names.append(name)
             total_duration = 0
             for e in q:
-                if "start_time" in e:
-                    total_duration += e["duration"] + e["start_time"] - time.time()
-                else:
-                    total_duration += e["duration"]
-            total_duration = max(total_duration, dur / 128 + frand(0.5) + 2)
+                total_duration += e["duration"]
+            total_duration = max(total_duration - elapsed, dur / 128 + frand(0.5) + 2)
             q += added
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")

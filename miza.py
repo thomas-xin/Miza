@@ -13,6 +13,7 @@ client = discord.Client(
 class customAudio(discord.AudioSource):
 
     def __init__(self, c_id):
+        self.change()
         self.queue = []
         self.channel = c_id
         self.is_playing = False
@@ -23,11 +24,12 @@ class customAudio(discord.AudioSource):
         self.filt = butter(1, 1/3, btype="low", output="sos")
         self.stats = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0, "bitdepth": 16 / 100}
 
-    def change(self, source):
+    def change(self, source=None):
         self.readpos = 0
-        if getattr(self, "source", None) is not None:
-            self.source.cleanup()
-        self.source = discord.FFmpegPCMAudio(source)
+        if source is not None:
+            if getattr(self, "source", None) is not None:
+                self.source.cleanup()
+            self.source = discord.FFmpegPCMAudio(source)
 
     def new(self, source):
         doParallel(self.change, [source])
@@ -943,7 +945,6 @@ async def handleUpdate(force=False):
                                     auds.new(path)
                                     if not vc.is_playing():
                                         vc.play(auds, after=sendUpdateRequest)
-                                    q[0]["start_time"] = time.time()
                                     channel = await client.fetch_channel(auds.channel)
                                     await channel.send(
                                         "```\n🎵 Now playing " + uniStr(q[0]["name"])
