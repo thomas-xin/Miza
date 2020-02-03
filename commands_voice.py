@@ -480,10 +480,10 @@ class volume:
     server_only = True
 
     def __init__(self):
-        self.name = ["vol", "audio"]
+        self.name = ["vol", "audio", "v"]
         self.min_level = 0
         self.description = "Changes the current playing volume in this server."
-        self.usage = "<value> <reverb(?r)> <pitch(?p)>"
+        self.usage = "<value> <reverb(?r)> <pitch(?p)> <bassboost(?b)> <delay(?d)>"
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, **void):
         found = False
@@ -506,7 +506,7 @@ class volume:
         elif "b" in flags:
             op = "bassboost"
         elif "d" in flags:
-            op = "bitdepth"
+            op = "delay"
         elif "r" in flags:
             op = "reverb"
         else:

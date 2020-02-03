@@ -288,7 +288,8 @@ class restart:
             s_perm = _vars.getPerms(user, guild)
             if s_perm is not nan:
                 raise PermissionError("Insufficient priviliges to request shutdown.")
-        os.startfile("miza.bat")
+        else:
+            os.startfile("miza.bat")
         await client.close()
         raise BaseException("Shutting down...")
 

@@ -1,4 +1,4 @@
-import discord, ast, os, sys, asyncio, datetime, json, shlex
+import discord, ast, os, sys, asyncio, datetime, json, shlex, traceback
 import urllib.request
 from scipy.signal import butter, sosfilt, resample
 from smath import *
@@ -6,25 +6,30 @@ from smath import *
 
 client = discord.Client(
     max_messages=2000,
-    activity=discord.Activity(name=uniStr("Magic")),
     )
 
 
 class customAudio(discord.AudioSource):
+    
+    length = 1920
+    empty = numpy.zeros(length >> 1, float)
+    bass = butter(2, 1/6, btype="low", output="sos")
+    filt = butter(1, 1/3, btype="low", output="sos")
 
     def __init__(self, c_id):
         self.change()
         self.queue = []
         self.channel = c_id
-        self.delay = 16
-        self.length = 1920
-        self.empty = numpy.zeros(self.length, float)
         self.buffer = []
         self.feedback = None
         self.bassadj = None
-        self.bass = butter(2, 1/6, btype="low", output="sos")
-        self.filt = butter(1, 1/3, btype="low", output="sos")
-        self.stats = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0, "bitdepth": 16 / 100}
+        self.stats = {
+            "volume": 1,
+            "reverb": 0,
+            "pitch": 0,
+            "bassboost": 0,
+            "delay": 16 / 5,
+            }
 
     def change(self, source=None):
         self.readpos = 0
@@ -61,26 +66,23 @@ class customAudio(discord.AudioSource):
             reverb = sndset["reverb"]
             pitch = sndset["pitch"]
             bassboost = sndset["bassboost"]
-            bitdepth = round(sndset["bitdepth"] * 100)
-            if volume == 1 and reverb == pitch == bassboost == 0 and bitdepth == 16:
+            delay = min(400, max(2, round(sndset["delay"] * 5)))
+            if volume == 1 and reverb == pitch == bassboost == 0 and delay == 16:
                 return temp
             array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
-            size = len(array)
-            if 0 < bitdepth < 16:
-                bd = 2 ** (bitdepth - 16)
-                array = numpy.round(array * bd) / bd
+            size = self.length >> 1
             if not isValid(volume):
-                array = numpy.random.rand(len(temp)) * 65536 - 32768
-            else:
+                array = numpy.random.rand(self.length << 1) * 65536 - 32768
+            elif volume != 1:
                 array *= volume
+            left, right = array[::2], array[1::2]
             if bassboost:
                 if self.bassadj is not None:
                     array += sosfilt(self.bass, numpy.concatenate((self.bassadj, array)))[size:]
                 self.bassadj = numpy.array(array) * bassboost
             if pitch:
-                left, right = array[::2], array[1::2]
                 lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
-                n = max(len(lft), len(rft))
+                n = size
                 lsh, rsh = numpy.zeros(n, lft.dtype), numpy.zeros(n, rft.dtype)
                 s = round(pitch)
                 if s < 0:
@@ -92,37 +94,45 @@ class customAudio(discord.AudioSource):
                     numpy.fft.irfft(lsh, len(left)),
                     numpy.fft.irfft(rsh, len(right))
                     )
-                array = numpy.stack((left, right), axis=-1).flatten()
             if reverb:
                 if not len(self.buffer):
-                    self.buffer = [self.empty] * self.delay
+                    self.buffer = [[self.empty] * 2] * delay
                 r = 18
                 p1 = round(size * (0.5 - 2 / r))
                 p2 = round(size * (0.5 - 1 / r))
                 p3 = round(size * 0.5)
                 p4 = round(size * (0.5 + 1 / r))
                 p5 = round(size * (0.5 + 2 / r))
-                feedback = (
-                    numpy.concatenate((self.buffer[0][p1:], self.buffer[1][:p1])) / 24
-                    + numpy.concatenate((self.buffer[0][p2:], self.buffer[1][:p2])) / 12
-                    + numpy.concatenate((self.buffer[0][p3:], self.buffer[1][:p3])) * 0.75
-                    + numpy.concatenate((self.buffer[0][p4:], self.buffer[1][:p4])) / 12
-                    + numpy.concatenate((self.buffer[0][p5:], self.buffer[1][:p5])) / 24
+                lfeed = (
+                    + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 24
+                    + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
+                    + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
+                    + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
+                    + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 24
+                    ) * reverb
+                rfeed = (
+                    + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 24
+                    + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
+                    + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
+                    + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
+                    + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 24
                     ) * reverb
                 if self.feedback is not None:
-                    array -= sosfilt(self.filt, numpy.concatenate((self.feedback, feedback)))[size:]
-                self.feedback = feedback
+                    left -= sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size:]
+                    right -= sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size:]
+                self.feedback = (lfeed, rfeed)
                 #array = numpy.convolve(array, resizeVector(self.buffer[0], len(array) * 2))
-                self.buffer = self.buffer[-self.delay:]
-                left, right = array[::2], array[1::2]
-                flipped = numpy.stack((right, left), axis=-1).flatten()
-                self.buffer.append(flipped)
+                self.buffer = self.buffer[-delay:]
+                a = 1 / 16
+                b = 1 - a
+                self.buffer.append((left * a + right * b, left * b + right * a))
             else:
                 self.buffer = []
+            array = numpy.stack((left, right), axis=-1).flatten()
             numpy.clip(array, -32767, 32767, out=array)
             temp = array.astype(numpy.int16).tobytes()
         except Exception as ex:
-            print(ex)
+            print(traceback.format_exc())
         return temp
 
     def is_opus(self):
@@ -343,6 +353,7 @@ class _globals:
         self.resetGlobals()
         doParallel(self.getModules)
         self.current_channel = None
+        self.guilds = 0
         self.blocked = 0
         self.doUpdate = False
         self.msgFollow = {}
@@ -364,7 +375,7 @@ class _globals:
                 try:
                     os.remove("cache/" + path)
                 except Exception as ex:
-                    print(ex)
+                    print(traceback.format_exc())
 
     def loadSave(self):
         try:
@@ -435,7 +446,7 @@ class _globals:
             f.write(s)
             f.close()
         except Exception as ex:
-            print(ex)
+            print(traceback.format_exc())
 
     def createPlayer(self, c_id):
         return customAudio(c_id)
@@ -718,7 +729,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             errmsg = "```\nError: Error message too long.\n```"
                         else:
                             errmsg = "```\nError: " + rep + "\n```"
-                        print(errmsg)
+                        print(traceback.format_exc())
                         await channel.send(errmsg)
     elif not edit and u_id != client.user.id and g_id in _vars.following:
         checker = orig
@@ -772,7 +783,7 @@ async def outputLoop():
                 except discord.errors.NotFound:
                     pass
             except Exception as ex:
-                print(ex)
+                print(traceback.format_exc())
         elif proc[0] == "&":
             proc = proc[1:]
             hist = await ch.history(limit=1).flatten()
@@ -818,7 +829,7 @@ async def changeColour(g_id, roles, counter):
                 #print("Edited role " + role.name)
             await asyncio.sleep(frand(2))
         except discord.errors.HTTPException as ex:
-            print(ex)
+            print(traceback.format_exc())
             _vars.blocked += 20
             break
 
@@ -845,8 +856,21 @@ def sendUpdateRequest(error=False):
 
 
 async def handleUpdate(force=False):
-    global client, _vars
     if force or time.time() - _vars.lastCheck > 0.5:
+        guilds = len(client.guilds)
+        if guilds != _vars.guilds:
+            _vars.guilds = guilds
+            u = await client.fetch_user(_vars.owner_id)
+            n = u.name
+            gamestr = (
+                "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s")
+                + " place, to " + uniStr(guilds) + " servers!"
+                )
+            print(gamestr)
+            game = discord.Game(gamestr)
+            await client.change_presence(
+                activity=game,
+                )
         _vars.lastCheck = time.time()
         dtime = datetime.datetime.utcnow().timestamp()
         bans = _vars.bans
@@ -973,7 +997,7 @@ async def handleUpdate(force=False):
                                             "skips": (),
                                             })
                     except KeyError as ex:
-                        print("Error: " + repr(ex))
+                        print(traceback.format_exc())
             l = list(_vars.audiocache)
             for i in l:
                 if not i in should_cache:
@@ -1006,8 +1030,8 @@ async def checkDelete(message, reaction, user):
                         temp = message.content
                         await message.delete()
                         print(temp + " deleted by " + user.name)
-                    except Exception as ex:
-                        print(repr(ex))
+                    except discord.NotFound:
+                        pass
             await handleUpdate()
 
 
@@ -1075,8 +1099,7 @@ async def on_raw_reaction_add(payload):
         channel = await client.fetch_channel(payload.channel_id)
         user = await client.fetch_user(payload.user_id)
         message = await channel.fetch_message(payload.message_id)
-    except Exception as ex:
-        print(repr(ex))
+    except discord.NotFound:
         return
     if user.id != client.user.id:
         reaction = payload.emoji
@@ -1137,7 +1160,7 @@ async def handleMessage(message, edit=True):
             try:
                 await message.add_reaction("❎")
             except Exception as ex:
-                print(repr(ex))
+                print(traceback.format_exc())
     try:
         await asyncio.wait_for(processMessage(message, reconstitute(msg), edit, msg), timeout=_vars.timeout)
     except Exception as ex:
@@ -1178,7 +1201,7 @@ async def on_raw_message_edit(payload):
                     try:
                         message = await channel.fetch_message(payload.message_id)
                     except Exception as ex:
-                        print(repr(ex))
+                        print(traceback.format_exc())
     if message:
         await handleUpdate()
         await handleMessage(message)
