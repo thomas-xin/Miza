@@ -1,4 +1,4 @@
-import datetime
+import datetime, traceback
 from smath import *
 
 
@@ -54,6 +54,7 @@ class purge:
                 deleted += min(len(delM), 100)
                 delM = delM[100:]
         except:
+            print(traceback.format_exc())
             for m in delM:
                 try:
                     await m.delete()

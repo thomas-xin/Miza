@@ -332,7 +332,7 @@ class loop:
         self.usage = "<0:iterations> <1:command> <hide:(?h)>"
 
     async def __call__(self, args, argv, message, callback, _vars, flags, **void):
-        iters = _vars.evalMath(args[0])
+        iters = round(float(_vars.evalMath(args[0])))
         func = func2 = " ".join(args[1:])
         if flags:
             func += " ?" + "?".join(flags)

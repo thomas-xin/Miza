@@ -819,7 +819,8 @@ async def updateLoop():
 async def changeColour(g_id, roles, counter):
     guild = await client.fetch_guild(g_id)
     colTime = 12
-    for r in roles:
+    l = list(roles)
+    for r in l:
         try:
             role = guild.get_role(r)
             delay = roles[r]

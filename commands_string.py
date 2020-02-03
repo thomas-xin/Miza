@@ -240,13 +240,14 @@ class translate:
         for i in range(count):
             for t in trans:
                 try:
-                    dest = dest[:-2] + dest[-2:].upper()
+                    dest = dest[:2] + dest[2:].upper()
                     output = translators[t].translate(string, dest, source)
                     output = output.text
                     response += "\n" + output + "  `" + t + "`"
                     source, dest = dest, source
                     break
-                except:
+                except Exception as ex:
+                    print(ex)
                     if t == trans[-1]:
                         raise
         return response + end

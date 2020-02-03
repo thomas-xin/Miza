@@ -130,7 +130,7 @@ class queue:
             elapsed = auds.readpos / 50
             auds.channel = channel.id
         except KeyError:
-            raise KeyError("Voice channel not found.")
+            raise LookupError("Voice channel not found.")
         q = _vars.queue[guild.id].queue
         if not len(argv.replace(" ", "")):
             if not len(q):
@@ -331,7 +331,7 @@ class leave:
                 _vars.queue.pop(guild.id)
                 await vclient.disconnect(force=False)
                 return "```\n🎵 Successfully disconnected from " + uniStr(guild.name) + ". 🎵```"
-        raise EOFError("Unable to find connected channel.")
+        raise LookupError("Unable to find connected channel.")
 
 
 class remove:
@@ -347,7 +347,7 @@ class remove:
     async def __call__(self, client, user, _vars, argv, guild, flags, **void):
         found = False
         if guild.id not in _vars.queue:
-            raise EOFError("Currently not playing in a voice channel.")
+            raise LookupError("Currently not playing in a voice channel.")
         s_perm = _vars.getPerms(user, guild)
         if "f" in flags and s_perm < 2:
             raise PermissionError(
@@ -433,7 +433,7 @@ class pause:
             auds = _vars.queue[guild.id]
             auds.channel = channel.id
         except KeyError:
-            raise KeyError("Voice channel not found.")
+            raise LookupError("Voice channel not found.")
         auds.paused = name == "pause"
         return "```\nSuccessfully " + name + "d audio playback in " + uniStr(guild.name) + ".```"
 
@@ -470,7 +470,7 @@ class copy:
         try:
             auds = _vars.queue[guild.id]
         except KeyError:
-            raise KeyError("Voice channel not found.")
+            raise LookupError("Voice channel not found.")
         _vars.queue[guild.id] = auds = copy.deepcopy(target)
         auds.channel = channel.id
 
@@ -500,7 +500,7 @@ class volume:
             auds = _vars.queue[guild.id]
             auds.channel = channel.id
         except KeyError:
-            raise KeyError("Voice channel not found.")
+            raise LookupError("Voice channel not found.")
         if "p" in flags:
             op = "pitch"
         elif "b" in flags:
