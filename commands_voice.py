@@ -23,14 +23,17 @@ def getDuration(filename):
         output = output[:i]
     except ValueError:
         pass
-    return output
+    return float(output)
+
+
+class urlBypass(urllib.request.FancyURLopener):
+    version = "Mozilla/6.0"
 
     
 class videoDownloader:
     ydl_opts = {
         "quiet": 1,
         "format": "bestaudio/best",
-        "outtmpl": "/cache/%(id)s.mp3",
         "noplaylist": 1,
         "nocheckcertificate": 1,
         "nooverwrites": 1,
@@ -38,58 +41,63 @@ class videoDownloader:
         "source_address": "0.0.0.0",
         "default_search": "auto",
         }
-    
-    class urlBypass(urllib.request.FancyURLopener):
-        version = "Mozilla/6.0"
 
     opener = urlBypass()
 
     def __init__(self):
         self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
 
-    def search(self, item, _vars):
+    def search(self, item):
         item = item.strip("<>")
         try:
-            resp = self.opener.open(item)
-            if resp.getcode() != 200:
-                raise
-            cont = resp.read()
-            check = "<!DOCTYPE html>"
-            if cont[:len(check)] == check:
-                raise
-            name = item.split("/")[-1]
-            try:
-                i = name.index(".")
-                name = name[:i]
-            except ValueError:
-                pass
-            key = "&" + str(hash(item))
-            fn = "cache/" + key + ".mp3"
-            if fn not in os.listdir("cache/"):
-                f = open(fn, "wb")
-                f.write(cont)
-                f.close()
-            _vars.audiocache.append(key)
-            dur = float(getDuration(fn))
-            return {"entries": [{
-                "title": name,
-                "webpage_url": item,
-                "duration": dur,
-                "id": key,
-                }]}
-        except:
-            try:
-                print("Direct download failed, retrying with youtube_dl...")
-                pl = self.downloader.extract_info(item, False)
-                return pl
-            except:
-                return {}
+            pl = self.downloader.extract_info(item, False)
+            if "direct" in pl:
+                resp = self.opener.open(item)
+                rescode = resp.getcode()
+                if rescode != 200:
+                    raise ConnectionError(rescode)
+                header = dict(resp.headers.items())
+                duration = float(header["Content-Length"]) / 16384
+                hh = hex(hash(item)).replace("-", "").replace("0x", "")
+                return [{
+                    "name": pl["title"],
+                    "url": pl["webpage_url"],
+                    "duration": duration,
+                    "id": hh,
+                    }]
+            elif "entries" in pl:
+                output = []
+                for e in pl["entries"]:
+                    output.append({
+                        "name": e["title"],
+                        "url": e["webpage_url"],
+                        "duration": e["duration"],
+                        "id": e["id"],
+                        })
+            else:
+                output = [{
+                    "name": pl["title"],
+                    "url": pl["webpage_url"],
+                    "duration": pl["duration"],
+                    "id": pl["id"],
+                    }]
+            return output
+        except Exception as ex:
+            return str(ex)
         
-    def download(self, item):
+    def download(self, item, i_id, durc=None):
+        new_opts = dict(self.ydl_opts)
+        fn = "cache/" + i_id.replace("@", "") + ".mp3"
+        print(fn)
+        new_opts["outtmpl"] = fn
+        downloader = youtube_dl.YoutubeDL(new_opts)
         try:
-            self.downloader.download([item])
-        except youtube_dl.utils.DownloadError:
-            pass
+            downloader.download([item])
+            if durc is not None:
+                durc[0] = getDuration(fn)
+                print(durc)
+        except Exception as ex:
+            print(repr(ex))
 
 
 class queue:
@@ -122,7 +130,9 @@ class queue:
             q = _vars.queue[guild.id]["queue"]
             if not len(q):
                 return "```\nQueue for " + uniStr(guild.name) + " is currently empty. ```"
-            totalTime = 0
+            t = time.time()
+            origTime = q[0].get("start_time", t)
+            totalTime = origTime - t
             for e in q:
                 totalTime += e["duration"]
             if "v" in flags:
@@ -133,8 +143,6 @@ class queue:
                     )
             else:
                 info = ""
-            t = time.time()
-            origTime = q[0].get("start_time", t)
             currTime = 0
             showing = True
             show = ""
@@ -170,24 +178,18 @@ class queue:
                 )
         else:
             output = [None]
-            doParallel(self.ytdl.search, [argv, _vars], output)
+            doParallel(self.ytdl.search, [argv], output)
             while output[0] is None:
                 await asyncio.sleep(0.01)
             res = output[0]
-            #print(res)
-            try:
-                entries = res["entries"]
-            except KeyError:
-                if "uploader" in res:
-                    entries = [res]
-                else:
-                    entries = []
+            if type(res) is str:
+                raise ConnectionError(res)
             dur = 0
             added = []
             names = []
-            for e in entries:
-                name = e["title"]
-                url = e["webpage_url"]
+            for e in res:
+                name = e["name"]
+                url = e["url"]
                 duration = e["duration"]
                 v_id = e["id"]
                 added.append({
@@ -253,22 +255,17 @@ class playlist:
             _vars.update()
             return "```\nRemoved " + str(temp["name"]) + " from the default playlist for " + uniStr(guild.name) + ".```"
         output = [None]
-        doParallel(self.ytdl.search, [argv, _vars], output)
+        doParallel(self.ytdl.search, [argv], output)
         while output[0] is None:
             await asyncio.sleep(0.01)
         res = output[0]
-        try:
-            entries = res["entries"]
-        except KeyError:
-            if "uploader" in res:
-                entries = [res]
-            else:
-                entries = []
+        if type(res) is str:
+            raise ConnectionError(res)
         names = []
-        for e in entries:
-            name = e["title"]
+        for e in res:
+            name = e["name"]
             names.append(name)
-            url = e["webpage_url"]
+            url = e["url"]
             if "r" in flags:
                 for p in curr:
                     if p["url"] == url:
@@ -276,7 +273,7 @@ class playlist:
                         break
             else:
                 curr.append({
-                    "name": e["title"],
+                    "name": name,
                     "url": url,
                     "duration": e["duration"],
                     "id": e["id"],
@@ -444,7 +441,7 @@ class volume:
                 "Insufficient permissions to change volume. Current permission level: " + uniStr(s_perm)
                 + ", required permission level: " + uniStr(1) + "."
                 )
-        origVol = _vars.volumes.get(guild.id, self.defaults)
+        origVol = _vars.volumes.get(guild.id, dict(self.defaults))
         val = roundMin(float(_vars.evalMath(argv) / 100))
         orig = origVol[op]
         origVol[op] = val

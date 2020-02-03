@@ -8,6 +8,8 @@ images = {
     "https://media.discordapp.net/attachments/543449246221860885/651594997925281803/parrot.gif": ["parrot"],
     "https://cdn.discordapp.com/attachments/313292557603962881/671873663120703508/dolphino.gif": ["dolphin"],
     "https://cdn.discordapp.com/attachments/313292557603962881/671873485722746890/curiouseal.gif": ["seal"],
+    "https://cdn.discordapp.com/attachments/292453316099702786/673082811464286228/HW.gif": ["hw"],
+    "https://media.discordapp.net/attachments/528720242336333837/663588773283627018/WTF.gif": ["wtf"],    
     }
 
 

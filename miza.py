@@ -319,7 +319,7 @@ class _globals:
         self.doUpdate = False
         self.msgFollow = {}
         self.volumes = {}
-        self.audiocache = []
+        self.audiocache = {}
         should_cache = []
         for g in self.playlists:
             for i in self.playlists[g]:
@@ -881,12 +881,16 @@ async def handleUpdate(force=False):
                 else:
                     try:
                         q = _vars.queue[guild.id]["queue"]
+                        for e in q:
+                            e_id = e["id"]
+                            if e_id in _vars.audiocache:
+                                e["duration"] = _vars.audiocache[e_id][0]
                         if len(q):
                             for i in range(2):
                                 if i < len(q):
                                     e_id = q[i]["id"].replace("@", "")
                                     should_cache.append(e_id)
-                                    if q[i]["id"][0] != "&" and q[i]["id"][-1] != "@":
+                                    if q[i]["id"][-1] != "@":
                                         q[i]["id"] = e_id + "@"
                                         if e_id not in _vars.audiocache:
                                             search = e_id + ".mp3"
@@ -895,8 +899,12 @@ async def handleUpdate(force=False):
                                                 if search in path:
                                                     found = True
                                             if not found:
-                                                _vars.audiocache.append(e_id)
-                                                doParallel(ytdl.download, [q[i]["url"]])
+                                                durc = [q[i]["duration"]]
+                                                _vars.audiocache[e_id] = durc
+                                                doParallel(
+                                                    ytdl.download,
+                                                    [q[i]["url"], q[i]["id"], durc],
+                                                    )
                             if q[0]["id"][0] != "@" and not vc.is_playing():
                                 try:
                                     path = "cache/" + q[0]["id"].replace("@", "") + ".mp3"
@@ -934,16 +942,17 @@ async def handleUpdate(force=False):
                                             })
                     except KeyError as ex:
                         print("Error: " + repr(ex))
-            for i in _vars.audiocache:
+            l = list(_vars.audiocache)
+            for i in l:
                 if not i in should_cache:
                     path = "cache/" + i + ".mp3"
                     try:
                         os.remove(path)
-                        _vars.audiocache.remove(i)
+                        _vars.audiocache.pop(i)
                     except PermissionError:
                         pass
                     except FileNotFoundError:
-                        _vars.audiocache.remove(i)
+                        _vars.audiocache.pop(i)
 
 
 async def checkDelete(message, reaction, user):
