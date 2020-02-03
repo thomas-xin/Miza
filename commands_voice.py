@@ -1,4 +1,4 @@
-import youtube_dl, asyncio, discord, time, os, urllib
+import youtube_dl, asyncio, discord, time, os, urllib, copy
 from subprocess import check_output, CalledProcessError, STDOUT
 from smath import *
 
@@ -297,6 +297,8 @@ class join:
     async def __call__(self, client, user, _vars, channel, guild, **void):
         voice = user.voice
         vc = voice.channel
+        if guild.id not in _vars.queue:
+            _vars.queue[guild.id] = _vars.createPlayer(channel.id)
         try:
             joined = True
             await vc.connect(timeout=_vars.timeout, reconnect=True)
@@ -305,8 +307,6 @@ class join:
         for user in guild.members:
             if user.id == client.user.id:
                 asyncio.create_task(user.edit(mute=False,deafen=False))
-        if guild.id not in _vars.queue:
-            _vars.queue[guild.id] = _vars.createPlayer(channel.id)
         if joined:
             return (
                 "```\n🎵 Successfully connected to " + uniStr(vc.name)
@@ -408,10 +408,76 @@ class remove:
         return response + "```"
 
 
+class pause:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = ["resume"]
+        self.min_level = 1
+        self.description = "Pauses or resumes audio playing."
+        self.usage = ""
+
+    async def __call__(self, _vars, name, guild, client, user, channel, **void):
+        found = False
+        if guild.id not in _vars.queue:
+            for func in _vars.categories["voice"]:
+                if "join" in func.name:
+                    try:
+                        await func(client=client, user=user, _vars=_vars, channel=channel, guild=guild)
+                    except discord.ClientException:
+                        pass
+                    except AttributeError:
+                        pass
+        try:
+            auds = _vars.queue[guild.id]
+            auds.channel = channel.id
+        except KeyError:
+            raise KeyError("Voice channel not found.")
+        auds.paused = name == "pause"
+        return "```\nSuccessfully " + name + "d audio playback in " + uniStr(guild.name) + ".```"
+
+
+class copy:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = []
+        self.min_level = 2
+        self.description = "Copies the voice channel player from another server to this one."
+        self.usage = "<server_id>"
+
+    async def __call__(self, guild, _vars, argv, client, channel, user, **void):
+        if not len(argv.replace(" ", "")):
+            return "```\nID of " + uniStr(guild.name) + ": " + uniStr(guild.id) + ".```"
+        g_id = _vars.evalMath(argv)
+        try:
+            target = _vars.queue[g_id]
+        except KeyError:
+            raise LookupError("No voice channel player found.")
+        
+        found = False
+        if guild.id not in _vars.queue:
+            for func in _vars.categories["voice"]:
+                if "join" in func.name:
+                    try:
+                        await func(client=client, user=user, _vars=_vars, channel=channel, guild=guild)
+                    except discord.ClientException:
+                        pass
+                    except AttributeError:
+                        pass
+        try:
+            auds = _vars.queue[guild.id]
+        except KeyError:
+            raise KeyError("Voice channel not found.")
+        _vars.queue[guild.id] = auds = copy.deepcopy(target)
+        auds.channel = channel.id
+
+
 class volume:
     is_command = True
     server_only = True
-    defaults = {"volume": 1, "reverb": 0, "pitch": 0, "bassboost": 0, "bitdepth": 16 / 100}
 
     def __init__(self):
         self.name = ["vol", "audio"]

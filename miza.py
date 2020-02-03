@@ -16,7 +16,9 @@ class customAudio(discord.AudioSource):
         self.change()
         self.queue = []
         self.channel = c_id
-        self.is_playing = False
+        self.delay = 16
+        self.length = 1920
+        self.empty = numpy.zeros(self.length, float)
         self.buffer = []
         self.feedback = None
         self.bassadj = None
@@ -26,6 +28,8 @@ class customAudio(discord.AudioSource):
 
     def change(self, source=None):
         self.readpos = 0
+        self.is_playing = False
+        self.paused = False
         if source is not None:
             if getattr(self, "source", None) is not None:
                 self.source.cleanup()
@@ -36,17 +40,21 @@ class customAudio(discord.AudioSource):
         
     def read(self):
         try:
+            if self.paused:
+                self.is_playing = True
+                raise EOFError
             temp = self.source.read()
             if not len(temp):
                 raise EOFError
             self.readpos += 1
             self.is_playing = True
         except:
-            self.readpos = 0
-            if self.is_playing:
-                sendUpdateRequest(True)
-            self.is_playing = False
-            temp = numpy.zeros(1920, numpy.int16).tobytes()
+            if not self.paused:
+                self.is_playing = False
+                self.readpos = 0
+                if self.is_playing:
+                    sendUpdateRequest(True)
+            temp = numpy.zeros(self.length, numpy.uint16).tobytes()
         try:
             sndset = self.stats
             volume = sndset["volume"]
@@ -86,27 +94,26 @@ class customAudio(discord.AudioSource):
                     )
                 array = numpy.stack((left, right), axis=-1).flatten()
             if reverb:
-                try:
-                    r = 18
-                    p1 = round(size * (0.5 - 2 / r))
-                    p2 = round(size * (0.5 - 1 / r))
-                    p3 = round(size * 0.5)
-                    p4 = round(size * (0.5 + 1 / r))
-                    p5 = round(size * (0.5 + 2 / r))
-                    feedback = (
-                        numpy.concatenate((self.buffer[0][p1:], self.buffer[1][:p1])) / 24
-                        + numpy.concatenate((self.buffer[0][p2:], self.buffer[1][:p2])) / 12
-                        + numpy.concatenate((self.buffer[0][p3:], self.buffer[1][:p3])) * 0.75
-                        + numpy.concatenate((self.buffer[0][p4:], self.buffer[1][:p4])) / 12
-                        + numpy.concatenate((self.buffer[0][p5:], self.buffer[1][:p5])) / 24
-                        ) * reverb
-                    if self.feedback is not None:
-                        array -= sosfilt(self.filt, numpy.concatenate((self.feedback, feedback)))[size:]
-                    self.feedback = feedback
-                    #array = numpy.convolve(array, resizeVector(self.buffer[0], len(array) * 2))
-                    self.buffer = self.buffer[-16:]
-                except IndexError:
-                    pass
+                if not len(self.buffer):
+                    self.buffer = [self.empty] * self.delay
+                r = 18
+                p1 = round(size * (0.5 - 2 / r))
+                p2 = round(size * (0.5 - 1 / r))
+                p3 = round(size * 0.5)
+                p4 = round(size * (0.5 + 1 / r))
+                p5 = round(size * (0.5 + 2 / r))
+                feedback = (
+                    numpy.concatenate((self.buffer[0][p1:], self.buffer[1][:p1])) / 24
+                    + numpy.concatenate((self.buffer[0][p2:], self.buffer[1][:p2])) / 12
+                    + numpy.concatenate((self.buffer[0][p3:], self.buffer[1][:p3])) * 0.75
+                    + numpy.concatenate((self.buffer[0][p4:], self.buffer[1][:p4])) / 12
+                    + numpy.concatenate((self.buffer[0][p5:], self.buffer[1][:p5])) / 24
+                    ) * reverb
+                if self.feedback is not None:
+                    array -= sosfilt(self.filt, numpy.concatenate((self.feedback, feedback)))[size:]
+                self.feedback = feedback
+                #array = numpy.convolve(array, resizeVector(self.buffer[0], len(array) * 2))
+                self.buffer = self.buffer[-self.delay:]
                 left, right = array[::2], array[1::2]
                 flipped = numpy.stack((right, left), axis=-1).flatten()
                 self.buffer.append(flipped)
@@ -884,7 +891,7 @@ async def handleUpdate(force=False):
                 channel = vc.channel
                 guild = channel.guild
                 auds = _vars.queue[guild.id]
-                playing = auds.is_playing
+                playing = auds.is_playing and vc.is_playing()
                 membs = channel.members
                 for memb in membs:
                     if memb.id == client.user.id:
@@ -895,9 +902,7 @@ async def handleUpdate(force=False):
                         channel = await client.fetch_channel(auds.channel)
                         _vars.queue.pop(guild.id)
                         msg = "```\n🎵 Successfully disconnected from "+ uniStr(guild.name) + ". 🎵```"
-                        await channel.send(
-                            msg
-                            )
+                        await channel.send(msg)
                         print(msg)
                     except KeyError:
                         pass
