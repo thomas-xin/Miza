@@ -1,0 +1,12 @@
+Gabriel Ravier (https://github.com/GabrielRavier)
+-Help with code style
+-Debugging
+
+Brayconn (https://github.com/Brayconn)
+-Help with finding APIs for functions
+-Debugging
+
+Bombchu Link (https://github.com/BombchuLink)
+Clownacy (https://github.com/Clownacy)
+pachuco (https://github.com/pachuco)
+-Making the org2xm program for converting org files to xm tracked music
