@@ -534,7 +534,7 @@ class convert_org:
         try:
             f = discord.File(fn)
         except:
-            raise repr(fn)
+            raise eval(fn)
         return {
             "content": "Org successfully converted!",
             "file": f,

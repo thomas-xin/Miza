@@ -49,11 +49,22 @@ class videoDownloader:
 
     def __init__(self):
         self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
+        self.lastsearch = 0
+        self.requests = 0
 
     def search(self, item):
         item = item.strip("<>").replace("\n", "")
+        while self.requests > 4:
+            time.sleep(0.01)
+        if time.time() - self.lastsearch > 1800:
+            self.lastsearch = time.time()
+            self.searched = {}
+        if item in self.searched:
+            return self.searched[item]
         try:
+            self.requests += 1
             pl = self.downloader.extract_info(item, False)
+            self.requests = max(self.requests - 1, 0)
             if "direct" in pl:
                 resp = self.opener.open(item)
                 rescode = resp.getcode()
@@ -62,7 +73,7 @@ class videoDownloader:
                 header = dict(resp.headers.items())
                 duration = float(header["Content-Length"]) / 16384
                 hh = hex(hash(item)).replace("-", "").replace("0x", "")
-                return [{
+                output = [{
                     "name": pl["title"],
                     "url": pl["webpage_url"],
                     "duration": duration,
@@ -84,6 +95,7 @@ class videoDownloader:
                     "duration": pl["duration"],
                     "id": pl["id"],
                     }]
+            self.searched[item] = output
             return output
         except Exception as ex:
             return str(ex)
@@ -104,10 +116,13 @@ class videoDownloader:
         return getDuration(filename)
 
 
+downloader = videoDownloader()
+
+
 class queue:
     is_command = True
     server_only = True
-    ytdl = videoDownloader()
+    ytdl = downloader
 
     def __init__(self):
         self.name = ["q", "qlist", "play", "playing", "np"]
@@ -229,7 +244,7 @@ class queue:
 class playlist:
     is_command = True
     server_only = True
-    ytdl = videoDownloader()
+    ytdl = downloader
 
     def __init__(self):
         self.name = ["defaultplaylist", "pl"]

@@ -281,15 +281,16 @@ class restart:
         self.usage = ""
 
     async def __call__(self, client, channel, user, guild, name, **void):
-        await channel.send("Restarting... :wave:")
-        for vc in client.voice_clients:
-            await vc.disconnect(force=True)
         if name == "shutdown":
             s_perm = _vars.getPerms(user, guild)
             if s_perm is not nan:
                 raise PermissionError("Insufficient priviliges to request shutdown.")
+            await channel.send("Shutting down... :wave:")
         else:
+            await channel.send("Restarting... :wave:")
             os.startfile("miza.bat")
+        for vc in client.voice_clients:
+            await vc.disconnect(force=True)
         await client.close()
         raise BaseException("Shutting down...")
 

@@ -50,6 +50,7 @@ class customAudio(discord.AudioSource):
                 raise EOFError
             temp = self.source.read()
             if not len(temp):
+                sendUpdateRequest(True)
                 raise EOFError
             self.readpos += 1
             self.is_playing = True
@@ -232,7 +233,7 @@ fig = plt.figure()
 
 
 class _globals:
-    timeout = 20
+    timeout = 24
     deleted = [
         "discord",
         "client",
@@ -715,12 +716,12 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                 print("[RESPONSE OVER 64KB]")
                             if type(response) is list:
                                 for r in response:
-                                    await channel.send(r)
+                                    asyncio.create_task(channel.send(r))
                             elif type(response) is dict:
-                                await channel.send(**response)
+                                asyncio.create_task(channel.send(**response))
                             else:
                                 if len(response) <= 2000:
-                                    await channel.send(response)
+                                    asyncio.create_task(channel.send(response))
                                 else:
                                     fn = "cache/temp.txt"
                                     f = open(fn, "wb")
@@ -728,7 +729,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                     f.close()
                                     f = discord.File(fn)
                                     print(fn)
-                                    await channel.send("Response too long for message.", file=f)
+                                    asyncio.create_task(channel.send("Response too long for message.", file=f))
                     except Exception as ex:
                         rep = repr(ex)
                         if len(rep) > 1950:
@@ -736,7 +737,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         else:
                             errmsg = "```\nError: " + rep + "\n```"
                         print(traceback.format_exc())
-                        await channel.send(errmsg)
+                        asyncio.create_task(channel.send(errmsg))
     elif not edit and u_id != client.user.id and g_id in _vars.following:
         checker = orig
         curr = _vars.msgFollow.get(g_id)
@@ -940,9 +941,9 @@ async def handleUpdate(force=False):
                     await vc.disconnect(force=False)
                 else:
                     try:
-                        q = _vars.queue[guild.id].queue
+                        q = auds.queue
                         for e in q:
-                            e_id = e["id"]
+                            e_id = e["id"].replace("@", "")
                             if e_id in _vars.audiocache:
                                 e["duration"] = _vars.audiocache[e_id][0]
                         if len(q):
@@ -1138,7 +1139,6 @@ async def handleMessage(message, edit=True):
             "```\nLooping ",
             "Error: ",
             "Commands for ",
-            "Response too long for message.",
             "Hi, did you require my services for anything? Use ~? or ~help for help.",
             "Sorry, you are currently not permitted to request my services.",
             "Currently enabled command categories in ",
