@@ -1151,7 +1151,7 @@ async def handleMessage(message, edit=True):
             "Available commands in ",
             "Successfully connected to ",
             "Successfully disconnected from ",
-            "Currently playing in ",
+            "Queue for ",
             " to the queue!",
             "Voted to remove ",
             "has been removed from the queue.",

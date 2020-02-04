@@ -177,7 +177,7 @@ class queue:
                 if showing:
                     curr = "\n"
                     e = q[i]
-                    curr += " " * int(math.log10(len(q)))
+                    curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
                     curr += "【" + uniStr(i) + "】 "
                     if "v" in flags:
                         curr += (
@@ -192,16 +192,23 @@ class queue:
                         curr += ", Time until playing: " + uniStr(" ".join(timeConv(estim)))
                     else:
                         curr += ", Remaining time: " + uniStr(" ".join(timeConv(estim + e["duration"])))
-                    if len(show) + len(info) + len(curr) < 1920:
+                    if len(show) + len(info) + len(curr) < 1800:
                         show += curr
                     else:
                         show += uniStr("\nAnd " + str(len(q) - i) + " more...", 1)
                         showing = False
                 currTime += e["duration"]
+            duration = q[0]["duration"]
+            sym = "⬜⬛"
+            count = 16 * (1 + ("v" in flags))
+            r = round(elapsed / duration * count)
+            countstr = "Currently playing " + uniStr(q[0]["name"]) + ", "
+            countstr += uniStr(dhms(elapsed)) + "/" + uniStr(dhms(duration)) + ", "
+            countstr += sym[0] * r + sym[1] * (count - r) + "\n"
             return (
-                "Currently playing in **" + guild.name + "**: "
-                + info + "\n"
-                + "```\n" + show + "```"
+                "Queue for **" + guild.name + "**: "
+                + info + "\n```\n"
+                + countstr + show + "```"
                 )
         else:
             output = [None]
@@ -244,7 +251,7 @@ class queue:
                 names = names[0]
             if not "h" in flags:
                 return (
-                    "```\n🎶 Added " + str(names) + " to the queue! Estimated time until playing: "
+                    "```\n🎶 Added " + uniStr(names) + " to the queue! Estimated time until playing: "
                     + uniStr(" ".join(timeConv(total_duration))) + ". 🎶```"
                     )
 
@@ -277,7 +284,7 @@ class playlist:
             curr.pop(i)
             _vars.playlists[guild.id] = curr
             _vars.update()
-            return "```\nRemoved " + str(temp["name"]) + " from the default playlist for " + uniStr(guild.name) + ".```"
+            return "```\nRemoved " + uniStr(temp["name"]) + " from the default playlist for " + uniStr(guild.name) + ".```"
         output = [None]
         doParallel(self.ytdl.search, [argv], output)
         while output[0] is None:
@@ -305,7 +312,7 @@ class playlist:
         if len(names):
             _vars.playlists[guild.id] = curr
             _vars.update()
-            return "```\nAdded " + str(names) + " to the default playlist for " + uniStr(guild.name) + ".```"
+            return "```\nAdded " + uniStr(names) + " to the default playlist for " + uniStr(guild.name) + ".```"
         
 
 class join:
@@ -313,7 +320,7 @@ class join:
     server_only = True
 
     def __init__(self):
-        self.name = ["summon"]
+        self.name = ["summon", "connect"]
         self.min_level = 0
         self.description = "Summons the bot into a voice channel."
         self.usage = ""
@@ -349,13 +356,19 @@ class leave:
         self.usage = ""
 
     async def __call__(self, user, client, _vars, guild, **void):
+        error = None
+        try:
+            _vars.queue.pop(guild.id)
+        except KeyError:
+            error = LookupError("Unable to find connected channel.")
         found = False
         for vclient in client.voice_clients:
             if guild.id == vclient.channel.guild.id:
-                _vars.queue.pop(guild.id)
                 await vclient.disconnect(force=False)
                 return "```\n🎵 Successfully disconnected from " + uniStr(guild.name) + ". 🎵```"
-        raise LookupError("Unable to find connected channel.")
+        error = LookupError("Unable to find connected channel.")
+        if error is not None:
+            raise error
 
 
 class remove:

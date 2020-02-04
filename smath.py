@@ -1226,6 +1226,29 @@ def timeConv(s):
     return taken
 
 
+def dhms(s):
+    if not isValid(s):
+        return str(s)
+    output = str(int(s % 60))
+    if len(output) < 2:
+        output = "0" + output
+    if s >= 60:
+        temp = str(int((s // 60) % 60))
+        if len(temp) < 2 and s > 3600:
+            temp = "0" + temp
+        output = temp + ":" + output
+        if s >= 3600:
+            temp = str(int(((s // 60) // 60) % 24))
+            if len(temp) < 2 and s >= 86400:
+                temp = "0" + temp
+            output = temp + ":" + output
+            if s >= 86400:
+                output = str(int(((s // 60) // 60) // 24)) + ":" + output
+    else:
+        output = "0:" + output
+    return output
+
+
 __fmts = [
     "𝟎𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙",
     "𝟢𝟣𝟤𝟥𝟦𝟧𝟨𝟩𝟪𝟫𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩",
