@@ -78,7 +78,7 @@ class help:
                     found = False
                     for n in com.name:
                         n = n.lower()
-                        if n in argv:
+                        if n in args:
                             found = True
                     if found:
                         newstr = (

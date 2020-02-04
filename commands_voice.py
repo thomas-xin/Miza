@@ -147,7 +147,7 @@ class queue:
     ytdl = downloader
 
     def __init__(self):
-        self.name = ["q", "qlist", "play", "playing", "np"]
+        self.name = ["q", "qlist", "play", "playing", "np", "p"]
         self.min_level = 0
         self.description = "Shows the music queue, or plays a song in voice."
         self.usage = "<link:[]> <verbose:(?v)>"
