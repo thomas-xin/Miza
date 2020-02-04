@@ -28,6 +28,25 @@ def getDuration(filename):
     return n
 
 
+async def forceJoin(guild, channel, user, client, _vars):
+    found = False
+    if guild.id not in _vars.queue:
+        for func in _vars.categories["voice"]:
+            if "join" in func.name:
+                try:
+                    await func(client=client, user=user, _vars=_vars, channel=channel, guild=guild)
+                except discord.ClientException:
+                    pass
+                except AttributeError:
+                    pass
+    try:
+        auds = _vars.queue[guild.id]
+        auds.channel = channel.id
+    except KeyError:
+        raise LookupError("Voice channel not found.")
+    return auds
+
+
 class urlBypass(urllib.request.FancyURLopener):
     version = "Mozilla/6.0"
 
@@ -63,8 +82,11 @@ class videoDownloader:
             return self.searched[item]
         try:
             self.requests += 1
-            pl = self.downloader.extract_info(item, False)
-            self.requests = max(self.requests - 1, 0)
+            try:
+                pl = self.downloader.extract_info(item, False)
+                self.requests = max(self.requests - 1, 0)
+            except:
+                raise
             if "direct" in pl:
                 resp = self.opener.open(item)
                 rescode = resp.getcode()
@@ -131,22 +153,8 @@ class queue:
         self.usage = "<link:[]> <verbose:(?v)>"
 
     async def __call__(self, client, user, _vars, argv, channel, guild, flags, **void):
-        found = False
-        if guild.id not in _vars.queue:
-            for func in _vars.categories["voice"]:
-                if "join" in func.name:
-                    try:
-                        await func(client=client, user=user, _vars=_vars, channel=channel, guild=guild)
-                    except discord.ClientException:
-                        pass
-                    except AttributeError:
-                        pass
-        try:
-            auds = _vars.queue[guild.id]
-            elapsed = auds.readpos / 50
-            auds.channel = channel.id
-        except KeyError:
-            raise LookupError("Voice channel not found.")
+        auds = await forceJoin(guild, channel, user, client, _vars)
+        elapsed = auds.readpos / 50
         q = _vars.queue[guild.id].queue
         if not len(argv.replace(" ", "")):
             if not len(q):
@@ -435,21 +443,7 @@ class pause:
         self.usage = ""
 
     async def __call__(self, _vars, name, guild, client, user, channel, **void):
-        found = False
-        if guild.id not in _vars.queue:
-            for func in _vars.categories["voice"]:
-                if "join" in func.name:
-                    try:
-                        await func(client=client, user=user, _vars=_vars, channel=channel, guild=guild)
-                    except discord.ClientException:
-                        pass
-                    except AttributeError:
-                        pass
-        try:
-            auds = _vars.queue[guild.id]
-            auds.channel = channel.id
-        except KeyError:
-            raise LookupError("Voice channel not found.")
+        auds = await forceJoin(guild, channel, user, client, _vars)
         auds.paused = name == "pause"
         return "```\nSuccessfully " + name + "d audio playback in " + uniStr(guild.name) + ".```"
 
@@ -502,21 +496,7 @@ class volume:
         self.usage = "<value> <reverb(?r)> <pitch(?p)> <bassboost(?b)> <delay(?d)>"
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, **void):
-        found = False
-        if guild.id not in _vars.queue:
-            for func in _vars.categories["voice"]:
-                if "join" in func.name:
-                    try:
-                        await func(client=client, user=user, _vars=_vars, channel=channel, guild=guild)
-                    except discord.ClientException:
-                        pass
-                    except AttributeError:
-                        pass
-        try:
-            auds = _vars.queue[guild.id]
-            auds.channel = channel.id
-        except KeyError:
-            raise LookupError("Voice channel not found.")
+        auds = await forceJoin(guild, channel, user, client, _vars)
         if "p" in flags:
             op = "pitch"
         elif "b" in flags:
@@ -548,6 +528,23 @@ class volume:
             + " from " + uniStr(round(100. * orig, 8))
             + " to " + uniStr(round(100. * val, 8)) + ".```"
             )
+
+
+class randomize:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = ["shuffle"]
+        self.min_level = 1
+        self.description = "Shuffles the audio queue."
+        self.usage = ""
+
+    async def __call__(self, guild, channel, user, client, _vars, **void):
+        auds = await forceJoin(guild, channel, user, client, _vars)
+        if len(auds.queue):
+            auds.queue = [auds.queue[0]] + shuffle(auds.queue[1:])
+        return "```\nSuccessfully shuffled audio queue for " + uniStr(guild.name) + ".```"
 
 
 class unmute:

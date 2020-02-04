@@ -37,10 +37,23 @@ intg = integrate = sympy.integrate
 factorize = factorint = primeFactors = sympy.ntheory.factorint
 mobius = sympy.ntheory.mobius
 
+def shuffle(it):
+    if type(it) is list:
+        random.shuffle(it)
+        return it
+    elif type(it) is tuple:
+        it = list(it)
+        random.shuffle(it)
+        return it
+    elif type(it) is dict:
+        ir = list(it)
+        random.shuffle(ir)
+        return {k: it[k] for k in ir}
+    else:
+        raise TypeError("Shuffling " + type(it) + " is not supported.")
 
 def nop(*args):
     pass
-
 
 phase = cmath.phase
 sin = mpmath.sin

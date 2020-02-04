@@ -1,6 +1,5 @@
 import ast, copy, asyncio
 from smath import *
-from random import shuffle
 
 
 class text2048:
