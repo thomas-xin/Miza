@@ -34,10 +34,11 @@ class urlBypass(urllib.request.FancyURLopener):
     
 class videoDownloader:
     ydl_opts = {
-        "quiet": 1,
+        "quiet": 0,
+        "verbose": 0,
         "format": "bestaudio/best",
         "noplaylist": 1,
-        "nocheckcertificate": 1,
+        "call_home": 1,
         "nooverwrites": 1,
         "ignoreerrors": 1,
         "source_address": "0.0.0.0",

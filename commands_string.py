@@ -154,8 +154,7 @@ class math:
             fn = "cache/temp.png"
             _vars.plt.savefig(fn, bbox_inches="tight")
             f = discord.File(fn)
-            await channel.send(file=f)
-            return
+            return {"file": f}
         else:
             answer = returns[0]
             if answer is None:

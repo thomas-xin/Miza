@@ -71,15 +71,18 @@ class customAudio(discord.AudioSource):
                 return temp
             array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
             size = self.length >> 1
-            if not isValid(volume):
+            if not isValid(volume) or not isValid(reverb) or not isValid(bassboost) or not isValid(pitch):
                 array = numpy.random.rand(self.length << 1) * 65536 - 32768
             elif volume != 1:
-                array *= volume
-            left, right = array[::2], array[1::2]
+                try:
+                    array *= volume
+                except:
+                    array = numpy.random.rand(self.length << 1) * 65536 - 32768
             if bassboost:
                 if self.bassadj is not None:
-                    array += sosfilt(self.bass, numpy.concatenate((self.bassadj, array)))[size:]
+                    array += sosfilt(self.bass, numpy.concatenate((self.bassadj, array)))[self.length:]
                 self.bassadj = numpy.array(array) * bassboost
+            left, right = array[::2], array[1::2]
             if pitch:
                 lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
                 n = size
@@ -128,6 +131,7 @@ class customAudio(discord.AudioSource):
                 self.buffer.append((left * a + right * b, left * b + right * a))
             else:
                 self.buffer = []
+                self.feedback = None
             array = numpy.stack((left, right), axis=-1).flatten()
             numpy.clip(array, -32767, 32767, out=array)
             temp = array.astype(numpy.int16).tobytes()
@@ -712,6 +716,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             if type(response) is list:
                                 for r in response:
                                     await channel.send(r)
+                            elif type(response) is dict:
+                                await channel.send(**response)
                             else:
                                 if len(response) <= 2000:
                                     await channel.send(response)

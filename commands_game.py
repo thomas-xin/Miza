@@ -38,7 +38,7 @@ class text2048:
 
     def __init__(self):
         self.name = ["2048", "text_2048"]
-        self.min_level = 1
+        self.min_level = 0
         self.description = "Plays a game of 2048 using reactions."
         self.usage = (
             "<board_size:[4]> <verbose:(?v)> <special_tiles:(?s)> <public:(?p)> "

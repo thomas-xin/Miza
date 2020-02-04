@@ -1,6 +1,10 @@
-import requests, csv, time, knackpy, ast, discord, urllib, asyncio
+import requests, csv, time, knackpy, ast, discord, urllib, asyncio, os, ffmpy
 from prettytable import PrettyTable as ptable
 from smath import *
+
+
+class urlBypass(urllib.request.FancyURLopener):
+    version = "Mozilla/5." + str(xrand(1, 10))
 
 
 class DouClub:
@@ -46,9 +50,6 @@ douclub = DouClub(auth["knack_id"], auth["knack_secret"])
 
 
 def searchForums(query):
-    
-    class urlBypass(urllib.request.FancyURLopener):
-        version = "Mozilla/5." + str(xrand(1, 10))
         
     url = (
         "https://www.cavestory.org/forums/search/1/?q=" + query.replace(" ", "+")
@@ -299,7 +300,10 @@ class cs_hex2xml:
         f.close()
         f = discord.File(fn)
         print(fn)
-        await channel.send("Hack successfully converted!", file=f)
+        return {
+            "content": "Hack successfully converted!",
+            "file": f,
+            }
 
 
 class cs_npc:
@@ -424,3 +428,114 @@ class cs_mod:
             return response
         else:
             raise EOFError("No results found for " + uniStr(argv) + ".")
+
+
+##def orgConv(org, wave100, fmt="mp3"):
+##    resp = opener.open(url)
+##    if resp.getcode() != 200:
+##        raise ConnectionError("Error " + str(resp.getcode()))
+##    data = list(resp.read())
+##    for i in range(len(data) >> 8):
+##        tempf = open("cache/wave100/wave"+str(i)+".wav","wb")
+##        outA = [82,73,70,70,36,1,0,0,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,172,130,0,0,
+##                88,5,1,0,2,0,16,0,100,97,116,97,0,1,0,0]
+##        outA += data[i << 8:i * 256 + 256]
+##        for f in range(44, len(outA)):
+##            if outA[f] < 0:
+##                outA[f] += 256
+##        outF = bytes(outA)
+##        tempf.write(outF)
+##        tempf.close
+##    os.system("org2xm cache/temp.org 
+##    return
+
+
+def orgConv(org, wave, fmt):
+    try:
+        try:
+            os.remove("cache/temp.org")
+        except FileNotFoundError:
+            pass
+        try:
+            os.remove("cache/temp.xm")
+        except FileNotFoundError:
+            pass
+        opener = urlBypass()
+        opener.retrieve(wave, "cache/temp.dat")
+        opener.retrieve(org, "cache/temp.org")
+        os.system("org2xm cache/temp.org cache/temp.dat")
+        fi = "cache/temp.xm"
+        t = time.time()
+        while time.time() - t < 12:
+            time.sleep(0.01)
+            if "temp.xm" in os.listdir("cache"):
+                try:
+                    f = open(fi, "rb")
+                    f.read(32)
+                    f.close()
+                    break
+                except Exception as ex:
+                    print(repr(ex))                
+                    pass
+        if fmt != "xm":
+            fn = "cache/temp." + fmt
+            try:
+                os.remove(fn)
+            except FileNotFoundError:
+                pass
+            ff = ffmpy.FFmpeg(
+                global_options=["-y", "-hide_banner", "-loglevel panic"],
+                inputs={fi: None},
+                outputs={"160k": "-b:a", fn: None},
+                )
+            ff.run()
+        else:
+            fn = fi
+        return fn
+    except Exception as ex:
+        return repr(ex)
+
+
+class convert_org:
+    is_command = True
+    fmts = [
+        "mp3",
+        "ogg",
+        "xm",
+        ]
+
+    def __init__(self):
+        self.name = ["org2xm", "cs_org2xm"]
+        self.min_level = 0
+        self.description = "Converts a .org file to another file format."
+        self.usage = "<0:org_url> <2:wave_url[]> <1:out_format[mp3]>"
+
+    async def __call__(self, args, _vars, channel, **void):
+        if len(args) > 2:
+            wave = _vars.verifyURL(args[1])
+        else:
+            wave = "https://cdn.discordapp.com/attachments/313292557603962881/674183355972976660/ORG210EN.DAT"
+            #wave = "https://cdn.discordapp.com/attachments/317898572458754049/674166849763672064/wave100"
+        if len(args) > 1:
+            fmt = args[-1]
+        else:
+            fmt = "xm"
+        if fmt not in self.fmts:
+            raise TypeError(fmt + " is not a supported output format.")
+        org = args[0]
+        returns = [None]
+        doParallel(orgConv, [org, wave, fmt], returns)
+        t = time.time()
+        while returns[0] is None and time.time() - t < _vars.timeout - 1:
+            await asyncio.sleep(0.01)
+        fn = returns[0]
+        if fn is None:
+            raise TimeoutError("Request timed out.")
+        try:
+            f = discord.File(fn)
+        except:
+            raise repr(fn)
+        return {
+            "content": "Org successfully converted!",
+            "file": f,
+            }
