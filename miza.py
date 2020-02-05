@@ -17,7 +17,7 @@ class customAudio(discord.AudioSource):
     filt = butter(1, 1/3, btype="low", output="sos")
 
     def __init__(self, c_id):
-        self.change()
+        self.new()
         self.queue = []
         self.channel = c_id
         self.buffer = []
@@ -31,17 +31,17 @@ class customAudio(discord.AudioSource):
             "delay": 16 / 5,
             }
 
-    def change(self, source=None):
+    def change(self, source):
+        if getattr(self, "source", None) is not None:
+            self.source.cleanup()
+        self.source = discord.FFmpegPCMAudio(source)
+
+    def new(self, source=None):
         self.readpos = 0
         self.is_playing = False
         self.paused = False
         if source is not None:
-            if getattr(self, "source", None) is not None:
-                self.source.cleanup()
-            self.source = discord.FFmpegPCMAudio(source)
-
-    def new(self, source):
-        doParallel(self.change, [source])
+            doParallel(self.change, [source])
         
     def read(self):
         try:
@@ -144,7 +144,8 @@ class customAudio(discord.AudioSource):
         return False
 
     def cleanup(self):
-        return self.source.cleanup()
+        if getattr(self, "source", None) is not None:
+            return self.source.cleanup()
     
 
 from matplotlib import use as plot_sys
@@ -681,14 +682,18 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         if argv:
                             while argv[0] == " ":
                                 argv = argv[1:]
-                        a = argv.replace('"', "\0")
-                        b = a.replace("'", "")
-                        c = b.replace("<", "'")
-                        d = c.replace(">", "'")
-                        try:
-                            args = shlex.split(d)
-                        except ValueError:
-                            args = d.split(" ")
+                        if not len(argv.replace(" ", "")):
+                            argv = ""
+                            args = []
+                        else:
+                            a = argv.replace('"', "\0")
+                            b = a.replace("'", "")
+                            c = b.replace("<", "'")
+                            d = c.replace(">", "'")
+                            try:
+                                args = shlex.split(d)
+                            except ValueError:
+                                args = d.split(" ")
                         if not loop:
                             await channel.trigger_typing()
                         #async with channel.typing():
@@ -809,6 +814,7 @@ async def updateLoop():
     counter = 0
     while True:
         while _vars.blocked > 0:
+            print("Blocked...")
             _vars.blocked -= 1
             await asyncio.sleep(1)
         for g in _vars.special:

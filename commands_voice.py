@@ -1,4 +1,4 @@
-import youtube_dl, asyncio, discord, time, os, urllib, copy
+import youtube_dl, asyncio, discord, time, os, urllib, json, copy
 from subprocess import check_output, CalledProcessError, STDOUT
 from smath import *
 
@@ -53,7 +53,7 @@ class urlBypass(urllib.request.FancyURLopener):
     
 class videoDownloader:
     ydl_opts = {
-        "quiet": 0,
+        "quiet": 1,
         "verbose": 0,
         "format": "bestaudio/best",
         "noplaylist": 1,
@@ -268,7 +268,7 @@ class playlist:
         self.usage = "<link:[]> <remove:(?r)>"
 
     async def __call__(self, user, argv, _vars, guild, flags, **void):
-        if not len(argv.replace(" ","")):
+        if not argv:
             if "r" in flags:
                 _vars.playlists[guild.id] = []
                 _vars.update()
@@ -386,12 +386,13 @@ class remove:
         if guild.id not in _vars.queue:
             raise LookupError("Currently not playing in a voice channel.")
         s_perm = _vars.getPerms(user, guild)
-        if "f" in flags and s_perm < 2:
+        min_level = 1
+        if "f" in flags and s_perm < 1:
             raise PermissionError(
                 "Insufficient permissions to force skip. Current permission level: " + uniStr(s_perm)
-                + ", required permission level: " + uniStr(2) + "."
+                + ", required permission level: " + uniStr(min_level) + "."
                 )
-        if not len(argv.replace(" ","")):
+        if not argv:
             pos = 0
         else:
             pos = _vars.evalMath(argv)
@@ -461,42 +462,48 @@ class pause:
         return "```\nSuccessfully " + name + "d audio playback in " + uniStr(guild.name) + ".```"
 
 
-class copy:
+class dump:
     is_command = True
     server_only = True
 
     def __init__(self):
         self.name = []
-        self.min_level = 2
-        self.description = "Copies the voice channel player from another server to this one."
-        self.usage = "<server_id>"
+        self.min_level = 1
+        self.description = "Dumps or restores the currently playing audio."
+        self.usage = "<data:[]>"
 
-    async def __call__(self, guild, _vars, argv, client, channel, user, **void):
-        if not len(argv.replace(" ", "")):
-            return "```\nID of " + uniStr(guild.name) + ": " + uniStr(guild.id) + ".```"
-        g_id = _vars.evalMath(argv)
+    async def __call__(self, guild, channel, user, client, _vars, argv, **void):
+        auds = await forceJoin(guild, channel, user, client, _vars)
+        if not argv:
+            q = copy.deepcopy(auds.queue)
+            for e in q:
+                e["id"] = e["id"].replace("@", "")
+            d = {
+                "stats": auds.stats,
+                "queue": q,
+                }
+            return "Queue data for " + uniStr(guild.name) + ":\n```\n" + json.dumps(d) + "\n```"
         try:
-            target = _vars.queue[g_id]
-        except KeyError:
-            raise LookupError("No voice channel player found.")
-        
-        found = False
-        if guild.id not in _vars.queue:
-            for func in _vars.categories["voice"]:
-                if "join" in func.name:
-                    try:
-                        await func(client=client, user=user, _vars=_vars, channel=channel, guild=guild)
-                    except discord.ClientException:
-                        pass
-                    except AttributeError:
-                        pass
-        try:
-            auds = _vars.queue[guild.id]
-        except KeyError:
-            raise LookupError("Voice channel not found.")
-        _vars.queue[guild.id] = auds = copy.deepcopy(target)
-        auds.channel = channel.id
-
+            opener = urlBypass()
+            resp = opener.open(_vars.verifyURL(argv))
+            rescode = resp.getcode()
+            if rescode != 200:
+                raise ConnectionError(rescode)
+            s = resp.read().decode("utf-8")
+            s = s[s.index("{"):]
+            if s[-4:] == "\n```":
+                s = s[:-4]
+            d = json.loads(s)
+        except:
+            d = json.loads(argv)
+        print("Stopped audio playback in " + guild.name)
+        for vc in client.voice_clients:
+            if vc.channel.guild.id == guild.id:
+                vc.stop()
+        auds.queue = d["queue"]
+        auds.stats = d["stats"]
+        return "```\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"
+            
 
 class volume:
     is_command = True

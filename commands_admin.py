@@ -158,7 +158,7 @@ class roleGiver:
             _vars.update()
             return "```\nRemoved all automated role givers from channel " + uniStr(channel.name) + ".```"
         currentSchedule = _vars.scheduled.get(channel.id, {})
-        if not len(argv.replace(" ","")):
+        if not argv:
             return (
                 "Currently active permission givers in channel **" + channel.name
                 + "**:\n```\n" + repr(currentSchedule) + "```"
@@ -197,7 +197,7 @@ class defaultPerms:
 
     async def __call__(self, _vars, argv, user, guild, **void):
         currPerm = _vars.perms.get("defaults", {}).get(guild.id, 0)
-        if not len(argv.replace(" ","")):
+        if not argv:
             return (
                 "```\nCurrent default permission level for " + uniStr(guild.name)
                 + ": " + uniStr(currPerm) + ".```"
@@ -229,7 +229,7 @@ class rainbowRole:
 
     async def __call__(self, _vars, flags, args, argv, guild, **void):
         guild_special = _vars.special.get(guild.id, {})
-        if not len(argv.replace(" ","")):
+        if not argv:
             return (
                 "Currently active dynamic role colours in **" + guild.name
                 + "**:\n```\n" + str(guild_special) + "```"
