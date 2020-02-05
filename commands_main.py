@@ -53,7 +53,7 @@ class help:
                     if c_name == "DM" and getattr(com, "server_only", False):
                         continue
                     newstr = (
-                        "```\n" + name
+                        "```css\n" + name
                         + "\nAliases: " + str(com.name)
                         + "\nEffect: " + description
                         + "\nUsage: ~" + name + " " + usage
@@ -82,7 +82,7 @@ class help:
                             found = True
                     if found:
                         newstr = (
-                            "```\n" + name
+                            "```css\n" + name
                             + "\nCategory: " + c
                             + "\nAliases: " + str(com.name)
                             + "\nEffect: " + description
@@ -110,7 +110,7 @@ class help:
                             "\n" + com.__name__
                             + "\nEffect: " + com.description
                             + "\nUsage: ~" + name + " " + usage)
-            return "Commands for **" + user.name + "** in **" + c_name + "**:\n```\n" + "\n".join(show) + "```"
+            return "Commands for **" + user.name + "** in **" + c_name + "**:\n```css\n" + "\n".join(show) + "```"
         return "\n".join(show)
 
 
@@ -126,7 +126,7 @@ class clearCache:
     async def __call__(self, client, _vars, **void):
         _vars.resetGlobals()
         _vars.loadSave()
-        return "```\nCache cleared!```"
+        return "```css\nCache cleared!```"
 
 
 class perms:
@@ -172,14 +172,14 @@ class perms:
                 if "h" in flags:
                     return
                 return (
-                    "```\nChanged permissions for "+ uniStr(name)
+                    "```css\nChanged permissions for "+ uniStr(name)
                     + " in " + uniStr(guild.name)
                     + " from " + uniStr(t_perm)
                     + " to " + uniStr(c_perm) + ".```"
                 )
             else:
                 return (
-                    "```\nError: Insufficient priviliges to change permissions for " + uniStr(name)
+                    "```css\nError: Insufficient priviliges to change permissions for " + uniStr(name)
                     + " in " + uniStr(guild.name)
                     + " from " + uniStr(t_perm)
                     + " to " + uniStr(c_perm)
@@ -187,7 +187,7 @@ class perms:
                     + ", Current level: " + uniStr(s_perm) + ".```"
                 )
         return (
-            "```\nCurrent permissions for " + uniStr(t_user.name)
+            "```css\nCurrent permissions for " + uniStr(t_user.name)
             + " in " + uniStr(guild.name)
             + ": " + uniStr(t_perm) + ".```"
             )
@@ -221,21 +221,21 @@ class enableCommand:
                 _vars.update()
                 if "h" in flags:
                     return
-                return "```\nEnabled all command categories in " + uniStr(channel.name) + ".```"
+                return "```css\nEnabled all command categories in " + uniStr(channel.name) + ".```"
             if "d" in flags:
                 _vars.enabled[channel.id] = []
                 _vars.update()
                 if "h" in flags:
                     return
-                return "```\nDisabled all command categories in " + uniStr(channel.name) + ".```"
+                return "```css\nDisabled all command categories in " + uniStr(channel.name) + ".```"
             return (
                 "Currently enabled command categories in **" + channel.name
-                + "**:\n```\n"
+                + "**:\n```css\n"
                 + str(["main"] + _vars.enabled.get(channel.id, default_commands)) + "```"
             )
         else:
             if not catg in _vars.categories:
-                raise EOFError("Error: Unknown command category " + uniStr(argv) + ".")
+                raise KeyError("Error: Unknown command category " + uniStr(argv) + ".")
             else:
                 try:
                     enabled = _vars.enabled[channel.id]
@@ -252,7 +252,7 @@ class enableCommand:
                     _vars.update()
                     if "h" in flags:
                         return
-                    return "```\nEnabled command category " + uniStr(catg) + " in " + uniStr(channel.name) + ".```"
+                    return "```css\nEnabled command category " + uniStr(catg) + " in " + uniStr(channel.name) + ".```"
                 if "d" in flags:
                     if catg not in enabled:
                         raise IndexError(
@@ -263,9 +263,9 @@ class enableCommand:
                     _vars.update()
                     if "h" in flags:
                         return
-                    return "```\nDisabled command category " + uniStr(catg) + " in " + uniStr(channel.name) + ".```"
+                    return "```css\nDisabled command category " + uniStr(catg) + " in " + uniStr(channel.name) + ".```"
                 return (
-                    "```\nCommand category " + uniStr(catg)
+                    "```css\nCommand category " + uniStr(catg)
                     + " is currently" + uniStr(" not" * (catg not in enabled))
                     + " enabled in " + uniStr(channel.name) + ".```"
                 )
@@ -309,7 +309,7 @@ class suspend:
             if len(args) >= 1:
                 user = await client.fetch_user(_vars.verifyID(args[0]))
             return (
-                "```\nCurrent suspension status of " + uniStr(user.name) + ": "
+                "```css\nCurrent suspension status of " + uniStr(user.name) + ": "
                 + uniStr(_vars.bans[0].get(user.id, None)) + ".```"
                 )
         else:
@@ -318,7 +318,7 @@ class suspend:
             _vars.bans[0][user.id] = change
             _vars.update()
             return (
-                "```\nChanged suspension status of " + uniStr(user.name) + " to "
+                "```css\nChanged suspension status of " + uniStr(user.name) + " to "
                 + uniStr(change) + ".```"
                 )
 
@@ -341,4 +341,4 @@ class loop:
         for i in range(iters):
             asyncio.create_task(callback(message, func, cb_argv=func2, cb_flags=flags, loop=i != iters - 1))
         if not "h" in flags:
-            return "```\nLooping <" + func + "> " + uniStr(iters) + " times...```"
+            return "```css\nLooping <" + func + "> " + uniStr(iters) + " times...```"

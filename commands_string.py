@@ -178,7 +178,7 @@ class uni2hex:
 
     async def __call__(self, argv, **extra):
         b = bytes(argv, "utf-8")
-        return "```\n" + bytes2Hex(b) + "```"
+        return "```css\n" + bytes2Hex(b) + "```"
 
 
 class hex2uni:

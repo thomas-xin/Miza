@@ -158,7 +158,7 @@ class queue:
         q = _vars.queue[guild.id].queue
         if not len(argv.replace(" ", "")):
             if not len(q):
-                return "```\nQueue for " + uniStr(guild.name) + " is currently empty. ```"
+                return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```"
             totalTime = -elapsed
             for e in q:
                 totalTime += e["duration"]
@@ -207,7 +207,7 @@ class queue:
             countstr += sym[0] * r + sym[1] * (count - r) + "\n"
             return (
                 "Queue for **" + guild.name + "**: "
-                + info + "\n```\n"
+                + info + "\n```css\n"
                 + countstr + show + "```"
                 )
         else:
@@ -251,7 +251,7 @@ class queue:
                 names = names[0]
             if not "h" in flags:
                 return (
-                    "```\n🎶 Added " + uniStr(names) + " to the queue! Estimated time until playing: "
+                    "```css\n🎶 Added " + uniStr(names) + " to the queue! Estimated time until playing: "
                     + uniStr(" ".join(timeConv(total_duration))) + ". 🎶```"
                     )
 
@@ -272,9 +272,9 @@ class playlist:
             if "r" in flags:
                 _vars.playlists[guild.id] = []
                 _vars.update()
-                return "```\nRemoved all entries from the default playlist for " + uniStr(guild.name) + ".```"
+                return "```css\nRemoved all entries from the default playlist for " + uniStr(guild.name) + ".```"
             return (
-                "```\nCurrent default playlist for " + uniStr(guild.name) + ": "
+                "```css\nCurrent default playlist for " + uniStr(guild.name) + ": "
                 + str(_vars.playlists.get(guild.id, [])) + ".```"
                 )
         curr = _vars.playlists.get(guild.id, [])
@@ -284,7 +284,7 @@ class playlist:
             curr.pop(i)
             _vars.playlists[guild.id] = curr
             _vars.update()
-            return "```\nRemoved " + uniStr(temp["name"]) + " from the default playlist for " + uniStr(guild.name) + ".```"
+            return "```css\nRemoved " + uniStr(temp["name"]) + " from the default playlist for " + uniStr(guild.name) + ".```"
         output = [None]
         doParallel(self.ytdl.search, [argv], output)
         while output[0] is None:
@@ -312,7 +312,7 @@ class playlist:
         if len(names):
             _vars.playlists[guild.id] = curr
             _vars.update()
-            return "```\nAdded " + uniStr(names) + " to the default playlist for " + uniStr(guild.name) + ".```"
+            return "```css\nAdded " + uniStr(names) + " to the default playlist for " + uniStr(guild.name) + ".```"
         
 
 class join:
@@ -340,7 +340,7 @@ class join:
                 asyncio.create_task(user.edit(mute=False,deafen=False))
         if joined:
             return (
-                "```\n🎵 Successfully connected to " + uniStr(vc.name)
+                "```css\n🎵 Successfully connected to " + uniStr(vc.name)
                 + " in " + uniStr(guild.name) + ". 🎵```"
                 )
 
@@ -365,7 +365,7 @@ class leave:
         for vclient in client.voice_clients:
             if guild.id == vclient.channel.guild.id:
                 await vclient.disconnect(force=False)
-                return "```\n🎵 Successfully disconnected from " + uniStr(guild.name) + ". 🎵```"
+                return "```css\n🎵 Successfully disconnected from " + uniStr(guild.name) + ". 🎵```"
         error = LookupError("Unable to find connected channel.")
         if error is not None:
             raise error
@@ -404,7 +404,7 @@ class remove:
                     for vc in client.voice_clients:
                         if vc.channel.guild.id == guild.id:
                             vc.stop()
-                    return "```\nRemoved all items from the queue.```"
+                    return "```css\nRemoved all items from the queue.```"
                 raise LookupError
             curr = _vars.queue[guild.id].queue[pos]
         except LookupError:
@@ -425,7 +425,7 @@ class remove:
             response = "```\n"
         else:
             response = (
-                "```\nVoted to remove " + uniStr(curr["name"]) + " from the queue.\nCurrent vote count: "
+                "```css\nVoted to remove " + uniStr(curr["name"]) + " from the queue.\nCurrent vote count: "
                 + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + "."
                 )
         skipped = False
@@ -459,7 +459,7 @@ class pause:
     async def __call__(self, _vars, name, guild, client, user, channel, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         auds.paused = name == "pause"
-        return "```\nSuccessfully " + name + "d audio playback in " + uniStr(guild.name) + ".```"
+        return "```css\nSuccessfully " + name + "d audio playback in " + uniStr(guild.name) + ".```"
 
 
 class dump:
@@ -482,7 +482,7 @@ class dump:
                 "stats": auds.stats,
                 "queue": q,
                 }
-            return "Queue data for " + uniStr(guild.name) + ":\n```\n" + json.dumps(d) + "\n```"
+            return "Queue data for " + uniStr(guild.name) + ":\n```css\n" + json.dumps(d) + "\n```"
         try:
             opener = urlBypass()
             resp = opener.open(_vars.verifyURL(argv))
@@ -502,7 +502,7 @@ class dump:
                 vc.stop()
         auds.queue = d["queue"]
         auds.stats = d["stats"]
-        return "```\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"
+        return "```css\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"
             
 
 class volume:
@@ -530,7 +530,7 @@ class volume:
         if not len(argv.replace(" ", "")):
             num = round(100. * _vars.queue[guild.id].stats[op], 8)
             return (
-                "```\nCurrent audio " + op + " in " + uniStr(guild.name)
+                "```css\nCurrent audio " + op + " in " + uniStr(guild.name)
                 + ": " + uniStr(num) + ".```"
                 )
         s_perm = _vars.getPerms(user, guild)
@@ -544,7 +544,7 @@ class volume:
         orig = origVol[op]
         origVol[op] = val
         return (
-            "```\nChanged audio " + op + " in " + uniStr(guild.name)
+            "```css\nChanged audio " + op + " in " + uniStr(guild.name)
             + " from " + uniStr(round(100. * orig, 8))
             + " to " + uniStr(round(100. * val, 8)) + ".```"
             )
@@ -564,7 +564,7 @@ class randomize:
         auds = await forceJoin(guild, channel, user, client, _vars)
         if len(auds.queue):
             auds.queue = [auds.queue[0]] + shuffle(auds.queue[1:])
-        return "```\nSuccessfully shuffled audio queue for " + uniStr(guild.name) + ".```"
+        return "```css\nSuccessfully shuffled audio queue for " + uniStr(guild.name) + ".```"
 
 
 class unmute:
@@ -581,4 +581,4 @@ class unmute:
         for vc in guild.voice_channels:
             for user in vc.members:
                 asyncio.create_task(user.edit(mute=False,deafen=False))
-        return "```\nSuccessfully unmuted all users in voice channels in " + uniStr(guild.name) + ".```"
+        return "```css\nSuccessfully unmuted all users in voice channels in " + uniStr(guild.name) + ".```"

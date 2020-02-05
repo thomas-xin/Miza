@@ -232,7 +232,7 @@ class rainbowRole:
         if not argv:
             return (
                 "Currently active dynamic role colours in **" + guild.name
-                + "**:\n```\n" + str(guild_special) + "```"
+                + "**:\n```css\n" + str(guild_special) + "```"
                 )
         role = args[0].lower()
         if len(args) < 2:
@@ -252,7 +252,7 @@ class rainbowRole:
         _vars.update()
         return (
             "Changed dynamic role colours for **" + guild.name
-            + "** to:\n```\n" + str(guild_special) + "```"
+            + "** to:\n```css\n" + str(guild_special) + "```"
             )
         
 
@@ -270,13 +270,13 @@ class follow:
         if "d" in flags:
             _vars.following.pop(guild.id)
             _vars.update()
-            return "```\nDisabled follow imitating for " + uniStr(guild.name) + ".```"
+            return "```css\nDisabled follow imitating for " + uniStr(guild.name) + ".```"
         elif "e" in flags:
             _vars.following[guild.id] = False
             _vars.update()
-            return "```\nEnabled follow imitating for " + uniStr(guild.name) + ".```"
+            return "```css\nEnabled follow imitating for " + uniStr(guild.name) + ".```"
         else:
             return (
-                "```\nCurrently " + uniStr("not " * _vars.following.get(guild.id, 1))
+                "```css\nCurrently " + uniStr("not " * _vars.following.get(guild.id, 1))
                 + "follow imitating in " + uniStr(guild.name) + ".```"
                 )

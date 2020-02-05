@@ -24,7 +24,7 @@ class img:
 
     async def __call__(self, flags, channel, argv, **void):
         if "l" in flags:
-            return "Available images: ```\n" + str([images[i][0] for i in images]) + "```"
+            return "Available images: ```css\n" + str([images[i][0] for i in images]) + "```"
         check = argv.lower()
         sources = []
         for url in images:

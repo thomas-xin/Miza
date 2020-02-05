@@ -1229,7 +1229,7 @@ def timeConv(s):
 def dhms(s):
     if not isValid(s):
         return str(s)
-    output = str(int(s % 60))
+    output = str(round(s % 60))
     if len(output) < 2:
         output = "0" + output
     if s >= 60:

@@ -342,8 +342,8 @@ class cs_mem2flag:
 
     async def __call__(self, _vars, args, **void):
         if len(args) < 2:
-            return "```\n" + _m2f(args[0], 1) + "```"
-        return "```\n" + _m2f(args[0], _vars.evalMath(" ".join(args[1:]))) + "```"
+            return "```css\n" + _m2f(args[0], 1) + "```"
+        return "```css\n" + _m2f(args[0], _vars.evalMath(" ".join(args[1:]))) + "```"
 
 
 class cs_hex2xml:
@@ -446,11 +446,11 @@ class cs_npc:
             if len(output) < 20000 and len(output) > 1900:
                 response = ["Search results for **" + argv + "**:"]
                 lines = output.split("\n")
-                curr = "```\n"
+                curr = "```css\n"
                 for line in lines:
                     if len(curr) + len(line) > 1900:
                         response.append(curr + "```")
-                        curr = "```\n"
+                        curr = "```css\n"
                     if len(line):
                         curr += line + "\n"
                 response.append(curr + "```")
@@ -486,11 +486,11 @@ class cs_tsc:
             if len(output) < 20000 and len(output) > 1900:
                 response = ["Search results for **" + argv + "**:"]
                 lines = output.split("\n")
-                curr = "```\n"
+                curr = "```css\n"
                 for line in lines:
                     if len(curr) + len(line) > 1900:
                         response.append(curr + "```")
-                        curr = "```\n"
+                        curr = "```css\n"
                     if len(line):
                         curr += line + "\n"
                 response.append(curr + "```")
@@ -524,7 +524,7 @@ class cs_mod:
             for l in data:
                 line = (
                     "\n<" + str(l["url"]) + ">\n"
-                    + "```\nName: " + uniStr(l["name"])
+                    + "```css\nName: " + uniStr(l["name"])
                     + "\nAuthor: " + uniStr(l["author"])
                     + "\n" + limStr(l["description"].replace("\n", " "), 128)
                     + "```\r"

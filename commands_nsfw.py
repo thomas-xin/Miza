@@ -331,7 +331,7 @@ class neko:
         isNSFW = is_nsfw(channel)
         if "l" in flags:
             available = []
-            text = "Available commands in **#" + channel.name + "**:\n```"
+            text = "Available commands in **#" + channel.name + "**:\n```css"
             for key in neko_tags:
                 if isNSFW or not neko_tags[key] == True:
                     available.append(key)
