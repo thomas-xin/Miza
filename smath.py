@@ -197,7 +197,7 @@ def sgn(x):
 
 
 def frand(x=1, y=0):
-    return (random.random() / mpf(random.random())) % x + y
+    return (random.random() * x * y / mpf(random.random())) % x + y
 
 
 def xrand(x, y=None, z=0):

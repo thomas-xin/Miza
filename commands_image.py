@@ -9,7 +9,12 @@ images = {
     "https://cdn.discordapp.com/attachments/313292557603962881/671873663120703508/dolphino.gif": ["dolphin"],
     "https://cdn.discordapp.com/attachments/313292557603962881/671873485722746890/curiouseal.gif": ["seal"],
     "https://cdn.discordapp.com/attachments/292453316099702786/673082811464286228/HW.gif": ["hw"],
-    "https://media.discordapp.net/attachments/528720242336333837/663588773283627018/WTF.gif": ["wtf"],    
+    "https://media.discordapp.net/attachments/528720242336333837/663588773283627018/WTF.gif": ["wtf"],
+    "https://cdn.discordapp.com/attachments/317898572458754049/674495774591156252/ok.gif": ["ok"],
+    "https://cdn.discordapp.com/attachments/317898572458754049/674497566188109824/hug.gif": ["hug", "cuddle"],
+    "https://cdn.discordapp.com/attachments/317898572458754049/674497584160833536/munch.gif": ["munch", "moonch"],
+    "https://cdn.discordapp.com/attachments/317898572458754049/674497598949818378/no.gif": ["no"],
+    "https://cdn.discordapp.com/attachments/664992327701495828/674517702697680896/cave_story_modding.png": ["modding"],
     }
 
 

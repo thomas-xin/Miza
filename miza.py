@@ -73,7 +73,7 @@ class customAudio(discord.AudioSource):
             array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
             size = self.length >> 1
             if not isValid(volume) or not isValid(reverb) or not isValid(bassboost) or not isValid(pitch):
-                array = numpy.random.rand(self.length << 1) * 65536 - 32768
+                array = numpy.random.rand(self.length) * 65536 - 32768
             elif volume != 1:
                 try:
                     array *= volume
