@@ -33,10 +33,29 @@ twinprime = mp.twinprime
 
 Function = sympy.Function
 Symbol = sympy.Symbol
-diff = differentiate = sympy.diff
-intg = integrate = sympy.integrate
 factorize = factorint = primeFactors = sympy.ntheory.factorint
 mobius = sympy.ntheory.mobius
+
+from sympy.parsing.sympy_parser import parse_expr
+
+def diff(string):
+    func = parse_expr(string)
+    return str(sympy.diff(func))
+
+def intg(string):
+    func = parse_expr(string)
+    return str(sympy.integrate(func))
+
+def simplify(string):
+    func = parse_expr(string)
+    return str(func)
+
+def solve(string):
+    func = parse_expr(string)
+    return sympy.solve(func)
+
+derivative = differentiate = diff
+integral = integrate = intg
 
 def shuffle(it):
     if type(it) is list:
