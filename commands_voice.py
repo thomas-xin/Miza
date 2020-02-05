@@ -399,11 +399,10 @@ class remove:
         try:
             if not isValid(pos):
                 if "f" in flags:
-                    _vars.queue[guild.id].queue = []
+                    auds = _vars.queue[guild.id]
+                    auds.queue = []
+                    auds.new(None)
                     print("Stopped audio playback in " + guild.name)
-                    for vc in client.voice_clients:
-                        if vc.channel.guild.id == guild.id:
-                            vc.stop()
                     return "```css\nRemoved all items from the queue.```"
                 raise LookupError
             curr = _vars.queue[guild.id].queue[pos]
@@ -429,7 +428,8 @@ class remove:
                 + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + "."
                 )
         skipped = False
-        q = _vars.queue[guild.id].queue
+        auds = _vars.queue[guild.id]
+        q = auds.queue
         i = 0
         while i < len(q):
             song = q[i]
@@ -437,10 +437,8 @@ class remove:
                 q.pop(i)
                 response += "\n" + uniStr(song["name"]) + " has been removed from the queue."
                 if i == 0:
+                    auds.new(None)
                     print("Stopped audio playback in " + guild.name)
-                    for vc in client.voice_clients:
-                        if vc.channel.guild.id == guild.id:
-                            vc.stop()
                 continue
             i += 1
         return response + "```"
@@ -510,12 +508,13 @@ class dump:
             e["skips"] = []
         if not "a" in flags:
             print("Stopped audio playback in " + guild.name)
-            for vc in client.voice_clients:
-                if vc.channel.guild.id == guild.id:
-                    vc.stop()
             auds.new()
             auds.queue = q
-            auds.stats = d["stats"]
+            for k in d["stats"]:
+                if k not in auds.stats:
+                    d["stats"].pop(k)
+                d["stats"][k] = float(d["stats"][k])
+            auds.stats.update(d["stats"])
             return "```css\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"
         auds.queue += q
         auds.stats = d["stats"]

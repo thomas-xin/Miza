@@ -33,7 +33,10 @@ class customAudio(discord.AudioSource):
 
     def change(self, source):
         if getattr(self, "source", None) is not None:
-            self.source.cleanup()
+            try:
+                self.source.cleanup()
+            except:
+                pass
         self.source = discord.FFmpegPCMAudio(source)
 
     def new(self, source=None):
@@ -41,6 +44,7 @@ class customAudio(discord.AudioSource):
         self.is_playing = source is not None
         self.paused = False
         if source is not None:
+            self.source = 0
             doParallel(self.change, [source])
         else:
             if getattr(self, "source", None) is not None:
@@ -60,10 +64,10 @@ class customAudio(discord.AudioSource):
             self.is_playing = True
         except:
             if not self.paused:
-                self.is_playing = False
-                self.readpos = 0
                 if self.is_playing:
                     sendUpdateRequest(True)
+                if self.source is not 0:
+                    self.new()
             temp = numpy.zeros(self.length, numpy.uint16).tobytes()
         try:
             sndset = self.stats
@@ -780,44 +784,47 @@ async def outputLoop():
     global client, _vars
     print("Output Loop initiated.")
     while True:
-        msg = [None]
-        ch = _vars.current_channel
-        if ch is not None:
-            chan = str(ch.id)
-        else:
-            chan = ""
-        printed = chan + ">>> "
-        setPrint(printed)
-        doParallel(input, [printed], msg, name="inputter")
-        while msg[0] is None:
-            await asyncio.sleep(0.1)
-        proc = msg[0]
-        if not proc:
-            continue
-        if proc[0] == "!":
-            proc = proc[1:]
-            try:
-                chanID = int(proc)
-                _vars.current_channel = await client.fetch_channel(chanID)
-            except ValueError:
-                sent = await ch.send("*** ***")
-                await processMessage(sent, reconstitute(proc))
-                try:
-                    await sent.delete()
-                except discord.errors.NotFound:
-                    pass
-            except Exception as ex:
-                print(traceback.format_exc())
-        elif proc[0] == "&":
-            proc = proc[1:]
-            hist = await ch.history(limit=1).flatten()
-            message = hist[0]
-            await message.add_reaction(proc)
-        else:
+        try:
+            msg = [None]
+            ch = _vars.current_channel
             if ch is not None:
-                await ch.send(proc)
+                chan = str(ch.id)
             else:
-                print("Channel does not exist.")
+                chan = ""
+            printed = chan + ">>> "
+            setPrint(printed)
+            doParallel(input, [printed], msg, name="inputter")
+            while msg[0] is None:
+                await asyncio.sleep(0.1)
+            proc = msg[0]
+            if not proc:
+                continue
+            if proc[0] == "!":
+                proc = proc[1:]
+                try:
+                    chanID = int(proc)
+                    _vars.current_channel = await client.fetch_channel(chanID)
+                except ValueError:
+                    sent = await ch.send("*** ***")
+                    await processMessage(sent, reconstitute(proc))
+                    try:
+                        await sent.delete()
+                    except discord.errors.NotFound:
+                        pass
+                except Exception as ex:
+                    print(traceback.format_exc())
+            elif proc[0] == "&":
+                proc = proc[1:]
+                hist = await ch.history(limit=1).flatten()
+                message = hist[0]
+                await message.add_reaction(proc)
+            else:
+                if ch is not None:
+                    await ch.send(proc)
+                else:
+                    print("Channel does not exist.")
+        except:
+            print(traceback.format_exc())
 
 
 async def updateLoop():
@@ -1004,18 +1011,20 @@ async def handleUpdate(force=False):
                                     if len(b) < minl:
                                         raise FileNotFoundError
                                     q[0]["id"] = "@" + q[0]["id"]
+                                    name = q[0]["name"]
+                                    added_by = q[0]["added by"]
                                     auds = _vars.queue[guild.id]
                                     auds.new(path)
                                     if not vc.is_playing():
                                         vc.play(auds, after=sendUpdateRequest)
                                     channel = await client.fetch_channel(auds.channel)
                                     await channel.send(
-                                        "```css\n🎵 Now playing " + uniStr(q[0]["name"])
-                                        + ", added by " + uniStr(q[0]["added by"]) + "! 🎵```"
+                                        "```css\n🎵 Now playing " + uniStr(name)
+                                        + ", added by " + uniStr(added_by) + "! 🎵```"
                                         )
                                 except FileNotFoundError:
                                     pass
-                            elif not playing:
+                            elif not playing and auds.source is None:
                                 q.pop(0)
                                 if not len(q):
                                     t = _vars.playlists.get(guild.id, ())
