@@ -469,7 +469,7 @@ class dump:
     def __init__(self):
         self.name = []
         self.min_level = 1
-        self.description = "Dumps or restores the currently playing audio."
+        self.description = "Dumps or restores the currently playing audio queue state."
         self.usage = "<data:[]>"
 
     async def __call__(self, guild, channel, user, client, _vars, argv, **void):
