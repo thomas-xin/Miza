@@ -945,13 +945,16 @@ async def handleUpdate(force=False):
             for vc in client.voice_clients:
                 channel = vc.channel
                 guild = channel.guild
-                auds = _vars.queue[guild.id]
-                playing = auds.is_playing and vc.is_playing()
-                membs = channel.members
-                for memb in membs:
-                    if memb.id == client.user.id:
-                        membs.remove(memb)
-                cnt = len(membs)
+                try:
+                    auds = _vars.queue[guild.id]
+                    playing = auds.is_playing and vc.is_playing()
+                    membs = channel.members
+                    for memb in membs:
+                        if memb.id == client.user.id:
+                            membs.remove(memb)
+                    cnt = len(membs)
+                except KeyError:
+                    cnt = -1
                 if not cnt:
                     try:
                         channel = await client.fetch_channel(auds.channel)

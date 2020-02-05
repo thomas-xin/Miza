@@ -1,4 +1,4 @@
-import asyncio, os
+import asyncio, os, sys
 from smath import *
 
 default_commands = ["string", "admin"]
@@ -291,7 +291,11 @@ class restart:
             os.system("start cmd /c miza.bat")
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
-        await client.close()
+        try:
+            await client.close()
+        except:
+            del client
+        sys.exit(0)
         raise BaseException("Shutting down...")
 
 
