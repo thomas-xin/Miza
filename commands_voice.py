@@ -274,8 +274,8 @@ class playlist:
                 _vars.update()
                 return "```css\nRemoved all entries from the default playlist for " + uniStr(guild.name) + ".```"
             return (
-                "```css\nCurrent default playlist for " + uniStr(guild.name) + ": "
-                + str(_vars.playlists.get(guild.id, [])) + ".```"
+                "Current default playlist for **" + guild.name + "**: ```css\n"
+                + str(_vars.playlists.get(guild.id, [])) + "```"
                 )
         curr = _vars.playlists.get(guild.id, [])
         if "r" in flags:

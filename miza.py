@@ -551,8 +551,11 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     elif msg[:2] == "||" and msg[-2:] == "||":
         msg = msg[2:-2]
     msg = msg.replace("`", "")
-    while len(msg) and msg[0] == "\n" or msg[0] == "\r":
-        msg = msg[1:]
+    while len(msg):
+        if msg[0] == "\n" or msg[0] == "\r":
+            msg = msg[1:]
+        else:
+            break
     user = message.author
     guild = message.guild
     u_id = user.id
@@ -1089,6 +1092,7 @@ async def reactCallback(message, reaction, user):
                             timeout=_vars.timeout)
                         return
                     except Exception as ex:
+                        print(traceback.format_exc())
                         killThreads()
                         await message.channel.send("```python\nError: " + repr(ex) + "\n```")
 
@@ -1179,9 +1183,9 @@ async def handleMessage(message, edit=True):
     try:
         await asyncio.wait_for(processMessage(message, reconstitute(msg), edit, msg), timeout=_vars.timeout)
     except Exception as ex:
+        print(traceback.format_exc())
         killThreads()
         errmsg = "```python\nError: " + repr(ex) + "\n```"
-        print(errmsg)
         await message.channel.send(errmsg)
     return
 
