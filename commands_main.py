@@ -277,10 +277,10 @@ class restart:
     def __init__(self):
         self.name = ["shutdown"]
         self.min_level = inf
-        self.description = "Restarts the bot."
+        self.description = "Restarts or shuts down the bot."
         self.usage = ""
 
-    async def __call__(self, client, channel, user, guild, name, **void):
+    async def __call__(self, client, channel, user, guild, name, _vars, **void):
         if name == "shutdown":
             s_perm = _vars.getPerms(user, guild)
             if s_perm is not nan:
@@ -288,7 +288,7 @@ class restart:
             await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
-            os.startfile("miza.bat")
+            os.system("start cmd /c miza.bat")
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
         await client.close()

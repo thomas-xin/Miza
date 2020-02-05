@@ -147,7 +147,7 @@ class queue:
     ytdl = downloader
 
     def __init__(self):
-        self.name = ["q", "qlist", "play", "playing", "np", "p"]
+        self.name = ["q", "play", "playing", "np", "p"]
         self.min_level = 0
         self.description = "Shows the music queue, or plays a song in voice."
         self.usage = "<link:[]> <verbose:(?v)>"
@@ -274,7 +274,7 @@ class playlist:
                 _vars.update()
                 return "```css\nRemoved all entries from the default playlist for " + uniStr(guild.name) + ".```"
             return (
-                "Current default playlist for **" + guild.name + "**: ```css\n"
+                "Current default playlist for **" + guild.name + "**: ```json\n"
                 + str(_vars.playlists.get(guild.id, [])) + "```"
                 )
         curr = _vars.playlists.get(guild.id, [])
@@ -451,7 +451,7 @@ class pause:
     server_only = True
 
     def __init__(self):
-        self.name = ["resume"]
+        self.name = ["resume", "unpause"]
         self.min_level = 1
         self.description = "Pauses or resumes audio playing."
         self.usage = ""
@@ -482,7 +482,7 @@ class dump:
                 "stats": auds.stats,
                 "queue": q,
                 }
-            return "Queue data for " + uniStr(guild.name) + ":\n```css\n" + json.dumps(d) + "\n```"
+            return "Queue data for " + uniStr(guild.name) + ":\n```json\n" + json.dumps(d) + "\n```"
         try:
             opener = urlBypass()
             resp = opener.open(_vars.verifyURL(argv))
@@ -500,6 +500,7 @@ class dump:
         for vc in client.voice_clients:
             if vc.channel.guild.id == guild.id:
                 vc.stop()
+        auds.new()
         auds.queue = d["queue"]
         auds.stats = d["stats"]
         return "```css\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"

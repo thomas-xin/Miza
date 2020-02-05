@@ -8,6 +8,7 @@ array = tinyarray.array
 import colorsys, random, threading, time
 from scipy import interpolate, special
 
+random.seed(random.random() + time.time() % 1)
 sympy.init_printing(use_unicode=True)
 
 mp = mpmath.mp
@@ -197,7 +198,7 @@ def sgn(x):
 
 
 def frand(x=1, y=0):
-    return (random.random() * x * y / mpf(random.random())) % x + y
+    return (random.random() * max(x, y) / mpf(random.random())) % x + y
 
 
 def xrand(x, y=None, z=0):

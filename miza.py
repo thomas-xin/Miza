@@ -42,6 +42,10 @@ class customAudio(discord.AudioSource):
         self.paused = False
         if source is not None:
             doParallel(self.change, [source])
+        else:
+            if getattr(self, "source", None) is not None:
+                self.source.cleanup()
+            self.source = None
         
     def read(self):
         try:
@@ -69,6 +73,9 @@ class customAudio(discord.AudioSource):
             bassboost = sndset["bassboost"]
             delay = min(400, max(2, round(sndset["delay"] * 5)))
             if volume == 1 and reverb == pitch == bassboost == 0 and delay == 16:
+                self.buffer = []
+                self.feedback = None
+                self.bassadj = None
                 return temp
             array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
             size = self.length >> 1
@@ -818,19 +825,22 @@ async def updateLoop():
     print("Update loop initiated.")
     counter = 0
     while True:
-        while _vars.blocked > 0:
-            print("Blocked...")
-            _vars.blocked -= 1
-            await asyncio.sleep(1)
-        for g in _vars.special:
-            asyncio.create_task(changeColour(g, _vars.special[g], counter))
-        await handleUpdate()
-        t = time.time()
-        while time.time() - t < frand(2) + 1:
-            await asyncio.sleep(0.001)
-            if _vars.doUpdate:
-                await handleUpdate(True)
-                _vars.doUpdate = False
+        try:
+            while _vars.blocked > 0:
+                print("Blocked...")
+                _vars.blocked -= 1
+                await asyncio.sleep(1)
+            for g in _vars.special:
+                asyncio.create_task(changeColour(g, _vars.special[g], counter))
+            await handleUpdate()
+            t = time.time()
+            while time.time() - t < frand(2) + 1:
+                await asyncio.sleep(0.001)
+                if _vars.doUpdate:
+                    await handleUpdate(True)
+                    _vars.doUpdate = False
+        except:
+            print(traceback.format_exc())
         counter = counter + 1 & 65535
 
 
@@ -871,11 +881,13 @@ async def on_ready():
 
 
 def sendUpdateRequest(error=False):
+    #print("Sending update request...")
     _vars.doUpdate = True
 
 
 async def handleUpdate(force=False):
     if force or time.time() - _vars.lastCheck > 0.5:
+        #print("Sending update...")
         guilds = len(client.guilds)
         if guilds != _vars.guilds:
             _vars.guilds = guilds
@@ -1138,6 +1150,10 @@ async def on_typing(channel, user, when):
 
 @client.event
 async def on_voice_state_update(member, before, after):
+    if member.id == client.user.id:
+        if after.mute or after.deaf:
+            print("Unmuted self in " + member.guild.name)
+            await member.edit(mute=False, deafen=False)
     await handleUpdate()
 
 
