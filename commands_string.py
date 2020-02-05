@@ -123,7 +123,7 @@ def _c2e(string, em1, em2):
     output = "\n".join(printed)
     print("[" + em1 + "]", "[" + em2 + "]")
     if len(em1) == len(em2) == 1:
-        output = "```\n" + output + "```"
+        output = "```fix\n" + output + "```"
     return output
 
 
@@ -192,7 +192,7 @@ class hex2uni:
 
     async def __call__(self, argv, **extra):
         b = hex2Bytes(argv.replace("0x", "").replace(" ", ""))
-        return "```\n" + b.decode("utf-8") + "```"
+        return "```fix\n" + b.decode("utf-8") + "```"
 
 
 class char2emoj:

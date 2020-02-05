@@ -1010,7 +1010,7 @@ async def handleUpdate(force=False):
                                         vc.play(auds, after=sendUpdateRequest)
                                     channel = await client.fetch_channel(auds.channel)
                                     await channel.send(
-                                        "```\n🎵 Now playing " + uniStr(q[0]["name"])
+                                        "```css\n🎵 Now playing " + uniStr(q[0]["name"])
                                         + ", added by " + uniStr(q[0]["added by"]) + "! 🎵```"
                                         )
                                 except FileNotFoundError:

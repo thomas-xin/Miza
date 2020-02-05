@@ -274,7 +274,7 @@ class playlist:
                 _vars.update()
                 return "```css\nRemoved all entries from the default playlist for " + uniStr(guild.name) + ".```"
             return (
-                "Current default playlist for **" + guild.name + "**: ```json\n"
+                "Current default playlist for **" + guild.name + "**: ```ini\n"
                 + str(_vars.playlists.get(guild.id, [])) + "```"
                 )
         curr = _vars.playlists.get(guild.id, [])
@@ -469,15 +469,18 @@ class dump:
     def __init__(self):
         self.name = []
         self.min_level = 1
-        self.description = "Dumps or restores the currently playing audio queue state."
-        self.usage = "<data:[]>"
+        self.description = "Dumps or loads the currently playing audio queue state."
+        self.usage = "<data:[]> <add:(?a)>"
 
-    async def __call__(self, guild, channel, user, client, _vars, argv, **void):
+    async def __call__(self, guild, channel, user, client, _vars, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if not argv:
             q = copy.deepcopy(auds.queue)
             for e in q:
                 e["id"] = e["id"].replace("@", "")
+                e.pop("added by")
+                e.pop("u_id")
+                e.pop("skips")
             d = {
                 "stats": auds.stats,
                 "queue": q,
@@ -485,7 +488,11 @@ class dump:
             return "Queue data for " + uniStr(guild.name) + ":\n```json\n" + json.dumps(d) + "\n```"
         try:
             opener = urlBypass()
-            resp = opener.open(_vars.verifyURL(argv))
+            if len(message.attachments):
+                url = message.attachments[0].url
+            else:
+                url = _vars.verifyURL(argv)
+            resp = opener.open(url)
             rescode = resp.getcode()
             if rescode != 200:
                 raise ConnectionError(rescode)
@@ -496,14 +503,23 @@ class dump:
             d = json.loads(s)
         except:
             d = json.loads(argv)
-        print("Stopped audio playback in " + guild.name)
-        for vc in client.voice_clients:
-            if vc.channel.guild.id == guild.id:
-                vc.stop()
-        auds.new()
-        auds.queue = d["queue"]
+        q = d["queue"]
+        for e in q:
+            e["added by"] = user.name
+            e["u_id"] = user.id
+            e["skips"] = []
+        if not "a" in flags:
+            print("Stopped audio playback in " + guild.name)
+            for vc in client.voice_clients:
+                if vc.channel.guild.id == guild.id:
+                    vc.stop()
+            auds.new()
+            auds.queue = q
+            auds.stats = d["stats"]
+            return "```css\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"
+        auds.queue += q
         auds.stats = d["stats"]
-        return "```css\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"
+        return "```css\nSuccessfully appended dump to queue for " + uniStr(guild.name) + ".```"
             
 
 class volume:

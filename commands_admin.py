@@ -63,7 +63,7 @@ class purge:
                     print(repr(ex))
         if not "h" in flags:
             return (
-                "```\nDeleted " + uniStr(deleted)
+                "```css\nDeleted " + uniStr(deleted)
                 + " message" + "s" * (deleted != 1) + "!```"
                 )
 
@@ -107,13 +107,13 @@ class ban:
             is_banned = is_banned[0] - dtime
             if len(args) < 2:
                 return (
-                    "```\nCurrent ban for " + uniStr(t_user.name)
+                    "```css\nCurrent ban for " + uniStr(t_user.name)
                     + " from " + uniStr(guild.name) + ": "
                     + uniStr(" ".join(timeConv(is_banned))) +  ".```"
                 )
         elif len(args) < 2:
             return (
-                "```\n" + uniStr(t_user.name)
+                "```css\n" + uniStr(t_user.name)
                 + " is currently not banned from " + uniStr(guild.name) + ".```"
                 )
         secs = tm * 3600
@@ -125,14 +125,14 @@ class ban:
         response = None
         if is_banned:
             response = (
-                "```\nUpdated ban for " + uniStr(t_user.name)
+                "```css\nUpdated ban for " + uniStr(t_user.name)
                 + " from " + uniStr(" ".join(timeConv(is_banned)))
                 + " to " + uniStr(" ".join(timeConv(secs)))
                 + "."
             )
         elif tm >= 0:
             response = (
-                "```\n" + uniStr(t_user.name)
+                "```css\n" + uniStr(t_user.name)
                 + " has been banned from " + uniStr(guild.name)
                 + " for " + uniStr(" ".join(timeConv(secs))) + "."
             )
@@ -156,12 +156,12 @@ class roleGiver:
         if "r" in flags:
             _vars.scheduled[channel.id] = {}
             _vars.update()
-            return "```\nRemoved all automated role givers from channel " + uniStr(channel.name) + ".```"
+            return "```css\nRemoved all automated role givers from channel " + uniStr(channel.name) + ".```"
         currentSchedule = _vars.scheduled.get(channel.id, {})
         if not argv:
             return (
                 "Currently active permission givers in channel **" + channel.name
-                + "**:\n```\n" + repr(currentSchedule) + "```"
+                + "**:\n```css\n" + repr(currentSchedule) + "```"
                 )
         react = args[0].lower()
         try:
@@ -179,7 +179,7 @@ class roleGiver:
         _vars.scheduled[channel.id] = currentSchedule
         _vars.update()
         return (
-            "```\nAdded role giver with reaction to " + uniStr(react)
+            "```css\nAdded role giver with reaction to " + uniStr(react)
             + " and " + r_type + " " + uniStr(role)
             + " to channel " + uniStr(channel.name) + ".```"
             )
@@ -199,7 +199,7 @@ class defaultPerms:
         currPerm = _vars.perms.get("defaults", {}).get(guild.id, 0)
         if not argv:
             return (
-                "```\nCurrent default permission level for " + uniStr(guild.name)
+                "```css\nCurrent default permission level for " + uniStr(guild.name)
                 + ": " + uniStr(currPerm) + ".```"
                 )
         s_perm = _vars.getPerms(user, guild)
@@ -212,7 +212,7 @@ class defaultPerms:
         _vars.perms["defaults"][guild.id] = c_perm
         _vars.update()
         return (
-            "```\nChanged default permission level of " + uniStr(guild.name)
+            "```css\nChanged default permission level of " + uniStr(guild.name)
             + " to " + uniStr(c_perm) + ".```"
             )
 
