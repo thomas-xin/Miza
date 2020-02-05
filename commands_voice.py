@@ -474,7 +474,7 @@ class dump:
 
     async def __call__(self, guild, channel, user, client, _vars, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        if not argv:
+        if not argv and not len(message.attachments):
             q = copy.deepcopy(auds.queue)
             for e in q:
                 e["id"] = e["id"].replace("@", "")
@@ -500,9 +500,9 @@ class dump:
             s = s[s.index("{"):]
             if s[-4:] == "\n```":
                 s = s[:-4]
-            d = json.loads(s)
         except:
-            d = json.loads(argv)
+            s = argv
+        d = json.loads(s)
         q = d["queue"]
         for e in q:
             e["added by"] = user.name
