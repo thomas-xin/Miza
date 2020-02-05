@@ -259,9 +259,14 @@ class cs_org2xm:
         self.name = ["org2xm", "convert_org"]
         self.min_level = 0
         self.description = "Converts a .org file to another file format."
-        self.usage = "<0:org_url> <2:wave_url[]> <1:out_format[mp3]>"
+        self.usage = "<0:org_url{attached_file}> <2:wave_url[]> <1:out_format[xm]>"
 
-    async def __call__(self, args, _vars, channel, **void):
+    async def __call__(self, args, _vars, message, channel, **void):
+        if len(message.attachments):
+            org = message.attachments[0].url
+            args = [""] + args
+        else:
+            org = args[0]
         if len(args) > 2:
             wave = _vars.verifyURL(args[1])
         else:
@@ -273,7 +278,6 @@ class cs_org2xm:
             fmt = "xm"
         if fmt not in self.fmts:
             raise TypeError(fmt + " is not a supported output format.")
-        org = args[0]
         returns = [None]
         doParallel(orgConv, [org, wave, fmt], returns)
         t = time.time()

@@ -551,7 +551,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     elif msg[:2] == "||" and msg[-2:] == "||":
         msg = msg[2:-2]
     msg = msg.replace("`", "")
-    while msg[0] == "\n" or msg[0] == "\r":
+    while len(msg) and msg[0] == "\n" or msg[0] == "\r":
         msg = msg[1:]
     user = message.author
     guild = message.guild
@@ -740,9 +740,9 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                     except Exception as ex:
                         rep = repr(ex)
                         if len(rep) > 1950:
-                            errmsg = "```\nError: Error message too long.\n```"
+                            errmsg = "```css\nError: Error message too long.\n```"
                         else:
-                            errmsg = "```\nError: " + rep + "\n```"
+                            errmsg = "```python\nError: " + rep + "\n```"
                         print(traceback.format_exc())
                         asyncio.create_task(channel.send(errmsg))
     elif not edit and u_id != client.user.id and g_id in _vars.following:
@@ -1090,7 +1090,7 @@ async def reactCallback(message, reaction, user):
                         return
                     except Exception as ex:
                         killThreads()
-                        await message.channel.send("```\nError: " + repr(ex) + "\n```")
+                        await message.channel.send("```python\nError: " + repr(ex) + "\n```")
 
 
 @client.event
@@ -1180,7 +1180,7 @@ async def handleMessage(message, edit=True):
         await asyncio.wait_for(processMessage(message, reconstitute(msg), edit, msg), timeout=_vars.timeout)
     except Exception as ex:
         killThreads()
-        errmsg = "```\nError: " + repr(ex) + "\n```"
+        errmsg = "```python\nError: " + repr(ex) + "\n```"
         print(errmsg)
         await message.channel.send(errmsg)
     return

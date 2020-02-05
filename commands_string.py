@@ -160,11 +160,11 @@ class math:
             if answer is None:
                 if "h" in flags:
                     return
-                return "```\n" + argv + " successfully executed!```"
+                return "```python\n" + argv + " successfully executed!```"
             elif "\nError" in answer:
-                return "```" + answer + "\n```"
+                return "```python" + answer + "\n```"
             else:
-                return "```\n" + argv + " = " + str(answer) + "\n```"
+                return "```python\n" + argv + " = " + str(answer) + "\n```"
 
 
 class uni2hex:
