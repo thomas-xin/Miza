@@ -163,9 +163,9 @@ class queue:
             for e in q:
                 totalTime += e["duration"]
             if "v" in flags:
-                cnt = uniStr(len(q))
+                cnt = len(q)
                 info = (
-                    "`" + cnt + " item" + "s" * (cnt != 1) + ", estimated total duration: "
+                    "`" + uniStr(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
                     + uniStr(" ".join(timeConv(totalTime))) + "`"
                     )
             else:
