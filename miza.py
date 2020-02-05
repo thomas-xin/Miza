@@ -38,7 +38,7 @@ class customAudio(discord.AudioSource):
 
     def new(self, source=None):
         self.readpos = 0
-        self.is_playing = False
+        self.is_playing = source is not None
         self.paused = False
         if source is not None:
             doParallel(self.change, [source])
@@ -551,6 +551,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     elif msg[:2] == "||" and msg[-2:] == "||":
         msg = msg[2:-2]
     msg = msg.replace("`", "")
+    while msg[0] == "\n" or msg[0] == "\r":
+        msg = msg[1:]
     user = message.author
     guild = message.guild
     u_id = user.id
