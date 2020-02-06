@@ -1,4 +1,4 @@
-import datetime, traceback
+import datetime, traceback, copy
 from smath import *
 
 
@@ -256,6 +256,12 @@ class rainbowRole:
             )
         
 
+follow_default = {
+    "follow": False,
+    "reacts": {},
+    }
+
+                  
 class follow:
     is_command = True
     server_only = True
@@ -267,16 +273,64 @@ class follow:
         self.usage = "<state:(?e)(?d)>"
 
     async def __call__(self, _vars, flags, guild, **void):
+        curr = _vars.following.get(guild.id, copy.deepcopy(follow_default))
+        if type(curr) is not dict:
+            curr = copy.deepcopy(follow_default)
         if "d" in flags:
-            _vars.following.pop(guild.id)
+            curr["follow"] = False
+            _vars.following[guild.id] = curr
             _vars.update()
             return "```css\nDisabled follow imitating for " + uniStr(guild.name) + ".```"
         elif "e" in flags:
-            _vars.following[guild.id] = False
+            curr["follow"] = True
+            _vars.following[guild.id] = curr
             _vars.update()
             return "```css\nEnabled follow imitating for " + uniStr(guild.name) + ".```"
         else:
             return (
-                "```css\nCurrently " + uniStr("not " * _vars.following.get(guild.id, 1))
+                "```css\nCurrently " + uniStr("not " * (not curr["follow"]))
                 + "follow imitating in " + uniStr(guild.name) + ".```"
                 )
+
+
+class react:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = ["autoreact"]
+        self.min_level = 3
+        self.description = "Causes Miza to automatically assign a reaction to messages containing the substring."
+        self.usage = "<reaction> <disable:(?d)>"
+
+    async def __call__(self, _vars, flags, guild, argv, args, **void):
+        curr = _vars.following.get(guild.id, copy.deepcopy(follow_default))
+        if type(curr) is not dict:
+            curr = copy.deepcopy(follow_default)
+        if not argv:
+            if "d" in flags:
+                curr["reacts"] = {}
+                _vars.following[guild.id] = curr
+                _vars.update()
+                return "```css\nRemoved all auto reacts for " + uniStr(guild.name) + ".```"
+            else:
+                return (
+                    "Currently active auto reacts for " + uniStr(guild.name) + ":\n```json\n"
+                    + str(curr) + "```"
+                    )
+        a = args[0].lower()
+        if "d" in flags:
+            if a in curr["reacts"]:
+                curr["reacts"].pop(a)
+                _vars.following[guild.id] = curr
+                _vars.update()
+                return "```css\nRemoved " + uniStr(a) + " from the auto react list for " + uniStr(guild.name) + ".```"
+            else:
+                raise LookupError(uniStr(a) + " is not in the auto react list.")
+        curr["reacts"][a] = args[1]
+        _vars.following[guild.id] = curr
+        _vars.update()
+        return (
+            "```css\nAdded " + uniStr(a) + ": " + uniStr(args[1]) + " to the auto react list for "
+            + uniStr(guild.name) + ".```"
+            )
