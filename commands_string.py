@@ -177,8 +177,10 @@ class uni2hex:
         self.usage = "<string>"
 
     async def __call__(self, argv, **extra):
+        if not argv:
+            raise ValueError("Input string is empty.")
         b = bytes(argv, "utf-8")
-        return "```css\n" + bytes2Hex(b) + "```"
+        return "```fix\n" + bytes2Hex(b) + "```"
 
 
 class hex2uni:
@@ -191,6 +193,8 @@ class hex2uni:
         self.usage = "<string>"
 
     async def __call__(self, argv, **extra):
+        if not argv:
+            raise ValueError("Input string is empty.")
         b = hex2Bytes(argv.replace("0x", "").replace(" ", ""))
         return "```fix\n" + b.decode("utf-8") + "```"
 
@@ -202,7 +206,7 @@ class char2emoj:
         self.name = ["c2e"]
         self.min_level = 0
         self.description = "Makes emoji blocks using a string."
-        self.usage = "<0:string> <1:emoji1> <2:emoji2>"
+        self.usage = "<0:string> <1:emoji_1> <2:emoji_2>"
 
     async def __call__(self, args, **extra):
         for i in range(1,3):
@@ -218,7 +222,7 @@ class translate:
         self.name = ["tr"]
         self.min_level = 0
         self.description = "Translates a string into another language."
-        self.usage = "<0:language> <1:string> <verbose:(?v)> <translator:(?g)>"
+        self.usage = "<0:language> <1:string> <verbose(?v)> <translator(?g)>"
 
     async def __call__(self, args, flags, user, **extra):
         dest = args[0]

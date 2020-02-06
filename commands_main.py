@@ -1,6 +1,7 @@
 import asyncio, os, sys
 from smath import *
 
+
 default_commands = ["string", "admin"]
 
 
@@ -11,7 +12,7 @@ class help:
         self.name = ["?"]
         self.min_level = -inf
         self.description = "Shows a list of usable commands."
-        self.usage = "<command:[]> <verbose:(?v)>"
+        self.usage = "<command{all}> <category{all}> <verbose(?v)>"
 
     async def __call__(self, _vars, client, args, user, channel, guild, flags, **void):
         if guild:
@@ -137,9 +138,9 @@ class perms:
         self.name = ["changePerms", "perm", "changePerm"]
         self.min_level = -inf
         self.description = "Shows or changes a user's permission level."
-        self.usage = "<0:user:{self}> <1:level{curr}> <hide:(?h)>"
+        self.usage = "<0:user{self}> <1:level{curr}> <hide(?h)>"
 
-    async def __call__(self, client, _vars, args, user, guild, flags, **void):
+    async def __call__(self, client, _vars, args, user, perm, guild, flags, **void):
         if len(args) < 2:
             if len(args) < 1:
                 t_user = user
@@ -150,7 +151,7 @@ class perms:
         else:
             c_perm = _vars.evalMath(" ".join(args[1:]))
             s_user = user
-            s_perm = _vars.getPerms(s_user.id, guild)
+            s_perm = perm
             if "everyone" in args[0] or "here" in args[0]:
                 t_user = None
                 t_perm = inf
@@ -178,13 +179,13 @@ class perms:
                     + " to " + uniStr(c_perm) + ".```"
                 )
             else:
-                return (
-                    "```css\nError: Insufficient priviliges to change permissions for " + uniStr(name)
+                raise PermissionError(
+                    "Insufficient priviliges to change permissions for " + uniStr(name)
                     + " in " + uniStr(guild.name)
                     + " from " + uniStr(t_perm)
                     + " to " + uniStr(c_perm)
                     + ".\nRequired level: " + uniStr(m_perm)
-                    + ", Current level: " + uniStr(s_perm) + ".```"
+                    + ", Current level: " + uniStr(s_perm) + "."
                 )
         return (
             "```css\nCurrent permissions for " + uniStr(t_user.name)
@@ -201,15 +202,15 @@ class enableCommand:
         self.name = ["ec", "enable"]
         self.min_level = 0
         self.description = "Shows, enables, or disables a command category in the current channel."
-        self.usage = "<command:{all}> <enable:(?e)> <disable:(?d)> <hide:(?h)>"
+        self.usage = "<command{all}> <enable(?e)> <disable(?d)> <hide(?h)>"
 
-    async def __call__(self, client, _vars, argv, flags, user, channel, guild, **void):
+    async def __call__(self, client, _vars, argv, flags, user, channel, perm, **void):
         if "e" in flags or "d" in flags:
-            s_perm = _vars.getPerms(user, guild)
-            if s_perm < 3:
+            if perm < 3:
                 raise PermissionError(
-                    "Insufficient priviliges to modify enabled commands in "
-                    + uniStr(channel.name) + "."
+                    "Insufficient priviliges to change command list for " + uniStr(channel.name)
+                    + ".\nRequred level: " + uniStr(3)
+                    + ", Current level: " + uniStr(perm) + "."
                     )
         catg = argv.lower()
         print(catg)
@@ -235,7 +236,7 @@ class enableCommand:
             )
         else:
             if not catg in _vars.categories:
-                raise KeyError("Error: Unknown command category " + uniStr(argv) + ".")
+                raise KeyError("Unknown command category " + uniStr(argv) + ".")
             else:
                 try:
                     enabled = _vars.enabled[channel.id]
@@ -295,7 +296,8 @@ class restart:
             await client.close()
         except:
             del client
-        sys.exit(0)
+        del _vars
+        sys.exit()
         raise BaseException("Shutting down...")
 
 
@@ -306,7 +308,7 @@ class suspend:
         self.name = []
         self.min_level = nan
         self.description = "Prevents a user from accessing the bot's commands. Overrides ~perms."
-        self.usage = "<0:user> <1:value:[]>"
+        self.usage = "<0:user> <1:value[]>"
 
     async def __call__(self, _vars, client, user, guild, args, **void):
         if len(args) < 2:
@@ -334,7 +336,7 @@ class loop:
         self.name = ["for", "rep", "repeat", "while"]
         self.min_level = 2
         self.description = "Loops a command."
-        self.usage = "<0:iterations> <1:command> <hide:(?h)>"
+        self.usage = "<0:iterations> <1:command> <hide(?h)>"
 
     async def __call__(self, args, argv, message, callback, _vars, flags, **void):
         iters = round(float(_vars.evalMath(args[0])))

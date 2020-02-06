@@ -375,24 +375,7 @@ class _globals:
         self.doUpdate = False
         self.msgFollow = {}
         self.audiocache = {}
-        should_cache = []
-        for g in self.playlists:
-            for i in self.playlists[g]:
-                s = i["id"] + ".mp3"
-                should_cache.append(s)
-        if not os.path.exists("cache/"):
-            os.mkdir("cache/")
-        for path in os.listdir("cache/"):
-            found = False
-            for i in should_cache:
-                if i in path:
-                    found = True
-                    break
-            if not found:
-                try:
-                    os.remove("cache/" + path)
-                except Exception as ex:
-                    print(traceback.format_exc())
+        self.clearAudioCache()
 
     def loadSave(self):
         try:
@@ -401,12 +384,14 @@ class _globals:
         except:
             print("Creating new save data...")
             self.perms = {}
-            self.bans = {0: {}}
+            self.bans = {}
             self.enabled = {}
             self.scheduled = {}
             self.special = {}
             self.following = {}
             self.playlists = {}
+            self.imglists = {}
+            self.bans[0] = {}
             self.update()
             f = open(self.savedata)
             savedata = eval(f.read())
@@ -419,6 +404,7 @@ class _globals:
         self.special = savedata.get("special", {})
         self.following = savedata.get("following", {})
         self.playlists = savedata.get("playlists", {})
+        self.imglists = savedata.get("imglists", {})
 
     def getModule(self, module, category):
         exec("import " + module + " as _vars_", globals())
@@ -457,12 +443,33 @@ class _globals:
                 "special": self.special,
                 "following": self.following,
                 "playlists": self.playlists,
+                "imglists": self.imglists,
                 }
             s = bytes(repr(savedata), "utf-8")
             f.write(s)
             f.close()
         except Exception as ex:
             print(traceback.format_exc())
+
+    def clearAudioCache(self):
+        should_cache = []
+        for g in self.playlists:
+            for i in self.playlists[g]:
+                s = i["id"] + ".mp3"
+                should_cache.append(s)
+        if not os.path.exists("cache/"):
+            os.mkdir("cache/")
+        for path in os.listdir("cache/"):
+            found = False
+            for i in should_cache:
+                if i in path:
+                    found = True
+                    break
+            if not found:
+                try:
+                    os.remove("cache/" + path)
+                except Exception as ex:
+                    print(traceback.format_exc())
 
     def createPlayer(self, c_id):
         return customAudio(c_id)
@@ -478,12 +485,12 @@ class _globals:
         if guild:
             g_id = guild.id
             g_perm = self.perms.get(g_id, {})
-            if u_id == self.owner_id:
+            if u_id == self.owner_id or u_id == client.user.id:
                 u_perm = nan
             else:
                 u_perm = g_perm.get(u_id, self.perms.get("defaults", {}).get(g_id, 0))
             self.perms[g_id] = g_perm
-        elif u_id == self.owner_id:
+        elif u_id == self.owner_id or u_id == client.user.id:
             u_perm = nan
         else:
             u_perm = 1
@@ -607,34 +614,6 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         op = True
     else:
         op = False
-    if not op and u_id != client.user.id:
-        currentSchedule = _vars.scheduled.get(channel.id, {})
-        checker = message.content.lower()
-        for k in currentSchedule:
-            if k in checker:
-                curr = currentSchedule[k]
-                role = curr["role"]
-                deleter = curr["deleter"]
-                try:
-                    perm = float(role)
-                    currPerm = _vars.getPerms(user, guild)
-                    if perm > currPerm:
-                        _vars.setPerms(user, guild, perm)
-                    print("Granted perm " + str(perm) + " to " + user.name + ".")
-                except ValueError:
-                    for r in guild.roles:
-                        if r.name.lower() == role:
-                            await user.add_roles(
-                                r,
-                                reason="Verified.",
-                                atomic=True,
-                                )
-                            print("Granted role " + r.name + " to " + user.name + ".")
-                if deleter:
-                    try:
-                        await message.delete()
-                    except discord.errors.NotFound:
-                        pass
     if op:
         commands = []
         for catg in categories:
@@ -649,14 +628,13 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                 if check == alias and (len(comm) == length or comm[length] == " " or comm[length] == "?"):
                     print(user.name + " (" + str(u_id) + ") issued command " + msg)
                     req = command.min_level
-                    if req > u_perm or (u_perm is not nan and req is nan):
-                        await channel.send(
-                            "```\nError: Insufficient priviliges for command " + alias
-                            + ".\nRequred level: " + uniStr(req)
-                            + ", Current level: " + uniStr(u_perm) + ".```"
-                        )
-                        return
                     try:
+                        if req > u_perm or (u_perm is not nan and req is nan):
+                            raise PermissionError(
+                                "Insufficient priviliges for command " + alias
+                                + ".\nRequred level: " + uniStr(req)
+                                + ", Current level: " + uniStr(u_perm) + "."
+                            )
                         if cb_argv is not None:
                             argv = cb_argv
                             flags = cb_flags
@@ -722,6 +700,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             argv=argv,              # raw text argument
                             args=args,              # split text arguments
                             flags=flags,            # special flags
+                            perm=u_perm,            # permission level
                             user=user,              # user that invoked the command
                             message=message,        # message data
                             channel=channel,        # channel data
@@ -731,9 +710,11 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             )
                         if response is not None and len(response):
                             if len(response) < 65536:
-                                print(response)
+                                #print(response)
+                                pass
                             else:
-                                print("[RESPONSE OVER 64KB]")
+                                #print("[RESPONSE OVER 64KB]")
+                                pass
                             if type(response) is list:
                                 for r in response:
                                     asyncio.create_task(channel.send(r))
@@ -748,12 +729,12 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                     f.write(bytes(response, "utf-8"))
                                     f.close()
                                     f = discord.File(fn)
-                                    print(fn)
+                                    print("Created file " + fn)
                                     asyncio.create_task(channel.send("Response too long for message.", file=f))
                     except Exception as ex:
                         rep = repr(ex)
                         if len(rep) > 1950:
-                            errmsg = "```css\nError: Error message too long.\n```"
+                            errmsg = "```fix\nError: Error message too long.\n```"
                         else:
                             errmsg = "```python\nError: " + rep + "\n```"
                         print(traceback.format_exc())
@@ -778,7 +759,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                     curr[0] = checker
                     curr[1] = xrand(-1, 2)
                 curr[2] = u_id
-                print(curr)
+                #print(curr)
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
         temp = list(reconstitute(orig.lower()))
         for i in range(len(temp)):
@@ -791,6 +772,32 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         for r in _vars.following[g_id]["reacts"]:
             if r in temp:
                 await message.add_reaction(_vars.following[g_id]["reacts"][r])
+        currentSchedule = _vars.scheduled.get(channel.id, {})
+        for k in currentSchedule:
+            if k in " ".join(temp):
+                curr = currentSchedule[k]
+                role = curr["role"]
+                deleter = curr["deleter"]
+                try:
+                    perm = float(role)
+                    currPerm = _vars.getPerms(user, guild)
+                    if perm > currPerm:
+                        _vars.setPerms(user, guild, perm)
+                    print("Granted perm " + str(perm) + " to " + user.name + ".")
+                except ValueError:
+                    for r in guild.roles:
+                        if r.name.lower() == role:
+                            await user.add_roles(
+                                r,
+                                reason="Verified.",
+                                atomic=True,
+                                )
+                            print("Granted role " + r.name + " to " + user.name + ".")
+                if deleter:
+                    try:
+                        await message.delete()
+                    except discord.errors.NotFound:
+                        pass
 
 
 async def outputLoop():
@@ -824,8 +831,6 @@ async def outputLoop():
                         await sent.delete()
                     except discord.errors.NotFound:
                         pass
-                except Exception as ex:
-                    print(traceback.format_exc())
             elif proc[0] == "&":
                 proc = proc[1:]
                 hist = await ch.history(limit=1).flatten()
@@ -917,7 +922,7 @@ async def handleUpdate(force=False):
                 "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s")
                 + " place, to " + uniStr(guilds) + " servers!"
                 )
-            print(gamestr)
+            print("Playing " + gamestr)
             game = discord.Game(gamestr)
             await client.change_presence(
                 activity=game,
@@ -981,7 +986,7 @@ async def handleUpdate(force=False):
                         _vars.queue.pop(guild.id)
                         msg = "```\n🎵 Successfully disconnected from "+ uniStr(guild.name) + ". 🎵```"
                         await channel.send(msg)
-                        print(msg)
+                        #print(msg)
                     except KeyError:
                         pass
                     await vc.disconnect(force=False)

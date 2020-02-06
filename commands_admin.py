@@ -9,9 +9,9 @@ class purge:
         self.name = ["del", "delete"]
         self.min_level = 1
         self.description = "Deletes a number of messages from a certain user in current channel."
-        self.usage = "<1:user:{bot}(?a)> <0:count:[1]> <hide:(?h)>"
+        self.usage = "<1:user{bot}(?a)> <0:count[1]> <hide(?h)>"
 
-    async def __call__(self, client, _vars, argv, args, channel, user, guild, name, flags, **void):
+    async def __call__(self, client, _vars, argv, args, channel, name, flags, perm, **void):
         t_user = -1
         if "a" in flags or "@everyone" in argv or "@here" in argv:
             t_user = None
@@ -29,12 +29,11 @@ class purge:
             if t_user == -1:
                 t_user = await client.fetch_user(_vars.verifyID(a1))
         if t_user != client.user:
-            s_perm = _vars.getPerms(user, guild)
-            if s_perm < 3:
+            if perm < 3:
                 raise PermissionError (
                     "Insufficient priviliges for command " + uniStr(name)
                     + " for target user.\nRequred level: " + uniStr(3)
-                    + ", Current level: " + uniStr(s_perm) + "."
+                    + ", Current level: " + uniStr(perm) + "."
                 )
         lim = count*2+16
         if not isValid(lim):
@@ -76,13 +75,13 @@ class ban:
         self.name = []
         self.min_level = 3
         self.description = "Bans a user for a certain amount of hours, with an optional reason."
-        self.usage = "<0:user> <1:hours[]> <2:reason[]> <hide:(?h)>"
+        self.usage = "<0:user> <1:hours[]> <2:reason[]> <hide(?h)>"
 
-    async def __call__(self, client, _vars, args, user, channel, guild, flags, **void):
+    async def __call__(self, client, _vars, args, user, channel, guild, flags, perm, **void):
         dtime = datetime.datetime.utcnow().timestamp()
         a1 = args[0]
         t_user = await client.fetch_user(_vars.verifyID(a1))
-        s_perm = _vars.getPerms(user, guild)
+        s_perm = perm
         t_perm = _vars.getPerms(t_user, guild)
         if t_perm + 1 >= s_perm or not isValid(t_perm):
             if len(args) > 1:
@@ -150,10 +149,10 @@ class roleGiver:
         self.name = ["verifier"]
         self.min_level = 3
         self.description = "Adds an automated role giver to the current channel."
-        self.usage = "<0:react_to> <1:role/perm> <disable:(?r)> <deleter:(?d)>"
+        self.usage = "<0:react_to> <1:role/perm> <disable(?d)> <remover(?r)>"
 
     async def __call__(self, _vars, argv, args, user, channel, guild, flags, **void):
-        if "r" in flags:
+        if "d" in flags:
             _vars.scheduled[channel.id] = {}
             _vars.update()
             return "```css\nRemoved all automated role givers from channel " + uniStr(channel.name) + ".```"
@@ -169,13 +168,16 @@ class roleGiver:
             s_perm = _vars.getPerms(user, guild)
             if s_perm < role + 1 or role is nan:
                 raise PermissionError(
-                    "Insufficient permissions to assign permission giver with value " + uniStr(role) + "."
+                    "Insufficient priviliges to assign permission giver to " + uniStr(guild.name)
+                    + " with value " + uniStr(role)
+                    + ".\nRequred level: " + uniStr(role + 1)
+                    + ", Current level: " + uniStr(perm) + "."
                     )
             r_type = "perm"
         except ValueError:
             role = args[1].lower()
             r_type = "role"
-        currentSchedule[react] = {"role": role, "deleter": "d" in flags}
+        currentSchedule[react] = {"role": role, "deleter": "r" in flags}
         _vars.scheduled[channel.id] = currentSchedule
         _vars.update()
         return (
@@ -193,7 +195,7 @@ class defaultPerms:
         self.name = ["defaultPerm"]
         self.min_level = 3
         self.description = "Sets the default bot permission levels for all users in current server."
-        self.usage = "<level:[]>"
+        self.usage = "<level[]>"
 
     async def __call__(self, _vars, argv, user, guild, **void):
         currPerm = _vars.perms.get("defaults", {}).get(guild.id, 0)
@@ -206,7 +208,11 @@ class defaultPerms:
         c_perm = _vars.evalMath(argv)
         if s_perm < c_perm + 1 or c_perm is nan:
             raise PermissionError(
-                "Insufficient permissions to assign default permission level " + uniStr(c_perm) + ".")
+                "Insufficient priviliges to change default permission level for " + uniStr(guild.name)
+                + " to " + uniStr(c_perm)
+                + ".\nRequred level: " + uniStr(c_perm + 1)
+                + ", Current level: " + uniStr(perm) + "."
+                )
         if not "defaults" in _vars.perms:
             _vars.perms["defaults"] = {}
         _vars.perms["defaults"][guild.id] = c_perm
@@ -270,7 +276,7 @@ class follow:
         self.name = ["dogpile"]
         self.min_level = 3
         self.description = "Causes Miza to automatically imitate users when 3 of the same message is posted in a row."
-        self.usage = "<state:(?e)(?d)>"
+        self.usage = "<enable(?e)> <disable(?d)>"
 
     async def __call__(self, _vars, flags, guild, **void):
         curr = _vars.following.get(guild.id, copy.deepcopy(follow_default))
@@ -301,7 +307,7 @@ class react:
         self.name = ["autoreact"]
         self.min_level = 3
         self.description = "Causes Miza to automatically assign a reaction to messages containing the substring."
-        self.usage = "<reaction> <disable:(?d)>"
+        self.usage = "<reaction[]> <disable(?d)>"
 
     async def __call__(self, _vars, flags, guild, argv, args, **void):
         curr = _vars.following.get(guild.id, copy.deepcopy(follow_default))

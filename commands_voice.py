@@ -150,7 +150,7 @@ class queue:
         self.name = ["q", "play", "playing", "np", "p"]
         self.min_level = 0
         self.description = "Shows the music queue, or plays a song in voice."
-        self.usage = "<link:[]> <verbose:(?v)>"
+        self.usage = "<link[]> <verbose(?v)>"
 
     async def __call__(self, client, user, _vars, argv, channel, guild, flags, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -265,11 +265,11 @@ class playlist:
         self.name = ["defaultplaylist", "pl"]
         self.min_level = 2
         self.description = "Shows, appends, or removes from the default playlist."
-        self.usage = "<link:[]> <remove:(?r)>"
+        self.usage = "<link[]> <remove(?d)>"
 
     async def __call__(self, user, argv, _vars, guild, flags, **void):
         if not argv:
-            if "r" in flags:
+            if "d" in flags:
                 _vars.playlists[guild.id] = []
                 _vars.update()
                 return "```css\nRemoved all entries from the default playlist for " + uniStr(guild.name) + ".```"
@@ -278,7 +278,7 @@ class playlist:
                 + str(_vars.playlists.get(guild.id, [])) + "```"
                 )
         curr = _vars.playlists.get(guild.id, [])
-        if "r" in flags:
+        if "d" in flags:
             i = _vars.evalMath(argv)
             temp = curr[i]
             curr.pop(i)
@@ -296,19 +296,12 @@ class playlist:
         for e in res:
             name = e["name"]
             names.append(name)
-            url = e["url"]
-            if "r" in flags:
-                for p in curr:
-                    if p["url"] == url:
-                        curr.remove(p)
-                        break
-            else:
-                curr.append({
-                    "name": name,
-                    "url": url,
-                    "duration": e["duration"],
-                    "id": e["id"],
-                    })
+            curr.append({
+                "name": name,
+                "url": e["url"],
+                "duration": e["duration"],
+                "id": e["id"],
+                })
         if len(names):
             _vars.playlists[guild.id] = curr
             _vars.update()
@@ -379,7 +372,7 @@ class remove:
         self.name = ["rem", "skip"]
         self.min_level = 0
         self.description = "Removes an entry from the voice channel queue."
-        self.usage = "<0:queue_position[0]> <force:(?f)>"
+        self.usage = "<0:queue_position[0]> <force(?f)>"
 
     async def __call__(self, client, user, _vars, argv, guild, flags, **void):
         found = False
@@ -403,7 +396,7 @@ class remove:
                     auds.queue = []
                     auds.new(None)
                     print("Stopped audio playback in " + guild.name)
-                    return "```css\nRemoved all items from the queue.```"
+                    return "```fix\nRemoved all items from the queue.```"
                 raise LookupError
             curr = _vars.queue[guild.id].queue[pos]
         except LookupError:
@@ -468,7 +461,7 @@ class dump:
         self.name = []
         self.min_level = 1
         self.description = "Dumps or loads the currently playing audio queue state."
-        self.usage = "<data:[]> <add:(?a)>"
+        self.usage = "<data[]> <append(?a)>"
 
     async def __call__(self, guild, channel, user, client, _vars, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -529,7 +522,7 @@ class volume:
         self.name = ["vol", "audio", "v"]
         self.min_level = 0
         self.description = "Changes the current playing volume in this server."
-        self.usage = "<value> <reverb(?r)> <pitch(?p)> <bassboost(?b)> <delay(?d)>"
+        self.usage = "<value[]> <reverb(?r)> <pitch(?p)> <bassboost(?b)> <delay(?d)>"
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -591,10 +584,10 @@ class unmute:
         self.name = ["unmuteall"]
         self.min_level = 2
         self.description = "Disables server mute for all members."
-        self.usage = "<link:[]> <verbose:(?v)>"
+        self.usage = ""
 
     async def __call__(self, guild, **void):
         for vc in guild.voice_channels:
             for user in vc.members:
-                asyncio.create_task(user.edit(mute=False,deafen=False))
+                asyncio.create_task(user.edit(mute=False, deafen=False))
         return "```css\nSuccessfully unmuted all users in voice channels in " + uniStr(guild.name) + ".```"

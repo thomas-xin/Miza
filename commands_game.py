@@ -40,8 +40,8 @@ class text2048:
         self.min_level = 0
         self.description = "Plays a game of 2048 using reactions."
         self.usage = (
-            "<board_size:[4]> <verbose:(?v)> <special_tiles:(?s)> <public:(?p)> "
-            + "<insanity_mode:(?i)> <special_controls:(?c)> <easy_mode:(?e)>"
+            "<board_size[4]> <verbose(?v)> <special_tiles(?s)> <public(?p)> "
+            + "<insanity_mode(?i)> <special_controls(?c)> <easy_mode(?e)>"
             )
 
     def moveTiles(self, gamestate, direction):

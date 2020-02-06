@@ -325,13 +325,13 @@ class neko:
         self.name = []
         self.min_level = 1
         self.description = "Pulls a random image from nekos.life and embeds it."
-        self.usage = "<tags:[](?r)> <verbose:(?v)> <list:(?l)>"
+        self.usage = "<tags[]> <random(?r)> <verbose(?v)> <list(?l)>"
 
     async def __call__(self, args, argv, flags, channel, **void):
         isNSFW = is_nsfw(channel)
-        if "l" in flags:
+        if "l" in flags or (not "r" in flags and not len(args)):
             available = []
-            text = "Available commands in **#" + channel.name + "**:\n```css"
+            text = "Available tags in **" + channel.name + "**:\n```css"
             for key in neko_tags:
                 if isNSFW or not neko_tags[key] == True:
                     available.append(key)
@@ -388,7 +388,7 @@ class lewd:
         self.name = ["nsfw"]
         self.min_level = 1
         self.description = "Pulls a random image from a search on Rule34 and e621, and embeds it."
-        self.usage = "<query> <verbose:(?v)>"
+        self.usage = "<query> <verbose(?v)>"
 
     async def __call__(self, _vars, args, flags, channel, **void):
         if not is_nsfw(channel):
@@ -419,6 +419,8 @@ class owoify:
         self.usage = "<string>"
 
     async def __call__(self, argv, **void):
+        if not argv:
+            raise ValueError("Input string is empty.")
         output = ""
         while argv:
             output += nekos.owoify(argv[:200])
