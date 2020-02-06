@@ -66,7 +66,7 @@ class customAudio(discord.AudioSource):
             if not self.paused:
                 if self.is_playing:
                     sendUpdateRequest(True)
-                if self.source is not 0:
+                if self.source != 0:
                     self.new()
             temp = numpy.zeros(self.length, numpy.uint16).tobytes()
         try:

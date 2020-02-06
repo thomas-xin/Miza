@@ -23,24 +23,29 @@ class DouClub:
             doParallel(self.pull)
         output = []
         query = query.lower()
-        qlist = query.split(" ")
-        for q in qlist:
-            for l in self.data[0]:
-                found = False
+        for l in self.data[0]:
+            found = True
+            qlist = query.split(" ")
+            for q in qlist:
+                tag = False
                 for k in l:
                     i = str(l[k])
                     if q in i.lower():
-                        found = True
-                if found:
-                    output.append({
-                        "author": l["Author"],
-                        "name": l["Title"],
-                        "description": l["Description"],
-                        "url": (
-                            "https://doukutsuclub.knack.com/database#search-database/mod-details/"
-                            + l["id"] + "/"
-                            ),
-                        })
+                        tag = True
+                        break
+                if not tag:
+                    found = False
+                    break
+            if found:
+                output.append({
+                    "author": l["Author"],
+                    "name": l["Title"],
+                    "description": l["Description"],
+                    "url": (
+                        "https://doukutsuclub.knack.com/database#search-database/mod-details/"
+                        + l["id"] + "/"
+                        ),
+                    })
         return output
 
 f = open("auth.json")
@@ -515,9 +520,11 @@ class cs_mod:
         resp = [None]
         doParallel(searchForums, [argv], resp)
         data = douclub.search(argv)
-        while resp[0] is None:
+        t = time.time()
+        while resp[0] is None and time.time() - t < 5:
             await asyncio.sleep(0.01)
-        data += resp[0]
+        if resp[0] is not None:
+            data += resp[0]
         print(data)
         if len(data):
             response = "Search results for **" + argv + "**:\n"
