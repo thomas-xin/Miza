@@ -161,7 +161,7 @@ class queue:
             if not len(q):
                 return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```", 1
             if auds.stats["loop"]:
-                totaltime = inf
+                totalTime = inf
             else:
                 totalTime = -elapsed
                 for e in q:
@@ -276,7 +276,7 @@ class playlist:
         if not argv:
             if "d" in flags:
                 _vars.playlists[guild.id] = []
-                _vars.update()
+                doParallel(_vars.update)
                 return "```css\nRemoved all entries from the default playlist for " + uniStr(guild.name) + ".```"
             return (
                 "Current default playlist for **" + guild.name + "**: ```json\n"
@@ -288,7 +288,7 @@ class playlist:
             temp = curr[i]
             curr.pop(i)
             _vars.playlists[guild.id] = curr
-            _vars.update()
+            doParallel(_vars.update)
             return "```css\nRemoved " + uniStr(temp["name"]) + " from the default playlist for " + uniStr(guild.name) + ".```"
         output = [None]
         doParallel(self.ytdl.search, [argv], output)
@@ -309,7 +309,7 @@ class playlist:
                 })
         if len(names):
             _vars.playlists[guild.id] = curr
-            _vars.update()
+            doParallel(_vars.update)
             return "```css\nAdded " + uniStr(names) + " to the default playlist for " + uniStr(guild.name) + ".```"
         
 

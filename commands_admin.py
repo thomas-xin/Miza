@@ -118,7 +118,7 @@ class ban:
         secs = tm * 3600
         g_bans[t_user.id] = [secs + dtime, channel.id]
         _vars.bans[g_id] = g_bans
-        _vars.update()
+        doParallel(_vars.update)
         if tm >= 0:
             await guild.ban(t_user, reason=msg, delete_message_days=0)
         response = None
@@ -154,7 +154,7 @@ class roleGiver:
     async def __call__(self, _vars, argv, args, user, channel, guild, flags, **void):
         if "d" in flags:
             _vars.scheduled[channel.id] = {}
-            _vars.update()
+            doParallel(_vars.update)
             return "```css\nRemoved all automated role givers from channel " + uniStr(channel.name) + ".```"
         currentSchedule = _vars.scheduled.get(channel.id, {})
         if not argv:
@@ -179,7 +179,7 @@ class roleGiver:
             r_type = "role"
         currentSchedule[react] = {"role": role, "deleter": "r" in flags}
         _vars.scheduled[channel.id] = currentSchedule
-        _vars.update()
+        doParallel(_vars.update)
         return (
             "```css\nAdded role giver with reaction to " + uniStr(react)
             + " and " + r_type + " " + uniStr(role)
@@ -216,7 +216,7 @@ class defaultPerms:
         if not "defaults" in _vars.perms:
             _vars.perms["defaults"] = {}
         _vars.perms["defaults"][guild.id] = c_perm
-        _vars.update()
+        doParallel(_vars.update)
         return (
             "```css\nChanged default permission level of " + uniStr(guild.name)
             + " to " + uniStr(c_perm) + ".```"
@@ -255,7 +255,7 @@ class rainbowRole:
                 else:
                     guild_special[r.id] = delay
         _vars.special[guild.id] = guild_special
-        _vars.update()
+        doParallel(_vars.update)
         return (
             "Changed dynamic role colours for **" + guild.name
             + "** to:\n```css\n" + str(guild_special) + "```"
@@ -285,12 +285,12 @@ class follow:
         if "d" in flags:
             curr["follow"] = False
             _vars.following[guild.id] = curr
-            _vars.update()
+            doParallel(_vars.update)
             return "```css\nDisabled follow imitating for " + uniStr(guild.name) + ".```"
         elif "e" in flags:
             curr["follow"] = True
             _vars.following[guild.id] = curr
-            _vars.update()
+            doParallel(_vars.update)
             return "```css\nEnabled follow imitating for " + uniStr(guild.name) + ".```"
         else:
             return (
@@ -317,7 +317,7 @@ class react:
             if "d" in flags:
                 curr["reacts"] = {}
                 _vars.following[guild.id] = curr
-                _vars.update()
+                doParallel(_vars.update)
                 return "```css\nRemoved all auto reacts for " + uniStr(guild.name) + ".```"
             else:
                 return (
@@ -329,13 +329,13 @@ class react:
             if a in curr["reacts"]:
                 curr["reacts"].pop(a)
                 _vars.following[guild.id] = curr
-                _vars.update()
+                doParallel(_vars.update)
                 return "```css\nRemoved " + uniStr(a) + " from the auto react list for " + uniStr(guild.name) + ".```"
             else:
                 raise LookupError(uniStr(a) + " is not in the auto react list.")
         curr["reacts"][a] = args[1]
         _vars.following[guild.id] = curr
-        _vars.update()
+        doParallel(_vars.update)
         return (
             "```css\nAdded " + uniStr(a) + ": " + uniStr(args[1]) + " to the auto react list for "
             + uniStr(guild.name) + ".```"

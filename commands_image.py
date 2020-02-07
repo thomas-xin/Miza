@@ -26,14 +26,14 @@ class img:
                 url = _vars.verifyURL(args[1])
                 images[key] = url
                 _vars.imglists[guild.id] = images
-                _vars.update()
+                doParallel(_vars.update)
                 return (
                     "```css\nSuccessfully added " + uniStr(key)
                     + " to the image list for " + uniStr(guild.name) + ".```"
                     )
             if not args:
                 _vars.imglists[guild.id] = {}
-                _vars.update()
+                doParallel(_vars.update)
                 return (
                     "```css\nSuccessfully removed all images from the image list for "
                     + uniStr(guild.name) + ".```"
@@ -41,7 +41,7 @@ class img:
             key = args[0].lower()
             images.pop(key)
             _vars.imglists[guild.id] = images
-            _vars.update()
+            doParallel(_vars.update)
             return (
                 "```css\nSuccessfully removed " + uniStr(key)
                 + " from the image list for " + uniStr(guild.name) + ".```"

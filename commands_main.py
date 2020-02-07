@@ -24,7 +24,7 @@ class help:
                 enabled = _vars.enabled[channel.id]
             except KeyError:
                 enabled = _vars.enabled[channel.id] = default_commands
-                _vars.update()
+                doParallel(_vars.update)
         else:
             enabled = default_commands
         categories = _vars.categories
@@ -219,13 +219,13 @@ class enableCommand:
                 categories = list(_vars.categories)
                 categories.remove("main")
                 _vars.enabled[channel.id] = categories
-                _vars.update()
+                doParallel(_vars.update)
                 if "h" in flags:
                     return
                 return "```css\nEnabled all command categories in " + uniStr(channel.name) + ".```"
             if "d" in flags:
                 _vars.enabled[channel.id] = []
-                _vars.update()
+                doParallel(_vars.update)
                 if "h" in flags:
                     return
                 return "```css\nDisabled all command categories in " + uniStr(channel.name) + ".```"
@@ -250,7 +250,7 @@ class enableCommand:
                             + " is already enabled in " + uniStr(channel.name) + "."
                         )
                     enabled.append(catg)
-                    _vars.update()
+                    doParallel(_vars.update)
                     if "h" in flags:
                         return
                     return "```css\nEnabled command category " + uniStr(catg) + " in " + uniStr(channel.name) + ".```"
@@ -261,7 +261,7 @@ class enableCommand:
                             + " is not currently enabled in " + uniStr(channel.name) + "."
                         )
                     enabled.remove(catg)
-                    _vars.update()
+                    doParallel(_vars.update)
                     if "h" in flags:
                         return
                     return "```css\nDisabled command category " + uniStr(catg) + " in " + uniStr(channel.name) + ".```"
@@ -290,6 +290,7 @@ class restart:
         else:
             await channel.send("Restarting... :wave:")
             os.system("start cmd /c miza.bat")
+        _vars.update()
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
         try:
@@ -305,7 +306,7 @@ class suspend:
     is_command = True
 
     def __init__(self):
-        self.name = []
+        self.name = ["block"]
         self.min_level = nan
         self.description = "Prevents a user from accessing the bot's commands. Overrides ~perms."
         self.usage = "<0:user> <1:value[]>"
@@ -322,7 +323,7 @@ class suspend:
             user = await client.fetch_user(_vars.verifyID(args[0]))
             change = _vars.evalMath(args[1])
             _vars.bans[0][user.id] = change
-            _vars.update()
+            doParallel(_vars.update)
             return (
                 "```css\nChanged suspension status of " + uniStr(user.name) + " to "
                 + uniStr(change) + ".```"
