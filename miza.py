@@ -23,6 +23,7 @@ class customAudio(discord.AudioSource):
         self.buffer = []
         self.feedback = None
         self.bassadj = None
+        self.prev = None
         self.stats = {
             "volume": 1,
             "reverb": 0,
@@ -443,24 +444,25 @@ class _globals:
             category = module.replace(comstr, "")
             doParallel(self.getModule, [module, category])
 
-    def update(self):
-        try:
-            f = open(self.savedata, "wb")
-            savedata = {
-                "perms": self.perms,
-                "bans": self.bans,
-                "enabled": self.enabled,
-                "scheduled": self.scheduled,
-                "special": self.special,
-                "following": self.following,
-                "playlists": self.playlists,
-                "imglists": self.imglists,
-                }
-            s = bytes(repr(savedata), "utf-8")
-            f.write(s)
-            f.close()
-        except Exception as ex:
-            print(traceback.format_exc())
+    def update(self, force=False):
+        if force:
+            try:
+                f = open(self.savedata, "wb")
+                savedata = {
+                    "perms": self.perms,
+                    "bans": self.bans,
+                    "enabled": self.enabled,
+                    "scheduled": self.scheduled,
+                    "special": self.special,
+                    "following": self.following,
+                    "playlists": self.playlists,
+                    "imglists": self.imglists,
+                    }
+                s = bytes(repr(savedata), "utf-8")
+                f.write(s)
+                f.close()
+            except Exception as ex:
+                print(traceback.format_exc())
 
     def clearAudioCache(self):
         should_cache = []
@@ -987,6 +989,8 @@ async def handleUpdate(force=False):
                 for i in _vars.playlists[g]:
                     should_cache.append(i["id"])
             for vc in client.voice_clients:
+                if not vc.is_connected():
+                    continue
                 channel = vc.channel
                 guild = channel.guild
                 try:
@@ -1069,30 +1073,30 @@ async def handleUpdate(force=False):
                             elif not playing and auds.source is None:
                                 if auds.stats["loop"]:
                                     temp = q[0]
-                                prev = q[0]["id"]
+                                auds.prev = q[0]["id"]
                                 q.pop(0)
                                 if auds.stats["shuffle"]:
                                     shuffle(q)
                                 if auds.stats["loop"]:
                                     q.append(temp)
-                                if not len(q):
-                                    t = _vars.playlists.get(guild.id, ())
-                                    if len(t):
-                                        d = None
-                                        while d is None or d["id"] == prev:
-                                            p = t[xrand(len(t))]
-                                            d = {
-                                                "name": p["name"],
-                                                "url": p["url"],
-                                                "duration": p["duration"],
-                                                "added by": client.user.name,
-                                                "u_id": client.user.id,
-                                                "id": p["id"],
-                                                "skips": (),
-                                                }
-                                            if len(t) <= 1:
-                                                break
-                                        q.append(d)
+                        if not len(q):
+                            t = _vars.playlists.get(guild.id, ())
+                            if len(t):
+                                d = None
+                                while d is None or d["id"] == auds.prev:
+                                    p = t[xrand(len(t))]
+                                    d = {
+                                        "name": p["name"],
+                                        "url": p["url"],
+                                        "duration": p["duration"],
+                                        "added by": client.user.name,
+                                        "u_id": client.user.id,
+                                        "id": p["id"],
+                                        "skips": (),
+                                        }
+                                    if len(t) <= 1:
+                                        break
+                                q.append(d)
                     except KeyError as ex:
                         print(traceback.format_exc())
             l = list(_vars.audiocache)

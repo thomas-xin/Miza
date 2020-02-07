@@ -290,7 +290,7 @@ class restart:
         else:
             await channel.send("Restarting... :wave:")
             os.system("start cmd /c miza.bat")
-        _vars.update()
+        _vars.update(True)
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
         try:

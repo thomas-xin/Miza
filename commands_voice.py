@@ -269,26 +269,43 @@ class playlist:
         self.name = ["defaultplaylist", "pl"]
         self.min_level = 2
         self.description = "Shows, appends, or removes from the default playlist."
-        self.usage = "<link[]> <remove(?d)>"
+        self.usage = "<link[]> <remove(?d)> <verbose(?v)>"
 
     async def __call__(self, user, argv, _vars, guild, flags, **void):
+        pl = _vars.playlists.get(guild.id, [])
         if not argv:
             if "d" in flags:
                 _vars.playlists[guild.id] = []
                 doParallel(_vars.update)
                 return "```css\nRemoved all entries from the default playlist for " + uniStr(guild.name) + ".```"
+            if "v" in flags:
+                return (
+                    "Current default playlist for **" + guild.name + "**: ```json\n"
+                    + str(pl).replace("'", '"') + "```"
+                    )
+            else:
+                items = []
+                for i in pl:
+                    items.append(limStr(i["name"], 32))
+                s = ""
+                for i in range(len(items)):
+                    s += " " * (int(math.log10(len(items))) - int(math.log10(max(1, i))))
+                    s += "【" + uniStr(i) + "】 "
+                    s += "[" + items[i] + "]\n"
             return (
-                "Current default playlist for **" + guild.name + "**: ```json\n"
-                + str(_vars.playlists.get(guild.id, [])).replace("'", '"') + "```"
+                "Current default playlist for **" + guild.name + "**: ```ini\n"
+                + s + "```"
                 )
-        curr = _vars.playlists.get(guild.id, [])
         if "d" in flags:
             i = _vars.evalMath(argv)
-            temp = curr[i]
-            curr.pop(i)
-            _vars.playlists[guild.id] = curr
+            temp = pl[i]
+            pl.pop(i)
+            _vars.playlists[guild.id] = pl
             doParallel(_vars.update)
-            return "```css\nRemoved " + uniStr(temp["name"]) + " from the default playlist for " + uniStr(guild.name) + ".```"
+            return (
+                "```css\nRemoved " + uniStr(temp["name"]) + " from the default playlist for "
+                + uniStr(guild.name) + ".```"
+                )
         output = [None]
         doParallel(self.ytdl.search, [argv], output)
         while output[0] is None:
@@ -300,14 +317,14 @@ class playlist:
         for e in res:
             name = e["name"]
             names.append(name)
-            curr.append({
+            pl.append({
                 "name": name,
                 "url": e["url"],
                 "duration": e["duration"],
                 "id": e["id"],
                 })
         if len(names):
-            _vars.playlists[guild.id] = curr
+            _vars.playlists[guild.id] = sorted(pl, key=lambda x: x["name"][0].lower())
             doParallel(_vars.update)
             return "```css\nAdded " + uniStr(names) + " to the default playlist for " + uniStr(guild.name) + ".```"
         
