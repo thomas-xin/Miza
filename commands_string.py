@@ -162,7 +162,7 @@ class math:
                     return
                 return "```python\n" + argv + " successfully executed!```"
             elif "\nError" in answer:
-                return "```python" + answer + "\n```"
+                return "```python" + answer + "\n```", 1
             else:
                 return "```python\n" + argv + " = " + str(answer) + "\n```"
 

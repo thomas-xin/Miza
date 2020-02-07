@@ -366,6 +366,8 @@ class _globals:
     authdata = "auth.json"
 
     def __init__(self):
+        if not os.path.exists("cache/"):
+            os.mkdir("cache/")
         self.lastCheck = time.time()
         self.queue = {}
         self.loadSave()
@@ -466,8 +468,6 @@ class _globals:
             for i in self.playlists[g]:
                 s = i["id"] + ".mp3"
                 should_cache.append(s)
-        if not os.path.exists("cache/"):
-            os.mkdir("cache/")
         for path in os.listdir("cache/"):
             found = False
             for i in should_cache:
@@ -718,20 +718,27 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             callback=processMessage,# function that called the command
                             )
                         if response is not None and len(response):
-                            if len(response) < 65536:
-                                #print(response)
-                                pass
+                            if type(response) is tuple:
+                                response, react = response
+                                if react == 1:
+                                    react = "❎"
                             else:
-                                #print("[RESPONSE OVER 64KB]")
-                                pass
+                                react = False
+                            sent = None
                             if type(response) is list:
                                 for r in response:
                                     asyncio.create_task(channel.send(r))
                             elif type(response) is dict:
-                                asyncio.create_task(channel.send(**response))
+                                if react:
+                                    sent = await channel.send(**response)
+                                else:
+                                    asyncio.create_task(channel.send(**response))
                             else:
                                 if len(response) <= 2000:
-                                    asyncio.create_task(channel.send(response))
+                                    if react:
+                                        sent = await channel.send(response)
+                                    else:
+                                        asyncio.create_task(channel.send(response))
                                 else:
                                     fn = "cache/temp.txt"
                                     f = open(fn, "wb")
@@ -740,6 +747,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                     f = discord.File(fn)
                                     print("Created file " + fn)
                                     asyncio.create_task(channel.send("Response too long for message.", file=f))
+                            if sent is not None:
+                                await sent.add_reaction(react)
                     except Exception as ex:
                         rep = repr(ex)
                         if len(rep) > 1950:
@@ -747,7 +756,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         else:
                             errmsg = "```python\nError: " + rep + "\n```"
                         print(traceback.format_exc())
-                        asyncio.create_task(channel.send(errmsg))
+                        sent = await channel.send(errmsg)
+                        await sent.add_reaction("❎")
     elif u_id != client.user.id and g_id in _vars.following:
         if not edit:
             if _vars.following[g_id]["follow"]:
@@ -994,7 +1004,8 @@ async def handleUpdate(force=False):
                         channel = await client.fetch_channel(auds.channel)
                         _vars.queue.pop(guild.id)
                         msg = "```css\n🎵 Successfully disconnected from "+ uniStr(guild.name) + ". 🎵```"
-                        await channel.send(msg)
+                        sent = await channel.send(msg)
+                        await sent.add_reaction("❎")
                         #print(msg)
                     except KeyError:
                         pass
@@ -1048,10 +1059,11 @@ async def handleUpdate(force=False):
                                     if not vc.is_playing():
                                         vc.play(auds, after=sendUpdateRequest)
                                     channel = await client.fetch_channel(auds.channel)
-                                    await channel.send(
+                                    sent = await channel.send(
                                         "```css\n🎵 Now playing " + uniStr(name)
                                         + ", added by " + uniStr(added_by) + "! 🎵```"
                                         )
+                                    await sent.add_reaction("❎")
                                 except FileNotFoundError:
                                     pass
                             elif not playing and auds.source is None:
@@ -1160,7 +1172,8 @@ async def reactCallback(message, reaction, user):
                     except Exception as ex:
                         print(traceback.format_exc())
                         killThreads()
-                        await message.channel.send("```python\nError: " + repr(ex) + "\n```")
+                        sent = await message.channel.send("```python\nError: " + repr(ex) + "\n```")
+                        await sent.add_reaction("❎")
 
 
 @client.event
@@ -1213,50 +1226,14 @@ async def on_voice_state_update(member, before, after):
 
 async def handleMessage(message, edit=True):
     msg = message.content
-    user = message.author
-    u_id = user.id
-    u_perm = _vars.perms.get(u_id, 0)
-    if u_id == client.user.id:
-        checked = [
-            "```css\nLooping ",
-            "Error: ",
-            "Commands for ",
-            "Hi, did you require my services for anything? Use ~? or ~help for help.",
-            "Sorry, you are currently not permitted to request my services.",
-            "Currently enabled command categories in ",
-            "Required permission level: ",
-            "Current permissions for ",
-            "Current suspension status of ",
-            " is currently not banned from ",
-            "Cache cleared!",
-            "Currently active permission givers in channel ",
-            "Available commands in ",
-            "Successfully connected to ",
-            "Successfully disconnected from ",
-            "Queue for ",
-            " to the queue!",
-            "Voted to remove ",
-            "has been removed from the queue.",
-            "Now playing",
-            "Current audio",
-            ]
-        found = False
-        if len(msg) >= 7:
-            for i in checked:
-                if i in msg:
-                    found = True
-        if found:
-            try:
-                await message.add_reaction("❎")
-            except Exception as ex:
-                print(traceback.format_exc())
     try:
         await asyncio.wait_for(processMessage(message, reconstitute(msg), edit, msg), timeout=_vars.timeout)
     except Exception as ex:
         print(traceback.format_exc())
         killThreads()
         errmsg = "```python\nError: " + repr(ex) + "\n```"
-        await message.channel.send(errmsg)
+        sent = await message.channel.send(errmsg)
+        await message.add_reaction("❎")
     return
 
 

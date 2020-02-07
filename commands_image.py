@@ -14,10 +14,11 @@ class img:
     async def __call__(self, flags, args, argv, guild, perm, _vars, **void):
         images = _vars.imglists.get(guild.id, {})
         if "e" in flags or "d" in flags:
-            if perm < 3:
+            req = 2
+            if perm < req:
                 raise PermissionError(
                     "Insufficient priviliges to change image list for " + uniStr(guild.name)
-                    + ".\nRequred level: " + uniStr(3)
+                    + ".\nRequred level: " + uniStr(req)
                     + ", Current level: " + uniStr(perm) + "."
                     )
             if "e" in flags:

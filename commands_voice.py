@@ -159,7 +159,7 @@ class queue:
         q = _vars.queue[guild.id].queue
         if not len(argv.replace(" ", "")):
             if not len(q):
-                return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```"
+                return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```", 1
             if auds.stats["loop"]:
                 totaltime = inf
             else:
@@ -213,7 +213,7 @@ class queue:
             return (
                 "Queue for **" + guild.name + "**: "
                 + info + "\n```css\n"
-                + countstr + show + "```"
+                + countstr + show + "```", 1
                 )
         else:
             output = [None]
@@ -257,7 +257,7 @@ class queue:
             if not "h" in flags:
                 return (
                     "```css\n🎶 Added " + uniStr(names) + " to the queue! Estimated time until playing: "
-                    + uniStr(" ".join(timeConv(total_duration))) + ". 🎶```"
+                    + uniStr(" ".join(timeConv(total_duration))) + ". 🎶```", 1
                     )
 
 
@@ -339,7 +339,7 @@ class join:
         if joined:
             return (
                 "```css\n🎵 Successfully connected to " + uniStr(vc.name)
-                + " in " + uniStr(guild.name) + ". 🎵```"
+                + " in " + uniStr(guild.name) + ". 🎵```", 1
                 )
 
 
@@ -363,7 +363,7 @@ class leave:
         for vclient in client.voice_clients:
             if guild.id == vclient.channel.guild.id:
                 await vclient.disconnect(force=False)
-                return "```css\n🎵 Successfully disconnected from " + uniStr(guild.name) + ". 🎵```"
+                return "```css\n🎵 Successfully disconnected from " + uniStr(guild.name) + ". 🎵```", 1
         error = LookupError("Unable to find connected channel.")
         if error is not None:
             raise error
@@ -423,7 +423,7 @@ class remove:
         else:
             response = (
                 "```css\nVoted to remove " + uniStr(curr["name"]) + " from the queue.\nCurrent vote count: "
-                + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + "."
+                + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + ".", 1
                 )
         skipped = False
         auds = _vars.queue[guild.id]
@@ -439,7 +439,7 @@ class remove:
                     #print("Stopped audio playback in " + guild.name)
                 continue
             i += 1
-        return response + "```"
+        return response + "```", 1
 
 
 class pause:

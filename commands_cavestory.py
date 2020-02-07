@@ -172,7 +172,8 @@ class SheetPull:
                                 found = True
                         if found:
                             temp = [limLine(e, lim) for e in l]
-                            output.append(temp)
+                            if temp[2].replace(" ", ""):
+                                output.append(temp)
         return output
 
 
@@ -452,11 +453,11 @@ class cs_npc:
             if len(output) < 20000 and len(output) > 1900:
                 response = ["Search results for **" + argv + "**:"]
                 lines = output.split("\n")
-                curr = "```css\n"
+                curr = "```\n"
                 for line in lines:
                     if len(curr) + len(line) > 1900:
                         response.append(curr + "```")
-                        curr = "```css\n"
+                        curr = "```\n"
                     if len(line):
                         curr += line + "\n"
                 response.append(curr + "```")
@@ -492,11 +493,11 @@ class cs_tsc:
             if len(output) < 20000 and len(output) > 1900:
                 response = ["Search results for **" + argv + "**:"]
                 lines = output.split("\n")
-                curr = "```css\n"
+                curr = "```\n"
                 for line in lines:
                     if len(curr) + len(line) > 1900:
                         response.append(curr + "```")
-                        curr = "```css\n"
+                        curr = "```\n"
                     if len(line):
                         curr += line + "\n"
                 response.append(curr + "```")
