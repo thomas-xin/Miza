@@ -954,13 +954,13 @@ async def handleUpdate(force=False):
                                 try:
                                     await g_target.unban(u_target)
                                     await c_target.send(
-                                        "```\n" + uniStr(u_target.name)
+                                        "```css\n" + uniStr(u_target.name)
                                         + " has been unbanned from " + uniStr(g_target.name) + ".```"
                                         )
                                     changed = True
                                 except:
                                     await c_target.send(
-                                        "```\nUnable to unban " + uniStr(u_target.name)
+                                        "```css\nUnable to unban " + uniStr(u_target.name)
                                         + " from " + uniStr(g_target.name) + ".```"
                                         )
                             except KeyError:
@@ -993,7 +993,7 @@ async def handleUpdate(force=False):
                     try:
                         channel = await client.fetch_channel(auds.channel)
                         _vars.queue.pop(guild.id)
-                        msg = "```\n🎵 Successfully disconnected from "+ uniStr(guild.name) + ". 🎵```"
+                        msg = "```css\n🎵 Successfully disconnected from "+ uniStr(guild.name) + ". 🎵```"
                         await channel.send(msg)
                         #print(msg)
                     except KeyError:
@@ -1057,6 +1057,7 @@ async def handleUpdate(force=False):
                             elif not playing and auds.source is None:
                                 if auds.stats["loop"]:
                                     temp = q[0]
+                                prev = q[0]["id"]
                                 q.pop(0)
                                 if auds.stats["shuffle"]:
                                     shuffle(q)
@@ -1065,16 +1066,21 @@ async def handleUpdate(force=False):
                                 if not len(q):
                                     t = _vars.playlists.get(guild.id, ())
                                     if len(t):
-                                        p = t[xrand(len(t))]
-                                        q.append({
-                                            "name": p["name"],
-                                            "url": p["url"],
-                                            "duration": p["duration"],
-                                            "added by": client.user.name,
-                                            "u_id": client.user.id,
-                                            "id": p["id"],
-                                            "skips": (),
-                                            })
+                                        d = None
+                                        while d is None or d["id"] == prev:
+                                            p = t[xrand(len(t))]
+                                            d = {
+                                                "name": p["name"],
+                                                "url": p["url"],
+                                                "duration": p["duration"],
+                                                "added by": client.user.name,
+                                                "u_id": client.user.id,
+                                                "id": p["id"],
+                                                "skips": (),
+                                                }
+                                            if len(t) <= 1:
+                                                break
+                                        q.append(d)
                     except KeyError as ex:
                         print(traceback.format_exc())
             l = list(_vars.audiocache)
@@ -1212,7 +1218,7 @@ async def handleMessage(message, edit=True):
     u_perm = _vars.perms.get(u_id, 0)
     if u_id == client.user.id:
         checked = [
-            "```\nLooping ",
+            "```css\nLooping ",
             "Error: ",
             "Commands for ",
             "Hi, did you require my services for anything? Use ~? or ~help for help.",
