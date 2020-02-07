@@ -175,33 +175,32 @@ class queue:
             else:
                 info = ""
             currTime = 0
-            showing = True
             show = ""
             for i in range(len(q)):
-                if showing:
-                    curr = "\n"
-                    e = q[i]
-                    curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
-                    curr += "【" + uniStr(i) + "】 "
-                    if "v" in flags:
-                        curr += (
-                            uniStr(e["name"]) + ", URL: " + e["url"]
-                            + ", Duration: " + uniStr(" ".join(timeConv(e["duration"])))
-                            + ", Added by: " + uniStr(e["added by"])
-                            )
-                    else:
-                        curr += limStr(uniStr(e["name"]), 48)
-                    estim = currTime - elapsed
-                    if estim > 0:
-                        curr += ", Time until playing: " + uniStr(" ".join(timeConv(estim)))
-                    else:
-                        curr += ", Remaining time: " + uniStr(" ".join(timeConv(estim + e["duration"])))
-                    if len(show) + len(info) + len(curr) < 1800:
-                        show += curr
-                    else:
-                        show += uniStr("\nAnd " + str(len(q) - i) + " more...", 1)
-                        showing = False
-                currTime += e["duration"]
+                curr = "\n"
+                e = q[i]
+                curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
+                curr += "【" + uniStr(i) + "】 "
+                if "v" in flags:
+                    curr += (
+                        uniStr(e["name"]) + ", URL: " + e["url"]
+                        + ", Duration: " + uniStr(" ".join(timeConv(e["duration"])))
+                        + ", Added by: " + uniStr(e["added by"])
+                        )
+                else:
+                    curr += limStr(uniStr(e["name"]), 48)
+                estim = currTime - elapsed
+                if estim > 0:
+                    curr += ", Time until playing: " + uniStr(" ".join(timeConv(estim)))
+                else:
+                    curr += ", Remaining time: " + uniStr(" ".join(timeConv(estim + e["duration"])))
+                if len(show) + len(info) + len(curr) < 1800:
+                    show += curr
+                else:
+                    show += uniStr("\nAnd " + str(len(q) - i) + " more...", 1)
+                    break
+                if i == 0 or not auds.stats["shuffle"]:
+                    currTime += e["duration"]
             duration = q[0]["duration"]
             sym = "⬜⬛"
             barsize = 16 * (1 + ("v" in flags))
@@ -423,7 +422,7 @@ class remove:
         else:
             response = (
                 "```css\nVoted to remove " + uniStr(curr["name"]) + " from the queue.\nCurrent vote count: "
-                + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + ".", 1
+                + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + "."
                 )
         skipped = False
         auds = _vars.queue[guild.id]
