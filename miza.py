@@ -29,6 +29,8 @@ class customAudio(discord.AudioSource):
             "pitch": 0,
             "bassboost": 0,
             "delay": 16 / 5,
+            "loop": 0,
+            "shuffle": 0,
             }
 
     def change(self, source):
@@ -89,58 +91,65 @@ class customAudio(discord.AudioSource):
                 try:
                     array *= volume
                 except:
-                    array = numpy.random.rand(self.length << 1) * 65536 - 32768
+                    array = numpy.random.rand(self.length) * 65536 - 32768
             if bassboost:
-                if self.bassadj is not None:
-                    array += sosfilt(self.bass, numpy.concatenate((self.bassadj, array)))[self.length:]
-                self.bassadj = numpy.array(array) * bassboost
+                try:
+                    if self.bassadj is not None:
+                        array += sosfilt(self.bass, numpy.concatenate((self.bassadj, array)))[self.length:]
+                    self.bassadj = numpy.array(array) * bassboost
+                except:
+                    print(traceback.format_exc())
             left, right = array[::2], array[1::2]
             if pitch:
-                lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
-                n = size
-                lsh, rsh = numpy.zeros(n, lft.dtype), numpy.zeros(n, rft.dtype)
-                s = round(pitch)
-                if s < 0:
-                    s += n
-                t = n - s
-                lsh[:s], rsh[:s] = lft[t:], rft[t:]
-                lsh[s:], rsh[s:] = lft[:t], rft[:t]
-                left, right = (
-                    numpy.fft.irfft(lsh, len(left)),
-                    numpy.fft.irfft(rsh, len(right))
-                    )
+                try:
+                    lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
+                    n = size
+                    lsh, rsh = numpy.zeros(size, lft.dtype), numpy.zeros(size, rft.dtype)
+                    s = round(pitch % size)
+                    t = size - s
+                    lsh[:s], rsh[:s] = lft[t:], rft[t:]
+                    lsh[s:], rsh[s:] = lft[:t], rft[:t]
+                    left, right = (
+                        numpy.fft.irfft(lsh, len(left)),
+                        numpy.fft.irfft(rsh, len(right))
+                        )
+                except:
+                    print(traceback.format_exc())
             if reverb:
-                if not len(self.buffer):
-                    self.buffer = [[self.empty] * 2] * delay
-                r = 18
-                p1 = round(size * (0.5 - 2 / r))
-                p2 = round(size * (0.5 - 1 / r))
-                p3 = round(size * 0.5)
-                p4 = round(size * (0.5 + 1 / r))
-                p5 = round(size * (0.5 + 2 / r))
-                lfeed = (
-                    + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 24
-                    + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
-                    + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
-                    + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
-                    + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 24
-                    ) * reverb
-                rfeed = (
-                    + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 24
-                    + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
-                    + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
-                    + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
-                    + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 24
-                    ) * reverb
-                if self.feedback is not None:
-                    left -= sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size:]
-                    right -= sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size:]
-                self.feedback = (lfeed, rfeed)
-                #array = numpy.convolve(array, resizeVector(self.buffer[0], len(array) * 2))
+                try:
+                    if not len(self.buffer):
+                        self.buffer = [[self.empty] * 2] * delay
+                    r = 18
+                    p1 = round(size * (0.5 - 2 / r))
+                    p2 = round(size * (0.5 - 1 / r))
+                    p3 = round(size * 0.5)
+                    p4 = round(size * (0.5 + 1 / r))
+                    p5 = round(size * (0.5 + 2 / r))
+                    lfeed = (
+                        + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 24
+                        + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
+                        + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
+                        + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
+                        + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 24
+                        ) * reverb
+                    rfeed = (
+                        + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 24
+                        + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
+                        + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
+                        + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
+                        + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 24
+                        ) * reverb
+                    if self.feedback is not None:
+                        left -= sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size:]
+                        right -= sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size:]
+                    self.feedback = (lfeed, rfeed)
+                    #array = numpy.convolve(array, resizeVector(self.buffer[0], len(array) * 2))
+                    a = 1 / 16
+                    b = 1 - a
+                    self.buffer.append((left * a + right * b, left * b + right * a))
+                except:
+                    print(traceback.format_exc())
                 self.buffer = self.buffer[-delay:]
-                a = 1 / 16
-                b = 1 - a
-                self.buffer.append((left * a + right * b, left * b + right * a))
             else:
                 self.buffer = []
                 self.feedback = None
@@ -979,7 +988,7 @@ async def handleUpdate(force=False):
                             membs.remove(memb)
                     cnt = len(membs)
                 except KeyError:
-                    cnt = -1
+                    continue
                 if not cnt:
                     try:
                         channel = await client.fetch_channel(auds.channel)
@@ -992,7 +1001,10 @@ async def handleUpdate(force=False):
                     await vc.disconnect(force=False)
                 else:
                     try:
-                        q = auds.queue
+                        try:
+                            q = auds.queue
+                        except NameError:
+                            continue
                         for e in q:
                             e_id = e["id"].replace("@", "")
                             if e_id in _vars.audiocache:
@@ -1043,7 +1055,13 @@ async def handleUpdate(force=False):
                                 except FileNotFoundError:
                                     pass
                             elif not playing and auds.source is None:
+                                if auds.stats["loop"]:
+                                    temp = q[0]
                                 q.pop(0)
+                                if auds.stats["shuffle"]:
+                                    shuffle(q)
+                                if auds.stats["loop"]:
+                                    q.append(temp)
                                 if not len(q):
                                     t = _vars.playlists.get(guild.id, ())
                                     if len(t):

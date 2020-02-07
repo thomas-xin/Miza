@@ -23,9 +23,12 @@ def getDuration(filename):
         output = output[:i]
     except ValueError:
         pass
-    n = float(output)
-    print(n)
-    return n
+    if output == "N/A":
+        n = 0
+    else:
+        n = roundMin(float(output))
+    #print(n)
+    return max(1 / (1 << 32), n)
 
 
 async def forceJoin(guild, channel, user, client, _vars):
@@ -48,7 +51,7 @@ async def forceJoin(guild, channel, user, client, _vars):
 
 
 class urlBypass(urllib.request.FancyURLopener):
-    version = "Mozilla/6.0"
+    version = "Mozilla/6." + str(xrand(10))
 
     
 class videoDownloader:
@@ -59,12 +62,10 @@ class videoDownloader:
         "noplaylist": 1,
         "call_home": 1,
         "nooverwrites": 1,
-        "ignoreerrors": 1,
+        "ignoreerrors": 0,
         "source_address": "0.0.0.0",
         "default_search": "auto",
         }
-
-    opener = urlBypass()
 
     def __init__(self):
         self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
@@ -82,12 +83,12 @@ class videoDownloader:
             return self.searched[item]
         try:
             self.requests += 1
-            try:
-                pl = self.downloader.extract_info(item, False)
-                self.requests = max(self.requests - 1, 0)
-            except:
-                raise
+            pl = self.downloader.extract_info(item, False)
+            if pl is None:
+                return []
+            self.requests = max(self.requests - 1, 0)
             if "direct" in pl:
+                opener = urlBypass()
                 resp = self.opener.open(item)
                 rescode = resp.getcode()
                 if rescode != 200:
@@ -200,11 +201,12 @@ class queue:
                 currTime += e["duration"]
             duration = q[0]["duration"]
             sym = "⬜⬛"
-            count = 16 * (1 + ("v" in flags))
-            r = round(elapsed / duration * count)
+            barsize = 16 * (1 + ("v" in flags))
+            r = round(min(1, elapsed / duration) * barsize)
+            bar = sym[0] * r + sym[1] * (barsize - r)
             countstr = "Currently playing " + uniStr(q[0]["name"]) + ", "
             countstr += uniStr(dhms(elapsed)) + "/" + uniStr(dhms(duration)) + ", "
-            countstr += sym[0] * r + sym[1] * (count - r) + "\n"
+            countstr += bar + "\n"
             return (
                 "Queue for **" + guild.name + "**: "
                 + info + "\n```css\n"
@@ -274,8 +276,8 @@ class playlist:
                 _vars.update()
                 return "```css\nRemoved all entries from the default playlist for " + uniStr(guild.name) + ".```"
             return (
-                "Current default playlist for **" + guild.name + "**: ```ini\n"
-                + str(_vars.playlists.get(guild.id, [])) + "```"
+                "Current default playlist for **" + guild.name + "**: ```json\n"
+                + str(_vars.playlists.get(guild.id, [])).replace("'", '"') + "```"
                 )
         curr = _vars.playlists.get(guild.id, [])
         if "d" in flags:
@@ -395,7 +397,7 @@ class remove:
                     auds = _vars.queue[guild.id]
                     auds.queue = []
                     auds.new(None)
-                    print("Stopped audio playback in " + guild.name)
+                    #print("Stopped audio playback in " + guild.name)
                     return "```fix\nRemoved all items from the queue.```"
                 raise LookupError
             curr = _vars.queue[guild.id].queue[pos]
@@ -431,7 +433,7 @@ class remove:
                 response += "\n" + uniStr(song["name"]) + " has been removed from the queue."
                 if i == 0:
                     auds.new(None)
-                    print("Stopped audio playback in " + guild.name)
+                    #print("Stopped audio playback in " + guild.name)
                 continue
             i += 1
         return response + "```"
@@ -459,7 +461,7 @@ class dump:
 
     def __init__(self):
         self.name = []
-        self.min_level = 1
+        self.min_level = 2
         self.description = "Dumps or loads the currently playing audio queue state."
         self.usage = "<data[]> <append(?a)>"
 
@@ -591,3 +593,33 @@ class unmute:
             for user in vc.members:
                 asyncio.create_task(user.edit(mute=False, deafen=False))
         return "```css\nSuccessfully unmuted all users in voice channels in " + uniStr(guild.name) + ".```"
+
+
+class opt:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = ["qopt", "audioSettings"]
+        self.min_level = 1
+        self.description = "Changes the queue settings for the current audio player."
+        self.usage = "<option(loop)(shuffle)> <disable(?d)>"
+
+    async def __call__(self, argv, flags, guild, channel, user, client, _vars, **void):
+        auds = await forceJoin(guild, channel, user, client, _vars)
+        if "loop" in argv:
+            if "d" in flags:
+                auds.stats["loop"] = 0
+                return "```css\nDisabled queue autoloop for " + uniStr(guild.name) + ".```"
+            auds.stats["loop"] = 1
+            return "```css\nEnabled queue autoloop for " + uniStr(guild.name) + ".```"
+        elif "shuffle" in argv:
+            if "d" in flags:
+                auds.stats["shuffle"] = 0
+                return "```css\nDisabled queue autoshuffle for " + uniStr(guild.name) + ".```"
+            auds.stats["shuffle"] = 1
+            return "```css\nEnabled queue autoshuffle for " + uniStr(guild.name) + ".```"
+        return (
+            "Current queue settings for **" + guild.name + "**:\n```json\n"
+            + str(auds.stats).replace("'", '"') + "```"
+            )

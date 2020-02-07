@@ -1,4 +1,4 @@
-import requests, csv, time, knackpy, ast, discord, urllib, asyncio, os, ffmpy
+import requests, csv, time, knackpy, ast, discord, urllib, asyncio, os, ffmpy, traceback
 from prettytable import PrettyTable as ptable
 from smath import *
 
@@ -249,6 +249,7 @@ def orgConv(org, wave, fmt):
             fn = fi
         return fn
     except Exception as ex:
+        print(traceback.format_exc())
         return repr(ex)
 
 

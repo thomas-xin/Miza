@@ -46,7 +46,7 @@ class img:
                 + " from the image list for " + uniStr(guild.name) + ".```"
                 )
         if not argv and not "r" in flags:
-            return "Available images in **" + guild.name + "**: ```css\n" + str(list(images)) + "```"
+            return "Available images in **" + guild.name + "**: ```ini\n" + str(list(images)).replace("'", '"') + "```"
         sources = []
         for tag in args:
             t = tag.lower()
