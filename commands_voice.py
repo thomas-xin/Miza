@@ -160,9 +160,12 @@ class queue:
         if not len(argv.replace(" ", "")):
             if not len(q):
                 return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```"
-            totalTime = -elapsed
-            for e in q:
-                totalTime += e["duration"]
+            if auds.stats["loop"]:
+                totaltime = inf
+            else:
+                totalTime = -elapsed
+                for e in q:
+                    totalTime += e["duration"]
             if "v" in flags:
                 cnt = len(q)
                 info = (
@@ -204,8 +207,8 @@ class queue:
             barsize = 16 * (1 + ("v" in flags))
             r = round(min(1, elapsed / duration) * barsize)
             bar = sym[0] * r + sym[1] * (barsize - r)
-            countstr = "Currently playing " + uniStr(q[0]["name"]) + ", "
-            countstr += uniStr(dhms(elapsed)) + "/" + uniStr(dhms(duration)) + ", "
+            countstr = "Currently playing " + uniStr(q[0]["name"]) + "\n"
+            countstr += uniStr(dhms(elapsed)) + "/" + uniStr(dhms(duration)) + " "
             countstr += bar + "\n"
             return (
                 "Queue for **" + guild.name + "**: "
@@ -478,7 +481,7 @@ class dump:
                 "stats": auds.stats,
                 "queue": q,
                 }
-            return "Queue data for " + uniStr(guild.name) + ":\n```json\n" + json.dumps(d) + "\n```"
+            return "Queue data for **" + guild.name + "**:\n```json\n" + json.dumps(d) + "\n```"
         try:
             opener = urlBypass()
             if len(message.attachments):
@@ -502,7 +505,7 @@ class dump:
             e["u_id"] = user.id
             e["skips"] = []
         if not "a" in flags:
-            print("Stopped audio playback in " + guild.name)
+            #print("Stopped audio playback in " + guild.name)
             auds.new()
             auds.queue = q
             for k in d["stats"]:

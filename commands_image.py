@@ -9,7 +9,7 @@ class img:
         self.name = []
         self.min_level = 0
         self.description = "Sends an image in the current chat from a list."
-        self.usage = "<tags> <url[]> <verbose(?v)> <random(?r)> <enable(?e)> <disable(?d)>"
+        self.usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <enable(?e)> <disable(?d)>"
 
     async def __call__(self, flags, args, argv, guild, perm, _vars, **void):
         images = _vars.imglists.get(guild.id, {})
@@ -56,7 +56,7 @@ class img:
         for i in range(r):
             sources.append(images[tuple(images)[xrand(len(images))]])
         if not len(sources):
-            raise EOFError("Target image not found. Use ?l for list.")
+            raise EOFError("Target image not found. Use ~img for list.")
         v = xrand(len(sources))
         url = sources[v]
         if "v" in flags:
