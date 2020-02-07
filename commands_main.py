@@ -54,7 +54,7 @@ class help:
                     if c_name == "DM" and getattr(com, "server_only", False):
                         continue
                     newstr = (
-                        "```css\n" + name
+                        "```xml\n" + name
                         + "\nAliases: " + str(com.name)
                         + "\nEffect: " + description
                         + "\nUsage: ~" + name + " " + usage
@@ -83,7 +83,7 @@ class help:
                             found = True
                     if found:
                         newstr = (
-                            "```css\n" + name
+                            "```xml\n" + name
                             + "\nCategory: " + c
                             + "\nAliases: " + str(com.name)
                             + "\nEffect: " + description
@@ -105,13 +105,13 @@ class help:
                         continue
                 if description != "":
                     if not verb:
-                        show.append(name + " " + usage)
+                        show.append("~" + name + " " + usage)
                     else:
                         show.append(
-                            "\n" + com.__name__
+                            "\n~" + com.__name__
                             + "\nEffect: " + com.description
                             + "\nUsage: ~" + name + " " + usage)
-            return "Commands for **" + user.name + "** in **" + c_name + "**:\n```css\n" + "\n".join(show) + "```", 1
+            return "Commands for **" + user.name + "** in **" + c_name + "**:\n```xml\n" + "\n".join(show) + "```", 1
         return "\n".join(show), 1
 
 

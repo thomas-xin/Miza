@@ -1209,6 +1209,7 @@ def strGetRem(s, arg):
 
 
 __units = {
+    "galactic year": 7157540528801820.28133333333333,
     "millenium": [31556925216., "millenia"],
     "century": [3155692521.6, "centuries"],
     "decade": 315569252.16,
@@ -1223,7 +1224,8 @@ __units = {
 
 def timeConv(s):
     if not isValid(s):
-        return [str(s) + " millenia"]
+        high = "galactic years"
+        return [str(s) + " " + high]
     taken = []
     for i in __units:
         a = None

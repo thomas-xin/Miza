@@ -149,7 +149,7 @@ class roleGiver:
         self.name = ["verifier"]
         self.min_level = 3
         self.description = "Adds an automated role giver to the current channel."
-        self.usage = "<0:react_to> <1:role/perm> <disable(?d)> <remover(?r)>"
+        self.usage = "<0:react_to[]> <1:role[]> <1:perm[]> <disable(?d)> <remover(?r)>"
 
     async def __call__(self, _vars, argv, args, user, channel, guild, flags, **void):
         if "d" in flags:
@@ -307,7 +307,7 @@ class react:
         self.name = ["autoreact"]
         self.min_level = 3
         self.description = "Causes Miza to automatically assign a reaction to messages containing the substring."
-        self.usage = "<reaction[]> <disable(?d)>"
+        self.usage = "<react_to[]> <react_data[]> <disable(?d)>"
 
     async def __call__(self, _vars, flags, guild, argv, args, **void):
         curr = _vars.following.get(guild.id, copy.deepcopy(follow_default))
