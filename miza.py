@@ -660,7 +660,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                 for c in range(26):
                                     char = chr(c + 97)
                                     flag = "?" + char
-                                    for r in (flag.lower(), flag.upper()):
+                                    for r in (flag, flag.upper()):
                                         if len(argv) >= 4 and r in argv:
                                             i = argv.index(r)
                                             if i == 0 or argv[i - 1] == " " or argv[i - 2] == "?":
@@ -674,13 +674,13 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                 for c in range(26):
                                     char = chr(c + 97)
                                     flag = "?" + char
-                                    for r in (flag.lower(), flag.upper()):
+                                    for r in (flag, flag.upper()):
                                         if len(argv) >= 2 and r in argv:
                                             for check in (r + " ", " " + r):
                                                 if check in argv:
                                                     argv = argv.replace(check, "")
                                                     addDict(flags, {char: 1})
-                                            if argv == flag:
+                                            if argv == r:
                                                 argv = ""
                                                 addDict(flags, {char: 1})
                         if argv:
@@ -1078,6 +1078,7 @@ async def handleUpdate(force=False):
                                 if auds.stats["shuffle"]:
                                     shuffle(q)
                                 if auds.stats["loop"]:
+                                    temp["id"] = temp["id"].replace("@", "")
                                     q.append(temp)
                         if not len(q):
                             t = _vars.playlists.get(guild.id, ())

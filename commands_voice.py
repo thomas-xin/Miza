@@ -180,10 +180,10 @@ class queue:
                 curr = "\n"
                 e = q[i]
                 curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
-                curr += "【" + uniStr(i) + "】 "
+                curr += "[" + uniStr(i) + "] "
                 if "v" in flags:
                     curr += (
-                        uniStr(e["name"]) + ", URL: " + e["url"]
+                        uniStr(e["name"]) + ", URL: [" + e["url"] + "]"
                         + ", Duration: " + uniStr(" ".join(timeConv(e["duration"])))
                         + ", Added by: " + uniStr(e["added by"])
                         )
@@ -207,7 +207,7 @@ class queue:
             r = round(min(1, elapsed / duration) * barsize)
             bar = sym[0] * r + sym[1] * (barsize - r)
             countstr = "Currently playing " + uniStr(q[0]["name"]) + "\n"
-            countstr += uniStr(dhms(elapsed)) + "/" + uniStr(dhms(duration)) + " "
+            countstr += "(" + uniStr(dhms(elapsed)) + "/" + uniStr(dhms(duration)) + ") "
             countstr += bar + "\n"
             return (
                 "Queue for **" + guild.name + "**: "
@@ -290,8 +290,8 @@ class playlist:
                 s = ""
                 for i in range(len(items)):
                     s += " " * (int(math.log10(len(items))) - int(math.log10(max(1, i))))
-                    s += "【" + uniStr(i) + "】 "
-                    s += "[" + items[i] + "]\n"
+                    s += "[" + uniStr(i) + "] "
+                    s += items[i] + "\n"
             return (
                 "Current default playlist for **" + guild.name + "**: ```ini\n"
                 + s + "```"
@@ -435,7 +435,7 @@ class remove:
                         members += 1
         required = 1 + members >> 1
         if type(curr["skips"]) is tuple:
-            response = "```\n"
+            response = "```css\n"
         else:
             response = (
                 "```css\nVoted to remove " + uniStr(curr["name"]) + " from the queue.\nCurrent vote count: "

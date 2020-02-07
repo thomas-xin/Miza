@@ -111,8 +111,8 @@ class help:
                             "\n" + com.__name__
                             + "\nEffect: " + com.description
                             + "\nUsage: ~" + name + " " + usage)
-            return "Commands for **" + user.name + "** in **" + c_name + "**:\n```css\n" + "\n".join(show) + "```"
-        return "\n".join(show)
+            return "Commands for **" + user.name + "** in **" + c_name + "**:\n```css\n" + "\n".join(show) + "```", 1
+        return "\n".join(show), 1
 
 
 class clearCache:
