@@ -231,7 +231,7 @@ class rainbowRole:
         self.name = ["colourRole"]
         self.min_level = 3
         self.description = "Causes target role to randomly change colour."
-        self.usage = "<0:role> <mim_delay:[6]> <cancel:[](?c)>"
+        self.usage = "<0:role[]> <mim_delay[6]> <disable(?d)>"
 
     async def __call__(self, _vars, flags, args, argv, guild, **void):
         guild_special = _vars.special.get(guild.id, {})
@@ -247,7 +247,7 @@ class rainbowRole:
             delay = _vars.evalMath(" ".join(args[1:]))
         for r in guild.roles:
             if role in r.name.lower():
-                if "c" in flags:
+                if "d" in flags:
                     try:
                         guild_special.pop(r.id)
                     except KeyError:
