@@ -170,7 +170,7 @@ class queue:
                 cnt = len(q)
                 info = (
                     "`" + uniStr(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
-                    + uniStr(" ".join(timeConv(totalTime))) + "`"
+                    + uniStr(sec2Time(totalTime)) + "`"
                     )
             else:
                 info = ""
@@ -184,16 +184,16 @@ class queue:
                 if "v" in flags:
                     curr += (
                         uniStr(e["name"]) + ", URL: [" + e["url"] + "]"
-                        + ", Duration: " + uniStr(" ".join(timeConv(e["duration"])))
+                        + ", Duration: " + uniStr(sec2Time(e["duration"]))
                         + ", Added by: " + uniStr(e["added by"])
                         )
                 else:
                     curr += limStr(uniStr(e["name"]), 48)
                 estim = currTime - elapsed
                 if estim > 0:
-                    curr += ", Time until playing: " + uniStr(" ".join(timeConv(estim)))
+                    curr += ", Time until playing: " + uniStr(sec2Time(estim))
                 else:
-                    curr += ", Remaining time: " + uniStr(" ".join(timeConv(estim + e["duration"])))
+                    curr += ", Remaining time: " + uniStr(sec2Time(estim + e["duration"]))
                 if len(show) + len(info) + len(curr) < 1800:
                     show += curr
                 else:
@@ -256,7 +256,7 @@ class queue:
             if not "h" in flags:
                 return (
                     "```css\n🎶 Added " + uniStr(names) + " to the queue! Estimated time until playing: "
-                    + uniStr(" ".join(timeConv(total_duration))) + ". 🎶```", 1
+                    + uniStr(sec2Time(total_duration)) + ". 🎶```", 1
                     )
 
 

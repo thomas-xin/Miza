@@ -1237,7 +1237,7 @@ def timeConv(s):
         elif s >= t:
             a = int(s / t)
             s = s % t
-        if a is not None:
+        if a:
             if a != 1:
                 if type(m) is list:
                     i = m[1]
@@ -1247,6 +1247,10 @@ def timeConv(s):
     if not len(taken):
         return [str(roundMin(s)) + " seconds"]
     return taken
+
+
+def sec2Time(s):
+    return " ".join(timeConv(s))
 
 
 def dhms(s):

@@ -108,7 +108,7 @@ class ban:
                 return (
                     "```css\nCurrent ban for " + uniStr(t_user.name)
                     + " from " + uniStr(guild.name) + ": "
-                    + uniStr(" ".join(timeConv(is_banned))) +  ".```"
+                    + uniStr(sec2Time(is_banned)) +  ".```"
                 )
         elif len(args) < 2:
             return (
@@ -125,15 +125,15 @@ class ban:
         if is_banned:
             response = (
                 "```css\nUpdated ban for " + uniStr(t_user.name)
-                + " from " + uniStr(" ".join(timeConv(is_banned)))
-                + " to " + uniStr(" ".join(timeConv(secs)))
+                + " from " + uniStr(sec2Time(is_banned))
+                + " to " + uniStr(sec2Time(secs))
                 + "."
             )
         elif tm >= 0:
             response = (
                 "```css\n" + uniStr(t_user.name)
                 + " has been banned from " + uniStr(guild.name)
-                + " for " + uniStr(" ".join(timeConv(secs))) + "."
+                + " for " + uniStr(sec2Time(secs)) + "."
             )
         if msg:
             response += " Reason: " + uniStr(msg) + "."
