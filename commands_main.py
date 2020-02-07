@@ -54,7 +54,7 @@ class help:
                     if c_name == "DM" and getattr(com, "server_only", False):
                         continue
                     newstr = (
-                        "```xml\n" + name
+                        "```xml\n~" + name
                         + "\nAliases: " + str(com.name)
                         + "\nEffect: " + description
                         + "\nUsage: ~" + name + " " + usage
@@ -83,7 +83,7 @@ class help:
                             found = True
                     if found:
                         newstr = (
-                            "```xml\n" + name
+                            "```xml\n~" + name
                             + "\nCategory: " + c
                             + "\nAliases: " + str(com.name)
                             + "\nEffect: " + description
