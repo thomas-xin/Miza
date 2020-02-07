@@ -47,19 +47,16 @@ class purge:
             if t_user is None or m.author.id == t_user.id:
                 delM.append(m)
                 count -= 1
-        try:
-            while len(delM):
+        while len(delM):
+            try:
                 await channel.delete_messages(delM[:100])
                 deleted += min(len(delM), 100)
                 delM = delM[100:]
-        except:
-            print(traceback.format_exc())
-            for m in delM:
-                try:
-                    await m.delete()
-                    deleted += 1
-                except Exception as ex:
-                    print(repr(ex))
+            except:
+                print(traceback.format_exc())
+                await delM[0].delete()
+                deleted += 1
+                delM = delM[1:]
         if not "h" in flags:
             return (
                 "```css\nDeleted " + uniStr(deleted)
