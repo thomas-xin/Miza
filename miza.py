@@ -43,6 +43,7 @@ class customAudio(discord.AudioSource):
                 self.source.cleanup()
             except:
                 pass
+        self.file = source
         self.source = discord.FFmpegPCMAudio(source)
 
     def new(self, source=None):
@@ -56,6 +57,18 @@ class customAudio(discord.AudioSource):
             if getattr(self, "source", None) is not None:
                 self.source.cleanup()
             self.source = None
+            self.file = None
+
+    def seek(self, pos):
+        duration = self.queue[0]["duration"]
+        pos = min(max(0, pos), duration)
+        effpos = floor(pos * 50)
+        if effpos < self.readpos:
+            self.source = discord.FFmpegPCMAudio(self.file)
+            self.readpos = 0
+        while effpos > self.readpos:
+            self.source.read()
+            self.readpos += 1
         
     def read(self):
         try:

@@ -459,6 +459,32 @@ class remove:
         return response + "```", 1
 
 
+class seek:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = []
+        self.min_level = 1
+        self.description = "Seeks to a position in the current audio file."
+        self.usage = "<pos[0]>"
+
+    async def __call__(self, argv, _vars, guild, client, user, channel, **void):
+        auds = await forceJoin(guild, channel, user, client, _vars)
+        data = argv.split(":")
+        pos = 0
+        mult = 1
+        while len(data):
+            pos += _vars.evalMath(data[-1]) * mult
+            data = data[:-1]
+            if mult <= 60:
+                mult *= 60
+            elif mult > 86400:
+                raise ValueError("Too many time arguments.")
+        auds.seek(pos)
+        return "```css\nSuccessfully moved audio position to " + uniStr(sec2Time(pos)) + ".```"
+
+
 class pause:
     is_command = True
     server_only = True
