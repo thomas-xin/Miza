@@ -4,6 +4,8 @@ from scipy.signal import butter, sosfilt, resample
 from smath import *
 
 
+sys.path.insert(1, "commands")
+
 client = discord.Client(
     max_messages=2000,
     )
@@ -418,10 +420,10 @@ class _globals:
         self.playlists = savedata.get("playlists", {})
         self.imglists = savedata.get("imglists", {})
 
-    def getModule(self, module, category):
-        exec("import " + module + " as _vars_", globals())
+    def getModule(self, module):
+        mod = __import__(module)
         commands = []
-        vd = _vars_.__dict__
+        vd = mod.__dict__
         for k in vd:
             var = vd[k]
             try:
@@ -433,16 +435,18 @@ class _globals:
                 #print("Successfully loaded function " + obj.__name__ + ".")
             except AttributeError:
                 pass
-        self.categories[category] = commands
+        self.categories[module] = commands
+        del mod
 
     def getModules(self):
-        comstr = "commands_"
-        files = [f for f in os.listdir(".") if f[-3:] == ".py" and comstr in f]
+        files = [f for f in os.listdir("commands/") if f.endswith(".py") or f.endswith(".pyw")]
         self.categories = {}
         for f in files:
-            module = f[:-3]
-            category = module.replace(comstr, "")
-            doParallel(self.getModule, [module, category])
+            if f.endswith(".py"):
+                f = f[:-3]
+            else:
+                f = f[:-4]
+            doParallel(self.getModule, [f])
 
     def update(self, force=False):
         if force:
@@ -495,12 +499,11 @@ class _globals:
             u_id = int(user)
         if guild:
             g_id = guild.id
-            g_perm = self.perms.get(g_id, {})
+            g_perm = self.perms.setdefault(g_id, {})
             if u_id == self.owner_id or u_id == client.user.id:
                 u_perm = nan
             else:
-                u_perm = g_perm.get(u_id, self.perms.get("defaults", {}).get(g_id, 0))
-            self.perms[g_id] = g_perm
+                u_perm = g_perm.get(u_id, self.perms.setdefault("defaults", {}).get(g_id, 0))
         elif u_id == self.owner_id or u_id == client.user.id:
             u_perm = nan
         else:
@@ -514,9 +517,8 @@ class _globals:
             u_id = user.id
         except AttributeError:
             u_id = user
-        g_perm = self.perms.get(guild.id, {})
+        g_perm = self.perms.setdefault(guild.id, {})
         g_perm.update({u_id: value})
-        self.perms[guild.id] = g_perm
         self.update()
 
     def resetGlobals(self):
