@@ -427,6 +427,8 @@ class remove:
                 curr["skips"] = ()
             elif user.id not in curr["skips"]:
                 curr["skips"].append(user.id)
+        else:
+            curr["skips"] = ()
         members = 0
         for vc in client.voice_clients:
             if vc.channel.guild.id == guild.id:
@@ -434,7 +436,7 @@ class remove:
                     if not memb.bot:
                         members += 1
         required = 1 + members >> 1
-        if type(curr["skips"]) is tuple:
+        if type(curr["skips"]) is tuple and not len(curr["skips"]):
             response = "```css\n"
         else:
             response = (

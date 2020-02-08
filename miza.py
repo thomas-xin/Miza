@@ -1093,7 +1093,7 @@ async def handleUpdate(force=False):
                                         "added by": client.user.name,
                                         "u_id": client.user.id,
                                         "id": p["id"],
-                                        "skips": (),
+                                        "skips": (None),
                                         }
                                     if len(t) <= 1:
                                         break
