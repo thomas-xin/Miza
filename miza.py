@@ -16,7 +16,8 @@ class customAudio(discord.AudioSource):
     
     length = 1920
     empty = numpy.zeros(length >> 1, float)
-    bass = butter(2, 1/6, btype="low", output="sos")
+    bass = butter(2, 1/5, btype="low", output="sos")
+    treble = butter(2, 4/5, btype="high", output="sos")
     filt = butter(1, 1/3, btype="low", output="sos")
 
     def __init__(self, c_id):
@@ -64,7 +65,7 @@ class customAudio(discord.AudioSource):
         pos = max(0, pos)
         if pos >= duration:
             self.new(None)
-            return
+            return round(duration * 50)
         effpos = floor(pos * 50)
         if effpos < self.readpos:
             self.source = discord.FFmpegPCMAudio(self.file)
@@ -76,9 +77,10 @@ class customAudio(discord.AudioSource):
             except:
                 break
             self.readpos += 1
-            count += 1
-            if not count & 3:
+            count = 1 + count & 15
+            if not count:
                 time.sleep(0.001)
+        return self.readpos
         
     def read(self):
         try:
@@ -119,14 +121,23 @@ class customAudio(discord.AudioSource):
                     array *= volume
                 except:
                     array = numpy.random.rand(self.length) * 65536 - 32768
+            left, right = array[::2], array[1::2]
             if bassboost:
                 try:
+                    lbass = left * bassboost
+                    rbass = right * bassboost
                     if self.bassadj is not None:
-                        array += sosfilt(self.bass, numpy.concatenate((self.bassadj, array)))[self.length:]
-                    self.bassadj = numpy.array(array) * bassboost
+                        if bassboost > 0:
+                            filt = self.bass
+                        else:
+                            filt = self.treble
+                        left += sosfilt(filt, numpy.concatenate((self.bassadj[0], left)))[size:]
+                        right += sosfilt(filt, numpy.concatenate((self.bassadj[1], right)))[size:]
+                    self.bassadj = [lbass, rbass]
                 except:
                     print(traceback.format_exc())
-            left, right = array[::2], array[1::2]
+            else:
+                self.bassadj = None
             if pitch:
                 try:
                     lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
@@ -445,13 +456,15 @@ class _globals:
         self.imglists = savedata.get("imglists", {})
 
     def getModule(self, module):
+        rename = module.lower()
+        print("Loading module " + rename + "...")
         mod = __import__(module)
         commands = []
         vd = mod.__dict__
         for k in vd:
             var = vd[k]
             try:
-                assert var.is_command
+                var.is_command
                 obj = var()
                 obj.__name__ = var.__name__
                 obj.name.append(obj.__name__)
@@ -459,8 +472,7 @@ class _globals:
                 #print("Successfully loaded function " + obj.__name__ + ".")
             except AttributeError:
                 pass
-        self.categories[module] = commands
-        del mod
+        self.categories[rename] = commands
 
     def getModules(self):
         files = [f for f in os.listdir("commands/") if f.endswith(".py") or f.endswith(".pyw")]

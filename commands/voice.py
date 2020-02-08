@@ -421,7 +421,7 @@ class remove:
             curr = _vars.queue[guild.id].queue[pos]
         except LookupError:
             raise IndexError("Entry " + uniStr(pos) + " is out of range.")
-        if type(curr["skips"]) is not list:
+        if type(curr["skips"]) is list:
             if "f" in flags or user.id == curr["u_id"]:
                 curr["skips"] = None
             elif user.id not in curr["skips"]:
@@ -483,8 +483,14 @@ class seek:
                 mult *= 24
             else:
                 raise ValueError("Too many time arguments.")
-        auds.seek(pos)
-        return "```css\nSuccessfully moved audio position to " + uniStr(sec2Time(pos)) + ".```"
+        returns = [None]
+        doParallel(auds.seek, [pos], returns)
+        while returns[0] is None:
+            await asyncio.sleep(0.01)
+        return (
+            "```css\nSuccessfully moved audio position to "
+            + uniStr(sec2Time(returns[0] / 50)) + ".```"
+            )
 
 
 class pause:
