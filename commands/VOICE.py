@@ -158,18 +158,18 @@ class queue:
 
     async def __call__(self, client, user, _vars, argv, channel, guild, flags, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        elapsed = auds.readpos / 50
+        elapsed = auds.stats["position"]
         q = _vars.queue[guild.id].queue
         if not len(argv.replace(" ", "")):
             if not len(q):
                 return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```", 1
-            if auds.stats["loop"]:
-                totalTime = inf
-            else:
-                totalTime = -elapsed
-                for e in q:
-                    totalTime += e["duration"]
             if "v" in flags:
+                if auds.stats["loop"]:
+                    totalTime = inf
+                else:
+                    totalTime = -elapsed
+                    for e in q:
+                        totalTime += e["duration"]
                 cnt = len(q)
                 info = (
                     "`" + uniStr(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
@@ -210,7 +210,10 @@ class queue:
             r = round(min(1, elapsed / duration) * barsize)
             bar = sym[0] * r + sym[1] * (barsize - r)
             countstr = "Currently playing " + uniStr(q[0]["name"]) + "\n"
-            countstr += "(" + uniStr(dhms(elapsed)) + "/" + uniStr(dhms(duration)) + ") "
+            countstr += (
+                "(" + uniStr(dhms(elapsed))
+                + "/" + uniStr(dhms(duration)) + ") "
+                )
             countstr += bar + "\n"
             return (
                 "Queue for **" + guild.name + "**: "
@@ -248,7 +251,7 @@ class queue:
             total_duration = 0
             for e in q:
                 total_duration += e["duration"]
-            total_duration = max(total_duration - elapsed, dur / 128 + frand(0.5) + 2)
+            total_duration = max((total_duration - elapsed), dur / 128 + frand(0.5) + 2)
             q += added
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")
@@ -462,40 +465,6 @@ class remove:
         return response + "```", 1
 
 
-class seek:
-    is_command = True
-    server_only = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 1
-        self.description = "Seeks to a position in the current audio file."
-        self.usage = "<pos[0]>"
-
-    async def __call__(self, argv, _vars, guild, client, user, channel, **void):
-        auds = await forceJoin(guild, channel, user, client, _vars)
-        data = argv.split(":")
-        pos = 0
-        mult = 1
-        while len(data):
-            pos += _vars.evalMath(data[-1]) * mult
-            data = data[:-1]
-            if mult <= 60:
-                mult *= 60
-            elif mult <= 3600:
-                mult *= 24
-            else:
-                raise ValueError("Too many time arguments.")
-        returns = [None]
-        doParallel(auds.seek, [pos], returns)
-        while returns[0] is None:
-            await asyncio.sleep(0.01)
-        return (
-            "```css\nSuccessfully moved audio position to "
-            + uniStr(sec2Time(returns[0] / 50)) + ".```"
-            )
-
-
 class pause:
     is_command = True
     server_only = True
@@ -510,6 +479,38 @@ class pause:
         auds = await forceJoin(guild, channel, user, client, _vars)
         auds.paused = name == "pause"
         return "```css\nSuccessfully " + name + "d audio playback in " + uniStr(guild.name) + ".```"
+
+
+class seek:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = []
+        self.min_level = 1
+        self.description = "Seeks to a position in the current audio file."
+        self.usage = "<pos[0]>"
+
+    async def __call__(self, argv, _vars, guild, client, user, channel, **void):
+        auds = await forceJoin(guild, channel, user, client, _vars)
+        pos = 0
+        if argv:
+            data = argv.split(":")
+            mult = 1
+            while len(data):
+                pos += _vars.evalMath(data[-1]) * mult
+                data = data[:-1]
+                if mult <= 60:
+                    mult *= 60
+                elif mult <= 3600:
+                    mult *= 24
+                else:
+                    raise ValueError("Too many time arguments.")
+        pos = auds.seek(pos)
+        return (
+            "```css\nSuccessfully moved audio position to "
+            + uniStr(sec2Time(pos)) + ".```"
+            )
 
 
 class dump:
@@ -614,7 +615,7 @@ class volume:
         orig = origVol[op]
         origVol[op] = val
         if "s" in flags or "p" in flags:
-            auds.new(auds.file, None)
+            auds.new(auds.file, auds.stats["position"])
         return (
             "```css\nChanged audio " + op + " in " + uniStr(guild.name)
             + " from " + uniStr(round(100. * orig, 8))

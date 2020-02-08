@@ -21,13 +21,6 @@ class customAudio(discord.AudioSource):
     filt = butter(1, 1/3, btype="low", output="sos")
 
     def __init__(self, c_id):
-        self.new()
-        self.queue = []
-        self.channel = c_id
-        self.buffer = []
-        self.feedback = None
-        self.bassadj = None
-        self.prev = None
         self.stats = {
             "volume": 1,
             "reverb": 0,
@@ -37,13 +30,19 @@ class customAudio(discord.AudioSource):
             "delay": 16 / 5,
             "loop": 0,
             "shuffle": 0,
+            "position": 0,
             }
+        self.new()
+        self.queue = []
+        self.channel = c_id
+        self.buffer = []
+        self.feedback = None
+        self.bassadj = None
+        self.prev = None
 
     def new(self, source=None, pos=0):
-        if pos is None:
-            pos = self.readpos / 50
-        else:
-            self.readpos = pos * 50
+        self.stats["speed"] = max(0.01, self.stats["speed"])
+        self.stats["position"] = pos
         self.is_playing = source is not None
         self.paused = False
         if getattr(self, "source", None) is not None:
@@ -52,11 +51,15 @@ class customAudio(discord.AudioSource):
             except:
                 print(traceback.format_exc())
         if source is not None:
-            self.file = source
+            if not isValid(self.stats["pitch"]) or not isValid(self.stats["speed"]):
+                self.source = None
+                self.file = None
+                return
             d = {"source": source}
             pitchscale = 2 ** (self.stats["pitch"] / 12)
-            if pitchscale or self.stats["speed"] != 1:
+            if pitchscale != 1 or self.stats["speed"] != 1:
                 speed = self.stats["speed"] / pitchscale
+                speed = max(0.005, speed)
                 opts = ""
                 while speed > 1.8:
                     opts += "atempo=1.8,"
@@ -66,12 +69,13 @@ class customAudio(discord.AudioSource):
                     speed /= 0.6
                 opts += "atempo=" + str(speed)
                 d["options"] = "-af " + opts
-            if pitchscale:
-                d["options"] += ",asetrate=r=" + str(44100 * pitchscale)
+            if pitchscale != 1:
+                d["options"] += ",asetrate=r=" + str(48000 * pitchscale)
             if pos != 0:
                 d["before_options"] = "-ss " + str(pos)
             print(d)
             self.source = discord.FFmpegPCMAudio(**d)
+            self.file = source
         else:
             self.source = None
             self.file = None
@@ -81,11 +85,9 @@ class customAudio(discord.AudioSource):
         pos = max(0, pos)
         if pos >= duration:
             self.new()
-            return round(duration * 50)
-        effpos = floor(pos * 50)
+            return duration
         self.new(self.file, pos)
-        self.readpos = effpos
-        return self.readpos
+        return self.stats["position"]
         
     def read(self):
         try:
@@ -96,7 +98,7 @@ class customAudio(discord.AudioSource):
             if not len(temp):
                 sendUpdateRequest(True)
                 raise EOFError
-            self.readpos += 1
+            self.stats["position"] += self.stats["speed"] / 50
             self.is_playing = True
         except:
             if not self.paused:
@@ -135,8 +137,8 @@ class customAudio(discord.AudioSource):
                             filt = self.bass
                         else:
                             filt = self.treble
-                        left += sosfilt(filt, numpy.concatenate((self.bassadj[0], left)))[size:]
-                        right += sosfilt(filt, numpy.concatenate((self.bassadj[1], right)))[size:]
+                        left += sosfilt(filt, numpy.concatenate((self.bassadj[0], left)))[size-16:-16]
+                        right += sosfilt(filt, numpy.concatenate((self.bassadj[1], right)))[size-16:-16]
                     self.bassadj = [lbass, rbass]
                 except:
                     print(traceback.format_exc())
