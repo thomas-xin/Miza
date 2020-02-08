@@ -5,6 +5,7 @@ from smath import *
 
 
 sys.path.insert(1, "commands")
+sys.path.insert(1, "misc")
 
 client = discord.Client(
     max_messages=2000,

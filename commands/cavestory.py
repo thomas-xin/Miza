@@ -221,9 +221,16 @@ def orgConv(org, wave, fmt):
         opener.retrieve(org, "cache/temp.org")
         if wave is not None:
             opener.retrieve(wave, "cache/temp.dat")
-            os.system("org2xm cache/temp.org cache/temp.dat")
+            com = "org2xm ../cache/temp.org ../cache/temp.dat"
         else:
-            os.system("org2xm cache/temp.org ORG210EN.DAT")
+            com = "org2xm ../cache/temp.org ORG210EN.DAT"
+        os.chdir("misc")
+        try:
+            os.system(com)
+            os.chdir("..")
+        except:
+            os.chdir("..")
+            raise
         fi = "cache/temp.xm"
         t = time.time()
         while time.time() - t < 12:
