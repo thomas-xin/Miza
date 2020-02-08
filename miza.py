@@ -61,14 +61,23 @@ class customAudio(discord.AudioSource):
 
     def seek(self, pos):
         duration = self.queue[0]["duration"]
-        pos = min(max(0, pos), duration)
+        pos = max(0, pos)
+        if pos >= duration:
+            self.new(None)
         effpos = floor(pos * 50)
         if effpos < self.readpos:
             self.source = discord.FFmpegPCMAudio(self.file)
             self.readpos = 0
+        count = 0
         while effpos > self.readpos:
-            self.source.read()
+            try:
+                self.source.read()
+            except:
+                break
             self.readpos += 1
+            count += 1
+            if not count & 3:
+                time.sleep(0.001)
         
     def read(self):
         try:

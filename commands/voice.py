@@ -479,7 +479,9 @@ class seek:
             data = data[:-1]
             if mult <= 60:
                 mult *= 60
-            elif mult > 86400:
+            elif mult <= 3600:
+                mult *= 24
+            else:
                 raise ValueError("Too many time arguments.")
         auds.seek(pos)
         return "```css\nSuccessfully moved audio position to " + uniStr(sec2Time(pos)) + ".```"
