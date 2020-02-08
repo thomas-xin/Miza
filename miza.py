@@ -64,6 +64,7 @@ class customAudio(discord.AudioSource):
         pos = max(0, pos)
         if pos >= duration:
             self.new(None)
+            return
         effpos = floor(pos * 50)
         if effpos < self.readpos:
             self.source = discord.FFmpegPCMAudio(self.file)
