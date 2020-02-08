@@ -364,7 +364,7 @@ class leave:
     server_only = True
 
     def __init__(self):
-        self.name = ["quit","dc","disconnect"]
+        self.name = ["quit", "dc", "disconnect"]
         self.min_level = 1
         self.description = "Leaves a voice channel."
         self.usage = ""
@@ -422,13 +422,13 @@ class remove:
             curr = _vars.queue[guild.id].queue[pos]
         except LookupError:
             raise IndexError("Entry " + uniStr(pos) + " is out of range.")
-        if type(curr["skips"]) is not tuple:
+        if type(curr["skips"]) is not list:
             if "f" in flags or user.id == curr["u_id"]:
-                curr["skips"] = ()
+                curr["skips"] = None
             elif user.id not in curr["skips"]:
                 curr["skips"].append(user.id)
         else:
-            curr["skips"] = ()
+            curr["skips"] = None
         members = 0
         for vc in client.voice_clients:
             if vc.channel.guild.id == guild.id:
@@ -436,7 +436,7 @@ class remove:
                     if not memb.bot:
                         members += 1
         required = 1 + members >> 1
-        if type(curr["skips"]) is tuple and not len(curr["skips"]):
+        if curr["skips"] is None:
             response = "```css\n"
         else:
             response = (
@@ -449,7 +449,7 @@ class remove:
         i = 0
         while i < len(q):
             song = q[i]
-            if len(song["skips"]) >= required or type(song["skips"]) is tuple:
+            if song["skips"] is None or len(song["skips"]) >= required:
                 q.pop(i)
                 response += "\n" + uniStr(song["name"]) + " has been removed from the queue."
                 if i == 0:
