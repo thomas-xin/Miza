@@ -32,14 +32,18 @@ class customAudio(discord.AudioSource):
             "volume": 1,
             "reverb": 0,
             "pitch": 0,
+            "speed": 1,
             "bassboost": 0,
             "delay": 16 / 5,
             "loop": 0,
             "shuffle": 0,
             }
 
-    def new(self, source=None):
-        self.readpos = 0
+    def new(self, source=None, pos=0):
+        if pos is None:
+            pos = self.readpos / 50
+        else:
+            self.readpos = pos * 50
         self.is_playing = source is not None
         self.paused = False
         if getattr(self, "source", None) is not None:
@@ -49,22 +53,37 @@ class customAudio(discord.AudioSource):
                 print(traceback.format_exc())
         if source is not None:
             self.file = source
-            self.source = discord.FFmpegPCMAudio(source)
+            d = {"source": source}
+            pitchscale = 2 ** (self.stats["pitch"] / 12)
+            if pitchscale or self.stats["speed"] != 1:
+                speed = self.stats["speed"] / pitchscale
+                opts = ""
+                while speed > 1.8:
+                    opts += "atempo=1.8,"
+                    speed /= 1.8
+                while speed < 0.6:
+                    opts += "atempo=0.6,"
+                    speed /= 0.6
+                opts += "atempo=" + str(speed)
+                d["options"] = "-af " + opts
+            if pitchscale:
+                d["options"] += ",asetrate=r=" + str(44100 * pitchscale)
+            if pos != 0:
+                d["before_options"] = "-ss " + str(pos)
+            print(d)
+            self.source = discord.FFmpegPCMAudio(**d)
         else:
             self.source = None
             self.file = None
 
     def seek(self, pos):
-        self.new()
         duration = self.queue[0]["duration"]
         pos = max(0, pos)
         if pos >= duration:
+            self.new()
             return round(duration * 50)
         effpos = floor(pos * 50)
-        self.source = discord.FFmpegPCMAudio(
-            source=self.file,
-            before_options="-ss " + str(pos),
-            )
+        self.new(self.file, pos)
         self.readpos = effpos
         return self.readpos
         
@@ -123,21 +142,6 @@ class customAudio(discord.AudioSource):
                     print(traceback.format_exc())
             else:
                 self.bassadj = None
-            if pitch:
-                try:
-                    lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
-                    n = size
-                    lsh, rsh = numpy.zeros(size, lft.dtype), numpy.zeros(size, rft.dtype)
-                    s = round(pitch % size)
-                    t = size - s
-                    lsh[:s], rsh[:s] = lft[t:], rft[t:]
-                    lsh[s:], rsh[s:] = lft[:t], rft[:t]
-                    left, right = (
-                        numpy.fft.irfft(lsh, len(left)),
-                        numpy.fft.irfft(rsh, len(right))
-                        )
-                except:
-                    print(traceback.format_exc())
             if reverb:
                 try:
                     if not len(self.buffer):

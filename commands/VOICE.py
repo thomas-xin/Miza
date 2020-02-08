@@ -55,6 +55,9 @@ class urlBypass(urllib.request.FancyURLopener):
 
     
 class videoDownloader:
+    
+    opener = urlBypass()
+    
     ydl_opts = {
         "quiet": 1,
         "verbose": 0,
@@ -578,11 +581,13 @@ class volume:
         self.name = ["vol", "audio", "v"]
         self.min_level = 0
         self.description = "Changes the current playing volume in this server."
-        self.usage = "<value[]> <reverb(?r)> <pitch(?p)> <bassboost(?b)> <delay(?d)>"
+        self.usage = "<value[]> <reverb(?r)> <speed(?s)> <pitch(?p)> <bassboost(?b)> <delay(?d)>"
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        if "p" in flags:
+        if "s" in flags:
+            op = "speed"
+        elif "p" in flags:
             op = "pitch"
         elif "b" in flags:
             op = "bassboost"
@@ -608,6 +613,8 @@ class volume:
         val = roundMin(float(_vars.evalMath(argv) / 100))
         orig = origVol[op]
         origVol[op] = val
+        if "s" in flags or "p" in flags:
+            auds.new(auds.file, None)
         return (
             "```css\nChanged audio " + op + " in " + uniStr(guild.name)
             + " from " + uniStr(round(100. * orig, 8))
