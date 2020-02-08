@@ -38,48 +38,34 @@ class customAudio(discord.AudioSource):
             "shuffle": 0,
             }
 
-    def change(self, source):
-        if getattr(self, "source", None) is not None:
-            try:
-                self.source.cleanup()
-            except:
-                pass
-        self.file = source
-        self.source = discord.FFmpegPCMAudio(source)
-
     def new(self, source=None):
         self.readpos = 0
         self.is_playing = source is not None
         self.paused = False
-        if source is not None:
-            self.source = 0
-            doParallel(self.change, [source])
-        else:
-            if getattr(self, "source", None) is not None:
+        if getattr(self, "source", None) is not None:
+            try:
                 self.source.cleanup()
+            except:
+                print(traceback.format_exc())
+        if source is not None:
+            self.file = source
+            self.source = discord.FFmpegPCMAudio(source)
+        else:
             self.source = None
             self.file = None
 
     def seek(self, pos):
+        self.new()
         duration = self.queue[0]["duration"]
         pos = max(0, pos)
         if pos >= duration:
-            self.new(None)
             return round(duration * 50)
         effpos = floor(pos * 50)
-        if effpos < self.readpos:
-            self.source = discord.FFmpegPCMAudio(self.file)
-            self.readpos = 0
-        count = 0
-        while effpos > self.readpos:
-            try:
-                self.source.read()
-            except:
-                break
-            self.readpos += 1
-            count = 1 + count & 15
-            if not count:
-                time.sleep(0.001)
+        self.source = discord.FFmpegPCMAudio(
+            source=self.file,
+            before_options="-ss " + str(pos),
+            )
+        self.readpos = effpos
         return self.readpos
         
     def read(self):
@@ -97,8 +83,7 @@ class customAudio(discord.AudioSource):
             if not self.paused:
                 if self.is_playing:
                     sendUpdateRequest(True)
-                if self.source != 0:
-                    self.new()
+                self.new()
             temp = numpy.zeros(self.length, numpy.uint16).tobytes()
         try:
             sndset = self.stats
