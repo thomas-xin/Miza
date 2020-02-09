@@ -16,12 +16,10 @@ class customAudio(discord.AudioSource):
     
     length = 1920
     empty = numpy.zeros(length >> 1, float)
-    bass = butter(2, 1/5, btype="low", output="sos")
-    treble = butter(2, 1/5, btype="high", output="sos")
-    filt = butter(1, 1/3, btype="low", output="sos")
-
-    def __init__(self, c_id):
-        self.stats = {
+    bass = butter(2, 1/7, btype="low", output="sos")
+    treble = butter(2, 1/7, btype="high", output="sos")
+    filt = butter(1, 1/4, btype="low", output="sos")
+    defaults = {
             "volume": 1,
             "reverb": 0,
             "pitch": 0,
@@ -32,6 +30,9 @@ class customAudio(discord.AudioSource):
             "shuffle": False,
             "position": 0,
             }
+
+    def __init__(self, c_id):
+        self.stats = dict(self.defaults)
         self.new()
         self.queue = []
         self.channel = c_id
@@ -1121,7 +1122,11 @@ async def handleUpdate(force=False):
                                 auds.prev = q[0]["id"]
                                 q.pop(0)
                                 if auds.stats["shuffle"]:
-                                    shuffle(q)
+                                    if len(q):
+                                        t2 = q[0]
+                                        q.pop(0)
+                                        shuffle(q)
+                                        q.insert(0, t2)
                                 if auds.stats["loop"]:
                                     temp["id"] = temp["id"].replace("@", "")
                                     q.append(temp)

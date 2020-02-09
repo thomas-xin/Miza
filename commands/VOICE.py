@@ -202,7 +202,7 @@ class queue:
                 else:
                     show += uniStr("\nAnd " + str(len(q) - i) + " more...", 1)
                     break
-                if i == 0 or not auds.stats["shuffle"]:
+                if i <= 1 or not auds.stats["shuffle"]:
                     currTime += e["duration"]
             duration = q[0]["duration"]
             sym = "⬜⬛"
@@ -581,15 +581,17 @@ class volume:
     def __init__(self):
         self.name = ["vol", "audio", "v", "opt", "set"]
         self.min_level = 0
-        self.description = "Changes the current playing volume in this server."
+        self.description = "Changes the current audio settings for this server."
         self.usage = (
-            "<value[]> <reverb(?r)> <speed(?s)> <pitch(?p)>"
-            + "<bassboost(?b)> <reverbdelay(?d)> <loop(?l)> <shuffle(?x)>"
+            "<value[]> <volume()(?v)> <reverb(?r)> <speed(?s)> <pitch(?p)> "
+            + "<bassboost(?b)> <reverbdelay(?d)> <loop(?l)> <shuffle(?x)> <clear(?c)>"
             )
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        if "v" in flags:
+        if "c" in flags:
+            op = None
+        elif "v" in flags:
             op = "volume"
         elif "s" in flags:
             op = "speed"
@@ -607,7 +609,7 @@ class volume:
             op = "shuffle"
         else:
             op = "settings"
-        if not len(argv.replace(" ", "")):
+        if not argv and op is not None:
             if op == "settings":
                 return (
                     "Current audio settings for **" + guild.name + "**:\n```json\n"
@@ -629,6 +631,14 @@ class volume:
             raise PermissionError(
                 "Insufficient permissions to change audio settings. Current permission level: " + uniStr(s_perm)
                 + ", required permission level: " + uniStr(1) + "."
+                )
+        if op is None:
+            pos = auds.stats["position"]
+            auds.stats = dict(auds.defaults)
+            auds.new(auds.file, pos)
+            return (
+                "```css\nSuccessfully reset all audio settings for "
+                + uniStr(guild.name) + ".```"
                 )
         origVol = _vars.queue[guild.id].stats
         val = roundMin(float(_vars.evalMath(argv) / 100))
