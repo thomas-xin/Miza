@@ -28,7 +28,7 @@ def getDuration(filename):
     else:
         n = roundMin(float(output))
     #print(n)
-    return max(1 / (1 << 32), n)
+    return max(1 / (1 << 24), n)
 
 
 async def forceJoin(guild, channel, user, client, _vars):
@@ -504,7 +504,7 @@ class seek:
                     mult *= 60
                 elif mult <= 3600:
                     mult *= 24
-                else:
+                elif len(data):
                     raise ValueError("Too many time arguments.")
         pos = auds.seek(pos)
         return (
@@ -582,7 +582,10 @@ class volume:
         self.name = ["vol", "audio", "v", "opt"]
         self.min_level = 0
         self.description = "Changes the current playing volume in this server."
-        self.usage = "<value[]> <reverb(?r)> <speed(?s)> <pitch(?p)> <bassboost(?b)> <delay(?d)>"
+        self.usage = (
+            "<value[]> <reverb(?r)> <speed(?s)> <pitch(?p)>"
+            + "<bassboost(?b)> <delay(?d)> <loop(?l)> <shuffle(?x)>"
+            )
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -598,6 +601,10 @@ class volume:
             op = "delay"
         elif "r" in flags:
             op = "reverb"
+        elif "l" in flags:
+            op = "loop"
+        elif "x" in flags:
+            op = "shuffle"
         else:
             op = "settings"
         if not len(argv.replace(" ", "")):
@@ -606,7 +613,11 @@ class volume:
                     "Current audio settings for **" + guild.name + "**:\n```json\n"
                     + str(auds.stats).replace("'", '"') + "```"
                     )
-            num = round(100. * _vars.queue[guild.id].stats[op], 9)
+            orig = _vars.queue[guild.id].stats[op]
+            if op in "loop shuffle":
+                num = bool(orig)
+            else:
+                num = round(100. * orig, 9)
             return (
                 "```css\nCurrent audio " + op + " in " + uniStr(guild.name)
                 + ": " + uniStr(num) + ".```"
@@ -621,14 +632,18 @@ class volume:
                 )
         origVol = _vars.queue[guild.id].stats
         val = roundMin(float(_vars.evalMath(argv) / 100))
-        orig = origVol[op]
-        origVol[op] = val
-        if "s" in flags or "p" in flags:
+        orig = round(origVol[op] * 100, 9)
+        new = round(val * 100, 9)
+        if op in "loop shuffle":
+            origVol[op] = new = bool(val)
+        else:
+            origVol[op] = val
+        if op in "speed pitch":
             auds.new(auds.file, auds.stats["position"])
         return (
             "```css\nChanged audio " + op + " in " + uniStr(guild.name)
-            + " from " + uniStr(round(100. * orig, 9))
-            + " to " + uniStr(round(100. * val, 9)) + ".```"
+            + " from " + uniStr(orig)
+            + " to " + uniStr(new) + ".```"
             )
 
 
@@ -664,33 +679,3 @@ class unmute:
             for user in vc.members:
                 asyncio.create_task(user.edit(mute=False, deafen=False))
         return "```css\nSuccessfully unmuted all users in voice channels in " + uniStr(guild.name) + ".```"
-
-
-class qopt:
-    is_command = True
-    server_only = True
-
-    def __init__(self):
-        self.name = ["audioSettings"]
-        self.min_level = 1
-        self.description = "Changes the queue settings for the current audio player."
-        self.usage = "<option(loop)(shuffle)> <disable(?d)>"
-
-    async def __call__(self, argv, flags, guild, channel, user, client, _vars, **void):
-        auds = await forceJoin(guild, channel, user, client, _vars)
-        if "loop" in argv:
-            if "d" in flags:
-                auds.stats["loop"] = 0
-                return "```css\nDisabled queue autoloop for " + uniStr(guild.name) + ".```"
-            auds.stats["loop"] = 1
-            return "```css\nEnabled queue autoloop for " + uniStr(guild.name) + ".```"
-        elif "shuffle" in argv:
-            if "d" in flags:
-                auds.stats["shuffle"] = 0
-                return "```css\nDisabled queue autoshuffle for " + uniStr(guild.name) + ".```"
-            auds.stats["shuffle"] = 1
-            return "```css\nEnabled queue autoshuffle for " + uniStr(guild.name) + ".```"
-        return (
-            "Current queue settings for **" + guild.name + "**:\n```json\n"
-            + str(auds.stats).replace("'", '"') + "```"
-            )
