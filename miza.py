@@ -88,6 +88,7 @@ class customAudio(discord.AudioSource):
             self.source = None
             self.file = None
         self.is_loading = False
+        self.stats["position"] = pos
 
     def seek(self, pos):
         duration = self.queue[0]["duration"]
@@ -96,6 +97,7 @@ class customAudio(discord.AudioSource):
             self.new()
             return duration
         self.new(self.file, pos)
+        self.stats["position"] = pos
         return self.stats["position"]
         
     def read(self):
