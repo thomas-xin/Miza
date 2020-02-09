@@ -41,10 +41,15 @@ class customAudio(discord.AudioSource):
         self.prev = None
 
     def new(self, source=None, pos=0):
-        self.stats["speed"] = max(0.01, self.stats["speed"])
+        reverse = self.stats["speed"] < 0
+        self.speed = max(0.01, abs(self.stats["speed"]))
+        if self.speed == 0.01:
+            self.speed = 1
+            self.paused = 2
+        else:
+            self.paused = False
         self.stats["position"] = pos
         self.is_playing = source is not None
-        self.paused = False
         if getattr(self, "source", None) is not None:
             try:
                 self.source.cleanup()
@@ -58,7 +63,7 @@ class customAudio(discord.AudioSource):
             d = {"source": source}
             pitchscale = 2 ** (self.stats["pitch"] / 12)
             if pitchscale != 1 or self.stats["speed"] != 1:
-                speed = self.stats["speed"] / pitchscale
+                speed = self.speed / pitchscale
                 speed = max(0.005, speed)
                 opts = ""
                 while speed > 1.8:
@@ -71,14 +76,18 @@ class customAudio(discord.AudioSource):
                 d["options"] = "-af " + opts
             if pitchscale != 1:
                 d["options"] += ",asetrate=r=" + str(48000 * pitchscale)
+            if self.stats["speed"] < 0:
+                d["options"] += ",areverse"
             if pos != 0:
                 d["before_options"] = "-ss " + str(pos)
             print(d)
+            self.is_loading = True
             self.source = discord.FFmpegPCMAudio(**d)
             self.file = source
         else:
             self.source = None
             self.file = None
+        self.is_loading = False
 
     def seek(self, pos):
         duration = self.queue[0]["duration"]
@@ -91,6 +100,9 @@ class customAudio(discord.AudioSource):
         
     def read(self):
         try:
+            if self.is_loading:
+                self.is_playing = True
+                raise EOFError
             if self.paused:
                 self.is_playing = True
                 raise EOFError
@@ -98,10 +110,10 @@ class customAudio(discord.AudioSource):
             if not len(temp):
                 sendUpdateRequest(True)
                 raise EOFError
-            self.stats["position"] += self.stats["speed"] / 50
+            self.stats["position"] += self.speed / 50
             self.is_playing = True
         except:
-            if not self.paused:
+            if not self.paused and not self.is_loading:
                 if self.is_playing:
                     sendUpdateRequest(True)
                 self.new()
@@ -990,20 +1002,22 @@ async def handleUpdate(force=False):
                             try:
                                 u_target = await client.fetch_user(b)
                                 g_target = await client.fetch_guild(g)
-                                c_target = await client.fetch_channel(bans[g][b][1])
                                 bans[g].pop(b)
                                 try:
                                     await g_target.unban(u_target)
+                                    c_target = await client.fetch_channel(bans[g][b][1])
                                     await c_target.send(
                                         "```css\n" + uniStr(u_target.name)
                                         + " has been unbanned from " + uniStr(g_target.name) + ".```"
                                         )
                                     changed = True
                                 except:
+                                    c_target = await client.fetch_channel(bans[g][b][1])
                                     await c_target.send(
                                         "```css\nUnable to unban " + uniStr(u_target.name)
                                         + " from " + uniStr(g_target.name) + ".```"
                                         )
+                                    print(traceback.format_exc())
                             except KeyError:
                                 pass
             if changed:
@@ -1024,7 +1038,7 @@ async def handleUpdate(force=False):
                 guild = channel.guild
                 try:
                     auds = _vars.queue[guild.id]
-                    playing = auds.is_playing and vc.is_playing()
+                    playing = auds.is_playing and vc.is_playing() or auds.is_loading
                     membs = channel.members
                     for memb in membs:
                         if memb.id == client.user.id:

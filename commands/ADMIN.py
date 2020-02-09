@@ -13,7 +13,7 @@ class purge:
 
     async def __call__(self, client, _vars, argv, args, channel, name, flags, perm, **void):
         t_user = -1
-        if "a" in flags or "@everyone" in argv or "@here" in argv:
+        if "a" in flags or "everyone" in argv or "here" in argv:
             t_user = None
         if len(args) < 2:
             if t_user == -1:
@@ -76,11 +76,14 @@ class ban:
 
     async def __call__(self, client, _vars, args, user, channel, guild, flags, perm, **void):
         dtime = datetime.datetime.utcnow().timestamp()
-        a1 = args[0]
-        t_user = await client.fetch_user(_vars.verifyID(a1))
+        if "everyone" in args[0] or "here" in args[0]:
+            t_user = None
+            t_perm = inf
+        else:
+            t_user = await client.fetch_user(_vars.verifyID(args[0]))
+            t_perm = _vars.getPerms(t_user, guild)
         s_perm = perm
-        t_perm = _vars.getPerms(t_user, guild)
-        if t_perm + 1 >= s_perm or not isValid(t_perm):
+        if t_perm + 1 > s_perm or t_perm is nan:
             if len(args) > 1:
                 raise PermissionError (
                     "Insufficient priviliges to ban " + uniStr(t_user.name)
@@ -89,6 +92,12 @@ class ban:
                     + ", Current level: " + uniStr(s_perm) + "."
                 )
         if len(args) < 2:
+            if t_user is None:
+                g_bans = _vars.bans.setdefault(guild.id, {})
+                return (
+                    "Currently banned users from **" + guild.name + "**:\n```json\n"
+                    + str(g_bans).replace("'", '"') + "```"
+                    )
             tm = 0
         else:
             tm = _vars.evalMath(args[1])
@@ -98,41 +107,60 @@ class ban:
             msg = None
         g_id = guild.id
         g_bans = _vars.bans.setdefault(g_id, {})
-        is_banned = g_bans.get(t_user.id, None)
-        if is_banned is not None:
-            is_banned = is_banned[0] - dtime
-            if len(args) < 2:
+        if t_user is None:
+            if not "c" in flags:
+                response = uniStr(
+                    "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
+                    + "REPEAT COMMAND WITH \"?C\" FLAG TO CONFIRM."
+                    )
+                return ("```asciidoc\n[" + response + "]```")
+            users = guild.members
+            for u_id in g_bans:
+                users.append(await client.fetch_user(u_id))
+            is_banned = None
+        else:
+            users = [t_user]
+            is_banned = g_bans.get(t_user.id, None)
+            if is_banned is not None:
+                is_banned = is_banned[0] - dtime
+                if len(args) < 2:
+                    return (
+                        "```css\nCurrent ban for " + uniStr(t_user.name)
+                        + " from " + uniStr(guild.name) + ": "
+                        + uniStr(sec2Time(is_banned)) +  ".```"
+                    )
+            elif len(args) < 2:
                 return (
-                    "```css\nCurrent ban for " + uniStr(t_user.name)
-                    + " from " + uniStr(guild.name) + ": "
-                    + uniStr(sec2Time(is_banned)) +  ".```"
+                    "```css\n" + uniStr(t_user.name)
+                    + " is currently not banned from " + uniStr(guild.name) + ".```"
+                    )
+        response = "```css"
+        for t_user in users:
+            secs = tm * 3600
+            if tm >= 0:
+                try:
+                    await guild.ban(t_user, reason=msg, delete_message_days=0)
+                except Exception as ex:
+                    response += "\n" + repr(ex)
+                    continue
+            g_bans[t_user.id] = [secs + dtime, channel.id]
+            doParallel(_vars.update)
+            response = None
+            if is_banned:
+                response += (
+                    "\nUpdated ban for " + uniStr(t_user.name)
+                    + " from " + uniStr(sec2Time(is_banned))
+                    + " to " + uniStr(sec2Time(secs))
+                    + "."
                 )
-        elif len(args) < 2:
-            return (
-                "```css\n" + uniStr(t_user.name)
-                + " is currently not banned from " + uniStr(guild.name) + ".```"
+            elif tm >= 0:
+                response += (
+                    "\n" + uniStr(t_user.name)
+                    + " has been banned from " + uniStr(guild.name)
+                    + " for " + uniStr(sec2Time(secs)) + "."
                 )
-        secs = tm * 3600
-        g_bans[t_user.id] = [secs + dtime, channel.id]
-        doParallel(_vars.update)
-        if tm >= 0:
-            await guild.ban(t_user, reason=msg, delete_message_days=0)
-        response = None
-        if is_banned:
-            response = (
-                "```css\nUpdated ban for " + uniStr(t_user.name)
-                + " from " + uniStr(sec2Time(is_banned))
-                + " to " + uniStr(sec2Time(secs))
-                + "."
-            )
-        elif tm >= 0:
-            response = (
-                "```css\n" + uniStr(t_user.name)
-                + " has been banned from " + uniStr(guild.name)
-                + " for " + uniStr(sec2Time(secs)) + "."
-            )
-        if msg:
-            response += " Reason: " + uniStr(msg) + "."
+            if msg:
+                response += " Reason: " + uniStr(msg) + "."
         if response and "h" not in flags:
             return response + "```"
 

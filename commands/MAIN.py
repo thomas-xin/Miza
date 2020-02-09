@@ -141,7 +141,13 @@ class perms:
             if len(args) < 1:
                 t_user = user
             else:
-                t_user = await client.fetch_user(_vars.verifyID(args[0]))
+                if "everyone" in args[0] or "here" in args[0]:
+                    return (
+                        "Current user permissions for **" + guild.name + "**:\n```json\n"
+                        + str(_vars.perms[guild.id]).replace("'", '"') + "```"
+                        )
+                else:
+                    t_user = await client.fetch_user(_vars.verifyID(args[0]))
             print(t_user)
             t_perm = _vars.getPerms(t_user.id, guild)
         else:
@@ -162,6 +168,12 @@ class perms:
                 m_perm = max(t_perm, c_perm, 1) + 1
             if not s_perm <= m_perm and m_perm is not nan:
                 if t_user is None:
+                    if not "c" in flags:
+                        response = uniStr(
+                            "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
+                            + "REPEAT COMMAND WITH \"?C\" FLAG TO CONFIRM."
+                            )
+                        return ("```asciidoc\n[" + response + "]```")
                     for u in guild.members:
                         _vars.setPerms(u.id, guild, c_perm)
                 else:

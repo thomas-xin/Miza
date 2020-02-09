@@ -395,12 +395,12 @@ class remove:
     server_only = True
 
     def __init__(self):
-        self.name = ["rem", "skip"]
+        self.name = ["rem", "skip", "s"]
         self.min_level = 0
         self.description = "Removes an entry from the voice channel queue."
         self.usage = "<0:queue_position[0]> <force(?f)>"
 
-    async def __call__(self, client, user, _vars, argv, guild, flags, **void):
+    async def __call__(self, client, user, _vars, args, argv, guild, flags, **void):
         found = False
         if guild.id not in _vars.queue:
             raise LookupError("Currently not playing in a voice channel.")
@@ -412,28 +412,9 @@ class remove:
                 + ", required permission level: " + uniStr(min_level) + "."
                 )
         if not argv:
-            pos = 0
+            elems = [0]
         else:
-            pos = _vars.evalMath(argv)
-        try:
-            if not isValid(pos):
-                if "f" in flags:
-                    auds = _vars.queue[guild.id]
-                    auds.queue = []
-                    auds.new(None)
-                    #print("Stopped audio playback in " + guild.name)
-                    return "```fix\nRemoved all items from the queue.```"
-                raise LookupError
-            curr = _vars.queue[guild.id].queue[pos]
-        except LookupError:
-            raise IndexError("Entry " + uniStr(pos) + " is out of range.")
-        if type(curr["skips"]) is list:
-            if "f" in flags or user.id == curr["u_id"]:
-                curr["skips"] = None
-            elif user.id not in curr["skips"]:
-                curr["skips"].append(user.id)
-        else:
-            curr["skips"] = None
+            elems = [round(_vars.evalMath(i)) for i in args]
         members = 0
         for vc in client.voice_clients:
             if vc.channel.guild.id == guild.id:
@@ -441,14 +422,32 @@ class remove:
                     if not memb.bot:
                         members += 1
         required = 1 + members >> 1
-        if curr["skips"] is None:
-            response = "```css\n"
-        else:
-            response = (
-                "```css\nVoted to remove " + uniStr(curr["name"]) + " from the queue.\nCurrent vote count: "
-                + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + "."
-                )
-        skipped = False
+        response = "```css\n"
+        for pos in elems:
+            try:
+                if not isValid(pos):
+                    if "f" in flags:
+                        auds = _vars.queue[guild.id]
+                        auds.queue = []
+                        auds.new()
+                        #print("Stopped audio playback in " + guild.name)
+                        return "```fix\nRemoved all items from the queue.```"
+                    raise LookupError
+                curr = _vars.queue[guild.id].queue[pos]
+            except LookupError:
+                raise IndexError("Entry " + uniStr(pos) + " is out of range.")
+            if type(curr["skips"]) is list:
+                if "f" in flags or user.id == curr["u_id"]:
+                    curr["skips"] = None
+                elif user.id not in curr["skips"]:
+                    curr["skips"].append(user.id)
+            else:
+                curr["skips"] = None
+            if curr["skips"] is not None:
+                response += (
+                    "Voted to remove " + uniStr(curr["name"]) + " from the queue.\nCurrent vote count: "
+                    + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + ".\n"
+                    )
         auds = _vars.queue[guild.id]
         q = auds.queue
         i = 0
@@ -456,9 +455,9 @@ class remove:
             song = q[i]
             if song["skips"] is None or len(song["skips"]) >= required:
                 q.pop(i)
-                response += "\n" + uniStr(song["name"]) + " has been removed from the queue."
+                response += uniStr(song["name"]) + " has been removed from the queue.\n"
                 if i == 0:
-                    auds.new(None)
+                    auds.new()
                     #print("Stopped audio playback in " + guild.name)
                 continue
             i += 1
@@ -477,7 +476,8 @@ class pause:
 
     async def __call__(self, _vars, name, guild, client, user, channel, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        auds.paused = name == "pause"
+        if not auds.paused > 1:
+            auds.paused = name == "pause"
         return "```css\nSuccessfully " + name + "d audio playback in " + uniStr(guild.name) + ".```"
 
 
@@ -579,14 +579,16 @@ class volume:
     server_only = True
 
     def __init__(self):
-        self.name = ["vol", "audio", "v"]
+        self.name = ["vol", "audio", "v", "opt"]
         self.min_level = 0
         self.description = "Changes the current playing volume in this server."
         self.usage = "<value[]> <reverb(?r)> <speed(?s)> <pitch(?p)> <bassboost(?b)> <delay(?d)>"
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        if "s" in flags:
+        if "v" in flags:
+            op = "volume"
+        elif "s" in flags:
             op = "speed"
         elif "p" in flags:
             op = "pitch"
@@ -597,17 +599,24 @@ class volume:
         elif "r" in flags:
             op = "reverb"
         else:
-            op = "volume"
+            op = "settings"
         if not len(argv.replace(" ", "")):
-            num = round(100. * _vars.queue[guild.id].stats[op], 8)
+            if op == "settings":
+                return (
+                    "Current audio settings for **" + guild.name + "**:\n```json\n"
+                    + str(auds.stats).replace("'", '"') + "```"
+                    )
+            num = round(100. * _vars.queue[guild.id].stats[op], 9)
             return (
                 "```css\nCurrent audio " + op + " in " + uniStr(guild.name)
                 + ": " + uniStr(num) + ".```"
                 )
+        if op == "settings":
+            op = "volume"
         s_perm = _vars.getPerms(user, guild)
         if s_perm < 1:
             raise PermissionError(
-                "Insufficient permissions to change volume. Current permission level: " + uniStr(s_perm)
+                "Insufficient permissions to change audio settings. Current permission level: " + uniStr(s_perm)
                 + ", required permission level: " + uniStr(1) + "."
                 )
         origVol = _vars.queue[guild.id].stats
@@ -618,8 +627,8 @@ class volume:
             auds.new(auds.file, auds.stats["position"])
         return (
             "```css\nChanged audio " + op + " in " + uniStr(guild.name)
-            + " from " + uniStr(round(100. * orig, 8))
-            + " to " + uniStr(round(100. * val, 8)) + ".```"
+            + " from " + uniStr(round(100. * orig, 9))
+            + " to " + uniStr(round(100. * val, 9)) + ".```"
             )
 
 
@@ -657,12 +666,12 @@ class unmute:
         return "```css\nSuccessfully unmuted all users in voice channels in " + uniStr(guild.name) + ".```"
 
 
-class opt:
+class qopt:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["qopt", "audioSettings"]
+        self.name = ["audioSettings"]
         self.min_level = 1
         self.description = "Changes the queue settings for the current audio player."
         self.usage = "<option(loop)(shuffle)> <disable(?d)>"
