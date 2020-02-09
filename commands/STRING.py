@@ -40,6 +40,7 @@ translators = {
 
 class math:
     is_command = True
+    time_consuming = True
 
     def __init__(self):
         self.name = ["python"]
@@ -112,6 +113,7 @@ class hex2uni:
 
 class translate:
     is_command = True
+    time_consuming = True
 
     def __init__(self):
         self.name = ["tr"]

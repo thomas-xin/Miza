@@ -40,6 +40,8 @@ class customAudio(discord.AudioSource):
         self.feedback = None
         self.bassadj = None
         self.prev = None
+        self.searching = False
+        self.preparing = False
 
     def new(self, source=None, pos=0):
         reverse = self.stats["speed"] < 0
@@ -297,7 +299,7 @@ def plot(*args,**kwargs):
 fig = plt.figure()
 
 
-class _globals:
+class __globals:
     timeout = 24
     deleted = [
         "discord",
@@ -332,6 +334,7 @@ class _globals:
         "checkDelete",
         "reactCallback",
         "sendUpdateRequest",
+        "research",
         "on_ready",
         "on_reaction_add",
         "on_reaction_remove",
@@ -342,7 +345,6 @@ class _globals:
         "on_voice_state_update",
         "on_raw_message_delete",
         "on_typing",
-        "_globals",
         "_vars",
         "fig",
         "plt",
@@ -742,13 +744,12 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                 args = shlex.split(d)
                             except ValueError:
                                 args = d.split(" ")
-                        if not loop:
-                            await channel.trigger_typing()
-                        #async with channel.typing():
                         for a in range(len(args)):
                             args[a] = args[a].replace("", "'").replace("\0", '"')
                         if guild is None and getattr(command, "server_only", False):
                             raise ReferenceError("This command is only available in servers.")
+                        if not loop and getattr(command, "time_consuming", False):
+                            asyncio.create_task(channel.trigger_typing())
                         response = await command(
                             client=client,          # for interfacing with discord
                             _vars=_vars,            # for interfacing with bot's database
@@ -913,9 +914,13 @@ async def outputLoop():
 async def updateLoop():
     global _vars
     print("Update loop initiated.")
+    autosave = 0
     counter = 0
     while True:
         try:
+            if time.time() - autosave > 60:
+                autosave = time.time()
+                _vars.update(True)
             while _vars.blocked > 0:
                 print("Blocked...")
                 _vars.blocked -= 1
@@ -1066,8 +1071,12 @@ async def handleUpdate(force=False):
                             q = auds.queue
                         except NameError:
                             continue
+                        asyncio.create_task(research(auds, ytdl))
                         for e in q:
                             e_id = e["id"].replace("@", "")
+                            if not e_id:
+                                q.remove(e)
+                                continue
                             if e_id in _vars.audiocache:
                                 e["duration"] = _vars.audiocache[e_id][0]
                         if len(q):
@@ -1087,8 +1096,8 @@ async def handleUpdate(force=False):
                                                 durc = [q[i]["duration"]]
                                                 _vars.audiocache[e_id] = durc
                                                 doParallel(
-                                                    ytdl.download,
-                                                    [q[i]["url"], q[i]["id"], durc],
+                                                    ytdl.downloadSingle,
+                                                    [q[i], durc],
                                                     )
                                             else:
                                                 q[i]["duration"] = ytdl.getDuration("cache/" + search)
@@ -1116,6 +1125,7 @@ async def handleUpdate(force=False):
                                     await sent.add_reaction("❎")
                                 except FileNotFoundError:
                                     pass
+                                auds.preparing = False
                             elif not playing and auds.source is None:
                                 if auds.stats["loop"]:
                                     temp = q[0]
@@ -1130,7 +1140,8 @@ async def handleUpdate(force=False):
                                 if auds.stats["loop"]:
                                     temp["id"] = temp["id"].replace("@", "")
                                     q.append(temp)
-                        if not len(q):
+                                auds.preparing = False
+                        if not len(q) and not auds.preparing:
                             t = _vars.playlists.get(guild.id, ())
                             if len(t):
                                 d = None
@@ -1161,6 +1172,30 @@ async def handleUpdate(force=False):
                         pass
                     except FileNotFoundError:
                         _vars.audiocache.pop(i)
+
+
+async def research(auds, ytdl):
+    if auds.searching >= 1:
+        #print("researching blocked.")
+        return
+    auds.searching += 1
+    #print("researching...")
+    q = auds.queue
+    for i in q:
+        if i in auds.queue and "research" in i:
+            try:
+                print(i["name"])
+                i.pop("research")
+                returns = [None]
+                t = time.time()
+                doParallel(ytdl.extractSingle, [i], returns)
+                while returns[0] is None and time.time() - t < 10:
+                    await asyncio.sleep(0.01)
+                await asyncio.sleep(0.1)
+            except:
+                print(traceback.format_exc())
+    await asyncio.sleep(1)
+    auds.searching = max(auds.searching - 1, 0)
 
 
 async def checkDelete(message, reaction, user):
@@ -1330,6 +1365,6 @@ async def on_raw_message_edit(payload):
 
 
 if __name__ == "__main__":
-    _vars = _globals()
+    _vars = __globals()
     print("Attempting to authorize with token " + _vars.token + ":")
     client.run(_vars.token)

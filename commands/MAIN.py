@@ -278,6 +278,7 @@ class enableCommand:
 
 class restart:
     is_command = True
+    time_consuming = True
 
     def __init__(self):
         self.name = ["shutdown"]
@@ -336,6 +337,7 @@ class suspend:
 
 class loop:
     is_command = True
+    time_consuming = True
 
     def __init__(self):
         self.name = ["for", "rep", "repeat", "while"]
@@ -343,11 +345,25 @@ class loop:
         self.description = "Loops a command."
         self.usage = "<0:iterations> <1:command> <hide(?h)>"
 
-    async def __call__(self, args, argv, message, callback, _vars, flags, **void):
+    async def __call__(self, args, argv, message, callback, _vars, flags, perm, **void):
         iters = round(float(_vars.evalMath(args[0])))
+        limit = perm * 5
+        if iters > limit:
+            raise PermissionError(
+                "insufficient priviliges to execute loop of " + uniStr(iters)
+                + " iterations. Required level: " + uniStr(ceil(iters / 3))
+                + ", Current level: " + uniStr(perm) + "."
+                )
         func = func2 = " ".join(args[1:])
         if flags:
             func += " ?" + "?".join(flags)
+        if func:
+            while func[0] == " ":
+                func = func[1:]
+        for n in self.name:
+            if func.startswith("~" + n):
+                if isValid(perm):
+                    raise PermissionError("Insufficient priviliges to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
         for i in range(iters):
             asyncio.create_task(callback(message, func, cb_argv=func2, cb_flags=flags, loop=i != iters - 1))

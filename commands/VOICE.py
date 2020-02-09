@@ -1,4 +1,4 @@
-import youtube_dl, asyncio, discord, time, os, urllib, json, copy
+import youtube_dl, asyncio, discord, time, os, urllib, json, copy, traceback
 from subprocess import check_output, CalledProcessError, STDOUT
 from smath import *
 
@@ -75,7 +75,50 @@ class videoDownloader:
         self.lastsearch = 0
         self.requests = 0
 
-    def search(self, item):
+    def extract(self, item, force):
+        resp = self.downloader.extract_info(item, download=False, process=False)
+        if resp.get("_type", None) == "url":
+            resp = self.downloader.extract_info(resp["url"], download=False, process=False)
+        if resp is None or not len(resp):
+            raise EOFError("No search results found.")
+        output = []
+        if resp.get("_type", None) == "playlist":
+            entries = list(resp["entries"])
+            if force or len(entries) <= 1:
+                for entry in entries:
+                    data = self.downloader.extract_info(entry["id"], download=False, process=False)
+                    output.append({
+                        "id": data["id"],
+                        "name": data["title"],
+                        "url": data["webpage_url"],
+                        "duration": data["duration"],
+                        })
+            else:
+                for entry in entries:
+                    dur = "duration" in entry
+                    temp = {
+                        "id": entry["id"],
+                        "name": entry["title"],
+                        "url": entry["url"],
+                        "duration": entry.get("duration", 60),
+                        }
+                    if not dur:
+                        temp["research"] = True
+                    output.append(temp)
+        else:
+            dur = "duration" in resp
+            temp = {
+                "id": resp["id"],
+                "name": resp["title"],
+                "url": resp["webpage_url"],
+                "duration": resp.get("duration", 60),
+                }
+            if not dur:
+                temp["research"] = True
+            output.append(temp)
+        return output
+
+    def search(self, item, force=False):
         item = item.strip("<>").replace("\n", "")
         while self.requests > 4:
             time.sleep(0.01)
@@ -86,57 +129,49 @@ class videoDownloader:
             return self.searched[item]
         try:
             self.requests += 1
-            pl = self.downloader.extract_info(item, False)
-            if pl is None:
-                return []
+            self.searched[item] = output = self.extract(item, force)
             self.requests = max(self.requests - 1, 0)
-            if "direct" in pl:
-                opener = urlBypass()
-                resp = self.opener.open(item)
-                rescode = resp.getcode()
-                if rescode != 200:
-                    raise ConnectionError(rescode)
-                header = dict(resp.headers.items())
-                duration = float(header["Content-Length"]) / 16384
-                hh = hex(hash(item)).replace("-", "").replace("0x", "")
-                output = [{
-                    "name": pl["title"],
-                    "url": pl["webpage_url"],
-                    "duration": duration,
-                    "id": hh,
-                    }]
-            elif "entries" in pl:
-                output = []
-                for e in pl["entries"]:
-                    output.append({
-                        "name": e["title"],
-                        "url": e["webpage_url"],
-                        "duration": e["duration"],
-                        "id": e["id"],
-                        })
-            else:
-                output = [{
-                    "name": pl["title"],
-                    "url": pl["webpage_url"],
-                    "duration": pl["duration"],
-                    "id": pl["id"],
-                    }]
-            self.searched[item] = output
             return output
         except Exception as ex:
+            self.requests = max(self.requests - 1, 0)
             return str(ex)
         
-    def download(self, item, i_id, durc=None):
+    def downloadSingle(self, i, durc=None):
         new_opts = dict(self.ydl_opts)
-        fn = "cache/" + i_id.replace("@", "") + ".mp3"
+        fn = "cache/" + i["id"].replace("@", "") + ".mp3"
         new_opts["outtmpl"] = fn
         downloader = youtube_dl.YoutubeDL(new_opts)
         try:
-            downloader.download([item])
+            downloader.download([i["url"]])
             if durc is not None:
                 durc[0] = getDuration(fn)
-        except Exception as ex:
-            print(repr(ex))
+        except:
+            i["id"] = ""
+            print(traceback.format_exc())
+        return True
+
+    def extractSingle(self, i):
+        item = i["url"]
+        while self.requests > 4:
+            time.sleep(0.01)
+        if time.time() - self.lastsearch > 1800:
+            self.lastsearch = time.time()
+            self.searched = {}
+        if item in self.searched:
+            i["duration"] = self.searched[item]["duration"]
+            i["url"] = self.searched[item]["webpage_url"]
+            return True
+        try:
+            self.requests += 1
+            data = self.downloader.extract_info(item, download=False, process=False)
+            i["duration"] = data["duration"]
+            i["url"] = data["webpage_url"]
+            self.requests = max(self.requests - 1, 0)
+        except:
+            self.requests = max(self.requests - 1, 0)
+            i["id"] = ""
+            print(traceback.format_exc())
+        return True
 
     def getDuration(self, filename):
         return getDuration(filename)
@@ -154,7 +189,7 @@ class queue:
         self.name = ["q", "play", "playing", "np", "p"]
         self.min_level = 0
         self.description = "Shows the music queue, or plays a song in voice."
-        self.usage = "<link[]> <verbose(?v)>"
+        self.usage = "<link[]> <verbose(?v)> <hide(?h)>"
 
     async def __call__(self, client, user, _vars, argv, channel, guild, flags, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -173,7 +208,7 @@ class queue:
                 cnt = len(q)
                 info = (
                     "`" + uniStr(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
-                    + uniStr(sec2Time(totalTime)) + "`"
+                    + uniStr(sec2Time(totalTime / auds.speed)) + "`"
                     )
             else:
                 info = ""
@@ -194,9 +229,12 @@ class queue:
                     curr += limStr(uniStr(e["name"]), 48)
                 estim = currTime - elapsed
                 if estim > 0:
-                    curr += ", Time until playing: " + uniStr(sec2Time(estim))
+                    if i <= 1 or not auds.stats["shuffle"]:
+                        curr += ", Time until playing: " + uniStr(sec2Time(estim / auds.speed))
+                    else:
+                        curr += ", Time until playing: (" + uniStr(sec2Time(estim / auds.speed)) + ")"
                 else:
-                    curr += ", Remaining time: " + uniStr(sec2Time(estim + e["duration"]))
+                    curr += ", Remaining time: " + uniStr(sec2Time((estim + e["duration"]) / auds.speed))
                 if len(show) + len(info) + len(curr) < 1800:
                     show += curr
                 else:
@@ -223,11 +261,16 @@ class queue:
         else:
             output = [None]
             doParallel(self.ytdl.search, [argv], output)
+            await channel.trigger_typing()
             while output[0] is None:
                 await asyncio.sleep(0.01)
             res = output[0]
             if type(res) is str:
                 raise ConnectionError(res)
+            elif type(res) is dict:
+                return (
+                    "```css\nAdding " + uniStr(res["count"]) + " tracks...```", 1
+                    )
             dur = 0
             added = []
             names = []
@@ -236,7 +279,7 @@ class queue:
                 url = e["url"]
                 duration = e["duration"]
                 v_id = e["id"]
-                added.append({
+                temp = {
                     "name": name,
                     "url": url,
                     "duration": duration,
@@ -244,14 +287,18 @@ class queue:
                     "u_id": user.id,
                     "id": v_id,
                     "skips": [],
-                    })
+                    }
+                if "research" in e:
+                    temp["research"] = True
+                added.append(temp)
                 if not dur:
                     dur = duration
                 names.append(name)
             total_duration = 0
             for e in q:
                 total_duration += e["duration"]
-            total_duration = max((total_duration - elapsed), dur / 128 + frand(0.5) + 2)
+            total_duration = max((total_duration - elapsed) / auds.speed, dur / 128 + frand(0.5) + 2)
+            auds.preparing = True
             q += added
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")
@@ -273,11 +320,18 @@ class playlist:
 
     def __init__(self):
         self.name = ["defaultplaylist", "pl"]
-        self.min_level = 2
+        self.min_level = 0
         self.description = "Shows, appends, or removes from the default playlist."
         self.usage = "<link[]> <remove(?d)> <verbose(?v)>"
 
-    async def __call__(self, user, argv, _vars, guild, flags, **void):
+    async def __call__(self, user, argv, _vars, guild, flags, channel, perm, **void):
+        if argv or "d" in flags:
+            req = 2
+            if perm < req:
+                raise PermissionError(
+                    "Insufficient privileges to modify default playlist for " + uniStr(guild.name)
+                    + ". Required level: " + uniStr(req) + ", Current level: " + uniStr(perm) + "."
+                    )
         pl = _vars.playlists.setdefault(guild.id, [])
         if not argv:
             if "d" in flags:
@@ -312,7 +366,8 @@ class playlist:
                 + uniStr(guild.name) + ".```"
                 )
         output = [None]
-        doParallel(self.ytdl.search, [argv], output)
+        doParallel(self.ytdl.search, [argv, True], output)
+        await channel.trigger_typing()
         while output[0] is None:
             await asyncio.sleep(0.01)
         res = output[0]
@@ -348,6 +403,7 @@ class join:
         voice = user.voice
         vc = voice.channel
         if guild.id not in _vars.queue:
+            await channel.trigger_typing()
             _vars.queue[guild.id] = _vars.createPlayer(channel.id)
         try:
             joined = True
@@ -367,6 +423,7 @@ class join:
 class leave:
     is_command = True
     server_only = True
+    time_consuming = True
 
     def __init__(self):
         self.name = ["quit", "dc", "disconnect"]
@@ -516,12 +573,13 @@ class seek:
 class dump:
     is_command = True
     server_only = True
+    time_consuming = True
 
     def __init__(self):
         self.name = []
         self.min_level = 2
         self.description = "Dumps or loads the currently playing audio queue state."
-        self.usage = "<data[]> <append(?a)>"
+        self.usage = "<data[]> <append(?a)> <hide(?h)>"
 
     async def __call__(self, guild, channel, user, client, _vars, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -568,10 +626,12 @@ class dump:
                     d["stats"].pop(k)
                 d["stats"][k] = float(d["stats"][k])
             auds.stats.update(d["stats"])
-            return "```css\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"
+            if not "h" in flags:
+                return "```css\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"
         auds.queue += q
         auds.stats = d["stats"]
-        return "```css\nSuccessfully appended dump to queue for " + uniStr(guild.name) + ".```"
+        if not "h" in flags:
+            return "```css\nSuccessfully appended dump to queue for " + uniStr(guild.name) + ".```"
             
 
 class volume:
@@ -678,6 +738,7 @@ class randomize:
 class unmute:
     is_command = True
     server_only = True
+    time_consuming = True
 
     def __init__(self):
         self.name = ["unmuteall"]

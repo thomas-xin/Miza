@@ -4,6 +4,7 @@ from smath import *
 
 class text2048:
     is_command = True
+    time_consuming = True
     directions = {
         "⬅": [0, 0],
         "⬆": [0, 1],

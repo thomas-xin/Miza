@@ -4,6 +4,7 @@ from smath import *
 
 class purge:
     is_command = True
+    time_consuming = True
 
     def __init__(self):
         self.name = ["del", "delete"]
@@ -101,6 +102,7 @@ class ban:
             tm = 0
         else:
             tm = _vars.evalMath(args[1])
+        await channel.trigger_typing()
         if len(args) >= 3:
             msg = args[2]
         else:
