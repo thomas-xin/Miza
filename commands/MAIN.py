@@ -341,17 +341,18 @@ class loop:
 
     def __init__(self):
         self.name = ["for", "rep", "repeat", "while"]
-        self.min_level = 2
+        self.min_level = 1
         self.description = "Loops a command."
         self.usage = "<0:iterations> <1:command> <hide(?h)>"
 
     async def __call__(self, args, argv, message, callback, _vars, flags, perm, **void):
         iters = round(float(_vars.evalMath(args[0])))
-        limit = perm * 5
+        scale = 3
+        limit = perm * scale
         if iters > limit:
             raise PermissionError(
                 "insufficient priviliges to execute loop of " + uniStr(iters)
-                + " iterations. Required level: " + uniStr(ceil(iters / 3))
+                + " iterations. Required level: " + uniStr(ceil(iters / scale))
                 + ", Current level: " + uniStr(perm) + "."
                 )
         func = func2 = " ".join(args[1:])

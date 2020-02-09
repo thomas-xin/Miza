@@ -259,6 +259,7 @@ class queue:
                 + countstr + show + "```", 1
                 )
         else:
+            auds.preparing = True
             output = [None]
             doParallel(self.ytdl.search, [argv], output)
             await channel.trigger_typing()
@@ -298,7 +299,6 @@ class queue:
             for e in q:
                 total_duration += e["duration"]
             total_duration = max((total_duration - elapsed) / auds.speed, dur / 128 + frand(0.5) + 2)
-            auds.preparing = True
             q += added
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")
