@@ -579,7 +579,7 @@ class volume:
     server_only = True
 
     def __init__(self):
-        self.name = ["vol", "audio", "v", "opt"]
+        self.name = ["vol", "audio", "v", "opt", "set"]
         self.min_level = 0
         self.description = "Changes the current playing volume in this server."
         self.usage = (
@@ -636,6 +636,7 @@ class volume:
         new = round(val * 100, 9)
         if op in "loop shuffle":
             origVol[op] = new = bool(val)
+            orig = bool(orig)
         else:
             origVol[op] = val
         if op in "speed pitch":

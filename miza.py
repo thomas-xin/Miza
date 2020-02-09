@@ -17,7 +17,7 @@ class customAudio(discord.AudioSource):
     length = 1920
     empty = numpy.zeros(length >> 1, float)
     bass = butter(2, 1/5, btype="low", output="sos")
-    treble = butter(2, 4/5, btype="high", output="sos")
+    treble = butter(2, 1/3, btype="high", output="sos")
     filt = butter(1, 1/3, btype="low", output="sos")
 
     def __init__(self, c_id):
@@ -28,8 +28,8 @@ class customAudio(discord.AudioSource):
             "speed": 1,
             "bassboost": 0,
             "delay": 16 / 5,
-            "loop": 0,
-            "shuffle": 0,
+            "loop": False,
+            "shuffle": False,
             "position": 0,
             }
         self.new()
@@ -80,7 +80,7 @@ class customAudio(discord.AudioSource):
                 d["options"] += ",areverse"
             if pos != 0:
                 d["before_options"] = "-ss " + str(pos)
-            print(d)
+            #print(d)
             self.is_loading = True
             self.source = discord.FFmpegPCMAudio(**d)
             self.file = source
@@ -112,7 +112,7 @@ class customAudio(discord.AudioSource):
             if not len(temp):
                 sendUpdateRequest(True)
                 raise EOFError
-            self.stats["position"] += self.speed / 50
+            self.stats["position"] = round(self.stats["position"] + self.speed / 50, 4)
             self.is_playing = True
         except:
             if not self.paused and not self.is_loading:
@@ -183,8 +183,8 @@ class customAudio(discord.AudioSource):
                         + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 24
                         ) * reverb
                     if self.feedback is not None:
-                        left -= sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size:]
-                        right -= sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size:]
+                        left -= sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size-16:-16]
+                        right -= sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size-16:-16]
                     self.feedback = (lfeed, rfeed)
                     #array = numpy.convolve(array, resizeVector(self.buffer[0], len(array) * 2))
                     a = 1 / 16
