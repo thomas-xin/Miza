@@ -17,7 +17,7 @@ class customAudio(discord.AudioSource):
     length = 1920
     empty = numpy.zeros(length >> 1, float)
     bass = butter(2, 1/5, btype="low", output="sos")
-    treble = butter(2, 1/3, btype="high", output="sos")
+    treble = butter(2, 1/5, btype="high", output="sos")
     filt = butter(1, 1/3, btype="low", output="sos")
 
     def __init__(self, c_id):
@@ -27,7 +27,7 @@ class customAudio(discord.AudioSource):
             "pitch": 0,
             "speed": 1,
             "bassboost": 0,
-            "delay": 16 / 5,
+            "reverbdelay": 16 / 5,
             "loop": False,
             "shuffle": False,
             "position": 0,
@@ -126,7 +126,7 @@ class customAudio(discord.AudioSource):
             reverb = sndset["reverb"]
             pitch = sndset["pitch"]
             bassboost = sndset["bassboost"]
-            delay = min(400, max(2, round(sndset["delay"] * 5)))
+            delay = min(400, max(2, round(sndset["reverbdelay"] * 5)))
             if volume == 1 and reverb == pitch == bassboost == 0 and delay == 16:
                 self.buffer = []
                 self.feedback = None
@@ -144,15 +144,15 @@ class customAudio(discord.AudioSource):
             left, right = array[::2], array[1::2]
             if bassboost:
                 try:
-                    lbass = left * bassboost
-                    rbass = right * bassboost
+                    lbass = numpy.array(left)
+                    rbass = numpy.array(right)
                     if self.bassadj is not None:
                         if bassboost > 0:
                             filt = self.bass
                         else:
                             filt = self.treble
-                        left += sosfilt(filt, numpy.concatenate((self.bassadj[0], left)))[size-16:-16]
-                        right += sosfilt(filt, numpy.concatenate((self.bassadj[1], right)))[size-16:-16]
+                        left += sosfilt(filt, numpy.concatenate((self.bassadj[0], left)))[size-16:-16] * bassboost
+                        right += sosfilt(filt, numpy.concatenate((self.bassadj[1], right)))[size-16:-16] * bassboost
                     self.bassadj = [lbass, rbass]
                 except:
                     print(traceback.format_exc())

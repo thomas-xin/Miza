@@ -39,6 +39,9 @@ mobius = sympy.ntheory.mobius
 
 from sympy.parsing.sympy_parser import parse_expr
 
+TRUE, FALSE = True, False
+true, false = True, False
+
 def diff(string):
     func = parse_expr(string)
     return str(sympy.diff(func))

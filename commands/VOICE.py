@@ -584,7 +584,7 @@ class volume:
         self.description = "Changes the current playing volume in this server."
         self.usage = (
             "<value[]> <reverb(?r)> <speed(?s)> <pitch(?p)>"
-            + "<bassboost(?b)> <delay(?d)> <loop(?l)> <shuffle(?x)>"
+            + "<bassboost(?b)> <reverbdelay(?d)> <loop(?l)> <shuffle(?x)>"
             )
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, **void):
@@ -598,7 +598,7 @@ class volume:
         elif "b" in flags:
             op = "bassboost"
         elif "d" in flags:
-            op = "delay"
+            op = "reverbdelay"
         elif "r" in flags:
             op = "reverb"
         elif "l" in flags:
