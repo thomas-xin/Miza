@@ -1323,7 +1323,7 @@ async def handleMessage(message, edit=True):
         killThreads()
         errmsg = "```python\nError: " + repr(ex) + "\n```"
         sent = await message.channel.send(errmsg)
-        await message.add_reaction("❎")
+        await sent.add_reaction("❎")
     return
 
 
