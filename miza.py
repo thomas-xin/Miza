@@ -102,6 +102,24 @@ class customAudio(discord.AudioSource):
         self.new(self.file, pos)
         self.stats["position"] = pos
         return self.stats["position"]
+
+    def advance(self):
+        q = self.queue
+        if self.stats["loop"]:
+            temp = q[0]
+        self.prev = q[0]["id"]
+        q.pop(0)
+        if self.stats["shuffle"]:
+            if len(q):
+                t2 = q[0]
+                q.pop(0)
+                shuffle(q)
+                q.insert(0, t2)
+        if self.stats["loop"]:
+            temp["id"] = temp["id"].replace("@", "")
+            q.append(temp)
+        self.preparing = False
+        return len(q)
         
     def read(self):
         try:
@@ -1129,20 +1147,7 @@ async def handleUpdate(force=False):
                                     pass
                                 auds.preparing = False
                             elif not playing and auds.source is None:
-                                if auds.stats["loop"]:
-                                    temp = q[0]
-                                auds.prev = q[0]["id"]
-                                q.pop(0)
-                                if auds.stats["shuffle"]:
-                                    if len(q):
-                                        t2 = q[0]
-                                        q.pop(0)
-                                        shuffle(q)
-                                        q.insert(0, t2)
-                                if auds.stats["loop"]:
-                                    temp["id"] = temp["id"].replace("@", "")
-                                    q.append(temp)
-                                auds.preparing = False
+                                auds.advance()
                         if not len(q) and not auds.preparing:
                             t = _vars.playlists.get(guild.id, ())
                             if len(t):

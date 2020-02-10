@@ -520,13 +520,16 @@ class remove:
         while i < len(q):
             song = q[i]
             if song["skips"] is None or len(song["skips"]) >= required:
-                q.pop(i)
-                response += uniStr(noSquareBrackets(song["name"])) + " has been removed from the queue.\n"
                 if i == 0:
+                    auds.advance()
                     auds.new()
                     #print("Stopped audio playback in " + guild.name)
+                else:
+                    q.pop(i)
+                response += uniStr(noSquareBrackets(song["name"])) + " has been removed from the queue.\n"
                 continue
-            i += 1
+            else:
+                i += 1
         return response + "```", 1
 
 
