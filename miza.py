@@ -103,23 +103,24 @@ class customAudio(discord.AudioSource):
         self.stats["position"] = pos
         return self.stats["position"]
 
-    def advance(self):
+    def advance(self, loop=True):
         q = self.queue
-        if self.stats["loop"]:
-            temp = q[0]
-        self.prev = q[0]["id"]
-        q.pop(0)
-        if self.stats["shuffle"]:
-            if len(q):
-                t2 = q[0]
-                q.pop(0)
-                shuffle(q)
-                q.insert(0, t2)
-        if self.stats["loop"]:
-            temp["id"] = temp["id"].replace("@", "")
-            q.append(temp)
-        self.preparing = False
-        return len(q)
+        if len(q):
+            if self.stats["loop"]:
+                temp = q[0]
+            self.prev = q[0]["id"]
+            q.pop(0)
+            if self.stats["shuffle"]:
+                if len(q):
+                    t2 = q[0]
+                    q.pop(0)
+                    shuffle(q)
+                    q.insert(0, t2)
+            if self.stats["loop"] and loop:
+                temp["id"] = temp["id"].replace("@", "")
+                q.append(temp)
+            self.preparing = False
+            return len(q)
         
     def read(self):
         try:
@@ -233,9 +234,9 @@ class customAudio(discord.AudioSource):
     
 
 from matplotlib import use as plot_sys
-
 plot_sys("Agg")
 from matplotlib import pyplot as plt
+
 
 def tryFunc(func, *args, force=False, amax, **kwargs):
     try:

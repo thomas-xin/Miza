@@ -472,6 +472,19 @@ class remove:
                 )
         if not argv:
             elems = [0]
+        elif ":" in argv or ".." in argv:
+            l = argv.replace("...", ":").replace("..", ":").split(":")
+            if len(l) > 2:
+                raise ValueError("Too many arguments for range input.")
+            if l[0]:
+                left = round(_vars.evalMath(l[0]))
+            else:
+                left = 0
+            if l[1]:
+                right = round(_vars.evalMath(l[1]))
+            else:
+                right = len(auds.queue)
+            elems = xrange(left, right)
         else:
             elems = [round(_vars.evalMath(i)) for i in args]
         if not "f" in flags:
@@ -521,7 +534,7 @@ class remove:
             song = q[i]
             if song["skips"] is None or len(song["skips"]) >= required:
                 if i == 0:
-                    auds.advance()
+                    auds.advance(False)
                     auds.new()
                     #print("Stopped audio playback in " + guild.name)
                 else:
