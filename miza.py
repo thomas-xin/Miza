@@ -654,12 +654,13 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     suspended = _vars.bans[0].get(u_id, False)
     if suspended or msg.replace(" ", "") == check:
         if not u_perm < 0 and not suspended:
-            await channel.send(
+            sent = await channel.send(
 		"Hi, did you require my services for anything? Use `~?` or `~help` for help."
 		)
         else:
             print("Ignoring command from suspended user " + user.name + " (" + str(u_id) + ").")
-            await channel.send("Sorry, you are currently not permitted to request my services.")
+            sent = await channel.send("Sorry, you are currently not permitted to request my services.")
+        await sent.add_reaction("❎")
         return
     if len(msg) >= 2 and msg[0] == "~" and msg[1] != "~":
         comm = msg[1:]
@@ -1119,7 +1120,8 @@ async def handleUpdate(force=False):
                                         vc.play(auds, after=sendUpdateRequest)
                                     channel = await client.fetch_channel(auds.channel)
                                     sent = await channel.send(
-                                        "```css\n🎵 Now playing " + uniStr(name)
+                                        "```css\n🎵 Now playing "
+                                        + uniStr(noSquareBrackets(name))
                                         + ", added by " + uniStr(added_by) + "! 🎵```"
                                         )
                                     await sent.add_reaction("❎")

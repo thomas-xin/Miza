@@ -221,12 +221,12 @@ class queue:
                 curr += "[" + uniStr(i) + "] "
                 if "v" in flags:
                     curr += (
-                        uniStr(e["name"]) + ", URL: [" + e["url"] + "]"
+                        uniStr(noSquareBrackets(e["name"])) + ", URL: [" + e["url"] + "]"
                         + ", Duration: " + uniStr(sec2Time(e["duration"]))
                         + ", Added by: " + uniStr(e["added by"])
                         )
                 else:
-                    curr += limStr(uniStr(e["name"]), 48)
+                    curr += limStr(uniStr(noSquareBrackets(e["name"])), 48)
                 estim = currTime - elapsed
                 if estim > 0:
                     if i <= 1 or not auds.stats["shuffle"]:
@@ -247,7 +247,7 @@ class queue:
             barsize = 16 * (1 + ("v" in flags))
             r = round(min(1, elapsed / duration) * barsize)
             bar = sym[0] * r + sym[1] * (barsize - r)
-            countstr = "Currently playing " + uniStr(q[0]["name"]) + "\n"
+            countstr = "Currently playing " + uniStr(noSquareBrackets(q[0]["name"])) + "\n"
             countstr += (
                 "(" + uniStr(dhms(elapsed))
                 + "/" + uniStr(dhms(duration)) + ") "
@@ -308,7 +308,8 @@ class queue:
                 names = names[0]
             if not "h" in flags:
                 return (
-                    "```css\n🎶 Added " + uniStr(names) + " to the queue! Estimated time until playing: "
+                    "```css\n🎶 Added " + noSquareBrackets(uniStr(names))
+                    + " to the queue! Estimated time until playing: "
                     + uniStr(sec2Time(total_duration)) + ". 🎶```", 1
                     )
 
@@ -346,7 +347,7 @@ class playlist:
             else:
                 items = []
                 for i in pl:
-                    items.append(limStr(i["name"], 32))
+                    items.append(limStr(noSquareBrackets(i["name"]), 32))
                 s = ""
                 for i in range(len(items)):
                     s += " " * (int(math.log10(len(items))) - int(math.log10(max(1, i))))
@@ -362,7 +363,7 @@ class playlist:
             pl.pop(i)
             doParallel(_vars.update)
             return (
-                "```css\nRemoved " + uniStr(temp["name"]) + " from the default playlist for "
+                "```css\nRemoved " + uniStr(noSquareBrackets(temp["name"])) + " from the default playlist for "
                 + uniStr(guild.name) + ".```"
                 )
         output = [None]
@@ -376,7 +377,7 @@ class playlist:
         names = []
         for e in res:
             name = e["name"]
-            names.append(name)
+            names.append(noSquareBrackets(name))
             pl.append({
                 "name": name,
                 "url": e["url"],
@@ -461,6 +462,7 @@ class remove:
         found = False
         if guild.id not in _vars.queue:
             raise LookupError("Currently not playing in a voice channel.")
+        auds = _vars.queue[guild.id]
         s_perm = _vars.getPerms(user, guild)
         min_level = 1
         if "f" in flags and s_perm < 1:
@@ -472,6 +474,14 @@ class remove:
             elems = [0]
         else:
             elems = [round(_vars.evalMath(i)) for i in args]
+        if not "f" in flags:
+            valid = True
+            for e in elems:
+                if not isValid(e):
+                    valid = False
+                    break
+            if not valid:
+                elems = range(len(auds.queue))
         members = 0
         for vc in client.voice_clients:
             if vc.channel.guild.id == guild.id:
@@ -484,13 +494,12 @@ class remove:
             try:
                 if not isValid(pos):
                     if "f" in flags:
-                        auds = _vars.queue[guild.id]
                         auds.queue = []
                         auds.new()
                         #print("Stopped audio playback in " + guild.name)
                         return "```fix\nRemoved all items from the queue.```"
                     raise LookupError
-                curr = _vars.queue[guild.id].queue[pos]
+                curr = auds.queue[pos]
             except LookupError:
                 raise IndexError("Entry " + uniStr(pos) + " is out of range.")
             if type(curr["skips"]) is list:
@@ -502,17 +511,17 @@ class remove:
                 curr["skips"] = None
             if curr["skips"] is not None:
                 response += (
-                    "Voted to remove " + uniStr(curr["name"]) + " from the queue.\nCurrent vote count: "
+                    "Voted to remove " + uniStr(noSquareBrackets(curr["name"]))
+                    + " from the queue.\nCurrent vote count: "
                     + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + ".\n"
                     )
-        auds = _vars.queue[guild.id]
         q = auds.queue
         i = 0
         while i < len(q):
             song = q[i]
             if song["skips"] is None or len(song["skips"]) >= required:
                 q.pop(i)
-                response += uniStr(song["name"]) + " has been removed from the queue.\n"
+                response += uniStr(noSquareBrackets(song["name"])) + " has been removed from the queue.\n"
                 if i == 0:
                     auds.new()
                     #print("Stopped audio playback in " + guild.name)
