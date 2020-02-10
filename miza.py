@@ -95,22 +95,23 @@ class customAudio(discord.AudioSource):
                 C = ""
                 D = ""
                 for i in range(ceil(chorus)):
-                    j = i & 1
+                    neg = ((i & 1) << 1) - 1
+                    i = 1 + i >> 1
                     i *= chorus / ceil(chorus)
                     if i:
                         A += "|"
                         B += "|"
                         C += "|"
                         D += "|"
-                    delay = (20 + i * tau * (j * 2 - 1)) % 40 + 10
+                    delay = (25 + i * tau * neg) % 39 + 18
                     A += str(round(delay, 3))
-                    decay = (1 + i * 0.1 * (j * 2 - 1)) % 2
+                    decay = (0.125 + i * 0.03 * neg) % 0.25 + 0.25
                     B += str(round(decay, 3))
-                    speed = (2 + i * 0.61 * (j * 2 - 1)) % 4
+                    speed = (2 + i * 0.61 * neg) % 4.5 + 0.5
                     C += str(round(speed, 3))
-                    depth = (1.5 + i * 0.26 * (j * 2 - 1)) % 3
+                    depth = (1.5 + i * 0.43 * neg) % 4 + 0.5
                     D += str(round(depth, 3))
-                b = 0.5 / sqrt(chorus + 1)
+                b = 0.5 / sqrt(ceil(chorus + 1))
                 d["options"] += (
                     "\"chorus=1:" + str(round(b, 3)) + ":"
                     + A + ":"
@@ -120,7 +121,7 @@ class customAudio(discord.AudioSource):
                     )
             if pos != 0:
                 d["before_options"] = "-ss " + str(pos)
-            #print(d)
+            print(d)
             self.is_loading = True
             self.source = discord.FFmpegPCMAudio(**d)
             self.file = source
