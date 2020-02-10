@@ -44,7 +44,7 @@ class customAudio(discord.AudioSource):
         self.preparing = False
 
     def new(self, source=None, pos=0):
-        reverse = self.stats["speed"] < 0
+        self.reverse = self.stats["speed"] < 0
         self.speed = max(0.01, abs(self.stats["speed"]))
         if self.speed == 0.01:
             self.speed = 1
@@ -79,7 +79,7 @@ class customAudio(discord.AudioSource):
                 d["options"] = "-af " + opts
             if pitchscale != 1:
                 d["options"] += ",asetrate=r=" + str(48000 * pitchscale)
-            if self.stats["speed"] < 0:
+            if self.reverse:
                 d["options"] += ",areverse"
             if pos != 0:
                 d["before_options"] = "-ss " + str(pos)
@@ -92,6 +92,9 @@ class customAudio(discord.AudioSource):
             self.file = None
         self.is_loading = False
         self.stats["position"] = pos
+        if pos == 0:
+            if self.reverse and len(self.queue):
+                self.stats["position"] = self.queue[0]["duration"]
 
     def seek(self, pos):
         duration = self.queue[0]["duration"]
@@ -134,7 +137,9 @@ class customAudio(discord.AudioSource):
             if not len(temp):
                 sendUpdateRequest(True)
                 raise EOFError
-            self.stats["position"] = round(self.stats["position"] + self.speed / 50, 4)
+            self.stats["position"] = round(
+                self.stats["position"] + self.speed / 50 * (self.reverse * -2 + 1), 4
+                )
             self.is_playing = True
         except:
             if not self.paused and not self.is_loading:

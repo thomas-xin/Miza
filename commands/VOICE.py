@@ -202,7 +202,10 @@ class queue:
                 if auds.stats["loop"]:
                     totalTime = inf
                 else:
-                    totalTime = -elapsed
+                    if auds.reverse and len(auds.queue):
+                        totalTime = elapsed - auds.queue[0]["duration"]
+                    else:
+                        totalTime = -elapsed
                     for e in q:
                         totalTime += e["duration"]
                 cnt = len(q)
@@ -227,7 +230,10 @@ class queue:
                         )
                 else:
                     curr += limStr(uniStr(noSquareBrackets(e["name"])), 48)
-                estim = currTime - elapsed
+                if auds.reverse and len(auds.queue):
+                    estim = currTime + elapsed - auds.queue[0]["duration"]
+                else:
+                    estim = currTime - elapsed
                 if estim > 0:
                     if i <= 1 or not auds.stats["shuffle"]:
                         curr += ", Time until playing: " + uniStr(sec2Time(estim / auds.speed))
@@ -298,7 +304,11 @@ class queue:
             total_duration = 0
             for e in q:
                 total_duration += e["duration"]
-            total_duration = max((total_duration - elapsed) / auds.speed, dur / 128 + frand(0.5) + 2)
+            if auds.reverse and len(auds.queue):
+                total_duration += elapsed - auds.queue[0]["duration"]
+            else:
+                total_duration -= elapsed
+            total_duration = max(total_duration / auds.speed, dur / 128 + frand(0.5) + 2)
             q += added
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")

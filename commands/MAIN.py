@@ -367,6 +367,8 @@ class loop:
                     raise PermissionError("Insufficient priviliges to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
         for i in range(iters):
-            asyncio.create_task(callback(message, func, cb_argv=func2, cb_flags=flags, loop=i != iters - 1))
+            asyncio.create_task(callback(
+                message, func, cb_argv=func2, cb_flags=flags, loop=i != iters - 1
+                ))
         if not "h" in flags:
             return "```css\nLooping [" + func + "] " + uniStr(iters) + " times...```"
