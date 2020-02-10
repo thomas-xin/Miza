@@ -649,7 +649,10 @@ class dump:
             for k in d["stats"]:
                 if k not in auds.stats:
                     d["stats"].pop(k)
-                d["stats"][k] = float(d["stats"][k])
+                if k in "loop shuffle":
+                    d["stats"][k] = bool(d["stats"][k])
+                else:
+                    d["stats"][k] = float(d["stats"][k])
             auds.stats.update(d["stats"])
             if not "h" in flags:
                 return "```css\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"

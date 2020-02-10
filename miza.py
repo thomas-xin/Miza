@@ -825,7 +825,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         print(traceback.format_exc())
                         sent = await channel.send(errmsg)
                         await sent.add_reaction("❎")
-    elif u_id != client.user.id and g_id in _vars.following:
+    elif u_id != client.user.id and g_id in _vars.following and orig:
         if not edit:
             if _vars.following[g_id]["follow"]:
                 checker = orig
