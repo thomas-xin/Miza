@@ -25,9 +25,10 @@ class customAudio(discord.AudioSource):
             "pitch": 0,
             "speed": 1,
             "bassboost": 0,
-            "reverbdelay": 16 / 5,
+            "chorus": 0,
             "loop": False,
             "shuffle": False,
+            "quiet": False,
             "position": 0,
             }
 
@@ -59,12 +60,13 @@ class customAudio(discord.AudioSource):
             except:
                 print(traceback.format_exc())
         if source is not None:
-            if not isValid(self.stats["pitch"]) or not isValid(self.stats["speed"]):
+            if not isValid(self.stats["pitch"]) or not isValid(self.stats["speed"]) or not isValid(self.stats["chorus"]):
                 self.source = None
                 self.file = None
                 return
             d = {"source": source}
             pitchscale = 2 ** (self.stats["pitch"] / 12)
+            chorus = min(32, abs(self.stats["chorus"]))
             if pitchscale != 1 or self.stats["speed"] != 1:
                 speed = self.speed / pitchscale
                 speed = max(0.005, speed)
@@ -77,10 +79,45 @@ class customAudio(discord.AudioSource):
                     speed /= 0.6
                 opts += "atempo=" + str(speed)
                 d["options"] = "-af " + opts
+            else:
+                d["options"] = ""
             if pitchscale != 1:
                 d["options"] += ",asetrate=r=" + str(48000 * pitchscale)
             if self.reverse:
                 d["options"] += ",areverse"
+            if chorus:
+                if not d["options"]:
+                    d["options"] = "-af "
+                else:
+                    d["options"] += ","
+                A = ""
+                B = ""
+                C = ""
+                D = ""
+                for i in range(ceil(chorus)):
+                    j = i & 1
+                    i *= chorus / ceil(chorus)
+                    if i:
+                        A += "|"
+                        B += "|"
+                        C += "|"
+                        D += "|"
+                    delay = (20 + i * tau * (j * 2 - 1)) % 40 + 10
+                    A += str(round(delay, 3))
+                    decay = (1 + i * 0.1 * (j * 2 - 1)) % 2
+                    B += str(round(decay, 3))
+                    speed = (2 + i * 0.61 * (j * 2 - 1)) % 4
+                    C += str(round(speed, 3))
+                    depth = (1.5 + i * 0.26 * (j * 2 - 1)) % 3
+                    D += str(round(depth, 3))
+                b = 0.5 / sqrt(chorus + 1)
+                d["options"] += (
+                    "\"chorus=1:" + str(round(b, 3)) + ":"
+                    + A + ":"
+                    + B + ":"
+                    + C + ":"
+                    + D + "\""
+                    )
             if pos != 0:
                 d["before_options"] = "-ss " + str(pos)
             #print(d)
@@ -153,8 +190,8 @@ class customAudio(discord.AudioSource):
             reverb = sndset["reverb"]
             pitch = sndset["pitch"]
             bassboost = sndset["bassboost"]
-            delay = min(400, max(2, round(sndset["reverbdelay"] * 5)))
-            if volume == 1 and reverb == pitch == bassboost == 0 and delay == 16:
+            delay = 16 #min(400, max(2, round(sndset["reverbdelay"] * 5)))
+            if volume == 1 and reverb == pitch == bassboost == 0:
                 self.buffer = []
                 self.feedback = None
                 self.bassadj = None
@@ -1142,13 +1179,14 @@ async def handleUpdate(force=False):
                                     auds.new(path)
                                     if not vc.is_playing():
                                         vc.play(auds, after=sendUpdateRequest)
-                                    channel = await client.fetch_channel(auds.channel)
-                                    sent = await channel.send(
-                                        "```css\n🎵 Now playing "
-                                        + uniStr(noSquareBrackets(name))
-                                        + ", added by " + uniStr(added_by) + "! 🎵```"
-                                        )
-                                    await sent.add_reaction("❎")
+                                    if not auds.stats["quiet"]:
+                                        channel = await client.fetch_channel(auds.channel)
+                                        sent = await channel.send(
+                                            "```css\n🎵 Now playing "
+                                            + uniStr(noSquareBrackets(name))
+                                            + ", added by " + uniStr(added_by) + "! 🎵```"
+                                            )
+                                        await sent.add_reaction("❎")
                                 except FileNotFoundError:
                                     pass
                                 auds.preparing = False

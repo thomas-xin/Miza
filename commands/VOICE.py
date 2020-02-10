@@ -466,7 +466,7 @@ class remove:
         self.name = ["rem", "skip", "s"]
         self.min_level = 0
         self.description = "Removes an entry from the voice channel queue."
-        self.usage = "<0:queue_position[0]> <force(?f)>"
+        self.usage = "<0:queue_position[0]> <force(?f)> <vote(?v)>"
 
     async def __call__(self, client, user, _vars, args, argv, guild, flags, **void):
         found = False
@@ -526,10 +526,12 @@ class remove:
             except LookupError:
                 raise IndexError("Entry " + uniStr(pos) + " is out of range.")
             if type(curr["skips"]) is list:
-                if "f" in flags or user.id == curr["u_id"]:
+                if "f" in flags or user.id == curr["u_id"] and not "v" in flags:
                     curr["skips"] = None
                 elif user.id not in curr["skips"]:
                     curr["skips"].append(user.id)
+            elif "v" in flags:
+                curr["skips"] = [user.id]
             else:
                 curr["skips"] = None
             if curr["skips"] is not None:
@@ -659,7 +661,7 @@ class dump:
             for k in d["stats"]:
                 if k not in auds.stats:
                     d["stats"].pop(k)
-                if k in "loop shuffle":
+                if k in "loop shuffle quiet":
                     d["stats"][k] = bool(d["stats"][k])
                 else:
                     d["stats"][k] = float(d["stats"][k])
@@ -681,13 +683,13 @@ class volume:
         self.min_level = 0
         self.description = "Changes the current audio settings for this server."
         self.usage = (
-            "<value[]> <volume()(?v)> <reverb(?r)> <speed(?s)> <pitch(?p)> "
-            + "<bassboost(?b)> <reverbdelay(?d)> <loop(?l)> <shuffle(?x)> <clear(?c)>"
+            "<value[]> <volume()(?v)> <reverb(?r)> <speed(?s)> <pitch(?p)> <bassboost(?b)>"
+            + " <chorus(?c)> <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)>"
             )
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        if "c" in flags:
+        if "d" in flags:
             op = None
         elif "v" in flags:
             op = "volume"
@@ -697,14 +699,16 @@ class volume:
             op = "pitch"
         elif "b" in flags:
             op = "bassboost"
-        elif "d" in flags:
-            op = "reverbdelay"
+        elif "c" in flags:
+            op = "chorus"
         elif "r" in flags:
             op = "reverb"
         elif "l" in flags:
             op = "loop"
         elif "x" in flags:
             op = "shuffle"
+        elif "q" in flags:
+            op = "quiet"
         else:
             op = "settings"
         if not argv and op is not None:
@@ -714,7 +718,7 @@ class volume:
                     + str(auds.stats).replace("'", '"') + "```"
                     )
             orig = _vars.queue[guild.id].stats[op]
-            if op in "loop shuffle":
+            if op in "loop shuffle quiet":
                 num = bool(orig)
             else:
                 num = round(100. * orig, 9)
@@ -742,12 +746,12 @@ class volume:
         val = roundMin(float(_vars.evalMath(argv) / 100))
         orig = round(origVol[op] * 100, 9)
         new = round(val * 100, 9)
-        if op in "loop shuffle":
+        if op in "loop shuffle quiet":
             origVol[op] = new = bool(val)
             orig = bool(orig)
         else:
             origVol[op] = val
-        if op in "speed pitch":
+        if op in "speed pitch chorus":
             auds.new(auds.file, auds.stats["position"])
         return (
             "```css\nChanged audio " + op + " in " + uniStr(guild.name)
