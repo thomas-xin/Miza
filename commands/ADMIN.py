@@ -143,17 +143,15 @@ class ban:
                 try:
                     await guild.ban(t_user, reason=msg, delete_message_days=0)
                 except Exception as ex:
-                    response += "\n" + repr(ex)
+                    response += "\nError: " + repr(ex)
                     continue
             g_bans[t_user.id] = [secs + dtime, channel.id]
             doParallel(_vars.update)
-            response = None
             if is_banned:
                 response += (
                     "\nUpdated ban for " + uniStr(t_user.name)
                     + " from " + uniStr(sec2Time(is_banned))
-                    + " to " + uniStr(sec2Time(secs))
-                    + "."
+                    + " to " + uniStr(sec2Time(secs)) + "."
                 )
             elif tm >= 0:
                 response += (
@@ -163,7 +161,7 @@ class ban:
                 )
             if msg:
                 response += " Reason: " + uniStr(msg) + "."
-        if response and "h" not in flags:
+        if len(response) > 6 and "h" not in flags:
             return response + "```"
 
 

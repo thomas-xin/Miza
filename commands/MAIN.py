@@ -107,7 +107,10 @@ class help:
                             "\n~" + com.__name__
                             + "\nEffect: " + com.description
                             + "\nUsage: ~" + name + " " + usage)
-            return "Commands for **" + user.name + "** in **" + c_name + "**:\n```xml\n" + "\n".join(show) + "```", 1
+            return (
+                "Commands for **" + user.name + "** in **" + c_name
+                + "**:\n```xml\n" + "\n".join(show) + "```", 1
+                )
         return "\n".join(show), 1
 
 
@@ -257,7 +260,10 @@ class enableCommand:
                     doParallel(_vars.update)
                     if "h" in flags:
                         return
-                    return "```css\nEnabled command category " + uniStr(catg) + " in " + uniStr(channel.name) + ".```"
+                    return (
+                        "```css\nEnabled command category " + uniStr(catg)
+                        + " in " + uniStr(channel.name) + ".```"
+                        )
                 if "d" in flags:
                     if catg not in enabled:
                         raise IndexError(
@@ -268,7 +274,10 @@ class enableCommand:
                     doParallel(_vars.update)
                     if "h" in flags:
                         return
-                    return "```css\nDisabled command category " + uniStr(catg) + " in " + uniStr(channel.name) + ".```"
+                    return (
+                        "```css\nDisabled command category " + uniStr(catg)
+                        + " in " + uniStr(channel.name) + ".```"
+                        )
                 return (
                     "```css\nCommand category " + uniStr(catg)
                     + " is currently" + uniStr(" not" * (catg not in enabled))
@@ -367,8 +376,10 @@ class loop:
                     raise PermissionError("Insufficient priviliges to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
         for i in range(iters):
+            loop = i < iters - 1
+            #print(loop)
             asyncio.create_task(callback(
-                message, func, cb_argv=func2, cb_flags=flags, loop=i != iters - 1
+                message, func, cb_argv=func2, cb_flags=flags, loop=loop,
                 ))
         if not "h" in flags:
             return "```css\nLooping [" + func + "] " + uniStr(iters) + " times...```"

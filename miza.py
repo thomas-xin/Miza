@@ -900,9 +900,12 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         for i in temp:
             if not len(i.replace(" ", "")):
                 temp.remove(i)
-        for r in _vars.following[g_id]["reacts"]:
-            if r in temp:
-                await message.add_reaction(_vars.following[g_id]["reacts"][r])
+        try:
+            for r in _vars.following[g_id]["reacts"]:
+                if r in temp:
+                    await message.add_reaction(_vars.following[g_id]["reacts"][r])
+        except discord.errors.Forbidden:
+            pass
         currentSchedule = _vars.scheduled.get(channel.id, {})
         for k in currentSchedule:
             if k in " ".join(temp):
@@ -1075,7 +1078,6 @@ async def handleUpdate(force=False):
                             try:
                                 u_target = await client.fetch_user(b)
                                 g_target = await client.fetch_guild(g)
-                                bans[g].pop(b)
                                 try:
                                     await g_target.unban(u_target)
                                     c_target = await client.fetch_channel(bans[g][b][1])
@@ -1091,8 +1093,9 @@ async def handleUpdate(force=False):
                                         + " from " + uniStr(g_target.name) + ".```"
                                         )
                                     print(traceback.format_exc())
-                            except KeyError:
-                                pass
+                                bans[g].pop(b)
+                            except:
+                                print(traceback.format_exc())
             if changed:
                 _vars.update()
         ytdl = None
