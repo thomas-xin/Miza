@@ -138,7 +138,7 @@ class videoDownloader:
         
     def downloadSingle(self, i, durc=None):
         new_opts = dict(self.ydl_opts)
-        fn = "cache/" + i["id"].replace("@", "") + ".mp3"
+        fn = "cache/" + i["id"] + ".mp3"
         new_opts["outtmpl"] = fn
         downloader = youtube_dl.YoutubeDL(new_opts)
         try:
@@ -623,7 +623,7 @@ class dump:
         if not argv and not len(message.attachments):
             q = copy.deepcopy(auds.queue)
             for e in q:
-                e["id"] = e["id"].replace("@", "")
+                e["id"] = e["id"]
                 e.pop("added by")
                 e.pop("u_id")
                 e.pop("skips")
@@ -683,8 +683,8 @@ class volume:
         self.min_level = 0
         self.description = "Changes the current audio settings for this server."
         self.usage = (
-            "<value[]> <volume()(?v)> <reverb(?r)> <speed(?s)> <pitch(?p)> <bassboost(?b)>"
-            + " <chorus(?c)> <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)>"
+            "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <bassboost(?b)> <reverb(?r)> <chorus(?c)>"
+            + " <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)>"
             )
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, **void):

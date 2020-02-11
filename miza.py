@@ -113,7 +113,7 @@ class customAudio(discord.AudioSource):
                     D += str(round(depth, 3))
                 b = 0.5 / sqrt(ceil(chorus + 1))
                 d["options"] += (
-                    "\"chorus=1:" + str(round(b, 3)) + ":"
+                    "\"chorus=0.5:" + str(round(b, 3)) + ":"
                     + A + ":"
                     + B + ":"
                     + C + ":"
@@ -158,7 +158,9 @@ class customAudio(discord.AudioSource):
                     shuffle(q)
                     q.insert(0, t2)
             if self.stats["loop"] and loop:
-                temp["id"] = temp["id"].replace("@", "")
+                temp["id"] = temp["id"]
+                if "download" in temp:
+                    temp.pop("download")
                 q.append(temp)
             self.preparing = False
             return len(q)
@@ -1136,7 +1138,7 @@ async def handleUpdate(force=False):
                             continue
                         asyncio.create_task(research(auds, ytdl))
                         for e in q:
-                            e_id = e["id"].replace("@", "")
+                            e_id = e["id"]
                             if not e_id:
                                 q.remove(e)
                                 continue
@@ -1145,10 +1147,10 @@ async def handleUpdate(force=False):
                         if len(q):
                             for i in range(2):
                                 if i < len(q):
-                                    e_id = q[i]["id"].replace("@", "")
+                                    e_id = q[i]["id"]
                                     should_cache.append(e_id)
-                                    if q[i]["id"][-1] != "@":
-                                        q[i]["id"] = e_id + "@"
+                                    if not q[i].get("download", 0):
+                                        q[i]["download"] = 1
                                         if e_id not in _vars.audiocache:
                                             search = e_id + ".mp3"
                                             found = False
@@ -1164,16 +1166,16 @@ async def handleUpdate(force=False):
                                                     )
                                             else:
                                                 q[i]["duration"] = ytdl.getDuration("cache/" + search)
-                            if q[0]["id"][0] != "@" and not playing:
+                            if not q[0].get("download", 0) > 1 and not playing:
                                 try:
-                                    path = "cache/" + q[0]["id"].replace("@", "") + ".mp3"
+                                    path = "cache/" + q[0]["id"] + ".mp3"
                                     f = open(path, "rb")
                                     minl = 64
                                     b = f.read(minl)
                                     f.close()
                                     if len(b) < minl:
                                         raise FileNotFoundError
-                                    q[0]["id"] = "@" + q[0]["id"]
+                                    q[0]["download"] = 2
                                     name = q[0]["name"]
                                     added_by = q[0]["added by"]
                                     auds = _vars.queue[guild.id]

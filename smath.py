@@ -1373,7 +1373,7 @@ class _parallel:
                 try:
                     while self.actions:
                         action = self.actions[0]
-                        self.actions = self.actions[1:]
+                        self.actions.pop(0)
                         performAction(action)
                     self.state = -1
                     time.sleep(0.007)
@@ -1424,6 +1424,7 @@ def doParallel(func, data_in=None, data_out=[0], start=0, end=None,
                     break
                 t += 1
             while p.state > 1 or len(p.actions) >= maxq:
+                time.sleep(0.001)
                 d = xrand(processes.max)
                 p = ps[d]
         p(func, data_in, data_out, i, delay)
