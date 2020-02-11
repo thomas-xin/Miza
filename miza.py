@@ -1,6 +1,5 @@
 import discord, ast, os, sys, asyncio, datetime, json, shlex, traceback
 import urllib.request
-from scipy.signal import butter, sosfilt, resample
 from smath import *
 
 
@@ -10,294 +9,6 @@ sys.path.insert(1, "misc")
 client = discord.Client(
     max_messages=2000,
     )
-
-
-class customAudio(discord.AudioSource):
-    
-    length = 1920
-    empty = numpy.zeros(length >> 1, float)
-    bass = butter(2, 1/7, btype="low", output="sos")
-    treble = butter(2, 1/7, btype="high", output="sos")
-    filt = butter(1, 1/4, btype="low", output="sos")
-    defaults = {
-            "volume": 1,
-            "reverb": 0,
-            "pitch": 0,
-            "speed": 1,
-            "bassboost": 0,
-            "chorus": 0,
-            "loop": False,
-            "shuffle": False,
-            "quiet": False,
-            "position": 0,
-            }
-
-    def __init__(self, c_id):
-        self.stats = dict(self.defaults)
-        self.new()
-        self.queue = []
-        self.channel = c_id
-        self.buffer = []
-        self.feedback = None
-        self.bassadj = None
-        self.prev = None
-        self.searching = False
-        self.preparing = False
-        self.player = None
-
-    def new(self, source=None, pos=0):
-        self.reverse = self.stats["speed"] < 0
-        self.speed = max(0.01, abs(self.stats["speed"]))
-        if self.speed == 0.01:
-            self.speed = 1
-            self.paused = 2
-        else:
-            self.paused = False
-        self.stats["position"] = pos
-        self.is_playing = source is not None
-        if getattr(self, "source", None) is not None:
-            try:
-                self.source.cleanup()
-            except:
-                print(traceback.format_exc())
-        if source is not None:
-            if not isValid(self.stats["pitch"]) or not isValid(self.stats["speed"]) or not isValid(self.stats["chorus"]):
-                self.source = None
-                self.file = None
-                return
-            d = {"source": source}
-            pitchscale = 2 ** (self.stats["pitch"] / 12)
-            chorus = min(32, abs(self.stats["chorus"]))
-            if pitchscale != 1 or self.stats["speed"] != 1:
-                speed = self.speed / pitchscale
-                speed = max(0.005, speed)
-                opts = ""
-                while speed > 1.8:
-                    opts += "atempo=1.8,"
-                    speed /= 1.8
-                while speed < 0.6:
-                    opts += "atempo=0.6,"
-                    speed /= 0.6
-                opts += "atempo=" + str(speed)
-                d["options"] = "-af " + opts
-            else:
-                d["options"] = ""
-            if pitchscale != 1:
-                d["options"] += ",asetrate=r=" + str(48000 * pitchscale)
-            if self.reverse:
-                d["options"] += ",areverse"
-            if chorus:
-                if not d["options"]:
-                    d["options"] = "-af "
-                else:
-                    d["options"] += ","
-                A = ""
-                B = ""
-                C = ""
-                D = ""
-                for i in range(ceil(chorus)):
-                    neg = ((i & 1) << 1) - 1
-                    i = 1 + i >> 1
-                    i *= chorus / ceil(chorus)
-                    if i:
-                        A += "|"
-                        B += "|"
-                        C += "|"
-                        D += "|"
-                    delay = (25 + i * tau * neg) % 39 + 18
-                    A += str(round(delay, 3))
-                    decay = (0.125 + i * 0.03 * neg) % 0.25 + 0.25
-                    B += str(round(decay, 3))
-                    speed = (2 + i * 0.61 * neg) % 4.5 + 0.5
-                    C += str(round(speed, 3))
-                    depth = (1.5 + i * 0.43 * neg) % 4 + 0.5
-                    D += str(round(depth, 3))
-                b = 0.5 / sqrt(ceil(chorus + 1))
-                d["options"] += (
-                    "\"chorus=0.5:" + str(round(b, 3)) + ":"
-                    + A + ":"
-                    + B + ":"
-                    + C + ":"
-                    + D + "\""
-                    )
-            if pos != 0:
-                d["before_options"] = "-ss " + str(pos)
-            print(d)
-            self.is_loading = True
-            self.source = discord.FFmpegPCMAudio(**d)
-            self.file = source
-        else:
-            self.source = None
-            self.file = None
-        self.is_loading = False
-        self.stats["position"] = pos
-        if pos == 0:
-            if self.reverse and len(self.queue):
-                self.stats["position"] = self.queue[0]["duration"]
-
-    def seek(self, pos):
-        duration = self.queue[0]["duration"]
-        pos = max(0, pos)
-        if pos >= duration:
-            self.new()
-            return duration
-        self.new(self.file, pos)
-        self.stats["position"] = pos
-        return self.stats["position"]
-
-    def advance(self, loop=True):
-        q = self.queue
-        if len(q):
-            if self.stats["loop"]:
-                temp = q[0]
-            self.prev = q[0]["id"]
-            q.pop(0)
-            if self.stats["shuffle"]:
-                if len(q):
-                    t2 = q[0]
-                    q.pop(0)
-                    shuffle(q)
-                    q.insert(0, t2)
-            if self.stats["loop"] and loop:
-                temp["id"] = temp["id"]
-                if "download" in temp:
-                    temp.pop("download")
-                q.append(temp)
-            self.preparing = False
-            return len(q)
-        if self.player:
-            self.player["time"] = 0
-
-    async def updatePlayer(self):
-        curr = self.player
-        self.stats["quiet"] &= 1
-        if curr is not None:
-            self.stats["quiet"] |= 2
-            try:
-                if not curr["message"].content:
-                    raise EOFError
-            except:
-                self.player = None
-                print(traceback.format_exc())
-            if time.time() > curr["time"]:
-                curr["time"] = inf
-                try:
-                    await reactCallback(curr["message"], "❎", client.user)
-                except discord.errors.NotFound:
-                    self.player = None
-                    pass
-        
-    def read(self):
-        try:
-            if self.is_loading:
-                self.is_playing = True
-                raise EOFError
-            if self.paused:
-                self.is_playing = True
-                raise EOFError
-            temp = self.source.read()
-            if not len(temp):
-                sendUpdateRequest(True)
-                raise EOFError
-            self.stats["position"] = round(
-                self.stats["position"] + self.speed / 50 * (self.reverse * -2 + 1), 4
-                )
-            self.is_playing = True
-        except:
-            if not self.paused and not self.is_loading:
-                if self.is_playing:
-                    sendUpdateRequest(True)
-                self.new()
-            temp = numpy.zeros(self.length, numpy.uint16).tobytes()
-        try:
-            sndset = self.stats
-            volume = sndset["volume"]
-            reverb = sndset["reverb"]
-            pitch = sndset["pitch"]
-            bassboost = sndset["bassboost"]
-            delay = 16 #min(400, max(2, round(sndset["reverbdelay"] * 5)))
-            if volume == 1 and reverb == pitch == bassboost == 0:
-                self.buffer = []
-                self.feedback = None
-                self.bassadj = None
-                return temp
-            array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
-            size = self.length >> 1
-            if not isValid(volume) or not isValid(reverb) or not isValid(bassboost) or not isValid(pitch):
-                array = numpy.random.rand(self.length) * 65536 - 32768
-            elif volume != 1:
-                try:
-                    array *= volume
-                except:
-                    array = numpy.random.rand(self.length) * 65536 - 32768
-            left, right = array[::2], array[1::2]
-            if bassboost:
-                try:
-                    lbass = numpy.array(left)
-                    rbass = numpy.array(right)
-                    if self.bassadj is not None:
-                        if bassboost > 0:
-                            filt = self.bass
-                        else:
-                            filt = self.treble
-                        left += sosfilt(filt, numpy.concatenate((self.bassadj[0], left)))[size-16:-16] * bassboost
-                        right += sosfilt(filt, numpy.concatenate((self.bassadj[1], right)))[size-16:-16] * bassboost
-                    self.bassadj = [lbass, rbass]
-                except:
-                    print(traceback.format_exc())
-            else:
-                self.bassadj = None
-            if reverb:
-                try:
-                    if not len(self.buffer):
-                        self.buffer = [[self.empty] * 2] * delay
-                    r = 18
-                    p1 = round(size * (0.5 - 2 / r))
-                    p2 = round(size * (0.5 - 1 / r))
-                    p3 = round(size * 0.5)
-                    p4 = round(size * (0.5 + 1 / r))
-                    p5 = round(size * (0.5 + 2 / r))
-                    lfeed = (
-                        + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 24
-                        + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
-                        + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
-                        + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
-                        + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 24
-                        ) * reverb
-                    rfeed = (
-                        + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 24
-                        + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
-                        + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
-                        + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
-                        + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 24
-                        ) * reverb
-                    if self.feedback is not None:
-                        left -= sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size-16:-16]
-                        right -= sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size-16:-16]
-                    self.feedback = (lfeed, rfeed)
-                    #array = numpy.convolve(array, resizeVector(self.buffer[0], len(array) * 2))
-                    a = 1 / 16
-                    b = 1 - a
-                    self.buffer.append((left * a + right * b, left * b + right * a))
-                except:
-                    print(traceback.format_exc())
-                self.buffer = self.buffer[-delay:]
-            else:
-                self.buffer = []
-                self.feedback = None
-            array = numpy.stack((left, right), axis=-1).flatten()
-            numpy.clip(array, -32767, 32767, out=array)
-            temp = array.astype(numpy.int16).tobytes()
-        except Exception as ex:
-            print(traceback.format_exc())
-        return temp
-
-    def is_opus(self):
-        return False
-
-    def cleanup(self):
-        if getattr(self, "source", None) is not None:
-            return self.source.cleanup()
     
 
 from matplotlib import use as plot_sys
@@ -418,7 +129,6 @@ class __globals:
         "handleUpdate",
         "changeColour",
         "checkDelete",
-        "reactCallback",
         "sendUpdateRequest",
         "research",
         "on_ready",
@@ -496,6 +206,7 @@ class __globals:
     builtins = {i: getattr(__builtins__, i) for i in builtins_list}
     savedata = "data.json"
     authdata = "auth.json"
+    client = client
 
     def __init__(self):
         if not os.path.exists("cache/"):
@@ -519,6 +230,7 @@ class __globals:
         self.msgFollow = {}
         self.audiocache = {}
         self.clearAudioCache()
+        self.message_cache = {}
 
     async def fetch_user(self, u_id):
         try:
@@ -546,6 +258,18 @@ class __globals:
         except:
             channel = await client.fetch_channel(c_id)
         return channel
+
+    async def fetch_message(self, m_id, channel=None, user=None):
+        if m_id in self.message_cache:
+            return self.message_cache[m_id]
+        if user is not None and user.id != client.user.id:
+            message = await user.fetch_message(m_id)
+            self.message_cache[m_id] = message
+            return message
+        if channel is not None:
+            message = await channel.fetch_message(m_id)
+            self.message_cache[m_id] = message
+            return message
 
     def loadSave(self):
         try:
@@ -643,9 +367,6 @@ class __globals:
                 except Exception as ex:
                     print(traceback.format_exc())
 
-    def createPlayer(self, c_id):
-        return customAudio(c_id)
-
     def verifyID(self, value):
         return int(str(value).replace("<", "").replace(">", "").replace("@", "").replace("!", ""))
 
@@ -725,6 +446,52 @@ class __globals:
     def evalMath(self, f):
         self.verifyCommand(f)
         return eval(f, self.stored_vars)
+
+    async def reactCallback(self, message, reaction, user):
+        if message.author.id == client.user.id:
+            suspended = self.bans[0].get(user.id, False)
+            if suspended:
+                return
+            u_perm = self.getPerms(user.id, message.guild)
+            msg = message.content
+            if msg[:3] != "```" or len(msg) <= 3:
+                return
+            msg = msg[3:]
+            while msg[0] == "\n":
+                msg = msg[1:]
+            check = "callback-"
+            msg = msg.split("\n")[0]
+            if msg[:len(check)] == check:
+                msg = msg[len(check):]
+                args = msg.split("-")
+                catx = args[0]
+                func = args[1]
+                vals = args[2]
+                argv = "-".join(args[3:])
+                catg = self.categories[catx]
+                for f in catg:
+                    if f.__name__ == func:
+                        try:
+                            await asyncio.wait_for(
+                                f._callback_(
+                                    client=client,
+                                    message=message,
+                                    channel=message.channel,
+                                    guild=message.guild,
+                                    reaction=reaction,
+                                    user=user,
+                                    perm=u_perm,
+                                    vals=vals,
+                                    argv=argv,
+                                    _vars=self,
+                                    ),
+                                timeout=self.timeout)
+                            return
+                        except Exception as ex:
+                            print(traceback.format_exc())
+                            killThreads()
+                            sent = await message.channel.send("```python\nError: " + repr(ex) + "\n```")
+                            await sent.add_reaction("❎")
 
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_flags=None, loop=False):
@@ -1004,6 +771,9 @@ async def outputLoop():
                 continue
             if proc[0] == "!":
                 proc = proc[1:]
+                if not proc:
+                    ch = None
+                    continue
                 try:
                     chanID = int(proc)
                     _vars.current_channel = await _vars.fetch_channel(chanID)
@@ -1023,7 +793,14 @@ async def outputLoop():
                 if ch is not None:
                     await ch.send(proc)
                 else:
-                    print("Channel does not exist.")
+                    try:
+                        print(eval(proc))
+                    except:
+                        try:
+                            exec(proc)
+                            print(proc + " successfully executed!")
+                        except:
+                            print(traceback.format_exc())
         except:
             print(traceback.format_exc())
 
@@ -1173,7 +950,7 @@ async def handleUpdate(force=False):
                     continue
                 if not cnt or getattr(auds, "dead", 0):
                     try:
-                        channel = await _vars.fetch_channel(auds.channel)
+                        channel = auds.channel
                         _vars.queue.pop(guild.id)
                         msg = "```css\n🎵 Successfully disconnected from "+ uniStr(guild.name) + ". 🎵```"
                         sent = await channel.send(msg)
@@ -1236,7 +1013,7 @@ async def handleUpdate(force=False):
                                     if not vc.is_playing():
                                         vc.play(auds, after=sendUpdateRequest)
                                     if not auds.stats["quiet"]:
-                                        channel = await _vars.fetch_channel(auds.channel)
+                                        channel = auds.channel
                                         sent = await channel.send(
                                             "```css\n🎵 Now playing "
                                             + uniStr(noSquareBrackets(name))
@@ -1329,79 +1106,31 @@ async def checkDelete(message, reaction, user):
             await handleUpdate()
 
 
-async def reactCallback(message, reaction, user):
-    if message.author.id == client.user.id:
-        suspended = _vars.bans[0].get(user.id, False)
-        if suspended:
-            return
-        u_perm = _vars.getPerms(user.id, message.guild)
-        msg = message.content
-        if msg[:3] != "```" or len(msg) <= 3:
-            return
-        msg = msg[3:]
-        while msg[0] == "\n":
-            msg = msg[1:]
-        check = "callback-"
-        msg = msg.split("\n")[0]
-        if msg[:len(check)] == check:
-            msg = msg[len(check):]
-            args = msg.split("-")
-            catx = args[0]
-            func = args[1]
-            vals = args[2]
-            argv = "-".join(args[3:])
-            catg = _vars.categories[catx]
-            for f in catg:
-                if f.__name__ == func:
-                    try:
-                        await asyncio.wait_for(
-                            f._callback_(
-                                client=client,
-                                message=message,
-                                channel=message.channel,
-                                guild=message.guild,
-                                reaction=reaction,
-                                user=user,
-                                perm=u_perm,
-                                vals=vals,
-                                argv=argv,
-                                _vars=_vars,
-                                ),
-                            timeout=_vars.timeout)
-                        return
-                    except Exception as ex:
-                        print(traceback.format_exc())
-                        killThreads()
-                        sent = await message.channel.send("```python\nError: " + repr(ex) + "\n```")
-                        await sent.add_reaction("❎")
-
-
-@client.event
-async def on_reaction_add(reaction, user):
-    message = reaction.message
-    if user.id != client.user.id:
-        asyncio.create_task(checkDelete(message, reaction, user))
-
-
-@client.event
-async def on_reaction_remove(reaction, user):
-    message = reaction.message
-    if user.id != client.user.id:
-        asyncio.create_task(checkDelete(message, reaction, user))
-        await reactCallback(message, reaction, user)
-
-
 @client.event
 async def on_raw_reaction_add(payload):
     try:
         channel = await _vars.fetch_channel(payload.channel_id)
         user = await _vars.fetch_user(payload.user_id)
-        message = await channel.fetch_message(payload.message_id)
+        message = await _vars.fetch_message(payload.message_id, channel=channel, user=user)
     except discord.NotFound:
         return
     if user.id != client.user.id:
         reaction = str(payload.emoji)
-        await reactCallback(message, reaction, user)
+        await _vars.reactCallback(message, reaction, user)
+        asyncio.create_task(checkDelete(message, reaction, user))
+
+
+@client.event
+async def on_raw_reaction_remove(payload):
+    try:
+        channel = await _vars.fetch_channel(payload.channel_id)
+        user = await _vars.fetch_user(payload.user_id)
+        message = await _vars.fetch_message(payload.message_id, channel=channel, user=user)
+    except discord.NotFound:
+        return
+    if user.id != client.user.id:
+        reaction = str(payload.emoji)
+        await _vars.reactCallback(message, reaction, user)
         asyncio.create_task(checkDelete(message, reaction, user))
 
 
@@ -1439,7 +1168,7 @@ async def handleMessage(message, edit=True):
 
 @client.event
 async def on_message(message):
-    await reactCallback(message, None, message.author)
+    await _vars.reactCallback(message, None, message.author)
     await handleUpdate()
     await handleMessage(message, False)
     await handleUpdate(True)
@@ -1460,12 +1189,12 @@ async def on_raw_message_edit(payload):
     if payload.cached_message is None:
         try:
             channel = await _vars.fetch_channel(payload.data["channel_id"])
-            message = await channel.fetch_message(payload.message_id)
+            message = await _vars.fetch_message(payload.message_id, channel=channel)
         except:
             for guild in client.guilds:
                 for channel in guild.text_channels:
                     try:
-                        message = await channel.fetch_message(payload.message_id)
+                        message = await _vars.fetch_message(payload.message_id, channel=channel)
                     except Exception as ex:
                         print(traceback.format_exc())
     if message:

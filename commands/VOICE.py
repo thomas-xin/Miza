@@ -1,6 +1,300 @@
 import youtube_dl, asyncio, discord, time, os, urllib, json, copy, traceback
 from subprocess import check_output, CalledProcessError, STDOUT
+from scipy.signal import butter, sosfilt
 from smath import *
+
+
+class customAudio(discord.AudioSource):
+    
+    length = 1920
+    empty = numpy.zeros(length >> 1, float)
+    bass = butter(2, 1/7, btype="low", output="sos")
+    treble = butter(2, 1/7, btype="high", output="sos")
+    filt = butter(1, 1/4, btype="low", output="sos")
+    defaults = {
+            "volume": 1,
+            "reverb": 0,
+            "pitch": 0,
+            "speed": 1,
+            "bassboost": 0,
+            "chorus": 0,
+            "loop": False,
+            "shuffle": False,
+            "quiet": False,
+            "position": 0,
+            }
+
+    def __init__(self, channel, _vars):
+        try:
+            self.stats = dict(self.defaults)
+            self.new()
+            self.queue = []
+            self.channel = channel
+            self.buffer = []
+            self.feedback = None
+            self.bassadj = None
+            self.prev = None
+            self.searching = False
+            self.preparing = False
+            self.player = None
+            self._vars = _vars
+            _vars.queue[channel.guild.id] = self
+        except:
+            print(traceback.format_exc())
+
+    def new(self, source=None, pos=0):
+        self.reverse = self.stats["speed"] < 0
+        self.speed = max(0.01, abs(self.stats["speed"]))
+        if self.speed == 0.01:
+            self.speed = 1
+            self.paused = 2
+        else:
+            self.paused = False
+        self.stats["position"] = pos
+        self.is_playing = source is not None
+        if getattr(self, "source", None) is not None:
+            try:
+                self.source.cleanup()
+            except:
+                print(traceback.format_exc())
+        if source is not None:
+            if not isValid(self.stats["pitch"] * self.stats["speed"] * self.stats["chorus"]):
+                self.source = None
+                self.file = None
+                return
+            d = {"source": source}
+            pitchscale = 2 ** (self.stats["pitch"] / 12)
+            chorus = min(32, abs(self.stats["chorus"]))
+            if pitchscale != 1 or self.stats["speed"] != 1:
+                speed = self.speed / pitchscale
+                speed = max(0.005, speed)
+                opts = ""
+                while speed > 1.8:
+                    opts += "atempo=1.8,"
+                    speed /= 1.8
+                while speed < 0.6:
+                    opts += "atempo=0.6,"
+                    speed /= 0.6
+                opts += "atempo=" + str(speed)
+                d["options"] = "-af " + opts
+            else:
+                d["options"] = ""
+            if pitchscale != 1:
+                d["options"] += ",asetrate=r=" + str(48000 * pitchscale)
+            if self.reverse:
+                d["options"] += ",areverse"
+            if chorus:
+                if not d["options"]:
+                    d["options"] = "-af "
+                else:
+                    d["options"] += ","
+                A = ""
+                B = ""
+                C = ""
+                D = ""
+                for i in range(ceil(chorus)):
+                    neg = ((i & 1) << 1) - 1
+                    i = 1 + i >> 1
+                    i *= chorus / ceil(chorus)
+                    if i:
+                        A += "|"
+                        B += "|"
+                        C += "|"
+                        D += "|"
+                    delay = (25 + i * tau * neg) % 39 + 18
+                    A += str(round(delay, 3))
+                    decay = (0.125 + i * 0.03 * neg) % 0.25 + 0.25
+                    B += str(round(decay, 3))
+                    speed = (2 + i * 0.61 * neg) % 4.5 + 0.5
+                    C += str(round(speed, 3))
+                    depth = (1.5 + i * 0.43 * neg) % 4 + 0.5
+                    D += str(round(depth, 3))
+                b = 0.5 / sqrt(ceil(chorus + 1))
+                d["options"] += (
+                    "\"chorus=0.5:" + str(round(b, 3)) + ":"
+                    + A + ":"
+                    + B + ":"
+                    + C + ":"
+                    + D + "\""
+                    )
+            if pos != 0:
+                d["before_options"] = "-ss " + str(pos)
+            print(d)
+            self.is_loading = True
+            self.source = discord.FFmpegPCMAudio(**d)
+            self.file = source
+        else:
+            self.source = None
+            self.file = None
+        self.is_loading = False
+        self.stats["position"] = pos
+        if pos == 0:
+            if self.reverse and len(self.queue):
+                self.stats["position"] = self.queue[0]["duration"]
+
+    def seek(self, pos):
+        duration = self.queue[0]["duration"]
+        pos = max(0, pos)
+        if pos >= duration:
+            self.new()
+            return duration
+        self.new(self.file, pos)
+        self.stats["position"] = pos
+        return self.stats["position"]
+
+    def advance(self, loop=True):
+        q = self.queue
+        if len(q):
+            if self.stats["loop"]:
+                temp = q[0]
+            self.prev = q[0]["id"]
+            q.pop(0)
+            if self.stats["shuffle"]:
+                if len(q):
+                    t2 = q[0]
+                    q.pop(0)
+                    shuffle(q)
+                    q.insert(0, t2)
+            if self.stats["loop"] and loop:
+                temp["id"] = temp["id"]
+                if "download" in temp:
+                    temp.pop("download")
+                q.append(temp)
+            self.preparing = False
+            return len(q)
+        if self.player:
+            self.player["time"] = 0
+
+    async def updatePlayer(self):
+        curr = self.player
+        self.stats["quiet"] &= 1
+        if curr is not None:
+            self.stats["quiet"] |= 2
+            try:
+                if not curr["message"].content:
+                    raise EOFError
+            except:
+                self.player = None
+                print(traceback.format_exc())
+            if time.time() > curr["time"]:
+                curr["time"] = inf
+                try:
+                    await self._vars.reactCallback(curr["message"], "❎", self._vars.client.user)
+                except discord.errors.NotFound:
+                    self.player = None
+                    pass
+        
+    def read(self):
+        try:
+            if self.is_loading:
+                self.is_playing = True
+                raise EOFError
+            if self.paused:
+                self.is_playing = True
+                raise EOFError
+            temp = self.source.read()
+            if not len(temp):
+                sendUpdateRequest(True)
+                raise EOFError
+            self.stats["position"] = round(
+                self.stats["position"] + self.speed / 50 * (self.reverse * -2 + 1), 4
+                )
+            self.is_playing = True
+        except:
+            if not self.paused and not self.is_loading:
+                if self.is_playing:
+                    self._vars.doUpdate |= True
+                self.new()
+            temp = numpy.zeros(self.length, numpy.uint16).tobytes()
+        try:
+            volume = self.stats["volume"]
+            reverb = self.stats["reverb"]
+            pitch = self.stats["pitch"]
+            bassboost = self.stats["bassboost"]
+            chorus = self.stats["chorus"]
+            delay = 16 #min(400, max(2, round(sndset["reverbdelay"] * 5)))
+            if volume == 1 and reverb == pitch == bassboost == chorus == 0:
+                self.buffer = []
+                self.feedback = None
+                self.bassadj = None
+                return temp
+            array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
+            size = self.length >> 1
+            if not isValid(volume * reverb * bassboost * pitch):
+                array = numpy.random.rand(self.length) * 65536 - 32768
+            elif volume != 1 or chorus:
+                try:
+                    array *= volume * (bool(chorus) + 1)
+                except:
+                    array = numpy.random.rand(self.length) * 65536 - 32768
+            left, right = array[::2], array[1::2]
+            if bassboost:
+                try:
+                    lbass = numpy.array(left)
+                    rbass = numpy.array(right)
+                    if self.bassadj is not None:
+                        if bassboost > 0:
+                            filt = self.bass
+                        else:
+                            filt = self.treble
+                        left += sosfilt(filt, numpy.concatenate((self.bassadj[0], left)))[size-16:-16] * bassboost
+                        right += sosfilt(filt, numpy.concatenate((self.bassadj[1], right)))[size-16:-16] * bassboost
+                    self.bassadj = [lbass, rbass]
+                except:
+                    print(traceback.format_exc())
+            else:
+                self.bassadj = None
+            if reverb:
+                try:
+                    if not len(self.buffer):
+                        self.buffer = [[self.empty] * 2] * delay
+                    r = 18
+                    p1 = round(size * (0.5 - 2 / r))
+                    p2 = round(size * (0.5 - 1 / r))
+                    p3 = round(size * 0.5)
+                    p4 = round(size * (0.5 + 1 / r))
+                    p5 = round(size * (0.5 + 2 / r))
+                    lfeed = (
+                        + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 24
+                        + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
+                        + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
+                        + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
+                        + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 24
+                        ) * reverb
+                    rfeed = (
+                        + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 24
+                        + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
+                        + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
+                        + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
+                        + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 24
+                        ) * reverb
+                    if self.feedback is not None:
+                        left -= sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size-16:-16]
+                        right -= sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size-16:-16]
+                    self.feedback = (lfeed, rfeed)
+                    #array = numpy.convolve(array, resizeVector(self.buffer[0], len(array) * 2))
+                    a = 1 / 16
+                    b = 1 - a
+                    self.buffer.append((left * a + right * b, left * b + right * a))
+                except:
+                    print(traceback.format_exc())
+                self.buffer = self.buffer[-delay:]
+            else:
+                self.buffer = []
+                self.feedback = None
+            array = numpy.stack((left, right), axis=-1).flatten()
+            numpy.clip(array, -32767, 32767, out=array)
+            temp = array.astype(numpy.int16).tobytes()
+        except Exception as ex:
+            print(traceback.format_exc())
+        return temp
+
+    def is_opus(self):
+        return False
+
+    def cleanup(self):
+        if getattr(self, "source", None) is not None:
+            return self.source.cleanup()
 
 
 def getDuration(filename):
@@ -44,7 +338,7 @@ async def forceJoin(guild, channel, user, client, _vars):
                     pass
     try:
         auds = _vars.queue[guild.id]
-        auds.channel = channel.id
+        auds.channel = channel
     except KeyError:
         raise LookupError("Voice channel not found.")
     return auds
@@ -417,7 +711,7 @@ class join:
         vc = voice.channel
         if guild.id not in _vars.queue:
             await channel.trigger_typing()
-            _vars.queue[guild.id] = _vars.createPlayer(channel.id)
+            _vars.queue[guild.id] = customAudio(channel, _vars)
         try:
             joined = True
             await vc.connect(timeout=_vars.timeout, reconnect=True)
@@ -470,7 +764,7 @@ class remove:
         self.description = "Removes an entry from the voice channel queue."
         self.usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
 
-    async def __call__(self, client, user, _vars, args, argv, guild, flags, **void):
+    async def __call__(self, client, user, _vars, args, argv, guild, flags, message, **void):
         found = False
         if guild.id not in _vars.queue:
             raise LookupError("Currently not playing in a voice channel.")
@@ -577,7 +871,7 @@ class pause:
         self.description = "Pauses or resumes audio playing."
         self.usage = ""
 
-    async def __call__(self, _vars, name, guild, client, user, channel, **void):
+    async def __call__(self, _vars, name, guild, client, user, channel, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if not auds.paused > 1:
             auds.paused = name == "pause"
@@ -603,7 +897,7 @@ class seek:
         self.description = "Seeks to a position in the current audio file."
         self.usage = "<pos[0]>"
 
-    async def __call__(self, argv, _vars, guild, client, user, channel, **void):
+    async def __call__(self, argv, _vars, guild, client, user, channel, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         pos = 0
         if argv:
@@ -711,7 +1005,7 @@ class volume:
             + " <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)>"
             )
 
-    async def __call__(self, client, channel, user, guild, _vars, flags, argv, **void):
+    async def __call__(self, client, channel, user, guild, _vars, flags, argv, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if "d" in flags:
             op = None
@@ -905,10 +1199,12 @@ class player:
         elif p < 0:
             output += "⏬"
         output += "\n"
-        if auds.paused:
+        if auds.paused or not auds.stats["speed"]:
             output += "⏸️"
-        else:
+        elif auds.stats["speed"] > 0:
             output += "▶️"
+        else:
+            output += "◀️"
         output += (
             " (" + uniStr(dhms(auds.stats["position"]))
             + "/" + uniStr(dhms(q[0]["duration"])) + ") "
