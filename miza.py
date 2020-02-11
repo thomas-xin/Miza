@@ -43,6 +43,7 @@ class customAudio(discord.AudioSource):
         self.prev = None
         self.searching = False
         self.preparing = False
+        self.player = None
 
     def new(self, source=None, pos=0):
         self.reverse = self.stats["speed"] < 0
@@ -164,6 +165,27 @@ class customAudio(discord.AudioSource):
                 q.append(temp)
             self.preparing = False
             return len(q)
+        if self.player:
+            self.player["time"] = 0
+
+    async def updatePlayer(self):
+        curr = self.player
+        self.stats["quiet"] &= 1
+        if curr is not None:
+            self.stats["quiet"] |= 2
+            try:
+                if not curr["message"].content:
+                    raise EOFError
+            except:
+                self.player = None
+                print(traceback.format_exc())
+            if time.time() > curr["time"]:
+                curr["time"] = inf
+                try:
+                    await reactCallback(curr["message"], "❎", client.user)
+                except discord.errors.NotFound:
+                    self.player = None
+                    pass
         
     def read(self):
         try:
@@ -497,6 +519,33 @@ class __globals:
         self.msgFollow = {}
         self.audiocache = {}
         self.clearAudioCache()
+
+    async def fetch_user(self, u_id):
+        try:
+            user = client.get_user(u_id)
+            if user is None:
+                raise EOFError
+        except:
+            user = await client.fetch_user(u_id)
+        return user
+
+    async def fetch_guild(self, g_id):
+        try:
+            guild = client.get_guild(g_id)
+            if guild is None:
+                raise EOFError
+        except:
+            guild = await client.fetch_guild(g_id)
+        return guild
+
+    async def fetch_channel(self, c_id):
+        try:
+            channel = client.get_channel(c_id)
+            if channel is None:
+                raise EOFError
+        except:
+            channel = await client.fetch_channel(c_id)
+        return channel
 
     def loadSave(self):
         try:
@@ -957,7 +1006,7 @@ async def outputLoop():
                 proc = proc[1:]
                 try:
                     chanID = int(proc)
-                    _vars.current_channel = await client.fetch_channel(chanID)
+                    _vars.current_channel = await _vars.fetch_channel(chanID)
                 except ValueError:
                     sent = await ch.send("*** ***")
                     await processMessage(sent, reconstitute(proc))
@@ -997,7 +1046,7 @@ async def updateLoop():
                 asyncio.create_task(changeColour(g, _vars.special[g], counter))
             await handleUpdate()
             t = time.time()
-            while time.time() - t < frand(2) + 1:
+            while time.time() - t < frand(2) + 2:
                 await asyncio.sleep(0.001)
                 if _vars.doUpdate:
                     await handleUpdate(True)
@@ -1008,7 +1057,7 @@ async def updateLoop():
 
 
 async def changeColour(g_id, roles, counter):
-    guild = await client.fetch_guild(g_id)
+    guild = await _vars.fetch_guild(g_id)
     colTime = 12
     l = list(roles)
     for r in l:
@@ -1054,7 +1103,7 @@ async def handleUpdate(force=False):
         guilds = len(client.guilds)
         if guilds != _vars.guilds:
             _vars.guilds = guilds
-            u = await client.fetch_user(_vars.owner_id)
+            u = await _vars.fetch_user(_vars.owner_id)
             n = u.name
             gamestr = (
                 "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s")
@@ -1076,18 +1125,18 @@ async def handleUpdate(force=False):
                     for b in bl:
                         if type(bans[g][b]) is list and dtime >= bans[g][b][0]:
                             try:
-                                u_target = await client.fetch_user(b)
-                                g_target = await client.fetch_guild(g)
+                                u_target = await _vars.fetch_user(b)
+                                g_target = await _vars.fetch_guild(g)
                                 try:
                                     await g_target.unban(u_target)
-                                    c_target = await client.fetch_channel(bans[g][b][1])
+                                    c_target = await _vars.fetch_channel(bans[g][b][1])
                                     await c_target.send(
                                         "```css\n" + uniStr(u_target.name)
                                         + " has been unbanned from " + uniStr(g_target.name) + ".```"
                                         )
                                     changed = True
                                 except:
-                                    c_target = await client.fetch_channel(bans[g][b][1])
+                                    c_target = await _vars.fetch_channel(bans[g][b][1])
                                     await c_target.send(
                                         "```css\nUnable to unban " + uniStr(u_target.name)
                                         + " from " + uniStr(g_target.name) + ".```"
@@ -1122,9 +1171,9 @@ async def handleUpdate(force=False):
                     cnt = len(membs)
                 except KeyError:
                     continue
-                if not cnt:
+                if not cnt or getattr(auds, "dead", 0):
                     try:
-                        channel = await client.fetch_channel(auds.channel)
+                        channel = await _vars.fetch_channel(auds.channel)
                         _vars.queue.pop(guild.id)
                         msg = "```css\n🎵 Successfully disconnected from "+ uniStr(guild.name) + ". 🎵```"
                         sent = await channel.send(msg)
@@ -1135,6 +1184,7 @@ async def handleUpdate(force=False):
                     await vc.disconnect(force=False)
                 else:
                     try:
+                        asyncio.create_task(auds.updatePlayer())
                         try:
                             q = auds.queue
                         except NameError:
@@ -1186,7 +1236,7 @@ async def handleUpdate(force=False):
                                     if not vc.is_playing():
                                         vc.play(auds, after=sendUpdateRequest)
                                     if not auds.stats["quiet"]:
-                                        channel = await client.fetch_channel(auds.channel)
+                                        channel = await _vars.fetch_channel(auds.channel)
                                         sent = await channel.send(
                                             "```css\n🎵 Now playing "
                                             + uniStr(noSquareBrackets(name))
@@ -1308,11 +1358,14 @@ async def reactCallback(message, reaction, user):
                             f._callback_(
                                 client=client,
                                 message=message,
+                                channel=message.channel,
+                                guild=message.guild,
                                 reaction=reaction,
                                 user=user,
                                 perm=u_perm,
                                 vals=vals,
-                                argv=argv
+                                argv=argv,
+                                _vars=_vars,
                                 ),
                             timeout=_vars.timeout)
                         return
@@ -1328,7 +1381,6 @@ async def on_reaction_add(reaction, user):
     message = reaction.message
     if user.id != client.user.id:
         asyncio.create_task(checkDelete(message, reaction, user))
-        await reactCallback(message, reaction, user)
 
 
 @client.event
@@ -1342,13 +1394,14 @@ async def on_reaction_remove(reaction, user):
 @client.event
 async def on_raw_reaction_add(payload):
     try:
-        channel = await client.fetch_channel(payload.channel_id)
-        user = await client.fetch_user(payload.user_id)
+        channel = await _vars.fetch_channel(payload.channel_id)
+        user = await _vars.fetch_user(payload.user_id)
         message = await channel.fetch_message(payload.message_id)
     except discord.NotFound:
         return
     if user.id != client.user.id:
-        reaction = payload.emoji
+        reaction = str(payload.emoji)
+        await reactCallback(message, reaction, user)
         asyncio.create_task(checkDelete(message, reaction, user))
 
 
@@ -1406,7 +1459,7 @@ async def on_raw_message_edit(payload):
     message = None
     if payload.cached_message is None:
         try:
-            channel = await client.fetch_channel(payload.data["channel_id"])
+            channel = await _vars.fetch_channel(payload.data["channel_id"])
             message = await channel.fetch_message(payload.message_id)
         except:
             for guild in client.guilds:

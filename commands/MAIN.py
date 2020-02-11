@@ -14,7 +14,7 @@ class help:
         self.description = "Shows a list of usable commands."
         self.usage = "<command{all}> <category{all}> <verbose(?v)>"
 
-    async def __call__(self, _vars, client, args, user, channel, guild, flags, **void):
+    async def __call__(self, _vars, args, user, channel, guild, flags, **void):
         if guild:
             g_id = guild.id
         else:
@@ -123,7 +123,7 @@ class clearCache:
         self.description = "Clears all cached data."
         self.usage = ""
 
-    async def __call__(self, client, _vars, **void):
+    async def __call__(self, _vars, **void):
         _vars.resetGlobals()
         _vars.loadSave()
         return "```css\nCache cleared!```"
@@ -139,7 +139,7 @@ class perms:
         self.description = "Shows or changes a user's permission level."
         self.usage = "<0:user{self}> <1:level{curr}> <hide(?h)>"
 
-    async def __call__(self, client, _vars, args, user, perm, guild, flags, **void):
+    async def __call__(self, _vars, args, user, perm, guild, flags, **void):
         if len(args) < 2:
             if len(args) < 1:
                 t_user = user
@@ -150,7 +150,7 @@ class perms:
                         + str(_vars.perms[guild.id]).replace("'", '"') + "```"
                         )
                 else:
-                    t_user = await client.fetch_user(_vars.verifyID(args[0]))
+                    t_user = await _vars.fetch_user(_vars.verifyID(args[0]))
             print(t_user)
             t_perm = _vars.getPerms(t_user.id, guild)
         else:
@@ -162,7 +162,7 @@ class perms:
                 t_perm = inf
                 name = "everyone"
             else:
-                t_user = await client.fetch_user(_vars.verifyID(args[0]))
+                t_user = await _vars.fetch_user(_vars.verifyID(args[0]))
                 t_perm = _vars.getPerms(t_user.id, guild)
                 name = t_user.name
             if t_perm is nan or c_perm is nan:
@@ -215,7 +215,7 @@ class enableCommand:
         self.description = "Shows, enables, or disables a command category in the current channel."
         self.usage = "<command{all}> <enable(?e)> <disable(?d)> <hide(?h)>"
 
-    async def __call__(self, client, _vars, argv, flags, user, channel, perm, **void):
+    async def __call__(self, _vars, argv, flags, user, channel, perm, **void):
         if "e" in flags or "d" in flags:
             if perm < 3:
                 raise PermissionError(
@@ -325,16 +325,16 @@ class suspend:
         self.description = "Prevents a user from accessing the bot's commands. Overrides ~perms."
         self.usage = "<0:user> <1:value[]>"
 
-    async def __call__(self, _vars, client, user, guild, args, **void):
+    async def __call__(self, _vars, user, guild, args, **void):
         if len(args) < 2:
             if len(args) >= 1:
-                user = await client.fetch_user(_vars.verifyID(args[0]))
+                user = await _vars.fetch_user(_vars.verifyID(args[0]))
             return (
                 "```css\nCurrent suspension status of " + uniStr(user.name) + ": "
                 + uniStr(_vars.bans[0].get(user.id, None)) + ".```"
                 )
         else:
-            user = await client.fetch_user(_vars.verifyID(args[0]))
+            user = await _vars.fetch_user(_vars.verifyID(args[0]))
             change = _vars.evalMath(args[1])
             _vars.bans[0][user.id] = change
             doParallel(_vars.update)

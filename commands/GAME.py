@@ -220,7 +220,7 @@ class text2048:
                 gamestate[x][y] = v
                 i += 1
 
-    async def _callback_(self, client, message, reaction, argv, user, perm, vals, **void):
+    async def _callback_(self, _vars, message, reaction, argv, user, perm, vals, **void):
         u_id, mode = [int(x) for x in vals.split("_")]
         if reaction is not None and u_id != user.id and u_id != 0 and perm < 3:
             return
@@ -243,7 +243,7 @@ class text2048:
             username = "@everyone"
         else:
             if user.id != u_id:
-                u = await client.fetch_user(u_id)
+                u = await _vars.fetch_user(u_id)
                 username = u.name
             else:
                 username = user.name

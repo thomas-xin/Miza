@@ -28,7 +28,7 @@ class purge:
             a2 = " ".join(args[1:])
             count = round(_vars.evalMath(a2))
             if t_user == -1:
-                t_user = await client.fetch_user(_vars.verifyID(a1))
+                t_user = await _vars.fetch_user(_vars.verifyID(a1))
         if t_user != client.user:
             if perm < 3:
                 raise PermissionError (
@@ -75,13 +75,13 @@ class ban:
         self.description = "Bans a user for a certain amount of hours, with an optional reason."
         self.usage = "<0:user> <1:hours[]> <2:reason[]> <hide(?h)>"
 
-    async def __call__(self, client, _vars, args, user, channel, guild, flags, perm, **void):
+    async def __call__(self, _vars, args, user, channel, guild, flags, perm, **void):
         dtime = datetime.datetime.utcnow().timestamp()
         if "everyone" in args[0] or "here" in args[0]:
             t_user = None
             t_perm = inf
         else:
-            t_user = await client.fetch_user(_vars.verifyID(args[0]))
+            t_user = await _vars.fetch_user(_vars.verifyID(args[0]))
             t_perm = _vars.getPerms(t_user, guild)
         s_perm = perm
         if t_perm + 1 > s_perm or t_perm is nan:
@@ -118,7 +118,7 @@ class ban:
                 return ("```asciidoc\n[" + response + "]```")
             users = guild.members
             for u_id in g_bans:
-                users.append(await client.fetch_user(u_id))
+                users.append(await _vars.fetch_user(u_id))
             is_banned = None
         else:
             users = [t_user]

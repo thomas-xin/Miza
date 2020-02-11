@@ -191,8 +191,14 @@ class queue:
         self.description = "Shows the music queue, or plays a song in voice."
         self.usage = "<link[]> <verbose(?v)> <hide(?h)>"
 
-    async def __call__(self, client, user, _vars, argv, channel, guild, flags, **void):
+    async def __call__(self, client, user, _vars, argv, channel, guild, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
+        if auds.player:
+            flags["h"] = 1
+            try:
+                await message.delete()
+            except discord.errors.NotFound:
+                pass
         elapsed = auds.stats["position"]
         q = _vars.queue[guild.id].queue
         if not len(argv.replace(" ", "")):
@@ -274,10 +280,6 @@ class queue:
             res = output[0]
             if type(res) is str:
                 raise ConnectionError(res)
-            elif type(res) is dict:
-                return (
-                    "```css\nAdding " + uniStr(res["count"]) + " tracks...```", 1
-                    )
             dur = 0
             added = []
             names = []
@@ -451,7 +453,7 @@ class leave:
         found = False
         for vclient in client.voice_clients:
             if guild.id == vclient.channel.guild.id:
-                await vclient.disconnect(force=False)
+                await vclient.disconnect(force=True)
                 return "```css\n🎵 Successfully disconnected from " + uniStr(guild.name) + ". 🎵```", 1
         error = LookupError("Unable to find connected channel.")
         if error is not None:
@@ -466,13 +468,19 @@ class remove:
         self.name = ["rem", "skip", "s"]
         self.min_level = 0
         self.description = "Removes an entry from the voice channel queue."
-        self.usage = "<0:queue_position[0]> <force(?f)> <vote(?v)>"
+        self.usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
 
     async def __call__(self, client, user, _vars, args, argv, guild, flags, **void):
         found = False
         if guild.id not in _vars.queue:
             raise LookupError("Currently not playing in a voice channel.")
         auds = _vars.queue[guild.id]
+        if auds.player:
+            flags["h"] = 1
+            try:
+                await message.delete()
+            except discord.errors.NotFound:
+                pass
         s_perm = _vars.getPerms(user, guild)
         min_level = 1
         if "f" in flags and s_perm < 1:
@@ -555,7 +563,8 @@ class remove:
                 continue
             else:
                 i += 1
-        return response + "```", 1
+        if not "h" in flags:
+            return response + "```", 1
 
 
 class pause:
@@ -572,7 +581,16 @@ class pause:
         auds = await forceJoin(guild, channel, user, client, _vars)
         if not auds.paused > 1:
             auds.paused = name == "pause"
-        return "```css\nSuccessfully " + name + "d audio playback in " + uniStr(guild.name) + ".```"
+        if auds.player:
+            try:
+                await message.delete()
+            except discord.errors.NotFound:
+                pass
+        else:
+            return (
+                "```css\nSuccessfully " + name + "d audio playback in "
+                + uniStr(guild.name) + ".```"
+                )
 
 
 class seek:
@@ -601,10 +619,16 @@ class seek:
                 elif len(data):
                     raise ValueError("Too many time arguments.")
         pos = auds.seek(pos)
-        return (
-            "```css\nSuccessfully moved audio position to "
-            + uniStr(sec2Time(pos)) + ".```"
-            )
+        if auds.player:
+            try:
+                await message.delete()
+            except discord.errors.NotFound:
+                pass
+        else:
+            return (
+                "```css\nSuccessfully moved audio position to "
+                + uniStr(sec2Time(pos)) + ".```"
+                )
 
 
 class dump:
@@ -738,10 +762,16 @@ class volume:
             pos = auds.stats["position"]
             auds.stats = dict(auds.defaults)
             auds.new(auds.file, pos)
-            return (
-                "```css\nSuccessfully reset all audio settings for "
-                + uniStr(guild.name) + ".```"
-                )
+            if auds.player:
+                try:
+                    await message.delete()
+                except discord.errors.NotFound:
+                    pass
+            else:
+                return (
+                    "```css\nSuccessfully reset all audio settings for "
+                    + uniStr(guild.name) + ".```"
+                    )
         origVol = _vars.queue[guild.id].stats
         val = roundMin(float(_vars.evalMath(argv) / 100))
         orig = round(origVol[op] * 100, 9)
@@ -753,11 +783,17 @@ class volume:
             origVol[op] = val
         if op in "speed pitch chorus":
             auds.new(auds.file, auds.stats["position"])
-        return (
-            "```css\nChanged audio " + op + " in " + uniStr(guild.name)
-            + " from " + uniStr(orig)
-            + " to " + uniStr(new) + ".```"
-            )
+        if auds.player:
+            try:
+                await message.delete()
+            except discord.errors.NotFound:
+                pass
+        else:
+            return (
+                "```css\nChanged audio " + op + " in " + uniStr(guild.name)
+                + " from " + uniStr(orig)
+                + " to " + uniStr(new) + ".```"
+                )
 
 
 class randomize:
@@ -793,3 +829,202 @@ class unmute:
             for user in vc.members:
                 asyncio.create_task(user.edit(mute=False, deafen=False))
         return "```css\nSuccessfully unmuted all users in voice channels in " + uniStr(guild.name) + ".```"
+
+
+class player:
+    is_command = True
+    server_only = True
+    time_consuming = True
+    buttons = {
+	"⏸️": 0,
+	"🔄": 1,
+	"🔀": 2,
+	"⏮️": 3,
+	"⏭️": 4,
+        "🔊": 5,
+        "🥁": 6,
+        "📉": 7,
+        "📊": 8,
+        "⏪": 9,
+        "⏩": 10,
+        "⏫": 11,
+        "⏬": 12,
+        "♻️": 13,
+	"⏏️": 14,
+        "🚫": 15,
+        }
+    barsize = 28
+
+    def __init__(self):
+        self.name = []
+        self.min_level = 1
+        self.description = "Creates a virtual audio player for the current server."
+        self.usage = "<verbose:(?v)>"
+
+    def showCurr(self, auds):
+        q = auds.queue
+        if q:
+            output = "Playing " + uniStr(q[0]["name"]) + ", "
+            output += uniStr(len(q)) + " item" + "s" * (len(q) != 1) + " total "
+        else:
+            output = "Queue is currently empty. "
+        if auds.stats["loop"]:
+            output += "🔄"
+        if auds.stats["shuffle"]:
+            output += "🔀"
+        output += "\n"
+        v = abs(auds.stats["volume"])
+        if v <= 0.5:
+            output += "🔉"
+        elif v <= 1:
+            output += "🔊"
+        else:
+            output += "📢"
+        b = auds.stats["bassboost"]
+        if abs(b) > 1 / 3:
+            if b > 0:
+                output += "🥁"
+            else:
+                output += "🎻"
+        r = auds.stats["reverb"]
+        if r:
+            output += "📉"
+        c = auds.stats["chorus"]
+        if c:
+            output += "📊"
+        s = auds.stats["speed"]
+        if s < 0:
+            output += "⏪"
+        elif s > 1:
+            output += "⏩"
+        elif s > 0 and s < 1:
+            output += "🐌"
+        p = auds.stats["pitch"]
+        if p > 0:
+            output += "⏫"
+        elif p < 0:
+            output += "⏬"
+        output += "\n"
+        if auds.paused:
+            output += "⏸️"
+        else:
+            output += "▶️"
+        output += (
+            " (" + uniStr(dhms(auds.stats["position"]))
+            + "/" + uniStr(dhms(q[0]["duration"])) + ") "
+            )
+        sym = "⬜⬛"
+        r = round(min(1, auds.stats["position"] / q[0]["duration"]) * self.barsize)
+        output += sym[0] * r + sym[1] * (self.barsize - r)
+        return output
+
+    async def _callback_(self, message, guild, channel, reaction, _vars, perm, **void):
+        if perm < 1 or not guild.id in _vars.queue:
+            return
+        auds = _vars.queue[guild.id]
+        orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]) + "\n"
+        if reaction is None:
+            for b in self.buttons:
+                await message.add_reaction(b)
+        else:
+            if type(reaction) is str:
+                emoji = reaction
+            else:
+                emoji = reaction.emoji
+            if emoji in self.buttons:
+                i = self.buttons[emoji]
+                if i == 0:
+                    auds.paused ^= 1
+                elif i == 1:
+                    auds.stats["loop"] = bool(auds.stats["loop"] ^ 1)
+                elif i == 2:
+                    auds.stats["shuffle"] = bool(auds.stats["shuffle"] ^ 1)
+                elif i == 3 or i == 4:
+                    if i == 3:
+                        pos = 0
+                    else:
+                        pos = inf
+                    dur = auds.queue[0]["duration"]
+                    auds.seek(pos)
+                    auds.stats["position"] = dur
+                elif i == 5:
+                    v = abs(auds.stats["volume"])
+                    if v < 0.25 or v >= 2:
+                        v = 0.25
+                    elif v < 0.5:
+                        v = 0.5
+                    elif v < 1:
+                        v = 1
+                    else:
+                        v = 2
+                    auds.stats["volume"] = v
+                elif i == 6:
+                    b = auds.stats["bassboost"]
+                    if abs(b) < 1 / 3:
+                        b = 1
+                    elif b < 0:
+                        b = 0
+                    else:
+                        b = -1
+                    auds.stats["bassboost"] = b
+                elif i == 7:
+                    r = auds.stats["reverb"]
+                    if r:
+                        r = 0
+                    else:
+                        r = 0.5
+                    auds.stats["reverb"] = r
+                elif i == 8:
+                    c = abs(auds.stats["chorus"])
+                    if c:
+                        c = 0
+                    else:
+                        c = 1 / 3
+                    auds.stats["chorus"] = c
+                    auds.new(auds.file, auds.stats["position"])
+                elif i == 9 or i == 10:
+                    s = (i * 2 - 19) * 2 / 11
+                    auds.stats["speed"] = round(auds.stats["speed"] + s, 5)
+                    auds.new(auds.file, auds.stats["position"])
+                elif i == 11 or i == 12:
+                    p = i * 2 - 23
+                    auds.stats["pitch"] -= p
+                    auds.new(auds.file, auds.stats["position"])
+                elif i == 13:
+                    pos = auds.stats["position"]
+                    auds.stats = dict(auds.defaults)
+                    auds.new(auds.file, pos)
+                elif i == 14:
+                    auds.dead = True
+                    auds.player = None
+                    await message.delete()
+                    return
+                else:
+                    auds.player = None
+                    await message.delete()
+                    return
+        text = orig + self.showCurr(auds) + "```"
+        await message.edit(
+            content=text,
+            )
+        maxdel = auds.queue[0]["duration"] - auds.stats["position"] + 1
+        delay = max(6, min(maxdel, auds.queue[0]["duration"] / self.barsize / abs(auds.stats["speed"])))
+        if auds.paused:
+            delay = inf
+        auds.player = {
+            "time": time.time() + delay,
+            "message": message,
+            }
+        #print(text)
+
+    async def __call__(self, channel, user, client, _vars, flags, **void):
+        auds = await forceJoin(channel.guild, channel, user, client, _vars)
+        auds.stats["quiet"] |= 2
+        text = (
+            "```" + "\n" * ("v" in flags) + "callback-voice-player-_\n"
+            + "Initializing virtual audio player...```"
+            )
+        auds.player = {
+            "message": await channel.send(text),
+            "time": inf,
+            }
