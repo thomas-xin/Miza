@@ -720,7 +720,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
             for r in _vars.following[g_id]["reacts"]:
                 if r in temp:
                     await message.add_reaction(_vars.following[g_id]["reacts"][r])
-        except discord.errors.Forbidden:
+        except discord.Forbidden:
             pass
         currentSchedule = _vars.scheduled.get(channel.id, {})
         for k in currentSchedule:
@@ -746,7 +746,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                 if deleter:
                     try:
                         await message.delete()
-                    except discord.errors.NotFound:
+                    except discord.NotFound:
                         pass
 
 
@@ -782,7 +782,7 @@ async def outputLoop():
                     await processMessage(sent, reconstitute(proc))
                     try:
                         await sent.delete()
-                    except discord.errors.NotFound:
+                    except discord.NotFound:
                         pass
             elif proc[0] == "&":
                 proc = proc[1:]
@@ -846,7 +846,7 @@ async def changeColour(g_id, roles, counter):
                 await role.edit(colour=discord.Colour(col))
                 #print("Edited role " + role.name)
             await asyncio.sleep(frand(2))
-        except discord.errors.HTTPException as ex:
+        except discord.HTTPException as ex:
             print(traceback.format_exc())
             _vars.blocked += 20
             break
@@ -1136,6 +1136,9 @@ async def on_raw_reaction_remove(payload):
 
 @client.event
 async def on_raw_message_delete(payload):
+    m_id = payload.message_id
+    if m_id in _vars.message_cache:
+        _vars.message_cache.pop(m_id)
     await handleUpdate()
 
 

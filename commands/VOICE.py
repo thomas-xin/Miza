@@ -180,9 +180,9 @@ class customAudio(discord.AudioSource):
                 curr["time"] = inf
                 try:
                     await self._vars.reactCallback(curr["message"], "❎", self._vars.client.user)
-                except discord.errors.NotFound:
+                except discord.NotFound:
                     self.player = None
-                    pass
+                    print(traceback.format_exc())
         
     def read(self):
         try:
@@ -491,7 +491,7 @@ class queue:
             flags["h"] = 1
             try:
                 await message.delete()
-            except discord.errors.NotFound:
+            except discord.NotFound:
                 pass
         elapsed = auds.stats["position"]
         q = _vars.queue[guild.id].queue
@@ -773,7 +773,7 @@ class remove:
             flags["h"] = 1
             try:
                 await message.delete()
-            except discord.errors.NotFound:
+            except discord.NotFound:
                 pass
         s_perm = _vars.getPerms(user, guild)
         min_level = 1
@@ -878,7 +878,7 @@ class pause:
         if auds.player:
             try:
                 await message.delete()
-            except discord.errors.NotFound:
+            except discord.NotFound:
                 pass
         else:
             return (
@@ -916,7 +916,7 @@ class seek:
         if auds.player:
             try:
                 await message.delete()
-            except discord.errors.NotFound:
+            except discord.NotFound:
                 pass
         else:
             return (
@@ -1059,7 +1059,7 @@ class volume:
             if auds.player:
                 try:
                     await message.delete()
-                except discord.errors.NotFound:
+                except discord.NotFound:
                     pass
             else:
                 return (
@@ -1080,7 +1080,7 @@ class volume:
         if auds.player:
             try:
                 await message.delete()
-            except discord.errors.NotFound:
+            except discord.NotFound:
                 pass
         else:
             return (
@@ -1218,6 +1218,8 @@ class player:
         if perm < 1 or not guild.id in _vars.queue:
             return
         auds = _vars.queue[guild.id]
+        if reaction is not None and (auds.player is None or auds.player["message"].id != message.id):
+            return
         orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]) + "\n"
         if reaction is None:
             for b in self.buttons:
