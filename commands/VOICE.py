@@ -297,10 +297,10 @@ class customAudio(discord.AudioSource):
             return self.source.cleanup()
 
 
-async def createPlayer(auds):
+async def createPlayer(auds, verbose=False):
     auds.stats["quiet"] |= 2
     text = (
-        "```" + "\n" * ("v" in flags) + "callback-voice-player-_\n"
+        "```" + "\n" * verbose + "callback-voice-player-_\n"
         + "Initializing virtual audio player...```"
         )
     auds.player = {
@@ -1333,4 +1333,4 @@ class player:
 
     async def __call__(self, channel, user, client, _vars, flags, **void):
         auds = await forceJoin(channel.guild, channel, user, client, _vars)
-        await createPlayer(auds)
+        await createPlayer(auds, verbose="v" in flags)
