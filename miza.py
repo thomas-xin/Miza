@@ -531,17 +531,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     channel = message.channel
 
     check = "<@!" + str(client.user.id) + ">"
-    suspended = _vars.bans[0].get(u_id, False)
-    if suspended or msg.replace(" ", "") == check:
-        if not u_perm < 0 and not suspended:
-            sent = await channel.send(
-		"Hi, did you require my services for anything? Use `~?` or `~help` for help."
-		)
-        else:
-            print("Ignoring command from suspended user " + user.name + " (" + str(u_id) + ").")
-            sent = await channel.send("Sorry, you are currently not permitted to request my services.")
-        await sent.add_reaction("❎")
-        return
+
     if len(msg) >= 2 and msg[0] == "~" and msg[1] != "~":
         comm = msg[1:]
         op = True
@@ -552,6 +542,18 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         op = True
     else:
         op = False
+
+    suspended = _vars.bans[0].get(u_id, False)
+    if (suspended and op) or msg.replace(" ", "") == check:
+        if not u_perm < 0 and not suspended:
+            sent = await channel.send(
+		"Hi, did you require my services for anything? Use `~?` or `~help` for help."
+		)
+        else:
+            print("Ignoring command from suspended user " + user.name + " (" + str(u_id) + ").")
+            sent = await channel.send("Sorry, you are currently not permitted to request my services.")
+        await sent.add_reaction("❎")
+        return
     if op:
         commands = []
         for catg in categories:
@@ -772,7 +774,7 @@ async def outputLoop():
             if proc[0] == "!":
                 proc = proc[1:]
                 if not proc:
-                    ch = None
+                    ch = _vars.current_channel = None
                     continue
                 try:
                     chanID = int(proc)
