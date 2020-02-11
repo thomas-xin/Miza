@@ -1219,6 +1219,7 @@ class player:
             return
         auds = _vars.queue[guild.id]
         if reaction is not None and (auds.player is None or auds.player["message"].id != message.id):
+            await message.clear_reactions()
             return
         orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]) + "\n"
         if reaction is None:
