@@ -953,7 +953,8 @@ class dump:
         if not argv and not len(message.attachments):
             q = copy.deepcopy(auds.queue)
             for e in q:
-                e["id"] = e["id"]
+                if "download" in e:
+                    e.pop("download")
                 e.pop("added by")
                 e.pop("u_id")
                 e.pop("skips")
