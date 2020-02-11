@@ -297,6 +297,18 @@ class customAudio(discord.AudioSource):
             return self.source.cleanup()
 
 
+async def createPlayer(auds):
+    auds.stats["quiet"] |= 2
+    text = (
+        "```" + "\n" * ("v" in flags) + "callback-voice-player-_\n"
+        + "Initializing virtual audio player...```"
+        )
+    auds.player = {
+        "message": await auds.channel.send(text),
+        "time": inf,
+        }
+
+
 def getDuration(filename):
     command = [
         'ffprobe', 
@@ -947,6 +959,7 @@ class dump:
                 e.pop("skips")
             d = {
                 "stats": auds.stats,
+                "player": bool(auds.player),
                 "queue": q,
                 }
             return "Queue data for **" + guild.name + "**:\n```json\n" + json.dumps(d) + "\n```"
@@ -972,6 +985,8 @@ class dump:
             e["added by"] = user.name
             e["u_id"] = user.id
             e["skips"] = []
+        if s.get("player"):
+            await createPlayer(auds)
         if not "a" in flags:
             #print("Stopped audio playback in " + guild.name)
             auds.new()
@@ -1318,12 +1333,4 @@ class player:
 
     async def __call__(self, channel, user, client, _vars, flags, **void):
         auds = await forceJoin(channel.guild, channel, user, client, _vars)
-        auds.stats["quiet"] |= 2
-        text = (
-            "```" + "\n" * ("v" in flags) + "callback-voice-player-_\n"
-            + "Initializing virtual audio player...```"
-            )
-        auds.player = {
-            "message": await channel.send(text),
-            "time": inf,
-            }
+        await createPlayer(auds)
