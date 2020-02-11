@@ -985,7 +985,7 @@ class dump:
             e["added by"] = user.name
             e["u_id"] = user.id
             e["skips"] = []
-        if s.get("player"):
+        if d.get("player"):
             await createPlayer(auds)
         if not "a" in flags:
             #print("Stopped audio playback in " + guild.name)
