@@ -1375,18 +1375,20 @@ class player:
 
     async def __call__(self, channel, user, client, _vars, flags, perm, **void):
         auds = await forceJoin(channel.guild, channel, user, client, _vars)
-        if "c" in flags or "d" in flags or auds.stats["quiet"] & 2:
+        if "c" in flags or auds.stats["quiet"] & 2:
             req = 1
             if perm < req:
                 if auds.stats["quiet"] & 2:
-                    raise PermissionError(
-                        "Insufficient privileges to override virtual audio player for "
-                        + uniStr(guild.name) + ". Required level: " + uniStr(req)
-                        + ", Current level: " + uniStr(perm) + "."
-                        )
+                    if "d" in flags:
+                        reason = "delete"
+                    else:
+                        reason = "override"
+                else:
+                    reason = "create controllable"
                 raise PermissionError(
-                    "Insufficient privileges to create controllable virtual audio player for "
-                    + uniStr(guild.name) + ". Required level: " + uniStr(req)
+                    "Insufficient privileges to " + reason
+                    + " virtual audio player for " + uniStr(guild.name)
+                    + ". Required level: " + uniStr(req)
                     + ", Current level: " + uniStr(perm) + "."
                     )
         if "d" in flags:
