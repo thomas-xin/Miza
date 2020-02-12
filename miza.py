@@ -149,6 +149,7 @@ class __globals:
         "__",
         ".load",
         ".save",
+        ".dump",
         ".fromfile",
     ]
     builtins_list = [
@@ -272,8 +273,8 @@ class __globals:
             if message is not None:
                 self.message_cache[m_id] = message
         lim = 10000
-        i = iter(self.message_cache)
         while len(self.message_cache) > lim:
+            i = iter(self.message_cache)
             self.message_cache.pop(next(i))
         return message
 

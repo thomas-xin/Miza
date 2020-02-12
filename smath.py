@@ -2,7 +2,7 @@
 Adds many useful math-related functions.
 """
 
-import math, cmath, fractions, mpmath, sympy, ctypes
+import math, cmath, fractions, mpmath, sympy, ctypes, collections
 import numpy, tinyarray
 
 array = tinyarray.array
@@ -174,7 +174,10 @@ def round(x, y=None):
     except:
         if type(x) is complex:
             return round(x.real, y) + round(x.imag, y) * 1j
-    return x
+    try:
+        return math.round(x)
+    except:
+        return x
 
 
 def ceil(x):
@@ -183,7 +186,10 @@ def ceil(x):
     except:
         if type(x) is complex:
             return ceil(x.real) + ceil(x.imag) * 1j
-    return x
+    try:
+        return math.ceil(x)
+    except:
+        return x
 
 
 def floor(x):
@@ -192,7 +198,10 @@ def floor(x):
     except:
         if type(x) is complex:
             return floor(x.real) + floor(x.imag) * 1j
-    return x
+    try:
+        return math.floor(x)
+    except:
+        return x
 
 
 def trunc(x):
@@ -201,7 +210,10 @@ def trunc(x):
     except:
         if type(x) is complex:
             return trunc(x.real) + trunc(x.imag) * 1j
-    return x
+    try:
+        return math.trunc(x)
+    except:
+        return x
 
 
 def sqr(x):
@@ -1317,6 +1329,745 @@ def reconstitute(s):
     return s.translate(__trans)
 
 
+_hlist__maxoff = (1 << 1) - 1
+
+class hlist(collections.abc.MutableSequence):
+
+    def waiting(func):
+        def call(self, *args, force=False, **kwargs):
+            if not force:
+                while self.block:
+                    time.sleep(0.00001)
+            return func(self, *args, **kwargs)
+        return call
+
+    def blocking(func):
+        def call(self, *args, force=False, **kwargs):
+            if not force:
+                while self.block:
+                    time.sleep(0.00001)
+            self.block = True
+            self.chash = None
+            try:
+                output = func(self, *args, **kwargs)
+                self.block = False
+            except:
+                self.block = False
+                raise
+            return output
+        return call
+
+    def forceTuple(self, value):
+        try:
+            return tuple(value)
+        except TypeError:
+            return (value,)
+
+    def iterator(self, reverse=False):
+        for i in range(len(self.data)):
+            if i > len(self.data):
+                break
+            yield self.data[self.offs + i]
+        return
+
+    def constantIterator(self, other):
+        while True:
+            yield other
+
+    def createIterator(self, other, force=False):
+        d = self.data
+        try:
+            iterable = iter(other)
+            if len(other) != len(d) and not force:
+                raise IndexError(
+                    "Unable to perform operation on objects with size "
+                    + str(len(d)) + " and " + str(len(other)) + "."
+                    )
+            return iterable
+        except TypeError:
+            return self.constantIterator(other)
+
+    @blocking
+    def clear(self):
+        self.data = {}
+        self.offs = 0
+        return self
+
+    @waiting
+    def copy(self):
+        return hlist(self)
+
+    @waiting
+    def sort(self):
+        return hlist(sorted(self))
+
+    @waiting
+    def shuffle(self):
+        temp = tuple(self)
+        return hlist(shuffle(temp))
+
+    @blocking
+    def rotate(self, steps):
+        s = len(self.data)
+        steps = -steps % s
+        if steps > s / 2:
+            steps -= s
+        if steps < 0:
+            for i in xrange(steps):
+                self.appendleft(self.popright(force=True), force=True)
+        else:
+            for i in range(steps):
+                self.append(self.popleft(force=True), force=True)
+        return self
+
+    @blocking
+    def isempty(self):
+        if len(self.data):
+            if abs(self.offs) > self.maxoff:
+                self.reconstitute(force=True)
+            return True
+        self.offs = 0
+        return False
+
+    @blocking
+    def popleft(self):
+        key = self.offs
+        temp = self.data[key]
+        self.data.pop(key)
+        self.offs += 1
+        self.isempty(force=True)
+        return temp
+
+    @blocking
+    def popright(self):
+        key = self.offs + len(self.data) - 1
+        temp = self.data[key]
+        self.data.pop(key)
+        self.isempty(force=True)
+        return temp
+
+    @blocking
+    def pop(self, index):
+        if index >= len(self.data):
+            return self.popright(force=True)
+        elif index == 0:
+            return self.popleft(force=True)
+        index %= len(self.data)
+        temp = self.data[index + self.offs]
+        if index < len(self.data) / 2:
+            for i in range(index + self.offs, self.offs, -1):
+                self.data[i] = self.data[i - 1]
+            self.popleft(force=True)
+        else:
+            for i in range(index + self.offs, self.offs + len(self.data) - 1):
+                self.data[i] = self.data[i + 1]
+            self.popright(force=True)
+        self.isempty(force=True)
+        return temp
+
+    @blocking
+    def insert(self, index, value):
+        if index >= len(self.data):
+            return self.append(value, force=True)
+        elif index == 0:
+            return self.appendleft(value, force=True)
+        index %= len(self.data)
+        if index < len(self.data) / 2:
+            for i in range(self.offs, self.offs + index):
+                self.data[i - 1] = self.data[i]
+            self.offs -= 1
+            self.data[index + self.offs] = value
+        else:
+            for i in range(self.offs + len(self.data) - 1, index + self.offs - 1, - 1):
+                self.data[i + 1] = self.data[i]
+            self.data[index + self.offs] = value
+        return self
+
+    @blocking
+    def remove(self, value):
+        for i in self.data:
+            if self.data[i] == value:
+                self.pop(i, force=True)
+                self.isempty(force=True)
+                return self
+        raise IndexError(str(value) + " not found.")
+
+    @waiting
+    def index(self, value):
+        for i in range(len(self.data)):
+            if self[i] == value:
+                return i
+        raise IndexError(str(value) + " not found.")
+
+    @waiting
+    def search(self, value):
+        output = hlist()
+        for i in range(len(self.data)):
+            if self[i] == value:
+                output.append(i, force=True)
+        return output
+
+    @waiting
+    def count(self, value):
+        output = 0
+        for i in self:
+            if i == value:
+                output += 1
+        return output
+
+    @blocking
+    def extend(self, value):
+        value = self.forceTuple(value)
+        for i in value:
+            self.append(i, force=True)
+        return self
+
+    @waiting
+    def concat(self, value):
+        temp = self.copy()
+        temp.extend(value, force=True)
+        return temp
+
+    @blocking
+    def appendleft(self, value):
+        self.offs -= 1
+        self.data[self.offs] = value
+        return self
+
+    @blocking
+    def append(self, value):
+        self.data[self.offs + len(self.data)] = value
+        return self
+
+    appendright = append
+
+    @blocking
+    def fill(self, value):
+        data = (value,) * len(self.data)
+        self.__init__(data)
+
+    @waiting
+    def real(self):
+        temp = self.copy()
+        d = temp.data
+        for i in d:
+            d[i] = d[i].real
+        return temp
+
+    @waiting
+    def imag(self):
+        temp = self.copy()
+        d = temp.data
+        for i in d:
+            d[i] = d[i].imag
+        return temp
+
+    @waiting
+    def float(self):
+        temp = self.copy()
+        d = temp.data
+        for i in d:
+            d[i] = float(d[i])
+        return temp
+
+    @waiting
+    def complex(self):
+        temp = self.copy()
+        d = temp.data
+        for i in d:
+            d[i] = complex(d[i])
+        return temp
+
+    @waiting
+    def mpf(self):
+        temp = self.copy()
+        d = temp.data
+        for i in d:
+            d[i] = mpf(d[i])
+        return temp
+
+    @blocking
+    def reconstitute(self, data=None):
+        if data is None:
+            data = self.data
+        values = collections.deque()
+        l = sorted(data)
+        for i in l:
+            values.append(data[i])
+        self.__init__(values)
+
+    def __init__(self, iterable=(), maxoff=__maxoff, **void):
+        self.chash = None
+        self.block = True
+        self.maxoff = maxoff
+        if type(self) is type(iterable) and len(iterable):
+            self.offs = iterable.offs
+            self.data = iterable.data.copy()
+        else:
+            self.offs = 0
+            d = self.data = {}
+            try:
+                iterable = iter(iterable)
+                i = 0
+                while True:
+                    try:
+                        d[i] = next(iterable)
+                        i += 1
+                    except StopIteration:
+                        break
+            except TypeError:
+                d[0] = iterable
+        self.block = False
+
+    def __delattr__(self, name, value):
+        raise AttributeError("Deleting attributes is not permitted.")
+
+    @waiting
+    def __call__(self, arg=1, **void):
+        if arg == 1:
+            return self.copy()
+        return self * arg
+
+    def __hash__(self):
+        if self.chash is None:
+            self.chash = hash(tuple(self))
+        return self.chash
+
+    def __str__(self):
+        return "⟨" + ", ".join(str(i) for i in iter(self)) + "⟩"
+
+    def __repr__(self):
+        return "hlist(" + str(tuple(self)) + ")"
+
+    def __bool__(self):
+        return bool(len(self.data))
+
+    @blocking
+    def __iadd__(self, other):
+        d = self.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] += next(iterable)
+        return self
+
+    @blocking
+    def __isub__(self, other):
+        d = self.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] -= next(iterable)
+        return self
+
+    @blocking
+    def __imul__(self, other):
+        d = self.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] *= next(iterable)
+        return self
+
+    @blocking
+    def __imatmul__(self, other):
+        temp1 = numpy.array(tuple(self))
+        temp2 = numpy.array(self.forceTuple(other))
+        result = temp1 @ temp2
+        self.__init__(result)
+        return self
+
+    @blocking
+    def __itruediv__(self, other):
+        d = self.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] /= next(iterable)
+        return self
+
+    @blocking
+    def __ifloordiv__(self, other):
+        d = self.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] //= next(iterable)
+        return self
+
+    @blocking
+    def __imod__(self, other):
+        d = self.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] %= next(iterable)
+        return self
+
+    @blocking
+    def __ipow__(self, other):
+        d = self.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] **= next(iterable)
+        return self
+
+    @blocking
+    def __ilshift__(self, other):
+        d = self.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] <<= next(iterable)
+        return self
+
+    @blocking
+    def __irshift__(self, other):
+        d = self.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] >>= next(iterable)
+        return self
+
+    @blocking
+    def __iand__(self, other):
+        d = self.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] &= next(iterable)
+        return self
+
+    @blocking
+    def __ixor__(self, other):
+        d = self.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] ^= next(iterable)
+        return self
+
+    @blocking
+    def __ior__(self, other):
+        d = self.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] |= next(iterable)
+        return self
+
+    @waiting
+    def __neg__(self):
+        temp = self.copy()
+        d = temp.data
+        for i in d:
+            d[i] = -d[i]
+        return temp
+
+    @waiting
+    def __pos__(self):
+        return self
+
+    @waiting
+    def __abs__(self):
+        temp = self.copy()
+        d = temp.data
+        for i in d:
+            d[i] = abs(d[i])
+        return temp
+
+    @waiting
+    def __invert__(self):
+        temp = self.copy()
+        d = temp.data
+        for i in d:
+            d[i] = ~d[i]
+        return temp
+
+    @waiting
+    def __add__(self, other):
+        temp = self.copy()
+        temp += other
+        return temp
+
+    @waiting
+    def __sub__(self, other):
+        temp = self.copy()
+        temp -= other
+        return temp
+
+    @waiting
+    def __mul__(self, other):
+        temp = self.copy()
+        temp *= other
+        return temp
+
+    @waiting
+    def __matmul__(self, other):
+        temp1 = numpy.array(tuple(self))
+        temp2 = numpy.array(self.forceTuple(other))
+        result = temp1 @ temp2
+        return hlist(result)
+
+    @waiting
+    def __truediv__(self, other):
+        temp = self.copy()
+        temp /= other
+        return temp
+
+    @waiting
+    def __floordiv__(self, other):
+        temp = self.copy()
+        temp //= other
+        return temp
+
+    @waiting
+    def __mod__(self, other):
+        temp = self.copy()
+        temp %= other
+        return temp
+
+    @waiting
+    def __pow__(self, other):
+        temp = self.copy()
+        temp **= other
+        return temp
+
+    @waiting
+    def __lshift__(self, other):
+        temp = self.copy()
+        temp <<= other
+        return temp
+
+    @waiting
+    def __rshift__(self, other):
+        temp = self.copy()
+        temp >>= other
+        return temp
+
+    @waiting
+    def __and__(self, other):
+        temp = self.copy()
+        temp &= other
+        return temp
+
+    @waiting
+    def __xor__(self, other):
+        temp = self.copy()
+        temp ^= other
+        return temp
+
+    @waiting
+    def __or__(self, other):
+        temp = self.copy()
+        temp |= other
+        return temp
+
+    @waiting
+    def __round__(self, prec=0):
+        temp = numpy.array(tuple(self))
+        temp = numpy.round(temp, prec)
+        if prec <= 0:
+            temp = temp.astype(int)
+        return hlist(temp)
+
+    @waiting
+    def __trunc__(self):
+        temp = numpy.array(tuple(self))
+        return hlist(numpy.trunc(temp).astype(int))
+
+    @waiting
+    def __floor__(self):
+        temp = numpy.array(tuple(self))
+        return hlist(numpy.floor(temp).astype(int))
+
+    @waiting
+    def __ceil__(self):
+        temp = numpy.array(tuple(self))
+        return hlist(numpy.ceil(temp).astype(int))
+
+    def __index__(self):
+        return round(numpy.sum(tuple(self)))
+    
+    __radd__ = __add__
+
+    def __rsub__(self, other):
+        return -self + other
+    
+    __rmul__ = __mul__
+    __rmatmul__ = __matmul__
+
+    @waiting
+    def __rtruediv__(self, other):
+        temp = self.copy()
+        d = temp.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] = next(iterable) / d[i]
+        return temp
+
+    @waiting
+    def __rfloordiv__(self, other):
+        temp = self.copy()
+        d = temp.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] = next(iterable) // d[i]
+        return temp
+
+    @waiting
+    def __rmod__(self, other):
+        temp = self.copy()
+        d = temp.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] = next(iterable) % d[i]
+        return temp
+
+    @waiting
+    def __rpow__(self, other):
+        temp = self.copy()
+        d = temp.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] = next(iterable) ** d[i]
+        return temp
+
+    @waiting
+    def __rlshift__(self, other):
+        temp = self.copy()
+        d = temp.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] = next(iterable) << d[i]
+        return temp
+
+    @waiting
+    def __rrshift__(self, other):
+        temp = self.copy()
+        d = temp.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] = next(iterable) >> d[i]
+        return temp
+    
+    __rand__ = __and__
+    __rxor__ = __xor__
+    __ror__ = __or__
+
+    @waiting
+    def __lt__(self, other):
+        temp = self.copy()
+        d = temp.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] = d[i] < next(iterable)
+        return temp
+
+    @waiting
+    def __le__(self, other):
+        temp = self.copy()
+        d = temp.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] = d[i] <= next(iterable)
+        return temp
+
+    @waiting
+    def __eq__(self, other):
+        temp = self.copy()
+        d = temp.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] = d[i] == next(iterable)
+        return temp
+
+    @waiting
+    def __ne__(self, other):
+        temp = self.copy()
+        d = temp.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] = d[i] != next(iterable)
+        return temp
+
+    @waiting
+    def __gt__(self, other):
+        temp = self.copy()
+        d = temp.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] = d[i] > next(iterable)
+        return temp
+
+    @waiting
+    def __ge__(self, other):
+        temp = self.copy()
+        d = temp.data
+        iterable = self.createIterator(other)
+        for i in d:
+            d[i] = d[i] >= next(iterable)
+        return temp
+
+    @waiting
+    def __getitem__(self, key):
+        if type(key) is slice:
+            temp = hlist()
+            s = key.indices(len(self.data))
+            for i in xrange(*s):
+                temp.append(self[i], force=True)
+            return temp
+        elif type(key) is not int:
+            key = complex(key)
+            return get(self, key, 1)
+        index = self.offs + key % len(self.data)
+        return self.data[index]
+
+    @blocking
+    def __setitem__(self, key, value):
+        if type(key) is slice:
+            s = key.indices(len(self.data))
+            iterable = self.createIterator(value, True)
+            for i in xrange(*s):
+                self.data[i + self.offs] = next(iterable)
+            return value
+        elif type(key) is str:
+            key = int(key)
+        index = self.offs + key % len(self.data)
+        self.data[index] = value
+        return value
+
+    @blocking
+    def __delitem__(self, key):
+        if type(key) is slice:
+            temp = hlist()
+            s = key.indices(len(self.data))
+            for i in xrange(*s):
+                temp.append(self[i], force=True)
+                self.data.pop(i + self.offs)
+            self.reconstitute(force=True)
+            return temp
+        self.pop(key, force=True)
+
+    def __len__(self):
+        return len(self.data)
+
+    __length_hint__ = __len__
+
+    def __iter__(self):
+        return self.iterator()
+
+    def __reversed__(self):
+        return self.iterator(True)
+
+    def __contains__(self, item):
+        for i in self:
+            if i == item:
+                return True
+        return False
+
+    def __copy__(self):
+        return self.copy()
+
+
+def hrange(a, b=None, c=None, maxoff=_hlist__maxoff):
+    return hlist(xrange(a, b, c), maxoff)
+
+
+def hzero(size, maxoff=_hlist__maxoff):
+    return hlist((0 for i in range(size)), maxoff)
+
+
 class dynamicFunc:
     def __init__(self, func):
         self.text = func
@@ -1451,39 +2202,41 @@ def waitParallel(delay):
             while p.state > 0 and time.time() - t < delay:
                 time.sleep(0.001)
 
-
-def updatePrint():
-    global printGlobals, printLocals, printVars, origPrint
-    while True:
-        if printLocals:
-            printLocals += printVars
-            origPrint(printLocals,end="")
-            printGlobals += printLocals
-            printLocals = ""
-        time.sleep(0.1)
-
-
-def logPrint(*args, sep=" ", end="\n"):
-    global printLocals
-    printLocals += str(sep).join((str(i) for i in args)) + str(end)
-
-
-def setPrint(string):
-    global printVars
-    printVars = string
-
-
-def dumpLogData():
-    global printGlobals
-    f = open("cache/log.txt", "w")
-    f.write(printGlobals)
-    f.close()
-
-
 processes = _parallel()
-printVars = ""
-printLocals = ""
-printGlobals = ""
-origPrint = print
-print = logPrint
-doParallel(updatePrint, name="printer")
+
+
+if 1:
+    def updatePrint():
+        global printGlobals, printLocals, printVars, origPrint
+        while True:
+            if printLocals:
+                printLocals += printVars
+                origPrint(printLocals,end="")
+                printGlobals += printLocals
+                printLocals = ""
+            time.sleep(0.1)
+
+
+    def logPrint(*args, sep=" ", end="\n"):
+        global printLocals
+        printLocals += str(sep).join((str(i) for i in args)) + str(end)
+
+
+    def setPrint(string):
+        global printVars
+        printVars = string
+
+
+    def dumpLogData():
+        global printGlobals
+        f = open("cache/log.txt", "w")
+        f.write(printGlobals)
+        f.close()
+
+
+    printVars = ""
+    printLocals = ""
+    printGlobals = ""
+    origPrint = print
+    print = logPrint
+    doParallel(updatePrint, name="printer")
