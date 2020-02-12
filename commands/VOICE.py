@@ -1252,6 +1252,7 @@ class player:
                 "time": inf,
                 "message": message,
                 "type": int(vals),
+                "events": 0,
                 }
             if vals:
                 auds.stats["quiet"] |= 2
@@ -1350,10 +1351,12 @@ class player:
         text = orig + self.showCurr(auds) + "```"
         last = message.channel.last_message
         if last is not None and (auds.player["type"] or message.id == last.id):
+            auds.player["events"] += 1
             await message.edit(
                 content=text,
                 )
         else:
+            auds.player["events"] += 2
             channel = message.channel
             temp = message
             message = await channel.send(
