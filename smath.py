@@ -1329,7 +1329,7 @@ def reconstitute(s):
     return s.translate(__trans)
 
 
-_hlist__maxoff = (1 << 1) - 1
+_hlist__maxoff = (1 << 31) - 1
 
 class hlist(collections.abc.MutableSequence):
 
