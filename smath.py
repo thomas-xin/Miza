@@ -1684,7 +1684,10 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = self.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] /= next(iterable)
+            try:
+                d[i] /= next(iterable)
+            except ZeroDivisionError:
+                d[i] = inf * sgn(d[i])
         return self
 
     @blocking
@@ -1692,7 +1695,10 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = self.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] //= next(iterable)
+            try:
+                d[i] //= next(iterable)
+            except ZeroDivisionError:
+                d[i] = 0
         return self
 
     @blocking
@@ -1700,7 +1706,10 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = self.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] %= next(iterable)
+            try:
+                d[i] %= next(iterable)
+            except ZeroDivisionError:
+                d[i] = 0
         return self
 
     @blocking
@@ -1716,7 +1725,13 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = self.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] <<= next(iterable)
+            r = next(iterable)
+            try:
+                d[i] <<= r
+            except ValueError:
+                d[i] >>= -r
+            except TypeError:
+                d[i] *= 2 ** r
         return self
 
     @blocking
@@ -1724,7 +1739,13 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = self.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] >>= next(iterable)
+            r = next(iterable)
+            try:
+                d[i] >>= r
+            except ValueError:
+                d[i] <<= -r
+            except TypeError:
+                d[i] //= 2 ** r
         return self
 
     @blocking
@@ -1732,7 +1753,11 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = self.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] &= next(iterable)
+            r = next(iterable)
+            try:
+                d[i] &= r
+            except TypeError:
+                d[i] = int(d[i]) & int(r)
         return self
 
     @blocking
@@ -1740,7 +1765,11 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = self.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] ^= next(iterable)
+            r = next(iterable)
+            try:
+                d[i] ^= r
+            except TypeError:
+                d[i] = int(d[i]) ^ int(r)
         return self
 
     @blocking
@@ -1748,7 +1777,11 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = self.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] |= next(iterable)
+            r = next(iterable)
+            try:
+                d[i] |= r
+            except TypeError:
+                d[i] = int(d[i]) | int(r)
         return self
 
     @waiting
@@ -1898,7 +1931,11 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = temp.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] = next(iterable) / d[i]
+            r = next(iterable)
+            try:
+                d[i] = r / d[i]
+            except ZeroDivisionError:
+                d[i] = inf * sgn(r)
         return temp
 
     @waiting
@@ -1907,7 +1944,10 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = temp.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] = next(iterable) // d[i]
+            try:
+                d[i] = next(iterable) // d[i]
+            except ZeroDivisionError:
+                d[i] = 0
         return temp
 
     @waiting
@@ -1916,7 +1956,10 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = temp.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] = next(iterable) % d[i]
+            try:
+                d[i] = next(iterable) % d[i]
+            except ZeroDivisionError:
+                d[i] = 0
         return temp
 
     @waiting
@@ -1934,7 +1977,13 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = temp.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] = next(iterable) << d[i]
+            r = next(iterable)
+            try:
+                d[i] = r << d[i]
+            except ValueError:
+                d[i] = r >> -d[i]
+            except TypeError:
+                d[i] = r * 2 ** d[i]
         return temp
 
     @waiting
@@ -1943,7 +1992,13 @@ lookup time for all elements. Includes many array and numeric operations."""
         d = temp.data
         iterable = self.createIterator(other)
         for i in d:
-            d[i] = next(iterable) >> d[i]
+            r = next(iterable)
+            try:
+                d[i] = r >> d[i]
+            except ValueError:
+                d[i] = r << -d[i]
+            except TypeError:
+                d[i] = r // 2 ** d[i]
         return temp
     
     __rand__ = __and__
