@@ -1161,7 +1161,7 @@ class player:
         "⏬": 12,
         "♻️": 13,
 	"⏏️": 14,
-        "🚫": 15,
+        "⛔": 15,
         }
     barsize = 28
 
@@ -1176,6 +1176,7 @@ class player:
         if q:
             output = "Playing " + uniStr(q[0]["name"]) + ", "
             output += uniStr(len(q)) + " item" + "s" * (len(q) != 1) + " total "
+            output += len(q[0]["skips"]) * "🚫"
         else:
             output = "Queue is currently empty. "
         if auds.stats["loop"]:
@@ -1261,7 +1262,8 @@ class player:
                         pos = inf
                     dur = auds.queue[0]["duration"]
                     auds.seek(pos)
-                    auds.stats["position"] = dur
+                    if pos:
+                        return
                 elif i == 5:
                     v = abs(auds.stats["volume"])
                     if v < 0.25 or v >= 2:

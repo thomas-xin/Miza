@@ -260,16 +260,22 @@ class __globals:
         return channel
 
     async def fetch_message(self, m_id, channel=None, user=None):
+        message = None
         if m_id in self.message_cache:
-            return self.message_cache[m_id]
-        if user is not None and user.id != client.user.id:
+            message = self.message_cache[m_id]
+        if message is None and user is not None and user.id != client.user.id:
             message = await user.fetch_message(m_id)
-            self.message_cache[m_id] = message
-            return message
-        if channel is not None:
+            if message is not None:
+                self.message_cache[m_id] = message
+        if message is None and channel is not None:
             message = await channel.fetch_message(m_id)
-            self.message_cache[m_id] = message
-            return message
+            if message is not None:
+                self.message_cache[m_id] = message
+        lim = 10000
+        i = iter(self.message_cache)
+        while len(self.message_cache) > lim:
+            self.message_cache.pop(next(i))
+        return message
 
     def loadSave(self):
         try:
@@ -792,7 +798,7 @@ async def outputLoop():
                 message = hist[0]
                 await message.add_reaction(proc)
             else:
-                if ch is not None:
+                if ch:
                     await ch.send(proc)
                 else:
                     try:
