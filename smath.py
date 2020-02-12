@@ -1452,7 +1452,9 @@ lookup time for all elements. Includes many array and numeric operations."""
         return temp
 
     @blocking
-    def pop(self, index):
+    def pop(self, index=None):
+        if index is None:
+            return self.popright()
         if index >= len(self.data):
             return self.popright(force=True)
         elif index == 0:
@@ -1520,13 +1522,6 @@ lookup time for all elements. Includes many array and numeric operations."""
                 output += 1
         return output
 
-    @blocking
-    def extend(self, value):
-        value = self.forceTuple(value)
-        for i in value:
-            self.append(i, force=True)
-        return self
-
     @waiting
     def concat(self, value):
         temp = self.copy()
@@ -1545,6 +1540,22 @@ lookup time for all elements. Includes many array and numeric operations."""
         return self
 
     appendright = append
+
+    @blocking
+    def extendleft(self, value):
+        value = reversed(self.forceTuple(value))
+        for i in value:
+            self.appendleft(i, force=True)
+        return self
+
+    @blocking
+    def extend(self, value):
+        value = self.forceTuple(value)
+        for i in value:
+            self.append(i, force=True)
+        return self
+
+    extendright = extend
 
     @blocking
     def fill(self, value):
@@ -1598,7 +1609,7 @@ lookup time for all elements. Includes many array and numeric operations."""
         values = collections.deque()
         l = sorted(data)
         for i in l:
-            values.append(data[i])
+            values.append(data.pop(i))
         self.__init__(values)
 
     def __init__(self, iterable=(), maxoff=__maxoff, **void):
@@ -2109,6 +2120,13 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     def __reversed__(self):
         return self.iterator(True)
+
+    @waiting
+    def __bytes__(self):
+        temp = bytes()
+        for i in self:
+            temp += bytes((round(i) & 255,))
+        return temp
 
     def __contains__(self, item):
         for i in self:
