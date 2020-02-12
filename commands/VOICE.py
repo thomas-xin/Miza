@@ -1349,7 +1349,7 @@ class player:
                     return
         text = orig + self.showCurr(auds) + "```"
         last = message.channel.last_message
-        if last is not None and auds.player["type"] or message.id == last.id:
+        if last is not None and (auds.player["type"] or message.id == last.id):
             await message.edit(
                 content=text,
                 )
