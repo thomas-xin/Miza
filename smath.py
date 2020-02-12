@@ -1333,6 +1333,11 @@ _hlist__maxoff = (1 << 1) - 1
 
 class hlist(collections.abc.MutableSequence):
 
+    """
+custom list-like data structure that incorporates the functionality of dicts in \
+order to have average O(1) constant time insertion on both sides as well as O(1) \
+lookup time for all elements. Includes many array and numeric operations."""
+
     def waiting(func):
         def call(self, *args, force=False, **kwargs):
             if not force:
@@ -2155,6 +2160,8 @@ class _parallel:
 
 def doParallel(func, data_in=None, data_out=[0], start=0, end=None,
                per=1, delay=0, maxq=64, name=False):
+    """
+Performs an action using parallel threads."""
     global processes
     if end == None:
         end = len(data_out)

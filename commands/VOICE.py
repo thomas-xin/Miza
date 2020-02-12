@@ -150,10 +150,9 @@ class customAudio(discord.AudioSource):
             self.prev = q[0]["id"]
             q.pop(0)
             if self.stats["shuffle"]:
-                if len(q):
-                    t2 = q[0]
-                    q.pop(0)
-                    shuffle(q)
+                if len(q) > 1:
+                    t2 = q.pop(0)
+                    q = q.shuffle()
                     q.insert(0, t2)
             if self.stats["loop"] and loop:
                 temp["id"] = temp["id"]
@@ -886,6 +885,8 @@ class pause:
         auds = await forceJoin(guild, channel, user, client, _vars)
         if not auds.paused > 1:
             auds.paused = name == "pause"
+        if auds.player is not None:
+            auds.player["time"] = 0
         if auds.stats["quiet"] & 2:
             try:
                 await message.delete()
@@ -924,6 +925,8 @@ class seek:
                 elif len(data):
                     raise ValueError("Too many time arguments.")
         pos = auds.seek(pos)
+        if auds.player is not None:
+            auds.player["time"] = 0
         if auds.stats["quiet"] & 2:
             try:
                 await message.delete()
@@ -988,6 +991,8 @@ class dump:
             e["skips"] = []
         if d.get("player"):
             await createPlayer(auds, p_type=d["player"])
+        if auds.player is not None:
+            auds.player["time"] = 0
         if not "a" in flags:
             #print("Stopped audio playback in " + guild.name)
             auds.new()
