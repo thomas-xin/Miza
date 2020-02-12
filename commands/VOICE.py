@@ -1190,21 +1190,30 @@ class player:
             output += "🔀"
         output += "\n"
         v = abs(auds.stats["volume"])
+        if v == 0:
+            output += "🔇"
         if v <= 0.5:
             output += "🔉"
         elif v <= 1:
             output += "🔊"
-        else:
+        elif v <= 5:
             output += "📢"
+        else:
+            output += "🌪️"
         b = auds.stats["bassboost"]
         if abs(b) > 1 / 3:
-            if b > 0:
+            if abs(b) > 5:
+                output += "💥"
+            elif b > 0:
                 output += "🥁"
             else:
                 output += "🎻"
         r = auds.stats["reverb"]
         if r:
-            output += "📉"
+            if abs(r) >= 1:
+                output += "📈"
+            else:
+                output += "📉"
         c = auds.stats["chorus"]
         if c:
             output += "📊"
@@ -1295,9 +1304,7 @@ class player:
                 elif i == 5:
                     v = abs(auds.stats["volume"])
                     if v < 0.25 or v >= 2:
-                        v = 0.25
-                    elif v < 0.5:
-                        v = 0.5
+                        v = 1 / 3
                     elif v < 1:
                         v = 1
                     else:
