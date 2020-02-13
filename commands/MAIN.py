@@ -305,8 +305,13 @@ class restart:
         else:
             await channel.send("Restarting... :wave:")
         if perm is nan or frand(1) > 0.75:
-            _vars.suspected.close()
-            os.remove(_vars.suspected)
+            while True:
+                try:
+                    os.remove(_vars.suspected)
+                    break
+                except:
+                    print(traceback.format_exc())
+                    time.sleep(0.1)
         _vars.update()
         _vars.update(True)
         for vc in client.voice_clients:
