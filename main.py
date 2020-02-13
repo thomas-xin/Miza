@@ -13,6 +13,9 @@ def delete(f):
             time.sleep(1)
     
 name = "C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe"
+op = "start powershell .\\bot.bat"
+#name = "C:\\WINDOWS\\system32\\cmd.exe"
+#op = "start cmd /abovenormal /c bot.bat"
 filt = "taskkill /f /fi \"windowtitle eq " + name + "\""
 
 kill()
@@ -20,7 +23,7 @@ delete("shutdown")
 delete("heartbeat")
 
 while not "shutdown" in os.listdir():
-    os.system("start powershell .\\bot.bat")
+    os.system(op)
     print("Bot started.")
     time.sleep(30)
     print("Heartbeat started.")

@@ -132,7 +132,7 @@ class customAudio(discord.AudioSource):
             if self.reverse and len(self.queue):
                 self.stats["position"] = self.queue[0]["duration"]
         if self.source is not None and self.player:
-            self.player["time"] = 1
+            self.player["time"] = 2
 
     def seek(self, pos):
         duration = self.queue[0]["duration"]
@@ -164,7 +164,7 @@ class customAudio(discord.AudioSource):
             self.preparing = False
             return len(q)
         if self.player:
-            self.player["time"] = 1
+            self.player["time"] = 2
 
     async def updatePlayer(self):
         curr = self.player
@@ -888,7 +888,7 @@ class pause:
         if not auds.paused > 1:
             auds.paused = name == "pause"
         if auds.player is not None:
-            auds.player["time"] = 0
+            auds.player["time"] = 1
         if auds.stats["quiet"] & 2:
             try:
                 await message.delete()
@@ -928,7 +928,7 @@ class seek:
                     raise ValueError("Too many time arguments.")
         pos = auds.seek(pos)
         if auds.player is not None:
-            auds.player["time"] = 0
+            auds.player["time"] = 1
         if auds.stats["quiet"] & 2:
             try:
                 await message.delete()
@@ -1385,7 +1385,7 @@ class player:
             except discord.NotFound:
                 pass
         if auds.queue:
-            maxdel = auds.queue[0]["duration"] - auds.stats["position"] + 1
+            maxdel = auds.queue[0]["duration"] - auds.stats["position"] + 2
             delay = min(maxdel, auds.queue[0]["duration"] / self.barsize / abs(auds.stats["speed"]))
         else:
             delay = inf
