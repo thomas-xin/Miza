@@ -6,6 +6,7 @@ import math, cmath, fractions, mpmath, sympy, ctypes, collections
 import numpy, tinyarray
 
 array = tinyarray.array
+deque = collections.deque
 import colorsys, random, threading, time
 from scipy import interpolate, special
 
@@ -1431,6 +1432,12 @@ lookup time for all elements. Includes many array and numeric operations."""
         return self
 
     @blocking
+    def rotateleft(self, steps):
+        return self.rotate(-steps, force=True)
+
+    rotateright = rotate
+
+    @blocking
     def isempty(self):
         s = len(self.data)
         if s:
@@ -1617,7 +1624,7 @@ lookup time for all elements. Includes many array and numeric operations."""
     def reconstitute(self, data=None):
         if data is None:
             data = self.data
-        values = collections.deque()
+        values = deque()
         l = sorted(data)
         for i in l:
             values.append(data.pop(i))

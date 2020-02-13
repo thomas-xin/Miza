@@ -301,9 +301,10 @@ class restart:
             if s_perm is not nan:
                 raise PermissionError("Insufficient priviliges to request shutdown.")
             await channel.send("Shutting down... :wave:")
+            f = open("shutdown", "wb")
+            f.close()
         else:
             await channel.send("Restarting... :wave:")
-            os.system("start cmd /c miza.bat")
         _vars.update(True)
         for vc in client.voice_clients:
             await vc.disconnect(force=True)

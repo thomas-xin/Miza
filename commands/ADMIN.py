@@ -37,10 +37,12 @@ class purge:
                     + ", Current level: " + uniStr(perm) + "."
                 )
         lim = count*2+16
+        if lim < 0:
+            lim = 0
         if not isValid(lim):
             lim = None
         hist = await channel.history(limit=lim).flatten()
-        delM = []
+        delM = hlist()
         deleted = 0
         for m in hist:
             if count <= 0:
@@ -50,14 +52,19 @@ class purge:
                 count -= 1
         while len(delM):
             try:
-                await channel.delete_messages(delM[:100])
-                deleted += min(len(delM), 100)
-                delM = delM[100:]
+                try:
+                    await channel.delete_messages(delM[:100])
+                    deleted += min(len(delM), 100)
+                    for i in range(100):
+                        delM.popleft()
+                except AttributeError:
+                    await delM[0].delete()
+                    deleted += 1
+                    delM.pop(0)
             except:
                 print(traceback.format_exc())
-                await delM[0].delete()
+                await delM.pop(0).delete()
                 deleted += 1
-                delM = delM[1:]
         if not "h" in flags:
             return (
                 "```css\nDeleted " + uniStr(deleted)

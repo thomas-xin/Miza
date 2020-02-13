@@ -131,6 +131,8 @@ class customAudio(discord.AudioSource):
         if pos == 0:
             if self.reverse and len(self.queue):
                 self.stats["position"] = self.queue[0]["duration"]
+        if self.source is not None and self.player:
+            self.player["time"] = 1
 
     def seek(self, pos):
         duration = self.queue[0]["duration"]
@@ -1350,11 +1352,17 @@ class player:
                 elif i == 14:
                     auds.dead = True
                     auds.player = None
-                    await message.delete()
+                    try:
+                        await message.delete()
+                    except discord.NotFound:
+                        pass
                     return
                 else:
                     auds.player = None
-                    await message.delete()
+                    try:
+                        await message.delete()
+                    except discord.NotFound:
+                        pass
                     return
         text = orig + self.showCurr(auds) + "```"
         last = message.channel.last_message
@@ -1364,6 +1372,7 @@ class player:
                 content=text,
                 )
         else:
+            auds.player["time"] = inf
             auds.player["events"] += 2
             channel = message.channel
             temp = message
@@ -1375,8 +1384,11 @@ class player:
                 await temp.delete()
             except discord.NotFound:
                 pass
-        maxdel = auds.queue[0]["duration"] - auds.stats["position"] + 1
-        delay = min(maxdel, auds.queue[0]["duration"] / self.barsize / abs(auds.stats["speed"]))
+        if auds.queue:
+            maxdel = auds.queue[0]["duration"] - auds.stats["position"] + 1
+            delay = min(maxdel, auds.queue[0]["duration"] / self.barsize / abs(auds.stats["speed"]))
+        else:
+            delay = inf
         if delay > 20:
             delay = 20
         elif delay < 6:
