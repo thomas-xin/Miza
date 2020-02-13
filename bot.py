@@ -762,15 +762,20 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
 
 async def heartbeatLoop():
     print("Heartbeat Loop initiated.")
-    while True:
-        if "heartbeat" in os.listdir():
+    try:
+        while True:
             try:
-                os.remove("heartbeat")
-                await asyncio.sleep(5)
-            except:
-                print(traceback.format_exc())
-        else:
+                _vars
+            except NameError:
+                sys.exit()
+            if "heartbeat" in os.listdir():
+                try:
+                    os.remove("heartbeat")
+                except:
+                    print(traceback.format_exc())
             await asyncio.sleep(1)
+    except asyncio.exceptions.CancelledError:
+        sys.exit()
 
 
 async def outputLoop():
@@ -872,7 +877,7 @@ async def changeColour(g_id, roles, counter):
             print(traceback.format_exc())
             _vars.blocked += 20
             break
-
+        
 
 @client.event
 async def on_ready():
@@ -1236,4 +1241,9 @@ async def on_raw_message_edit(payload):
 if __name__ == "__main__":
     _vars = __globals()
     print("Attempting to authorize with token " + _vars.token + ":")
-    client.run(_vars.token)
+    try:
+        client.run(_vars.token)
+    except KeyboardInterrupt:
+        sys.exit()
+    except SystemExit:
+        sys.exit()

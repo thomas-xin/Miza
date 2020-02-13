@@ -308,13 +308,20 @@ class restart:
         _vars.update(True)
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
+        while True:
+            try:
+                f = open("heartbeat", "wb")
+                f.close()
+                break
+            except:
+                print(traceback.format_exc())
+                await asyncio.sleep(0.1)
         try:
             await client.close()
         except:
             del client
         del _vars
         sys.exit()
-        raise BaseException("Shutting down...")
 
 
 class suspend:
