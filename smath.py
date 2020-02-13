@@ -2309,6 +2309,8 @@ if 1:
         while True:
             if printLocals:
                 printLocals += printVars
+                if len(printLocals) > 500 or printLocals.count("\n") > 5:
+                    printLocals = limStr(printLocals.replace("\n", " "), 200)
                 origPrint(printLocals,end="")
                 printGlobals += printLocals
                 printLocals = ""
