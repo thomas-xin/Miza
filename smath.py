@@ -1392,10 +1392,15 @@ lookup time for all elements. Includes many array and numeric operations."""
         except TypeError:
             return self.constantIterator(other)
 
+    def remove(self, item):
+        del item
+
     @blocking
     def clear(self):
+        temp = self.data
         self.data = {}
         self.offs = 0
+        doParallel(self.remove, [temp])
         return self
 
     @waiting
@@ -1432,8 +1437,10 @@ lookup time for all elements. Includes many array and numeric operations."""
             if abs(self.offs) > self.maxoff:
                 self.reconstitute(force=True)
             elif s == 1 and self.offs:
+                temp = self.data
                 self.data = {0: self.data[self.offs]}
                 self.offs = 0
+                doParallel(self.remove, [temp])
             return False
         self.offs = 0
         return True
@@ -1496,7 +1503,7 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @blocking
     def remove(self, value):
-        for i in self.data:
+        for i in range(self.offs, self.offs + len(self.data)):
             if self.data[i] == value:
                 self.pop(i, force=True)
                 self.isempty(force=True)
@@ -1505,16 +1512,16 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @waiting
     def index(self, value):
-        for i in range(len(self.data)):
-            if self[i] == value:
+        for i in self:
+            if i == value:
                 return i
         raise IndexError(str(value) + " not found.")
 
     @waiting
     def search(self, value):
         output = hlist()
-        for i in range(len(self.data)):
-            if self[i] == value:
+        for i in self:
+            if i == value:
                 output.append(i, force=True)
         return output
 
@@ -2080,7 +2087,7 @@ lookup time for all elements. Includes many array and numeric operations."""
             temp = hlist()
             s = key.indices(len(self.data))
             for i in xrange(*s):
-                temp.append(self[i], force=True)
+                temp.append(self.data[i + self.offs], force=True)
             return temp
         elif type(key) is not int:
             key = complex(key)
