@@ -162,7 +162,7 @@ class customAudio(discord.AudioSource):
             self.preparing = False
             return len(q)
         if self.player:
-            self.player["time"] = 0
+            self.player["time"] = 1
 
     async def updatePlayer(self):
         curr = self.player
@@ -989,10 +989,10 @@ class dump:
             e["added by"] = user.name
             e["u_id"] = user.id
             e["skips"] = []
-        if d.get("player"):
+        if "player" in d:
             await createPlayer(auds, p_type=d["player"])
         if auds.player is not None:
-            auds.player["time"] = 0
+            auds.player["time"] = 1
         if not "a" in flags:
             #print("Stopped audio playback in " + guild.name)
             auds.new()
@@ -1375,8 +1375,12 @@ class player:
             except discord.NotFound:
                 pass
         maxdel = auds.queue[0]["duration"] - auds.stats["position"] + 1
-        delay = max(6, min(maxdel, auds.queue[0]["duration"] / self.barsize / abs(auds.stats["speed"])))
-        if auds.paused:
+        delay = min(maxdel, auds.queue[0]["duration"] / self.barsize / abs(auds.stats["speed"]))
+        if delay > 20:
+            delay = 20
+        elif delay < 6:
+            delay = 6
+        if auds.paused & 1:
             delay = inf
         auds.player["time"] = time.time() + delay
 

@@ -976,6 +976,7 @@ async def handleUpdate(force=False):
                         except NameError:
                             continue
                         asyncio.create_task(research(auds, ytdl))
+                        i = 0
                         for e in q:
                             e_id = e["id"]
                             if not e_id:
@@ -983,6 +984,9 @@ async def handleUpdate(force=False):
                                 continue
                             if e_id in _vars.audiocache:
                                 e["duration"] = _vars.audiocache[e_id][0]
+                            i += 1
+                            if i > 10000:
+                                break
                         if len(q):
                             for i in range(2):
                                 if i < len(q):

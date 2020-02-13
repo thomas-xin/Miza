@@ -1427,12 +1427,16 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @blocking
     def isempty(self):
-        if len(self.data):
+        s = len(self.data)
+        if s:
             if abs(self.offs) > self.maxoff:
                 self.reconstitute(force=True)
-            return True
+            elif s == 1 and self.offs:
+                self.data = {0: self.data[self.left]}
+                self.offs = 0
+            return False
         self.offs = 0
-        return False
+        return True
 
     @blocking
     def popleft(self):
@@ -1454,7 +1458,7 @@ lookup time for all elements. Includes many array and numeric operations."""
     @blocking
     def pop(self, index=None):
         if index is None:
-            return self.popright()
+            return self.popright(force=True)
         if index >= len(self.data):
             return self.popright(force=True)
         elif index == 0:
