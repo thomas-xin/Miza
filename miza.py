@@ -15,3 +15,5 @@ while "shutdown" in os.listdir():
     except:
         print(traceback.format_exc())
         time.sleep(1)
+print("Shutdown signal confirmed. Press [ENTER] to close.")
+input()
