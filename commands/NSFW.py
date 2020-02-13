@@ -1,4 +1,4 @@
-import nekos, rule34, discord, urllib, asyncio
+import nekos, rule34, discord, urllib
 from smath import *
 
 image_forms = [

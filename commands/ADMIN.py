@@ -1,4 +1,4 @@
-import datetime, traceback, copy
+import datetime
 from smath import *
 
 
@@ -153,7 +153,7 @@ class ban:
                     response += "\nError: " + repr(ex)
                     continue
             g_bans[t_user.id] = [secs + dtime, channel.id]
-            doParallel(_vars.update)
+            _vars.update()
             if is_banned:
                 response += (
                     "\nUpdated ban for " + uniStr(t_user.name)
@@ -185,7 +185,7 @@ class roleGiver:
     async def __call__(self, _vars, argv, args, user, channel, guild, flags, **void):
         if "d" in flags:
             _vars.scheduled[channel.id] = {}
-            doParallel(_vars.update)
+            _vars.update()
             return "```css\nRemoved all automated role givers from channel " + uniStr(channel.name) + ".```"
         currentSchedule = _vars.scheduled.setdefault(channel.id, {})
         if not argv:
@@ -209,7 +209,7 @@ class roleGiver:
             role = args[1].lower()
             r_type = "role"
         currentSchedule[react] = {"role": role, "deleter": "r" in flags}
-        doParallel(_vars.update)
+        _vars.update()
         return (
             "```css\nAdded role giver with reaction to " + uniStr(react)
             + " and " + r_type + " " + uniStr(role)
@@ -246,7 +246,7 @@ class defaultPerms:
         if not "defaults" in _vars.perms:
             _vars.perms["defaults"] = {}
         _vars.perms["defaults"][guild.id] = c_perm
-        doParallel(_vars.update)
+        _vars.update()
         return (
             "```css\nChanged default permission level of " + uniStr(guild.name)
             + " to " + uniStr(c_perm) + ".```"
@@ -290,7 +290,7 @@ class rainbowRole:
                         pass
                 else:
                     guild_special[r.id] = delay
-        doParallel(_vars.update)
+        _vars.update()
         return (
             "Changed dynamic role colours for **" + guild.name
             + "** to:\n```css\n" + str(guild_special) + "```"
@@ -319,11 +319,11 @@ class follow:
             curr = copy.deepcopy(follow_default)
         if "d" in flags:
             curr["follow"] = False
-            doParallel(_vars.update)
+            _vars.update()
             return "```css\nDisabled follow imitating for " + uniStr(guild.name) + ".```"
         elif "e" in flags:
             curr["follow"] = True
-            doParallel(_vars.update)
+            _vars.update()
             return "```css\nEnabled follow imitating for " + uniStr(guild.name) + ".```"
         else:
             return (
@@ -349,7 +349,7 @@ class react:
         if not argv:
             if "d" in flags:
                 curr["reacts"] = {}
-                doParallel(_vars.update)
+                _vars.update()
                 return "```css\nRemoved all auto reacts for " + uniStr(guild.name) + ".```"
             else:
                 return (
@@ -360,7 +360,7 @@ class react:
         if "d" in flags:
             if a in curr["reacts"]:
                 curr["reacts"].pop(a)
-                doParallel(_vars.update)
+                _vars.update()
                 return (
                     "```css\nRemoved " + uniStr(a) + " from the auto react list for "
                     + uniStr(guild.name) + ".```"
@@ -368,7 +368,7 @@ class react:
             else:
                 raise LookupError(uniStr(a) + " is not in the auto react list.")
         curr["reacts"][a] = args[1]
-        doParallel(_vars.update)
+        _vars.update()
         return (
             "```css\nAdded " + uniStr(a) + ": " + uniStr(args[1]) + " to the auto react list for "
             + uniStr(guild.name) + ".```"

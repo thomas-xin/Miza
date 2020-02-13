@@ -1,7 +1,10 @@
-import discord, ast, os, sys, asyncio, datetime, json, shlex, traceback
+import discord, os, sys, datetime, json
 import urllib.request
 from smath import *
 
+from matplotlib import use as plot_sys
+plot_sys("Agg")
+from matplotlib import pyplot as plt
 
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
@@ -9,11 +12,6 @@ sys.path.insert(1, "misc")
 client = discord.Client(
     max_messages=2000,
     )
-    
-
-from matplotlib import use as plot_sys
-plot_sys("Agg")
-from matplotlib import pyplot as plt
 
 
 def tryFunc(func, *args, force=False, amax, **kwargs):
@@ -211,6 +209,7 @@ class __globals:
     client = client
 
     def __init__(self):
+        print("Initializing...")
         if not os.path.exists("cache/"):
             os.mkdir("cache/")
         self.lastCheck = time.time()
@@ -229,10 +228,12 @@ class __globals:
         self.guilds = 0
         self.blocked = 0
         self.doUpdate = False
+        self.updated = False
         self.msgFollow = {}
         self.audiocache = {}
         self.clearAudioCache()
         self.message_cache = {}
+        print("Initialized.")
 
     async def fetch_user(self, u_id):
         try:
@@ -266,9 +267,12 @@ class __globals:
         if m_id in self.message_cache:
             message = self.message_cache[m_id]
         if message is None and user is not None and user.id != client.user.id:
-            message = await user.fetch_message(m_id)
-            if message is not None:
-                self.message_cache[m_id] = message
+            try:
+                message = await user.fetch_message(m_id)
+                if message is not None:
+                    self.message_cache[m_id] = message
+            except discord.NotFound:
+                pass
         if message is None and channel is not None:
             message = await channel.fetch_message(m_id)
             if message is not None:
@@ -339,23 +343,27 @@ class __globals:
 
     def update(self, force=False):
         if force:
-            try:
-                f = open(self.savedata, "wb")
-                savedata = {
-                    "perms": self.perms,
-                    "bans": self.bans,
-                    "enabled": self.enabled,
-                    "scheduled": self.scheduled,
-                    "special": self.special,
-                    "following": self.following,
-                    "playlists": self.playlists,
-                    "imglists": self.imglists,
-                    }
-                s = bytes(repr(savedata), "utf-8")
-                f.write(s)
-                f.close()
-            except Exception as ex:
-                print(traceback.format_exc())
+            if self.updated:
+                try:
+                    f = open(self.savedata, "wb")
+                    savedata = {
+                        "perms": self.perms,
+                        "bans": self.bans,
+                        "enabled": self.enabled,
+                        "scheduled": self.scheduled,
+                        "special": self.special,
+                        "following": self.following,
+                        "playlists": self.playlists,
+                        "imglists": self.imglists,
+                        }
+                    s = bytes(repr(savedata), "utf-8")
+                    f.write(s)
+                    f.close()
+                    self.updated = False
+                except Exception as ex:
+                    print(traceback.format_exc())
+        else:
+            self.updated = True
 
     def clearAudioCache(self):
         should_cache = []
@@ -774,15 +782,22 @@ async def heartbeatLoop():
                 except:
                     print(traceback.format_exc())
             await asyncio.sleep(1)
-    except asyncio.exceptions.CancelledError:
+    except asyncio.CancelledError:
         sys.exit()
+
+
+def sendInput(output):
+    while True:
+        output[0] = input()
 
 
 async def outputLoop():
     print("Output Loop initiated.")
+    msg = [None]
+    doParallel(sendInput, [msg], name="inputter")
     while True:
         try:
-            msg = [None]
+            msg[0] = None
             ch = _vars.current_channel
             if ch is not None:
                 chan = str(ch.id)
@@ -790,9 +805,8 @@ async def outputLoop():
                 chan = ""
             printed = chan + ">>> "
             setPrint(printed)
-            doParallel(input, [printed], msg, name="inputter")
             while msg[0] is None:
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.01)
             proc = msg[0]
             if not proc:
                 continue

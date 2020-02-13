@@ -24,15 +24,17 @@ while not "shutdown" in os.listdir():
     print("Bot started.")
     time.sleep(30)
     print("Heartbeat started.")
-    while not "heartbeat" in os.listdir():
+    alive = True
+    while alive:
         f = open("heartbeat", "wb")
         f.close()
         print("Heartbeat at " + str(round(time.time(), 3)) + ".")
-        time.sleep(5)
-        for i in range(5):
-            if "heartbeat" in os.listdir():
-                break
+        time.sleep(2)
+        for i in range(3):
             time.sleep(1)
+            if "heartbeat" in os.listdir():
+                alive = False
+                break
     kill(3)
     print("Bot closed without shutdown signal, restarting...")
     

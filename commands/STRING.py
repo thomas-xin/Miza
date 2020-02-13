@@ -55,11 +55,11 @@ class math:
         if not len(f):
             raise EOFError("Function is empty.")
         terr = self
-        returns = [terr]
+        returns = [BaseException]
         doParallel(_vars.doMath, [f, returns])
-        while returns[0] == terr and time.time() < tm + _vars.timeout / 2:
-            await asyncio.sleep(0.01)
-        if returns[0] == terr:
+        while returns[0] is BaseException and time.time() < tm + _vars.timeout / 2:
+            await asyncio.sleep(0.1)
+        if returns[0] == BaseException:
             raise TimeoutError("Request timed out.")
         _vars.updateGlobals()
         if _vars.fig.get_axes():
@@ -73,7 +73,7 @@ class math:
                 if "h" in flags:
                     return
                 return "```python\n" + argv + " successfully executed!```"
-            elif "\nError" in answer:
+            elif "\nError: " in answer:
                 return "```python" + answer + "\n```", 1
             else:
                 return "```python\n" + argv + " = " + str(answer) + "\n```"

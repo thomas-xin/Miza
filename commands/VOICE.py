@@ -1,4 +1,4 @@
-import youtube_dl, asyncio, discord, time, os, urllib, json, copy, traceback
+import youtube_dl, asyncio, discord, os, urllib, json
 from subprocess import check_output, CalledProcessError, STDOUT
 from scipy.signal import butter, sosfilt
 from smath import *
@@ -582,7 +582,7 @@ class queue:
             doParallel(self.ytdl.search, [argv], output)
             await channel.trigger_typing()
             while output[0] is None:
-                await asyncio.sleep(0.01)
+                await asyncio.sleep(0.1)
             res = output[0]
             if type(res) is str:
                 raise ConnectionError(res)
@@ -655,7 +655,7 @@ class playlist:
         if not argv:
             if "d" in flags:
                 _vars.playlists[guild.id] = []
-                doParallel(_vars.update)
+                _vars.update()
                 return "```css\nRemoved all entries from the default playlist for " + uniStr(guild.name) + ".```"
             if "v" in flags:
                 return (
@@ -679,7 +679,7 @@ class playlist:
             i = _vars.evalMath(argv)
             temp = pl[i]
             pl.pop(i)
-            doParallel(_vars.update)
+            _vars.update()
             return (
                 "```css\nRemoved " + uniStr(noSquareBrackets(temp["name"])) + " from the default playlist for "
                 + uniStr(guild.name) + ".```"
@@ -688,7 +688,7 @@ class playlist:
         doParallel(self.ytdl.search, [argv, True], output)
         await channel.trigger_typing()
         while output[0] is None:
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.1)
         res = output[0]
         if type(res) is str:
             raise ConnectionError(res)
@@ -704,7 +704,7 @@ class playlist:
                 })
         if len(names):
             pl.sort(key=lambda x: x["name"][0].lower())
-            doParallel(_vars.update)
+            _vars.update()
             return "```css\nAdded " + uniStr(names) + " to the default playlist for " + uniStr(guild.name) + ".```"
         
 

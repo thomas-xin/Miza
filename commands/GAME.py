@@ -1,4 +1,3 @@
-import ast, copy, asyncio
 from smath import *
 
 

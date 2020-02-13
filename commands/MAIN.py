@@ -230,13 +230,13 @@ class enableCommand:
                 categories = list(_vars.categories)
                 categories.remove("main")
                 _vars.enabled[channel.id] = categories
-                doParallel(_vars.update)
+                _vars.update()
                 if "h" in flags:
                     return
                 return "```css\nEnabled all command categories in " + uniStr(channel.name) + ".```"
             if "d" in flags:
                 _vars.enabled[channel.id] = []
-                doParallel(_vars.update)
+                _vars.update()
                 if "h" in flags:
                     return
                 return "```css\nDisabled all command categories in " + uniStr(channel.name) + ".```"
@@ -257,7 +257,7 @@ class enableCommand:
                             + " is already enabled in " + uniStr(channel.name) + "."
                         )
                     enabled.append(catg)
-                    doParallel(_vars.update)
+                    _vars.update()
                     if "h" in flags:
                         return
                     return (
@@ -271,7 +271,7 @@ class enableCommand:
                             + " is not currently enabled in " + uniStr(channel.name) + "."
                         )
                     enabled.remove(catg)
-                    doParallel(_vars.update)
+                    _vars.update()
                     if "h" in flags:
                         return
                     return (
@@ -345,7 +345,7 @@ class suspend:
             user = await _vars.fetch_user(_vars.verifyID(args[0]))
             change = _vars.evalMath(args[1])
             _vars.bans[0][user.id] = change
-            doParallel(_vars.update)
+            _vars.update()
             return (
                 "```css\nChanged suspension status of " + uniStr(user.name) + " to "
                 + uniStr(change) + ".```"

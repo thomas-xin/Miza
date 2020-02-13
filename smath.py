@@ -2,12 +2,13 @@
 Adds many useful math-related functions.
 """
 
-import math, cmath, fractions, mpmath, sympy, ctypes, collections
-import numpy, tinyarray
+import asyncio, threading, time, traceback, ctypes, collections, ast
+import random, math, cmath, fractions, mpmath, sympy, shlex
+import numpy, tinyarray, colorsys
 
 array = tinyarray.array
 deque = collections.deque
-import colorsys, random, threading, time
+
 from scipy import interpolate, special
 
 random.seed(random.random() + time.time() % 1)
@@ -2198,15 +2199,16 @@ def performAction(action):
 
 class _parallel:
     def __init__(self):
-        self.max = 32
-        self.running = {i: self.new() for i in range(self.max)}
+        self.max = 64
+        self.running = {i: self.new(i) for i in range(self.max)}
         for i in self.running:
             self.running[i].start()
 
     class new(threading.Thread):
-        def __init__(self):
+        def __init__(self, p_id):
             threading.Thread.__init__(self)
-            self.actions = []
+            self.id = p_id
+            self.actions = hlist()
             self.state = 0
             self.daemon = True
             self._stop = threading.Event()
@@ -2219,10 +2221,12 @@ class _parallel:
             while True:
                 try:
                     while self.actions:
-                        action = self.actions[0]
-                        self.actions.pop(0)
+                        action = self.actions.popleft()
                         performAction(action)
                     self.state = -1
+                except TimeoutError:
+                    pass
+                try:
                     time.sleep(0.007)
                 except TimeoutError:
                     pass
@@ -2247,20 +2251,23 @@ class _parallel:
                     thread_id, ctypes.py_object(BaseException)
                     )
                 self.stop()
+                processes.running[self.id] = processes.new(self.id)
+                del self
 
 
 def doParallel(func, data_in=None, data_out=[0], start=0, end=None,
-               per=1, delay=0, maxq=64, name=False):
+               per=1, delay=0, maxq=64, name=None):
     """
 Performs an action using parallel threads."""
     global processes
+    #t = time.time()
     if end == None:
-        end = len(data_out)
+        end = len(data_out) + start
     ps = processes.running
     for i in range(start, end):
-        if name:
+        if name is not None:
             d = name
-            ps[d] = processes.new()
+            ps[d] = processes.new(d)
             p = ps[d]
             p.start()
         else:
@@ -2277,6 +2284,7 @@ Performs an action using parallel threads."""
                 d = xrand(processes.max)
                 p = ps[d]
         p(func, data_in, data_out, i, delay)
+    #print(time.time() - t)
 
 
 def killThreads():
@@ -2286,8 +2294,6 @@ def killThreads():
         if type(i) is int and i in processes.running:
             p = processes.running[i]
             p.kill()
-            del p
-    processes = _parallel()
 
 
 def waitParallel(delay):
@@ -2305,16 +2311,16 @@ processes = _parallel()
 
 if 1:
     def updatePrint():
-        global printGlobals, printLocals, printVars, origPrint
+        global printGlobals, printLocals, printVars, forcePrint
         while True:
             if printLocals:
                 printLocals += printVars
-                if len(printLocals) > 500 or printLocals.count("\n") > 5:
-                    printLocals = limStr(printLocals.replace("\n", " "), 200)
-                origPrint(printLocals,end="")
+                if len(printLocals) > 1024 or printLocals.count("\n") > 12:
+                    printLocals = limStr(printLocals, 512)
+                forcePrint(printLocals,end="")
                 printGlobals += printLocals
                 printLocals = ""
-            time.sleep(0.1)
+            time.sleep(0.3)
 
 
     def logPrint(*args, sep=" ", end="\n"):
@@ -2337,6 +2343,6 @@ if 1:
     printVars = ""
     printLocals = ""
     printGlobals = ""
-    origPrint = print
+    forcePrint = print
     print = logPrint
     doParallel(updatePrint, name="printer")
