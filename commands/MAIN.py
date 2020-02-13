@@ -295,16 +295,19 @@ class restart:
         self.description = "Restarts or shuts down the bot."
         self.usage = ""
 
-    async def __call__(self, client, channel, user, guild, name, _vars, **void):
+    async def __call__(self, client, channel, user, guild, name, _vars, perm, **void):
         if name == "shutdown":
-            s_perm = _vars.getPerms(user, guild)
-            if s_perm is not nan:
+            if perm is not nan:
                 raise PermissionError("Insufficient priviliges to request shutdown.")
             await channel.send("Shutting down... :wave:")
             f = open("shutdown", "wb")
             f.close()
         else:
             await channel.send("Restarting... :wave:")
+        if perm is nan or frand(1) > 0.75:
+            _vars.suspected.close()
+            os.remove(_vars.suspected)
+        _vars.update()
         _vars.update(True)
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
@@ -339,12 +342,12 @@ class suspend:
                 user = await _vars.fetch_user(_vars.verifyID(args[0]))
             return (
                 "```css\nCurrent suspension status of " + uniStr(user.name) + ": "
-                + uniStr(_vars.bans[0].get(user.id, None)) + ".```"
+                + uniStr(_vars.suspended.get(user.id, None)) + ".```"
                 )
         else:
             user = await _vars.fetch_user(_vars.verifyID(args[0]))
             change = _vars.evalMath(args[1])
-            _vars.bans[0][user.id] = change
+            _vars.suspended[user.id] = change
             _vars.update()
             return (
                 "```css\nChanged suspension status of " + uniStr(user.name) + " to "

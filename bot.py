@@ -96,6 +96,7 @@ fig = plt.figure()
 
 class __globals:
     timeout = 24
+    min_suspend = 3
     deleted = [
         "discord",
         "client",
@@ -283,6 +284,17 @@ class __globals:
             self.message_cache.pop(next(i))
         return message
 
+    async def getDM(self, user):
+        channel = user.dm_channel
+        if channel is None:
+            channel = await user.create_dm()
+        return channel
+
+    def isSuspended(self, u_id):
+        if u_id in (self.owner_id, client.user.id):
+            return False
+        return self.suspended.get(u_id, False) >= time.time() + self.min_suspend * 86400
+
     def loadSave(self):
         try:
             f = open(self.savedata, "rb")
@@ -297,6 +309,7 @@ class __globals:
             self.following = {}
             self.playlists = {}
             self.imglists = {}
+            self.suspended = {}
             self.bans[0] = {}
             self.update()
             f = open(self.savedata)
@@ -311,6 +324,30 @@ class __globals:
         self.following = savedata.get("following", {})
         self.playlists = savedata.get("playlists", {})
         self.imglists = savedata.get("imglists", {})
+        self.suspended = savedata.get("suspended", {})
+
+        try:
+            self.lastsusp = None
+            self.suspected = "suspected.json"
+            f = open(self.suspected, "r")
+            susp = f.readline().replace("\r", "").replace("\n", "")
+            f.close()
+            os.remove(self.suspected)
+            if susp:
+                susp = int(susp)
+                if self.suspended.get(susp) is None:
+                    self.suspended[susp] = time.time() + 86400
+                else:
+                    self.suspended[susp] -= time.time()
+                    self.suspended[susp] *= 1.25
+                    self.suspended[susp] += time.time() + 86400
+                print(susp, (self.suspended[susp] - time.time()) / 86400)
+                if (self.suspended[susp] - time.time()) / 86400 >= self.min_suspend - 1:
+                    self.lastsusp = susp
+                self.update()
+                self.update(True)
+        except FileNotFoundError:
+            pass
 
     def getModule(self, module):
         rename = module.lower()
@@ -355,6 +392,7 @@ class __globals:
                         "following": self.following,
                         "playlists": self.playlists,
                         "imglists": self.imglists,
+                        "suspended": self.suspended,
                         }
                     s = bytes(repr(savedata), "utf-8")
                     f.write(s)
@@ -394,11 +432,11 @@ class __globals:
         if guild:
             g_id = guild.id
             g_perm = self.perms.setdefault(g_id, {})
-            if u_id == self.owner_id or u_id == client.user.id:
+            if u_id in (self.owner_id, client.user.id):
                 u_perm = nan
             else:
                 u_perm = g_perm.get(u_id, self.perms.setdefault("defaults", {}).get(g_id, 0))
-        elif u_id == self.owner_id or u_id == client.user.id:
+        elif u_id in (self.owner_id, client.user.id):
             u_perm = nan
         else:
             u_perm = 1
@@ -465,7 +503,7 @@ class __globals:
 
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:
-            suspended = self.bans[0].get(user.id, False)
+            suspended = _vars.isSuspended(user.id)
             if suspended:
                 return
             u_perm = self.getPerms(user.id, message.guild)
@@ -559,7 +597,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     else:
         op = False
 
-    suspended = _vars.bans[0].get(u_id, False)
+    suspended = _vars.isSuspended(u_id)
     if (suspended and op) or msg.replace(" ", "") == check:
         if not u_perm < 0 and not suspended:
             sent = await channel.send(
@@ -649,6 +687,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             raise ReferenceError("This command is only available in servers.")
                         if not loop and getattr(command, "time_consuming", False):
                             asyncio.create_task(channel.trigger_typing())
+                        _vars.suspclear = time.time()
+                        f = open(_vars.suspected, "w")
+                        f.write(str(user.id) + "\r\n")
+                        f.close()
                         response = await command(
                             client=client,          # for interfacing with discord
                             _vars=_vars,            # for interfacing with bot's database
@@ -730,10 +772,9 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         for i in range(len(temp)):
             if not(temp[i] in s):
                 temp[i] = " "
-        temp = "".join(temp).split(" ")
-        for i in temp:
-            if not len(i.replace(" ", "")):
-                temp.remove(i)
+        temp = "".join(temp)
+        while "  " in temp:
+            temp = temp.replace("  ", " ")
         try:
             for r in _vars.following[g_id]["reacts"]:
                 if r in temp:
@@ -742,7 +783,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
             pass
         currentSchedule = _vars.scheduled.get(channel.id, {})
         for k in currentSchedule:
-            if k in " ".join(temp):
+            if k in temp:
                 curr = currentSchedule[k]
                 role = curr["role"]
                 deleter = curr["deleter"]
@@ -770,12 +811,20 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
 
 async def heartbeatLoop():
     print("Heartbeat Loop initiated.")
+    _vars.suspclear = inf
     try:
         while True:
             try:
                 _vars
             except NameError:
                 sys.exit()
+            if time.time() - _vars.suspclear > 7:
+                _vars.suspclear = inf
+                try:
+                    os.remove(_vars.suspected)
+                except:
+                    print(traceback.format_exc())
+                #forcePrint("Cleared.")
             if "heartbeat" in os.listdir():
                 try:
                     os.remove("heartbeat")
@@ -814,10 +863,12 @@ async def outputLoop():
                 proc = proc[1:]
                 if not proc:
                     ch = _vars.current_channel = None
+                    print()
                     continue
                 try:
                     chanID = int(proc)
                     _vars.current_channel = await _vars.fetch_channel(chanID)
+                    print()
                 except ValueError:
                     sent = await ch.send("*** ***")
                     await processMessage(sent, reconstitute(proc))
@@ -825,21 +876,25 @@ async def outputLoop():
                         await sent.delete()
                     except discord.NotFound:
                         pass
+                    print()
             elif proc[0] == "&":
                 proc = proc[1:]
                 hist = await ch.history(limit=1).flatten()
                 message = hist[0]
                 await message.add_reaction(proc)
+                print()
             else:
                 if ch:
                     await ch.send(proc)
+                    print()
                 else:
                     try:
-                        print(eval(proc))
+                        output = eval(proc)
+                        print(output)
                     except:
                         try:
                             exec(proc)
-                            print(proc + " successfully executed!")
+                            print(None)
                         except:
                             print(traceback.format_exc())
         except:
@@ -853,7 +908,7 @@ async def updateLoop():
     counter = 0
     while True:
         try:
-            if time.time() - autosave > 60:
+            if time.time() - autosave > 30:
                 autosave = time.time()
                 _vars.update(True)
             while _vars.blocked > 0:
@@ -965,6 +1020,28 @@ async def handleUpdate(force=False):
                             except:
                                 print(traceback.format_exc())
             if changed:
+                _vars.update()
+        if _vars.lastsusp is not None:
+            u_susp = await _vars.fetch_user(_vars.lastsusp)
+            _vars.lastsusp = None
+            channel = await _vars.getDM(u_susp)
+            secs = _vars.suspended.get(u_susp.id, 0) - time.time()
+            msg = (
+                "Apologies for the inconvenience, but your account has been "
+                + "flagged as having attempted a denial-of-service attack.\n"
+                + "This will expire in `" + sec2Time(secs) + "`.\n"
+                + "If you believe this is an error, please notify <@!"
+                + str(_vars.owner_id) + "> as soon as possible."
+                )
+            print(
+                u_susp.name + " may be attempting a DDOS attack. Expires in "
+                + sec2Time(secs) + "."
+                )
+            await channel.send(msg)
+        l = list(_vars.suspended)
+        for u_id in l:
+            if _vars.suspended[u_id] < time.time():
+                _vars.suspended.pop(u_id)
                 _vars.update()
         ytdl = None
         for func in _vars.categories.get("voice", []):
