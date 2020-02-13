@@ -855,7 +855,7 @@ async def outputLoop():
             printed = chan + ">>> "
             setPrint(printed)
             while msg[0] is None:
-                await asyncio.sleep(0.01)
+                await asyncio.sleep(0.1)
             proc = msg[0]
             if not proc:
                 continue
@@ -920,7 +920,7 @@ async def updateLoop():
             await handleUpdate()
             t = time.time()
             while time.time() - t < frand(2) + 2:
-                await asyncio.sleep(0.001)
+                await asyncio.sleep(0.01)
                 if _vars.doUpdate:
                     await handleUpdate(True)
                     _vars.doUpdate = False
@@ -1197,7 +1197,7 @@ async def research(auds, ytdl):
                 t = time.time()
                 doParallel(ytdl.extractSingle, [i], returns)
                 while returns[0] is None and time.time() - t < 10:
-                    await asyncio.sleep(0.01)
+                    await asyncio.sleep(0.1)
                 await asyncio.sleep(0.1)
             except:
                 print(traceback.format_exc())

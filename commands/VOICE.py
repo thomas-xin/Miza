@@ -42,6 +42,15 @@ class customAudio(discord.AudioSource):
         except:
             print(traceback.format_exc())
 
+    def __str__(self):
+        return (
+            "<customAudio object at " + hex(id(self)).upper() + ">: {"
+            + "\"queue\": " + str(self.queue)
+            + ", \"stats\": " + str(self.stats)
+            + ", \"player\": " + str(self.player)
+            + "}"
+            )
+
     def new(self, source=None, pos=0):
         self.reverse = self.stats["speed"] < 0
         self.speed = max(0.01, abs(self.stats["speed"]))
@@ -999,6 +1008,7 @@ class dump:
         if not "a" in flags:
             #print("Stopped audio playback in " + guild.name)
             auds.new()
+            del auds.queue
             auds.queue = hlist(q)
             for k in d["stats"]:
                 if k not in auds.stats:

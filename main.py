@@ -13,7 +13,7 @@ def delete(f):
             time.sleep(1)
     
 name = "C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe"
-op = "start powershell .\\bot.bat"
+op = "start powershell -NoExit -Command \"$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::UTF8\"; .\\bot.bat"
 #name = "C:\\WINDOWS\\system32\\cmd.exe"
 #op = "start cmd /abovenormal /c bot.bat"
 filt = "taskkill /f /fi \"windowtitle eq " + name + "\""

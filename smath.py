@@ -2,7 +2,7 @@
 Adds many useful math-related functions.
 """
 
-import asyncio, threading, time, traceback, ctypes, collections, ast
+import asyncio, threading, time, traceback, ctypes, collections, ast, copy
 import random, math, cmath, fractions, mpmath, sympy, shlex
 import numpy, tinyarray, colorsys
 
