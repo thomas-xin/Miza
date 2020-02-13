@@ -962,9 +962,10 @@ class dump:
                 e.pop("skips")
             d = {
                 "stats": auds.stats,
-                "player": auds.player["type"],
                 "queue": list(q),
                 }
+            if auds.player is not None:
+                d["player"] = auds.player["type"]
             d["stats"].pop("position")
             return "Queue data for **" + guild.name + "**:\n```json\n" + json.dumps(d) + "\n```"
         try:

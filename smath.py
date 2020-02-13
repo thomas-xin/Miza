@@ -1432,7 +1432,7 @@ lookup time for all elements. Includes many array and numeric operations."""
             if abs(self.offs) > self.maxoff:
                 self.reconstitute(force=True)
             elif s == 1 and self.offs:
-                self.data = {0: self.data[self.left]}
+                self.data = {0: self.data[self.offs]}
                 self.offs = 0
             return False
         self.offs = 0
@@ -2108,7 +2108,7 @@ lookup time for all elements. Includes many array and numeric operations."""
             temp = hlist()
             s = key.indices(len(self.data))
             for i in xrange(*s):
-                temp.append(self[i], force=True)
+                temp.append(self.data[i + self.offs], force=True)
                 self.data.pop(i + self.offs)
             self.reconstitute(force=True)
             return temp
