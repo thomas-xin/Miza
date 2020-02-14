@@ -1394,7 +1394,7 @@ lookup time for all elements. Includes many array and numeric operations."""
         except TypeError:
             return self.constantIterator(other)
 
-    def remove(self, item):
+    def deleteobj(self, item):
         del item
 
     @blocking
@@ -1402,7 +1402,7 @@ lookup time for all elements. Includes many array and numeric operations."""
         temp = self.data
         self.data = {}
         self.offs = 0
-        doParallel(self.remove, [temp])
+        doParallel(self.deleteobj, [temp])
         return self
 
     @waiting
@@ -1448,7 +1448,7 @@ lookup time for all elements. Includes many array and numeric operations."""
                 temp = self.data
                 self.data = {0: self.data[self.offs]}
                 self.offs = 0
-                doParallel(self.remove, [temp])
+                doParallel(self.deleteobj, [temp])
             return False
         self.offs = 0
         return True
@@ -1456,8 +1456,7 @@ lookup time for all elements. Includes many array and numeric operations."""
     @blocking
     def popleft(self):
         key = self.offs
-        temp = self.data[key]
-        self.data.pop(key)
+        temp = self.data.pop(key)
         self.offs += 1
         self.isempty(force=True)
         return temp
@@ -1630,6 +1629,13 @@ lookup time for all elements. Includes many array and numeric operations."""
         for i in l:
             values.append(data.pop(i))
         self.__init__(values)
+
+    @blocking
+    def delitems(self, iterable):
+        for i in iterable:
+            self.data.pop(i + self.offs)
+        self.reconstitute(force=True)
+        return self
 
     def __init__(self, iterable=(), maxoff=__maxoff, **void):
         self.chash = None

@@ -55,15 +55,15 @@ class purge:
                 try:
                     await channel.delete_messages(delM[:100])
                     deleted += min(len(delM), 100)
-                    for i in range(100):
+                    for i in range(min(len(delM), 100)):
                         delM.popleft()
                 except AttributeError:
                     await delM[0].delete()
                     deleted += 1
-                    delM.pop(0)
+                    delM.popleft()
             except:
                 print(traceback.format_exc())
-                await delM.pop(0).delete()
+                await delM.popleft().delete()
                 deleted += 1
         if not "h" in flags:
             return (

@@ -304,7 +304,7 @@ class restart:
             f.close()
         else:
             await channel.send("Restarting... :wave:")
-        if perm is nan or frand(1) > 0.75:
+        if perm is nan or frand() > 0.75:
             while True:
                 try:
                     os.remove(_vars.suspected)
@@ -362,7 +362,7 @@ class suspend:
 
 class loop:
     is_command = True
-    time_consuming = True
+    time_consuming = 2
 
     def __init__(self):
         self.name = ["for", "rep", "repeat", "while"]

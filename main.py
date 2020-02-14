@@ -1,7 +1,10 @@
-import os, time, traceback
+import os, time, datetime, traceback
 
 def kill(count=1):
     for i in range(count):
+        filt = "taskkill /f /fi \"windowtitle eq " + name + "\""
+        os.system(filt)
+        filt = "taskkill /f /fi \"windowtitle eq " + opt + name + "\""
         os.system(filt)
 
 def delete(f):
@@ -13,25 +16,32 @@ def delete(f):
             time.sleep(1)
     
 name = "C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe"
-op = "start powershell -NoExit -Command \"$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::UTF8\"; .\\bot.bat"
+opt = "Select "
+op = (
+    "start powershell -NoExit -Command \"$OutputEncoding = "
+    + "[Console]::OutputEncoding = [Text.UTF8Encoding]::UTF8\"; .\\bot.bat"
+    )
 #name = "C:\\WINDOWS\\system32\\cmd.exe"
 #op = "start cmd /abovenormal /c bot.bat"
-filt = "taskkill /f /fi \"windowtitle eq " + name + "\""
 
-kill()
+kill(2)
 delete("shutdown")
 delete("heartbeat")
 
 while not "shutdown" in os.listdir():
     os.system(op)
     print("Bot started.")
-    time.sleep(30)
+    time.sleep(20)
     print("Heartbeat started.")
     alive = True
     while alive:
         f = open("heartbeat", "wb")
         f.close()
-        print("Heartbeat at " + str(round(time.time(), 3)) + ".")
+        print(
+            "Heartbeat at "
+            + str(datetime.datetime.now())
+            + "."
+            )
         time.sleep(2)
         for i in range(3):
             time.sleep(1)

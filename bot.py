@@ -237,6 +237,7 @@ class __globals:
         print("Initialized.")
 
     async def fetch_user(self, u_id):
+        u_id = int(u_id)
         try:
             user = client.get_user(u_id)
             if user is None:
@@ -246,6 +247,7 @@ class __globals:
         return user
 
     async def fetch_guild(self, g_id):
+        g_id = int(g_id)
         try:
             guild = client.get_guild(g_id)
             if guild is None:
@@ -255,6 +257,7 @@ class __globals:
         return guild
 
     async def fetch_channel(self, c_id):
+        c_id = int(c_id)
         try:
             channel = client.get_channel(c_id)
             if channel is None:
@@ -264,6 +267,7 @@ class __globals:
         return channel
 
     async def fetch_message(self, m_id, channel=None, user=None):
+        m_id = int(m_id)
         message = None
         if m_id in self.message_cache:
             message = self.message_cache[m_id]
@@ -275,9 +279,12 @@ class __globals:
             except discord.NotFound:
                 pass
         if message is None and channel is not None:
-            message = await channel.fetch_message(m_id)
-            if message is not None:
-                self.message_cache[m_id] = message
+            try:
+                message = await channel.fetch_message(m_id)
+                if message is not None:
+                    self.message_cache[m_id] = message
+            except discord.NotFound:
+                pass
         lim = 10000
         while len(self.message_cache) > lim:
             i = iter(self.message_cache)
@@ -291,6 +298,7 @@ class __globals:
         return channel
 
     def isSuspended(self, u_id):
+        u_id = int(u_id)
         if u_id in (self.owner_id, client.user.id):
             return False
         return self.suspended.get(u_id, False) >= time.time() + self.min_suspend * 86400
@@ -685,9 +693,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             args[a] = args[a].replace("", "'").replace("\0", '"')
                         if guild is None and getattr(command, "server_only", False):
                             raise ReferenceError("This command is only available in servers.")
-                        if not loop and getattr(command, "time_consuming", False):
+                        tc = getattr(command, "time_consuming", False)
+                        if not loop and tc:
                             asyncio.create_task(channel.trigger_typing())
-                        _vars.suspclear = time.time()
+                        _vars.suspclear = time.time() + 5 + (tc * 2) ** 2
                         f = open(_vars.suspected, "w")
                         f.write(str(user.id) + "\r\n")
                         f.close()
@@ -818,10 +827,11 @@ async def heartbeatLoop():
                 _vars
             except NameError:
                 sys.exit()
-            if time.time() - _vars.suspclear > 7:
+            if time.time() - _vars.suspclear:
                 _vars.suspclear = inf
                 try:
-                    os.remove(_vars.suspected)
+                    if _vars.suspected in os.listdir():
+                        os.remove(_vars.suspected)
                 except:
                     print(traceback.format_exc())
                 #forcePrint("Cleared.")
@@ -866,8 +876,7 @@ async def outputLoop():
                     print()
                     continue
                 try:
-                    chanID = int(proc)
-                    _vars.current_channel = await _vars.fetch_channel(chanID)
+                    _vars.current_channel = await _vars.fetch_channel(proc)
                     print()
                 except ValueError:
                     sent = await ch.send("*** ***")
@@ -1086,17 +1095,22 @@ async def handleUpdate(force=False):
                         except NameError:
                             continue
                         asyncio.create_task(research(auds, ytdl))
+                        dels = deque()
                         i = 0
-                        for e in q:
+                        for i in range(len(q)):
+                            if i >= len(q) or i > 10000:
+                                break
+                            e = q[i]
                             e_id = e["id"]
                             if not e_id:
-                                q.remove(e)
+                                dels.append(i)
                                 continue
                             if e_id in _vars.audiocache:
                                 e["duration"] = _vars.audiocache[e_id][0]
-                            i += 1
-                            if i > 10000:
-                                break
+                        if len(dels) > 1:
+                            q.delitems(dels)
+                        elif len(dels):
+                            q.pop(dels[0])
                         if len(q):
                             for i in range(2):
                                 if i < len(q):

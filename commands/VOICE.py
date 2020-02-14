@@ -43,8 +43,10 @@ class customAudio(discord.AudioSource):
             print(traceback.format_exc())
 
     def __str__(self):
+        classname = self.__class__.replace("'>", "")
+        classname = classname[classname.index("'") + 1:]
         return (
-            "<customAudio object at " + hex(id(self)).upper() + ">: {"
+            "<" + classname + " object at " + hex(id(self)).upper() + ">: {"
             + "\"queue\": " + str(self.queue)
             + ", \"stats\": " + str(self.stats)
             + ", \"player\": " + str(self.player)
@@ -162,9 +164,9 @@ class customAudio(discord.AudioSource):
             q.pop(0)
             if self.stats["shuffle"]:
                 if len(q) > 1:
-                    t2 = q.pop(0)
+                    temp = q.popleft()
                     q = q.shuffle()
-                    q.insert(0, t2)
+                    q.appendleft(temp)
             if self.stats["loop"] and loop:
                 temp["id"] = temp["id"]
                 if "download" in temp:
@@ -964,7 +966,8 @@ class dump:
     async def __call__(self, guild, channel, user, client, _vars, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if not argv and not len(message.attachments):
-            q = copy.deepcopy(auds.queue)
+            q = copy.deepcopy(list(auds.queue))
+            s = copy.deepcopy(auds.stats)
             for e in q:
                 if "download" in e:
                     e.pop("download")
@@ -972,8 +975,8 @@ class dump:
                 e.pop("u_id")
                 e.pop("skips")
             d = {
-                "stats": auds.stats,
-                "queue": list(q),
+                "stats": s,
+                "queue": q,
                 }
             if auds.player is not None:
                 d["player"] = auds.player["type"]
@@ -1137,7 +1140,9 @@ class randomize:
     async def __call__(self, guild, channel, user, client, _vars, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if len(auds.queue):
-            auds.queue = auds.queue.popright().shuffle().appendleft(auds.queue[0])
+            temp = auds.queue.popright()
+            auds.queue = auds.queue.shuffle()
+            auds.queue.appendleft(temp)
         return "```css\nSuccessfully shuffled audio queue for " + uniStr(guild.name) + ".```"
 
 
