@@ -97,6 +97,12 @@ fig = plt.figure()
 class __globals:
     timeout = 24
     min_suspend = 3
+    heartbeat = "heartbeat.json"
+    suspected = "suspected.json"
+    shutdown = "shutdown.json"
+    savedata = "data.json"
+    authdata = "auth.json"
+    client = client
     deleted = [
         "discord",
         "client",
@@ -205,9 +211,6 @@ class __globals:
         "zip",
     ]
     builtins = {i: getattr(__builtins__, i) for i in builtins_list}
-    savedata = "data.json"
-    authdata = "auth.json"
-    client = client
 
     def __init__(self):
         print("Initializing...")
@@ -479,21 +482,95 @@ class __globals:
                 pass
         self.stored_vars["__builtins__"] = self.builtins
         return self.stored_vars
+    
+    mmap = {
+    "“": '"',
+    "”": '"',
+    "„": '"',
+    "‘": "'",
+    "’": "'",
+    "‚": "'",
+    "〝": '"',
+    "〞": '"',
+    "⸌": "'",
+    "⸍": "'",
+    "⸢": "'",
+    "⸣": "'",
+    "⸤": "'",
+    "⸥": "'",
+    "⸨": "((",
+    "⸩": "))",
+    "⟦": "[",
+    "⟧": "]",
+    "〚": "[",
+    "〛": "]",
+    "「": "[",
+    "」": "]",
+    "『": "[",
+    "』": "]",
+    "【": "[",
+    "】": "]",
+    "〖": "[",
+    "〗": "]",
+    "（": "(",
+    "）": ")",
+    "［": "[",
+    "］": "]",
+    "｛": "{",
+    "｝": "}",
+    "⌈": "[",
+    "⌉": "]",
+    "⌊": "[",
+    "⌋": "]",
+    "⦋": "[",
+    "⦌": "]",
+    "⦍": "[",
+    "⦐": "]",
+    "⦏": "[",
+    "⦎": "]",
+    "⁅": "[",
+    "⁆": "]",
+    "〔": "[",
+    "〕": "]",
+    "«": "hlist((",
+    "»": "))",
+    "❮": "hlist((",
+    "❯": "))",
+    "❰": "hlist((",
+    "❱": "))",
+    "❬": "hlist((",
+    "❭": "))",
+    "＜": "hlist((",
+    "＞": "))",
+    "⟨": "hlist((",
+    "⟩": "))",
+    "<": "hlist((",
+    ">": "))",
+    }
+    mtrans = "".maketrans(mmap)
+
+    umap = {
+        "<": "",
+        ">": "",
+        "|": "",
+        "*": "",
+        "_": "",
+        }
+    utrans = "".maketrans(umap)
 
     def verifyCommand(self, func):
-        f = func.lower()
+        f = func.lower().translate(self.mtrans)
         for d in self.disabled:
             if d in f:
                 raise PermissionError("\"" + d + "\" is not enabled.")
         return func
 
-    def verifyURL(self, _f):
-        _f = _f.replace("<", "").replace(">", "").replace("|", "").replace("*", "").replace("_", "").replace("`", "")
-        return _f
+    def verifyURL(self, f):
+        return f.translate(self.utrans)
 
     def doMath(self, f, returns):
         try:
-            self.verifyCommand(f)
+            f = self.verifyCommand(f)
             try:
                 answer = eval(f, self.stored_vars)
             except:
@@ -506,7 +583,7 @@ class __globals:
         returns[0] = answer
 
     def evalMath(self, f):
-        self.verifyCommand(f)
+        f = self.verifyCommand(f)
         return eval(f, self.stored_vars)
 
     async def reactCallback(self, message, reaction, user):
@@ -750,11 +827,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         killThreads()
                         raise TimeoutError("Request timed out.")
                     except Exception as ex:
-                        rep = repr(ex)
-                        if len(rep) > 1950:
-                            errmsg = "```fix\nError: Error message too long.\n```"
-                        else:
-                            errmsg = "```python\nError: " + rep + "\n```"
+                        errmsg = limStr("```python\nError: " + rep + "\n```", 2000)
                         print(traceback.format_exc())
                         sent = await channel.send(errmsg)
                         await sent.add_reaction("❎")
@@ -780,7 +853,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                 curr[2] = u_id
                 #print(curr)
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
-        temp = list(reconstitute(orig.lower()))
+        temp = list(orig.lower())
         for i in range(len(temp)):
             if not(temp[i] in s):
                 temp[i] = " "
@@ -838,9 +911,9 @@ async def heartbeatLoop():
                 except:
                     print(traceback.format_exc())
                 #forcePrint("Cleared.")
-            if "heartbeat" in os.listdir():
+            if _vars.heartbeat in os.listdir():
                 try:
-                    os.remove("heartbeat")
+                    os.remove(_vars.heartbeat)
                 except:
                     print(traceback.format_exc())
             await asyncio.sleep(1)
@@ -1303,7 +1376,7 @@ async def handleMessage(message, edit=True):
     except Exception as ex:
         print(traceback.format_exc())
         killThreads()
-        errmsg = "```python\nError: " + repr(ex) + "\n```"
+        errmsg = limStr("```python\nError: " + repr(ex) + "\n```", 2000)
         sent = await message.channel.send(errmsg)
         await sent.add_reaction("❎")
     return

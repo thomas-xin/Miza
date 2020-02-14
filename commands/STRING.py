@@ -146,8 +146,7 @@ class translate:
                     response += "\n" + output + "  `" + t + "`"
                     source, dest = dest, source
                     break
-                except Exception as ex:
-                    print(ex)
+                except:
                     if t == trans[-1]:
                         raise
         return response + end

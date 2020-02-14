@@ -300,12 +300,12 @@ class restart:
             if perm is not nan:
                 raise PermissionError("Insufficient priviliges to request shutdown.")
             await channel.send("Shutting down... :wave:")
-            f = open("shutdown", "wb")
+            f = open(_vars.shutdown, "wb")
             f.close()
         else:
             await channel.send("Restarting... :wave:")
         if perm is nan or frand() > 0.75:
-            while True:
+            for i in range(64):
                 try:
                     os.remove(_vars.suspected)
                     break
@@ -316,14 +316,14 @@ class restart:
         _vars.update(True)
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
-        while True:
+        for i in range(64):
             try:
-                f = open("heartbeat", "wb")
+                f = open(_vars.heartbeat, "wb")
                 f.close()
                 break
             except:
                 print(traceback.format_exc())
-                await asyncio.sleep(0.1)
+                time.sleep(0.1)
         try:
             await client.close()
         except:
@@ -362,7 +362,7 @@ class suspend:
 
 class loop:
     is_command = True
-    time_consuming = 2
+    time_consuming = 3
 
     def __init__(self):
         self.name = ["for", "rep", "repeat", "while"]

@@ -74,9 +74,26 @@ def shuffle(it):
     elif type(it) is dict:
         ir = list(it)
         random.shuffle(ir)
-        return {k: it[k] for k in ir}
+        r = tuple(it.values())
+        for i in range(len(ir)):
+            it[ir[i]] = r[i]
+        return it
+    elif type(it) is deque:
+        it = list(it)
+        random.shuffle(it)
+        return deque(it)
+    elif isinstance(it, hlist):
+        temp = it.shuffle()
+        it.data = temp.data
+        del temp
+        return it
     else:
-        raise TypeError("Shuffling " + type(it) + " is not supported.")
+        try:
+            it = list(it)
+            random.shuffle(it)
+            return it
+        except TypeError:
+            raise TypeError("Shuffling " + type(it) + " is not supported.")
 
 def nop(*args):
     pass
@@ -1415,7 +1432,7 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @waiting
     def shuffle(self):
-        temp = tuple(self)
+        temp = list(self)
         return hlist(shuffle(temp))
 
     @blocking
@@ -1641,7 +1658,7 @@ lookup time for all elements. Includes many array and numeric operations."""
         self.chash = None
         self.block = True
         self.maxoff = maxoff
-        if type(self) is type(iterable) and len(iterable):
+        if isinstance(iterable, hlist) and len(iterable):
             self.offs = iterable.offs
             self.data = iterable.data.copy()
         else:

@@ -24,18 +24,21 @@ op = (
 #name = "C:\\WINDOWS\\system32\\cmd.exe"
 #op = "start cmd /abovenormal /c bot.bat"
 
-kill(2)
-delete("shutdown")
-delete("heartbeat")
+sd = "shutdown.json"
+hb = "heartbeat.json"
 
-while not "shutdown" in os.listdir():
+kill(2)
+delete(sd)
+delete(hb)
+
+while not sd in os.listdir():
     os.system(op)
     print("Bot started.")
     time.sleep(20)
     print("Heartbeat started.")
     alive = True
     while alive:
-        f = open("heartbeat", "wb")
+        f = open(hb, "wb")
         f.close()
         print(
             "Heartbeat at "
@@ -45,15 +48,15 @@ while not "shutdown" in os.listdir():
         time.sleep(2)
         for i in range(3):
             time.sleep(1)
-            if "heartbeat" in os.listdir():
+            if hb in os.listdir():
                 alive = False
                 break
     kill(3)
     print("Bot closed without shutdown signal, restarting...")
     
 kill(2)
-delete("shutdown")
-delete("heartbeat")
+delete(hb)
+delete(sd)
         
 print("Shutdown signal confirmed. Press [ENTER] to close.")
 input()
