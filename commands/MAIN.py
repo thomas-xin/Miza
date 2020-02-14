@@ -14,20 +14,22 @@ class help:
         self.description = "Shows a list of usable commands."
         self.usage = "<command{all}> <category{all}> <verbose(?v)>"
 
-    async def __call__(self, _vars, args, user, channel, guild, flags, **void):
+    async def __call__(self, args, user, channel, guild, flags, **void):
+        _vars = self._vars
+        enabled = _vars.data["enabled"]
         if guild:
             g_id = guild.id
         else:
             g_id = 0
         if g_id:
-            enabled = _vars.enabled.setdefault(channel.id, list(default_commands))
+            enabled = enabled.setdefault(channel.id, list(default_commands))
         else:
             enabled = default_commands
         categories = _vars.categories
-        commands = []
+        commands = hlist()
         for catg in categories:
             if catg in enabled or catg == "main":
-                commands += categories[catg]
+                commands.extend(categories[catg])
         c_name = getattr(channel, "name", "DM")
         u_perm = _vars.getPerms(user, guild)
         verb = "v" in flags
@@ -112,21 +114,6 @@ class help:
                 + "**:\n```xml\n" + "\n".join(show) + "```", 1
                 )
         return "\n".join(show), 1
-
-
-class clearCache:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["cc"]
-        self.min_level = 1
-        self.description = "Clears all cached data."
-        self.usage = ""
-
-    async def __call__(self, _vars, **void):
-        _vars.resetGlobals()
-        _vars.loadSave()
-        return "```css\nCache cleared!```"
 
 
 class perms:
@@ -215,7 +202,10 @@ class enableCommand:
         self.description = "Shows, enables, or disables a command category in the current channel."
         self.usage = "<command{all}> <enable(?e)> <disable(?d)> <hide(?h)>"
 
-    async def __call__(self, _vars, argv, flags, user, channel, perm, **void):
+    async def __call__(self, argv, flags, user, channel, perm, **void):
+        update = self.data["enabled"].update
+        _vars = self._vars
+        enabled = _vars.data["enabled"]
         if "e" in flags or "d" in flags:
             if perm < 3:
                 raise PermissionError(
@@ -229,27 +219,27 @@ class enableCommand:
             if "e" in flags:
                 categories = list(_vars.categories)
                 categories.remove("main")
-                _vars.enabled[channel.id] = categories
-                _vars.update()
+                enabled[channel.id] = categories
+                update()
                 if "h" in flags:
                     return
                 return "```css\nEnabled all command categories in " + uniStr(channel.name) + ".```"
             if "d" in flags:
-                _vars.enabled[channel.id] = []
-                _vars.update()
+                enabled[channel.id] = []
+                update()
                 if "h" in flags:
                     return
                 return "```css\nDisabled all command categories in " + uniStr(channel.name) + ".```"
             return (
                 "Currently enabled command categories in **" + channel.name
                 + "**:\n```css\n"
-                + str(["main"] + _vars.enabled.get(channel.id, default_commands)) + "```"
+                + str(["main"] + enabled.get(channel.id, default_commands)) + "```"
             )
         else:
             if not catg in _vars.categories:
                 raise KeyError("Unknown command category " + uniStr(argv) + ".")
             else:
-                enabled = _vars.enabled.setdefault(channel.id, {})
+                enabled = enabled.setdefault(channel.id, {})
                 if "e" in flags:
                     if catg in enabled:
                         raise IndexError(
@@ -257,7 +247,7 @@ class enableCommand:
                             + " is already enabled in " + uniStr(channel.name) + "."
                         )
                     enabled.append(catg)
-                    _vars.update()
+                    update()
                     if "h" in flags:
                         return
                     return (
@@ -271,7 +261,7 @@ class enableCommand:
                             + " is not currently enabled in " + uniStr(channel.name) + "."
                         )
                     enabled.remove(catg)
-                    _vars.update()
+                    update()
                     if "h" in flags:
                         return
                     return (
@@ -299,21 +289,21 @@ class restart:
         if name == "shutdown":
             if perm is not nan:
                 raise PermissionError("Insufficient priviliges to request shutdown.")
-            await channel.send("Shutting down... :wave:")
             f = open(_vars.shutdown, "wb")
             f.close()
+            await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
         if perm is nan or frand() > 0.75:
             for i in range(64):
                 try:
-                    os.remove(_vars.suspected)
+                    if _vars.suspected in os.listdir():
+                        os.remove(_vars.suspected)
                     break
                 except:
                     print(traceback.format_exc())
                     time.sleep(0.1)
         _vars.update()
-        _vars.update(True)
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
         for i in range(64):
@@ -342,6 +332,7 @@ class suspend:
         self.usage = "<0:user> <1:value[]>"
 
     async def __call__(self, _vars, user, guild, args, **void):
+        update = self.data["suspended"].update
         if len(args) < 2:
             if len(args) >= 1:
                 user = await _vars.fetch_user(_vars.verifyID(args[0]))
@@ -353,7 +344,7 @@ class suspend:
             user = await _vars.fetch_user(_vars.verifyID(args[0]))
             change = _vars.evalMath(args[1])
             _vars.suspended[user.id] = change
-            _vars.update()
+            update()
             return (
                 "```css\nChanged suspension status of " + uniStr(user.name) + " to "
                 + uniStr(change) + ".```"
@@ -399,3 +390,85 @@ class loop:
                 ))
         if not "h" in flags:
             return "```css\nLooping [" + func + "] " + uniStr(iters) + " times...```"
+
+
+class updateEnabled:
+    is_update = True
+    name = "enabled"
+
+    def __init__(self):
+        pass
+
+    async def __call__(self):
+        pass
+
+
+class updateSuspended:
+    is_update = True
+    name = "suspended"
+    suspected = "suspected.json"
+
+    def __init__(self):
+        self.suspended = self.data
+        self.suspclear = inf
+        try:
+            self.lastsusp = None
+            f = open(self.suspected, "r")
+            susp = f.read()
+            f.close()
+            os.remove(self.suspected)
+            if susp:
+                susp = int(susp)
+                if self.suspended.get(susp) is None:
+                    self.suspended[susp] = time.time() + 86400
+                else:
+                    self.suspended[susp] -= time.time()
+                    self.suspended[susp] *= 1.25
+                    self.suspended[susp] += time.time() + 86400
+                print(susp, (self.suspended[susp] - time.time()) / 86400)
+                if (self.suspended[susp] - time.time()) / 86400 >= self.min_suspend - 1:
+                    self.lastsusp = susp
+                self.update()
+                self.update(True)
+        except FileNotFoundError:
+            pass
+
+    async def _command_(self, user, command, **void):
+        tc = getattr(command, "time_consuming", False)
+        self.suspclear = time.time() + 5 + (tc * 2) ** 2
+        f = open(self.suspected, "w")
+        f.write(str(user.id))
+        f.close()
+
+    async def __call__(self, **void):
+        if time.time() - self.suspclear:
+            self.suspclear = inf
+            try:
+                if self.suspected in os.listdir():
+                    os.remove(self.suspected)
+            except:
+                print(traceback.format_exc())
+            #forcePrint("Cleared.")
+        _vars = self._vars
+        if self.lastsusp is not None:
+            u_susp = await _vars.fetch_user(self.lastsusp)
+            self.lastsusp = None
+            channel = await _vars.getDM(u_susp)
+            secs = self.suspended.get(u_susp.id, 0) - time.time()
+            msg = (
+                "Apologies for the inconvenience, but your account has been "
+                + "flagged as having attempted a denial-of-service attack.\n"
+                + "This will expire in `" + sec2Time(secs) + "`.\n"
+                + "If you believe this is an error, please notify <@!"
+                + str(_vars.owner_id) + "> as soon as possible."
+                )
+            print(
+                u_susp.name + " may be attempting a DDOS attack. Expires in "
+                + sec2Time(secs) + "."
+                )
+            await channel.send(msg)
+        l = list(self.suspended)
+        for u_id in l:
+            if self.suspended[u_id] < time.time():
+                self.suspended.pop(u_id)
+                self.update()

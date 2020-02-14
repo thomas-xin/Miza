@@ -1,4 +1,4 @@
-import datetime
+import datetime, discord
 from smath import *
 
 
@@ -83,8 +83,10 @@ class ban:
         self.usage = "<0:user> <1:hours[]> <2:reason[]> <hide(?h)>"
 
     async def __call__(self, _vars, args, user, channel, guild, flags, perm, **void):
+        update = self.data["bans"].update
+        bans = _vars.data["bans"]
         dtime = datetime.datetime.utcnow().timestamp()
-        if "everyone" in args[0] or "here" in args[0]:
+        if not args or "everyone" in args[0] or "here" in args[0]:
             t_user = None
             t_perm = inf
         else:
@@ -101,7 +103,7 @@ class ban:
                 )
         if len(args) < 2:
             if t_user is None:
-                g_bans = _vars.bans.setdefault(guild.id, {})
+                g_bans = bans.setdefault(guild.id, {})
                 return (
                     "Currently banned users from **" + guild.name + "**:\n```json\n"
                     + str(g_bans).replace("'", '"') + "```"
@@ -115,7 +117,7 @@ class ban:
         else:
             msg = None
         g_id = guild.id
-        g_bans = _vars.bans.setdefault(g_id, {})
+        g_bans = bans.setdefault(g_id, {})
         if t_user is None:
             if not "c" in flags:
                 response = uniStr(
@@ -153,7 +155,7 @@ class ban:
                     response += "\nError: " + repr(ex)
                     continue
             g_bans[t_user.id] = [secs + dtime, channel.id]
-            _vars.update()
+            update()
             if is_banned:
                 response += (
                     "\nUpdated ban for " + uniStr(t_user.name)
@@ -182,12 +184,15 @@ class roleGiver:
         self.description = "Adds an automated role giver to the current channel."
         self.usage = "<0:react_to[]> <1:role[]> <1:perm[]> <disable(?d)> <remover(?r)>"
 
-    async def __call__(self, _vars, argv, args, user, channel, guild, flags, **void):
+    async def __call__(self, argv, args, user, channel, guild, flags, **void):
+        update = self.data["rolegivers"].update
+        _vars = self._vars
+        scheduled = _vars.data["rolegivers"]
         if "d" in flags:
-            _vars.scheduled[channel.id] = {}
-            _vars.update()
+            scheduled[channel.id] = {}
+            update()
             return "```css\nRemoved all automated role givers from channel " + uniStr(channel.name) + ".```"
-        currentSchedule = _vars.scheduled.setdefault(channel.id, {})
+        currentSchedule = scheduled.setdefault(channel.id, {})
         if not argv:
             return (
                 "Currently active permission givers in channel **" + channel.name
@@ -209,7 +214,7 @@ class roleGiver:
             role = args[1].lower()
             r_type = "role"
         currentSchedule[react] = {"role": role, "deleter": "r" in flags}
-        _vars.update()
+        update()
         return (
             "```css\nAdded role giver with reaction to " + uniStr(react)
             + " and " + r_type + " " + uniStr(role)
@@ -228,7 +233,9 @@ class defaultPerms:
         self.usage = "<level[]>"
 
     async def __call__(self, _vars, argv, user, guild, **void):
-        currPerm = _vars.perms.get("defaults", {}).get(guild.id, 0)
+        update = self.data["perms"].update
+        perms = _vars.data["perms"]
+        currPerm = perms.setdefault("defaults", {}).get(guild.id, 0)
         if not argv:
             return (
                 "```css\nCurrent default permission level for " + uniStr(guild.name)
@@ -243,10 +250,8 @@ class defaultPerms:
                 + ".\nRequred level: " + uniStr(c_perm + 1)
                 + ", Current level: " + uniStr(perm) + "."
                 )
-        if not "defaults" in _vars.perms:
-            _vars.perms["defaults"] = {}
-        _vars.perms["defaults"][guild.id] = c_perm
-        _vars.update()
+        perms["defaults"][guild.id] = c_perm
+        update()
         return (
             "```css\nChanged default permission level of " + uniStr(guild.name)
             + " to " + uniStr(c_perm) + ".```"
@@ -264,10 +269,13 @@ class rainbowRole:
         self.usage = "<0:role[]> <mim_delay[6]> <disable(?d)>"
 
     async def __call__(self, _vars, flags, args, argv, guild, **void):
-        guild_special = _vars.special.setdefault(guild.id, {})
+        update = self.data["rolecolours"].update
+        _vars = self._vars
+        colours = _vars.data["rolecolours"]
+        guild_special = colours.setdefault(guild.id, {})
         if not argv:
             if "d" in flags:
-                _vars.special.pop(guild.id)
+                colours.pop(guild.id)
                 return (
                     "```css\nRemoved all active dynamic role colours in "
                     + uniStr(guild.name) + ".```"
@@ -285,12 +293,12 @@ class rainbowRole:
             if role in r.name.lower():
                 if "d" in flags:
                     try:
-                        guild_special.pop(r.id)
+                        colours.pop(r.id)
                     except KeyError:
                         pass
                 else:
-                    guild_special[r.id] = delay
-        _vars.update()
+                    colours[r.id] = delay
+        update()
         return (
             "Changed dynamic role colours for **" + guild.name
             + "** to:\n```css\n" + str(guild_special) + "```"
@@ -313,17 +321,20 @@ class follow:
         self.description = "Causes Miza to automatically imitate users when 3 of the same message is posted in a row."
         self.usage = "<enable(?e)> <disable(?d)>"
 
-    async def __call__(self, _vars, flags, guild, **void):
-        curr = _vars.following.setdefault(guild.id, copy.deepcopy(follow_default))
+    async def __call__(self, flags, guild, **void):
+        update = self.data["follows"].update
+        _vars = self._vars
+        following = _vars.data["follows"]
+        curr = following.setdefault(guild.id, copy.deepcopy(follow_default))
         if type(curr) is not dict:
             curr = copy.deepcopy(follow_default)
         if "d" in flags:
             curr["follow"] = False
-            _vars.update()
+            update()
             return "```css\nDisabled follow imitating for " + uniStr(guild.name) + ".```"
         elif "e" in flags:
             curr["follow"] = True
-            _vars.update()
+            update()
             return "```css\nEnabled follow imitating for " + uniStr(guild.name) + ".```"
         else:
             return (
@@ -343,13 +354,16 @@ class react:
         self.usage = "<react_to[]> <react_data[]> <disable(?d)>"
 
     async def __call__(self, _vars, flags, guild, argv, args, **void):
-        curr = _vars.following.setdefault(guild.id, copy.deepcopy(follow_default))
+        update = self.data["follows"].update
+        _vars = self._vars
+        following = _vars.data["follows"]
+        curr = following.setdefault(guild.id, copy.deepcopy(follow_default))
         if type(curr) is not dict:
             curr = copy.deepcopy(follow_default)
         if not argv:
             if "d" in flags:
                 curr["reacts"] = {}
-                _vars.update()
+                update()
                 return "```css\nRemoved all auto reacts for " + uniStr(guild.name) + ".```"
             else:
                 return (
@@ -360,7 +374,7 @@ class react:
         if "d" in flags:
             if a in curr["reacts"]:
                 curr["reacts"].pop(a)
-                _vars.update()
+                update()
                 return (
                     "```css\nRemoved " + uniStr(a) + " from the auto react list for "
                     + uniStr(guild.name) + ".```"
@@ -368,8 +382,184 @@ class react:
             else:
                 raise LookupError(uniStr(a) + " is not in the auto react list.")
         curr["reacts"][a] = args[1]
-        _vars.update()
+        update()
         return (
             "```css\nAdded " + uniStr(a) + ": " + uniStr(args[1]) + " to the auto react list for "
             + uniStr(guild.name) + ".```"
             )
+
+
+class updateFollows:
+    is_update = True
+    name = "follows"
+
+    def __init__(self):
+        self.msgFollow = {}
+
+    async def _nocommand_(self, text, edit, orig, message, **void):
+        g_id = message.guild.id
+        u_id = message.author.id
+        following = self.data
+        words = text.split(" ")
+        if not edit:
+            if following[g_id]["follow"]:
+                checker = orig
+                curr = self.msgFollow.get(g_id)
+                if curr is None:
+                    curr = [checker, 1, 0]
+                    self.msgFollow[g_id] = curr
+                elif checker == curr[0] and u_id != curr[2]:
+                    curr[1] += 1
+                    if curr[1] >= 3:
+                        curr[1] = xrand(-3) + 1
+                        if len(checker):
+                            asyncio.create_task(channel.send(checker))
+                else:
+                    if len(checker) > 100:
+                        checker = ""
+                    curr[0] = checker
+                    curr[1] = xrand(-1, 2)
+                curr[2] = u_id
+        if g_id in following:
+            try:
+                for r in following[g_id]["reacts"]:
+                    if r in words:
+                        await message.add_reaction(following[g_id]["reacts"][r])
+            except discord.Forbidden:
+                pass
+
+    async def __call__(self):
+        pass
+
+
+class updateRolegiver:
+    is_update = True
+    name = "rolegivers"
+
+    def __init__(self):
+        pass
+
+    async def _message_(self, text):
+        scheduled = self.data
+        _vars = self._vars
+        currentSchedule = scheduled.get(channel.id, {})
+        for k in currentSchedule:
+            if k in text:
+                curr = currentSchedule[k]
+                role = curr["role"]
+                deleter = curr["deleter"]
+                try:
+                    perm = float(role)
+                    currPerm = _vars.getPerms(user, guild)
+                    if perm > currPerm:
+                        _vars.setPerms(user, guild, perm)
+                    print("Granted perm " + str(perm) + " to " + user.name + ".")
+                except ValueError:
+                    for r in guild.roles:
+                        if r.name.lower() == role:
+                            await user.add_roles(
+                                r,
+                                reason="Verified.",
+                                atomic=True,
+                                )
+                            print("Granted role " + r.name + " to " + user.name + ".")
+                if deleter:
+                    try:
+                        await message.delete()
+                    except discord.NotFound:
+                        pass
+
+    async def __call__(self):
+        pass
+
+
+class updatePerms:
+    is_update = True
+    name = "perms"
+
+    def __init__(self):
+        pass
+
+    async def __call__(self):
+        pass
+
+
+class updateColours:
+    is_update = True
+    name = "rolecolours"
+
+    def __init__(self):
+        self.counter = 0
+        self.count = 0
+        self.delay = 0
+
+    async def changeColour(self, g_id, roles):
+        guild = await self._vars.fetch_guild(g_id)
+        colTime = 12
+        l = list(roles)
+        for r in l:
+            try:
+                role = guild.get_role(r)
+                delay = roles[r]
+                if not (self.counter + r) % delay:
+                    col = colour2Raw(colourCalculation(xrand(1536)))
+                    await role.edit(colour=discord.Colour(col))
+                    self.count += 1
+                    #print("Edited role " + role.name)
+                await asyncio.sleep(frand(2))
+            except discord.HTTPException as ex:
+                print(traceback.format_exc())
+                _vars.blocked += 20
+                break
+
+    async def __call__(self):
+        self.counter = self.counter + 1 & 65535
+        if time.time() > self.delay:
+            self.delay = time.time() + 60
+            self.count = 0
+        for g in self.data:
+            if self.count < 64 and self._vars.blocked <= 0:
+                asyncio.create_task(self.changeColour(g, self.data[g]))
+
+
+class updateBans:
+    is_update = True
+    name = "bans"
+
+    def __init__(self):
+        pass
+
+    async def __call__(self, **void):
+        _vars = self._vars
+        dtime = datetime.datetime.utcnow().timestamp()
+        bans = self.data
+        if bans:
+            changed = False
+            for g in bans:
+                if g:
+                    bl = list(bans[g])
+                    for b in bl:
+                        if type(bans[g][b]) is list and dtime >= bans[g][b][0]:
+                            try:
+                                u_target = await _vars.fetch_user(b)
+                                g_target = await _vars.fetch_guild(g)
+                                try:
+                                    await g_target.unban(u_target)
+                                    c_target = await _vars.fetch_channel(bans[g][b][1])
+                                    await c_target.send(
+                                        "```css\n" + uniStr(u_target.name)
+                                        + " has been unbanned from " + uniStr(g_target.name) + ".```"
+                                        )
+                                    changed = True
+                                except:
+                                    c_target = await _vars.fetch_channel(bans[g][b][1])
+                                    await c_target.send(
+                                        "```css\nUnable to unban " + uniStr(u_target.name)
+                                        + " from " + uniStr(g_target.name) + ".```"
+                                        )
+                                    print(traceback.format_exc())
+                                bans[g].pop(b)
+                            except:
+                                print(traceback.format_exc())
+            if changed:
+                self.update()

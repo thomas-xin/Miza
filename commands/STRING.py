@@ -119,7 +119,7 @@ class translate:
         self.name = ["tr"]
         self.min_level = 0
         self.description = "Translates a string into another language."
-        self.usage = "<0:language> <1:string> <verbose(?v)> <translator(?g)>"
+        self.usage = "<0:language> <1:string> <verbose(?v)> <google(?g)>"
 
     async def __call__(self, args, flags, user, **extra):
         dest = args[0]

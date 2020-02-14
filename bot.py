@@ -94,7 +94,7 @@ def plot(*args,**kwargs):
 fig = plt.figure()
 
 
-class __globals:
+class main_data:
     timeout = 24
     min_suspend = 3
     heartbeat = "heartbeat.json"
@@ -123,7 +123,6 @@ class __globals:
         "waitParallel",
         "killThreads",
         "performAction",
-        "customAudio",
         "dynamicFunc",
         "dumpLogData",
         "setPrint",
@@ -132,11 +131,7 @@ class __globals:
         "outputLoop",
         "heartbeatLoop",
         "handleMessage",
-        "handleUpdate",
-        "changeColour",
         "checkDelete",
-        "sendUpdateRequest",
-        "research",
         "on_ready",
         "on_reaction_add",
         "on_reaction_remove",
@@ -216,9 +211,10 @@ class __globals:
         print("Initializing...")
         if not os.path.exists("cache/"):
             os.mkdir("cache/")
+        if not os.path.exists("saves/"):
+            os.mkdir("saves/")
         self.lastCheck = time.time()
         self.queue = {}
-        self.loadSave()
         self.fig = fig
         self.plt = plt
         f = open(self.authdata)
@@ -227,15 +223,14 @@ class __globals:
         self.owner_id = int(auth["owner_id"])
         self.token = auth["discord_token"]
         self.resetGlobals()
+        self.data = {}
         doParallel(self.getModules)
         self.current_channel = None
         self.guilds = 0
         self.blocked = 0
         self.doUpdate = False
         self.updated = False
-        self.msgFollow = {}
         self.audiocache = {}
-        self.clearAudioCache()
         self.message_cache = {}
         print("Initialized.")
 
@@ -304,84 +299,72 @@ class __globals:
         u_id = int(u_id)
         if u_id in (self.owner_id, client.user.id):
             return False
-        return self.suspended.get(u_id, False) >= time.time() + self.min_suspend * 86400
+        return self.data["suspended"].get(u_id, False) >= time.time() + self.min_suspend * 86400
 
-    def loadSave(self):
-        try:
-            f = open(self.savedata, "rb")
-            savedata = eval(f.read())
-        except:
-            print("Creating new save data...")
-            self.perms = {}
-            self.bans = {}
-            self.enabled = {}
-            self.scheduled = {}
-            self.special = {}
-            self.following = {}
-            self.playlists = {}
-            self.imglists = {}
-            self.suspended = {}
-            self.bans[0] = {}
-            self.update()
-            f = open(self.savedata)
-            savedata = eval(f.read())
-            
-        f.close()
-        self.perms = savedata.get("perms", {})
-        self.bans = savedata.get("bans", {})
-        self.enabled = savedata.get("enabled", {})
-        self.scheduled = savedata.get("scheduled", {})
-        self.special = savedata.get("special", {})
-        self.following = savedata.get("following", {})
-        self.playlists = savedata.get("playlists", {})
-        self.imglists = savedata.get("imglists", {})
-        self.suspended = savedata.get("suspended", {})
-
-        try:
-            self.lastsusp = None
-            self.suspected = "suspected.json"
-            f = open(self.suspected, "r")
-            susp = f.readline().replace("\r", "").replace("\n", "")
-            f.close()
-            os.remove(self.suspected)
-            if susp:
-                susp = int(susp)
-                if self.suspended.get(susp) is None:
-                    self.suspended[susp] = time.time() + 86400
-                else:
-                    self.suspended[susp] -= time.time()
-                    self.suspended[susp] *= 1.25
-                    self.suspended[susp] += time.time() + 86400
-                print(susp, (self.suspended[susp] - time.time()) / 86400)
-                if (self.suspended[susp] - time.time()) / 86400 >= self.min_suspend - 1:
-                    self.lastsusp = susp
-                self.update()
-                self.update(True)
-        except FileNotFoundError:
-            pass
+    def updatePart(self, force=False):
+        if force:
+            name = getattr(self, "name", None)
+            if name:
+                if self.updated:
+                    #print(self.file)
+                    self.updated = False
+                    f = open(self.file, "wb")
+                    f.write(bytes(repr(self.data), "utf-8"))
+                    f.close()
+                    return True
+        else:
+            self.updated = True
+        return False
 
     def getModule(self, module):
+        #print(main_data)
         rename = module.lower()
         print("Loading module " + rename + "...")
         mod = __import__(module)
-        commands = []
+        commands = hlist()
+        updates = hlist()
         vd = mod.__dict__
         for k in vd:
             var = vd[k]
             try:
                 var.is_command
+                var._vars = self
                 obj = var()
+                obj.data = {}
                 obj.__name__ = var.__name__
                 obj.name.append(obj.__name__)
                 commands.append(obj)
-                #print("Successfully loaded function " + obj.__name__ + ".")
+                #print("Successfully loaded command " + obj.__name__ + ".")
             except AttributeError:
-                pass
+                try:
+                    var.is_update
+                    if getattr(var, "name", None):
+                        name = var.name
+                        var.file = "saves/" + name + ".json"
+                        var.update = main_data.updatePart
+                        var.updated = False
+                        try:
+                            f = open(var.file, "rb")
+                            self.data[name] = var.data = eval(f.read())
+                            f.close()
+                        except FileNotFoundError:
+                            self.data[name] = var.data = {}
+                    var._vars = self
+                    obj = var()
+                    self.updaters[obj.name] = obj
+                    updates.append(obj)
+                    #print("Successfully loaded updater " + obj.__name__ + ".")
+                except AttributeError:
+                    pass
+        for u in updates:
+            for c in commands:
+                c.data[u.name] = u
         self.categories[rename] = commands
 
     def getModules(self):
         files = [f for f in os.listdir("commands/") if f.endswith(".py") or f.endswith(".pyw")]
         self.categories = {}
+        self.updaters = {}
         for f in files:
             if f.endswith(".py"):
                 f = f[:-3]
@@ -389,64 +372,34 @@ class __globals:
                 f = f[:-4]
             doParallel(self.getModule, [f])
 
-    def update(self, force=False):
-        if force:
-            if self.updated:
-                try:
-                    f = open(self.savedata, "wb")
-                    savedata = {
-                        "perms": self.perms,
-                        "bans": self.bans,
-                        "enabled": self.enabled,
-                        "scheduled": self.scheduled,
-                        "special": self.special,
-                        "following": self.following,
-                        "playlists": self.playlists,
-                        "imglists": self.imglists,
-                        "suspended": self.suspended,
-                        }
-                    s = bytes(repr(savedata), "utf-8")
-                    f.write(s)
-                    f.close()
-                    self.updated = False
-                except Exception as ex:
-                    print(traceback.format_exc())
-        else:
-            self.updated = True
-
-    def clearAudioCache(self):
-        should_cache = []
-        for g in self.playlists:
-            for i in self.playlists[g]:
-                s = i["id"] + ".mp3"
-                should_cache.append(s)
-        for path in os.listdir("cache/"):
-            found = False
-            for i in should_cache:
-                if i in path:
-                    found = True
-                    break
-            if not found:
-                try:
-                    os.remove("cache/" + path)
-                except Exception as ex:
-                    print(traceback.format_exc())
+    def update(self):
+        count = 0
+        try:
+            for u in self.updaters.values():
+                if getattr(u, "update", None) is not None:
+                    count += u.update(True)
+            self.updated = False
+        except Exception as ex:
+            print(traceback.format_exc())
+        if count:
+            print("Autosaved " + str(count) + " save files.")
 
     def verifyID(self, value):
         return int(str(value).replace("<", "").replace(">", "").replace("@", "").replace("!", ""))
 
     def getPerms(self, user, guild):
+        perms = self.data["perms"]
         try:
             u_id = int(user.id)
         except AttributeError:
             u_id = int(user)
         if guild:
             g_id = guild.id
-            g_perm = self.perms.setdefault(g_id, {})
+            g_perm = perms.setdefault(g_id, {})
             if u_id in (self.owner_id, client.user.id):
                 u_perm = nan
             else:
-                u_perm = g_perm.get(u_id, self.perms.setdefault("defaults", {}).get(g_id, 0))
+                u_perm = g_perm.get(u_id, perms.setdefault("defaults", {}).get(g_id, 0))
         elif u_id in (self.owner_id, client.user.id):
             u_perm = nan
         else:
@@ -456,13 +409,14 @@ class __globals:
         return u_perm
 
     def setPerms(self, user, guild, value):
+        perms = self.data["perms"]
         try:
             u_id = user.id
         except AttributeError:
             u_id = user
-        g_perm = self.perms.setdefault(guild.id, {})
+        g_perm = perms.setdefault(guild.id, {})
         g_perm.update({u_id: value})
-        self.update()
+        self.updaters["perms"].update()
 
     def resetGlobals(self):
         self.stored_vars = dict(globals())
@@ -484,70 +438,74 @@ class __globals:
         return self.stored_vars
     
     mmap = {
-    "“": '"',
-    "”": '"',
-    "„": '"',
-    "‘": "'",
-    "’": "'",
-    "‚": "'",
-    "〝": '"',
-    "〞": '"',
-    "⸌": "'",
-    "⸍": "'",
-    "⸢": "'",
-    "⸣": "'",
-    "⸤": "'",
-    "⸥": "'",
-    "⸨": "((",
-    "⸩": "))",
-    "⟦": "[",
-    "⟧": "]",
-    "〚": "[",
-    "〛": "]",
-    "「": "[",
-    "」": "]",
-    "『": "[",
-    "』": "]",
-    "【": "[",
-    "】": "]",
-    "〖": "[",
-    "〗": "]",
-    "（": "(",
-    "）": ")",
-    "［": "[",
-    "］": "]",
-    "｛": "{",
-    "｝": "}",
-    "⌈": "[",
-    "⌉": "]",
-    "⌊": "[",
-    "⌋": "]",
-    "⦋": "[",
-    "⦌": "]",
-    "⦍": "[",
-    "⦐": "]",
-    "⦏": "[",
-    "⦎": "]",
-    "⁅": "[",
-    "⁆": "]",
-    "〔": "[",
-    "〕": "]",
-    "«": "hlist((",
-    "»": "))",
-    "❮": "hlist((",
-    "❯": "))",
-    "❰": "hlist((",
-    "❱": "))",
-    "❬": "hlist((",
-    "❭": "))",
-    "＜": "hlist((",
-    "＞": "))",
-    "⟨": "hlist((",
-    "⟩": "))",
-    "<": "hlist((",
-    ">": "))",
-    }
+        "“": '"',
+        "”": '"',
+        "„": '"',
+        "‘": "'",
+        "’": "'",
+        "‚": "'",
+        "〝": '"',
+        "〞": '"',
+        "⸌": "'",
+        "⸍": "'",
+        "⸢": "'",
+        "⸣": "'",
+        "⸤": "'",
+        "⸥": "'",
+        "⸨": "((",
+        "⸩": "))",
+        "⟦": "[",
+        "⟧": "]",
+        "〚": "[",
+        "〛": "]",
+        "「": "[",
+        "」": "]",
+        "『": "[",
+        "』": "]",
+        "【": "[",
+        "】": "]",
+        "〖": "[",
+        "〗": "]",
+        "（": "(",
+        "）": ")",
+        "［": "[",
+        "］": "]",
+        "｛": "{",
+        "｝": "}",
+        "⌈": "[",
+        "⌉": "]",
+        "⌊": "[",
+        "⌋": "]",
+        "⦋": "[",
+        "⦌": "]",
+        "⦍": "[",
+        "⦐": "]",
+        "⦏": "[",
+        "⦎": "]",
+        "⁅": "[",
+        "⁆": "]",
+        "〔": "[",
+        "〕": "]",
+        "«": "<<",
+        "»": ">>",
+        "❮": "<",
+        "❯": ">",
+        "❰": "<",
+        "❱": ">",
+        "❬": "<",
+        "❭": ">",
+        "＜": "<",
+        "＞": ">",
+        "⟨": "<",
+        "⟩": ">",
+        }
     mtrans = "".maketrans(mmap)
+
+    cmap = {
+        "<": "hlist((",
+        ">": "))",
+        }
+    ctrans = "".maketrans(cmap)
 
     umap = {
         "<": "",
@@ -561,23 +519,32 @@ class __globals:
     utrans = "".maketrans(umap)
 
     def verifyCommand(self, func):
-        f = func.lower().translate(self.mtrans)
+        f1 = func.lower().translate(self.mtrans)
+        f2 = func.translate(self.ctrans)
         for d in self.disabled:
-            if d in f:
+            if d in f1:
                 raise PermissionError("\"" + d + "\" is not enabled.")
-        return f
+        return f2, f1
 
     def verifyURL(self, f):
         return f.strip(" ").translate(self.utrans)
 
     def doMath(self, f, returns):
         try:
-            f = self.verifyCommand(f)
-            try:
-                answer = eval(f, self.stored_vars)
-            except:
-                exec(f, self.stored_vars)
-                answer = None
+            att = 0
+            for f in self.verifyCommand(f):
+                try:
+                    answer = eval(f, self.stored_vars)
+                    break
+                except:
+                    try:
+                        exec(f, self.stored_vars)
+                        answer = None
+                        break
+                    except:
+                        if att >= 1:
+                            raise
+                att += 1
         except Exception as ex:
             answer = "\nError: " + repr(ex)
         if answer is not None:
@@ -585,8 +552,11 @@ class __globals:
         returns[0] = answer
 
     def evalMath(self, f):
-        f = self.verifyCommand(f)
-        return eval(f, self.stored_vars)
+        f1, f2 = self.verifyCommand(f)
+        try:
+            return eval(f1, self.stored_vars)
+        except:
+            return eval(f2, self.stored_vars)
 
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:
@@ -633,12 +603,33 @@ class __globals:
                             killThreads()
                             sent = await message.channel.send("```python\nError: " + repr(ex) + "\n```")
                             await sent.add_reaction("❎")
+                            
+    async def handleUpdate(self, force=False):
+        if force or time.time() - self.lastCheck > 0.5:
+            #print("Sending update...")
+            guilds = len(client.guilds)
+            if guilds != self.guilds:
+                self.guilds = guilds
+                u = await self.fetch_user(self.owner_id)
+                n = u.name
+                gamestr = (
+                    "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s")
+                    + " place, to " + uniStr(guilds) + " servers!"
+                    )
+                print("Playing " + gamestr)
+                game = discord.Game(gamestr)
+                await client.change_presence(
+                    activity=game,
+                    )
+            self.lastCheck = time.time()
+            for u in self.updaters.values():
+                asyncio.create_task(u())
 
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_flags=None, loop=False):
     global client
-    perms = _vars.perms
-    bans = _vars.bans
+    perms = _vars.data["perms"]
+    bans = _vars.data["bans"]
     categories = _vars.categories
     stored_vars = _vars.stored_vars
     if msg[:2] == "> ":
@@ -662,9 +653,9 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     c_id = channel.id
     if g_id:
         try:
-            enabled = _vars.enabled[c_id]
+            enabled = _vars.data["enabled"][c_id]
         except KeyError:
-            enabled = _vars.enabled[c_id] = ["string", "admin"]
+            enabled = _vars.data["enabled"][c_id] = ["string", "admin"]
             _vars.update()
     else:
         enabled = list(_vars.categories)
@@ -696,10 +687,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         await sent.add_reaction("❎")
         return
     if op:
-        commands = []
+        commands = hlist()
         for catg in categories:
             if catg in enabled or catg == "main":
-                commands += categories[catg]
+                commands.extend(categories[catg])
         for command in commands:
             for alias in command.name:
                 alias = alias.lower()
@@ -775,10 +766,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
                             asyncio.create_task(channel.trigger_typing())
-                        _vars.suspclear = time.time() + 5 + (tc * 2) ** 2
-                        f = open(_vars.suspected, "w")
-                        f.write(str(user.id) + "\r\n")
-                        f.close()
+                        for u in _vars.updaters.values():
+                            f = getattr(u, "_command_", None)
+                            if f is not None:
+                                await f(user, command)
                         response = await command(
                             client=client,          # for interfacing with discord
                             _vars=_vars,            # for interfacing with bot's database
@@ -829,31 +820,11 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         killThreads()
                         raise TimeoutError("Request timed out.")
                     except Exception as ex:
-                        errmsg = limStr("```python\nError: " + rep + "\n```", 2000)
+                        errmsg = limStr("```python\nError: " + repr(ex) + "\n```", 2000)
                         print(traceback.format_exc())
                         sent = await channel.send(errmsg)
                         await sent.add_reaction("❎")
-    elif u_id != client.user.id and g_id in _vars.following and orig:
-        if not edit:
-            if _vars.following[g_id]["follow"]:
-                checker = orig
-                curr = _vars.msgFollow.get(g_id)
-                if curr is None:
-                    curr = [checker, 1, 0]
-                    _vars.msgFollow[g_id] = curr
-                elif checker == curr[0] and u_id != curr[2]:
-                    curr[1] += 1
-                    if curr[1] >= 3:
-                        curr[1] = xrand(-3) + 1
-                        if len(checker):
-                            asyncio.create_task(channel.send(checker))
-                else:
-                    if len(checker) > 100:
-                        checker = ""
-                    curr[0] = checker
-                    curr[1] = xrand(-1, 2)
-                curr[2] = u_id
-                #print(curr)
+    elif u_id != client.user.id and orig:
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
         temp = list(orig.lower())
         for i in range(len(temp)):
@@ -862,57 +833,25 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         temp = "".join(temp)
         while "  " in temp:
             temp = temp.replace("  ", " ")
-        try:
-            for r in _vars.following[g_id]["reacts"]:
-                if r in temp:
-                    await message.add_reaction(_vars.following[g_id]["reacts"][r])
-        except discord.Forbidden:
-            pass
-        currentSchedule = _vars.scheduled.get(channel.id, {})
-        for k in currentSchedule:
-            if k in temp:
-                curr = currentSchedule[k]
-                role = curr["role"]
-                deleter = curr["deleter"]
-                try:
-                    perm = float(role)
-                    currPerm = _vars.getPerms(user, guild)
-                    if perm > currPerm:
-                        _vars.setPerms(user, guild, perm)
-                    print("Granted perm " + str(perm) + " to " + user.name + ".")
-                except ValueError:
-                    for r in guild.roles:
-                        if r.name.lower() == role:
-                            await user.add_roles(
-                                r,
-                                reason="Verified.",
-                                atomic=True,
-                                )
-                            print("Granted role " + r.name + " to " + user.name + ".")
-                if deleter:
-                    try:
-                        await message.delete()
-                    except discord.NotFound:
-                        pass
+        for u in _vars.updaters.values():
+            f = getattr(u, "_nocommand_", None)
+            if f is not None:
+                await f(
+                    text=temp,
+                    edit=edit,
+                    orig=orig,
+                    message=message,
+                    )
 
 
 async def heartbeatLoop():
     print("Heartbeat Loop initiated.")
-    _vars.suspclear = inf
     try:
         while True:
             try:
                 _vars
             except NameError:
                 sys.exit()
-            if time.time() - _vars.suspclear:
-                _vars.suspclear = inf
-                try:
-                    if _vars.suspected in os.listdir():
-                        os.remove(_vars.suspected)
-                except:
-                    print(traceback.format_exc())
-                #forcePrint("Cleared.")
             if _vars.heartbeat in os.listdir():
                 try:
                     os.remove(_vars.heartbeat)
@@ -992,47 +931,24 @@ async def updateLoop():
     global _vars
     print("Update loop initiated.")
     autosave = 0
-    counter = 0
     while True:
         try:
             if time.time() - autosave > 30:
                 autosave = time.time()
-                _vars.update(True)
+                _vars.update()
             while _vars.blocked > 0:
                 print("Blocked...")
                 _vars.blocked -= 1
                 await asyncio.sleep(1)
-            for g in _vars.special:
-                asyncio.create_task(changeColour(g, _vars.special[g], counter))
-            await handleUpdate()
+            await _vars.handleUpdate()
             t = time.time()
             while time.time() - t < frand(2) + 2:
                 await asyncio.sleep(0.01)
                 if _vars.doUpdate:
-                    await handleUpdate(True)
+                    await _vars.handleUpdate(True)
                     _vars.doUpdate = False
         except:
             print(traceback.format_exc())
-        counter = counter + 1 & 65535
-
-
-async def changeColour(g_id, roles, counter):
-    guild = await _vars.fetch_guild(g_id)
-    colTime = 12
-    l = list(roles)
-    for r in l:
-        try:
-            role = guild.get_role(r)
-            delay = roles[r]
-            if not (counter + r) % delay:
-                col = colour2Raw(colourCalculation(xrand(1536)))
-                await role.edit(colour=discord.Colour(col))
-                #print("Edited role " + role.name)
-            await asyncio.sleep(frand(2))
-        except discord.HTTPException as ex:
-            print(traceback.format_exc())
-            _vars.blocked += 20
-            break
         
 
 @client.event
@@ -1044,257 +960,13 @@ async def on_ready():
             print("> " + str(guild.id) + " is not available.")
         else:
             print("> " + guild.name)
-    await handleUpdate()
+    await _vars.handleUpdate()
     asyncio.create_task(updateLoop())
     asyncio.create_task(outputLoop())
     asyncio.create_task(heartbeatLoop())
 ##    print("Users: ")
 ##    for guild in client.guilds:
 ##        print(guild.members)
-
-
-def sendUpdateRequest(error=False):
-    #print("Sending update request...")
-    _vars.doUpdate = True
-
-
-async def handleUpdate(force=False):
-    if force or time.time() - _vars.lastCheck > 0.5:
-        #print("Sending update...")
-        guilds = len(client.guilds)
-        if guilds != _vars.guilds:
-            _vars.guilds = guilds
-            u = await _vars.fetch_user(_vars.owner_id)
-            n = u.name
-            gamestr = (
-                "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s")
-                + " place, to " + uniStr(guilds) + " servers!"
-                )
-            print("Playing " + gamestr)
-            game = discord.Game(gamestr)
-            await client.change_presence(
-                activity=game,
-                )
-        _vars.lastCheck = time.time()
-        dtime = datetime.datetime.utcnow().timestamp()
-        bans = _vars.bans
-        if bans:
-            changed = False
-            for g in bans:
-                if g:
-                    bl = list(bans[g])
-                    for b in bl:
-                        if type(bans[g][b]) is list and dtime >= bans[g][b][0]:
-                            try:
-                                u_target = await _vars.fetch_user(b)
-                                g_target = await _vars.fetch_guild(g)
-                                try:
-                                    await g_target.unban(u_target)
-                                    c_target = await _vars.fetch_channel(bans[g][b][1])
-                                    await c_target.send(
-                                        "```css\n" + uniStr(u_target.name)
-                                        + " has been unbanned from " + uniStr(g_target.name) + ".```"
-                                        )
-                                    changed = True
-                                except:
-                                    c_target = await _vars.fetch_channel(bans[g][b][1])
-                                    await c_target.send(
-                                        "```css\nUnable to unban " + uniStr(u_target.name)
-                                        + " from " + uniStr(g_target.name) + ".```"
-                                        )
-                                    print(traceback.format_exc())
-                                bans[g].pop(b)
-                            except:
-                                print(traceback.format_exc())
-            if changed:
-                _vars.update()
-        if _vars.lastsusp is not None:
-            u_susp = await _vars.fetch_user(_vars.lastsusp)
-            _vars.lastsusp = None
-            channel = await _vars.getDM(u_susp)
-            secs = _vars.suspended.get(u_susp.id, 0) - time.time()
-            msg = (
-                "Apologies for the inconvenience, but your account has been "
-                + "flagged as having attempted a denial-of-service attack.\n"
-                + "This will expire in `" + sec2Time(secs) + "`.\n"
-                + "If you believe this is an error, please notify <@!"
-                + str(_vars.owner_id) + "> as soon as possible."
-                )
-            print(
-                u_susp.name + " may be attempting a DDOS attack. Expires in "
-                + sec2Time(secs) + "."
-                )
-            await channel.send(msg)
-        l = list(_vars.suspended)
-        for u_id in l:
-            if _vars.suspended[u_id] < time.time():
-                _vars.suspended.pop(u_id)
-                _vars.update()
-        ytdl = None
-        for func in _vars.categories.get("voice", []):
-            if "queue" in func.name:
-                ytdl = func.ytdl
-        if ytdl is not None:
-            should_cache = []
-            for g in _vars.playlists:
-                for i in _vars.playlists[g]:
-                    should_cache.append(i["id"])
-            for vc in client.voice_clients:
-                if not vc.is_connected():
-                    continue
-                channel = vc.channel
-                guild = channel.guild
-                try:
-                    auds = _vars.queue[guild.id]
-                    playing = auds.is_playing and vc.is_playing() or auds.is_loading
-                    membs = channel.members
-                    for memb in membs:
-                        if memb.id == client.user.id:
-                            membs.remove(memb)
-                    cnt = len(membs)
-                except KeyError:
-                    continue
-                if not cnt or getattr(auds, "dead", 0):
-                    try:
-                        channel = auds.channel
-                        _vars.queue.pop(guild.id)
-                        msg = "```css\n🎵 Successfully disconnected from "+ uniStr(guild.name) + ". 🎵```"
-                        sent = await channel.send(msg)
-                        await sent.add_reaction("❎")
-                        #print(msg)
-                    except KeyError:
-                        pass
-                    await vc.disconnect(force=False)
-                else:
-                    try:
-                        asyncio.create_task(auds.updatePlayer())
-                        try:
-                            q = auds.queue
-                        except NameError:
-                            continue
-                        asyncio.create_task(research(auds, ytdl))
-                        dels = deque()
-                        i = 0
-                        for i in range(len(q)):
-                            if i >= len(q) or i > 10000:
-                                break
-                            e = q[i]
-                            e_id = e["id"]
-                            if not e_id:
-                                dels.append(i)
-                                continue
-                            if e_id in _vars.audiocache:
-                                e["duration"] = _vars.audiocache[e_id][0]
-                        if len(dels) > 1:
-                            q.delitems(dels)
-                        elif len(dels):
-                            q.pop(dels[0])
-                        if len(q):
-                            for i in range(2):
-                                if i < len(q):
-                                    e_id = q[i]["id"]
-                                    should_cache.append(e_id)
-                                    if not q[i].get("download", 0):
-                                        q[i]["download"] = 1
-                                        if e_id not in _vars.audiocache:
-                                            search = e_id + ".mp3"
-                                            found = False
-                                            for path in os.listdir("cache"):
-                                                if search in path:
-                                                    found = True
-                                            if not found:
-                                                durc = [q[i]["duration"]]
-                                                _vars.audiocache[e_id] = durc
-                                                doParallel(
-                                                    ytdl.downloadSingle,
-                                                    [q[i], durc],
-                                                    )
-                                            else:
-                                                q[i]["duration"] = ytdl.getDuration("cache/" + search)
-                            if not q[0].get("download", 0) > 1 and not playing:
-                                try:
-                                    path = "cache/" + q[0]["id"] + ".mp3"
-                                    f = open(path, "rb")
-                                    minl = 64
-                                    b = f.read(minl)
-                                    f.close()
-                                    if len(b) < minl:
-                                        raise FileNotFoundError
-                                    q[0]["download"] = 2
-                                    name = q[0]["name"]
-                                    added_by = q[0]["added by"]
-                                    auds = _vars.queue[guild.id]
-                                    auds.new(path)
-                                    if not vc.is_playing():
-                                        vc.play(auds, after=sendUpdateRequest)
-                                    if not auds.stats["quiet"]:
-                                        channel = auds.channel
-                                        sent = await channel.send(
-                                            "```css\n🎵 Now playing "
-                                            + uniStr(noSquareBrackets(name))
-                                            + ", added by " + uniStr(added_by) + "! 🎵```"
-                                            )
-                                        await sent.add_reaction("❎")
-                                except FileNotFoundError:
-                                    pass
-                                auds.preparing = False
-                            elif not playing and auds.source is None:
-                                auds.advance()
-                        if not len(q) and not auds.preparing:
-                            t = _vars.playlists.get(guild.id, ())
-                            if len(t):
-                                d = None
-                                while d is None or d["id"] == auds.prev:
-                                    p = t[xrand(len(t))]
-                                    d = {
-                                        "name": p["name"],
-                                        "url": p["url"],
-                                        "duration": p["duration"],
-                                        "added by": client.user.name,
-                                        "u_id": client.user.id,
-                                        "id": p["id"],
-                                        "skips": (),
-                                        }
-                                    if len(t) <= 1:
-                                        break
-                                q.append(d)
-                    except KeyError as ex:
-                        print(traceback.format_exc())
-            l = list(_vars.audiocache)
-            for i in l:
-                if not i in should_cache:
-                    path = "cache/" + i + ".mp3"
-                    try:
-                        os.remove(path)
-                        _vars.audiocache.pop(i)
-                    except PermissionError:
-                        pass
-                    except FileNotFoundError:
-                        _vars.audiocache.pop(i)
-
-
-async def research(auds, ytdl):
-    if auds.searching >= 1:
-        #print("researching blocked.")
-        return
-    auds.searching += 1
-    #print("researching...")
-    q = auds.queue
-    for i in q:
-        if i in auds.queue and "research" in i:
-            try:
-                print(i["name"])
-                i.pop("research")
-                returns = [None]
-                t = time.time()
-                doParallel(ytdl.extractSingle, [i], returns)
-                while returns[0] is None and time.time() - t < 10:
-                    await asyncio.sleep(0.1)
-                await asyncio.sleep(0.1)
-            except:
-                print(traceback.format_exc())
-    await asyncio.sleep(1)
-    auds.searching = max(auds.searching - 1, 0)
 
 
 async def checkDelete(message, reaction, user):
@@ -1318,7 +990,7 @@ async def checkDelete(message, reaction, user):
                         print(temp + " deleted by " + user.name)
                     except discord.NotFound:
                         pass
-            await handleUpdate()
+            await _vars.handleUpdate()
 
 
 @client.event
@@ -1354,12 +1026,12 @@ async def on_raw_message_delete(payload):
     m_id = payload.message_id
     if m_id in _vars.message_cache:
         _vars.message_cache.pop(m_id)
-    await handleUpdate()
+    await _vars.handleUpdate()
 
 
 @client.event
 async def on_typing(channel, user, when):
-    await handleUpdate()
+    await _vars.handleUpdate()
 
 
 @client.event
@@ -1368,7 +1040,7 @@ async def on_voice_state_update(member, before, after):
         if after.mute or after.deaf:
             print("Unmuted self in " + member.guild.name)
             await member.edit(mute=False, deafen=False)
-    await handleUpdate()
+    await _vars.handleUpdate()
 
 
 async def handleMessage(message, edit=True):
@@ -1387,18 +1059,17 @@ async def handleMessage(message, edit=True):
 @client.event
 async def on_message(message):
     await _vars.reactCallback(message, None, message.author)
-    await handleUpdate()
     await handleMessage(message, False)
-    await handleUpdate(True)
+    await _vars.handleUpdate(True)
 
 
 @client.event
 async def on_message_edit(before, after):
-    await handleUpdate()
+    await _vars.handleUpdate()
     if before.content != after.content:
         message = after
         await handleMessage(message)
-        await handleUpdate(True)
+        await _vars.handleUpdate(True)
 
 
 @client.event
@@ -1416,13 +1087,12 @@ async def on_raw_message_edit(payload):
                     except Exception as ex:
                         print(traceback.format_exc())
     if message:
-        await handleUpdate()
         await handleMessage(message)
-        await handleUpdate(True)
+        await _vars.handleUpdate(True)
 
 
 if __name__ == "__main__":
-    _vars = __globals()
+    _vars = main_data()
     print("Attempting to authorize with token " + _vars.token + ":")
     try:
         client.run(_vars.token)

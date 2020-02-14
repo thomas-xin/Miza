@@ -11,8 +11,11 @@ class img:
         self.description = "Sends an image in the current chat from a list."
         self.usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <enable(?e)> <disable(?d)>"
 
-    async def __call__(self, flags, args, argv, guild, perm, _vars, **void):
-        images = _vars.imglists.get(guild.id, {})
+    async def __call__(self, flags, args, argv, guild, perm, **void):
+        update = self.data["images"].update
+        _vars = self._vars
+        imglists = _vars.data["images"]
+        images = imglists.get(guild.id, {})
         if "e" in flags or "d" in flags:
             req = 2
             if perm < req:
@@ -25,23 +28,23 @@ class img:
                 key = args[0].lower()
                 url = _vars.verifyURL(args[1])
                 images[key] = url
-                _vars.imglists[guild.id] = images
-                _vars.update()
+                imglists[guild.id] = images
+                update()
                 return (
                     "```css\nSuccessfully added " + uniStr(key)
                     + " to the image list for " + uniStr(guild.name) + ".```"
                     )
             if not args:
-                _vars.imglists[guild.id] = {}
-                _vars.update()
+                imglists[guild.id] = {}
+                update()
                 return (
                     "```css\nSuccessfully removed all images from the image list for "
                     + uniStr(guild.name) + ".```"
                     )
             key = args[0].lower()
             images.pop(key)
-            _vars.imglists[guild.id] = images
-            _vars.update()
+            imglists[guild.id] = images
+            update()
             return (
                 "```css\nSuccessfully removed " + uniStr(key)
                 + " from the image list for " + uniStr(guild.name) + ".```"
@@ -175,3 +178,14 @@ class char2emoj:
             if args[i][0] == ":" and args[i][-1] != ":":
                 args[i] = "<" + args[i] + ">"
         return _c2e(*args[:3])
+
+
+class updateImages:
+    is_update = True
+    name = "images"
+
+    def __init__(self):
+        pass
+
+    async def __call__(self):
+        pass
