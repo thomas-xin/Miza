@@ -35,6 +35,7 @@ def tryFunc(func, *args, force=False, amax, **kwargs):
     return ans
 
 def plot(*args,**kwargs):
+    args = list(args)
     flip = False
     if type(args[0]) is str:
         s = args[0]
@@ -603,7 +604,7 @@ class main_data:
                             killThreads()
                             sent = await message.channel.send("```python\nError: " + repr(ex) + "\n```")
                             await sent.add_reaction("❎")
-                            
+
     async def handleUpdate(self, force=False):
         if force or time.time() - self.lastCheck > 0.5:
             #print("Sending update...")
@@ -614,7 +615,7 @@ class main_data:
                 n = u.name
                 gamestr = (
                     "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s")
-                    + " place, to " + uniStr(guilds) + " servers!"
+                    + " place, to " + uniStr(guilds) + " server" + "s" * (guilds != 1) + "!"
                     )
                 print("Playing " + gamestr)
                 game = discord.Game(gamestr)

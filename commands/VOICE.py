@@ -1141,8 +1141,8 @@ class randomize:
 
     async def __call__(self, guild, channel, user, client, _vars, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        if len(auds.queue):
-            temp = auds.queue.popright()
+        if len(auds.queue) > 1:
+            temp = auds.queue.popleft()
             auds.queue = auds.queue.shuffle()
             auds.queue.appendleft(temp)
         return "```css\nSuccessfully shuffled audio queue for " + uniStr(guild.name) + ".```"
