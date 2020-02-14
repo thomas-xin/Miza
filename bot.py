@@ -555,6 +555,8 @@ class __globals:
         "|": "",
         "*": "",
         "_": "",
+        "~": "",
+        " ": "%20",
         }
     utrans = "".maketrans(umap)
 
@@ -563,10 +565,10 @@ class __globals:
         for d in self.disabled:
             if d in f:
                 raise PermissionError("\"" + d + "\" is not enabled.")
-        return func
+        return f
 
     def verifyURL(self, f):
-        return f.translate(self.utrans)
+        return f.strip(" ").translate(self.utrans)
 
     def doMath(self, f, returns):
         try:
