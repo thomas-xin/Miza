@@ -746,6 +746,9 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                     asyncio.create_task(channel.send("Response too long for message.", file=f))
                             if sent is not None:
                                 await sent.add_reaction(react)
+                    except TimeoutError:
+                        killThreads()
+                        raise TimeoutError("Request timed out.")
                     except Exception as ex:
                         rep = repr(ex)
                         if len(rep) > 1950:
