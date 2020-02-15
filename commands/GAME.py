@@ -20,7 +20,7 @@ class text2048:
         "💠": [16, 12],
         "💯": [16, 13],
         "🔢": [16, 14],
-        }
+    }
     multis = {
         5: [0, 1],
         6: [1, 2],
@@ -32,7 +32,7 @@ class text2048:
         12: [i for i in range(16)],
         13: [i for i in range(100)],
         14: [i for i in range(1234)],
-        }
+    }
     numScore = lambda self, x: x * 2 ** (x + 1)
 
     def __init__(self):
@@ -42,7 +42,7 @@ class text2048:
         self.usage = (
             "<board_size[4]> <verbose(?v)> <special_tiles(?s)> <public(?p)> "
             + "<insanity_mode(?i)> <special_controls(?c)> <easy_mode(?e)>"
-            )
+        )
 
     def moveTiles(self, gamestate, direction):
         tiles = copy.deepcopy(gamestate[0])
@@ -175,7 +175,10 @@ class text2048:
                     empty = size - len(num)
                     text += "|" + " " * (empty + 1 >> 1) + num + " " * (empty >> 1)
                 text += "|\n"
-            text += ("+" + "-" * size) * width + "+" + "\nPlayer: " + username + "\nScore: " + str(score) + "```"
+            text += (
+                ("+" + "-" * size) * width + "+" + "\nPlayer: "
+                + username + "\nScore: " + str(score) + "```"
+            )
             print(text)
             await message.edit(content=text)
         elif not mode & 1:
@@ -280,5 +283,5 @@ class text2048:
         text = (
             "```" + "\n" * (mode & 8 != 0) + "callback-game-text2048-"
             + str(u_id) + "_" + str(mode) + "-" + gsr + "\nStarting Game...```"
-            )
+        )
         return text

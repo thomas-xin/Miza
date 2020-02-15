@@ -22,7 +22,7 @@ class customAudio(discord.AudioSource):
             "shuffle": False,
             "quiet": False,
             "position": 0,
-            }
+        }
 
     def __init__(self, channel, _vars):
         try:
@@ -51,7 +51,7 @@ class customAudio(discord.AudioSource):
             + ", \"stats\": " + str(self.stats)
             + ", \"player\": " + str(self.player)
             + "}"
-            )
+        )
 
     def new(self, source=None, pos=0):
         self.reverse = self.stats["speed"] < 0
@@ -127,7 +127,7 @@ class customAudio(discord.AudioSource):
                     + B + ":"
                     + C + ":"
                     + D + "\""
-                    )
+                )
             if pos != 0:
                 d["before_options"] = "-ss " + str(pos)
             print(d)
@@ -211,7 +211,7 @@ class customAudio(discord.AudioSource):
                 raise EOFError
             self.stats["position"] = round(
                 self.stats["position"] + self.speed / 50 * (self.reverse * -2 + 1), 4
-                )
+            )
             self.is_playing = True
         except:
             if not self.paused and not self.is_loading:
@@ -273,14 +273,14 @@ class customAudio(discord.AudioSource):
                         + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
                         + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
                         + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 24
-                        ) * reverb
+                    ) * reverb
                     rfeed = (
                         + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 24
                         + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
                         + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
                         + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
                         + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 24
-                        ) * reverb
+                    ) * reverb
                     if self.feedback is not None:
                         left -= sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size-16:-16]
                         right -= sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size-16:-16]
@@ -315,7 +315,7 @@ async def createPlayer(auds, p_type=0, verbose=False):
     text = (
         "```" + "\n" * verbose + "callback-voice-player-" + str(int(bool(p_type)))
         + "\nInitializing virtual audio player...```"
-        )
+    )
     await auds.channel.send(text)
     await auds.updatePlayer()
 
@@ -330,7 +330,7 @@ def getDuration(filename):
         '-of', 
         'default=noprint_wrappers=1:nokey=1', 
         filename,
-      ]
+    ]
     try:
         output = check_output(command, stderr=STDOUT).decode()
     except CalledProcessError as e:
@@ -385,7 +385,7 @@ class videoDownloader:
         "ignoreerrors": 0,
         "source_address": "0.0.0.0",
         "default_search": "auto",
-        }
+    }
 
     def __init__(self):
         self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
@@ -409,7 +409,7 @@ class videoDownloader:
                         "name": data["title"],
                         "url": data["webpage_url"],
                         "duration": data["duration"],
-                        })
+                    })
             else:
                 for entry in entries:
                     dur = "duration" in entry
@@ -418,7 +418,7 @@ class videoDownloader:
                         "name": entry["title"],
                         "url": entry["url"],
                         "duration": entry.get("duration", 60),
-                        }
+                    }
                     if not dur:
                         temp["research"] = True
                     output.append(temp)
@@ -429,7 +429,7 @@ class videoDownloader:
                 "name": resp["title"],
                 "url": resp["webpage_url"],
                 "duration": resp.get("duration", 60),
-                }
+            }
             if not dur:
                 temp["research"] = True
             output.append(temp)
@@ -535,7 +535,7 @@ class queue:
                 info = (
                     "`" + uniStr(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
                     + uniStr(sec2Time(totalTime / auds.speed)) + "`"
-                    )
+                )
             else:
                 info = ""
             currTime = 0
@@ -550,7 +550,7 @@ class queue:
                         uniStr(noSquareBrackets(e["name"])) + ", URL: [" + e["url"] + "]"
                         + ", Duration: " + uniStr(sec2Time(e["duration"]))
                         + ", Added by: " + uniStr(e["added by"])
-                        )
+                    )
                 else:
                     curr += limStr(uniStr(noSquareBrackets(e["name"])), 48)
                 if auds.reverse and len(auds.queue):
@@ -580,13 +580,13 @@ class queue:
             countstr += (
                 "(" + uniStr(dhms(elapsed))
                 + "/" + uniStr(dhms(duration)) + ") "
-                )
+            )
             countstr += bar + "\n"
             return (
                 "Queue for **" + guild.name + "**: "
                 + info + "\n```css\n"
                 + countstr + show + "```", 1
-                )
+            )
         else:
             auds.preparing = True
             output = [None]
@@ -613,7 +613,7 @@ class queue:
                     "u_id": user.id,
                     "id": v_id,
                     "skips": [],
-                    }
+                }
                 if "research" in e:
                     temp["research"] = True
                 added.append(temp)
@@ -640,7 +640,7 @@ class queue:
                     "```css\n🎶 Added " + noSquareBrackets(uniStr(names))
                     + " to the queue! Estimated time until playing: "
                     + uniStr(sec2Time(total_duration)) + ". 🎶```", 1
-                    )
+                )
 
 
 class playlist:
@@ -663,7 +663,7 @@ class playlist:
                 raise PermissionError(
                     "Insufficient privileges to modify default playlist for " + uniStr(guild.name)
                     + ". Required level: " + uniStr(req) + ", Current level: " + uniStr(perm) + "."
-                    )
+                )
         pl = pl.setdefault(guild.id, [])
         if not argv:
             if "d" in flags:
@@ -674,7 +674,7 @@ class playlist:
                 return (
                     "Current default playlist for **" + guild.name + "**: ```json\n"
                     + str(pl).replace("'", '"') + "```"
-                    )
+                )
             else:
                 items = []
                 for i in pl:
@@ -687,7 +687,7 @@ class playlist:
             return (
                 "Current default playlist for **" + guild.name + "**: ```ini\n"
                 + s + "```"
-                )
+            )
         if "d" in flags:
             i = _vars.evalMath(argv)
             temp = pl[i]
@@ -696,7 +696,7 @@ class playlist:
             return (
                 "```css\nRemoved " + uniStr(noSquareBrackets(temp["name"])) + " from the default playlist for "
                 + uniStr(guild.name) + ".```"
-                )
+            )
         output = [None]
         doParallel(ytdl.search, [argv, True], output)
         await channel.trigger_typing()
@@ -714,7 +714,7 @@ class playlist:
                 "url": e["url"],
                 "duration": e["duration"],
                 "id": e["id"],
-                })
+            })
         if len(names):
             pl.sort(key=lambda x: x["name"][0].lower())
             update()
@@ -749,7 +749,7 @@ class join:
             return (
                 "```css\n🎵 Successfully connected to " + uniStr(vc.name)
                 + " in " + uniStr(guild.name) + ". 🎵```", 1
-                )
+            )
 
 
 class leave:
@@ -806,7 +806,7 @@ class remove:
             raise PermissionError(
                 "Insufficient permissions to force skip. Current permission level: " + uniStr(s_perm)
                 + ", required permission level: " + uniStr(min_level) + "."
-                )
+            )
         if not argv:
             elems = [0]
         elif ":" in argv or ".." in argv:
@@ -866,7 +866,7 @@ class remove:
                     "Voted to remove " + uniStr(noSquareBrackets(curr["name"]))
                     + " from the queue.\nCurrent vote count: "
                     + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + ".\n"
-                    )
+                )
         q = auds.queue
         i = 0
         while i < len(q):
@@ -911,7 +911,7 @@ class pause:
             return (
                 "```css\nSuccessfully " + name + "d audio playback in "
                 + uniStr(guild.name) + ".```"
-                )
+            )
 
 
 class seek:
@@ -951,7 +951,7 @@ class seek:
             return (
                 "```css\nSuccessfully moved audio position to "
                 + uniStr(sec2Time(pos)) + ".```"
-                )
+            )
 
 
 class dump:
@@ -979,7 +979,7 @@ class dump:
             d = {
                 "stats": s,
                 "queue": q,
-                }
+            }
             if auds.player is not None:
                 d["player"] = auds.player["type"]
             d["stats"].pop("position")
@@ -1042,7 +1042,7 @@ class volume:
         self.usage = (
             "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <bassboost(?b)> <reverb(?r)> <chorus(?c)>"
             + " <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)>"
-            )
+        )
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1073,7 +1073,7 @@ class volume:
                 return (
                     "Current audio settings for **" + guild.name + "**:\n```json\n"
                     + str(auds.stats).replace("'", '"') + "```"
-                    )
+                )
             orig = _vars.queue[guild.id].stats[op]
             if op in "loop shuffle quiet":
                 num = bool(orig)
@@ -1082,7 +1082,7 @@ class volume:
             return (
                 "```css\nCurrent audio " + op + " in " + uniStr(guild.name)
                 + ": " + uniStr(num) + ".```"
-                )
+            )
         if op == "settings":
             op = "volume"
         s_perm = _vars.getPerms(user, guild)
@@ -1090,7 +1090,7 @@ class volume:
             raise PermissionError(
                 "Insufficient permissions to change audio settings. Current permission level: " + uniStr(s_perm)
                 + ", required permission level: " + uniStr(1) + "."
-                )
+            )
         if op is None:
             pos = auds.stats["position"]
             auds.stats = dict(auds.defaults)
@@ -1104,7 +1104,7 @@ class volume:
                 return (
                     "```css\nSuccessfully reset all audio settings for "
                     + uniStr(guild.name) + ".```"
-                    )
+                )
         origVol = _vars.queue[guild.id].stats
         val = roundMin(float(_vars.evalMath(argv) / 100))
         orig = round(origVol[op] * 100, 9)
@@ -1126,7 +1126,7 @@ class volume:
                 "```css\nChanged audio " + op + " in " + uniStr(guild.name)
                 + " from " + uniStr(orig)
                 + " to " + uniStr(new) + ".```"
-                )
+            )
 
 
 class randomize:
@@ -1145,7 +1145,10 @@ class randomize:
             temp = auds.queue.popleft()
             auds.queue = auds.queue.shuffle()
             auds.queue.appendleft(temp)
-        return "```css\nSuccessfully shuffled audio queue for " + uniStr(guild.name) + ".```"
+        return (
+            "```css\nSuccessfully shuffled audio queue for "
+            + uniStr(guild.name) + ".```"
+        )
 
 
 class unmute:
@@ -1163,7 +1166,10 @@ class unmute:
         for vc in guild.voice_channels:
             for user in vc.members:
                 asyncio.create_task(user.edit(mute=False, deafen=False))
-        return "```css\nSuccessfully unmuted all users in voice channels in " + uniStr(guild.name) + ".```"
+        return (
+            "```css\nSuccessfully unmuted all users in voice channels in "
+            + uniStr(guild.name) + ".```"
+        )
 
 
 class player:
@@ -1263,7 +1269,7 @@ class player:
         output += (
             " (" + uniStr(dhms(p[0]))
             + "/" + uniStr(dhms(p[1])) + ") "
-            )
+        )
         sym = "⬜⬛"
         r = round(min(1, p[0] / p[1]) * self.barsize)
         output += sym[0] * r + sym[1] * (self.barsize - r)
@@ -1282,7 +1288,7 @@ class player:
                 "message": message,
                 "type": int(vals),
                 "events": 0,
-                }
+            }
             if vals:
                 auds.stats["quiet"] |= 2
         elif auds.player is None or auds.player["message"].id != message.id:
@@ -1387,7 +1393,7 @@ class player:
             auds.player["events"] += 1
             await message.edit(
                 content=text,
-                )
+            )
         else:
             auds.player["time"] = inf
             auds.player["events"] += 2
@@ -1395,7 +1401,7 @@ class player:
             temp = message
             message = await channel.send(
                 content=text,
-                )
+            )
             auds.player["message"] = message
             try:
                 await temp.delete()
@@ -1431,13 +1437,13 @@ class player:
                     + " virtual audio player for " + uniStr(guild.name)
                     + ". Required level: " + uniStr(req)
                     + ", Current level: " + uniStr(perm) + "."
-                    )
+                )
         if "d" in flags:
             auds.player = None
             return (
                 "```css\nSuccessfully disabled active virtual audio players in "
                 + uniStr(channel.guild.name) + ".```"
-                )
+            )
         await createPlayer(auds, p_type="c" in flags, verbose="v" in flags)
 
 
@@ -1524,7 +1530,7 @@ class updateQueues:
                     msg = (
                         "```css\n🎵 Successfully disconnected from "
                         + uniStr(guild.name) + ". 🎵```"
-                        )
+                    )
                     sent = await channel.send(msg)
                     await sent.add_reaction("❎")
                     #print(msg)
@@ -1574,7 +1580,7 @@ class updateQueues:
                                             doParallel(
                                                 ytdl.downloadSingle,
                                                 [q[i], durc],
-                                                )
+                                            )
                                         else:
                                             q[i]["duration"] = ytdl.getDuration("cache/" + search)
                         if not q[0].get("download", 0) > 1 and not playing:
@@ -1599,7 +1605,7 @@ class updateQueues:
                                         "```css\n🎵 Now playing "
                                         + uniStr(noSquareBrackets(name))
                                         + ", added by " + uniStr(added_by) + "! 🎵```"
-                                        )
+                                    )
                                     await sent.add_reaction("❎")
                             except FileNotFoundError:
                                 pass
@@ -1620,7 +1626,7 @@ class updateQueues:
                                     "u_id": client.user.id,
                                     "id": p["id"],
                                     "skips": (),
-                                    }
+                                }
                                 if len(t) <= 1:
                                     break
                             q.append(d)

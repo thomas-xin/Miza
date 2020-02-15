@@ -36,7 +36,7 @@ class purge:
                     + " for target user.\nRequred level: " + uniStr(3)
                     + ", Current level: " + uniStr(perm) + "."
                 )
-        lim = count*2+16
+        lim = count * 2 + 16
         if lim < 0:
             lim = 0
         if not isValid(lim):
@@ -138,7 +138,7 @@ class ban:
                     return (
                         "```css\nCurrent ban for " + uniStr(t_user.name)
                         + " from " + uniStr(guild.name) + ": "
-                        + uniStr(sec2Time(is_banned)) +  ".```"
+                        + uniStr(sec2Time(is_banned)) + ".```"
                     )
             elif len(args) < 2:
                 return (
@@ -413,7 +413,7 @@ class updateFollows:
                     if curr[1] >= 3:
                         curr[1] = xrand(-3) + 1
                         if len(checker):
-                            asyncio.create_task(channel.send(checker))
+                            asyncio.create_task(message.channel.send(checker))
                 else:
                     if len(checker) > 100:
                         checker = ""
@@ -439,10 +439,9 @@ class updateRolegiver:
     def __init__(self):
         pass
 
-    async def _message_(self, text):
-        scheduled = self.data
+    async def _nocommand_(self, text, message, **void):
         _vars = self._vars
-        currentSchedule = scheduled.get(channel.id, {})
+        currentSchedule = self.data.get(message.channel.id, {})
         for k in currentSchedule:
             if k in text:
                 curr = currentSchedule[k]
@@ -459,7 +458,7 @@ class updateRolegiver:
                         if r.name.lower() == role:
                             await user.add_roles(
                                 r,
-                                reason="Verified.",
+                                reason="Keyword found in message.",
                                 atomic=True,
                                 )
                             print("Granted role " + r.name + " to " + user.name + ".")

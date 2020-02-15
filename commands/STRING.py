@@ -35,7 +35,8 @@ auth = ast.literal_eval(f.read())
 f.close()
 translators = {
     "Google Translate": Translator(["translate.google.com"]),
-    "Papago": PapagoTrans(auth["papago_id"], auth["papago_secret"])}
+    "Papago": PapagoTrans(auth["papago_id"], auth["papago_secret"])
+}
 
 
 class math:

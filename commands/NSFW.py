@@ -106,8 +106,12 @@ def pull_rule34_xxx(argv, data, thr, delay=5):
         t = time.time()
         while time.time() - t < delay:
             try:
-                sources = rule34_sync.getImages(tags=argv, fuzzy=True,
-                                                randomPID=True, singlePage=True)
+                sources = rule34_sync.getImages(
+                    tags=argv,
+                    fuzzy=True,
+                    randomPID=True,
+                    singlePage=True
+                )
                 break
             except TimeoutError:
                 pass
@@ -403,7 +407,7 @@ class lewd:
                 + "\nImage **__" + str(objs[2])
                 + "__** on page **__" + str(objs[1])
                 + "__**"
-                )
+            )
             return text
         emb = discord.Embed(url=url)
         emb.set_image(url=url)

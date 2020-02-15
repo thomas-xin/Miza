@@ -1254,7 +1254,7 @@ __units = {
     "hour": 3600.,
     "minute": 60.,
     "second": 1,
-    }
+}
 
 def timeConv(s):
     if not isValid(s):
@@ -1331,7 +1331,7 @@ __fmts = [
     "𝟶𝟷𝟸𝟹𝟺𝟻𝟼𝟽𝟾𝟿𝚊𝚋𝚌𝚍𝚎𝚏𝚐𝚑𝚒𝚓𝚔𝚕𝚖𝚗𝚘𝚙𝚚𝚛𝚜𝚝𝚞𝚟𝚠𝚡𝚢𝚣𝙰𝙱𝙲𝙳𝙴𝙵𝙶𝙷𝙸𝙹𝙺𝙻𝙼𝙽𝙾𝙿𝚀𝚁𝚂𝚃𝚄𝚅𝚆𝚇𝚈𝚉",
     "0123456789ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖqʳˢᵗᵘᵛʷˣʸᶻ🇦🇧🇨🇩🇪🇫🇬🇭🇮🇯🇰🇱🇲🇳🇴🇵🇶🇷🇸🇹🇺🇻🇼🇽🇾🇿",
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
-    ]
+]
 __map = {__fmts[k][i]: __fmts[-1][i] for k in range(len(__fmts) - 1) for i in range(len(__fmts[k]))}
 __trans = "".maketrans(__map)
 
@@ -1406,7 +1406,7 @@ lookup time for all elements. Includes many array and numeric operations."""
                 raise IndexError(
                     "Unable to perform operation on objects with size "
                     + str(len(d)) + " and " + str(len(other)) + "."
-                    )
+                )
             return iterable
         except TypeError:
             return self.constantIterator(other)
@@ -2268,11 +2268,11 @@ class _parallel:
             thread_id = self.get_id()
             res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
                 thread_id, ctypes.py_object(TimeoutError)
-                )
+            )
             if res > 1:
                 ctypes.pythonapi.PyThreadState_SetAsyncExc(
                     thread_id, ctypes.py_object(BaseException)
-                    )
+                )
                 self.stop()
                 processes.running[self.id] = processes.new(self.id)
                 del self

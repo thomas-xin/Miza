@@ -23,7 +23,7 @@ class img:
                     "Insufficient priviliges to change image list for " + uniStr(guild.name)
                     + ".\nRequred level: " + uniStr(req)
                     + ", Current level: " + uniStr(perm) + "."
-                    )
+                )
             if "e" in flags:
                 key = args[0].lower()
                 url = _vars.verifyURL(args[1])
@@ -33,14 +33,14 @@ class img:
                 return (
                     "```css\nSuccessfully added " + uniStr(key)
                     + " to the image list for " + uniStr(guild.name) + ".```"
-                    )
+                )
             if not args:
                 imglists[guild.id] = {}
                 update()
                 return (
                     "```css\nSuccessfully removed all images from the image list for "
                     + uniStr(guild.name) + ".```"
-                    )
+                )
             key = args[0].lower()
             images.pop(key)
             imglists[guild.id] = images
@@ -48,9 +48,12 @@ class img:
             return (
                 "```css\nSuccessfully removed " + uniStr(key)
                 + " from the image list for " + uniStr(guild.name) + ".```"
-                )
+            )
         if not argv and not "r" in flags:
-            return "Available images in **" + guild.name + "**: ```ini\n" + str(list(images)).replace("'", '"') + "```"
+            return (
+                "Available images in **" + guild.name
+                + "**: ```ini\n" + str(list(images)).replace("'", '"') + "```"
+            )
         sources = []
         for tag in args:
             t = tag.lower()
@@ -68,11 +71,11 @@ class img:
         emb = discord.Embed(
             url=url,
             colour=colour2Raw(colourCalculation(xrand(1536))),
-            )
+        )
         emb.set_image(url=url)
         return {
             "embed": emb
-            }
+        }
 
 
 def _c2e(string, em1, em2):

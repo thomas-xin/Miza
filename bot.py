@@ -11,7 +11,7 @@ sys.path.insert(1, "misc")
 
 client = discord.Client(
     max_messages=2000,
-    )
+)
 
 
 def tryFunc(func, *args, force=False, amax, **kwargs):
@@ -499,13 +499,13 @@ class main_data:
         "＞": ">",
         "⟨": "<",
         "⟩": ">",
-        }
+    }
     mtrans = "".maketrans(mmap)
 
     cmap = {
         "<": "hlist((",
         ">": "))",
-        }
+    }
     ctrans = "".maketrans(cmap)
 
     umap = {
@@ -516,12 +516,12 @@ class main_data:
         "_": "",
         "~": "",
         " ": "%20",
-        }
+    }
     utrans = "".maketrans(umap)
 
     def verifyCommand(self, func):
-        f1 = func.lower().translate(self.mtrans)
-        f2 = func.translate(self.ctrans)
+        f1 = func.translate(self.mtrans)
+        f2 = f1.translate(self.ctrans)
         for d in self.disabled:
             if d in f1:
                 raise PermissionError("\"" + d + "\" is not enabled.")
@@ -596,7 +596,7 @@ class main_data:
                                     vals=vals,
                                     argv=argv,
                                     _vars=self,
-                                    ),
+                                ),
                                 timeout=self.timeout)
                             return
                         except Exception as ex:
@@ -616,12 +616,12 @@ class main_data:
                 gamestr = (
                     "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s")
                     + " place, to " + uniStr(guilds) + " server" + "s" * (guilds != 1) + "!"
-                    )
+                )
                 print("Playing " + gamestr)
                 game = discord.Game(gamestr)
                 await client.change_presence(
                     activity=game,
-                    )
+                )
             self.lastCheck = time.time()
             for u in self.updaters.values():
                 asyncio.create_task(u())
@@ -681,7 +681,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         if not u_perm < 0 and not suspended:
             sent = await channel.send(
 		"Hi, did you require my services for anything? Use `~?` or `~help` for help."
-		)
+	    )
         else:
             print("Ignoring command from suspended user " + user.name + " (" + str(u_id) + ").")
             sent = await channel.send("Sorry, you are currently not permitted to request my services.")
@@ -784,7 +784,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             guild=guild,            # guild data
                             name=alias,             # alias the command was called as
                             callback=processMessage,# function that called the command
-                            )
+                        )
                         if response is not None and len(response):
                             if type(response) is tuple:
                                 response, react = response
@@ -842,7 +842,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                     edit=edit,
                     orig=orig,
                     message=message,
-                    )
+                )
 
 
 async def heartbeatLoop():

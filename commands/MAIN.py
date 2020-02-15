@@ -41,7 +41,8 @@ class help:
                     "\nCommands for **" + user.name
                     + "** in **" + channel.name
                     + "** in category **" + a
-                    + "**:\n")
+                    + "**:\n"
+                )
                 for com in categories[a]:
                     name = com.__name__
                     min_level = com.min_level
@@ -108,11 +109,12 @@ class help:
                         show.append(
                             "\n~" + com.__name__
                             + "\nEffect: " + com.description
-                            + "\nUsage: ~" + name + " " + usage)
+                            + "\nUsage: ~" + name + " " + usage
+                        )
             return (
                 "Commands for **" + user.name + "** in **" + c_name
                 + "**:\n```xml\n" + "\n".join(show) + "```", 1
-                )
+            )
         return "\n".join(show), 1
 
 
@@ -135,7 +137,7 @@ class perms:
                     return (
                         "Current user permissions for **" + guild.name + "**:\n```json\n"
                         + str(_vars.perms[guild.id]).replace("'", '"') + "```"
-                        )
+                    )
                 else:
                     t_user = await _vars.fetch_user(_vars.verifyID(args[0]))
             print(t_user)
@@ -162,7 +164,7 @@ class perms:
                         response = uniStr(
                             "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
                             + "REPEAT COMMAND WITH \"?C\" FLAG TO CONFIRM."
-                            )
+                        )
                         return ("```asciidoc\n[" + response + "]```")
                     for u in guild.members:
                         _vars.setPerms(u.id, guild, c_perm)
@@ -189,7 +191,7 @@ class perms:
             "```css\nCurrent permissions for " + uniStr(t_user.name)
             + " in " + uniStr(guild.name)
             + ": " + uniStr(t_perm) + ".```"
-            )
+        )
 
 
 class enableCommand:
@@ -209,10 +211,11 @@ class enableCommand:
         if "e" in flags or "d" in flags:
             if perm < 3:
                 raise PermissionError(
-                    "Insufficient priviliges to change command list for " + uniStr(channel.name)
+                    "Insufficient priviliges to change command list for "
+                    + uniStr(channel.name)
                     + ".\nRequred level: " + uniStr(3)
                     + ", Current level: " + uniStr(perm) + "."
-                    )
+                )
         catg = argv.lower()
         print(catg)
         if not catg:
@@ -223,13 +226,19 @@ class enableCommand:
                 update()
                 if "h" in flags:
                     return
-                return "```css\nEnabled all command categories in " + uniStr(channel.name) + ".```"
+                return (
+                    "```css\nEnabled all command categories in "
+                    + uniStr(channel.name) + ".```"
+                )
             if "d" in flags:
                 enabled[channel.id] = []
                 update()
                 if "h" in flags:
                     return
-                return "```css\nDisabled all command categories in " + uniStr(channel.name) + ".```"
+                return (
+                    "```css\nDisabled all command categories in "
+                    + uniStr(channel.name) + ".```"
+                )
             return (
                 "Currently enabled command categories in **" + channel.name
                 + "**:\n```css\n"
@@ -242,7 +251,7 @@ class enableCommand:
                 enabled = enabled.setdefault(channel.id, {})
                 if "e" in flags:
                     if catg in enabled:
-                        raise IndexError(
+                        raise OverflowError(
                             "Command category " + uniStr(catg)
                             + " is already enabled in " + uniStr(channel.name) + "."
                         )
@@ -253,10 +262,10 @@ class enableCommand:
                     return (
                         "```css\nEnabled command category " + uniStr(catg)
                         + " in " + uniStr(channel.name) + ".```"
-                        )
+                    )
                 if "d" in flags:
                     if catg not in enabled:
-                        raise IndexError(
+                        raise OverflowError(
                             "Command category " + uniStr(catg)
                             + " is not currently enabled in " + uniStr(channel.name) + "."
                         )
@@ -267,7 +276,7 @@ class enableCommand:
                     return (
                         "```css\nDisabled command category " + uniStr(catg)
                         + " in " + uniStr(channel.name) + ".```"
-                        )
+                    )
                 return (
                     "```css\nCommand category " + uniStr(catg)
                     + " is currently" + uniStr(" not" * (catg not in enabled))
@@ -339,7 +348,7 @@ class suspend:
             return (
                 "```css\nCurrent suspension status of " + uniStr(user.name) + ": "
                 + uniStr(_vars.suspended.get(user.id, None)) + ".```"
-                )
+            )
         else:
             user = await _vars.fetch_user(_vars.verifyID(args[0]))
             change = _vars.evalMath(args[1])
@@ -348,7 +357,7 @@ class suspend:
             return (
                 "```css\nChanged suspension status of " + uniStr(user.name) + " to "
                 + uniStr(change) + ".```"
-                )
+            )
 
 
 class loop:
@@ -370,7 +379,7 @@ class loop:
                 "insufficient priviliges to execute loop of " + uniStr(iters)
                 + " iterations. Required level: " + uniStr(ceil(iters / scale))
                 + ", Current level: " + uniStr(perm) + "."
-                )
+            )
         func = func2 = " ".join(args[1:])
         if flags:
             func += " ?" + "?".join(flags)
@@ -387,7 +396,7 @@ class loop:
             #print(loop)
             asyncio.create_task(callback(
                 message, func, cb_argv=func2, cb_flags=flags, loop=loop,
-                ))
+            ))
         if not "h" in flags:
             return "```css\nLooping [" + func + "] " + uniStr(iters) + " times...```"
 
@@ -461,11 +470,11 @@ class updateSuspended:
                 + "This will expire in `" + sec2Time(secs) + "`.\n"
                 + "If you believe this is an error, please notify <@!"
                 + str(_vars.owner_id) + "> as soon as possible."
-                )
+            )
             print(
                 u_susp.name + " may be attempting a DDOS attack. Expires in "
                 + sec2Time(secs) + "."
-                )
+            )
             await channel.send(msg)
         l = list(self.suspended)
         for u_id in l:
