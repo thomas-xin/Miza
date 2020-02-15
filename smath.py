@@ -2,7 +2,7 @@
 Adds many useful math-related functions.
 """
 
-import asyncio, threading, time, traceback, ctypes, collections, ast, copy
+import os, sys, asyncio, threading, time, traceback, ctypes, collections, ast, copy
 import random, math, cmath, fractions, mpmath, sympy, shlex
 import numpy, tinyarray, colorsys
 
@@ -1388,7 +1388,11 @@ lookup time for all elements. Includes many array and numeric operations."""
             return (value,)
 
     def iterator(self, reverse=False):
-        for i in range(len(self.data)):
+        if reverse:
+            r = xrange(len(self.data) - 1, -1)
+        else:
+            r = range(len(self.data))
+        for i in r:
             if i > len(self.data):
                 break
             yield self.data[self.offs + i]
@@ -2241,6 +2245,7 @@ class _parallel:
             self.state = 1
 
         def run(self):
+            print = sys.stdout.write
             while True:
                 try:
                     while self.actions:
@@ -2249,10 +2254,16 @@ class _parallel:
                     self.state = -1
                 except TimeoutError:
                     pass
+                except:
+                    print(traceback.format_exc())
+                    self.actions.clear()
                 try:
                     time.sleep(0.007)
                 except TimeoutError:
                     pass
+                except:
+                    print(traceback.format_exc())
+                    self.actions.clear()
 
         def stop(self):
             self._stop.set()
@@ -2332,40 +2343,46 @@ def waitParallel(delay):
 processes = _parallel()
 
 
-if 1:
-    def updatePrint():
-        global printGlobals, printLocals, printVars, forcePrint
+def logClear():
+    if os.name == 'nt':
+        os.system('cls')
+    else:
+        os.system('clear')
+
+
+class __logPrinter():
+
+    print_temp = ""
+    
+    def updatePrint(self, file):
+        if file is None:
+            outfunc = sys.stdout.write
+            enc = lambda x: str(x)
+        else:
+            def filePrint(b):
+                f = open(file, "ab+")
+                f.write(b)
+                f.close()
+            outfunc = filePrint
+            enc = lambda x: bytes(str(x), "utf-8")
+        outfunc(enc("Logging started...\n"))
         while True:
-            if printLocals:
-                printLocals += printVars
-                if len(printLocals) > 1024 or printLocals.count("\n") > 12:
-                    printLocals = limStr(printLocals, 512)
-                forcePrint(printLocals,end="")
-                printGlobals += printLocals
-                printLocals = ""
-            time.sleep(0.3)
+            if self.print_temp:
+                if len(self.print_temp) > 4096 or self.print_temp.count("\n") > 48:
+                    self.print_temp = limStr(self._temp, 2048)
+                data = enc(self.print_temp)
+                #sys.stdout.write(repr(data))
+                outfunc(data)
+                self.print_temp = ""
+            time.sleep(1)
+            #sys.stdout.write(str(f))
+
+    def logPrint(self, *args, sep=" ", end="\n", prefix="", **void):
+        self.print_temp += str(sep).join((str(i) for i in args)) + str(end) + str(prefix)
+
+    def __init__(self, file=None):
+        doParallel(self.updatePrint, [file], name="printer")
 
 
-    def logPrint(*args, sep=" ", end="\n"):
-        global printLocals
-        printLocals += str(sep).join((str(i) for i in args)) + str(end)
-
-
-    def setPrint(string):
-        global printVars
-        printVars = string
-
-
-    def dumpLogData():
-        global printGlobals
-        f = open("cache/log.txt", "w")
-        f.write(printGlobals)
-        f.close()
-
-
-    printVars = ""
-    printLocals = ""
-    printGlobals = ""
-    forcePrint = print
-    print = logPrint
-    doParallel(updatePrint, name="printer")
+__printer = __logPrinter("log.txt")
+print = __printer.logPrint

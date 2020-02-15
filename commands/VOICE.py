@@ -4,6 +4,9 @@ from scipy.signal import butter, sosfilt
 from smath import *
 
 
+youtube_dl.__builtins__["print"] = print
+
+
 class customAudio(discord.AudioSource):
     
     length = 1920

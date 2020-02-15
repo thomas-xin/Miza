@@ -103,6 +103,7 @@ fig = plt.figure()
 
 
 class main_data:
+    
     timeout = 24
     min_suspend = 3
     heartbeat = "heartbeat.json"
@@ -124,23 +125,17 @@ class main_data:
         "copy",
         "threading",
         "processes",
-        "printVars",
-        "printGlobals",
-        "printLocals",
-        "origPrint",
-        "logPrint",
         "doParallel",
         "updatePrint",
         "waitParallel",
         "killThreads",
         "performAction",
         "dynamicFunc",
-        "dumpLogData",
-        "setPrint",
         "sendInput",
+        "logClear",
         "processMessage",
         "updateLoop",
-        "outputLoop",
+        "inputLoop",
         "heartbeatLoop",
         "handleMessage",
         "checkDelete",
@@ -270,7 +265,13 @@ class main_data:
         self.updated = False
         self.audiocache = {}
         self.message_cache = {}
+        self.suffix = ">>> "
         print("Initialized.")
+
+    def print(self, *args, sep=" ", end="\n", suffix=None):
+        if suffix is None:
+            suffix = self.suffix
+        sys.stdout.write(str(sep).join(str(i) for i in args) + end + suffix)
 
     async def fetch_user(self, u_id):
         u_id = int(u_id)
@@ -408,12 +409,33 @@ class main_data:
         files = [f for f in os.listdir("commands/") if f.endswith(".py") or f.endswith(".pyw")]
         self.categories = {}
         self.updaters = {}
+        totalsize = hlist(self.getLineCount("bot.py"))
+        totalsize += self.getLineCount("main.py")
+        totalsize += self.getLineCount("smath.py")
         for f in files:
+            totalsize += self.getLineCount("commands/" + f)
             if f.endswith(".py"):
                 f = f[:-3]
             else:
                 f = f[:-4]
             doParallel(self.getModule, [f])
+        self.codeSize = totalsize
+
+    def getLineCount(self, fn):
+        #print(fn)
+        f = open(fn, "rb")
+        count = 1
+        size = 0
+        while True:
+            try:
+                i = f.read(1024)
+                if not i:
+                    raise EOFError
+                size += len(i)
+                count += i.count(b"\n")
+            except EOFError:
+                f.close()
+                return size, count
 
     def update(self):
         count = 0
@@ -671,6 +693,26 @@ class main_data:
             for u in self.updaters.values():
                 asyncio.create_task(u())
 
+    def printMessage(self, message, channel, suffix=False):
+        data = (
+            "[" + channel.name + "] "
+            + str(channel.id) + ": "
+            + message.author.name + ": "
+            + limStr(message.content, 512)
+        )
+        if message.reactions:
+            data += " {" + ", ".join(str(i) for i in message.reactions) + "}"
+        if message.embeds:
+            data += " <" + ", ".join(str(i.to_dict()) for i in message.embeds) + ">"
+        if message.attachments:
+            data += " <" + ", ".join(i.url for i in message.attachments) + ">"
+        data += " (" + str(datetime.datetime.now()) + ")"
+        if suffix:
+            suffix = None
+        else:
+            suffix = ""
+        self.print(data, suffix=suffix)
+
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_flags=None, loop=False):
     global client
@@ -905,13 +947,15 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                     orig=orig,
                     message=message,
                 )
-    elif not message.guild:
-        print(
-            "\n[DM] " + str(message.channel.id) + ": "
-            + message.author.name + ": "
-            + limStr(message.content, 512)
-            + " (" + str(datetime.datetime.now()) + ")"
-        )
+    if guild is None or _vars.current_channel and (channel.id == _vars.current_channel.id):
+        if guild is None:
+            guild = main_data.userGuild(
+                user=user,
+                channel=channel,
+            )
+            channel = guild.channel
+        _vars.print(suffix="")
+        _vars.printMessage(message, channel, suffix=True)
 
 
 async def heartbeatLoop():
@@ -934,23 +978,41 @@ async def heartbeatLoop():
 
 def sendInput(output):
     while True:
-        output[0] = input()
+        try:
+            output[0] = input()
+        except:
+            _vars.print(traceback.format_exc())
 
 
-async def outputLoop():
-    print("Output Loop initiated.")
+async def inputLoop():
+
+    def updateChannel():
+        ch = _vars.current_channel
+        if ch is not None:
+            chan = str(ch.id)
+        else:
+            chan = ""
+        suffix = chan + ">>> "
+        _vars.suffix = suffix
+        return ch
+
+    def verifyChannel(channel):
+        try:
+            if channel.guild is None:
+                raise TypeError
+        except:
+            channel = _vars.userGuild(channel.recipient, channel).channel
+        return channel
+        
+    print("Input Loop initiated.")
     msg = [None]
     doParallel(sendInput, [msg], name="inputter")
+    prev = hlist()
+    _vars.print(end="")
     while True:
         try:
             msg[0] = None
-            ch = _vars.current_channel
-            if ch is not None:
-                chan = str(ch.id)
-            else:
-                chan = ""
-            printed = chan + ">>> "
-            setPrint(printed)
+            ch = updateChannel()
             while msg[0] is None:
                 await asyncio.sleep(0.1)
             proc = msg[0]
@@ -959,48 +1021,62 @@ async def outputLoop():
             if proc[0] == "!":
                 proc = proc[1:]
                 if not proc:
-                    ch = _vars.current_channel = None
-                    print()
+                    prev.append(_vars.current_channel)
+                    _vars.current_channel = None
+                    ch = updateChannel()
                     continue
+                elif proc[0] == "!":
+                    _vars.current_channel = verifyChannel(prev.popright())
+                    ch = updateChannel()
                 try:
-                    _vars.current_channel = await _vars.fetch_channel(proc)
-                    print()
+                    prev.append(_vars.current_channel)
+                    try:
+                        channel = await _vars.fetch_channel(proc)
+                        _vars.current_channel = verifyChannel(channel)
+                        ch = updateChannel()
+                    except:
+                        user = await _vars.fetch_user(proc)
+                        temp = await _vars.getDM(user)
+                        _vars.current_channel = _vars.userGuild(user, temp).channel
+                        ch = updateChannel()
+                    logClear()
+                    hist = await ch.history(limit=512).flatten()
+                    hist = hlist(hist)
+                    for m in reversed(hist):
+                        _vars.printMessage(m, _vars.current_channel)
                 except ValueError:
-                    sent = await ch.send("*** ***")
+                    sent = await ch.send("_ _")
                     await processMessage(sent, reconstitute(proc))
                     try:
                         await sent.delete()
                     except discord.NotFound:
                         pass
-                    print()
             elif proc[0] == "&":
                 proc = proc[1:]
                 hist = await ch.history(limit=1).flatten()
                 message = hist[0]
                 await message.add_reaction(proc)
-                print()
             else:
                 if ch:
                     await ch.send(proc)
-                    print()
                 else:
                     try:
                         output = await eval(proc)
-                        print(output)
+                        _vars.print(output)
                     except:
                         #print(traceback.format_exc())
                         try:
                             output = eval(proc)
-                            print(output)
+                            _vars.print(output)
                         except:
                             #print(traceback.format_exc())
                             try:
                                 exec(proc)
-                                print(None)
+                                _vars.print(None)
                             except:
-                                print(traceback.format_exc())
+                                _vars.print(traceback.format_exc())
         except:
-            print(traceback.format_exc())
+            _vars.print(traceback.format_exc())
 
 
 async def updateLoop():
@@ -1038,7 +1114,7 @@ async def on_ready():
             print("> " + guild.name)
     await _vars.handleUpdate()
     asyncio.create_task(updateLoop())
-    asyncio.create_task(outputLoop())
+    asyncio.create_task(inputLoop())
     asyncio.create_task(heartbeatLoop())
 ##    print("Users: ")
 ##    for guild in client.guilds:

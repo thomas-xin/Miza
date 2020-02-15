@@ -3,6 +3,10 @@ from prettytable import PrettyTable as ptable
 from smath import *
 
 
+knackpy.__builtins__["print"] = print
+ffmpy.__builtins__["print"] = print
+
+
 class urlBypass(urllib.request.FancyURLopener):
     version = "Mozilla/5." + str(xrand(1, 10))
 
