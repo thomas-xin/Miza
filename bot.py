@@ -208,6 +208,17 @@ class main_data:
     ]
     builtins = {i: getattr(__builtins__, i) for i in builtins_list}
 
+    class customGuild:
+
+        def __init__(self, user, channel, **void):
+            self.id = channel.id
+            self.name = "DM"
+            self.members = [user]
+            self.channels = [self]
+            self.me = client.user
+            self.roles = []
+            self.unavailable = False
+
     def __init__(self):
         print("Initializing...")
         if not os.path.exists("cache/"):
@@ -291,6 +302,11 @@ class main_data:
         return message
 
     async def getDM(self, user):
+        try:
+            int(user)
+            user = await self.fetch_user(user)
+        except:
+            pass
         channel = user.dm_channel
         if channel is None:
             channel = await user.create_dm()
@@ -383,7 +399,7 @@ class main_data:
         except Exception as ex:
             print(traceback.format_exc())
         if count:
-            print("Autosaved " + str(count) + " save files.")
+            print("Autosaved " + str(count) + " save file" + "s" * (count != 1) + ".")
 
     def verifyID(self, value):
         return int(str(value).replace("<", "").replace(">", "").replace("@", "").replace("!", ""))
@@ -602,7 +618,7 @@ class main_data:
                         except Exception as ex:
                             print(traceback.format_exc())
                             killThreads()
-                            sent = await message.channel.send("```python\nError: " + repr(ex) + "\n```")
+                            sent = await message.channel.send("```py\nError: " + repr(ex) + "\n```")
                             await sent.add_reaction("❎")
 
     async def handleUpdate(self, force=False):
@@ -762,8 +778,13 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                 args = d.split(" ")
                         for a in range(len(args)):
                             args[a] = args[a].replace("", "'").replace("\0", '"')
-                        if guild is None and getattr(command, "server_only", False):
-                            raise ReferenceError("This command is only available in servers.")
+                        if guild is None:
+                            guild = main_data.customGuild(
+                                user=user,
+                                channel=channel,
+                            )
+                            if getattr(command, "server_only", False):
+                                raise ReferenceError("This command is only available in servers.")
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
                             asyncio.create_task(channel.trigger_typing())
@@ -821,11 +842,11 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         killThreads()
                         raise TimeoutError("Request timed out.")
                     except Exception as ex:
-                        errmsg = limStr("```python\nError: " + repr(ex) + "\n```", 2000)
+                        errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)
                         print(traceback.format_exc())
                         sent = await channel.send(errmsg)
                         await sent.add_reaction("❎")
-    elif u_id != client.user.id and orig:
+    elif message.guild and u_id != client.user.id and orig:
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
         temp = list(orig.lower())
         for i in range(len(temp)):
@@ -843,6 +864,12 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                     orig=orig,
                     message=message,
                 )
+    elif not message.guild:
+        print(
+            "\nDM " + str(message.channel.id) + ": "
+            + message.author.name + ": "
+            + limStr(message.content, 512)
+        )
 
 
 async def heartbeatLoop():
@@ -916,14 +943,20 @@ async def outputLoop():
                     print()
                 else:
                     try:
-                        output = eval(proc)
+                        output = await eval(proc)
                         print(output)
                     except:
+                        #print(traceback.format_exc())
                         try:
-                            exec(proc)
-                            print(None)
+                            output = eval(proc)
+                            print(output)
                         except:
-                            print(traceback.format_exc())
+                            #print(traceback.format_exc())
+                            try:
+                                exec(proc)
+                                print(None)
+                            except:
+                                print(traceback.format_exc())
         except:
             print(traceback.format_exc())
 
@@ -1051,7 +1084,7 @@ async def handleMessage(message, edit=True):
     except Exception as ex:
         print(traceback.format_exc())
         killThreads()
-        errmsg = limStr("```python\nError: " + repr(ex) + "\n```", 2000)
+        errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)
         sent = await message.channel.send(errmsg)
         await sent.add_reaction("❎")
     return

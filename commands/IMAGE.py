@@ -9,7 +9,7 @@ class img:
         self.name = []
         self.min_level = 0
         self.description = "Sends an image in the current chat from a list."
-        self.usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <enable(?e)> <disable(?d)>"
+        self.usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <enable(?e)> <disable(?d)> <hide(?h)>"
 
     async def __call__(self, flags, args, argv, guild, perm, **void):
         update = self.data["images"].update
@@ -30,10 +30,11 @@ class img:
                 images[key] = url
                 imglists[guild.id] = images
                 update()
-                return (
-                    "```css\nSuccessfully added " + uniStr(key)
-                    + " to the image list for " + uniStr(guild.name) + ".```"
-                )
+                if not "h" in flags:
+                    return (
+                        "```css\nSuccessfully added " + uniStr(key)
+                        + " to the image list for " + uniStr(guild.name) + ".```"
+                    )
             if not args:
                 imglists[guild.id] = {}
                 update()
