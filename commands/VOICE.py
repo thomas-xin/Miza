@@ -158,14 +158,14 @@ class customAudio(discord.AudioSource):
         self.stats["position"] = pos
         return self.stats["position"]
 
-    def advance(self, loop=True):
+    def advance(self, loop=True, shuffle=True):
         q = self.queue
-        if len(q):
+        if q:
             if self.stats["loop"]:
                 temp = q[0]
             self.prev = q[0]["id"]
             q.pop(0)
-            if self.stats["shuffle"]:
+            if shuffle and self.stats["shuffle"]:
                 if len(q) > 1:
                     temp = q.popleft()
                     q = q.shuffle()
@@ -176,9 +176,10 @@ class customAudio(discord.AudioSource):
                     temp.pop("download")
                 q.append(temp)
             self.preparing = False
-            return len(q)
+            self.queue = q
         if self.player:
             self.player["time"] = 2
+        return len(q)
 
     async def updatePlayer(self):
         curr = self.player
@@ -870,18 +871,19 @@ class remove:
                     + " from the queue.\nCurrent vote count: "
                     + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + ".\n"
                 )
-        q = auds.queue
+        count = 0
         i = 0
-        while i < len(q):
+        while i < len(auds.queue):
+            q = auds.queue
             song = q[i]
             if song["skips"] is None or len(song["skips"]) >= required:
                 if i == 0:
-                    auds.advance(False)
+                    auds.advance(False, not count)
                     auds.new()
-                    #print("Stopped audio playback in " + guild.name)
                 else:
                     q.pop(i)
                 response += uniStr(noSquareBrackets(song["name"])) + " has been removed from the queue.\n"
+                count += 1
                 continue
             else:
                 i += 1
@@ -1208,9 +1210,14 @@ class player:
     def showCurr(self, auds):
         q = auds.queue
         if q:
+            s = q[0]["skips"]
+            if s is not None:
+                skips = len(s)
+            else:
+                skips = 0
             output = "Playing " + uniStr(q[0]["name"]) + ", "
             output += uniStr(len(q)) + " item" + "s" * (len(q) != 1) + " total "
-            output += len(q[0]["skips"]) * "🚫"
+            output += skips * "🚫"
         else:
             output = "Queue is currently empty. "
         if auds.stats["loop"]:

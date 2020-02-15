@@ -978,10 +978,7 @@ async def heartbeatLoop():
 
 def sendInput(output):
     while True:
-        try:
-            output[0] = input()
-        except:
-            _vars.print(traceback.format_exc())
+        output[0] = input()
 
 
 async def inputLoop():

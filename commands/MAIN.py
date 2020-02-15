@@ -425,6 +425,7 @@ class updateSuspended:
             self.lastsusp = None
             f = open(self.suspected, "r")
             susp = f.read()
+            print(susp)
             f.close()
             os.remove(self.suspected)
             if susp:
@@ -440,7 +441,7 @@ class updateSuspended:
                         self.suspended[susp] += 86400 * 2
                     self.suspended[susp] += time.time() + 86400
                 print(susp, (self.suspended[susp] - time.time()) / 86400)
-                if (self.suspended[susp] - time.time()) / 86400 >= self.min_suspend - 1:
+                if (self.suspended[susp] - time.time()) / 86400 >= self._vars.min_suspend - 1:
                     self.lastsusp = susp
                 self.update()
                 self.update(True)
@@ -449,7 +450,7 @@ class updateSuspended:
 
     async def _command_(self, user, command, **void):
         tc = getattr(command, "time_consuming", False)
-        self.suspclear = time.time() + 5 + (tc * 2) ** 2
+        self.suspclear = time.time() + 10 + (tc * 2) ** 2
         f = open(self.suspected, "w")
         f.write(str(user.id))
         f.close()
