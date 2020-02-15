@@ -1021,10 +1021,22 @@ async def inputLoop():
                     prev.append(_vars.current_channel)
                     _vars.current_channel = None
                     ch = updateChannel()
+                    _vars.print(end="")
                     continue
                 elif proc[0] == "!":
                     _vars.current_channel = verifyChannel(prev.popright())
                     ch = updateChannel()
+                    _vars.print(end="")
+                    continue
+                elif proc[0] == "~":
+                    sent = await ch.send("_ _")
+                    await processMessage(sent, reconstitute(proc))
+                    try:
+                        await sent.delete()
+                    except discord.NotFound:
+                        pass
+                    _vars.print(end="")
+                    continue
                 try:
                     prev.append(_vars.current_channel)
                     try:
@@ -1041,21 +1053,19 @@ async def inputLoop():
                     hist = hlist(hist)
                     for m in reversed(hist):
                         _vars.printMessage(m, _vars.current_channel)
-                except ValueError:
-                    sent = await ch.send("_ _")
-                    await processMessage(sent, reconstitute(proc))
-                    try:
-                        await sent.delete()
-                    except discord.NotFound:
-                        pass
+                    _vars.print(end="")
+                except:
+                    _vars.print(end="")
             elif proc[0] == "&":
                 proc = proc[1:]
                 hist = await ch.history(limit=1).flatten()
                 message = hist[0]
                 await message.add_reaction(proc)
+                _vars.print(end="")
             else:
                 if ch:
                     await ch.send(proc)
+                    _vars.print(end="")
                 else:
                     try:
                         output = await eval(proc)
