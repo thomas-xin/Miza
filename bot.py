@@ -65,14 +65,14 @@ def plot(*args,**kwargs):
             except NameError as ex2:
                 raise NameError(str(ex1) + ", " + str(ex2))
             flip = True
-        args = (f,) + args[1:]
+        args = [f] + args[1:]
     if callable(args[0]):
         amax = 100
         if len(args) < 2:
             r = float(2 * tau)
             c = float(-tau)
         elif len(args) < 3:
-            r = args[1]*2
+            r = args[1] * 2
             c = -args[1]
         else:
             r = abs(args[2]-args[1])
@@ -81,7 +81,14 @@ def plot(*args,**kwargs):
                 amax = args[3]
         size = 1024
         array1 = array(range(size)) / size * r + c
-        array2 = [tryFunc(args[0], array1[i], force=(i == 0 or i == len(array1) - 1), amax=amax) for i in range(len(array1))]
+        array2 = [
+            tryFunc(
+                args[0],
+                array1[i],
+                force=(i == 0 or i == len(array1) - 1),
+                amax=amax
+            ) for i in range(len(array1))
+        ]
         if flip:
             args = [array2, array1]
         else:
@@ -112,6 +119,9 @@ class main_data:
         "sys",
         "asyncio",
         "ast",
+        "ctypes",
+        "traceback",
+        "copy",
         "threading",
         "processes",
         "printVars",
@@ -127,6 +137,7 @@ class main_data:
         "dynamicFunc",
         "dumpLogData",
         "setPrint",
+        "sendInput",
         "processMessage",
         "updateLoop",
         "outputLoop",
@@ -633,7 +644,9 @@ class main_data:
                         except Exception as ex:
                             print(traceback.format_exc())
                             killThreads()
-                            sent = await message.channel.send("```py\nError: " + repr(ex) + "\n```")
+                            sent = await message.channel.send(
+                                "```py\nError: " + repr(ex) + "\n```"
+                            )
                             await sent.add_reaction("❎")
 
     async def handleUpdate(self, force=False):
@@ -646,7 +659,8 @@ class main_data:
                 n = u.name
                 gamestr = (
                     "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s")
-                    + " place, to " + uniStr(guilds) + " server" + "s" * (guilds != 1) + "!"
+                    + " place, to " + uniStr(guilds) + " server"
+                    + "s" * (guilds != 1) + "!"
                 )
                 print("Playing " + gamestr)
                 game = discord.Game(gamestr)
@@ -714,8 +728,14 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
 		"Hi, did you require my services for anything? Use `~?` or `~help` for help."
 	    )
         else:
-            print("Ignoring command from suspended user " + user.name + " (" + str(u_id) + ").")
-            sent = await channel.send("Sorry, you are currently not permitted to request my services.")
+            print(
+                "Ignoring command from suspended user "
+                + user.name + " (" + str(u_id) + "): "
+                + limStr(message.content, 256)
+            )
+            sent = await channel.send(
+                "Sorry, you are currently not permitted to request my services."
+            )
         await sent.add_reaction("❎")
         return
     if op:
@@ -729,7 +749,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                 length = len(alias)
                 check = comm[:length].lower()
                 argv = comm[length:]
-                if check == alias and (len(comm) == length or comm[length] == " " or comm[length] == "?"):
+                match = check == alias and (
+                    len(comm) == length or comm[length] == " " or comm[length] == "?"
+                )
+                if match:
                     print(user.name + " (" + str(u_id) + ") issued command " + msg)
                     req = command.min_level
                     try:
@@ -851,7 +874,9 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                     f.close()
                                     f = discord.File(fn)
                                     print("Created file " + fn)
-                                    asyncio.create_task(channel.send("Response too long for message.", file=f))
+                                    asyncio.create_task(
+                                        channel.send("Response too long for message.", file=f)
+                                    )
                             if sent is not None:
                                 await sent.add_reaction(react)
                     except TimeoutError:
@@ -1097,7 +1122,9 @@ async def on_voice_state_update(member, before, after):
 async def handleMessage(message, edit=True):
     msg = message.content
     try:
-        await asyncio.wait_for(processMessage(message, reconstitute(msg), edit, msg), timeout=_vars.timeout)
+        await asyncio.wait_for(
+            processMessage(message, reconstitute(msg), edit, msg), timeout=_vars.timeout
+        )
     except Exception as ex:
         print(traceback.format_exc())
         killThreads()

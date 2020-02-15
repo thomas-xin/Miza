@@ -441,6 +441,7 @@ class updateRolegiver:
 
     async def _nocommand_(self, text, message, **void):
         user = message.author
+        guild = message.guild
         _vars = self._vars
         currentSchedule = self.data.get(message.channel.id, {})
         for k in currentSchedule:
@@ -455,7 +456,7 @@ class updateRolegiver:
                         _vars.setPerms(user, guild, perm)
                     print("Granted perm " + str(perm) + " to " + user.name + ".")
                 except ValueError:
-                    for r in message.guild.roles:
+                    for r in guild.roles:
                         if r.name.lower() == role:
                             await user.add_roles(
                                 r,
