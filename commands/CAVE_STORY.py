@@ -1,4 +1,4 @@
-import requests, csv, time, knackpy, ast, discord, urllib, asyncio, os, ffmpy, traceback
+import requests, csv, knackpy, ast, discord, urllib, os, ffmpy
 from prettytable import PrettyTable as ptable
 from smath import *
 
@@ -44,8 +44,8 @@ class DouClub:
                     "url": (
                         "https://doukutsuclub.knack.com/database#search-database/mod-details/"
                         + l["id"] + "/"
-                        ),
-                    })
+                    ),
+                })
         return output
 
 f = open("auth.json")
@@ -59,7 +59,7 @@ def searchForums(query):
     url = (
         "https://www.cavestory.org/forums/search/1/?q=" + query.replace(" ", "+")
         + "&t=post&c[child_nodes]=1&c[nodes][0]=33&o=date&g=1"
-        )
+    )
     opener = urlBypass()
     resp = opener.open(url)
     if resp.getcode() != 200:
@@ -254,7 +254,7 @@ def orgConv(org, wave, fmt):
                 global_options=["-y", "-hide_banner", "-loglevel panic"],
                 inputs={fi: None},
                 outputs={"160k": "-b:a", fn: None},
-                )
+            )
             ff.run()
         else:
             fn = fi
@@ -270,7 +270,7 @@ class cs_org2xm:
         "mp3",
         "ogg",
         "xm",
-        ]
+    ]
 
     def __init__(self):
         self.name = ["org2xm", "convert_org"]
@@ -300,7 +300,7 @@ class cs_org2xm:
         doParallel(orgConv, [org, wave, fmt], returns)
         t = time.time()
         while returns[0] is None and time.time() - t < _vars.timeout - 1:
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.1)
         fn = returns[0]
         if fn is None:
             raise TimeoutError("Request timed out.")
@@ -311,7 +311,7 @@ class cs_org2xm:
         return {
             "content": "Org successfully converted!",
             "file": f,
-            }
+        }
 
 
 def _m2f(mem, val):
@@ -410,7 +410,7 @@ class cs_hex2xml:
             + '\t\t<panel title="Data">\n'
             + '\t\t</panel>\n'
             + '\t\t<panel>\n'
-            )
+        )
         col = 0
         for hack in sorted(hacks):
             n = 63
@@ -420,13 +420,13 @@ class cs_hex2xml:
                 '\t\t\t<field type="data" offset="' + hack + '" col="' + str(col) + '">\n'
                 + '\t\t\t\t' + p + '\n'
                 + '\t\t\t</field>\n'
-                )
+            )
             col = 1 + col & 3
         output += (
             '\t\t</panel>\n'
             + '\t</panel>\n'
             + '</hack>'
-            )
+        )
         fn = "cache/temp.xml"
         f = open(fn, "w")
         f.write(output)
@@ -436,7 +436,7 @@ class cs_hex2xml:
         return {
             "content": "Hack successfully converted!",
             "file": f,
-            }
+        }
 
 
 class cs_npc:
@@ -535,7 +535,7 @@ class cs_mod:
         data = douclub.search(argv)
         t = time.time()
         while resp[0] is None and time.time() - t < 5:
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.1)
         if resp[0] is not None:
             data += resp[0]
         print(data)
@@ -548,7 +548,7 @@ class cs_mod:
                     + "\nAuthor: " + uniStr(l["author"])
                     + "\n" + limStr(l["description"].replace("\n", " "), 128)
                     + "```\r"
-                    )
+                )
                 response += line
             if len(response) < 20000 and len(response) > 1900:
                 output = response.split("\r")

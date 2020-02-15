@@ -342,17 +342,18 @@ class suspend:
 
     async def __call__(self, _vars, user, guild, args, **void):
         update = self.data["suspended"].update
+        susp = _vars.data["suspended"]
         if len(args) < 2:
             if len(args) >= 1:
                 user = await _vars.fetch_user(_vars.verifyID(args[0]))
             return (
                 "```css\nCurrent suspension status of " + uniStr(user.name) + ": "
-                + uniStr(_vars.suspended.get(user.id, None)) + ".```"
+                + uniStr(susp.get(user.id, None)) + ".```"
             )
         else:
             user = await _vars.fetch_user(_vars.verifyID(args[0]))
             change = _vars.evalMath(args[1])
-            _vars.suspended[user.id] = change
+            susp[user.id] = change
             update()
             return (
                 "```css\nChanged suspension status of " + uniStr(user.name) + " to "
@@ -433,6 +434,10 @@ class updateSuspended:
                 else:
                     self.suspended[susp] -= time.time()
                     self.suspended[susp] *= 1.25
+                    if self.suspended[susp] > 86400 * 3.5:
+                        self.suspended[susp] += 86400 * 5
+                    elif self.suspended[susp] > 86400 * 3:
+                        self.suspended[susp] += 86400 * 2
                     self.suspended[susp] += time.time() + 86400
                 print(susp, (self.suspended[susp] - time.time()) / 86400)
                 if (self.suspended[susp] - time.time()) / 86400 >= self.min_suspend - 1:

@@ -208,17 +208,32 @@ class main_data:
     ]
     builtins = {i: getattr(__builtins__, i) for i in builtins_list}
 
-    class customGuild:
+    class userGuild:
+
+        class userChannel:
+
+            def __init__(self, channel, **void):
+                self.recipient = channel.recipient
+                self.me = client.user.id
+                self.name = "DM"
+                self.id = channel.id
+                self.topic = None
+                self.is_nsfw = lambda: True
+                self.is_news = lambda: False
+                self.send = channel.send
+                self.history = channel.history
+                self.trigger_typing = channel.trigger_typing
 
         def __init__(self, user, channel, **void):
-            self.id = channel.id
-            self.name = "DM"
+            self.channel = self.userChannel(channel)
+            self.id = self.channel.id
+            self.name = self.channel.name
             self.members = [user]
-            self.channels = [self]
-            self.me = client.user
+            self.channels = [self.channel]
+            self.me = self.channel.me
             self.roles = []
             self.unavailable = False
-
+            
     def __init__(self):
         print("Initializing...")
         if not os.path.exists("cache/"):
@@ -779,10 +794,11 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         for a in range(len(args)):
                             args[a] = args[a].replace("", "'").replace("\0", '"')
                         if guild is None:
-                            guild = main_data.customGuild(
+                            guild = main_data.userGuild(
                                 user=user,
                                 channel=channel,
                             )
+                            channel = guild.channel
                             if getattr(command, "server_only", False):
                                 raise ReferenceError("This command is only available in servers.")
                         tc = getattr(command, "time_consuming", False)
@@ -866,9 +882,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                 )
     elif not message.guild:
         print(
-            "\nDM " + str(message.channel.id) + ": "
+            "\n[DM] " + str(message.channel.id) + ": "
             + message.author.name + ": "
             + limStr(message.content, 512)
+            + " (" + str(datetime.datetime.now()) + ")"
         )
 
 
