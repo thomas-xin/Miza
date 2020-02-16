@@ -743,7 +743,7 @@ class join:
             _vars.updaters["playlists"].audio[guild.id] = customAudio(channel, _vars)
         try:
             joined = True
-            await vc.connect(timeout=_vars.timeout, reconnect=True)
+            await vc.connect(timeout=30, reconnect=True)
         except discord.ClientException:
             joined = False
         for user in guild.members:
@@ -1522,14 +1522,13 @@ class updateQueues:
                 should_cache[i["id"]] = True
         for vc in client.voice_clients:
             if not vc.is_connected():
-                await vc.disconnect(force=True)
                 continue
             channel = vc.channel
             guild = channel.guild
             try:
                 auds = self.audio[guild.id]
                 playing = auds.is_playing and vc.is_playing() or auds.is_loading
-                membs = channel.members
+                membs = auds.channel.members
                 for memb in membs:
                     if memb.id == client.user.id:
                         membs.remove(memb)
