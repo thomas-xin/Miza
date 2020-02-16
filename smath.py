@@ -1342,6 +1342,9 @@ def htmlDecode(s):
     while len(s) > 7:
         try:
             i = s.index("&#")
+        except ValueError:
+            break
+        try:
             if s[i + 2] == "x":
                 h = "0x"
                 p = i + 3
@@ -1355,8 +1358,11 @@ def htmlDecode(s):
             c = chr(v)
             s = s[:i] + c + s[p + a + 1:]
         except ValueError:
-            break
-    return s
+            continue
+        except IndexError:
+            continue
+    s = s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    return s.replace("&quot;", '"').replace("&apos;", "'")
 
 
 __units = {
@@ -1510,7 +1516,7 @@ lookup time for all elements. Includes many array and numeric operations."""
         else:
             r = range(len(self.data))
         for i in r:
-            if i > len(self.data):
+            if not i + self.offs in self.data:
                 break
             yield self.data[self.offs + i]
         return

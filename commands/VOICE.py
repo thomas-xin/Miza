@@ -422,7 +422,7 @@ class videoDownloader:
                         duration = temp[:temp.index('" />')]
                         t = '<meta name="description" content="'
                         s = s[s.index(t) + len(t):]
-                        item = htmlDecode(s[:s.index('" />')]).replace("a song by ", "").replace(" on Spotify", "").strip(" ")
+                        item = htmlDecode(s[:s.index('" />')]).replace(", a song by ", " ~ ").replace(" on Spotify", "").strip(" ")
                         temp = {
                             "id": hex(abs(hash(item))).replace("0x", ""),
                             "name": item,
@@ -566,17 +566,26 @@ class videoDownloader:
             self.searched = {}
         self.lastsearch = time.time()
         if item in self.searched:
-            i["duration"] = self.searched[item]["duration"]
-            i["url"] = self.searched[item]["webpage_url"]
+            it = self.searched[item][-1]
+            i["name"] = it["name"]
+            i["duration"] = it["duration"]
+            i["url"] = it["url"]
             return True
         try:
             self.requests += 1
             data = self.downloader.extract_info(item, download=False, process=True)
             if "entries" in data:
                 data = data["entries"][-1]
-            self.searched[item] = data
-            i["duration"] = data["duration"]
-            i["url"] = data["webpage_url"]
+            self.searched[item] = data = [{
+                "id": data["id"],
+                "name": data["title"],
+                "duration": data["duration"],
+                "url": data["webpage_url"],
+                }]
+            it = data[-1]
+            i["name"] = it["name"]
+            i["duration"] = it["duration"]
+            i["url"] = it["url"]
             self.requests = max(self.requests - 1, 0)
         except:
             self.requests = max(self.requests - 1, 0)
@@ -1585,7 +1594,7 @@ class updateQueues:
                     doParallel(ytdl.extractSingle, [i], returns)
                     while returns[0] is None and time.time() - t < 10:
                         await asyncio.sleep(0.1)
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.2)
                 except:
                     print(traceback.format_exc())
         await asyncio.sleep(1)
