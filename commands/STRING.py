@@ -90,7 +90,8 @@ class clear:
 
     async def __call__(self, guild, **void):
         try:
-            del self._vars.updaters["variables"][guild.id]
+            del self._vars.updaters["variables"].data[guild.id]
+            _vars.updaters["variables"].update()
         except KeyError:
             pass
         return (
@@ -181,8 +182,9 @@ class updateVariables:
 
     def __init__(self):
         for g in self.data:
-            self.data[g].data["__builtins__"] = self._vars.builtins
-            self.data[g].ignore("__builtins__")
+            if self.data[g] is not None:
+                self.data[g].data["__builtins__"] = self._vars.builtins
+                self.data[g].ignore("__builtins__")
 
     async def __call__(self):
         pass

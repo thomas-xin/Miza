@@ -22,16 +22,17 @@ mp = mpmath.mp
 mp.dps = 128
 
 math.round = round
-c_ = 299792458
-inf = math.inf
-nan = math.nan
 
 mpf = mpmath.mpf
 mpc = mpmath.mpc
-matrix = mpmath.matrix
+Mat = mat = matrix = mpmath.matrix
 
+inf = math.inf
+nan = math.nan
+i = I = j = J = 1j
 pi = mp.pi
-e_ = mp.e
+E = e = e_ = mp.e
+c = c_ = 299792458
 tau = pi * 2
 d2r = mp.degree
 phi = mp.phi
@@ -2296,9 +2297,12 @@ class pickled:
         c = dict(self.data)
         for i in self.ignores:
             c.pop(i)
+        d = pickle.dumps(c)
+        if len(d) > 1048576:
+            return "None"
         return (
             "pickled(pickle.loads(hex2Bytes('''"
-            + bytes2Hex(pickle.dumps(c)).replace(" ", "")
+            + bytes2Hex(d).replace(" ", "")
             + "''')))"
         )
 

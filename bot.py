@@ -24,7 +24,6 @@ class main_data:
     authdata = "auth.json"
     client = client
     disabled = [
-        "__",
         ".load",
         ".save",
         ".dump",
@@ -401,12 +400,17 @@ class main_data:
         "chr",
         "complex",
         "dict",
+        "dir",
         "divmod",
         "enumerate",
+        "eval",
+        "exec",
         "filter",
         "float",
         "format",
         "frozenset",
+        "getattr",
+        "globals",
         "hash",
         "hex",
         "id",
@@ -416,6 +420,7 @@ class main_data:
         "iter",
         "len",
         "list",
+        "locals",
         "map",
         "max",
         "min",
@@ -438,6 +443,7 @@ class main_data:
         "super",
         "tuple",
         "type",
+        "vars",
         "zip",
     ]
 
@@ -447,7 +453,14 @@ class main_data:
             d = d.__dict__()
         d = {i: d[i] for i in self.builtins_list}
         d.update(smath.__dict__)
+        d["__name__"] = "__main__"
         removed = (
+            "__package__",
+            "__spec__",
+            "__file__",
+            "__builtins__",
+            "__loader__",
+            "__cached__",
             "os",
             "sys",
             "asyncio",
@@ -469,6 +482,11 @@ class main_data:
             "logClear",
             "__logPrinter",
             "__printer",
+            "__units",
+            "_hlist__maxoff",
+            "__trans",
+            "__map",
+            "__fmts",
         )
         for i in removed:
             d.pop(i)
@@ -479,11 +497,18 @@ class main_data:
         data = var.data
         if g_id not in data:
             data[g_id] = var.create()
+        if data[g_id] is None:
+            data.pop(g_id)
+            var.update()
+            raise OverflowError(
+                "Unfortunately the variable cache for this server has become "
+                + "too large, and has been deleted. Please try again."
+            )
         return data[g_id].data
 
     def doMath(self, f, g_id):
-        var = self.getVar(g_id)
         try:
+            var = self.getVar(g_id)
             att = 0
             for f in self.verifyCommand(f):
                 try:
@@ -617,8 +642,8 @@ class main_data:
         if message.attachments:
             data += " <" + ", ".join(i.url for i in message.attachments) + ">"
         t = message.created_at
-        if t.edited_at:
-            t = t.edited_at
+        if message.edited_at:
+            t = message.edited_at
         data += " (" + str(t) + ")"
         if suffix:
             suffix = None

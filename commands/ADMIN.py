@@ -426,7 +426,7 @@ class updateFollows:
                     if r in words:
                         await message.add_reaction(following[g_id]["reacts"][r])
             except discord.Forbidden:
-                pass
+                print(traceback.format_exc())
 
     async def __call__(self):
         pass
