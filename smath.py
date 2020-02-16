@@ -31,8 +31,14 @@ inf = math.inf
 nan = math.nan
 i = I = j = J = 1j
 pi = mp.pi
-E = e = e_ = mp.e
-c = c_ = 299792458
+E = e = mp.e
+c = 299792458
+lP = 1.61625518e-35
+mP = 2.17643524e-8
+tP = 5.39124760e-44
+h = 6.62607015e-34
+G = 6.6743015e-11
+g = 9.80665
 tau = pi * 2
 d2r = mp.degree
 phi = mp.phi
@@ -507,7 +513,7 @@ def isPrime(n):
 
 
 def generatePrimes(a=2, b=inf, c=1):
-    primes = []
+    primes = hlist()
     a = round(a)
     b = round(b)
     if b is None:
@@ -704,7 +710,7 @@ def romanNumerals(num, order=0):
     sym = ""
     output = ""
     if num >= 4000:
-        carry //= 1000
+        carry = num // 1000
         num %= 1000
         over = romanNumerals(carry, order + 1)
     while num >= 1000:
@@ -1332,6 +1338,27 @@ def strGetRem(s, arg):
         return s, False
 
 
+def htmlDecode(s):
+    while len(s) > 7:
+        try:
+            i = s.index("&#")
+            if s[i + 2] == "x":
+                h = "0x"
+                p = i + 3
+            else:
+                h = ""
+                p = i + 2
+            for a in range(4):
+                if s[p + a] == ";":
+                    v = int(h + s[p:p + a])
+                    break
+            c = chr(v)
+            s = s[:i] + c + s[p + a + 1:]
+        except ValueError:
+            break
+    return s
+
+
 __units = {
     "galactic year": 7157540528801820.28133333333333,
     "millenium": [31556925216., "millenia"],
@@ -1438,7 +1465,7 @@ def reconstitute(s):
     return s.translate(__trans)
 
 
-_hlist__maxoff = (1 << 31) - 1
+__hlist_maxoff__ = (1 << 31) - 1
 
 class hlist(collections.abc.MutableSequence):
 
@@ -1748,7 +1775,7 @@ lookup time for all elements. Includes many array and numeric operations."""
         self.reconstitute(force=True)
         return self
 
-    def __init__(self, iterable=(), maxoff=__maxoff, **void):
+    def __init__(self, iterable=(), maxoff=__hlist_maxoff__, **void):
         self.chash = None
         self.block = True
         self.maxoff = maxoff
@@ -2274,11 +2301,11 @@ lookup time for all elements. Includes many array and numeric operations."""
         return self.copy()
 
 
-def hrange(a, b=None, c=None, maxoff=_hlist__maxoff):
+def hrange(a, b=None, c=None, maxoff=__hlist_maxoff__):
     return hlist(xrange(a, b, c), maxoff)
 
 
-def hzero(size, maxoff=_hlist__maxoff):
+def hzero(size, maxoff=__hlist_maxoff__):
     return hlist((0 for i in range(size)), maxoff)
 
 

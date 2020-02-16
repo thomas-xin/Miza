@@ -94,23 +94,7 @@ def searchForums(query):
         curr["description"] = s[:j]
         for elem in curr:
             temp = curr[elem].replace('<em class="textHighlight">', "").replace('</em>', "")
-            while len(temp) > 7:
-                try:
-                    i = temp.index("&#")
-                    if temp[i + 2] == "x":
-                        h = "0x"
-                        p = i + 3
-                    else:
-                        h = ""
-                        p = i + 2
-                    for a in range(4):
-                        if temp[p + a] == ";":
-                            v = int(h + temp[p:p + a])
-                            break
-                    c = chr(v)
-                    temp = temp[:i] + c + temp[p + a + 1:]
-                except ValueError:
-                    break
+            temp = htmlDecode(temp)
             curr[elem] = temp
         output.append(curr)
     return output

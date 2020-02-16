@@ -1,4 +1,4 @@
-import youtube_dl, asyncio, discord, os, urllib, json
+import discord, urllib, json, youtube_dl
 from subprocess import check_output, CalledProcessError, STDOUT
 from scipy.signal import butter, sosfilt
 from smath import *
@@ -381,11 +381,10 @@ class videoDownloader:
     
     ydl_opts = {
         "quiet": 1,
-        "verbose": 0,
         "format": "bestaudio/best",
-        "noplaylist": 1,
         "call_home": 1,
         "nooverwrites": 1,
+        "noplaylist": 1,
         "ignoreerrors": 0,
         "source_address": "0.0.0.0",
         "default_search": "auto",
@@ -397,55 +396,141 @@ class videoDownloader:
         self.requests = 0
 
     def extract(self, item, force):
-        resp = self.downloader.extract_info(item, download=False, process=False)
-        if resp.get("_type", None) == "url":
-            resp = self.downloader.extract_info(resp["url"], download=False, process=False)
-        if resp is None or not len(resp):
-            raise EOFError("No search results found.")
-        output = []
-        if resp.get("_type", None) == "playlist":
-            entries = list(resp["entries"])
-            if force or len(entries) <= 1:
-                for entry in entries:
-                    data = self.downloader.extract_info(entry["id"], download=False, process=False)
-                    output.append({
-                        "id": data["id"],
-                        "name": data["title"],
-                        "url": data["webpage_url"],
-                        "duration": data["duration"],
-                    })
-            else:
-                for entry in entries:
-                    dur = "duration" in entry
+        try:
+            output = []
+            r = None
+            if "open.spotify.com" in item or force == "spotify":
+                try:
+                    op = urlBypass()
+                    for i in range(4):
+                        try:
+                            r = op.open(item)
+                            rescode = r.getcode()
+                            if rescode != 200:
+                                raise ConnectionError(rescode)
+                            continue
+                        except:
+                            time.sleep(1)
+                    if force == "spotify":
+                        time.sleep(frand(2))
+                        it = '<meta property="music:duration" content="'
+                        s = ""
+                        while not it in s:
+                            s += r.read(256).decode("utf-8")
+                        s += r.read(256).decode("utf-8")
+                        temp = s[s.index(it) + len(it):]
+                        duration = temp[:temp.index('" />')]
+                        t = '<meta name="description" content="'
+                        s = s[s.index(t) + len(t):]
+                        item = htmlDecode(s[:s.index('" />')]).replace("a song by ", "").replace(" on Spotify", "").strip(" ")
+                        temp = {
+                            "id": hex(abs(hash(item))).replace("0x", ""),
+                            "name": item,
+                            "url": "ytsearch: " + item,
+                            "duration": int(duration),
+                            "research": True,
+                            }
+                        sys.stdout.write(repr(temp) + "\n")
+                        output.append(temp)
+                    else:
+                        it = '<meta property="og:type" content="'
+                        s = ""
+                        while not it in s:
+                            s += r.read(512).decode("utf-8")
+                        s += r.read(256).decode("utf-8")
+                        temp = s[s.index(it) + len(it):]
+                        ptype = temp[:temp.index('" />')]
+                        sys.stdout.write(ptype + "\n")
+                        if "album" in ptype or "playlist" in ptype:
+                            s += r.read().decode("utf-8")
+                            output = []
+                            while s:
+                                try:
+                                    i = s.index('<meta property="music:song')
+                                    s = s[i:]
+                                    it = 'content="'
+                                    i = s.index(it) + len(it)
+                                    s = s[i:]
+                                    if s[:5] == ":disc":
+                                        continue
+                                    x = s[:s.index('" />')]
+                                    if len(x) > 12:
+                                        output.append([None])
+                                        doParallel(self.extract, [x, "spotify"], output[-1])
+                                except ValueError:
+                                    break
+                            while [None] in output:
+                                time.sleep(0.1)
+                            outlist = [i[-1] for i in output if i[-1] != 0]
+                            output = []
+                            for i in outlist:
+                                output += i
+                            sys.stdout.write(repr(output) + "\n\n")
+                        else:
+                            t = '<meta name="description" content="'
+                            s = s[s.index(t) + len(t):]
+                            item = htmlDecode(s[:s.index('" />')]).replace(" on Spotify", "")
+                            sys.stdout.write(item + "\n")
+                except urllib.error.URLError:
+                    pass
+            if r is not None:
+                r.close()
+            if not len(output) and force != "spotify":
+                resp = self.downloader.extract_info(item, download=False, process=False)
+                if resp.get("_type", None) == "url":
+                    resp = self.downloader.extract_info(resp["url"], download=False, process=False)
+                if resp is None or not len(resp):
+                    raise EOFError("No search results found.")
+                if resp.get("_type", None) == "playlist":
+                    entries = list(resp["entries"])
+                    if force or len(entries) <= 1:
+                        for entry in entries:
+                            data = self.downloader.extract_info(entry["id"], download=False, process=False)
+                            output.append({
+                                "id": data["id"],
+                                "name": data["title"],
+                                "url": data["webpage_url"],
+                                "duration": data["duration"],
+                            })
+                    else:
+                        for entry in entries:
+                            dur = "duration" in entry
+                            temp = {
+                                "id": entry["id"],
+                                "name": entry["title"],
+                                "url": entry["url"],
+                                "duration": entry.get("duration", 60),
+                            }
+                            if not dur:
+                                temp["research"] = True
+                            output.append(temp)
+                else:
+                    dur = "duration" in resp
                     temp = {
-                        "id": entry["id"],
-                        "name": entry["title"],
-                        "url": entry["url"],
-                        "duration": entry.get("duration", 60),
+                        "id": resp["id"],
+                        "name": resp["title"],
+                        "url": resp["webpage_url"],
+                        "duration": resp.get("duration", 60),
                     }
                     if not dur:
                         temp["research"] = True
                     output.append(temp)
-        else:
-            dur = "duration" in resp
-            temp = {
-                "id": resp["id"],
-                "name": resp["title"],
-                "url": resp["webpage_url"],
-                "duration": resp.get("duration", 60),
-            }
-            if not dur:
-                temp["research"] = True
-            output.append(temp)
-        return output
+            #sys.stdout.write(repr(output) + "\n\n")
+            return output
+        except:
+            if force != "spotify":
+                raise
+            print(traceback.format_exc())
+            return 0
 
     def search(self, item, force=False):
-        item = item.strip("<>").replace("\n", "")
+        item = item.strip("< >").replace("\n", "")
         while self.requests > 4:
-            time.sleep(0.01)
-        if time.time() - self.lastsearch > 1800:
+            time.sleep(0.1)
+        if time.time() - self.lastsearch > 86400:
             self.lastsearch = time.time()
             self.searched = {}
+        self.lastsearch = time.time()
         if item in self.searched:
             return self.searched[item]
         try:
@@ -475,17 +560,21 @@ class videoDownloader:
     def extractSingle(self, i):
         item = i["url"]
         while self.requests > 4:
-            time.sleep(0.01)
+            time.sleep(0.1)
         if time.time() - self.lastsearch > 1800:
             self.lastsearch = time.time()
             self.searched = {}
+        self.lastsearch = time.time()
         if item in self.searched:
             i["duration"] = self.searched[item]["duration"]
             i["url"] = self.searched[item]["webpage_url"]
             return True
         try:
             self.requests += 1
-            data = self.downloader.extract_info(item, download=False, process=False)
+            data = self.downloader.extract_info(item, download=False, process=True)
+            if "entries" in data:
+                data = data["entries"][-1]
+            self.searched[item] = data
             i["duration"] = data["duration"]
             i["url"] = data["webpage_url"]
             self.requests = max(self.requests - 1, 0)
@@ -497,6 +586,17 @@ class videoDownloader:
 
     def getDuration(self, filename):
         return getDuration(filename)
+
+
+def downloadTextFile(url):
+    opener = urlBypass()
+    resp = opener.open(url)
+    rescode = resp.getcode()
+    if rescode != 200:
+        raise ConnectionError(rescode)
+    s = resp.read().decode("utf-8")
+    resp.close()
+    return s
 
 
 ytdl = videoDownloader()
@@ -990,16 +1090,15 @@ class dump:
             d["stats"].pop("position")
             return "Queue data for **" + guild.name + "**:\n```json\n" + json.dumps(d) + "\n```"
         try:
-            opener = urlBypass()
             if len(message.attachments):
                 url = message.attachments[0].url
             else:
                 url = _vars.verifyURL(argv)
-            resp = opener.open(url)
-            rescode = resp.getcode()
-            if rescode != 200:
-                raise ConnectionError(rescode)
-            s = resp.read().decode("utf-8")
+            response = [None]
+            doParallel(downloadText, [url], response)
+            while response[0] is None:
+                asyncio.sleep(0.1)
+            s = response[0]
             s = s[s.index("{"):]
             if s[-4:] == "\n```":
                 s = s[:-4]
@@ -1528,11 +1627,9 @@ class updateQueues:
             try:
                 auds = self.audio[guild.id]
                 playing = auds.is_playing and vc.is_playing() or auds.is_loading
-                membs = auds.channel.members
-                for memb in membs:
-                    if memb.id == client.user.id:
-                        membs.remove(memb)
+                membs = [m for m in channel.members if m.id != client.user.id]
                 cnt = len(membs)
+                #print(cnt, client.user.id)
             except KeyError:
                 continue
             if not cnt or getattr(auds, "dead", 0):
@@ -1548,7 +1645,7 @@ class updateQueues:
                     #print(msg)
                 except KeyError:
                     pass
-                await vc.disconnect(force=False)
+                await vc.disconnect(force=True)
             else:
                 try:
                     asyncio.create_task(auds.updatePlayer())

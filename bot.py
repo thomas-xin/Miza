@@ -448,14 +448,7 @@ class main_data:
             d = d.__dict__()
         d = {i: d[i] for i in self.builtins_list}
         d.update(smath.__dict__)
-        d["__name__"] = "__main__"
         removed = (
-            "__package__",
-            "__spec__",
-            "__file__",
-            "__builtins__",
-            "__loader__",
-            "__cached__",
             "os",
             "sys",
             "asyncio",
@@ -475,16 +468,14 @@ class main_data:
             "waitParallel",
             "processes",
             "logClear",
-            "__logPrinter",
-            "__printer",
-            "__units",
-            "_hlist__maxoff",
-            "__trans",
-            "__map",
-            "__fmts",
         )
         for i in removed:
             d.pop(i)
+        for i in list(d.keys()):
+            if "__" in i:
+                d.pop(i)
+        d["__name__"] = "__main__"
+        d["__doc__"] = "A multipurpose Discord bot."
         self.builtins = d
 
     def getVar(self, g_id):
