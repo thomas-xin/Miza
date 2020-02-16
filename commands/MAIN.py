@@ -143,7 +143,7 @@ class perms:
             print(t_user)
             t_perm = _vars.getPerms(t_user.id, guild)
         else:
-            c_perm = _vars.evalMath(" ".join(args[1:]))
+            c_perm = _vars.evalMath(" ".join(args[1:]), guild.id)
             s_user = user
             s_perm = perm
             if "everyone" in args[0] or "here" in args[0]:
@@ -352,7 +352,7 @@ class suspend:
             )
         else:
             user = await _vars.fetch_user(_vars.verifyID(args[0]))
-            change = _vars.evalMath(args[1])
+            change = _vars.evalMath(args[1], guild.id)
             susp[user.id] = change
             update()
             return (
@@ -371,8 +371,8 @@ class loop:
         self.description = "Loops a command."
         self.usage = "<0:iterations> <1:command> <hide(?h)>"
 
-    async def __call__(self, args, argv, message, callback, _vars, flags, perm, **void):
-        iters = round(float(_vars.evalMath(args[0])))
+    async def __call__(self, args, argv, message, callback, _vars, flags, perm, guild, **void):
+        iters = round(float(_vars.evalMath(args[0], guild.id)))
         scale = 3
         limit = perm * scale
         if iters > limit:
@@ -435,10 +435,12 @@ class updateSuspended:
                 else:
                     self.suspended[susp] -= time.time()
                     self.suspended[susp] *= 1.25
-                    if self.suspended[susp] > 86400 * 3.5:
-                        self.suspended[susp] += 86400 * 5
+                    if self.suspended[susp] > 86400 * 3.7:
+                        self.suspended[susp] += 86400 * (16 + frand(256))
+                    elif self.suspended[susp] > 86400 * 3.5:
+                        self.suspended[susp] += 86400 * (4 + frand(16))
                     elif self.suspended[susp] > 86400 * 3:
-                        self.suspended[susp] += 86400 * 2
+                        self.suspended[susp] += 86400 * (2 + frand(4))
                     self.suspended[susp] += time.time() + 86400
                 print(susp, (self.suspended[susp] - time.time()) / 86400)
                 if (self.suspended[susp] - time.time()) / 86400 >= self._vars.min_suspend - 1:

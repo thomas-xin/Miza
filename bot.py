@@ -1,10 +1,9 @@
 import discord, os, sys, datetime, json
 import urllib.request
-from smath import *
-
-from matplotlib import use as plot_sys
-plot_sys("Agg")
-from matplotlib import pyplot as plt
+import smath
+s = smath.__dict__
+s.pop("__name__")
+globals().update(s)
 
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
@@ -12,94 +11,6 @@ sys.path.insert(1, "misc")
 client = discord.Client(
     max_messages=2000,
 )
-
-
-def tryFunc(func, *args, force=False, amax, **kwargs):
-    try:
-        ans = nan
-        ans = func(*args, **kwargs)
-        if not (ans > -amax and ans < amax):
-            raise OverflowError
-    except:
-        if force:
-            ans = 0
-        else:
-            if ans.imag:
-                ans = nan
-            elif ans > amax:
-                ans = inf
-            elif ans < amax:
-                ans = -inf
-            else:
-                ans = nan
-    return ans
-
-def plot(*args,**kwargs):
-    args = list(args)
-    flip = False
-    if type(args[0]) is str:
-        s = args[0]
-        if s[0] == "y":
-            try:
-                t = s.index("=")
-                s = s[t + 1:]
-            except ValueError:
-                pass
-        f = _vars.evalMath("lambda x: " + s)
-        try:
-            f(0)
-        except ArithmeticError:
-            pass
-        except NameError as ex1:
-            if s[0] == "x":
-                try:
-                    t = s.index("=")
-                    s = s[t + 1:]
-                except ValueError:
-                    pass
-            f = _vars.evalMath("lambda y: " + s)
-            try:
-                f(0)
-            except ArithmeticError:
-                pass
-            except NameError as ex2:
-                raise NameError(str(ex1) + ", " + str(ex2))
-            flip = True
-        args = [f] + args[1:]
-    if callable(args[0]):
-        amax = 100
-        if len(args) < 2:
-            r = float(2 * tau)
-            c = float(-tau)
-        elif len(args) < 3:
-            r = args[1] * 2
-            c = -args[1]
-        else:
-            r = abs(args[2]-args[1])
-            c = min(args[2], args[1])
-            if len(args) >= 4:
-                amax = args[3]
-        size = 1024
-        array1 = array(range(size)) / size * r + c
-        array2 = [
-            tryFunc(
-                args[0],
-                array1[i],
-                force=(i == 0 or i == len(array1) - 1),
-                amax=amax
-            ) for i in range(len(array1))
-        ]
-        if flip:
-            args = [array2, array1]
-        else:
-            args = [array1, array2]
-    if len(args) < 3:
-        cols = "rgbcmy"
-        args.append("-" + cols[xrand(len(cols))])
-    return plt.plot(*args)
-
-
-fig = plt.figure()
 
 
 class main_data:
@@ -112,47 +23,6 @@ class main_data:
     savedata = "data.json"
     authdata = "auth.json"
     client = client
-    deleted = [
-        "discord",
-        "client",
-        "urllib",
-        "os",
-        "sys",
-        "asyncio",
-        "ast",
-        "ctypes",
-        "traceback",
-        "copy",
-        "threading",
-        "processes",
-        "doParallel",
-        "updatePrint",
-        "waitParallel",
-        "killThreads",
-        "performAction",
-        "dynamicFunc",
-        "sendInput",
-        "logClear",
-        "processMessage",
-        "updateLoop",
-        "inputLoop",
-        "heartbeatLoop",
-        "handleMessage",
-        "checkDelete",
-        "on_ready",
-        "on_reaction_add",
-        "on_reaction_remove",
-        "on_message",
-        "on_message_edit",
-        "on_raw_reaction_add",
-        "on_raw_message_edit",
-        "on_voice_state_update",
-        "on_raw_message_delete",
-        "on_typing",
-        "_vars",
-        "fig",
-        "plt",
-    ]
     disabled = [
         "__",
         ".load",
@@ -160,59 +30,6 @@ class main_data:
         ".dump",
         ".fromfile",
     ]
-    builtins_list = [
-        "abs",
-        "all",
-        "any",
-        "ascii",
-        "bin",
-        "bool",
-        "bytearray",
-        "bytes",
-        "chr",
-        "complex",
-        "dict",
-        "divmod",
-        "enumerate",
-        "filter",
-        "float",
-        "format",
-        "frozenset",
-        "hash",
-        "hex",
-        "id",
-        "int",
-        "isinstance",
-        "issubclass",
-        "iter",
-        "len",
-        "list",
-        "map",
-        "max",
-        "memoryview",
-        "min",
-        "next",
-        "object",
-        "oct",
-        "ord",
-        "pow",
-        "print",
-        "property",
-        "range",
-        "repr",
-        "reversed",
-        "round",
-        "set",
-        "slice",
-        "sorted",
-        "str",
-        "sum",
-        "super",
-        "tuple",
-        "type",
-        "zip",
-    ]
-    builtins = {i: getattr(__builtins__, i) for i in builtins_list}
 
     class userGuild:
 
@@ -246,8 +63,8 @@ class main_data:
             os.mkdir("cache/")
         if not os.path.exists("saves/"):
             os.mkdir("saves/")
+        self.initBuiltins()
         self.lastCheck = time.time()
-        self.queue = {}
         self.fig = fig
         self.plt = plt
         f = open(self.authdata)
@@ -255,7 +72,6 @@ class main_data:
         f.close()
         self.owner_id = int(auth["owner_id"])
         self.token = auth["discord_token"]
-        self.resetGlobals()
         self.data = {}
         doParallel(self.getModules)
         self.current_channel = None
@@ -263,10 +79,18 @@ class main_data:
         self.blocked = 0
         self.doUpdate = False
         self.updated = False
-        self.audiocache = {}
         self.message_cache = {}
         self.suffix = ">>> "
         print("Initialized.")
+
+    def run(self):
+        print("Attempting to authorize with token " + self.token + ":")
+        try:
+            self.client.run(self.token)
+        except KeyboardInterrupt:
+            sys.exit()
+        except SystemExit:
+            sys.exit()
 
     def print(self, *args, sep=" ", end="\n", suffix=None):
         if suffix is None:
@@ -389,7 +213,10 @@ class main_data:
                         var.updated = False
                         try:
                             f = open(var.file, "rb")
-                            self.data[name] = var.data = eval(f.read())
+                            s = f.read()
+                            if not s:
+                                raise FileNotFoundError
+                            self.data[name] = var.data = eval(s)
                             f.close()
                         except FileNotFoundError:
                             self.data[name] = var.data = {}
@@ -421,22 +248,6 @@ class main_data:
             doParallel(self.getModule, [f])
         self.codeSize = totalsize
 
-    def getLineCount(self, fn):
-        #print(fn)
-        f = open(fn, "rb")
-        count = 1
-        size = 0
-        while True:
-            try:
-                i = f.read(1024)
-                if not i:
-                    raise EOFError
-                size += len(i)
-                count += i.count(b"\n")
-            except EOFError:
-                f.close()
-                return size, count
-
     def update(self):
         count = 0
         try:
@@ -455,11 +266,14 @@ class main_data:
     def getPerms(self, user, guild):
         perms = self.data["perms"]
         try:
-            u_id = int(user.id)
+            u_id = user.id
         except AttributeError:
             u_id = int(user)
         if guild:
-            g_id = guild.id
+            try:
+                g_id = guild.id
+            except AttributeError:
+                g_id = int(guild)
             g_perm = perms.setdefault(g_id, {})
             if u_id in (self.owner_id, client.user.id):
                 u_perm = nan
@@ -482,25 +296,6 @@ class main_data:
         g_perm = perms.setdefault(guild.id, {})
         g_perm.update({u_id: value})
         self.updaters["perms"].update()
-
-    def resetGlobals(self):
-        self.stored_vars = dict(globals())
-        self.verifyGlobals()
-        return self.stored_vars
-
-    def updateGlobals(self):
-        self.stored_vars.update(dict(globals()))
-        self.verifyGlobals()
-        return self.stored_vars
-
-    def verifyGlobals(self):
-        for i in self.deleted:
-            try:
-                self.stored_vars.pop(i)
-            except KeyError:
-                pass
-        self.stored_vars["__builtins__"] = self.builtins
-        return self.stored_vars
     
     mmap = {
         "“": '"',
@@ -594,16 +389,110 @@ class main_data:
     def verifyURL(self, f):
         return f.strip(" ").translate(self.utrans)
 
-    def doMath(self, f, returns):
+    builtins_list = [
+        "abs",
+        "all",
+        "any",
+        "ascii",
+        "bin",
+        "bool",
+        "bytearray",
+        "bytes",
+        "chr",
+        "complex",
+        "dict",
+        "divmod",
+        "enumerate",
+        "filter",
+        "float",
+        "format",
+        "frozenset",
+        "hash",
+        "hex",
+        "id",
+        "int",
+        "isinstance",
+        "issubclass",
+        "iter",
+        "len",
+        "list",
+        "map",
+        "max",
+        "min",
+        "next",
+        "object",
+        "oct",
+        "ord",
+        "pow",
+        "print",
+        "property",
+        "range",
+        "repr",
+        "reversed",
+        "round",
+        "set",
+        "slice",
+        "sorted",
+        "str",
+        "sum",
+        "super",
+        "tuple",
+        "type",
+        "zip",
+    ]
+
+    def initBuiltins(self):
+        d = __builtins__
+        if type(d) is not dict:
+            d = d.__dict__()
+        d = {i: d[i] for i in self.builtins_list}
+        d.update(smath.__dict__)
+        removed = (
+            "os",
+            "sys",
+            "asyncio",
+            "threading",
+            "pickle",
+            "ast",
+            "traceback",
+            "matplotlib",
+            "mp",
+            "parse_expr",
+            "pickled",
+            "dynamicFunc",
+            "performAction",
+            "_parallel",
+            "doParallel",
+            "killThreads",
+            "waitParallel",
+            "processes",
+            "logClear",
+            "__logPrinter",
+            "__printer",
+        )
+        for i in removed:
+            d.pop(i)
+        self.builtins = d
+
+    def getVar(self, g_id):
+        var = self.updaters["variables"]
+        data = var.data
+        if g_id not in data:
+            data[g_id] = var.create()
+        return data[g_id].data
+
+    def doMath(self, f, g_id):
+        var = self.getVar(g_id)
         try:
             att = 0
             for f in self.verifyCommand(f):
                 try:
-                    answer = eval(f, self.stored_vars)
+                    answer = eval(f, var)
                     break
                 except:
                     try:
-                        exec(f, self.stored_vars)
+                        exec(f, var)
+                        self.updaters["variables"].update()
                         answer = None
                         break
                     except:
@@ -614,14 +503,35 @@ class main_data:
             answer = "\nError: " + repr(ex)
         if answer is not None:
             answer = str(answer)
-        returns[0] = answer
+        return answer
 
-    def evalMath(self, f):
+    def evalMath(self, f, guild):
+        try:
+            g_id = guild.id
+        except AttributeError:
+            g_id = int(guild)
+        var = self.getVar(g_id)
         f1, f2 = self.verifyCommand(f)
         try:
-            return eval(f1, self.stored_vars)
+            return eval(f1, var)
         except:
-            return eval(f2, self.stored_vars)
+            return eval(f2, var)
+
+    def getLineCount(self, fn):
+        #print(fn)
+        f = open(fn, "rb")
+        count = 1
+        size = 0
+        while True:
+            try:
+                i = f.read(1024)
+                if not i:
+                    raise EOFError
+                size += len(i)
+                count += i.count(b"\n")
+            except EOFError:
+                f.close()
+                return size, count
 
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:
@@ -706,7 +616,10 @@ class main_data:
             data += " <" + ", ".join(str(i.to_dict()) for i in message.embeds) + ">"
         if message.attachments:
             data += " <" + ", ".join(i.url for i in message.attachments) + ">"
-        data += " (" + str(datetime.datetime.now()) + ")"
+        t = message.created_at
+        if t.edited_at:
+            t = t.edited_at
+        data += " (" + str(t) + ")"
         if suffix:
             suffix = None
         else:
@@ -715,11 +628,9 @@ class main_data:
 
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_flags=None, loop=False):
-    global client
     perms = _vars.data["perms"]
     bans = _vars.data["bans"]
     categories = _vars.categories
-    stored_vars = _vars.stored_vars
     if msg[:2] == "> ":
         msg = msg[2:]
     elif msg[:2] == "||" and msg[-2:] == "||":
@@ -994,6 +905,8 @@ async def inputLoop():
         return ch
 
     def verifyChannel(channel):
+        if channel is None:
+            return None
         try:
             if channel.guild is None:
                 raise TypeError
@@ -1014,6 +927,7 @@ async def inputLoop():
                 await asyncio.sleep(0.1)
             proc = msg[0]
             if not proc:
+                _vars.print(end="")
                 continue
             if proc[0] == "!":
                 proc = proc[1:]
@@ -1053,9 +967,9 @@ async def inputLoop():
                     hist = hlist(hist)
                     for m in reversed(hist):
                         _vars.printMessage(m, _vars.current_channel)
-                    _vars.print(end="")
                 except:
-                    _vars.print(end="")
+                    pass
+                _vars.print(end="")
             elif proc[0] == "&":
                 proc = proc[1:]
                 hist = await ch.history(limit=1).flatten()
@@ -1254,10 +1168,4 @@ async def on_raw_message_edit(payload):
 
 if __name__ == "__main__":
     _vars = main_data()
-    print("Attempting to authorize with token " + _vars.token + ":")
-    try:
-        client.run(_vars.token)
-    except KeyboardInterrupt:
-        sys.exit()
-    except SystemExit:
-        sys.exit()
+    _vars.run()

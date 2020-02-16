@@ -2,17 +2,21 @@
 Adds many useful math-related functions.
 """
 
-import os, sys, asyncio, threading, time, traceback, ctypes, collections, ast, copy
-import random, math, cmath, fractions, mpmath, sympy, shlex
-import numpy, tinyarray, colorsys
-
-array = tinyarray.array
-deque = collections.deque
+import os, sys, asyncio, threading, time, traceback, ctypes, collections, ast, copy, pickle
+import random, math, cmath, fractions, mpmath, sympy, shlex, matplotlib, numpy, tinyarray, colorsys
 
 from scipy import interpolate, special
 
+
+np = numpy
+array = tinyarray.array
+deque = collections.deque
+
 random.seed(random.random() + time.time() % 1)
 sympy.init_printing(use_unicode=True)
+matplotlib.use("Agg")
+from matplotlib import pyplot as plt
+from sympy.parsing.sympy_parser import parse_expr
 
 mp = mpmath.mp
 mp.dps = 128
@@ -38,8 +42,6 @@ Function = sympy.Function
 Symbol = sympy.Symbol
 factorize = factorint = primeFactors = sympy.ntheory.factorint
 mobius = sympy.ntheory.mobius
-
-from sympy.parsing.sympy_parser import parse_expr
 
 TRUE, FALSE = True, False
 true, false = True, False
@@ -85,6 +87,7 @@ def shuffle(it):
     elif isinstance(it, hlist):
         temp = it.shuffle()
         it.data = temp.data
+        it.offs = temp.offs
         del temp
         return it
     else:
@@ -94,6 +97,92 @@ def shuffle(it):
             return it
         except TypeError:
             raise TypeError("Shuffling " + type(it) + " is not supported.")
+
+def tryFunc(func, *args, force=False, amax, **kwargs):
+    try:
+        ans = nan
+        ans = func(*args, **kwargs)
+        if not (ans > -amax and ans < amax):
+            raise OverflowError
+    except:
+        if force:
+            ans = 0
+        else:
+            if ans.imag:
+                ans = nan
+            elif ans > amax:
+                ans = inf
+            elif ans < amax:
+                ans = -inf
+            else:
+                ans = nan
+    return ans
+
+def plot(*args,**kwargs):
+    args = list(args)
+    flip = False
+    if type(args[0]) is str:
+        s = args[0]
+        if s[0] == "y":
+            try:
+                t = s.index("=")
+                s = s[t + 1:]
+            except ValueError:
+                pass
+        f = eval("lambda x: " + s)
+        try:
+            f(0)
+        except ArithmeticError:
+            pass
+        except NameError as ex1:
+            if s[0] == "x":
+                try:
+                    t = s.index("=")
+                    s = s[t + 1:]
+                except ValueError:
+                    pass
+            f = eval("lambda y: " + s)
+            try:
+                f(0)
+            except ArithmeticError:
+                pass
+            except NameError as ex2:
+                raise NameError(str(ex1) + ", " + str(ex2))
+            flip = True
+        args = [f] + args[1:]
+    if callable(args[0]):
+        amax = 100
+        if len(args) < 2:
+            r = float(2 * tau)
+            c = float(-tau)
+        elif len(args) < 3:
+            r = args[1] * 2
+            c = -args[1]
+        else:
+            r = abs(args[2]-args[1])
+            c = min(args[2], args[1])
+            if len(args) >= 4:
+                amax = args[3]
+        size = 1024
+        array1 = array(range(size)) / size * r + c
+        array2 = [
+            tryFunc(
+                args[0],
+                array1[i],
+                force=(i == 0 or i == len(array1) - 1),
+                amax=amax
+            ) for i in range(len(array1))
+        ]
+        if flip:
+            args = [array2, array1]
+        else:
+            args = [array1, array2]
+    if len(args) < 3:
+        cols = "rgbcmy"
+        args.append("-" + cols[xrand(len(cols))])
+    return plt.plot(*args)
+
+fig = plt.figure()
 
 def nop(*args):
     pass
@@ -742,7 +831,7 @@ def bytes2Hex(b):
 
 def hex2Bytes(h):
     o = []
-    h = h.replace(" ", "")
+    h = h.replace(" ", "").replace("\r", "").replace("\n", "")
     for a in range(0, len(h), 2):
         o.append(int(h[a : a + 2], 16))
     return bytes(o)
@@ -2192,7 +2281,29 @@ def hzero(size, maxoff=_hlist__maxoff):
     return hlist((0 for i in range(size)), maxoff)
 
 
+class pickled:
+
+    def __init__(self, obj=None, ignore=()):
+        self.data = obj
+        self.ignores = hlist(ignore)
+        self.__str__ = obj.__str__
+        self.__dict__.update(getattr(obj, "__dict__", {}))
+
+    def ignore(self, item):
+        self.ignores.append(item)
+
+    def __repr__(self):
+        c = dict(self.data)
+        for i in self.ignores:
+            c.pop(i)
+        return (
+            "pickled(pickle.loads(hex2Bytes('''"
+            + bytes2Hex(pickle.dumps(c)).replace(" ", "")
+            + "''')))"
+        )
+
 class dynamicFunc:
+    
     def __init__(self, func):
         self.text = func
         self.func = eval(func)
@@ -2225,6 +2336,7 @@ def performAction(action):
 
 
 class _parallel:
+    
     def __init__(self):
         self.max = 64
         self.running = {i: self.new(i) for i in range(self.max)}

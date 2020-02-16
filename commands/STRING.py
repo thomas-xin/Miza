@@ -49,7 +49,7 @@ class math:
         self.description = "Evaluates a math formula using Python syntax."
         self.usage = "<function>"
 
-    async def __call__(self, _vars, argv, channel, flags, **extra):
+    async def __call__(self, _vars, argv, channel, flags, guild, **void):
         tm = time.time()
         f = argv
         _vars.plt.clf()
@@ -57,12 +57,11 @@ class math:
             raise EOFError("Function is empty.")
         terr = self
         returns = [BaseException]
-        doParallel(_vars.doMath, [f, returns])
+        doParallel(_vars.doMath, [f, guild.id], returns)
         while returns[0] is BaseException and time.time() < tm + _vars.timeout / 2:
             await asyncio.sleep(0.1)
         if returns[0] == BaseException:
             raise TimeoutError("Request timed out.")
-        _vars.updateGlobals()
         if _vars.fig.get_axes():
             fn = "cache/temp.png"
             _vars.plt.savefig(fn, bbox_inches="tight")
@@ -80,6 +79,26 @@ class math:
                 return "```py\n" + argv + " = " + str(answer) + "\n```"
 
 
+class clear:
+    is_command = True
+
+    def __init__(self):
+        self.name = []
+        self.min_level = 2
+        self.description = "Deletes all stored variables for the current server."
+        self.usage = ""
+
+    async def __call__(self, guild, **void):
+        try:
+            del self._vars.updaters["variables"][guild.id]
+        except KeyError:
+            pass
+        return (
+            "```css\nSuccessfully deleted all stored variables for "
+            + uniStr(guild.name) + ".```"
+        )
+
+
 class uni2hex:
     is_command = True
 
@@ -89,7 +108,7 @@ class uni2hex:
         self.description = "Converts unicode text to hexadecimal numbers."
         self.usage = "<string>"
 
-    async def __call__(self, argv, **extra):
+    async def __call__(self, argv, **void):
         if not argv:
             raise ValueError("Input string is empty.")
         b = bytes(argv, "utf-8")
@@ -105,7 +124,7 @@ class hex2uni:
         self.description = "Converts hexadecimal numbers to unicode text."
         self.usage = "<string>"
 
-    async def __call__(self, argv, **extra):
+    async def __call__(self, argv, **void):
         if not argv:
             raise ValueError("Input string is empty.")
         b = hex2Bytes(argv.replace("0x", "").replace(" ", ""))
@@ -122,7 +141,7 @@ class translate:
         self.description = "Translates a string into another language."
         self.usage = "<0:language> <1:string> <verbose(?v)> <google(?g)>"
 
-    async def __call__(self, args, flags, user, **extra):
+    async def __call__(self, args, flags, user, **void):
         dest = args[0]
         string = " ".join(args[1:])
         detected = translators["Google Translate"].detect(string)
@@ -151,3 +170,19 @@ class translate:
                     if t == trans[-1]:
                         raise
         return response + end
+
+
+class updateVariables:
+    is_update = True
+    name = "variables"
+
+    def create(self):
+        return pickled({"__builtins__": self._vars.builtins}, ("__builtins__",))
+
+    def __init__(self):
+        for g in self.data:
+            self.data[g].data["__builtins__"] = self._vars.builtins
+            self.data[g].ignore("__builtins__")
+
+    async def __call__(self):
+        pass

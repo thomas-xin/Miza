@@ -41,7 +41,7 @@ class customAudio(discord.AudioSource):
             self.preparing = False
             self.player = None
             self._vars = _vars
-            _vars.queue[channel.guild.id] = self
+            _vars.updaters["playlists"].audio[channel.guild.id] = self
         except:
             print(traceback.format_exc())
 
@@ -354,7 +354,7 @@ def getDuration(filename):
 
 async def forceJoin(guild, channel, user, client, _vars):
     found = False
-    if guild.id not in _vars.queue:
+    if guild.id not in _vars.updaters["playlists"].audio:
         for func in _vars.categories["voice"]:
             if "join" in func.name:
                 try:
@@ -364,7 +364,7 @@ async def forceJoin(guild, channel, user, client, _vars):
                 except AttributeError:
                     pass
     try:
-        auds = _vars.queue[guild.id]
+        auds = _vars.updaters["playlists"].audio[guild.id]
         auds.channel = channel
     except KeyError:
         raise LookupError("Voice channel not found.")
@@ -521,7 +521,7 @@ class queue:
             except discord.NotFound:
                 pass
         elapsed = auds.stats["position"]
-        q = _vars.queue[guild.id].queue
+        q = _vars.updaters["playlists"].audio[guild.id].queue
         if not len(argv.replace(" ", "")):
             if not len(q):
                 return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```", 1
@@ -693,7 +693,7 @@ class playlist:
                 + s + "```"
             )
         if "d" in flags:
-            i = _vars.evalMath(argv)
+            i = _vars.evalMath(argv, guild.id)
             temp = pl[i]
             pl.pop(i)
             update()
@@ -738,9 +738,9 @@ class join:
     async def __call__(self, client, user, _vars, channel, guild, **void):
         voice = user.voice
         vc = voice.channel
-        if guild.id not in _vars.queue:
+        if guild.id not in _vars.updaters["playlists"].audio:
             await channel.trigger_typing()
-            _vars.queue[guild.id] = customAudio(channel, _vars)
+            _vars.updaters["playlists"].audio[guild.id] = customAudio(channel, _vars)
         try:
             joined = True
             await vc.connect(timeout=_vars.timeout, reconnect=True)
@@ -770,7 +770,7 @@ class leave:
     async def __call__(self, user, client, _vars, guild, **void):
         error = None
         try:
-            _vars.queue.pop(guild.id)
+            _vars.updaters["playlists"].audio.pop(guild.id)
         except KeyError:
             error = LookupError("Unable to find connected channel.")
         found = False
@@ -795,9 +795,9 @@ class remove:
 
     async def __call__(self, client, user, _vars, args, argv, guild, flags, message, **void):
         found = False
-        if guild.id not in _vars.queue:
+        if guild.id not in _vars.updaters["playlists"].audio:
             raise LookupError("Currently not playing in a voice channel.")
-        auds = _vars.queue[guild.id]
+        auds = _vars.updaters["playlists"].audio[guild.id]
         if auds.stats["quiet"] & 2:
             flags["h"] = 1
             try:
@@ -818,16 +818,16 @@ class remove:
             if len(l) > 2:
                 raise ValueError("Too many arguments for range input.")
             if l[0]:
-                left = round(_vars.evalMath(l[0]))
+                left = round(_vars.evalMath(l[0], guild.id))
             else:
                 left = 0
             if l[1]:
-                right = round(_vars.evalMath(l[1]))
+                right = round(_vars.evalMath(l[1], guild.id))
             else:
                 right = len(auds.queue)
             elems = xrange(left, right)
         else:
-            elems = [round(_vars.evalMath(i)) for i in args]
+            elems = [round(_vars.evalMath(i, guild.id)) for i in args]
         if not "f" in flags:
             valid = True
             for e in elems:
@@ -936,7 +936,7 @@ class seek:
             data = argv.split(":")
             mult = 1
             while len(data):
-                pos += _vars.evalMath(data[-1]) * mult
+                pos += _vars.evalMath(data[-1], guild.id) * mult
                 data = data[:-1]
                 if mult <= 60:
                     mult *= 60
@@ -1079,7 +1079,7 @@ class volume:
                     "Current audio settings for **" + guild.name + "**:\n```json\n"
                     + str(auds.stats).replace("'", '"') + "```"
                 )
-            orig = _vars.queue[guild.id].stats[op]
+            orig = _vars.updaters["playlists"].audio[guild.id].stats[op]
             if op in "loop shuffle quiet":
                 num = bool(orig)
             else:
@@ -1110,8 +1110,8 @@ class volume:
                     "```css\nSuccessfully reset all audio settings for "
                     + uniStr(guild.name) + ".```"
                 )
-        origVol = _vars.queue[guild.id].stats
-        val = roundMin(float(_vars.evalMath(argv) / 100))
+        origVol = _vars.updaters["playlists"].audio[guild.id].stats
+        val = roundMin(float(_vars.evalMath(argv, guild.id) / 100))
         orig = round(origVol[op] * 100, 9)
         new = round(val * 100, 9)
         if op in "loop shuffle quiet":
@@ -1288,10 +1288,10 @@ class player:
     async def _callback_(self, message, guild, channel, reaction, _vars, perm, vals, **void):
         if message is None:
             return
-        if not guild.id in _vars.queue:
+        if not guild.id in _vars.updaters["playlists"].audio:
             await message.clear_reactions()
             return
-        auds = _vars.queue[guild.id]
+        auds = _vars.updaters["playlists"].audio[guild.id]
         if reaction is None:
             auds.player = {
                 "time": inf,
@@ -1462,6 +1462,8 @@ class updateQueues:
     name = "playlists"
 
     def __init__(self):
+        self.audio = {}
+        self.audiocache = {}
         self.clearAudioCache()
 
     def sendUpdateRequest(self, **void):
@@ -1492,7 +1494,7 @@ class updateQueues:
 
     def clearAudioCache(self):
         _vars = self._vars
-        pl = _vars.data["playlists"]
+        pl = self.data
         should_cache = {}
         for g in pl:
             for i in pl[g]:
@@ -1512,7 +1514,7 @@ class updateQueues:
 
     async def __call__(self, **void):
         _vars = self._vars
-        pl = _vars.data["playlists"]
+        pl = self.data
         client = _vars.client
         should_cache = {}
         for g in pl:
@@ -1520,11 +1522,12 @@ class updateQueues:
                 should_cache[i["id"]] = True
         for vc in client.voice_clients:
             if not vc.is_connected():
+                await vc.disconnect(force=True)
                 continue
             channel = vc.channel
             guild = channel.guild
             try:
-                auds = _vars.queue[guild.id]
+                auds = self.audio[guild.id]
                 playing = auds.is_playing and vc.is_playing() or auds.is_loading
                 membs = channel.members
                 for memb in membs:
@@ -1536,7 +1539,7 @@ class updateQueues:
             if not cnt or getattr(auds, "dead", 0):
                 try:
                     channel = auds.channel
-                    _vars.queue.pop(guild.id)
+                    self.audio.pop(guild.id)
                     msg = (
                         "```css\n🎵 Successfully disconnected from "
                         + uniStr(guild.name) + ". 🎵```"
@@ -1565,8 +1568,8 @@ class updateQueues:
                         if not e_id:
                             dels.append(i)
                             continue
-                        if e_id in _vars.audiocache:
-                            e["duration"] = _vars.audiocache[e_id][0]
+                        if e_id in self.audiocache:
+                            e["duration"] = self.audiocache[e_id][0]
                     if len(dels) > 1:
                         q.delitems(dels)
                     elif len(dels):
@@ -1578,7 +1581,7 @@ class updateQueues:
                                 should_cache[e_id] = True
                                 if not q[i].get("download", 0):
                                     q[i]["download"] = 1
-                                    if e_id not in _vars.audiocache:
+                                    if e_id not in self.audiocache:
                                         search = e_id + ".mp3"
                                         found = False
                                         for path in os.listdir("cache"):
@@ -1586,7 +1589,7 @@ class updateQueues:
                                                 found = True
                                         if not found:
                                             durc = [q[i]["duration"]]
-                                            _vars.audiocache[e_id] = durc
+                                            self.audiocache[e_id] = durc
                                             doParallel(
                                                 ytdl.downloadSingle,
                                                 [q[i], durc],
@@ -1605,7 +1608,7 @@ class updateQueues:
                                 q[0]["download"] = 2
                                 name = q[0]["name"]
                                 added_by = q[0]["added by"]
-                                auds = _vars.queue[guild.id]
+                                auds = self.audio[guild.id]
                                 auds.new(path)
                                 if not vc.is_playing():
                                     vc.play(auds, after=self.sendUpdateRequest)
@@ -1642,14 +1645,14 @@ class updateQueues:
                             q.append(d)
                 except KeyError as ex:
                     print(traceback.format_exc())
-            l = list(_vars.audiocache)
+            l = list(self.audiocache)
             for i in l:
                 if not i in should_cache:
                     path = "cache/" + i + ".mp3"
                     try:
                         os.remove(path)
-                        _vars.audiocache.pop(i)
+                        self.audiocache.pop(i)
                     except PermissionError:
                         pass
                     except FileNotFoundError:
-                        _vars.audiocache.pop(i)
+                        self.audiocache.pop(i)

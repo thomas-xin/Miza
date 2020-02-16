@@ -12,7 +12,7 @@ class purge:
         self.description = "Deletes a number of messages from a certain user in current channel."
         self.usage = "<1:user{bot}(?a)> <0:count[1]> <hide(?h)>"
 
-    async def __call__(self, client, _vars, argv, args, channel, name, flags, perm, **void):
+    async def __call__(self, client, _vars, argv, args, channel, name, flags, perm, guild, **void):
         t_user = -1
         if "a" in flags or "everyone" in argv or "here" in argv:
             t_user = None
@@ -22,11 +22,11 @@ class purge:
             if len(args) < 1:
                 count = 1
             else:
-                count = round(_vars.evalMath(args[0]))
+                count = round(_vars.evalMath(args[0], guild.id))
         else:
             a1 = args[0]
             a2 = " ".join(args[1:])
-            count = round(_vars.evalMath(a2))
+            count = round(_vars.evalMath(a2, guild.id))
             if t_user == -1:
                 t_user = await _vars.fetch_user(_vars.verifyID(a1))
         if t_user != client.user:
@@ -110,7 +110,7 @@ class ban:
                     )
             tm = 0
         else:
-            tm = _vars.evalMath(args[1])
+            tm = _vars.evalMath(args[1], guild.id)
         await channel.trigger_typing()
         if len(args) >= 3:
             msg = args[2]
@@ -241,8 +241,8 @@ class defaultPerms:
                 "```css\nCurrent default permission level for " + uniStr(guild.name)
                 + ": " + uniStr(currPerm) + ".```"
                 )
-        s_perm = _vars.getPerms(user, guild)
-        c_perm = _vars.evalMath(argv)
+        s_perm = _vars.getPerms(user, guild.id)
+        c_perm = _vars.evalMath(argv, guild.id)
         if s_perm < c_perm + 1 or c_perm is nan:
             raise PermissionError(
                 "Insufficient priviliges to change default permission level for " + uniStr(guild.name)
@@ -288,7 +288,7 @@ class rainbowRole:
         if len(args) < 2:
             delay = 6
         else:
-            delay = _vars.evalMath(" ".join(args[1:]))
+            delay = _vars.evalMath(" ".join(args[1:]), guild.id)
         for r in guild.roles:
             if role in r.name.lower():
                 if "d" in flags:

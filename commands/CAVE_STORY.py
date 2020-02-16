@@ -362,10 +362,10 @@ class cs_mem2flag:
         self.description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
         self.usage = "<0:address> <1:value[1]>"
 
-    async def __call__(self, _vars, args, **void):
+    async def __call__(self, _vars, args, guild, **void):
         if len(args) < 2:
             return "```css\n" + _m2f(args[0], 1) + "```"
-        return "```css\n" + _m2f(args[0], _vars.evalMath(" ".join(args[1:]))) + "```"
+        return "```css\n" + _m2f(args[0], _vars.evalMath(" ".join(args[1:]), guild.id)) + "```"
 
 
 class cs_hex2xml:
