@@ -363,7 +363,7 @@ class cs_hex2xml:
 
     async def __call__(self, argv, channel, **void):
         hacks = {}
-        hack = argv.replace(" ", "").replace("`", "")
+        hack = argv.replace(" ", "").replace("`", "").strip("\n")
         while len(hack):
             try:
                 i = hack.index("0x")

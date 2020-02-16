@@ -19,7 +19,7 @@ from matplotlib import pyplot as plt
 from sympy.parsing.sympy_parser import parse_expr
 
 mp = mpmath.mp
-mp.dps = 128
+mp.dps = 256
 
 math.round = round
 
@@ -1723,6 +1723,19 @@ lookup time for all elements. Includes many array and numeric operations."""
     def fill(self, value):
         data = (value,) * len(self.data)
         self.__init__(data)
+
+    @blocking
+    def clip(self, a, b=None):
+        if b is None:
+            b = -a
+        a, b = sorted(a, b)
+        d = self.data
+        for i in d:
+            if d[i] < a:
+                d[i] = a
+            elif d[i] > b:
+                d[i] = b
+        return self
 
     @waiting
     def real(self):

@@ -741,6 +741,8 @@ class queue:
             else:
                 total_duration -= elapsed
             total_duration = max(total_duration / auds.speed, dur / 128 + frand(0.5) + 2)
+            if auds.stats["shuffle"]:
+                added = shuffle(list(added))
             q.extend(added)
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")
@@ -1104,7 +1106,7 @@ class dump:
             else:
                 url = _vars.verifyURL(argv)
             response = [None]
-            doParallel(downloadText, [url], response)
+            doParallel(downloadTextFile, [url], response)
             while response[0] is None:
                 asyncio.sleep(0.1)
             s = response[0]
@@ -1113,7 +1115,8 @@ class dump:
                 s = s[:-4]
         except:
             s = argv
-        d = json.loads(s)
+            print(traceback.format_exc())
+        d = json.loads(s.strip("\n"))
         q = d["queue"]
         for e in q:
             e["added by"] = user.name
