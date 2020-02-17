@@ -2,3 +2,5 @@ __pycache__
 *.json
 *.yml
 cache
+saves
+log.txt
