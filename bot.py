@@ -29,6 +29,13 @@ class main_data:
         ".dump",
         ".fromfile",
     ]
+    cache = {
+        "guilds": {},
+        "channels": {},
+        "users": {},
+        "messages": {},
+    }
+    cachelim = 16384
 
     class userGuild:
 
@@ -64,8 +71,6 @@ class main_data:
             os.mkdir("saves/")
         self.initBuiltins()
         self.lastCheck = time.time()
-        self.fig = fig
-        self.plt = plt
         f = open(self.authdata)
         auth = ast.literal_eval(f.read())
         f.close()
@@ -77,9 +82,11 @@ class main_data:
         self.guilds = 0
         self.blocked = 0
         self.doUpdate = False
+        self.busy = False
         self.updated = False
-        self.message_cache = {}
         self.suffix = ">>> "
+        self.fig = fig
+        self.plt = plt
         print("Initialized.")
 
     def run(self):
@@ -103,7 +110,11 @@ class main_data:
             if user is None:
                 raise EOFError
         except:
+            if u_id in self.cache["users"]:
+                return self.cache["users"][u_id]
             user = await client.fetch_user(u_id)
+        self.cache["users"][u_id] = user
+        self.limitCache()
         return user
 
     async def fetch_guild(self, g_id):
@@ -113,7 +124,11 @@ class main_data:
             if guild is None:
                 raise EOFError
         except:
+            if g_id in self.cache["guilds"]:
+                return self.cache["guilds"][g_id]
             guild = await client.fetch_guild(g_id)
+        self.cache["guilds"][g_id] = guild
+        self.limitCache()
         return guild
 
     async def fetch_channel(self, c_id):
@@ -123,32 +138,31 @@ class main_data:
             if channel is None:
                 raise EOFError
         except:
+            if c_id in self.cache["channels"]:
+                return self.cache["channels"][c_id]
             channel = await client.fetch_channel(c_id)
+        self.cache["channels"][c_id] = channel
+        self.limitCache()
         return channel
 
     async def fetch_message(self, m_id, channel=None, user=None):
         m_id = int(m_id)
         message = None
-        if m_id in self.message_cache:
-            message = self.message_cache[m_id]
+        if m_id in self.cache["messages"]:
+            return self.cache["messages"][m_id]
         if message is None and user is not None and user.id != client.user.id:
             try:
                 message = await user.fetch_message(m_id)
-                if message is not None:
-                    self.message_cache[m_id] = message
             except discord.NotFound:
                 pass
         if message is None and channel is not None:
             try:
                 message = await channel.fetch_message(m_id)
-                if message is not None:
-                    self.message_cache[m_id] = message
             except discord.NotFound:
                 pass
-        lim = 10000
-        while len(self.message_cache) > lim:
-            i = iter(self.message_cache)
-            self.message_cache.pop(next(i))
+        if message is not None:
+            self.cache["messages"][m_id] = message
+            self.limitCache()
         return message
 
     async def getDM(self, user):
@@ -161,6 +175,16 @@ class main_data:
         if channel is None:
             channel = await user.create_dm()
         return channel
+
+    def limitCache(self, cache=None):
+        if cache is not None:
+            cache = [self.cache[cache]]
+        else:
+            cache = self.cache.values()
+        for c in cache:
+            if len(c) > self.cachelim:
+                i = iter(c)
+                c.pop(next(i))
 
     def isSuspended(self, u_id):
         u_id = int(u_id)
@@ -221,6 +245,7 @@ class main_data:
                             self.data[name] = var.data = {}
                     var._vars = self
                     obj = var()
+                    obj.busy = False
                     self.updaters[obj.name] = obj
                     updates.append(obj)
                     #print("Successfully loaded updater " + obj.__name__ + ".")
@@ -248,16 +273,17 @@ class main_data:
         self.codeSize = totalsize
 
     def update(self):
-        count = 0
+        saved = hlist()
         try:
-            for u in self.updaters.values():
+            for i in self.updaters:
+                u = self.updaters[i]
                 if getattr(u, "update", None) is not None:
-                    count += u.update(True)
-            self.updated = False
+                    if u.update(True):
+                        saved.append(i)
         except Exception as ex:
             print(traceback.format_exc())
-        if count:
-            print("Autosaved " + str(count) + " save file" + "s" * (count != 1) + ".")
+        if saved:
+            print("Autosaved " + str(saved) + ".")
 
     def verifyID(self, value):
         return int(str(value).replace("<", "").replace(">", "").replace("@", "").replace("!", ""))
@@ -594,25 +620,30 @@ class main_data:
 
     async def handleUpdate(self, force=False):
         if force or time.time() - self.lastCheck > 0.5:
-            #print("Sending update...")
-            guilds = len(client.guilds)
-            if guilds != self.guilds:
-                self.guilds = guilds
-                u = await self.fetch_user(self.owner_id)
-                n = u.name
-                gamestr = (
-                    "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s")
-                    + " place, to " + uniStr(guilds) + " server"
-                    + "s" * (guilds != 1) + "!"
-                )
-                print("Playing " + gamestr)
-                game = discord.Game(gamestr)
-                await client.change_presence(
-                    activity=game,
-                )
-            self.lastCheck = time.time()
-            for u in self.updaters.values():
-                asyncio.create_task(u())
+            while self.busy:
+                await asyncio.sleep(0.1)
+            self.busy = True
+            try:
+                #print("Sending update...")
+                guilds = len(client.guilds)
+                if guilds != self.guilds:
+                    self.guilds = guilds
+                    u = await self.fetch_user(self.owner_id)
+                    n = u.name
+                    gamestr = (
+                        "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s")
+                        + " place, to " + uniStr(guilds) + " server"
+                        + "s" * (guilds != 1) + "!"
+                    )
+                    print("Playing " + gamestr)
+                    game = discord.Game(gamestr)
+                    await client.change_presence(activity=game)
+                self.lastCheck = time.time()
+                for u in self.updaters.values():
+                    asyncio.create_task(u())
+            except:
+                print(traceback.format_exc())
+            self.busy = False
 
     def printMessage(self, message, channel, suffix=False):
         data = (
@@ -1108,8 +1139,8 @@ async def on_raw_reaction_remove(payload):
 @client.event
 async def on_raw_message_delete(payload):
     m_id = payload.message_id
-    if m_id in _vars.message_cache:
-        _vars.message_cache.pop(m_id)
+    if m_id in _vars.cache["messages"]:
+        _vars.cache["messages"].pop(m_id)
     await _vars.handleUpdate()
 
 

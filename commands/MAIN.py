@@ -313,17 +313,9 @@ class restart:
                     print(traceback.format_exc())
                     time.sleep(0.1)
         _vars.update()
-        if perm is nan:
-            for i in range(64):
-                try:
-                    if "log.txt" in os.listdir():
-                        os.remove("log.txt")
-                except:
-                    print(traceback.format_exc())
-                    time.sleep(0.1)
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
-        for i in range(64):
+        for i in range(5):
             try:
                 f = open(_vars.heartbeat, "wb")
                 f.close()
@@ -336,6 +328,15 @@ class restart:
         except:
             del client
         del _vars
+        if perm is nan:
+            for i in range(8):
+                try:
+                    if "log.txt" in os.listdir():
+                        os.remove("log.txt")
+                    break
+                except:
+                    print(traceback.format_exc())
+                    time.sleep(0.1)
         sys.exit()
 
 

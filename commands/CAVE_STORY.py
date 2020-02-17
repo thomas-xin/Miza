@@ -254,6 +254,7 @@ def orgConv(org, wave, fmt):
 
 class cs_org2xm:
     is_command = True
+    time_consuming = True
     fmts = [
         "mp3",
         "ogg",
@@ -354,6 +355,7 @@ class cs_mem2flag:
 
 class cs_hex2xml:
     is_command = True
+    time_consuming = True
 
     def __init__(self):
         self.name = ["cs_h2x"]
@@ -429,6 +431,7 @@ class cs_hex2xml:
 
 class cs_npc:
     is_command = True
+    time_consuming = True
 
     def __init__(self):
         self.name = []
@@ -469,6 +472,7 @@ class cs_npc:
 
 class cs_tsc:
     is_command = True
+    time_consuming = True
 
     def __init__(self):
         self.name = []
@@ -509,6 +513,7 @@ class cs_tsc:
 
 class cs_mod:
     is_command = True
+    time_consuming = True
 
     def __init__(self):
         self.name = ["cs_search"]

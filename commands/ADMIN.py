@@ -69,7 +69,7 @@ class purge:
             return (
                 "```css\nDeleted " + uniStr(deleted)
                 + " message" + "s" * (deleted != 1) + "!```"
-                )
+            )
 
 
 class ban:
@@ -77,12 +77,12 @@ class ban:
     server_only = True
 
     def __init__(self):
-        self.name = []
+        self.name = ["bans", "unban"]
         self.min_level = 3
         self.description = "Bans a user for a certain amount of hours, with an optional reason."
-        self.usage = "<0:user> <1:hours[]> <2:reason[]> <hide(?h)>"
+        self.usage = "<0:user> <1:hours[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
 
-    async def __call__(self, _vars, args, user, channel, guild, flags, perm, **void):
+    async def __call__(self, _vars, args, user, channel, guild, flags, perm, name, **void):
         update = self.data["bans"].update
         bans = _vars.data["bans"]
         dtime = datetime.datetime.utcnow().timestamp()
@@ -101,13 +101,31 @@ class ban:
                     + ".\nRequired level: " + uniStr(t_perm + 1)
                     + ", Current level: " + uniStr(s_perm) + "."
                 )
-        if len(args) < 2:
+        if name == "unban":
+            tm = -1
+            args = ["", ""]
+        elif len(args) < 2:
             if t_user is None:
-                g_bans = bans.setdefault(guild.id, {})
-                return (
-                    "Currently banned users from **" + guild.name + "**:\n```json\n"
-                    + str(g_bans).replace("'", '"') + "```"
+                g_bans = await getBans(_vars, guild)
+                if not g_bans:
+                    return (
+                        "```css\nNo currently banned users for "
+                        + uniStr(guild.name) + ".```"
                     )
+                output = ""
+                for u_id in g_bans:
+                    user = await _vars.fetch_user(u_id)
+                    output += (
+                        "[" + user.name + "] "
+                        + uniStr(sec2Time(g_bans[u_id]["unban"] - dtime))
+                    )
+                    if "v" in flags:
+                        output += " .ID: " + str(user.id)
+                    output += " .Reason: " + str(g_bans[u_id]["reason"]) + "\n"
+                return (
+                    "Currently banned users from **" + guild.name + "**:\n```css\n"
+                    + output.strip("\n") + "```"
+                )
             tm = 0
         else:
             tm = _vars.evalMath(args[1], guild.id)
@@ -117,15 +135,19 @@ class ban:
         else:
             msg = None
         g_id = guild.id
-        g_bans = bans.setdefault(g_id, {})
+        g_bans = await getBans(_vars, guild)
         if t_user is None:
             if not "c" in flags:
                 response = uniStr(
                     "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
                     + "REPEAT COMMAND WITH \"?C\" FLAG TO CONFIRM."
-                    )
+                )
                 return ("```asciidoc\n[" + response + "]```")
-            users = guild.members
+            if tm >= 0:
+                it = guild.fetch_members(limit=None)
+                users = await it.flatten()
+            else:
+                users = []
             for u_id in g_bans:
                 users.append(await _vars.fetch_user(u_id))
             is_banned = None
@@ -133,7 +155,7 @@ class ban:
             users = [t_user]
             is_banned = g_bans.get(t_user.id, None)
             if is_banned is not None:
-                is_banned = is_banned[0] - dtime
+                is_banned = is_banned["unban"] - dtime
                 if len(args) < 2:
                     return (
                         "```css\nCurrent ban for " + uniStr(t_user.name)
@@ -144,17 +166,22 @@ class ban:
                 return (
                     "```css\n" + uniStr(t_user.name)
                     + " is currently not banned from " + uniStr(guild.name) + ".```"
-                    )
+                )
         response = "```css"
         for t_user in users:
             secs = tm * 3600
             if tm >= 0:
                 try:
-                    await guild.ban(t_user, reason=msg, delete_message_days=0)
+                    asyncio.create_task(guild.ban(t_user, reason=msg, delete_message_days=0))
+                    await asyncio.sleep(0.1)
                 except Exception as ex:
                     response += "\nError: " + repr(ex)
                     continue
-            g_bans[t_user.id] = [secs + dtime, channel.id]
+            g_bans[t_user.id] = {
+                "unban": secs + dtime,
+                "reason": msg,
+                "channel": channel.id,
+            }
             update()
             if is_banned:
                 response += (
@@ -168,7 +195,7 @@ class ban:
                     + " has been banned from " + uniStr(guild.name)
                     + " for " + uniStr(sec2Time(secs)) + "."
                 )
-            if msg:
+            if msg is not None and tm >= 0:
                 response += " Reason: " + uniStr(msg) + "."
         if len(response) > 6 and "h" not in flags:
             return response + "```"
@@ -197,7 +224,7 @@ class roleGiver:
             return (
                 "Currently active permission givers in channel **" + channel.name
                 + "**:\n```css\n" + repr(currentSchedule) + "```"
-                )
+            )
         react = args[0].lower()
         try:
             role = float(args[1])
@@ -208,7 +235,7 @@ class roleGiver:
                     + " with value " + uniStr(role)
                     + ".\nRequred level: " + uniStr(role + 1)
                     + ", Current level: " + uniStr(perm) + "."
-                    )
+                )
             r_type = "perm"
         except ValueError:
             role = args[1].lower()
@@ -219,7 +246,7 @@ class roleGiver:
             "```css\nAdded role giver with reaction to " + uniStr(react)
             + " and " + r_type + " " + uniStr(role)
             + " to channel " + uniStr(channel.name) + ".```"
-            )
+        )
 
         
 class defaultPerms:
@@ -240,7 +267,7 @@ class defaultPerms:
             return (
                 "```css\nCurrent default permission level for " + uniStr(guild.name)
                 + ": " + uniStr(currPerm) + ".```"
-                )
+            )
         s_perm = _vars.getPerms(user, guild.id)
         c_perm = _vars.evalMath(argv, guild.id)
         if s_perm < c_perm + 1 or c_perm is nan:
@@ -249,13 +276,13 @@ class defaultPerms:
                 + " to " + uniStr(c_perm)
                 + ".\nRequred level: " + uniStr(c_perm + 1)
                 + ", Current level: " + uniStr(perm) + "."
-                )
+            )
         perms["defaults"][guild.id] = c_perm
         update()
         return (
             "```css\nChanged default permission level of " + uniStr(guild.name)
             + " to " + uniStr(c_perm) + ".```"
-            )
+        )
 
 
 class rainbowRole:
@@ -279,11 +306,11 @@ class rainbowRole:
                 return (
                     "```css\nRemoved all active dynamic role colours in "
                     + uniStr(guild.name) + ".```"
-                    )
+                )
             return (
                 "Currently active dynamic role colours in **" + guild.name
                 + "**:\n```css\n" + str(guild_special) + "```"
-                )
+            )
         role = args[0].lower()
         if len(args) < 2:
             delay = 6
@@ -302,13 +329,13 @@ class rainbowRole:
         return (
             "Changed dynamic role colours for **" + guild.name
             + "** to:\n```css\n" + str(guild_special) + "```"
-            )
+        )
         
 
 follow_default = {
     "follow": False,
     "reacts": {},
-    }
+}
 
                   
 class follow:
@@ -340,7 +367,7 @@ class follow:
             return (
                 "```css\nCurrently " + uniStr("not " * (not curr["follow"]))
                 + "follow imitating in " + uniStr(guild.name) + ".```"
-                )
+            )
 
 
 class react:
@@ -369,7 +396,7 @@ class react:
                 return (
                     "Currently active auto reacts for " + uniStr(guild.name) + ":\n```json\n"
                     + str(curr) + "```"
-                    )
+                )
         a = args[0].lower()
         if "d" in flags:
             if a in curr["reacts"]:
@@ -378,7 +405,7 @@ class react:
                 return (
                     "```css\nRemoved " + uniStr(a) + " from the auto react list for "
                     + uniStr(guild.name) + ".```"
-                    )
+                )
             else:
                 raise LookupError(uniStr(a) + " is not in the auto react list.")
         curr["reacts"][a] = args[1]
@@ -386,7 +413,7 @@ class react:
         return (
             "```css\nAdded " + uniStr(a) + ": " + uniStr(args[1]) + " to the auto react list for "
             + uniStr(guild.name) + ".```"
-            )
+        )
 
 
 class updateFollows:
@@ -462,7 +489,7 @@ class updateRolegiver:
                                 r,
                                 reason="Keyword found in message.",
                                 atomic=True,
-                                )
+                            )
                             print("Granted role " + r.name + " to " + user.name + ".")
                 if deleter:
                     try:
@@ -523,44 +550,79 @@ class updateColours:
                 asyncio.create_task(self.changeColour(g, self.data[g]))
 
 
+async def getBans(_vars, guild):
+    bans = _vars.data["bans"].setdefault(guild.id, {})
+    try:
+        banlist = await guild.bans()
+    except discord.Forbidden:
+        print(traceback.format_exc())
+        print("Unable to retrieve ban list for " + guild.name + ".")
+        return []
+    for ban in banlist:
+        if ban.user.id not in bans:
+            bans[ban.user.id] = {
+                "unban": inf,
+                "reason": ban.reason,
+                "channel": None,
+            }
+    if not len(bans):
+        _vars.data["bans"].pop(guild.id)
+    return bans
+
+
 class updateBans:
     is_update = True
     name = "bans"
 
     def __init__(self):
-        pass
+        self.synced = False
 
     async def __call__(self, **void):
-        _vars = self._vars
-        dtime = datetime.datetime.utcnow().timestamp()
-        bans = self.data
-        if bans:
+        while self.busy:
+            await asyncio.sleep(0.5)
+        self.busy = True
+        try:
+            _vars = self._vars
+            dtime = datetime.datetime.utcnow().timestamp()
+            bans = self.data
             changed = False
-            for g in bans:
-                if g:
-                    bl = list(bans[g])
-                    for b in bl:
-                        if type(bans[g][b]) is list and dtime >= bans[g][b][0]:
+            if not self.synced:
+                self.synced = True
+                for guild in _vars.client.guilds:
+                    asyncio.create_task(getBans(_vars, guild))
+                changed = True
+            for g in list(bans):
+                for b in list(bans[g]):
+                    utime = bans[g][b]["unban"]
+                    if dtime >= utime:
+                        try:
+                            u_target = await _vars.fetch_user(b)
+                            g_target = await _vars.fetch_guild(g)
+                            c_id = bans[g][b]["channel"]
+                            if c_id is not None:
+                                c_target = await _vars.fetch_channel(c_id)
                             try:
-                                u_target = await _vars.fetch_user(b)
-                                g_target = await _vars.fetch_guild(g)
-                                try:
-                                    await g_target.unban(u_target)
-                                    c_target = await _vars.fetch_channel(bans[g][b][1])
+                                await g_target.unban(u_target)
+                                if c_id is not None:
                                     await c_target.send(
                                         "```css\n" + uniStr(u_target.name)
                                         + " has been unbanned from " + uniStr(g_target.name) + ".```"
-                                        )
-                                    changed = True
-                                except:
-                                    c_target = await _vars.fetch_channel(bans[g][b][1])
+                                    )
+                            except:
+                                if c_id is not None:
                                     await c_target.send(
                                         "```css\nUnable to unban " + uniStr(u_target.name)
                                         + " from " + uniStr(g_target.name) + ".```"
-                                        )
-                                    print(traceback.format_exc())
-                                bans[g].pop(b)
-                            except:
+                                    )
                                 print(traceback.format_exc())
-            if changed:
+                            bans[g].pop(b)
+                            changed = True
+                        except:
+                            print(traceback.format_exc())
+                if not len(bans[g]):
+                    bans.pop(g)
+            if changed and len(bans):
                 self.update()
+        except:
+            print(traceback.format_exc())
+        self.busy = False
