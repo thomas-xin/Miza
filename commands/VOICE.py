@@ -1,5 +1,5 @@
 import discord, urllib, json, youtube_dl
-from subprocess import check_output, CalledProcessError, STDOUT
+from subprocess import check_output, CalledProcessError
 from scipy.signal import butter, sosfilt
 from smath import *
 
@@ -13,19 +13,19 @@ class customAudio(discord.AudioSource):
     empty = numpy.zeros(length >> 1, float)
     bass = butter(2, 1/7, btype="low", output="sos")
     treble = butter(2, 1/7, btype="high", output="sos")
-    filt = butter(1, 1/4, btype="low", output="sos")
+    filt = butter(1, 1/7, btype="low", output="sos")
     defaults = {
-            "volume": 1,
-            "reverb": 0,
-            "pitch": 0,
-            "speed": 1,
-            "bassboost": 0,
-            "chorus": 0,
-            "loop": False,
-            "shuffle": False,
-            "quiet": False,
-            "position": 0,
-        }
+        "volume": 1,
+        "reverb": 0,
+        "pitch": 0,
+        "speed": 1,
+        "bassboost": 0,
+        "chorus": 0,
+        "loop": False,
+        "shuffle": False,
+        "quiet": False,
+        "position": 0,
+    }
 
     def __init__(self, channel, _vars):
         try:
@@ -94,6 +94,7 @@ class customAudio(discord.AudioSource):
             else:
                 d["options"] = ""
             if pitchscale != 1:
+                #br = getBitrate(source)
                 d["options"] += ",asetrate=r=" + str(48000 * pitchscale)
             if self.reverse:
                 d["options"] += ",areverse"
@@ -326,29 +327,58 @@ async def createPlayer(auds, p_type=0, verbose=False):
 
 def getDuration(filename):
     command = [
-        'ffprobe', 
-        '-v', 
-        'error', 
-        '-show_entries', 
-        'format=duration', 
-        '-of', 
-        'default=noprint_wrappers=1:nokey=1', 
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
         filename,
     ]
     try:
-        output = check_output(command, stderr=STDOUT).decode()
-    except CalledProcessError as e:
-        output = e.output.decode()
+        output = check_output(command).decode()
+    except:
+        print(traceback.format_exc())
+        output = "N/A"
     try:
         i = output.index("\r")
         output = output[:i]
     except ValueError:
-        pass
+        output = "N/A"
     if output == "N/A":
         n = 0
     else:
         n = roundMin(float(output))
-    #print(n)
+    return max(1 / (1 << 24), n)
+
+
+def getBitrate(filename):
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=bit_rate",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        filename,
+    ]
+    try:
+        output = check_output(command).decode()
+    except:
+        print(traceback.format_exc())
+        output = "N/A"
+    print(output)
+    try:
+        i = output.index("\r")
+        output = output[:i]
+    except ValueError:
+        output = "N/A"
+    if output == "N/A":
+        n = 0
+    else:
+        n = roundMin(float(output))
     return max(1 / (1 << 24), n)
 
 
@@ -581,7 +611,7 @@ class videoDownloader:
                 "name": data["title"],
                 "duration": data["duration"],
                 "url": data["webpage_url"],
-                }]
+            }]
             it = data[-1]
             i["name"] = it["name"]
             i["duration"] = it["duration"]
