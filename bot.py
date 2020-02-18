@@ -417,6 +417,7 @@ class main_data:
         "compile",
         "exec",
         "eval",
+        "input",
     ]
 
     def initBuiltins(self):

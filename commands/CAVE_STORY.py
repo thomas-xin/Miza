@@ -3,6 +3,7 @@ from subprocess import check_output, CalledProcessError
 from prettytable import PrettyTable as ptable
 from smath import *
 
+FFRuntimeError = ffmpy.FFRuntimeError
 
 knackpy.__builtins__["print"] = print
 ffmpy.__builtins__["print"] = print
