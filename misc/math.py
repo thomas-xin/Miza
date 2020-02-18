@@ -61,6 +61,6 @@ while True:
     s = repr(evalSym(*i)) + "\n"
     stdout.write(s)
     stdout.flush()
-    f = open("temp.txt", "a")
-    f.write(s)
-    f.close()
+##    f = open("temp.txt", "a")
+##    f.write(s)
+##    f.close()
