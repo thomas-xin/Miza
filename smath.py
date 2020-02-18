@@ -2335,8 +2335,8 @@ def subFunc(key, com, data_in, timeout):
         proc.stdin.flush()
         out = [None]
         err = [None]
-        a = doParallel(proc.stdout.readline, [], out)
-        b = doParallel(proc.stderr.readline, [], err)
+        a = doParallel(proc.stdout.readline, [], out, name=str(random.random()))
+        b = doParallel(proc.stderr.readline, [], err, name=str(random.random()))
         while out[0] is None and err[0] is None:
             #sys.stdout.write(str(round(time.time() - t, 3)) + "\n")
             if time.time() - t > timeout:
@@ -2348,11 +2348,11 @@ def subFunc(key, com, data_in, timeout):
             rerr += proc.stderr.read()
             raise RuntimeError(rerr)
     except Exception as ex:
-        a.kill()
-        b.kill()
         proc.kill()
         __subs.pop(key)
         return repr(ex)
+    a.kill()
+    b.kill()
     return [resp]
 
 
