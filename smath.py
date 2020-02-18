@@ -1448,7 +1448,7 @@ def dhms(s):
         output = "0" + output
     if s >= 60:
         temp = str((s // 60) % 60)
-        if len(temp) < 2 and s > 3600:
+        if len(temp) < 2 and s >= 3600:
             temp = "0" + temp
         output = temp + ":" + output
         if s >= 3600:
