@@ -22,11 +22,13 @@ class purge:
             if len(args) < 1:
                 count = 1
             else:
-                count = round(_vars.evalMath(args[0], guild.id))
+                num = await _vars.evalMath(args[0], guild.id)
+                count = round(num)
         else:
             a1 = args[0]
             a2 = " ".join(args[1:])
-            count = round(_vars.evalMath(a2, guild.id))
+            num = await _vars.evalMath(a2, guild.id)
+            count = round(num)
             if t_user == -1:
                 t_user = await _vars.fetch_user(_vars.verifyID(a1))
         if t_user != client.user:
@@ -128,7 +130,7 @@ class ban:
                 )
             tm = 0
         else:
-            tm = _vars.evalMath(args[1], guild.id)
+            tm = await _vars.evalMath(args[1], guild.id)
         await channel.trigger_typing()
         if len(args) >= 3:
             msg = args[2]
@@ -269,7 +271,7 @@ class defaultPerms:
                 + ": " + uniStr(currPerm) + ".```"
             )
         s_perm = _vars.getPerms(user, guild.id)
-        c_perm = _vars.evalMath(argv, guild.id)
+        c_perm = await _vars.evalMath(argv, guild.id)
         if s_perm < c_perm + 1 or c_perm is nan:
             raise PermissionError(
                 "Insufficient priviliges to change default permission level for " + uniStr(guild.name)
@@ -315,7 +317,7 @@ class rainbowRole:
         if len(args) < 2:
             delay = 6
         else:
-            delay = _vars.evalMath(" ".join(args[1:]), guild.id)
+            delay = await _vars.evalMath(" ".join(args[1:]), guild.id)
         for r in guild.roles:
             if role in r.name.lower():
                 if "d" in flags:

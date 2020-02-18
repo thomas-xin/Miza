@@ -1,5 +1,4 @@
 import requests, csv, knackpy, ast, discord, urllib, os, ffmpy
-from subprocess import check_output, CalledProcessError
 from prettytable import PrettyTable as ptable
 from smath import *
 
@@ -209,7 +208,7 @@ def getDuration(filename):
         filename,
     ]
     try:
-        output = check_output(command).decode()
+        output = subprocess.check_output(command).decode()
     except:
         print(traceback.format_exc())
         output = "N/A"
@@ -382,7 +381,8 @@ class cs_mem2flag:
     async def __call__(self, _vars, args, guild, **void):
         if len(args) < 2:
             return "```css\n" + _m2f(args[0], 1) + "```"
-        return "```css\n" + _m2f(args[0], _vars.evalMath(" ".join(args[1:]), guild.id)) + "```"
+        num = await _vars.evalMath(" ".join(args[1:]), guild.id)
+        return "```css\n" + _m2f(args[0], num) + "```"
 
 
 class cs_hex2xml:

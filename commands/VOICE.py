@@ -1,5 +1,4 @@
 import discord, urllib, json, youtube_dl
-from subprocess import check_output, CalledProcessError
 from scipy.signal import butter, sosfilt
 from smath import *
 
@@ -337,7 +336,7 @@ def getDuration(filename):
         filename,
     ]
     try:
-        output = check_output(command).decode()
+        output = subprocess.check_output(command).decode()
     except:
         print(traceback.format_exc())
         output = "N/A"
@@ -365,7 +364,7 @@ def getBitrate(filename):
         filename,
     ]
     try:
-        output = check_output(command).decode()
+        output = subprocess.check_output(command).decode()
     except:
         print(traceback.format_exc())
         output = "N/A"
@@ -736,7 +735,7 @@ class queue:
             doParallel(ytdl.search, [argv], output)
             await channel.trigger_typing()
             while output[0] is None:
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.3)
             res = output[0]
             if type(res) is str:
                 raise ConnectionError(res)
@@ -838,7 +837,7 @@ class playlist:
                 + s + "```"
             )
         if "d" in flags:
-            i = _vars.evalMath(argv, guild.id)
+            i = await _vars.evalMath(argv, guild.id)
             temp = pl[i]
             pl.pop(i)
             update()
@@ -851,7 +850,7 @@ class playlist:
         doParallel(ytdl.search, [argv, True], output)
         await channel.trigger_typing()
         while output[0] is None:
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.3)
         res = output[0]
         if type(res) is str:
             raise ConnectionError(res)
@@ -972,16 +971,20 @@ class remove:
             if len(l) > 2:
                 raise ValueError("Too many arguments for range input.")
             if l[0]:
-                left = round(_vars.evalMath(l[0], guild.id))
+                num = await _vars.evalMath(l[0], guild.id)
+                left = round(num)
             else:
                 left = 0
             if l[1]:
-                right = round(_vars.evalMath(l[1], guild.id))
+                num = await _vars.evalMath(l[1], guild.id)
+                right = round(num)
             else:
                 right = len(auds.queue)
             elems = xrange(left, right)
         else:
-            elems = [round(_vars.evalMath(i, guild.id)) for i in args]
+            elems = [0 for i in args]
+            for i in range(len(args)):
+                elems[i] = await _vars.evalMath(args[i], guild.id)
         if not "f" in flags:
             valid = True
             for e in elems:
@@ -1094,7 +1097,7 @@ class seek:
             data = argv.split(":")
             mult = 1
             while len(data):
-                pos += _vars.evalMath(data[-1], guild.id) * mult
+                pos += await _vars.evalMath(data[-1], guild.id) * mult
                 data = data[:-1]
                 if mult <= 60:
                     mult *= 60
@@ -1155,7 +1158,7 @@ class dump:
             response = [None]
             doParallel(downloadTextFile, [url], response)
             while response[0] is None:
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.3)
             s = response[0]
             s = s[s.index("{"):]
             if s[-4:] == "\n```":
@@ -1271,7 +1274,8 @@ class volume:
                     + uniStr(guild.name) + ".```"
                 )
         origVol = _vars.updaters["playlists"].audio[guild.id].stats
-        val = roundMin(float(_vars.evalMath(argv, guild.id) / 100))
+        num = await _vars.evalMath(argv, guild.id)
+        val = roundMin(float(num / 100))
         orig = round(origVol[op] * 100, 9)
         new = round(val * 100, 9)
         if op in "loop shuffle quiet":
@@ -1645,8 +1649,8 @@ class updateQueues:
                     t = time.time()
                     doParallel(ytdl.extractSingle, [i], returns)
                     while returns[0] is None and time.time() - t < 10:
-                        await asyncio.sleep(0.1)
-                    await asyncio.sleep(0.2)
+                        await asyncio.sleep(0.3)
+                    await asyncio.sleep(0.4)
                 except:
                     print(traceback.format_exc())
         await asyncio.sleep(1)
@@ -1674,7 +1678,7 @@ class updateQueues:
 
     async def __call__(self, **void):
         while self.busy:
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.3)
         self.busy = True
         try:
             _vars = self._vars

@@ -1,6 +1,5 @@
 import discord, os, sys, datetime, json
 import urllib.request
-import smath
 from smath import *
 
 sys.path.insert(1, "commands")
@@ -67,8 +66,6 @@ class main_data:
             os.mkdir("cache/")
         if not os.path.exists("saves/"):
             os.mkdir("saves/")
-        self.initBuiltins()
-        self.lastCheck = time.time()
         f = open(self.authdata)
         auth = ast.literal_eval(f.read())
         f.close()
@@ -79,6 +76,7 @@ class main_data:
         self.current_channel = None
         self.guilds = 0
         self.blocked = 0
+        self.lastCheck = 0
         self.doUpdate = False
         self.busy = False
         self.updated = False
@@ -401,76 +399,8 @@ class main_data:
     }
     utrans = "".maketrans(umap)
 
-    def verifyCommand(self, func):
-        f1 = func.translate(self.mtrans)
-        f2 = f1.translate(self.ctrans)
-        for d in self.disabled:
-            if d in f1:
-                raise PermissionError("\"" + d + "\" is not enabled.")
-        return f2, f1
-
     def verifyURL(self, f):
         return f.strip(" ").translate(self.utrans)
-
-    removed = [
-        "open",
-        "compile",
-        "exec",
-        "eval",
-        "input",
-    ]
-
-    def initBuiltins(self):
-        d = dict(smath.__builtins__)
-        if type(d) is not dict:
-            d = d.__dict__()
-        for i in self.removed:
-            d.pop(i)
-        builtins = d
-        d = dict(builtins)
-        d.update(smath.__dict__)
-        removed = (
-            "os",
-            "sys",
-            "ast",
-            "collections",
-            "asyncio",
-            "threading",
-            "pickle",
-            "traceback",
-            "matplotlib",
-            "parse_expr",
-            "pickled",
-            "dynamicFunc",
-            "performAction",
-            "_parallel",
-            "doParallel",
-            "killThreads",
-            "waitParallel",
-            "processes",
-            "logClear",
-        )
-        for i in removed:
-            d.pop(i)
-        for i in list(d.keys()):
-            if "__" in i:
-                d.pop(i)
-        d["__name__"] = "__main__"
-        d["__doc__"] = "A multipurpose Discord bot."
-        for k in d:
-            curr = d[k]
-            if getattr(curr, "__globals__", None) is not None:
-                curr.__globals__["__builtins__"] = builtins
-            if getattr(curr, "__builtins__", None) is not None:
-                curr.__builtins__ = builtins
-##            if getattr(curr, "__class__", None) is not None:
-##                temp = curr.__class__.__bases__
-##                for i in temp:
-##                    if getattr(i, "__subclasses__", None) is not None:
-##                        i.__subclasses__ = lambda: []
-        ast.__builtins__["compile"] = compile
-        collections.__builtins__["exec"] = exec
-        self.builtins = d
 
     def getVar(self, g_id):
         var = self.updaters["variables"]
@@ -486,41 +416,35 @@ class main_data:
             )
         return data[g_id].data
 
-    def doMath(self, f, g_id):
-        try:
-            var = self.getVar(g_id)
-            att = 0
-            for f in self.verifyCommand(f):
-                try:
-                    answer = eval(f, var)
-                    break
-                except:
-                    try:
-                        exec(f, var)
-                        self.updaters["variables"].update()
-                        answer = None
-                        break
-                    except:
-                        if att >= 1:
-                            raise
-                att += 1
-        except Exception as ex:
-            answer = "\nError: " + repr(ex)
-        if answer is not None:
-            answer = str(answer)
-        return answer
+    async def evalMath(self, f, guild):
+        r = await self.solveMath(f, guild, 16, 0)
+        return float(r[0])
 
-    def evalMath(self, f, guild):
+    async def solveMath(self, f, guild, prec, r):
         try:
             g_id = guild.id
         except AttributeError:
             g_id = int(guild)
-        var = self.getVar(g_id)
-        f1, f2 = self.verifyCommand(f)
-        try:
-            return eval(f1, var)
-        except:
-            return eval(f2, var)
+        args = [
+            g_id,
+            "python misc/math.py",
+            str(f) + "`" + str(prec) + "`" + str(r) + "\n",
+            self.timeout / 2,
+            ]
+        print(args)
+        returns = [None]
+        doParallel(subFunc, args, returns)
+        t = time.time()
+        while returns[0] is None:
+            await asyncio.sleep(0.2)
+        resp = returns[0]
+        print(resp)
+        if type(resp) is str:
+            raise eval(resp)
+        resp = eval(resp[0].strip("\n"))
+        if type(resp) is str:
+            raise eval(resp)
+        return resp
 
     def getLineCount(self, fn):
         #print(fn)
@@ -934,7 +858,7 @@ async def inputLoop():
             msg[0] = None
             ch = updateChannel()
             while msg[0] is None:
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.2)
             proc = msg[0]
             if not proc:
                 _vars.print(end="")
@@ -1026,7 +950,7 @@ async def updateLoop():
             await _vars.handleUpdate()
             t = time.time()
             while time.time() - t < frand(2) + 2:
-                await asyncio.sleep(0.01)
+                await asyncio.sleep(0.03)
                 if _vars.doUpdate:
                     await _vars.handleUpdate(True)
                     _vars.doUpdate = False

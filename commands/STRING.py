@@ -44,10 +44,10 @@ class math:
     time_consuming = True
 
     def __init__(self):
-        self.name = ["python"]
+        self.name = ["python", "py", "sympy", "m"]
         self.min_level = 0
-        self.description = "Evaluates a math formula using Python syntax."
-        self.usage = "<function>"
+        self.description = "Evaluates a math formula."
+        self.usage = "<function> <verbose(?v)> <rationalize(?r)>"
 
     async def __call__(self, _vars, argv, channel, flags, guild, **void):
         tm = time.time()
@@ -55,49 +55,15 @@ class math:
         _vars.plt.clf()
         if not len(f):
             raise EOFError("Function is empty.")
-        terr = self
-        returns = [BaseException]
-        doParallel(_vars.doMath, [f, guild.id], returns)
-        while returns[0] is BaseException and time.time() < tm + _vars.timeout / 2:
-            await asyncio.sleep(0.1)
-        if returns[0] == BaseException:
-            raise TimeoutError("Request timed out.")
+        r = "r" in flags
+        p = ("v" in flags) * 2 + 1 << 6
+        resp = await _vars.solveMath(f, guild, p, r)
         if _vars.fig.get_axes():
             fn = "cache/temp.png"
             _vars.plt.savefig(fn, bbox_inches="tight")
             f = discord.File(fn)
             return {"file": f}
-        else:
-            answer = returns[0]
-            if answer is None:
-                if "h" in flags:
-                    return
-                return "```py\n" + argv + " successfully executed!```"
-            elif "\nError: " in answer:
-                return "```py" + answer + "\n```", 1
-            else:
-                return "```py\n" + argv + " = " + str(answer) + "\n```"
-
-
-class clear:
-    is_command = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 2
-        self.description = "Deletes all stored variables for the current server."
-        self.usage = ""
-
-    async def __call__(self, guild, **void):
-        try:
-            del self._vars.updaters["variables"].data[guild.id]
-            _vars.updaters["variables"].update()
-        except KeyError:
-            pass
-        return (
-            "```css\nSuccessfully deleted all stored variables for "
-            + uniStr(guild.name) + ".```"
-        )
+        return "```py\n" + str(f) + " = " + "\n".join(str(i) for i in resp) + "```"
 
 
 class uni2hex:
@@ -171,20 +137,3 @@ class translate:
                     if t == trans[-1]:
                         raise
         return response + end
-
-
-class updateVariables:
-    is_update = True
-    name = "variables"
-
-    def create(self):
-        return pickled({"__builtins__": self._vars.builtins}, ("__builtins__",))
-
-    def __init__(self):
-        for g in self.data:
-            if self.data[g] is not None:
-                self.data[g].data["__builtins__"] = self._vars.builtins
-                self.data[g].ignore("__builtins__")
-
-    async def __call__(self):
-        pass

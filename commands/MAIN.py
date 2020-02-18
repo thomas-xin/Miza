@@ -143,7 +143,7 @@ class perms:
             print(t_user)
             t_perm = _vars.getPerms(t_user.id, guild)
         else:
-            c_perm = _vars.evalMath(" ".join(args[1:]), guild.id)
+            c_perm = await _vars.evalMath(" ".join(args[1:]), guild.id)
             s_user = user
             s_perm = perm
             if "everyone" in args[0] or "here" in args[0]:
@@ -344,7 +344,7 @@ class suspend:
     is_command = True
 
     def __init__(self):
-        self.name = ["block"]
+        self.name = ["block", "blacklist"]
         self.min_level = nan
         self.description = "Prevents a user from accessing the bot's commands. Overrides ~perms."
         self.usage = "<0:user> <1:value[]>"
@@ -361,7 +361,7 @@ class suspend:
             )
         else:
             user = await _vars.fetch_user(_vars.verifyID(args[0]))
-            change = _vars.evalMath(args[1], guild.id)
+            change = await _vars.evalMath(args[1], guild.id)
             susp[user.id] = change
             update()
             return (
@@ -381,7 +381,8 @@ class loop:
         self.usage = "<0:iterations> <1:command> <hide(?h)>"
 
     async def __call__(self, args, argv, message, callback, _vars, flags, perm, guild, **void):
-        iters = round(float(_vars.evalMath(args[0], guild.id)))
+        num = await _vars.evalMath(args[0], guild.id)
+        iters = round(num)
         scale = 3
         limit = perm * scale
         if iters > limit:
@@ -451,6 +452,7 @@ class updateSuspended:
                     elif self.suspended[susp] > 86400 * 3:
                         self.suspended[susp] += 86400 * (2 + frand(4))
                     self.suspended[susp] += time.time() + 86400
+                self.suspended[susp] = float(self.suspended[susp])
                 print(susp, (self.suspended[susp] - time.time()) / 86400)
                 if (self.suspended[susp] - time.time()) / 86400 >= self._vars.min_suspend - 1:
                     self.lastsusp = susp

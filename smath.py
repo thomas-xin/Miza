@@ -2,23 +2,25 @@
 Adds many useful math-related functions.
 """
 
-import os, sys, asyncio, threading, time, traceback, ctypes, collections, ast, copy, pickle
+import os, sys, asyncio, threading, subprocess, time, traceback, ctypes, collections, ast, copy, pickle
 import random, math, cmath, fractions, mpmath, sympy, shlex, matplotlib, numpy, tinyarray, colorsys
 
 from scipy import interpolate, special
+from sympy.parsing.sympy_parser import parse_expr
+
+CalledProcessError = subprocess.CalledProcessError
 
 np = numpy
 array = tinyarray.array
 deque = collections.deque
 
-random.seed(random.random() + time.time() % 1)
-#sympy.init_printing(use_unicode=True)
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
-from sympy.parsing.sympy_parser import parse_expr
+fig = plt.figure()
 
+random.seed(random.random() + time.time() % 1)
 mp = mpmath.mp
-mp.dps = 256
+mp.dps = 64
 
 math.round = round
 
@@ -51,25 +53,6 @@ mobius = sympy.ntheory.mobius
 
 TRUE, FALSE = True, False
 true, false = True, False
-
-def diff(string):
-    func = parse_expr(string)
-    return str(sympy.diff(func))
-
-def intg(string):
-    func = parse_expr(string)
-    return str(sympy.integrate(func))
-
-def simplify(string):
-    func = parse_expr(string)
-    return str(func)
-
-def solve(string):
-    func = parse_expr(string)
-    return sympy.solve(func)
-
-derivative = differentiate = diff
-integral = integrate = intg
 
 def shuffle(it):
     if type(it) is list:
@@ -133,92 +116,6 @@ def sort(it, key=lambda x: x, reverse=False):
             return it
         except TypeError:
             raise TypeError("Sorting " + type(it) + " is not supported.")
-
-def tryFunc(func, *args, force=False, amax, **kwargs):
-    try:
-        ans = nan
-        ans = func(*args, **kwargs)
-        if not (ans > -amax and ans < amax):
-            raise OverflowError
-    except:
-        if force:
-            ans = 0
-        else:
-            if ans.imag:
-                ans = nan
-            elif ans > amax:
-                ans = inf
-            elif ans < amax:
-                ans = -inf
-            else:
-                ans = nan
-    return ans
-
-def plot(*args,**kwargs):
-    args = list(args)
-    flip = False
-    if type(args[0]) is str:
-        s = args[0]
-        if s[0] == "y":
-            try:
-                t = s.index("=")
-                s = s[t + 1:]
-            except ValueError:
-                pass
-        f = eval("lambda x: " + s)
-        try:
-            f(0)
-        except ArithmeticError:
-            pass
-        except NameError as ex1:
-            if s[0] == "x":
-                try:
-                    t = s.index("=")
-                    s = s[t + 1:]
-                except ValueError:
-                    pass
-            f = eval("lambda y: " + s)
-            try:
-                f(0)
-            except ArithmeticError:
-                pass
-            except NameError as ex2:
-                raise NameError(str(ex1) + ", " + str(ex2))
-            flip = True
-        args = [f] + args[1:]
-    if callable(args[0]):
-        amax = 100
-        if len(args) < 2:
-            r = float(2 * tau)
-            c = float(-tau)
-        elif len(args) < 3:
-            r = args[1] * 2
-            c = -args[1]
-        else:
-            r = abs(args[2]-args[1])
-            c = min(args[2], args[1])
-            if len(args) >= 4:
-                amax = args[3]
-        size = 1024
-        array1 = array(range(size)) / size * r + c
-        array2 = [
-            tryFunc(
-                args[0],
-                array1[i],
-                force=(i == 0 or i == len(array1) - 1),
-                amax=amax
-            ) for i in range(len(array1))
-        ]
-        if flip:
-            args = [array2, array1]
-        else:
-            args = [array1, array2]
-    if len(args) < 3:
-        cols = "rgbcmy"
-        args.append("-" + cols[xrand(len(cols))])
-    return plt.plot(*args)
-
-fig = plt.figure()
 
 def nop(*args):
     pass
@@ -2362,12 +2259,12 @@ class pickled:
 
     def __init__(self, obj=None, ignore=()):
         self.data = obj
-        self.ignores = hlist(ignore)
+        self.ignores = {}
         self.__str__ = obj.__str__
         self.__dict__.update(getattr(obj, "__dict__", {}))
 
     def ignore(self, item):
-        self.ignores.append(item)
+        self.ignores[item] = True
 
     def __repr__(self):
         c = dict(self.data)
@@ -2413,6 +2310,50 @@ def performAction(action):
         y = action[0]()
     if len(action) > 4:
         action[2][action[3]] = y
+
+
+__subs = {}
+
+
+def subFunc(key, com, data_in, timeout):
+    def readline(proc):
+        return proc.stdout.readline()
+    proc = __subs.setdefault(
+        key,
+        subprocess.Popen(
+            com,
+            text=True,
+            universal_newlines=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    )
+    try:
+        t = time.time()
+        proc.stdin.write(str(data_in))
+        proc.stdin.flush()
+        out = [None]
+        err = [None]
+        a = doParallel(proc.stdout.readline, [], out)
+        b = doParallel(proc.stderr.readline, [], err)
+        while out[0] is None and err[0] is None:
+            #sys.stdout.write(str(round(time.time() - t, 3)) + "\n")
+            if time.time() - t > timeout:
+                raise TimeoutError("Request timed out.")
+            time.sleep(0.001)
+        resp = out[0]
+        rerr = err[0]
+        if rerr:
+            rerr += proc.stderr.read()
+            raise RuntimeError(rerr)
+    except Exception as ex:
+        a.kill()
+        b.kill()
+        proc.kill()
+        __subs.pop(key)
+        return repr(ex)
+    return [resp]
 
 
 class _parallel:
@@ -2510,6 +2451,7 @@ Performs an action using parallel threads."""
                 d = xrand(processes.max)
                 p = ps[d]
         p(func, data_in, data_out, i, delay)
+    return p
     #print(time.time() - t)
 
 
