@@ -7,13 +7,12 @@ import random, math, cmath, fractions, mpmath, sympy, shlex, matplotlib, numpy, 
 
 from scipy import interpolate, special
 
-
 np = numpy
 array = tinyarray.array
 deque = collections.deque
 
 random.seed(random.random() + time.time() % 1)
-sympy.init_printing(use_unicode=True)
+#sympy.init_printing(use_unicode=True)
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 from sympy.parsing.sympy_parser import parse_expr
@@ -81,11 +80,12 @@ def shuffle(it):
         random.shuffle(it)
         return it
     elif type(it) is dict:
-        ir = list(it)
-        random.shuffle(ir)
-        r = tuple(it.values())
-        for i in range(len(ir)):
-            it[ir[i]] = r[i]
+        ir = sorted(it, key=lambda x: random.random())
+        new = {}
+        for i in ir:
+            new[i] = it[i]
+        it.clear()
+        it.update(new)
         return it
     elif type(it) is deque:
         it = list(it)
@@ -104,6 +104,35 @@ def shuffle(it):
             return it
         except TypeError:
             raise TypeError("Shuffling " + type(it) + " is not supported.")
+
+def sort(it, key=lambda x: x, reverse=False):
+    if type(it) is list:
+        it.sort(key=key, reverse=reverse)
+        return it
+    elif type(it) is tuple:
+        it = sorted(it, key=key, reverse=reverse)
+        return it
+    elif type(it) is dict:
+        ir = sorted(it, key=key, reverse=reverse)
+        new = {}
+        for i in ir:
+            new[i] = it[i]
+        it.clear()
+        it.update(new)
+        return it
+    elif type(it) is deque:
+        it = sorted(it, key=key, reverse=reverse)
+        return deque(it)
+    elif isinstance(it, hlist):
+        hlist(sorted(it, key=key, reverse=reverse))
+        return it
+    else:
+        try:
+            it = list(it)
+            it.sort(key=key, reverse=reverse)
+            return it
+        except TypeError:
+            raise TypeError("Sorting " + type(it) + " is not supported.")
 
 def tryFunc(func, *args, force=False, amax, **kwargs):
     try:

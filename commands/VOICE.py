@@ -3,7 +3,6 @@ from subprocess import check_output, CalledProcessError
 from scipy.signal import butter, sosfilt
 from smath import *
 
-
 youtube_dl.__builtins__["print"] = print
 
 
@@ -132,6 +131,7 @@ class customAudio(discord.AudioSource):
                     + C + ":"
                     + D + "\""
                 )
+            d["options"] = ("-q:a 8 " + d["options"]).strip(" ")
             if pos != 0:
                 d["before_options"] = "-ss " + str(pos)
             print(d)
@@ -806,15 +806,19 @@ class playlist:
             req = 2
             if perm < req:
                 raise PermissionError(
-                    "Insufficient privileges to modify default playlist for " + uniStr(guild.name)
-                    + ". Required level: " + uniStr(req) + ", Current level: " + uniStr(perm) + "."
+                    "Insufficient privileges to modify default playlist for "
+                    + uniStr(guild.name) + ". Required level: "
+                    + uniStr(req) + ", Current level: " + uniStr(perm) + "."
                 )
         pl = pl.setdefault(guild.id, [])
         if not argv:
             if "d" in flags:
                 pl[guild.id] = []
                 update()
-                return "```css\nRemoved all entries from the default playlist for " + uniStr(guild.name) + ".```"
+                return (
+                    "```css\nRemoved all entries from the default playlist for "
+                    + uniStr(guild.name) + ".```"
+                )
             if "v" in flags:
                 return (
                     "Current default playlist for **" + guild.name + "**: ```json\n"
@@ -839,7 +843,8 @@ class playlist:
             pl.pop(i)
             update()
             return (
-                "```css\nRemoved " + uniStr(noSquareBrackets(temp["name"])) + " from the default playlist for "
+                "```css\nRemoved " + uniStr(noSquareBrackets(temp["name"]))
+                + " from the default playlist for "
                 + uniStr(guild.name) + ".```"
             )
         output = [None]
@@ -861,9 +866,13 @@ class playlist:
                 "id": e["id"],
             })
         if len(names):
-            pl.sort(key=lambda x: x["name"][0].lower())
+            pl.sort(key=lambda x: x["name"].lower())
             update()
-            return "```css\nAdded " + uniStr(names) + " to the default playlist for " + uniStr(guild.name) + ".```"
+            return (
+                "```css\nAdded " + uniStr(names)
+                + " to the default playlist for "
+                + uniStr(guild.name) + ".```"
+            )
         
 
 class join:
@@ -918,7 +927,10 @@ class leave:
         for vclient in client.voice_clients:
             if guild.id == vclient.channel.guild.id:
                 await vclient.disconnect(force=True)
-                return "```css\n🎵 Successfully disconnected from " + uniStr(guild.name) + ". 🎵```", 1
+                return (
+                    "```css\n🎵 Successfully disconnected from " 
+                    + uniStr(guild.name) + ". 🎵```", 1
+                )
         error = LookupError("Unable to find connected channel.")
         if error is not None:
             raise error
@@ -949,8 +961,9 @@ class remove:
         min_level = 1
         if "f" in flags and s_perm < 1:
             raise PermissionError(
-                "Insufficient permissions to force skip. Current permission level: " + uniStr(s_perm)
-                + ", required permission level: " + uniStr(min_level) + "."
+                "Insufficient permissions to force skip. Current permission level: "
+                + uniStr(s_perm) + ", required permission level: "
+                + uniStr(min_level) + "."
             )
         if not argv:
             elems = [0]
@@ -1010,7 +1023,8 @@ class remove:
                 response += (
                     "Voted to remove " + uniStr(noSquareBrackets(curr["name"]))
                     + " from the queue.\nCurrent vote count: "
-                    + uniStr(len(curr["skips"])) + ", required vote count: " + uniStr(required) + ".\n"
+                    + uniStr(len(curr["skips"])) + ", required vote count: "
+                    + uniStr(required) + ".\n"
                 )
         count = 0
         i = 0
@@ -1023,7 +1037,10 @@ class remove:
                     auds.new()
                 else:
                     q.pop(i)
-                response += uniStr(noSquareBrackets(song["name"])) + " has been removed from the queue.\n"
+                response += (
+                    uniStr(noSquareBrackets(song["name"]))
+                    + " has been removed from the queue.\n"
+                )
                 count += 1
                 continue
             else:

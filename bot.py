@@ -1,9 +1,7 @@
 import discord, os, sys, datetime, json
 import urllib.request
 import smath
-s = smath.__dict__
-s.pop("__name__")
-globals().update(s)
+from smath import *
 
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
@@ -414,76 +412,32 @@ class main_data:
     def verifyURL(self, f):
         return f.strip(" ").translate(self.utrans)
 
-    builtins_list = [
-        "abs",
-        "all",
-        "any",
-        "ascii",
-        "bin",
-        "bool",
-        "bytearray",
-        "bytes",
-        "chr",
-        "complex",
-        "dict",
-        "dir",
-        "divmod",
-        "enumerate",
-        "filter",
-        "float",
-        "format",
-        "frozenset",
-        "getattr",
-        "hash",
-        "hex",
-        "id",
-        "int",
-        "isinstance",
-        "issubclass",
-        "iter",
-        "len",
-        "list",
-        "map",
-        "max",
-        "min",
-        "next",
-        "object",
-        "oct",
-        "ord",
-        "pow",
-        "print",
-        "property",
-        "range",
-        "repr",
-        "reversed",
-        "round",
-        "set",
-        "slice",
-        "sorted",
-        "str",
-        "sum",
-        "super",
-        "tuple",
-        "type",
-        "zip",
+    removed = [
+        "open",
+        "compile",
+        "exec",
+        "eval",
     ]
 
     def initBuiltins(self):
-        d = __builtins__
+        d = dict(smath.__builtins__)
         if type(d) is not dict:
             d = d.__dict__()
-        d = {i: d[i] for i in self.builtins_list}
+        for i in self.removed:
+            d.pop(i)
+        builtins = d
+        d = dict(builtins)
         d.update(smath.__dict__)
         removed = (
             "os",
             "sys",
+            "ast",
+            "collections",
             "asyncio",
             "threading",
             "pickle",
-            "ast",
             "traceback",
             "matplotlib",
-            "mp",
             "parse_expr",
             "pickled",
             "dynamicFunc",
@@ -502,6 +456,19 @@ class main_data:
                 d.pop(i)
         d["__name__"] = "__main__"
         d["__doc__"] = "A multipurpose Discord bot."
+        for k in d:
+            curr = d[k]
+            if getattr(curr, "__globals__", None) is not None:
+                curr.__globals__["__builtins__"] = builtins
+            if getattr(curr, "__builtins__", None) is not None:
+                curr.__builtins__ = builtins
+##            if getattr(curr, "__class__", None) is not None:
+##                temp = curr.__class__.__bases__
+##                for i in temp:
+##                    if getattr(i, "__subclasses__", None) is not None:
+##                        i.__subclasses__ = lambda: []
+        ast.__builtins__["compile"] = compile
+        collections.__builtins__["exec"] = exec
         self.builtins = d
 
     def getVar(self, g_id):

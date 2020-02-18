@@ -28,6 +28,7 @@ class img:
                 key = args[0].lower()
                 url = _vars.verifyURL(args[1])
                 images[key] = url
+                sort(images)
                 imglists[guild.id] = images
                 update()
                 if not "h" in flags:

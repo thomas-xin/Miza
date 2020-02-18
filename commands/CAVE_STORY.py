@@ -1,4 +1,5 @@
 import requests, csv, knackpy, ast, discord, urllib, os, ffmpy
+from subprocess import check_output, CalledProcessError
 from prettytable import PrettyTable as ptable
 from smath import *
 
@@ -195,6 +196,34 @@ tsc_list = SheetPull(
 ##    return
 
 
+def getDuration(filename):
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        filename,
+    ]
+    try:
+        output = check_output(command).decode()
+    except:
+        print(traceback.format_exc())
+        output = "N/A"
+    try:
+        i = output.index("\r")
+        output = output[:i]
+    except ValueError:
+        output = "N/A"
+    if output == "N/A":
+        n = 0
+    else:
+        n = roundMin(float(output))
+    return max(1 / (1 << 24), n)
+
+
 def orgConv(org, wave, fmt):
     try:
         try:
@@ -238,10 +267,12 @@ def orgConv(org, wave, fmt):
                 os.remove(fn)
             except FileNotFoundError:
                 pass
+            dur = getDuration(fi)
+            br = max(64, min(256, floor(((8388608 - 1024) / dur / 128) / 16) * 16))
             ff = ffmpy.FFmpeg(
                 global_options=["-y", "-hide_banner", "-loglevel panic"],
                 inputs={fi: None},
-                outputs={"160k": "-b:a", fn: None},
+                outputs={str(br) + "k": "-b:a", fn: None},
             )
             ff.run()
         else:
