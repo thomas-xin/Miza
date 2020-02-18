@@ -1442,21 +1442,22 @@ def sec2Time(s):
 def dhms(s):
     if not isValid(s):
         return str(s)
-    output = str(round(s % 60))
+    s = round(s)
+    output = str(s % 60)
     if len(output) < 2:
         output = "0" + output
     if s >= 60:
-        temp = str(int((s // 60) % 60))
+        temp = str((s // 60) % 60)
         if len(temp) < 2 and s > 3600:
             temp = "0" + temp
         output = temp + ":" + output
         if s >= 3600:
-            temp = str(int(((s // 60) // 60) % 24))
+            temp = str((s // 3600) % 24)
             if len(temp) < 2 and s >= 86400:
                 temp = "0" + temp
             output = temp + ":" + output
             if s >= 86400:
-                output = str(int(((s // 60) // 60) // 24)) + ":" + output
+                output = str(s // 86400) + ":" + output
     else:
         output = "0:" + output
     return output
