@@ -471,8 +471,8 @@ class main_data:
             await asyncio.sleep(0.5)
             try:
                 stats += (child.cpu_percent(), child.memory_percent())
-            except:
-                print(traceback.format_exc())
+            except psutil.NoSuchProcess:
+                pass
         stats[1] *= psutil.virtual_memory().total / 100
         self.currState = stats
         return stats

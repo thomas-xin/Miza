@@ -39,6 +39,12 @@ def lim(f, **kwargs):
         f = sympy.limit(f, i, kwargs[i])
     return f
 
+def integrate(*args, **kwargs):
+    try:
+        return sympy.integrate(*args, **kwargs)
+    except ValueError:
+        return sympy.integrate(*args, sympy.Symbol("x"))
+
 _globals = dict(sympy.__dict__)
 plots = (
     "plot",
@@ -56,8 +62,8 @@ _globals.update({
     "factors": sympy.factorint,
     "factorize": sympy.primefactors,
     "factor": sympy.primefactors,
-    "intg": sympy.integrate,
-    "integral": sympy.integrate,
+    "intg": integrate,
+    "integral": integrate,
     "differentiate": sympy.diff,
     "derivative": sympy.diff,
     "derive": sympy.diff,
@@ -74,7 +80,7 @@ _globals.update({
     "i": sympy.I,
     "j": sympy.I,
     "e": sympy.E,
-    "c": 299792458,
+    "C": 299792458,
     "G": 6.6743015e-11,
 })
 pop = (
@@ -228,7 +234,7 @@ while True:
         sys.stdout.write(s)
         sys.stdout.flush()
     except Exception as ex:
-        sys.stderr.write(ex + "\n")
+        sys.stderr.write(repr(ex) + "\n")
         sys.stderr.flush()
     time.sleep(0.01)
 ##    f = open("temp.txt", "a")
