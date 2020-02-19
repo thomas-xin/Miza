@@ -3,7 +3,7 @@ Adds many useful math-related functions.
 """
 
 import os, sys, asyncio, threading, subprocess, psutil, time, traceback, ctypes, collections, ast, copy, pickle, importlib
-import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, tinyarray, colorsys
+import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys
 
 from scipy import interpolate, special
 from sympy.parsing.sympy_parser import parse_expr
@@ -11,7 +11,7 @@ from sympy.parsing.sympy_parser import parse_expr
 CalledProcessError = subprocess.CalledProcessError
 
 np = numpy
-array = tinyarray.array
+array = numpy.array
 deque = collections.deque
 
 random.seed(random.random() + time.time() % 1)
