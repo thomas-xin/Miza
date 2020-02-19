@@ -1,5 +1,5 @@
 from time import time, sleep
-from sys import argv, stdout, stdin
+from sys import argv, stdout, stdin, exit
 from math import *
 import sympy
 from sympy import *
@@ -202,10 +202,10 @@ def readline(stream):
     t = time()
     while not "\n" in output:
         if time() - t > 900:
-            sys.exit(1)
+            exit(1)
         c = stream.read(1)
         output += c
-    return output    
+    return output
 
 
 while True:

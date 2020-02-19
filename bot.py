@@ -202,71 +202,73 @@ class main_data:
         return False
 
     def getModule(self, module):
-        #print(main_data)
-        rename = module.lower()
-        print("Loading module " + rename + "...")
-        mod = __import__(module)
-        commands = hlist()
-        updates = hlist()
-        vd = mod.__dict__
-        for k in vd:
-            var = vd[k]
-            try:
-                var.is_command
-                var._vars = self
-                obj = var()
-                obj.data = {}
-                obj.__name__ = var.__name__
-                obj.name.append(obj.__name__)
-                commands.append(obj)
-                #print("Successfully loaded command " + obj.__name__ + ".")
-            except AttributeError:
+        try:
+            #print(main_data)
+            rename = module.lower()
+            print("Loading module " + rename + "...")
+            mod = __import__(module)
+            commands = hlist()
+            updates = hlist()
+            vd = mod.__dict__
+            for k in vd:
+                var = vd[k]
                 try:
-                    var.is_update
-                    if getattr(var, "name", None):
-                        name = var.name
-                        var.file = "saves/" + name + ".json"
-                        var.update = main_data.updatePart
-                        var.updated = False
-                        try:
-                            f = open(var.file, "rb")
-                            s = f.read()
-                            if not s:
-                                raise FileNotFoundError
-                            self.data[name] = var.data = eval(s)
-                            f.close()
-                        except FileNotFoundError:
-                            self.data[name] = var.data = {}
+                    var.is_command
                     var._vars = self
                     obj = var()
-                    obj.busy = False
-                    self.updaters[obj.name] = obj
-                    updates.append(obj)
-                    #print("Successfully loaded updater " + obj.__name__ + ".")
+                    obj.data = {}
+                    obj.__name__ = var.__name__
+                    obj.name.append(obj.__name__)
+                    commands.append(obj)
+                    #print("Successfully loaded command " + obj.__name__ + ".")
                 except AttributeError:
-                    pass
-        for u in updates:
-            for c in commands:
-                c.data[u.name] = u
-        self.categories[rename] = commands
+                    try:
+                        var.is_update
+                        if getattr(var, "name", None):
+                            name = var.name
+                            var.file = "saves/" + name + ".json"
+                            var.update = main_data.updatePart
+                            var.updated = False
+                            try:
+                                f = open(var.file, "rb")
+                                s = f.read()
+                                if not s:
+                                    raise FileNotFoundError
+                                self.data[name] = var.data = eval(s)
+                                f.close()
+                            except FileNotFoundError:
+                                self.data[name] = var.data = {}
+                        var._vars = self
+                        obj = var()
+                        obj.busy = False
+                        self.updaters[obj.name] = obj
+                        updates.append(obj)
+                        #print("Successfully loaded updater " + obj.__name__ + ".")
+                    except AttributeError:
+                        pass
+            for u in updates:
+                for c in commands:
+                    c.data[u.name] = u
+            self.categories[rename] = commands
+        except:
+            print(traceback.format_exc())
 
     def getModules(self):
-        files = [f for f in os.listdir("commands/") if f.endswith(".py") or f.endswith(".pyw")]
+        files = (i for i in os.listdir("commands") if iscode(i))
         self.categories = {}
         self.updaters = {}
-        totalsize = hlist(self.getLineCount("bot.py"))
-        totalsize += self.getLineCount("main.py")
-        totalsize += self.getLineCount("smath.py")
-        totalsize += self.getLineCount("misc/math.py")
-        totalsize += self.getLineCount("misc/org2xm.c")
+        totalsize = [0,0]
+        totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
+        totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p)) 
         for f in files:
-            totalsize += self.getLineCount("commands/" + f)
+            totalsize += getLineCount("commands/" + f)
             if f.endswith(".py"):
                 f = f[:-3]
             else:
                 f = f[:-4]
             doParallel(self.getModule, [f])
         self.codeSize = totalsize
+        print(files)
 
     def update(self):
         saved = hlist()
@@ -445,22 +447,6 @@ class main_data:
         if type(resp) is str:
             raise eval(resp)
         return resp
-
-    def getLineCount(self, fn):
-        #print(fn)
-        f = open(fn, "rb")
-        count = 1
-        size = 0
-        while True:
-            try:
-                i = f.read(1024)
-                if not i:
-                    raise EOFError
-                size += len(i)
-                count += i.count(b"\n")
-            except EOFError:
-                f.close()
-                return size, count
 
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:

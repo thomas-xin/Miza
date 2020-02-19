@@ -2501,6 +2501,27 @@ def waitParallel(delay):
 processes = _parallel()
 
 
+def getLineCount(fn):
+    f = open(fn, "rb")
+    count = 1
+    size = 0
+    while True:
+        try:
+            i = f.read(1024)
+            if not i:
+                raise EOFError
+            size += len(i)
+            count += i.count(b"\n")
+        except EOFError:
+            f.close()
+            return hlist((size, count))
+
+
+def iscode(fn):
+    fn = str(fn)
+    return fn.endswith(".py") or fn.endswith(".pyw")# or fn.endswith(".c") or fn.endswith(".cpp")
+
+
 def logClear():
     if os.name == 'nt':
         os.system('cls')
