@@ -3,7 +3,7 @@ Adds many useful math-related functions.
 """
 
 import os, sys, asyncio, threading, subprocess, time, traceback, ctypes, collections, ast, copy, pickle
-import random, math, cmath, fractions, mpmath, sympy, shlex, matplotlib, numpy, tinyarray, colorsys
+import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, tinyarray, colorsys
 
 from scipy import interpolate, special
 from sympy.parsing.sympy_parser import parse_expr
@@ -13,10 +13,6 @@ CalledProcessError = subprocess.CalledProcessError
 np = numpy
 array = tinyarray.array
 deque = collections.deque
-
-matplotlib.use("Agg")
-from matplotlib import pyplot as plt
-fig = plt.figure()
 
 random.seed(random.random() + time.time() % 1)
 mp = mpmath.mp
@@ -53,6 +49,18 @@ mobius = sympy.ntheory.mobius
 
 TRUE, FALSE = True, False
 true, false = True, False
+
+
+def nop(*args):
+    pass
+
+
+class freeClass:
+    
+    def __init__(self, **kwargs):
+        for i in kwargs:
+            self.__setattr__(i, kwargs[i])
+
 
 def shuffle(it):
     if type(it) is list:
@@ -117,8 +125,6 @@ def sort(it, key=lambda x: x, reverse=False):
         except TypeError:
             raise TypeError("Sorting " + type(it) + " is not supported.")
 
-def nop(*args):
-    pass
 
 phase = cmath.phase
 sin = mpmath.sin
@@ -2312,33 +2318,48 @@ def performAction(action):
         action[2][action[3]] = y
 
 
+def readline(stream):
+    output = bytes()
+    while not b"\n" in output:
+        c = stream.read(1)
+        output += c
+        if not c:
+            time.sleep(0.001)
+    return output
+    
+
 __subs = {}
 
 
-def subFunc(key, com, data_in, timeout):
-    def readline(proc):
-        return proc.stdout.readline()
-    proc = __subs.setdefault(
-        key,
-        subprocess.Popen(
+def subFunc(key, com, data_in, timeout):    
+    if key in __subs:
+        try:
+            while __subs[key].busy:
+                time.sleep(0.01)
+        except KeyError:
+            return subFunc(key, com, data_in, timeout)
+    else:
+        __subs[key] = freeClass()
+        __subs[key].busy = True
+    if isinstance(__subs[key], subprocess.Popen):
+        proc = __subs[key]
+    else:
+        proc = __subs[key] = subprocess.Popen(
             com,
-            text=True,
-            universal_newlines=True,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-    )
     try:
         t = time.time()
-        proc.stdin.write(str(data_in))
+        proc.busy = True
+        proc.stdin.write(bytes(str(data_in), "utf-8") + b"\n")
         proc.stdin.flush()
         out = [None]
         err = [None]
-        a = doParallel(proc.stdout.readline, [], out, name=str(random.random()))
-        b = doParallel(proc.stderr.readline, [], err, name=str(random.random()))
+        a = doParallel(readline, [proc.stdout], out, name=str(random.random()))
+        b = doParallel(readline, [proc.stderr], err, name=str(random.random()))
         while out[0] is None and err[0] is None:
-            #sys.stdout.write(str(round(time.time() - t, 3)) + "\n")
             if time.time() - t > timeout:
                 raise TimeoutError("Request timed out.")
             time.sleep(0.001)
@@ -2346,14 +2367,15 @@ def subFunc(key, com, data_in, timeout):
         rerr = err[0]
         if rerr:
             rerr += proc.stderr.read()
-            raise RuntimeError(rerr)
+            raise RuntimeError(rerr.decode("utf-8"))
     except Exception as ex:
         proc.kill()
         __subs.pop(key)
         return repr(ex)
-    a.kill()
-    b.kill()
-    return [resp]
+    proc.busy = False
+    a.kill(True)
+    b.kill(True)
+    return [resp.decode("utf-8")]
 
 
 class _parallel:
@@ -2381,22 +2403,17 @@ class _parallel:
             print = sys.stdout.write
             while True:
                 try:
+                    time.sleep(0.007)
                     while self.actions:
                         action = self.actions.popleft()
                         performAction(action)
                     self.state = -1
                 except TimeoutError:
                     pass
+                except KeyboardInterrupt:
+                    break
                 except:
                     print(traceback.format_exc())
-                    self.actions.clear()
-                try:
-                    time.sleep(0.007)
-                except TimeoutError:
-                    pass
-                except:
-                    print(traceback.format_exc())
-                    self.actions.clear()
 
         def stop(self):
             self._stop.set()
@@ -2408,18 +2425,25 @@ class _parallel:
                 if thread is self:
                     return t_id
 
-        def kill(self):
+        def kill(self, destroy=False):
             thread_id = self.get_id()
-            res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                thread_id, ctypes.py_object(TimeoutError)
-            )
-            if res > 1:
-                ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                    thread_id, ctypes.py_object(BaseException)
-                )
+            if destroy:
                 self.stop()
-                processes.running[self.id] = processes.new(self.id)
+                ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                    thread_id, ctypes.py_object(KeyboardInterrupt)
+                )
                 del self
+            else:
+                res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                    thread_id, ctypes.py_object(TimeoutError)
+                )
+                if res > 1:
+                    ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                        thread_id, ctypes.py_object(BaseException)
+                    )
+                    self.stop()
+                    processes.running[self.id] = processes.new(self.id)
+                    del self
 
 
 def doParallel(func, data_in=None, data_out=[0], start=0, end=None,

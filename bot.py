@@ -81,8 +81,6 @@ class main_data:
         self.busy = False
         self.updated = False
         self.suffix = ">>> "
-        self.fig = fig
-        self.plt = plt
         print("Initialized.")
 
     def run(self):
@@ -259,6 +257,8 @@ class main_data:
         totalsize = hlist(self.getLineCount("bot.py"))
         totalsize += self.getLineCount("main.py")
         totalsize += self.getLineCount("smath.py")
+        totalsize += self.getLineCount("misc/math.py")
+        totalsize += self.getLineCount("misc/org2xm.c")
         for f in files:
             totalsize += self.getLineCount("commands/" + f)
             if f.endswith(".py"):
@@ -418,7 +418,7 @@ class main_data:
 
     async def evalMath(self, f, guild):
         r = await self.solveMath(f, guild, 16, 0)
-        return float(r[0])
+        return roundMin(float(r[0]))
 
     async def solveMath(self, f, guild, prec, r):
         try:
@@ -428,9 +428,9 @@ class main_data:
         args = [
             g_id,
             "python misc/math.py",
-            str(f) + "`" + str(prec) + "`" + str(r) + "\n",
+            str(g_id) + "`" + str(f) + "`" + str(prec) + "`" + str(r),
             self.timeout / 2,
-            ]
+        ]
         print(args)
         returns = [None]
         doParallel(subFunc, args, returns)

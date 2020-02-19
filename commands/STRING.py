@@ -52,16 +52,13 @@ class math:
     async def __call__(self, _vars, argv, channel, flags, guild, **void):
         tm = time.time()
         f = argv
-        _vars.plt.clf()
         if not len(f):
             raise EOFError("Function is empty.")
         r = "r" in flags
         p = ("v" in flags) * 2 + 1 << 6
         resp = await _vars.solveMath(f, guild, p, r)
-        if _vars.fig.get_axes():
-            fn = "cache/temp.png"
-            _vars.plt.savefig(fn, bbox_inches="tight")
-            f = discord.File(fn)
+        if type(resp) is dict and "file" in resp:
+            f = discord.File(resp["file"])
             return {"file": f}
         return "```py\n" + str(f) + " = " + "\n".join(str(i) for i in resp) + "```"
 
