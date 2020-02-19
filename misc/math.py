@@ -224,7 +224,7 @@ while True:
             resp[0].save(fn)
             s = "{'file':'" + fn + "'}\n"
         else:
-            s = repr(resp).replace("oo", "inf") + "\n"
+            s = repr([str(i) for i in resp]).replace("oo", "inf") + "\n"
         sys.stdout.write(s)
         sys.stdout.flush()
     except Exception as ex:

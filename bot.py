@@ -447,7 +447,7 @@ class main_data:
         print(resp)
         if type(resp) is str:
             raise eval(resp)
-        resp = eval(resp[0].strip("\n"))
+        resp = eval(resp[0].replace("\n", "").replace("\r", ""))
         if type(resp) is str:
             raise eval(resp)
         return resp
