@@ -567,7 +567,7 @@ async def getBans(_vars, guild):
                 "reason": ban.reason,
                 "channel": None,
             }
-    if not len(bans):
+    if not len(bans) and guild.id in _vars.data["bans"]:
         _vars.data["bans"].pop(guild.id)
     return bans
 

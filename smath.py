@@ -2,7 +2,7 @@
 Adds many useful math-related functions.
 """
 
-import os, sys, asyncio, threading, subprocess, time, traceback, ctypes, collections, ast, copy, pickle
+import os, sys, asyncio, threading, subprocess, psutil, time, traceback, ctypes, collections, ast, copy, pickle, importlib
 import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, tinyarray, colorsys
 
 from scipy import interpolate, special
@@ -226,7 +226,6 @@ def round(x, y=None):
     except:
         return x
 
-
 def ceil(x):
     try:
         return math.ceil(x)
@@ -238,7 +237,6 @@ def ceil(x):
     except:
         return x
 
-
 def floor(x):
     try:
         return math.floor(x)
@@ -249,7 +247,6 @@ def floor(x):
         return math.floor(x)
     except:
         return x
-
 
 def trunc(x):
     try:
@@ -266,14 +263,11 @@ def trunc(x):
 def sqr(x):
     return ((sin(x) >= 0) << 1) - 1
 
-
 def saw(x):
     return (x / pi + 1) % 2 - 1
 
-
 def tri(x):
     return (abs((0.5 - x / pi) % 2 - 1)) * 2 - 1
-
 
 def sgn(x):
     return (((x > 0) << 1) - 1) * (x != 0)
@@ -282,14 +276,12 @@ def sgn(x):
 def frand(x=1, y=0):
     return (random.random() * max(x, y) / mpf(random.random())) % x + y
 
-
 def xrand(x, y=None, z=0):
     if y == None:
         y = 0
     if x == y:
         return x
     return random.randint(floor(min(x, y)), ceil(max(x, y)) - 1) + z
-
 
 def rrand(x=1, y=0):
     return frand(x) ** (1 - y)
@@ -361,6 +353,7 @@ def next6np(start=0):
 
 
 def isPrime(n):
+    
     def divisibility(n):
         t = min(n, 2 + ceil(log(n) ** 2))
         g = next6np()
@@ -443,7 +436,6 @@ def isPrime(n):
         return True
     return None
 
-
 def generatePrimes(a=2, b=inf, c=1):
     primes = hlist()
     a = round(a)
@@ -480,7 +472,6 @@ def addDict(a, b, replace=True):
     for k in b:
         r[k] = b[k] + a.get(k, 0)
     return r
-
 
 def subDict(d, key):
     output = dict(d)
@@ -541,7 +532,6 @@ def gcd(x, y=1):
         return x
     return x
 
-
 def lcm2(x, y=1):
     if x != y:
         x = abs(x)
@@ -559,7 +549,6 @@ def lcm2(x, y=1):
             return toFrac(x / y)[0]
     return x
 
-
 def lcm(*x):
     try:
         while True:
@@ -571,7 +560,6 @@ def lcm(*x):
         while len(x) > 1:
             x = [lcm2(x[i], x[-i - 1]) for i in range(ceil(len(x) / 2))]
     return x[-1]
-
 
 def lcmRange(x):
     primes = generatePrimes(1, x, -1)
@@ -767,7 +755,6 @@ def bytes2Hex(b):
         o += c + " "
     return o[:-1]
 
-
 def hex2Bytes(h):
     o = []
     h = h.replace(" ", "").replace("\r", "").replace("\n", "")
@@ -779,13 +766,11 @@ def hex2Bytes(h):
 def colourCalculation(a, offset=0):
     return adjColour(colorsys.hsv_to_rgb((a / 1536) % 1, 1, 1), offset, 255)
 
-
 def colour2Raw(c):
     if len(c) == 3:
         return (c[0] << 16) + (c[1] << 8) + c[2]
     else:
         return (c[0] << 16) + (c[1] << 8) + c[2] + (c[3] << 24)
-
 
 def raw2Colour(x):
     if x > 1 << 24:
@@ -793,14 +778,11 @@ def raw2Colour(x):
     else:
         return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255))
 
-
 def hex2Colour(h):
     return verifyColour(hex2Bytes(h))
 
-
 def luma(c):
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
-
 
 def verifyColour(c):
     c = list(c)
@@ -812,7 +794,6 @@ def verifyColour(c):
         c[i] = int(abs(c[i]))
     return c
 
-
 def fillColour(a):
     if type(a) is complex:
         a = a.real
@@ -823,7 +804,6 @@ def fillColour(a):
     a = round(a)
     return verifyColour([a, a, a])
 
-
 def negColour(c, t=127):
     i = luma(c)
     if i > t:
@@ -831,10 +811,8 @@ def negColour(c, t=127):
     else:
         return fillColour(255)
 
-
 def invColour(c):
     return [255 - i for i in c]
-
 
 def adjColour(colour, brightness=0, intensity=1, hue=0, bits=0, scale=False):
     if hue != 0:
@@ -895,14 +873,12 @@ def multiVectorScalarOp(dest, operator):
         output.append(s)
     return output
 
-
 def vectorVectorOp(dest, source, operator):
     expression = "dest[i]" + operator + "source[i]"
     function = eval("lambda dest,source,i: " + expression)
     for i in range(len(source)):
         dest[i] = function(dest, source, i)
     return dest
-
 
 def vectorScalarOp(dest, source, operator):
     expression = "dest[i]" + operator + str(source)
@@ -937,7 +913,6 @@ def resizeVector(v, length, mode=5):
             resizing.append(resizeVector(v, new, i / floor(mode) * 5))
         resized = numpy.mean(resizing, 0)
     return resized
-
 
 def get(v, i, mode=5):
     size = len(v)
@@ -982,13 +957,11 @@ def limitList(source, dest, direction=False):
 def randomPolarCoord(x=1):
     return polarCoords(frand(x), frand(tau))
 
-
 def polarCoords(dist, angle, pos=None):
     p = dist * array([math.cos(angle), math.sin(angle)])
     if pos is None:
         return p
     return p + pos
-
 
 def cartesianCoords(x, y, pos=None):
     if pos is None:
@@ -1010,7 +983,6 @@ def convertRect(rect, edge=0):
     dest_rect[3] -= edge
     return dest_rect
 
-
 def inRect(pos, rect, edge=0):
     dest_rect = convertRect(rect, edge)
     if pos[0] - dest_rect[0] <= 0:
@@ -1022,7 +994,6 @@ def inRect(pos, rect, edge=0):
     if pos[1] - dest_rect[3] > 0:
         return False
     return True
-
 
 def toRect(pos, rect, edge=0):
     p = list(pos)
@@ -1053,7 +1024,6 @@ def toRect(pos, rect, edge=0):
             continue
     return p, lr, ud
 
-
 def rdRect(pos, rect, edge=0):
     dest_rect = convertRect(rect, edge)
     if not inRect(pos, rect, edge):
@@ -1074,14 +1044,12 @@ def diffExpD(r, s, t):
     else:
         return log(s * (r ** t - 1), r)
 
-
 def diffExpT(r, s, d):
     coeff = d * log(r) / s + 1
     if coeff < 0:
         return inf
     else:
         return log(coeff, r)
-
 
 def predictTrajectory(src, dest, vel, spd, dec=1, boundary=None, edge=0):
     pos = array(dest)
@@ -1144,7 +1112,6 @@ def angleDifference(angle1, angle2, unit=tau):
     b = abs(angle2 - unit - angle1)
     return min(a, b)
 
-
 def angleDistance(angle1, angle2, unit=tau):
     angle1 %= unit
     angle2 %= unit
@@ -1159,7 +1126,6 @@ def frameDistance(pos1, pos2, vel1, vel2):
     line2 = [pos2 - vel2, pos2]
     return intervalIntervalDist(line1, line2)
 
-
 def intervalIntervalDist(line1, line2):
     if intervalsIntersect(line1, line2):
         return 0
@@ -1169,7 +1135,6 @@ def intervalIntervalDist(line1, line2):
         pointIntervalDist(line2[0], line1),
         pointIntervalDist(line2[1], line1)]
     return min(distances)
-
 
 def pointIntervalDist(point, line):
     px, py = point
@@ -1190,7 +1155,6 @@ def pointIntervalDist(point, line):
         dx = px - x1 - t * dx
         dy = py - y1 - t * dy
     return hypot(dx, dy)
-
 
 def intervalsIntersect(line1, line2):
     x11, y11 = line1[0]
@@ -1215,7 +1179,6 @@ def func2Array(func, size=4096):
     array = function(numpy.arange(0, period, 1 / (size + 1) * period))
     return array
 
-
 def array2Harmonics(data, precision=1024):
     output = []
     T = len(data)
@@ -1232,7 +1195,6 @@ def array2Harmonics(data, precision=1024):
                 p = 0
             output.append(numpy.array((R, p)))
     return numpy.array(output[1 : precision + 1])
-
 
 def harmonics2Array(period, harmonics, func="sin(x)"):
     expression = func
@@ -1337,10 +1299,8 @@ def timeConv(s):
         return [str(roundMin(s)) + " seconds"]
     return taken
 
-
 def sec2Time(s):
     return " ".join(timeConv(s))
-
 
 def dhms(s):
     if not isValid(s):
@@ -1369,7 +1329,6 @@ def dhms(s):
 def noSquareBrackets(s):
     return str(s).replace("[", "⦍").replace("]", "⦎")
 
-
 __fmts = [
     "𝟎𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙",
     "𝟢𝟣𝟤𝟥𝟦𝟧𝟨𝟩𝟪𝟫𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩",
@@ -1391,14 +1350,12 @@ __fmts = [
 __map = {__fmts[k][i]: __fmts[-1][i] for k in range(len(__fmts) - 1) for i in range(len(__fmts[k]))}
 __trans = "".maketrans(__map)
 
-
 def uniStr(s, fmt=0):
     if type(s) is not str:
         s = str(s)
     for i in range(len(__fmts[-1])):
         s = s.replace(__fmts[-1][i], __fmts[fmt][i])
     return s
-
 
 def reconstitute(s):
     return s.translate(__trans)
@@ -1479,7 +1436,7 @@ lookup time for all elements. Includes many array and numeric operations."""
         temp = self.data
         self.data = {}
         self.offs = 0
-        doParallel(self.deleteobj, [temp])
+        doParallel(self.deleteobj, [temp], name="deleter", killable=False)
         return self
 
     @waiting
@@ -1525,7 +1482,7 @@ lookup time for all elements. Includes many array and numeric operations."""
                 temp = self.data
                 self.data = {0: self.data[self.offs]}
                 self.offs = 0
-                doParallel(self.deleteobj, [temp])
+                doParallel(self.deleteobj, [temp], killable=False)
             return False
         self.offs = 0
         return True
@@ -2252,10 +2209,8 @@ lookup time for all elements. Includes many array and numeric operations."""
     def __copy__(self):
         return self.copy()
 
-
 def hrange(a, b=None, c=None, maxoff=__hlist_maxoff__):
     return hlist(xrange(a, b, c), maxoff)
-
 
 def hzero(size, maxoff=__hlist_maxoff__):
     return hlist((0 for i in range(size)), maxoff)
@@ -2285,6 +2240,87 @@ class pickled:
             + "''')))"
         )
 
+
+def readline(stream):
+    output = bytes()
+    while not b"\n" in output:
+        c = stream.read(1)
+        if c:
+            output += c
+        else:
+            time.sleep(0.001)
+    return output
+    
+
+__subs__ = {}
+
+def subCount():
+    return len(__subs__)
+
+def subKill():
+    global __subs__
+    for i in __subs__:
+        __subs__[i].kill()
+    __subs__ = {}
+
+def subFunc(key, com, data_in, timeout):    
+    if key in __subs__:
+        try:
+            while __subs__[key].busy:
+                time.sleep(0.01)
+        except KeyError:
+            return subFunc(key, com, data_in, timeout)
+    else:
+        __subs__[key] = freeClass()
+        __subs__[key].busy = True
+    if isinstance(__subs__[key], psutil.Popen):
+        proc = __subs__[key]
+        if not proc.is_running():
+            __subs__.pop(key)
+            del proc
+            return subFunc(key, com, data_in, timeout)
+    else:
+        proc = __subs__[key] = psutil.Popen(
+            com,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    try:
+        t = time.time()
+        proc.busy = True
+        d = bytes(str(data_in), "utf-8") + b"\n"
+        print(d)
+        proc.stdin.write(d)
+        proc.stdin.flush()
+        out = [None]
+        err = [None]
+        a = doParallel(readline, [proc.stdout], out, name=str(random.random()))
+        b = doParallel(readline, [proc.stderr], err, name=str(random.random()))
+        while out[0] is None and err[0] is None:
+            if time.time() - t > timeout:
+                raise TimeoutError("Request timed out.")
+            time.sleep(0.001)
+        resp = out[0]
+        rerr = err[0]
+        if rerr:
+            output = rerr.decode("utf-8")
+        else:
+            output = [resp.decode("utf-8")]
+    except Exception as ex:
+        print(traceback.format_exc())
+        try:
+            proc.kill()
+        except psutil.NoSuchProcess:
+            pass
+        __subs__.pop(key)
+        output = repr(ex)
+    proc.busy = False
+    a.kill()
+    b.kill()
+    return output
+
+
 class dynamicFunc:
     
     def __init__(self, func):
@@ -2297,11 +2333,12 @@ class dynamicFunc:
     def __repr__(self):
         return self.text
 
-
 def performAction(action):
     try:
         time.sleep(action[-1])
-    except:
+    except IndexError:
+        pass
+    except TypeError:
         pass
     if len(action) > 1:
         x = action[1]
@@ -2318,66 +2355,6 @@ def performAction(action):
         action[2][action[3]] = y
 
 
-def readline(stream):
-    output = bytes()
-    while not b"\n" in output:
-        c = stream.read(1)
-        output += c
-        if not c:
-            time.sleep(0.001)
-    return output
-    
-
-__subs = {}
-
-
-def subFunc(key, com, data_in, timeout):    
-    if key in __subs:
-        try:
-            while __subs[key].busy:
-                time.sleep(0.01)
-        except KeyError:
-            return subFunc(key, com, data_in, timeout)
-    else:
-        __subs[key] = freeClass()
-        __subs[key].busy = True
-    if isinstance(__subs[key], subprocess.Popen):
-        proc = __subs[key]
-    else:
-        proc = __subs[key] = subprocess.Popen(
-            com,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    try:
-        t = time.time()
-        proc.busy = True
-        proc.stdin.write(bytes(str(data_in), "utf-8") + b"\n")
-        proc.stdin.flush()
-        out = [None]
-        err = [None]
-        a = doParallel(readline, [proc.stdout], out, name=str(random.random()))
-        b = doParallel(readline, [proc.stderr], err, name=str(random.random()))
-        while out[0] is None and err[0] is None:
-            if time.time() - t > timeout:
-                raise TimeoutError("Request timed out.")
-            time.sleep(0.001)
-        resp = out[0]
-        rerr = err[0]
-        if rerr:
-            rerr += proc.stderr.read()
-            raise RuntimeError(rerr.decode("utf-8"))
-    except Exception as ex:
-        proc.kill()
-        __subs.pop(key)
-        return repr(ex)
-    proc.busy = False
-    a.kill(True)
-    b.kill(True)
-    return [resp.decode("utf-8")]
-
-
 class _parallel:
     
     def __init__(self):
@@ -2387,67 +2364,74 @@ class _parallel:
             self.running[i].start()
 
     class new(threading.Thread):
-        def __init__(self, p_id):
+        
+        def __init__(self, p_id, killable=True):
             threading.Thread.__init__(self)
+            self.killable = killable
             self.id = p_id
             self.actions = hlist()
             self.state = 0
+            self.action = None
             self.daemon = True
-            self._stop = threading.Event()
 
         def __call__(self, *action):
             self.actions.append(action)
             self.state = 1
 
         def run(self):
-            print = sys.stdout.write
             while True:
                 try:
-                    time.sleep(0.007)
+                    time.sleep(0.003 * (random.random() + 1))
                     while self.actions:
-                        action = self.actions.popleft()
-                        performAction(action)
-                    self.state = -1
+                        self.action = self.actions.popleft()
+                        performAction(self.action)
                 except TimeoutError:
                     pass
-                except KeyboardInterrupt:
-                    break
                 except:
                     print(traceback.format_exc())
-
-        def stop(self):
-            self._stop.set()
+                if type(self.id) is str:
+                    break
+                self.state = -1
 
         def get_id(self):
             if hasattr(self, "_thread_id"):
                 return self._thread_id
             for t_id, thread in threading._active.items():
                 if thread is self:
+                    self._thread_id = t_id
                     return t_id
 
         def kill(self, destroy=False):
             thread_id = self.get_id()
             if destroy:
-                self.stop()
-                ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                    thread_id, ctypes.py_object(KeyboardInterrupt)
+                res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                    thread_id,
+                    ctypes.py_object(KeyboardInterrupt),
                 )
-                del self
             else:
                 res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                    thread_id, ctypes.py_object(TimeoutError)
+                    thread_id,
+                    ctypes.py_object(TimeoutError),
                 )
-                if res > 1:
-                    ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                        thread_id, ctypes.py_object(BaseException)
-                    )
-                    self.stop()
+            if res != 1:
+                ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                    thread_id,
+                    ctypes.py_object(BaseException),
+                )
+                try:
+                    del threading._active[thread_id]
+                except KeyError:
+                    pass
+                if not destroy:
                     processes.running[self.id] = processes.new(self.id)
-                    del self
-
+            elif type(self.id) is str:
+                try:
+                    del threading._active[thread_id]
+                except KeyError:
+                    pass
 
 def doParallel(func, data_in=None, data_out=[0], start=0, end=None,
-               per=1, delay=0, maxq=64, name=None):
+               per=1, delay=0, maxq=64, name=None, killable=True):
     """
 Performs an action using parallel threads."""
     global processes
@@ -2457,8 +2441,8 @@ Performs an action using parallel threads."""
     ps = processes.running
     for i in range(start, end):
         if name is not None:
-            d = name
-            ps[d] = processes.new(d)
+            d = str(name)
+            ps[d] = processes.new(d, killable)
             p = ps[d]
             p.start()
         else:
@@ -2471,22 +2455,19 @@ Performs an action using parallel threads."""
                     break
                 t += 1
             while p.state > 1 or len(p.actions) >= maxq:
-                time.sleep(0.001)
+                time.sleep(0.005)
                 d = xrand(processes.max)
                 p = ps[d]
         p(func, data_in, data_out, i, delay)
     return p
-    #print(time.time() - t)
-
 
 def killThreads():
     global processes
     running = tuple(processes.running)
     for i in running:
-        if type(i) is int and i in processes.running:
+        if processes.running[i].killable:
             p = processes.running[i]
             p.kill()
-
 
 def waitParallel(delay):
     global processes
@@ -2528,7 +2509,6 @@ def logClear():
     else:
         os.system('clear')
 
-
 class __logPrinter():
 
     print_temp = ""
@@ -2560,8 +2540,7 @@ class __logPrinter():
         self.print_temp += str(sep).join((str(i) for i in args)) + str(end) + str(prefix)
 
     def __init__(self, file=None):
-        doParallel(self.updatePrint, [file], name="printer")
-
+        doParallel(self.updatePrint, [file], name="printer", killable=False)
 
 __printer = __logPrinter("log.txt")
 print = __printer.logPrint

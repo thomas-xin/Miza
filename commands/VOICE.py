@@ -626,15 +626,30 @@ class videoDownloader:
         return getDuration(filename)
 
 
-def downloadTextFile(url):
-    opener = urlBypass()
-    resp = opener.open(url)
-    rescode = resp.getcode()
-    if rescode != 200:
-        raise ConnectionError(rescode)
-    s = resp.read().decode("utf-8")
-    resp.close()
-    return s
+async def downloadTextFile(url):
+    
+    def dtext(url):
+        try:
+            opener = urlBypass()
+            resp = opener.open(url)
+            rescode = resp.getcode()
+            if rescode != 200:
+                raise ConnectionError(rescode)
+            s = resp.read().decode("utf-8")
+            resp.close()
+            return [s]
+        except Exception as ex:
+            print(traceback.format_exc())
+            return repr(ex)
+
+    returns = [None]
+    doParallel(dtext, [url], returns)
+    while returns[0] is None:
+        await asyncio.sleep(0.3)
+    resp = returns[0]
+    if type(resp) is str:
+        raise eval(resp)
+    return resp[0]
 
 
 ytdl = videoDownloader()
@@ -1155,11 +1170,7 @@ class dump:
                 url = message.attachments[0].url
             else:
                 url = _vars.verifyURL(argv)
-            response = [None]
-            doParallel(downloadTextFile, [url], response)
-            while response[0] is None:
-                await asyncio.sleep(0.3)
-            s = response[0]
+            s = await downloadTextFile(url)
             s = s[s.index("{"):]
             if s[-4:] == "\n```":
                 s = s[:-4]

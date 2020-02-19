@@ -20,12 +20,6 @@ class main_data:
     savedata = "data.json"
     authdata = "auth.json"
     client = client
-    disabled = [
-        ".load",
-        ".save",
-        ".dump",
-        ".fromfile",
-    ]
     cache = {
         "guilds": {},
         "channels": {},
@@ -250,25 +244,32 @@ class main_data:
                 for c in commands:
                     c.data[u.name] = u
             self.categories[rename] = commands
+            self.modules[module] = mod
         except:
             print(traceback.format_exc())
 
-    def getModules(self):
+    def getModules(self, reload=False):
         files = (i for i in os.listdir("commands") if iscode(i))
         self.categories = {}
         self.updaters = {}
         totalsize = [0,0]
         totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
-        totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p)) 
+        totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p))
+        if not hasattr(self, "modules"):
+            self.modules = {}
         for f in files:
             totalsize += getLineCount("commands/" + f)
             if f.endswith(".py"):
                 f = f[:-3]
             else:
                 f = f[:-4]
-            doParallel(self.getModule, [f])
+            if f in self.modules:
+                importlib.reload(self.modules[f])
+            else:
+                doParallel(self.getModule, [f])
         self.codeSize = totalsize
-        print(files)
+        __import__("smath", globals())
+        subKill()
 
     def update(self):
         saved = hlist()
@@ -419,7 +420,10 @@ class main_data:
         return data[g_id].data
 
     async def evalMath(self, f, guild):
-        r = await self.solveMath(f, guild, 16, 0)
+        try:
+            r = [ast.literal_eval(f)]
+        except ValueError:
+            r = await self.solveMath(f, guild, 16, 0)
         return roundMin(float(r[0]))
 
     async def solveMath(self, f, guild, prec, r):
@@ -438,7 +442,7 @@ class main_data:
         doParallel(subFunc, args, returns)
         t = time.time()
         while returns[0] is None:
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.21)
         resp = returns[0]
         print(resp)
         if type(resp) is str:
@@ -447,6 +451,31 @@ class main_data:
         if type(resp) is str:
             raise eval(resp)
         return resp
+
+    def getActive(self):
+        procs = 2 + subCount()
+        thrds = threading.active_count()
+        coros = sum(1 for i in asyncio.all_tasks())
+        return hlist((procs, thrds, coros))
+
+    async def getState(self):
+        stats = hlist((0, 0))
+        if getattr(self, "currState", None) is None:
+            self.currState = stats
+        proc = psutil.Process()
+        proc.cpu_percent()
+        await asyncio.sleep(0.5)
+        stats += (proc.cpu_percent(), proc.memory_percent())
+        for child in proc.children(True):
+            child.cpu_percent()
+            await asyncio.sleep(0.5)
+            try:
+                stats += (child.cpu_percent(), child.memory_percent())
+            except:
+                print(traceback.format_exc())
+        stats[1] *= psutil.virtual_memory().total / 100
+        self.currState = stats
+        return stats
 
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:
@@ -501,6 +530,7 @@ class main_data:
             while self.busy:
                 await asyncio.sleep(0.1)
             self.busy = True
+            asyncio.create_task(self.getState())
             try:
                 #print("Sending update...")
                 guilds = len(client.guilds)
@@ -778,7 +808,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                     orig=orig,
                     message=message,
                 )
-    if guild is None or _vars.current_channel and (channel.id == _vars.current_channel.id):
+    if guild is None or _vars.current_channel and (channel.id == _vars.current_channel.id and not edit):
         if guild is None:
             guild = main_data.userGuild(
                 user=user,
@@ -802,7 +832,7 @@ async def heartbeatLoop():
                     os.remove(_vars.heartbeat)
                 except:
                     print(traceback.format_exc())
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
     except asyncio.CancelledError:
         sys.exit()
 
@@ -836,7 +866,7 @@ async def inputLoop():
         
     print("Input Loop initiated.")
     msg = [None]
-    doParallel(sendInput, [msg], name="inputter")
+    doParallel(sendInput, [msg], name="inputter", killable=False)
     prev = hlist()
     _vars.print(end="")
     while True:
