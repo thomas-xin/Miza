@@ -64,6 +64,7 @@ _globals.update({
     "factor": sympy.primefactors,
     "intg": integrate,
     "integral": integrate,
+    "integrate": integrate,
     "differentiate": sympy.diff,
     "derivative": sympy.diff,
     "derive": sympy.diff,
