@@ -612,6 +612,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
 
     check = "<@!" + str(client.user.id) + ">"
 
+    comm = msg
     if len(msg) >= 2 and msg[0] == "~" and msg[1] != "~":
         comm = msg[1:]
         op = True
