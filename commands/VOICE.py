@@ -130,7 +130,7 @@ class customAudio(discord.AudioSource):
                     + C + ":"
                     + D + "\""
                 )
-            d["options"] = ("-b:a 192k " + d["options"]).strip(" ")
+            d["options"] = d["options"].strip(" ")
             if pos != 0:
                 d["before_options"] = "-ss " + str(pos)
             print(d)

@@ -2245,13 +2245,13 @@ class pickled:
 def readline(stream, timeout=10):
     output = bytes()
     t = time.time()
-    while not b"\n" in output and time.time() - t < timeout:
+    while b"\n" not in output and time.time() - t < timeout:
         c = stream.read(1)
-        print(c)
         if c:
             output += c
         else:
-            time.sleep(0.001)
+            time.sleep(0.002)
+    print(output)
     return output
     
 
@@ -2305,7 +2305,7 @@ def subFunc(key, com, data_in, timeout):
         proc.stdin.write(d)
         proc.stdin.flush()
         returns = [None]
-        thread = doParallel(readline, [proc.stdout, timeout], returns, name=str(random.random()))
+        thread = doParallel(readline, [proc.stdout, timeout], returns, state=2)
         while returns[0] is None:
             if time.time() - t > timeout:
                 raise TimeoutError("Request timed out.")
@@ -2464,6 +2464,7 @@ Performs an action using parallel threads."""
     if kwargs is not None:
         action["kwargs"] = kwargs
     action["func"] = func
+    action["retn"] = data_out
     p(action)
     return p
 
