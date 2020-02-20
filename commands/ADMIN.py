@@ -430,26 +430,26 @@ class updateFollows:
         u_id = message.author.id
         following = self.data
         words = text.split(" ")
-        if not edit:
-            if following[g_id]["follow"]:
-                checker = orig
-                curr = self.msgFollow.get(g_id)
-                if curr is None:
-                    curr = [checker, 1, 0]
-                    self.msgFollow[g_id] = curr
-                elif checker == curr[0] and u_id != curr[2]:
-                    curr[1] += 1
-                    if curr[1] >= 3:
-                        curr[1] = xrand(-3) + 1
-                        if len(checker):
-                            asyncio.create_task(message.channel.send(checker))
-                else:
-                    if len(checker) > 100:
-                        checker = ""
-                    curr[0] = checker
-                    curr[1] = xrand(-1, 2)
-                curr[2] = u_id
         if g_id in following:
+            if not edit:
+                if following[g_id]["follow"]:
+                    checker = orig
+                    curr = self.msgFollow.get(g_id)
+                    if curr is None:
+                        curr = [checker, 1, 0]
+                        self.msgFollow[g_id] = curr
+                    elif checker == curr[0] and u_id != curr[2]:
+                        curr[1] += 1
+                        if curr[1] >= 3:
+                            curr[1] = xrand(-3) + 1
+                            if len(checker):
+                                asyncio.create_task(message.channel.send(checker))
+                    else:
+                        if len(checker) > 100:
+                            checker = ""
+                        curr[0] = checker
+                        curr[1] = xrand(-1, 2)
+                    curr[2] = u_id
             try:
                 for r in following[g_id]["reacts"]:
                     if r in words:
