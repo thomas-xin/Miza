@@ -396,8 +396,6 @@ class main_data:
         ">": "",
         "|": "",
         "*": "",
-        "_": "",
-        "~": "",
         " ": "%20",
     }
     utrans = "".maketrans(umap)
@@ -434,7 +432,7 @@ class main_data:
         args = [
             g_id,
             "python misc/math.py",
-            str(g_id) + "`" + str(f) + "`" + str(prec) + "`" + str(r),
+            str(f) + "`" + str(prec) + "`" + str(r) + "`" + str(g_id),
             self.timeout / 2,
         ]
         print(args)

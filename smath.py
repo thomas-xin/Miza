@@ -2255,13 +2255,18 @@ def readline(stream):
 __subs__ = {}
 
 def subCount():
-    return len(__subs__)
+    count = 0
+    for i in list(__subs__):
+        if __subs__[i].is_running():
+            i += 1
+        else:
+            __subs__.pop(i)
+    return count
 
 def subKill():
-    global __subs__
-    for i in __subs__:
-        __subs__[i].kill()
-    __subs__ = {}
+    for sub in __subs__.values():
+        sub.kill()
+    __subs__.clear()
 
 def subFunc(key, com, data_in, timeout):    
     if key in __subs__:
@@ -2271,8 +2276,10 @@ def subFunc(key, com, data_in, timeout):
         except KeyError:
             return subFunc(key, com, data_in, timeout)
     else:
-        __subs__[key] = freeClass()
-        __subs__[key].busy = True
+        __subs__[key] = freeClass(
+            busy=True,
+            is_running=lambda: True
+        )
     if isinstance(__subs__[key], psutil.Popen):
         proc = __subs__[key]
         if not proc.is_running():
@@ -2286,6 +2293,7 @@ def subFunc(key, com, data_in, timeout):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
+    thread = freeClass(kill=lambda: None)
     try:
         t = time.time()
         proc.busy = True
@@ -2293,21 +2301,21 @@ def subFunc(key, com, data_in, timeout):
         print(d)
         proc.stdin.write(d)
         proc.stdin.flush()
-        out = [None]
-        err = [None]
-        a = doParallel(readline, [proc.stdout], out, name=str(random.random()))
-        b = doParallel(readline, [proc.stderr], err, name=str(random.random()))
-        while out[0] is None and err[0] is None:
+        returns = [None]
+        thread = doParallel(readline, [proc.stdout], returns, name=str(random.random()))
+        while returns[0] is None:
             if time.time() - t > timeout:
                 raise TimeoutError("Request timed out.")
             time.sleep(0.001)
-        resp = out[0]
-        rerr = err[0]
-        if rerr:
-            output = rerr.decode("utf-8")
-        else:
-            output = [resp.decode("utf-8")]
-    except Exception as ex:
+        resp = returns[0]
+        print(resp)
+        resp = eval(resp.decode("utf-8"))
+        print(resp)
+        if issubclass(resp.__class__, Exception):
+            raise resp
+        resp = str(resp)
+        output = [resp]
+    except TimeoutError as ex:
         print(traceback.format_exc())
         try:
             proc.kill()
@@ -2315,9 +2323,11 @@ def subFunc(key, com, data_in, timeout):
             pass
         __subs__.pop(key)
         output = repr(ex)
+    except Exception as ex:
+        print(traceback.format_exc())
+        output = repr(ex)
     proc.busy = False
-    a.kill()
-    b.kill()
+    thread.kill()
     return output
 
 
@@ -2381,7 +2391,9 @@ class _parallel:
         def run(self):
             while True:
                 try:
-                    time.sleep(0.003 * (random.random() + 1))
+                    time.sleep(0.009 * (random.random() + 1))
+                    if self.actions is None:
+                        return
                     while self.actions:
                         self.action = self.actions.popleft()
                         performAction(self.action)
@@ -2404,6 +2416,7 @@ class _parallel:
         def kill(self, destroy=False):
             thread_id = self.get_id()
             if destroy:
+                self.actions = None
                 res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
                     thread_id,
                     ctypes.py_object(KeyboardInterrupt),
@@ -2418,6 +2431,7 @@ class _parallel:
                     thread_id,
                     ctypes.py_object(BaseException),
                 )
+                self.actions = None
                 try:
                     del threading._active[thread_id]
                 except KeyError:
@@ -2425,6 +2439,7 @@ class _parallel:
                 if not destroy:
                     processes.running[self.id] = processes.new(self.id)
             elif type(self.id) is str:
+                self.actions = None
                 try:
                     del threading._active[thread_id]
                 except KeyError:

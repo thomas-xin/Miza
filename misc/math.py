@@ -1,4 +1,4 @@
-import sympy, math, time, sys
+import sympy, time, sys
 import sympy.parsing.sympy_parser as parser
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
@@ -45,6 +45,14 @@ def integrate(*args, **kwargs):
     except ValueError:
         return sympy.integrate(*args, sympy.Symbol("x"))
 
+def factorize(*args):
+    temp = sympy.factorint(*args)
+    output = []
+    for k in temp:
+        for i in range(temp[k]):
+            output.append(k)
+    return output
+
 _globals = dict(sympy.__dict__)
 plots = (
     "plot",
@@ -60,14 +68,19 @@ for i in plots:
 _globals.update({
     "plt": plot,
     "factors": sympy.factorint,
-    "factorize": sympy.primefactors,
-    "factor": sympy.primefactors,
+    "factorize": factorize,
+    "factor": factorize,
     "intg": integrate,
     "integral": integrate,
     "integrate": integrate,
     "differentiate": sympy.diff,
     "derivative": sympy.diff,
     "derive": sympy.diff,
+    "phase": sympy.arg,
+    "ceil": sympy.ceiling,
+    "min": sympy.Min,
+    "max": sympy.Max,
+    "fac": sympy.factorial,
     "phi": sympy.GoldenRatio,
     "tau": sympy.pi * 2,
     "deg": sympy.pi / 180,
@@ -76,8 +89,8 @@ _globals.update({
     "rad": 1,
     "radians": 1,
     "radian": 1,
-    "inf": math.inf,
-    "nan": math.nan,
+    "inf": sympy.oo,
+    "nan": sympy.nan,
     "i": sympy.I,
     "j": sympy.I,
     "e": sympy.E,
@@ -100,6 +113,7 @@ for i in pop:
 
 sym_tr = parser.standard_transformations
 sym_tr += (
+    parser.convert_xor,
     parser.implicit_multiplication_application,
     parser.rationalize,
 )
@@ -149,13 +163,13 @@ translators = {
     "ψ": "psi",
     "ω": "omega",
     "∞": "oo",
+    "ℂ": "z",
 }
 
 replacers = {
-    "inf": "oo",
-    "nan": "(oo-oo)",
     "INF": "oo",
-    "NAN": "(oo-oo)",
+    "NAN": "nan",
+    "NaN": "nan",
     "TRUE": "True",
     "FALSE": "False",
 }
@@ -163,7 +177,14 @@ replacers = {
 ftrans = "".maketrans(translators)
 
 
-def evalSym(f, prec=None, r=False):
+def convAns(f):
+    return str(f).replace("zoo", "nan").replace("oo", "inf")
+
+def prettyAns(f):
+    return sympy.pretty(f).replace("zoo", "ℂ∞").replace("nan", "NaN")
+
+
+def evalSym(f, prec=64, r=False):
     for i in replacers:
         f = f.replace(i, replacers[i])
     f = parser.parse_expr(
@@ -173,11 +194,14 @@ def evalSym(f, prec=None, r=False):
         transformations=sym_tr,
     )
     try:
-        f = simplify(f)
+        f = sympy.simplify(f)
     except:
-        return [f, ""]
-    for i in preorder_traversal(f):
-        if isinstance(i, Float):
+        p = prettyAns(f)
+        if p == convAns(f):
+            p = ""
+        return [f, p]
+    for i in sympy.preorder_traversal(f):
+        if isinstance(i, sympy.Float):
             f = f.subs(i, rounder(i))
     if prec:
         try:
@@ -189,19 +213,17 @@ def evalSym(f, prec=None, r=False):
         except TypeError:
             e = y
             for i in preorder_traversal(e):
-                if isinstance(i, Float):
+                if isinstance(i, sympy.Float):
                     e = e.subs(i, rounder(i))
         if r:
-            p = pretty(f)
-            f = str(e)
-            if p == f:
+            p = prettyAns(f)
+            if p == convAns(e):
                 p = ""
             return [f, p]
         return [e, ""]
     else:
-        f = str(f)
-        p = pretty(f)
-        if p == f:
+        p = prettyAns(f)
+        if p == convAns(f):
             p = ""
         return [f, p]
 
@@ -223,21 +245,23 @@ def readline(stream):
 while True:
     try:
         i = readline(sys.stdin).replace("\n", "").split("`")
-        key = i[0]
-        resp = evalSym(*i[1:])
+        if len(i) <= 1:
+            i.append("0")
+        key = i[-1]
+        resp = evalSym(*i[:-1])
         if isinstance(resp[0], Plot):
-            resp[0].margin = 0
+            resp[0].margin = 0.5
             fn = "cache/" + key + ".png"
-            resp[0].save(fn)
+            try:
+                resp[0].save(fn)
+            except FileNotFoundError:
+                resp[0].save(key + ".png")
             s = "{'file':'" + fn + "'}\n"
         else:
-            s = repr([str(i) for i in resp]).replace("oo", "inf") + "\n"
+            s = repr([convAns(i) for i in resp]) + "\n"
         sys.stdout.write(s)
         sys.stdout.flush()
     except Exception as ex:
-        sys.stderr.write(repr(ex) + "\n")
-        sys.stderr.flush()
+        sys.stdout.write(repr(ex) + "\n")
+        sys.stdout.flush()
     time.sleep(0.01)
-##    f = open("temp.txt", "a")
-##    f.write(s)
-##    f.close()
