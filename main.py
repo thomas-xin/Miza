@@ -1,5 +1,4 @@
 import os, sys, time, datetime, traceback, subprocess, psutil
-from smath import *
 
 def delete(f):
     while f in os.listdir():
@@ -8,13 +7,13 @@ def delete(f):
         except:
             print(traceback.format_exc())
             time.sleep(1)
-    
-name = "C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\powershell.exe"
 
 sd = "shutdown.json"
 hb = "heartbeat.json"
 
 args = [
+    "powershell",
+    "-command",
     "python",
     "bot.py",
 ]
@@ -25,12 +24,12 @@ delete(hb)
 while not sd in os.listdir():
     proc = psutil.Popen(
         args,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+##        stdin=subprocess.PIPE,
+##        stdout=subprocess.PIPE,
+##        stderr=subprocess.PIPE,
     )
     print("Bot started with PID " + str(proc.pid) + ".")
-    time.sleep(2)
+    time.sleep(24)
     try:
         print("Heartbeat started.")
         alive = True
@@ -46,8 +45,10 @@ while not sd in os.listdir():
             if hb in os.listdir():
                 alive = False
                 break
-        time.sleep(10000)
-        proc.kill()
+        try:
+            proc.kill()
+        except psutil.NoSuchProcess:
+            pass
         print("Bot closed without shutdown signal, restarting...")
     except KeyboardInterrupt:
         raise

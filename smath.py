@@ -2258,7 +2258,7 @@ def subCount():
     count = 0
     for i in list(__subs__):
         if __subs__[i].is_running():
-            i += 1
+            count += 1
         else:
             __subs__.pop(i)
     return count
