@@ -164,6 +164,7 @@ translators = {
     "ω": "omega",
     "∞": "oo",
     "ℂ": "z",
+    "ℯ": "e",
 }
 
 replacers = {
