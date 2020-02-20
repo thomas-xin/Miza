@@ -618,7 +618,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         op = True
     elif msg.startswith(check):
         comm = msg[len(check):]
-        while comm and comm[0] == " ":
+        while len(comm and comm[0] == " ":
             comm = comm[1:]
         op = True
     else:

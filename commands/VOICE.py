@@ -1196,6 +1196,7 @@ class dump:
             shuffle(q)
         if not "a" in flags:
             #print("Stopped audio playback in " + guild.name)
+            print(q)
             auds.new()
             del auds.queue
             auds.queue = hlist(q)
