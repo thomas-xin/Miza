@@ -627,22 +627,22 @@ class videoDownloader:
 
 async def downloadTextFile(url):
     
-    def dtext(url):
+    def dreader(file):
         try:
-            opener = urlBypass()
-            resp = opener.open(url)
-            rescode = resp.getcode()
-            if rescode != 200:
-                raise ConnectionError(rescode)
             s = resp.read().decode("utf-8")
             resp.close()
             return [s]
         except Exception as ex:
             print(traceback.format_exc())
             return repr(ex)
-
+        
+    opener = urlBypass()
+    resp = opener.open(url)
+    rescode = resp.getcode()
+    if rescode != 200:
+        raise ConnectionError(rescode)
     returns = [None]
-    doParallel(dtext, [url], returns, state=2)
+    doParallel(dreader, [resp], returns, state=2)
     while returns[0] is None:
         await asyncio.sleep(0.3)
     resp = returns[0]
@@ -1195,8 +1195,6 @@ class dump:
         if auds.stats["shuffle"]:
             shuffle(q)
         if not "a" in flags:
-            #print("Stopped audio playback in " + guild.name)
-            print(q)
             auds.new()
             del auds.queue
             auds.queue = hlist(q)
