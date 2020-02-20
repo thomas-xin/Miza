@@ -12,6 +12,9 @@ sd = "shutdown.json"
 hb = "heartbeat.json"
 
 args = [
+    "cmd",
+    "/c"
+    "start",
     "powershell",
     "-command",
     "python",
