@@ -615,14 +615,15 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     if len(msg) >= 2 and msg[0] == "~" and msg[1] != "~":
         comm = msg[1:]
         op = True
-    elif msg[:len(check)] == check:
+    elif msg.startswith(check):
         comm = msg[len(check):]
-        while comm[0] == " ":
+        while comm and comm[0] == " ":
             comm = comm[1:]
         op = True
     else:
         op = False
-
+    if not comm:
+        op = False
     suspended = _vars.isSuspended(u_id)
     if (suspended and op) or msg.replace(" ", "") == check:
         if not u_perm < 0 and not suspended:

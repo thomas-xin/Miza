@@ -507,7 +507,6 @@ class updateSuspended:
                     os.remove(self.suspected)
             except:
                 print(traceback.format_exc())
-            #forcePrint("Cleared.")
         _vars = self._vars
         if self.lastsusp is not None:
             u_susp = await _vars.fetch_user(self.lastsusp)
