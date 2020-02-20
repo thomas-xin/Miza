@@ -53,7 +53,7 @@ class math:
         tm = time.time()
         f = argv
         if not len(f):
-            raise EOFError("Function is empty.")
+            raise IndexError("Function is empty.")
         r = "r" in flags
         p = flags.get("v", 0) * 2 + 1 << 6
         resp = await _vars.solveMath(f, guild, p, r)
@@ -74,7 +74,7 @@ class uni2hex:
 
     async def __call__(self, argv, **void):
         if not argv:
-            raise ValueError("Input string is empty.")
+            raise IndexError("Input string is empty.")
         b = bytes(argv, "utf-8")
         return "```fix\n" + bytes2Hex(b) + "```"
 
@@ -90,7 +90,7 @@ class hex2uni:
 
     async def __call__(self, argv, **void):
         if not argv:
-            raise ValueError("Input string is empty.")
+            raise IndexError("Input string is empty.")
         b = hex2Bytes(argv.replace("0x", "").replace(" ", ""))
         return "```fix\n" + b.decode("utf-8") + "```"
 

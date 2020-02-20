@@ -295,7 +295,7 @@ class rainbowRole:
         self.name = ["colourRole"]
         self.min_level = 3
         self.description = "Causes target role to randomly change colour."
-        self.usage = "<0:role[]> <mim_delay[6]> <disable(?d)>"
+        self.usage = "<0:role[]> <mim_delay[12]> <disable(?d)>"
 
     async def __call__(self, _vars, flags, args, argv, guild, **void):
         update = self.data["rolecolours"].update
@@ -315,7 +315,7 @@ class rainbowRole:
             )
         role = args[0].lower()
         if len(args) < 2:
-            delay = 6
+            delay = 12
         else:
             delay = await _vars.evalMath(" ".join(args[1:]), guild.id)
         for r in guild.roles:
@@ -380,7 +380,7 @@ class react:
         self.name = ["autoreact"]
         self.min_level = 3
         self.description = "Causes Miza to automatically assign a reaction to messages containing the substring."
-        self.usage = "<react_to[]> <react_data[]> <disable(?d)>"
+        self.usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
 
     async def __call__(self, _vars, flags, guild, argv, args, **void):
         update = self.data["follows"].update

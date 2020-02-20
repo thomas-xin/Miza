@@ -242,7 +242,7 @@ def readline(stream):
     output = ""
     t = time.time()
     while not "\n" in output:
-        if time.time() - t > 900:
+        if time.time() - t > 86400:
             sys.exit(1)
         c = stream.read(1)
         if c:

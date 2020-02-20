@@ -491,7 +491,7 @@ class main_data:
                 msg = msg[1:]
             check = "callback-"
             msg = msg.split("\n")[0]
-            if msg[:len(check)] == check:
+            if msg.startswith(check):
                 msg = msg[len(check):]
                 args = msg.split("-")
                 catx = args[0]

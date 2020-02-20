@@ -9,9 +9,9 @@ class customAudio(discord.AudioSource):
     
     length = 1920
     empty = numpy.zeros(length >> 1, float)
-    bass = butter(2, 1/7, btype="low", output="sos")
-    treble = butter(2, 1/7, btype="high", output="sos")
-    filt = butter(1, 1/7, btype="low", output="sos")
+    bass = butter(2, 1/9, btype="low", output="sos")
+    treble = butter(2, 1/9, btype="high", output="sos")
+    filt = butter(1, 1/9, btype="low", output="sos")
     defaults = {
         "volume": 1,
         "reverb": 0,
@@ -229,7 +229,7 @@ class customAudio(discord.AudioSource):
             pitch = self.stats["pitch"]
             bassboost = self.stats["bassboost"]
             chorus = self.stats["chorus"]
-            delay = 16 #min(400, max(2, round(sndset["reverbdelay"] * 5)))
+            delay = 16
             if volume == 1 and reverb == pitch == bassboost == chorus == 0:
                 self.buffer = []
                 self.feedback = None
@@ -289,7 +289,6 @@ class customAudio(discord.AudioSource):
                         left -= sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size-16:-16]
                         right -= sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size-16:-16]
                     self.feedback = (lfeed, rfeed)
-                    #array = numpy.convolve(array, resizeVector(self.buffer[0], len(array) * 2))
                     a = 1 / 16
                     b = 1 - a
                     self.buffer.append((left * a + right * b, left * b + right * a))
@@ -1109,7 +1108,7 @@ class seek:
         self.name = []
         self.min_level = 1
         self.description = "Seeks to a position in the current audio file."
-        self.usage = "<pos[0]>"
+        self.usage = "<position[0]>"
 
     async def __call__(self, argv, _vars, guild, client, user, channel, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1150,7 +1149,7 @@ class dump:
         self.name = []
         self.min_level = 2
         self.description = "Dumps or loads the currently playing audio queue state."
-        self.usage = "<data[]> <append(?a)> <hide(?h)>"
+        self.usage = "<data{attached_file}> <append(?a)> <hide(?h)>"
 
     async def __call__(self, guild, channel, user, client, _vars, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)

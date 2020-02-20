@@ -11,7 +11,7 @@ class help:
     def __init__(self):
         self.name = ["?"]
         self.min_level = -inf
-        self.description = "Shows a list of usable commands."
+        self.description = "Shows a list of usable commands, or gives a detailed description of a command."
         self.usage = "<command{all}> <category{all}> <verbose(?v)>"
 
     async def __call__(self, args, user, channel, guild, flags, **void):
@@ -33,7 +33,7 @@ class help:
         c_name = getattr(channel, "name", "DM")
         u_perm = _vars.getPerms(user, guild)
         verb = "v" in flags
-        argv = " ".join(args).lower()
+        argv = " ".join(args).lower().replace("~", "")
         show = []
         for a in args:
             if (a in categories and a in enabled) or a == "main":

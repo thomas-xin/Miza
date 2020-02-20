@@ -330,7 +330,7 @@ class neko:
         self.name = []
         self.min_level = 1
         self.description = "Pulls a random image from nekos.life and embeds it."
-        self.usage = "<tags[]> <random(?r)> <verbose(?v)> <list(?l)>"
+        self.usage = "<tags[neko]> <random(?r)> <verbose(?v)> <list(?l)>"
 
     async def __call__(self, args, argv, flags, channel, **void):
         isNSFW = is_nsfw(channel)
@@ -427,7 +427,7 @@ class owoify:
 
     async def __call__(self, argv, **void):
         if not argv:
-            raise ValueError("Input string is empty.")
+            raise IndexError("Input string is empty.")
         output = ""
         while argv:
             output += nekos.owoify(argv[:200])
