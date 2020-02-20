@@ -185,6 +185,8 @@ def prettyAns(f):
 
 
 def evalSym(f, prec=64, r=False):
+    r = int(r)
+    prec = int(prec)
     for i in replacers:
         f = f.replace(i, replacers[i])
     f = parser.parse_expr(
@@ -220,7 +222,10 @@ def evalSym(f, prec=64, r=False):
             if p == convAns(e):
                 p = ""
             return [f, p]
-        return [e, ""]
+        p = prettyAns(f)
+        if p == convAns(e):
+            p = ""
+        return [e, p]
     else:
         p = prettyAns(f)
         if p == convAns(f):
