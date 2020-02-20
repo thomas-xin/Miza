@@ -1,4 +1,4 @@
-import sympy, time, sys
+import sympy, time, sys, traceback
 import sympy.parsing.sympy_parser as parser
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
@@ -254,7 +254,7 @@ def readline(stream):
 
 while True:
     try:
-        i = readline(sys.stdin).replace("\n", "").split("`")
+        i = eval(readline(sys.stdin)).decode("utf-8").replace("\n", "").split("`")
         if len(i) <= 1:
             i.append("0")
         key = i[-1]
