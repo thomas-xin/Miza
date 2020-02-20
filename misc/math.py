@@ -181,7 +181,12 @@ def convAns(f):
     return str(f).replace("zoo", "nan").replace("oo", "inf")
 
 def prettyAns(f):
-    return sympy.pretty(f).replace("zoo", "ℂ∞").replace("nan", "NaN")
+    return sympy.pretty(
+        f,
+        use_unicode=True,
+        num_columns=2000,
+        mat_symbol_style="bold",
+    ).replace("zoo", "ℂ∞").replace("nan", "NaN")
 
 
 def evalSym(f, prec=64, r=False):
@@ -263,8 +268,8 @@ while True:
                 resp[0].save(key + ".png")
             s = "{'file':'" + fn + "'}\n"
         else:
-            s = repr([convAns(i) for i in resp]) + "\n"
-        sys.stdout.write(s)
+            s = repr([convAns(i) for i in resp])
+        sys.stdout.write(repr(s.encode("utf-8")) + "\n")
         sys.stdout.flush()
     except Exception as ex:
         sys.stdout.write(repr(ex) + "\n")

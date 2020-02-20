@@ -48,10 +48,11 @@ while not sd in os.listdir():
             if hb in os.listdir():
                 alive = False
                 break
-        try:
-            proc.kill()
-        except psutil.NoSuchProcess:
-            pass
+        while True:            
+            try:
+                proc.kill()
+            except psutil.NoSuchProcess:
+                break
         print("Bot closed without shutdown signal, restarting...")
     except KeyboardInterrupt:
         raise

@@ -432,7 +432,7 @@ class main_data:
         args = [
             g_id,
             "python misc/math.py",
-            str(f) + "`" + str(prec) + "`" + str(r) + "`" + str(g_id),
+            str(f) + "`" + str(int(prec)) + "`" + str(int(r)) + "`" + str(g_id),
             self.timeout / 2,
         ]
         print(args)

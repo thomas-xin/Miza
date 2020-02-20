@@ -2245,6 +2245,7 @@ def readline(stream):
     output = bytes()
     while not b"\n" in output:
         c = stream.read(1)
+        print(c)
         if c:
             output += c
         else:
@@ -2307,10 +2308,11 @@ def subFunc(key, com, data_in, timeout):
             if time.time() - t > timeout:
                 raise TimeoutError("Request timed out.")
             time.sleep(0.001)
-        resp = returns[0]
+        resp = eval(returns[0])
         print(resp)
+        if issubclass(resp.__class__, Exception):
+            raise resp
         resp = eval(resp.decode("utf-8"))
-        print(resp)
         if issubclass(resp.__class__, Exception):
             raise resp
         resp = str(resp)

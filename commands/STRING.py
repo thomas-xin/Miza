@@ -55,7 +55,7 @@ class math:
         if not len(f):
             raise EOFError("Function is empty.")
         r = "r" in flags
-        p = ("v" in flags) * 2 + 1 << 6
+        p = flags.get("v", 0) * 2 + 1 << 6
         resp = await _vars.solveMath(f, guild, p, r)
         if type(resp) is dict and "file" in resp:
             f = discord.File(resp["file"])
