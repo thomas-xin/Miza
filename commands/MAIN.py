@@ -417,8 +417,8 @@ class state:
 
     def __init__(self):
         self.name = []
-        self.min_level = 1
-        self.description = "Shows the bot's current state."
+        self.min_level = 0
+        self.description = "Shows the bot's current program state."
         self.usage = ""
 
     async def __call__(self, flags, client, _vars, **void):
@@ -428,13 +428,16 @@ class state:
         stats = _vars.currState
         return (
             "```css"
-            + "\nActive processes: " + uniStr(active[0])
+            + "\nActive servers: " + _vars.guilds
+            + ", Active shards: " + uniStr(1)
+            + ".\nActive processes: " + uniStr(active[0])
             + ", Active threads: " + uniStr(active[1])
             + ", Active coroutines: " + uniStr(active[2])
             + ".\nPing latency: " + uniStr(latency)
             + ".\nCode size: " + uniStr(size[0]) + " bytes"
             + ", " + uniStr(size[1]) + " lines"
-            + ".\nCPU usage: " + uniStr(round(stats[0] / 4, 3)) + "%"
+            + ".\nCached files: " + uniStr(len(os.listdir("cache/")))
+            + ".\nCPU usage: " + uniStr(round(stats[0], 3)) + "%"
             + ", RAM usage: " + uniStr(round(stats[1] / 1048576, 3)) + " MB"
             + ".```"
         )

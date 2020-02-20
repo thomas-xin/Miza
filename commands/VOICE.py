@@ -861,6 +861,12 @@ class playlist:
                 + " from the default playlist for "
                 + uniStr(guild.name) + ".```"
             )
+        if len(pl) >= 128:
+            raise OverflowError(
+                "Playlist size for " + uniStr(guild.name)
+                + " has reached the maximum of 128 items. "
+                + "Please remove an item in order to add another."
+            )
         output = [None]
         doParallel(ytdl.search, [argv, True], output, state=2)
         await channel.trigger_typing()

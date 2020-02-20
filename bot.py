@@ -472,6 +472,7 @@ class main_data:
                 stats += (child.cpu_percent(), child.memory_percent())
             except psutil.NoSuchProcess:
                 pass
+        stats[0] /= psutil.cpu_count()
         stats[1] *= psutil.virtual_memory().total / 100
         self.currState = stats
         return stats
