@@ -27,9 +27,6 @@ delete(hb)
 while not sd in os.listdir():
     proc = psutil.Popen(
         args,
-##        stdin=subprocess.PIPE,
-##        stdout=subprocess.PIPE,
-##        stderr=subprocess.PIPE,
     )
     print("Bot started with PID " + str(proc.pid) + ".")
     time.sleep(16)
@@ -48,8 +45,10 @@ while not sd in os.listdir():
             if hb in os.listdir():
                 alive = False
                 break
-        while True:            
+        while True:
             try:
+                for child in proc.children():
+                    child.kill()
                 proc.kill()
             except psutil.NoSuchProcess:
                 break
