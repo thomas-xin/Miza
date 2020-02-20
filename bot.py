@@ -66,7 +66,8 @@ class main_data:
         self.owner_id = int(auth["owner_id"])
         self.token = auth["discord_token"]
         self.data = {}
-        doParallel(self.getModules)
+        self.proc = psutil.Process()
+        doParallel(self.getModules, state=2)
         self.current_channel = None
         self.guilds = 0
         self.blocked = 0
@@ -266,7 +267,7 @@ class main_data:
             if f in self.modules:
                 importlib.reload(self.modules[f])
             else:
-                doParallel(self.getModule, [f])
+                doParallel(self.getModule, [f], state=2)
         self.codeSize = totalsize
         __import__("smath", globals())
         subKill()
@@ -437,7 +438,7 @@ class main_data:
         ]
         print(args)
         returns = [None]
-        doParallel(subFunc, args, returns)
+        doParallel(subFunc, args, returns, state=2)
         t = time.time()
         while returns[0] is None:
             await asyncio.sleep(0.21)
@@ -451,8 +452,8 @@ class main_data:
         return resp
 
     def getActive(self):
-        procs = 2 + subCount()
-        thrds = threading.active_count()
+        procs = 2 + sum(1 for c in self.proc.children(True))
+        thrds = self.proc.num_threads()
         coros = sum(1 for i in asyncio.all_tasks())
         return hlist((procs, thrds, coros))
 
@@ -460,7 +461,7 @@ class main_data:
         stats = hlist((0, 0))
         if getattr(self, "currState", None) is None:
             self.currState = stats
-        proc = psutil.Process()
+        proc = self.proc
         proc.cpu_percent()
         await asyncio.sleep(0.5)
         stats += (proc.cpu_percent(), proc.memory_percent())
@@ -517,7 +518,6 @@ class main_data:
                             return
                         except Exception as ex:
                             print(traceback.format_exc())
-                            killThreads()
                             sent = await message.channel.send(
                                 "```py\nError: " + repr(ex) + "\n```"
                             )
@@ -781,7 +781,6 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             if sent is not None:
                                 await sent.add_reaction(react)
                     except TimeoutError:
-                        killThreads()
                         raise TimeoutError("Request timed out.")
                     except Exception as ex:
                         errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)
@@ -1072,7 +1071,6 @@ async def handleMessage(message, edit=True):
         )
     except Exception as ex:
         print(traceback.format_exc())
-        killThreads()
         errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)
         sent = await message.channel.send(errmsg)
         await sent.add_reaction("❎")

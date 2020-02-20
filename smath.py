@@ -9,6 +9,7 @@ from scipy import interpolate, special
 from sympy.parsing.sympy_parser import parse_expr
 
 CalledProcessError = subprocess.CalledProcessError
+Process = psutil.Process()
 
 np = numpy
 array = numpy.array
@@ -2241,9 +2242,10 @@ class pickled:
         )
 
 
-def readline(stream):
+def readline(stream, timeout=10):
     output = bytes()
-    while not b"\n" in output:
+    t = time.time()
+    while not b"\n" in output and time.time() - t < timeout:
         c = stream.read(1)
         print(c)
         if c:
@@ -2303,7 +2305,7 @@ def subFunc(key, com, data_in, timeout):
         proc.stdin.write(d)
         proc.stdin.flush()
         returns = [None]
-        thread = doParallel(readline, [proc.stdout], returns, name=str(random.random()))
+        thread = doParallel(readline, [proc.stdout, timeout], returns, name=str(random.random()))
         while returns[0] is None:
             if time.time() - t > timeout:
                 raise TimeoutError("Request timed out.")
@@ -2346,26 +2348,9 @@ class dynamicFunc:
         return self.text
 
 def performAction(action):
-    try:
-        time.sleep(action[-1])
-    except IndexError:
-        pass
-    except TypeError:
-        pass
-    if len(action) > 1:
-        x = action[1]
-    else:
-        x = None
-    if x is not None:
-        if type(x) is list:
-            y = action[0](*x)
-        else:
-            y = action[0](*x[0], **x[1])
-    else:
-        y = action[0]()
-    if len(action) > 4:
-        action[2][action[3]] = y
-
+    if "delay" in action:
+        time.sleep(action["delay"])
+    action.get("retn", [0])[0] = action["func"](*action.get("args", ()), **action.get("kwargs", {}))
 
 class _parallel:
     
@@ -2386,15 +2371,18 @@ class _parallel:
             self.action = None
             self.daemon = True
 
-        def __call__(self, *action):
+        def __call__(self, action):
             self.actions.append(action)
-            self.state = 1
+            self.state = inf
 
         def run(self):
             while True:
                 try:
+                    if self.actions:
+                        self.state = max(i.get("state", 1) for i in self.actions)
                     time.sleep(0.009 * (random.random() + 1))
                     if self.actions is None:
+                        print("EXIT")
                         return
                     while self.actions:
                         self.action = self.actions.popleft()
@@ -2404,6 +2392,7 @@ class _parallel:
                 except:
                     print(traceback.format_exc())
                 if type(self.id) is str:
+                    print("EXIT")
                     break
                 self.state = -1
 
@@ -2417,7 +2406,7 @@ class _parallel:
 
         def kill(self, destroy=False):
             thread_id = self.get_id()
-            if destroy:
+            if destroy or type(self.id) is str:
                 self.actions = None
                 res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
                     thread_id,
@@ -2438,7 +2427,7 @@ class _parallel:
                     del threading._active[thread_id]
                 except KeyError:
                     pass
-                if not destroy:
+                if not destroy and type(self.id) is not str:
                     processes.running[self.id] = processes.new(self.id)
             elif type(self.id) is str:
                 self.actions = None
@@ -2447,56 +2436,54 @@ class _parallel:
                 except KeyError:
                     pass
 
-def doParallel(func, data_in=None, data_out=[0], start=0, end=None,
-               per=1, delay=0, maxq=64, name=None, killable=True):
+def doParallel(func, args=None, data_out=[0], kwargs=None, name=None, **kws):
     """
 Performs an action using parallel threads."""
-    global processes
-    #t = time.time()
-    if end == None:
-        end = len(data_out) + start
-    ps = processes.running
-    for i in range(start, end):
-        if name is not None:
-            d = str(name)
-            ps[d] = processes.new(d, killable)
+    ps = threads.running
+    if name is not None:
+        d = str(name)
+        ps[d] = threads.new(d, kws.get("killable", True))
+        p = ps[d]
+        p.start()
+    else:
+        t = d = 0
+        p = ps[0]
+        while p.state > 0:
+            d = xrand(threads.max)
             p = ps[d]
-            p.start()
-        else:
-            t = d = 0
-            p = ps[0]
-            while p.state > 0:
-                d = xrand(processes.max)
-                p = ps[d]
-                if t > processes.max:
-                    break
-                t += 1
-            while p.state > 1 or len(p.actions) >= maxq:
-                time.sleep(0.005)
-                d = xrand(processes.max)
-                p = ps[d]
-        p(func, data_in, data_out, i, delay)
+            if t > threads.max:
+                break
+            t += 1
+        while p.state > 1 or len(p.actions) >= 64:
+            time.sleep(0.005)
+            d = xrand(threads.max)
+            p = ps[d]
+    action = kws
+    if args is not None:
+        action["args"] = args
+    if kwargs is not None:
+        action["kwargs"] = kwargs
+    action["func"] = func
+    p(action)
     return p
 
 def killThreads():
-    global processes
-    running = tuple(processes.running)
+    running = tuple(threads.running)
     for i in running:
-        if processes.running[i].killable:
-            p = processes.running[i]
+        if threads.running[i].killable:
+            p = threads.running[i]
             p.kill()
 
 def waitParallel(delay):
-    global processes
     t = time.time()
-    running = tuple(processes.running)
+    running = tuple(threads.running)
     for i in running:
-        if type(i) is int and i in processes.running:
-            p = processes.running[i]
+        if type(i) is int and i in threads.running:
+            p = threads.running[i]
             while p.state > 0 and time.time() - t < delay:
                 time.sleep(0.001)
 
-processes = _parallel()
+threads = _parallel()
 
 
 def getLineCount(fn):

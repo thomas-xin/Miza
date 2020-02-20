@@ -1,4 +1,7 @@
-import os, sys, time, datetime, traceback, subprocess, psutil
+import os, time, datetime, traceback, subprocess, psutil
+
+Process = psutil.Process()
+
 
 def delete(f):
     while f in os.listdir():
@@ -11,25 +14,22 @@ def delete(f):
 sd = "shutdown.json"
 hb = "heartbeat.json"
 
-args = [
-    "cmd",
-    "/c"
-    "start",
-    "powershell",
-    "-command",
-    "python",
-    "bot.py",
-]
-
 delete(sd)
 delete(hb)
 
 while not sd in os.listdir():
-    proc = psutil.Popen(
-        args,
-    )
+    name = '"' + "bot.py: " + str(Process.pid) + '"'
+    proc = None
+    while proc is None:
+        os.system("start " + name + " /abovenormal powershell -command python bot.py")
+        time.sleep(1)
+        for p in psutil.process_iter():
+            if "powershell.exe" in p.name().lower():
+                if time.time() - p.create_time() < 12:
+                    proc = p
+                    break
     print("Bot started with PID " + str(proc.pid) + ".")
-    time.sleep(16)
+    time.sleep(8)
     try:
         print("Heartbeat started.")
         alive = True

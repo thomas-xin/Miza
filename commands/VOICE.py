@@ -485,7 +485,7 @@ class videoDownloader:
                                     x = s[:s.index('" />')]
                                     if len(x) > 12:
                                         output.append([None])
-                                        doParallel(self.extract, [x, "spotify"], output[-1])
+                                        doParallel(self.extract, [x, "spotify"], output[-1], state=2)
                                 except ValueError:
                                     break
                             while [None] in output:
@@ -643,7 +643,7 @@ async def downloadTextFile(url):
             return repr(ex)
 
     returns = [None]
-    doParallel(dtext, [url], returns)
+    doParallel(dtext, [url], returns, state=2)
     while returns[0] is None:
         await asyncio.sleep(0.3)
     resp = returns[0]
@@ -747,7 +747,7 @@ class queue:
         else:
             auds.preparing = True
             output = [None]
-            doParallel(ytdl.search, [argv], output)
+            doParallel(ytdl.search, [argv], output, state=2)
             await channel.trigger_typing()
             while output[0] is None:
                 await asyncio.sleep(0.3)
@@ -862,7 +862,7 @@ class playlist:
                 + uniStr(guild.name) + ".```"
             )
         output = [None]
-        doParallel(ytdl.search, [argv, True], output)
+        doParallel(ytdl.search, [argv, True], output, state=2)
         await channel.trigger_typing()
         while output[0] is None:
             await asyncio.sleep(0.3)
@@ -1769,6 +1769,7 @@ class updateQueues:
                                                 doParallel(
                                                     ytdl.downloadSingle,
                                                     [q[i], durc],
+                                                    state=2
                                                 )
                                             else:
                                                 q[i]["duration"] = ytdl.getDuration("cache/" + search)

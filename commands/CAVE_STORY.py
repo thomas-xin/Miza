@@ -25,7 +25,7 @@ class DouClub:
 
     def search(self, query):
         if time.time() - self.data[1] > 720:
-            doParallel(self.pull)
+            doParallel(self.pull, state=2)
         output = []
         query = query.lower()
         for l in self.data[0]:
@@ -137,7 +137,7 @@ class SheetPull:
 
     def search(self, query, lim):
         if time.time() - self.data[1] > 60:
-            doParallel(self.pull)
+            doParallel(self.pull, state=2)
         output = []
         query = query.lower()
         try:
@@ -317,7 +317,7 @@ class cs_org2xm:
         if fmt not in self.fmts:
             raise TypeError(fmt + " is not a supported output format.")
         returns = [None]
-        doParallel(orgConv, [org, wave, fmt], returns)
+        doParallel(orgConv, [org, wave, fmt], returns, state=2)
         t = time.time()
         while returns[0] is None and time.time() - t < _vars.timeout - 1:
             await asyncio.sleep(0.1)
@@ -556,7 +556,7 @@ class cs_mod:
     async def __call__(self, args, **void):
         argv = " ".join(args)
         resp = [None]
-        doParallel(searchForums, [argv], resp)
+        doParallel(searchForums, [argv], resp, state=2)
         data = douclub.search(argv)
         t = time.time()
         while resp[0] is None and time.time() - t < 5:

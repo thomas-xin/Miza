@@ -340,33 +340,6 @@ class restart:
         sys.exit()
 
 
-class reload:
-    is_command = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = inf
-        self.description = "Causes the bot to reload all files."
-        self.usage = ""
-
-    async def __call__(self, _vars, **void):
-        del _vars.data
-        _vars.data = {}
-        del _vars.updaters
-        _vars.updaters = {}
-        doParallel(_vars.getModules, [True], "reload")
-        killThreads()
-        for i in range(64):
-            try:
-                if _vars.suspected in os.listdir():
-                    os.remove(_vars.suspected)
-                break
-            except:
-                print(traceback.format_exc())
-                time.sleep(0.1)
-        return "Reloading..."
-
-
 class suspend:
     is_command = True
 
