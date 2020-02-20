@@ -32,7 +32,7 @@ while not sd in os.listdir():
 ##        stderr=subprocess.PIPE,
     )
     print("Bot started with PID " + str(proc.pid) + ".")
-    time.sleep(24)
+    time.sleep(16)
     try:
         print("Heartbeat started.")
         alive = True
