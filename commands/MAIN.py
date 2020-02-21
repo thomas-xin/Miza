@@ -17,14 +17,9 @@ class help:
     async def __call__(self, args, user, channel, guild, flags, **void):
         _vars = self._vars
         enabled = _vars.data["enabled"]
-        if guild:
-            g_id = guild.id
-        else:
-            g_id = 0
-        if g_id:
-            enabled = enabled.setdefault(channel.id, list(default_commands))
-        else:
-            enabled = default_commands
+        g_id = guild.id
+        prefix = _vars.getPrefix(g_id)
+        enabled = enabled.get(channel.id, list(default_commands))
         categories = _vars.categories
         commands = hlist()
         for catg in categories:
@@ -33,7 +28,7 @@ class help:
         c_name = getattr(channel, "name", "DM")
         u_perm = _vars.getPerms(user, guild)
         verb = "v" in flags
-        argv = " ".join(args).lower().replace("~", "")
+        argv = " ".join(args).lower().replace(prefix, "")
         show = []
         for a in args:
             if (a in categories and a in enabled) or a == "main":
@@ -209,11 +204,12 @@ class enableCommand:
         _vars = self._vars
         enabled = _vars.data["enabled"]
         if "e" in flags or "d" in flags:
-            if perm < 3:
+            req = 3
+            if perm < req:
                 raise PermissionError(
                     "Insufficient priviliges to change command list for "
                     + uniStr(channel.name)
-                    + ".\nRequred level: " + uniStr(3)
+                    + ".\nRequred level: " + uniStr(req)
                     + ", Current level: " + uniStr(perm) + "."
                 )
         catg = argv.lower()
@@ -286,7 +282,7 @@ class enableCommand:
 
 class restart:
     is_command = True
-    time_consuming = False
+    server_only = True
 
     def __init__(self):
         self.name = ["shutdown"]
@@ -441,6 +437,48 @@ class state:
             + ", RAM usage: " + uniStr(round(stats[1] / 1048576, 3)) + " MB"
             + ".```"
         )
+
+
+class prefix:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["changePrefix"]
+        self.min_level = 0
+        self.description = "Shows or changes the prefix for commands for this server."
+        self.usage = "<prefix[]>"
+
+    async def __call__(self, argv, guild, perm, **void):
+        pref = self._vars.data["prefixes"]
+        if not argv:
+            return (
+                "```Current command prefix for " + uniStr(guild.id)
+                + ": " + _vars.getPrefix(guild) + "```"
+            )
+        req = inf
+        if perm < req:
+            raise PermissionError(
+                "Insufficient priviliges to change command prefix for "
+                + uniStr(channel.name)
+                + ".\nRequred level: " + uniStr(req)
+                + ", Current level: " + uniStr(perm) + "."
+            )
+        pref[guild.id] = argv.strip(" ")
+        return (
+            "```Successfully changed command prefix for " + uniStr(guild.id)
+            + " to " + argv + "```"
+        )
+
+
+class updatePrefix:
+    is_update = True
+    name = "prefixes"
+
+    def __init__(self):
+        pass
+
+    async def __call__(self):
+        pass
 
 
 class updateEnabled:

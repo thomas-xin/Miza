@@ -48,7 +48,7 @@ class main_data:
             self.channel = self.userChannel(channel)
             self.id = self.channel.id
             self.name = self.channel.name
-            self.members = [user]
+            self.members = [user, client.user]
             self.channels = [self.channel]
             self.me = self.channel.me
             self.roles = []
@@ -165,6 +165,47 @@ class main_data:
             channel = await user.create_dm()
         return channel
 
+    def getPrefix(self, guild):
+        try:
+            g_id = guild.id
+        except:
+            g_id = int(guild)
+        return self.data["prefixes"].get(g_id, "~")
+
+    def getPerms(self, user, guild):
+        perms = self.data["perms"]
+        try:
+            u_id = user.id
+        except AttributeError:
+            u_id = int(user)
+        if guild:
+            try:
+                g_id = guild.id
+            except AttributeError:
+                g_id = int(guild)
+            g_perm = perms.setdefault(g_id, {})
+            if u_id in (self.owner_id, client.user.id):
+                u_perm = nan
+            else:
+                u_perm = g_perm.get(u_id, perms.setdefault("defaults", {}).get(g_id, 0))
+        elif u_id in (self.owner_id, client.user.id):
+            u_perm = nan
+        else:
+            u_perm = inf
+        if u_perm is not nan and u_id == getattr(guild, "owner_id", 0):
+            u_perm = inf
+        return u_perm
+
+    def setPerms(self, user, guild, value):
+        perms = self.data["perms"]
+        try:
+            u_id = user.id
+        except AttributeError:
+            u_id = user
+        g_perm = perms.setdefault(guild.id, {})
+        g_perm.update({u_id: value})
+        self.updaters["perms"].update()
+
     def limitCache(self, cache=None):
         if cache is not None:
             cache = [self.cache[cache]]
@@ -186,7 +227,6 @@ class main_data:
             name = getattr(self, "name", None)
             if name:
                 if self.updated:
-                    #print(self.file)
                     self.updated = False
                     f = open(self.file, "wb")
                     f.write(bytes(repr(self.data), "utf-8"))
@@ -287,40 +327,6 @@ class main_data:
 
     def verifyID(self, value):
         return int(str(value).replace("<", "").replace(">", "").replace("@", "").replace("!", ""))
-
-    def getPerms(self, user, guild):
-        perms = self.data["perms"]
-        try:
-            u_id = user.id
-        except AttributeError:
-            u_id = int(user)
-        if guild:
-            try:
-                g_id = guild.id
-            except AttributeError:
-                g_id = int(guild)
-            g_perm = perms.setdefault(g_id, {})
-            if u_id in (self.owner_id, client.user.id):
-                u_perm = nan
-            else:
-                u_perm = g_perm.get(u_id, perms.setdefault("defaults", {}).get(g_id, 0))
-        elif u_id in (self.owner_id, client.user.id):
-            u_perm = nan
-        else:
-            u_perm = 1
-        if u_perm is not nan and u_id == getattr(guild, "owner_id", 0):
-            u_perm = inf
-        return u_perm
-
-    def setPerms(self, user, guild, value):
-        perms = self.data["perms"]
-        try:
-            u_id = user.id
-        except AttributeError:
-            u_id = user
-        g_perm = perms.setdefault(guild.id, {})
-        g_perm.update({u_id: value})
-        self.updaters["perms"].update()
     
     mmap = {
         "“": '"',
@@ -608,26 +614,22 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     else:
         enabled = list(_vars.categories)
     u_perm = _vars.getPerms(u_id, guild)
-    channel = message.channel
 
-    check = "<@!" + str(client.user.id) + ">"
-
+    mention = "<@!" + str(client.user.id) + ">"
+    op = False
     comm = msg
-    if len(msg) >= 2 and msg[0] == "~" and msg[1] != "~":
-        comm = msg[1:]
-        op = True
-    elif msg.startswith(check):
-        comm = msg[len(check):]
-        while len(comm) and (comm[0] in " ~"):
+    for check in (_vars.getPrefix(guild), mention):
+        if comm.startswith(check):
+            comm = comm[len(check):]
+            op = True
+        while len(comm) and comm[0] == " ":
             comm = comm[1:]
-        op = True
-    else:
-        op = False
     suspended = _vars.isSuspended(u_id)
-    if (suspended and op) or msg.replace(" ", "") == check:
+    if (suspended and op) or msg.replace(" ", "") == mention:
         if not u_perm < 0 and not suspended:
             sent = await channel.send(
-		"Hi, did you require my services for anything? Use `~?` or `~help` for help."
+		"Hi, did you require my services for anything? Use `"
+                + prefix + "?` or `" + prefix + "help` for help."
 	    )
         else:
             print(
