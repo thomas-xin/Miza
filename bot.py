@@ -608,18 +608,21 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         enabled = list(_vars.categories)
     u_perm = _vars.getPerms(u_id, guild)
 
-    mention = "<@!" + str(client.user.id) + ">"
+    mention = (
+        "<@" + str(client.user.id) + ">",
+        "<@!" + str(client.user.id) + ">",
+    )
     prefix = _vars.getPrefix(guild)
     op = False
     comm = msg
-    for check in (prefix, mention):
+    for check in (prefix, *mention):
         if comm.startswith(check):
             comm = comm[len(check):]
             op = True
         while len(comm) and comm[0] == " ":
             comm = comm[1:]
     suspended = _vars.isSuspended(u_id)
-    if (suspended and op) or msg.replace(" ", "") == mention:
+    if (suspended and op) or msg.replace(" ", "") in mention:
         if not u_perm < 0 and not suspended:
             sent = await channel.send(
 		"Hi, did you require my services for anything? Use `"
