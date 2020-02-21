@@ -636,6 +636,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
             )
         await sent.add_reaction("❎")
         return
+    run = False
     if op:
         commands = hlist()
         for catg in categories:
@@ -651,6 +652,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                     len(comm) == length or comm[length] == " " or comm[length] == "?"
                 )
                 if match:
+                    run = True
                     print(user.name + " (" + str(u_id) + ") issued command " + msg)
                     req = command.min_level
                     try:
@@ -793,7 +795,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         print(traceback.format_exc())
                         sent = await channel.send(errmsg)
                         await sent.add_reaction("❎")
-    elif message.guild and u_id != client.user.id and orig:
+    if not run and message.guild and u_id != client.user.id and orig:
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
         temp = list(orig.lower())
         for i in range(len(temp)):
