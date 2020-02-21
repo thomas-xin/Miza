@@ -95,6 +95,15 @@ class hex2uni:
         return "```fix\n" + b.decode("utf-8") + "```"
 
 
+def getTranslate(translator, string, dest, source):
+    try:
+        resp = translator.translate(string, dest, source)
+        return resp
+    except Exception as ex:
+        print(traceback.format_exc())
+        return ex
+
+
 class translate:
     is_command = True
     time_consuming = True
@@ -125,7 +134,13 @@ class translate:
             for t in trans:
                 try:
                     dest = dest[:2] + dest[2:].upper()
-                    output = translators[t].translate(string, dest, source)
+                    returns = [None]
+                    doParallel(getTranslate, [translators[t], string, dest, source], returns)
+                    while returns[0] is None:
+                        await asyncio.sleep(0.5)
+                    output = returns[0]
+                    if issubclass(output, Exception):
+                        raise output
                     output = output.text
                     response += "\n" + output + "  `" + t + "`"
                     source, dest = dest, source

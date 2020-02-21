@@ -503,7 +503,7 @@ class main_data:
                                     message=message,
                                     channel=message.channel,
                                     guild=message.guild,
-                                    reaction=reaction,
+                                    reaction=str(reaction).encode("utf-8"),
                                     user=user,
                                     perm=u_perm,
                                     vals=vals,

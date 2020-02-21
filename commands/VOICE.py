@@ -642,7 +642,7 @@ async def downloadTextFile(url):
     if rescode != 200:
         raise ConnectionError(rescode)
     returns = [None]
-    doParallel(dreader, [resp], returns, state=2)
+    doParallel(dreader, [resp], returns)
     while returns[0] is None:
         await asyncio.sleep(0.3)
     resp = returns[0]
@@ -746,7 +746,7 @@ class queue:
         else:
             auds.preparing = True
             output = [None]
-            doParallel(ytdl.search, [argv], output, state=2)
+            doParallel(ytdl.search, [argv], output)
             await channel.trigger_typing()
             while output[0] is None:
                 await asyncio.sleep(0.3)
@@ -867,7 +867,7 @@ class playlist:
                 + "Please remove an item in order to add another."
             )
         output = [None]
-        doParallel(ytdl.search, [argv, True], output, state=2)
+        doParallel(ytdl.search, [argv, True], output)
         await channel.trigger_typing()
         while output[0] is None:
             await asyncio.sleep(0.3)
@@ -1361,22 +1361,22 @@ class player:
     server_only = True
     time_consuming = True
     buttons = {
-	"⏸️": 0,
-	"🔄": 1,
-	"🔀": 2,
-	"⏮️": 3,
-	"⏭️": 4,
-        "🔊": 5,
-        "🥁": 6,
-        "📉": 7,
-        "📊": 8,
-        "⏪": 9,
-        "⏩": 10,
-        "⏫": 11,
-        "⏬": 12,
-        "♻️": 13,
-	"⏏️": 14,
-        "⛔": 15,
+	b'\xe2\x8f\xb8': 0,
+	b'\xf0\x9f\x94\x84': 1,
+	b'\xf0\x9f\x94\x80': 2,
+	b'\xe2\x8f\xae': 3,
+	b'\xe2\x8f\xad': 4,
+        b'\xf0\x9f\x94\x8a': 5,
+        b'\xf0\x9f\xa5\x81': 6,
+        b'\xf0\x9f\x93\x89': 7,
+        b'\xf0\x9f\x93\x8a': 8,
+        b'\xe2\x8f\xaa': 9,
+        b'\xe2\x8f\xa9': 10,
+        b'\xe2\x8f\xab': 11,
+        b'\xe2\x8f\xac': 12,
+        b'\xe2\x99\xbb': 13,
+	b'\xe2\x8f\x8f': 14,
+        b'\xe2\x9b\x94': 15,
         }
     barsize = 28
 
@@ -1491,14 +1491,14 @@ class player:
                 await message.add_reaction(b)
         else:
             if not auds.player["type"]:
-                emoji = ""
-            elif type(reaction) is str:
-                emoji = reaction
+                emoji = bytes()
             else:
                 try:
                     emoji = reaction.emoji
                 except:
                     emoji = str(reaction)
+            if type(emoji) is str:
+                emoji = reaction.encode("utf-8")
             if emoji in self.buttons:
                 i = self.buttons[emoji]
                 if i == 0:
