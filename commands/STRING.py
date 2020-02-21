@@ -139,7 +139,11 @@ class translate:
                     while returns[0] is None:
                         await asyncio.sleep(0.5)
                     output = returns[0]
-                    if issubclass(output, Exception):
+                    try:
+                        ex = issubclass(output, Exception)
+                    except TypeError:
+                        ex = None
+                    if ex:
                         raise output
                     output = output.text
                     response += "\n" + output + "  `" + t + "`"
