@@ -141,7 +141,8 @@ class perms:
             c_perm = await _vars.evalMath(" ".join(args[1:]), guild.id)
             s_user = user
             s_perm = perm
-            if "everyone" in args[0] or "here" in args[0]:
+            check = args[0].lower()
+            if "everyone" in check or "here" in check:
                 t_user = None
                 t_perm = inf
                 name = "everyone"
@@ -432,6 +433,7 @@ class state:
             + ".\nPing latency: " + uniStr(latency)
             + ".\nCode size: " + uniStr(size[0]) + " bytes"
             + ", " + uniStr(size[1]) + " lines"
+            + ".\nConnected voice channels: " + uniStr(len(client.voice_clients))
             + ".\nCached files: " + uniStr(len(os.listdir("cache/")))
             + ".\nCPU usage: " + uniStr(round(stats[0], 3)) + "%"
             + ", RAM usage: " + uniStr(round(stats[1] / 1048576, 3)) + " MB"

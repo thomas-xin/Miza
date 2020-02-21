@@ -461,9 +461,9 @@ class main_data:
         await asyncio.sleep(0.5)
         stats += (proc.cpu_percent(), proc.memory_percent())
         for child in proc.children(True):
-            child.cpu_percent()
-            await asyncio.sleep(0.5)
             try:
+                child.cpu_percent()
+                await asyncio.sleep(0.5)
                 stats += (child.cpu_percent(), child.memory_percent())
             except psutil.NoSuchProcess:
                 pass
@@ -1090,6 +1090,7 @@ async def handleMessage(message, edit=True):
 
 @client.event
 async def on_message(message):
+    _vars.cache["messages"][message.id] = message
     await _vars.reactCallback(message, None, message.author)
     await handleMessage(message, False)
     await _vars.handleUpdate(True)
@@ -1100,6 +1101,7 @@ async def on_message_edit(before, after):
     await _vars.handleUpdate()
     if before.content != after.content:
         message = after
+        _vars.cache["messages"][message.id] = message
         await handleMessage(message)
         await _vars.handleUpdate(True)
 
@@ -1119,6 +1121,7 @@ async def on_raw_message_edit(payload):
                     except Exception as ex:
                         print(traceback.format_exc())
     if message:
+        _vars.cache["messages"][message.id] = message
         await handleMessage(message)
         await _vars.handleUpdate(True)
 

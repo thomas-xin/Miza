@@ -703,12 +703,12 @@ class queue:
                 curr += "[" + uniStr(i) + "] "
                 if "v" in flags:
                     curr += (
-                        uniStr(noSquareBrackets(e["name"])) + ", URL: [" + e["url"] + "]"
+                        uniStr(noHighlight(e["name"])) + ", URL: [" + e["url"] + "]"
                         + ", Duration: " + uniStr(sec2Time(e["duration"]))
                         + ", Added by: " + uniStr(e["added by"])
                     )
                 else:
-                    curr += limStr(uniStr(noSquareBrackets(e["name"])), 48)
+                    curr += limStr(uniStr(noHighlight(e["name"])), 48)
                 if auds.reverse and len(auds.queue):
                     estim = currTime + elapsed - auds.queue[0]["duration"]
                 else:
@@ -732,7 +732,7 @@ class queue:
             barsize = 16 * (1 + ("v" in flags))
             r = round(min(1, elapsed / duration) * barsize)
             bar = sym[0] * r + sym[1] * (barsize - r)
-            countstr = "Currently playing " + uniStr(noSquareBrackets(q[0]["name"])) + "\n"
+            countstr = "Currently playing " + uniStr(noHighlight(q[0]["name"])) + "\n"
             countstr += (
                 "(" + uniStr(dhms(elapsed))
                 + "/" + uniStr(dhms(duration)) + ") "
@@ -795,7 +795,7 @@ class queue:
                 names = names[0]
             if not "h" in flags:
                 return (
-                    "```css\n🎶 Added " + noSquareBrackets(uniStr(names))
+                    "```css\n🎶 Added " + nonoHighlightuniStr(names))
                     + " to the queue! Estimated time until playing: "
                     + uniStr(sec2Time(total_duration)) + ". 🎶```", 1
                 )
@@ -840,7 +840,7 @@ class playlist:
             else:
                 items = []
                 for i in pl:
-                    items.append(limStr(noSquareBrackets(i["name"]), 32))
+                    items.append(limStr(noHighlight(i["name"]), 32))
                 s = ""
                 for i in range(len(items)):
                     s += " " * (int(math.log10(len(items))) - int(math.log10(max(1, i))))
@@ -856,7 +856,7 @@ class playlist:
             pl.pop(i)
             update()
             return (
-                "```css\nRemoved " + uniStr(noSquareBrackets(temp["name"]))
+                "```css\nRemoved " + uniStr(noHighlight(temp["name"]))
                 + " from the default playlist for "
                 + uniStr(guild.name) + ".```"
             )
@@ -864,7 +864,7 @@ class playlist:
             raise OverflowError(
                 "Playlist size for " + uniStr(guild.name)
                 + " has reached the maximum of 128 items. "
-                + "Please remove an item in order to add another."
+                + "Please remove an item to add another."
             )
         output = [None]
         doParallel(ytdl.search, [argv, True], output)
@@ -877,7 +877,7 @@ class playlist:
         names = []
         for e in res:
             name = e["name"]
-            names.append(noSquareBrackets(name))
+            names.append(noHighlight(name))
             pl.append({
                 "name": name,
                 "url": e["url"],
@@ -1044,7 +1044,7 @@ class remove:
                 curr["skips"] = None
             if curr["skips"] is not None:
                 response += (
-                    "Voted to remove " + uniStr(noSquareBrackets(curr["name"]))
+                    "Voted to remove " + uniStr(noHighlight(curr["name"]))
                     + " from the queue.\nCurrent vote count: "
                     + uniStr(len(curr["skips"])) + ", required vote count: "
                     + uniStr(required) + ".\n"
@@ -1061,7 +1061,7 @@ class remove:
                 else:
                     q.pop(i)
                 response += (
-                    uniStr(noSquareBrackets(song["name"]))
+                    uniStr(noHighlight(song["name"]))
                     + " has been removed from the queue.\n"
                 )
                 count += 1
@@ -1263,7 +1263,7 @@ class volume:
             else:
                 num = round(100. * orig, 9)
             return (
-                "```css\nCurrent audio " + op + " in " + uniStr(guild.name)
+                "```css\nCurrent audio " + op + " state in " + uniStr(guild.name)
                 + ": " + uniStr(num) + ".```"
             )
         if op == "settings":
@@ -1797,7 +1797,7 @@ class updateQueues:
                                         channel = auds.channel
                                         sent = await channel.send(
                                             "```css\n🎵 Now playing "
-                                            + uniStr(noSquareBrackets(name))
+                                            + uniStr(noHighlight(name))
                                             + ", added by " + uniStr(added_by) + "! 🎵```"
                                         )
                                         await sent.add_reaction("❎")

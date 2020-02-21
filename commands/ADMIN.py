@@ -88,7 +88,8 @@ class ban:
         update = self.data["bans"].update
         bans = _vars.data["bans"]
         dtime = datetime.datetime.utcnow().timestamp()
-        if not args or "everyone" in args[0] or "here" in args[0]:
+        check = args[0].lower()
+        if not args or "everyone" in check or "here" in check:
             t_user = None
             t_perm = inf
         else:
@@ -150,6 +151,10 @@ class ban:
                 users = await it.flatten()
             else:
                 users = []
+                asyncio.create_task(channel.send(
+                    "```css\nUnbanning all users from "
+                    + uniStr(guild.name) + "...```"
+                ))
             for u_id in g_bans:
                 users.append(await _vars.fetch_user(u_id))
             is_banned = None

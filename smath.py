@@ -2,7 +2,8 @@
 Adds many useful math-related functions.
 """
 
-import os, sys, asyncio, threading, subprocess, psutil, time, traceback, ctypes, collections, ast, copy, pickle, importlib
+import os, sys, asyncio, threading, subprocess, psutil, traceback, time, importlib
+import ctypes, collections, ast, copy, pickle
 import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys
 
 from scipy import interpolate, special
@@ -1278,6 +1279,8 @@ def timeConv(s):
     if not isValid(s):
         high = "galactic years"
         return [str(s) + " " + high]
+    r = s < 0
+    s = abs(s)
     taken = []
     for i in __units:
         a = None
@@ -1287,7 +1290,7 @@ def timeConv(s):
         if type(t) is int:
             a = round(s, 3)
         elif s >= t:
-            a = int(s / t)
+            a = int(s // t)
             s = s % t
         if a:
             if a != 1:
@@ -1295,7 +1298,7 @@ def timeConv(s):
                     i = m[1]
                 else:
                     i += "s"
-            taken.append(str(roundMin(a)) + " " + str(i))
+            taken.append("-" * r + str(roundMin(a)) + " " + str(i))
     if not len(taken):
         return [str(roundMin(s)) + " seconds"]
     return taken
@@ -1327,8 +1330,10 @@ def dhms(s):
     return output
 
 
-def noSquareBrackets(s):
-    return str(s).replace("[", "⦍").replace("]", "⦎")
+def noHighlight(s):
+    s = str(s).replace("[", "⦍").replace("]", "⦎")
+    s = s.replace("@", "＠")
+    return s
 
 __fmts = [
     "𝟎𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙",
@@ -2300,7 +2305,7 @@ def subFunc(key, com, data_in, timeout):
     try:
         t = time.time()
         proc.busy = True
-        d = str(bytes(str(data_in), "utf-8")).encode("utf-8") + b"\n"
+        d = bytes(str(data_in), "utf-8") + b"\n"
         print(d)
         proc.stdin.write(d)
         proc.stdin.flush()

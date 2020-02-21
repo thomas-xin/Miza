@@ -77,7 +77,6 @@ _globals.update({
     "derivative": sympy.diff,
     "derive": sympy.diff,
     "phase": sympy.arg,
-    "pow": sympy.Pow,
     "ceil": sympy.ceiling,
     "min": sympy.Min,
     "max": sympy.Max,
@@ -165,6 +164,7 @@ translators = {
     "ω": "omega",
     "∞": "oo",
     "ℂ": "z",
+    "ℯ": "e",
 }
 
 replacers = {
@@ -243,13 +243,13 @@ def readline(stream):
     output = ""
     t = time.time()
     while not "\n" in output:
-        if time.time() - t > 900:
-            sys.exit(1)
         c = stream.read(1)
         if c:
             output += c
         else:
-            time.sleep(0.002)
+            time.sleep(0.003)
+            if time.time() - t > 900:
+                time.sleep(0.5)
     return output
 
 

@@ -33,7 +33,7 @@ class text2048:
         13: [i for i in range(100)],
         14: [i for i in range(1234)],
     }
-    numScore = lambda self, x: x * 2 ** (x + 1)
+    numScore = lambda y, x: x * 2 ** (x + 1)
 
     def __init__(self):
         self.name = ["2048", "text_2048"]
@@ -125,7 +125,6 @@ class text2048:
         returns[0] = (gamestate, a)
                                         
     async def nextIter(self, message, gamestate, username, direction, mode):
-        print(direction)
         width = len(gamestate[-1])
         i = direction
         for z in range(len(gamestate)):
@@ -134,8 +133,8 @@ class text2048:
                     if gamestate[z][x][y] < 0:
                         gamestate[z][x][y] = 0
         if i == 4:
+            a = gamestate[0] == gamestate[1]
             gamestate = gamestate[::-1]
-            a = 0
         elif i is None:
             a = 0
         else:
@@ -148,11 +147,12 @@ class text2048:
                 returns = [None]
                 t = time.time()
                 doParallel(self.randomSpam, [gamestate, mode, pool, returns])
-                while returns[0] is None and time.time() - t < 5:
-                    await asyncio.sleep(0.01)
+                while returns[0] is None and time.time() - t < self._vars.timeout / 3:
+                    await asyncio.sleep(0.2)
                 if returns[0] is None:
                     return
                 self.gamestate, a = returns[0]
+        print(a)
         if not a:
             gsr = str(gamestate).replace("[", "A").replace("]", "B").replace(",", "C").replace("-", "D").replace(" ", "")
             orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]).split("-")
@@ -188,7 +188,7 @@ class text2048:
                 for y in range(width):
                     if gamestate[0][x][y] > 0:
                         count += 1
-            if count == width ** 2:
+            if count >= width ** 2:
                 a = 1
                 for i in range(4):
                     dump, b = self.moveTiles(gamestate, i)
@@ -244,7 +244,7 @@ class text2048:
                     await message.add_reaction(react.decode("utf-8"))
             self.spawn(gamestate[0], mode, 1)
         if u_id == 0:
-            username = "@everyone"
+            username = "＠everyone"
         else:
             if user.id != u_id:
                 u = await _vars.fetch_user(u_id)
