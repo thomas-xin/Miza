@@ -616,9 +616,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     u_perm = _vars.getPerms(u_id, guild)
 
     mention = "<@!" + str(client.user.id) + ">"
+    prefix = _vars.getPrefix(guild)
     op = False
     comm = msg
-    for check in (_vars.getPrefix(guild), mention):
+    for check in (prefix, mention):
         if comm.startswith(check):
             comm = comm[len(check):]
             op = True
