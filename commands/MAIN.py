@@ -467,7 +467,7 @@ class prefix:
         pref[guild.id] = argv.strip(" ")
         update()
         return (
-            "```Successfully changed command prefix for " + uniStr(guild.id)
+            "```Successfully changed command prefix for " + uniStr(guild.name)
             + " to " + argv + "```"
         )
 
