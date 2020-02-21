@@ -1492,6 +1492,8 @@ class player:
         else:
             if not auds.player["type"]:
                 emoji = bytes()
+            elif type(reaction) is bytes:
+                emoji = reaction
             else:
                 try:
                     emoji = reaction.emoji

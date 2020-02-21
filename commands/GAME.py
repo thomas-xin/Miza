@@ -229,7 +229,6 @@ class text2048:
             return
         gamestate = ast.literal_eval(argv.replace("A", "[").replace("B", "]").replace("C", ",").replace("D", "-"))
         if reaction is not None:
-            reac = str(reaction)
             if not reac in self.directions:
                 return
             r = self.directions[reac]
