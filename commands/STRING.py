@@ -120,7 +120,7 @@ class translate:
             count = 1
             end = ""
         response = "**" + user.name + "**:"
-        #print(string, dest, source)
+        print(string, dest, source)
         for i in range(count):
             for t in trans:
                 try:
@@ -131,6 +131,6 @@ class translate:
                     source, dest = dest, source
                     break
                 except:
-                    if t == trans[-1]:
+                    if t == trans[-1] and i == count - 1:
                         raise
         return response + end

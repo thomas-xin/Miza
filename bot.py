@@ -169,7 +169,10 @@ class main_data:
         try:
             g_id = guild.id
         except:
-            g_id = int(guild)
+            try:
+                g_id = int(guild)
+            except TypeError:
+                g_id = 0
         return self.data["prefixes"].get(g_id, "~")
 
     def getPerms(self, user, guild):
@@ -409,20 +412,6 @@ class main_data:
 
     def verifyURL(self, f):
         return f.strip(" ").translate(self.utrans)
-
-    def getVar(self, g_id):
-        var = self.updaters["variables"]
-        data = var.data
-        if g_id not in data:
-            data[g_id] = var.create()
-        if data[g_id] is None:
-            data.pop(g_id)
-            var.update()
-            raise OverflowError(
-                "Unfortunately the variable cache for this server has become "
-                + "too large, and has been deleted. Please try again."
-            )
-        return data[g_id].data
 
     async def evalMath(self, f, guild):
         try:
