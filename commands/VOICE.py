@@ -1488,7 +1488,7 @@ class player:
         orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]) + "\n"
         if reaction is None and auds.player["type"]:
             for b in self.buttons:
-                await message.add_reaction(b)
+                await message.add_reaction(b.decode("utf-8"))
         else:
             if not auds.player["type"]:
                 emoji = bytes()

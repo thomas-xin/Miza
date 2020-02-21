@@ -240,7 +240,7 @@ class text2048:
             for react in self.directions:
                 rval = self.directions[react][0]
                 if rval & mode or rval == 0:
-                    await message.add_reaction(react)
+                    await message.add_reaction(react.decode("utf-8"))
             self.spawn(gamestate[0], mode, 1)
         if u_id == 0:
             username = "@everyone"
