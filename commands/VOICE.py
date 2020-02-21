@@ -1263,7 +1263,9 @@ class volume:
             else:
                 num = round(100. * orig, 9)
             return (
-                "```css\nCurrent audio " + op + " state in " + uniStr(guild.name)
+                "```css\nCurrent audio " + op
+                + " state" * (type(orig) is bool)
+                + " in " + uniStr(guild.name)
                 + ": " + uniStr(num) + ".```"
             )
         if op == "settings":
@@ -1271,8 +1273,8 @@ class volume:
         s_perm = _vars.getPerms(user, guild)
         if s_perm < 1:
             raise PermissionError(
-                "Insufficient permissions to change audio settings. Current permission level: " + uniStr(s_perm)
-                + ", required permission level: " + uniStr(1) + "."
+                "Insufficient permissions to change audio settings. Current permission level: "
+                + uniStr(s_perm) + ", required permission level: " + uniStr(1) + "."
             )
         if op is None:
             pos = auds.stats["position"]
@@ -1307,7 +1309,9 @@ class volume:
                 pass
         else:
             return (
-                "```css\nChanged audio " + op + " in " + uniStr(guild.name)
+                "```css\nChanged audio " + op
+                + " state" * (type(orig) is bool)
+                + " in " + uniStr(guild.name)
                 + " from " + uniStr(orig)
                 + " to " + uniStr(new) + ".```"
             )
