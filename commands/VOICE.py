@@ -1598,16 +1598,14 @@ class player:
                 await temp.delete()
             except discord.NotFound:
                 pass
-        if auds.queue:
+        if auds.queue and not auds.paused & 1:
             maxdel = auds.queue[0]["duration"] - auds.stats["position"] + 2
             delay = min(maxdel, auds.queue[0]["duration"] / self.barsize / abs(auds.stats["speed"]))
+            if delay > 20:
+                delay = 20
+            elif delay < 6:
+                delay = 6
         else:
-            delay = inf
-        if delay > 20:
-            delay = 20
-        elif delay < 6:
-            delay = 6
-        if auds.paused & 1:
             delay = inf
         auds.player["time"] = time.time() + delay
 

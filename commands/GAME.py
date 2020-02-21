@@ -231,9 +231,11 @@ class text2048:
         if reaction is not None:
             reac = reaction
             if not reac in self.directions:
+                print("FUCK")
                 return
             r = self.directions[reac]
             if not (r[0] & mode or r[0] == 0):
+                print("FUCK2")
                 return
             reaction = r[1]
         else:
