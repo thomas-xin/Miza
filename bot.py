@@ -486,6 +486,10 @@ class main_data:
                 msg = msg[1:]
             check = "callback-"
             msg = msg.split("\n")[0]
+            if reaction is not None:
+                reacode = str(reaction).encode("utf-8")
+            else:
+                reacode = None
             if msg.startswith(check):
                 msg = msg[len(check):]
                 args = msg.split("-")
@@ -503,7 +507,7 @@ class main_data:
                                     message=message,
                                     channel=message.channel,
                                     guild=message.guild,
-                                    reaction=str(reaction).encode("utf-8"),
+                                    reaction=reacode,
                                     user=user,
                                     perm=u_perm,
                                     vals=vals,
