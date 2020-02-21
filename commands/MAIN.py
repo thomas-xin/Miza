@@ -452,7 +452,7 @@ class prefix:
         pref = _vars.data["prefixes"]
         if not argv:
             return (
-                "```Current command prefix for " + uniStr(guild.id)
+                "```Current command prefix for " + uniStr(guild.name)
                 + ": " + _vars.getPrefix(guild) + "```"
             )
         req = inf
