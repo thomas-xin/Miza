@@ -448,8 +448,8 @@ class prefix:
         self.description = "Shows or changes the prefix for commands for this server."
         self.usage = "<prefix[]>"
 
-    async def __call__(self, argv, guild, perm, **void):
-        pref = self._vars.data["prefixes"]
+    async def __call__(self, argv, guild, perm, _vars, **void):
+        pref = _vars.data["prefixes"]
         if not argv:
             return (
                 "```Current command prefix for " + uniStr(guild.id)
