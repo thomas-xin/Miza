@@ -2305,7 +2305,7 @@ def subFunc(key, com, data_in, timeout):
     try:
         t = time.time()
         proc.busy = True
-        d = bytes(str(data_in), "utf-8") + b"\n"
+        d = repr(bytes(str(data_in), "utf-8")).encode("utf-8") + b"\n"
         print(d)
         proc.stdin.write(d)
         proc.stdin.flush()
