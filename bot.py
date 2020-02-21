@@ -618,12 +618,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         op = True
     elif msg.startswith(check):
         comm = msg[len(check):]
-        while len(comm) and comm[0] == " ":
+        while len(comm) and (comm[0] in " ~"):
             comm = comm[1:]
         op = True
     else:
-        op = False
-    if not comm:
         op = False
     suspended = _vars.isSuspended(u_id)
     if (suspended and op) or msg.replace(" ", "") == check:

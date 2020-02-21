@@ -223,6 +223,7 @@ class text2048:
                 i += 1
 
     async def _callback_(self, _vars, message, reaction, argv, user, perm, vals, **void):
+        print(user, message, reaction, argv)
         u_id, mode = [int(x) for x in vals.split("_")]
         if reaction is not None and u_id != user.id and u_id != 0 and perm < 3:
             return
