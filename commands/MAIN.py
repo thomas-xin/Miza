@@ -450,6 +450,7 @@ class prefix:
 
     async def __call__(self, argv, guild, perm, _vars, **void):
         pref = _vars.data["prefixes"]
+        update = self.data["prefixes"].update
         if not argv:
             return (
                 "```Current command prefix for " + uniStr(guild.name)
@@ -464,6 +465,7 @@ class prefix:
                 + ", Current level: " + uniStr(perm) + "."
             )
         pref[guild.id] = argv.strip(" ")
+        update()
         return (
             "```Successfully changed command prefix for " + uniStr(guild.id)
             + " to " + argv + "```"
