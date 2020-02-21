@@ -795,7 +795,7 @@ class queue:
                 names = names[0]
             if not "h" in flags:
                 return (
-                    "```css\n🎶 Added " + nonoHighlightuniStr(names)
+                    "```css\n🎶 Added " + noHighlight(uniStr(names))
                     + " to the queue! Estimated time until playing: "
                     + uniStr(sec2Time(total_duration)) + ". 🎶```", 1
                 )
