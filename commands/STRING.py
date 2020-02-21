@@ -139,10 +139,11 @@ class translate:
                     while returns[0] is None:
                         await asyncio.sleep(0.5)
                     output = returns[0]
+                    ex = issubclass(output.__class__, Exception)
                     try:
                         ex = issubclass(output, Exception)
                     except TypeError:
-                        ex = None
+                        pass
                     if ex:
                         raise output
                     output = output.text
