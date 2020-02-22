@@ -538,7 +538,11 @@ class updateColours:
                 delay = roles[r]
                 if not (self.counter + r) % delay:
                     col = colour2Raw(colourCalculation(xrand(1536)))
-                    await role.edit(colour=discord.Colour(col))
+                    try:
+                        await role.edit(colour=discord.Colour(col))
+                    except KeyError:
+                        _vars.blocked += 1
+                        break
                     self.count += 1
                     #print("Edited role " + role.name)
                 await asyncio.sleep(frand(2))

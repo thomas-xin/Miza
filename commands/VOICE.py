@@ -675,74 +675,97 @@ class queue:
         elapsed = auds.stats["position"]
         q = _vars.updaters["playlists"].audio[guild.id].queue
         if not len(argv.replace(" ", "")):
+            v = "v" in flags
             if not len(q):
                 return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```", 1
-            if "v" in flags:
-                if auds.stats["loop"]:
-                    totalTime = inf
-                else:
-                    if auds.reverse and len(auds.queue):
-                        totalTime = elapsed - auds.queue[0]["duration"]
-                    else:
-                        totalTime = -elapsed
-                    for e in q:
-                        totalTime += e["duration"]
-                cnt = len(q)
-                info = (
-                    "`" + uniStr(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
-                    + uniStr(sec2Time(totalTime / auds.speed)) + "`"
-                )
+            if auds.stats["loop"]:
+                totalTime = inf
             else:
-                info = ""
-            currTime = 0
-            show = ""
-            for i in range(len(q)):
-                curr = "\n"
-                e = q[i]
-                curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
-                curr += "[" + uniStr(i) + "] "
-                if "v" in flags:
-                    curr += (
-                        uniStr(noHighlight(e["name"])) + ", URL: [" + e["url"] + "]"
-                        + ", Duration: " + uniStr(sec2Time(e["duration"]))
-                        + ", Added by: " + uniStr(e["added by"])
-                    )
+                if auds.reverse and len(auds.queue):
+                    totalTime = elapsed - auds.queue[0]["duration"]
                 else:
-                    curr += limStr(uniStr(noHighlight(e["name"])), 48)
+                    totalTime = -elapsed
+                for e in q:
+                    totalTime += e["duration"]
+            cnt = len(q)
+            info = (
+                uniStr(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
+                + uniStr(sec2Time(totalTime / auds.speed)) + "\n"
+            )
+            duration = q[0]["duration"]
+            sym = "⬜⬛"
+            barsize = 32
+            r = round(min(1, elapsed / duration) * barsize)
+            bar = sym[0] * r + sym[1] * (barsize - r)
+            countstr = "Currently playing [" + q[0]["name"] + "](" + q[0]["url"] + ")\n"
+            countstr += (
+                "`(" + uniStr(dhms(elapsed))
+                + "/" + uniStr(dhms(duration)) + ") "
+            )
+            countstr += bar + "`\n"
+            embed=discord.Embed(
+                title=" ",
+                description=info + countstr,
+                colour=colour2Raw(colourCalculation(xrand(1536))),
+            )
+            embed.set_author(name="Queue for " + uniStr(guild.name) + ":")
+            embstr = ""
+            embcnt = 0
+            currTime = 0
+            for i in range(len(q)):
+                if i >= len(q):
+                    break
+                e = q[i]
+                curr = "`"
+                curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
+                curr += "【" + uniStr(i) + "】` "
+                curr += "[" + limStr(noHighlight(e["name"]), 64 + 192 * v) + "](" + e["url"] + ")```css\n"
+                if v:
+                    curr += (
+                        "Duration: " + uniStr(sec2Time(e["duration"]))
+                        + ", Added by: " + uniStr(e["added by"]) + "\n"
+                    )
                 if auds.reverse and len(auds.queue):
                     estim = currTime + elapsed - auds.queue[0]["duration"]
                 else:
                     estim = currTime - elapsed
                 if estim > 0:
+                    curr += "Time until playing: "
+                    estimate = uniStr(sec2Time(estim / auds.speed))
                     if i <= 1 or not auds.stats["shuffle"]:
-                        curr += ", Time until playing: " + uniStr(sec2Time(estim / auds.speed))
+                        curr += estimate
                     else:
-                        curr += ", Time until playing: (" + uniStr(sec2Time(estim / auds.speed)) + ")"
+                        curr += "(" + estimate + ")"
                 else:
-                    curr += ", Remaining time: " + uniStr(sec2Time((estim + e["duration"]) / auds.speed))
-                if len(show) + len(info) + len(curr) < 1800:
-                    show += curr
+                    curr += "Remaining time: " + uniStr(sec2Time((estim + e["duration"]) / auds.speed))
+                curr += "```\n"
+                if len(embstr) + len(curr) < 1024:
+                    embstr += curr
+                elif embcnt < v * 4:
+                    embed.add_field(
+                        name="Page " + uniStr(1 + embcnt),
+                        value=embstr,
+                        inline=False,
+                    )
+                    embcnt += 1
+                    embstr = curr
                 else:
-                    show += uniStr("\nAnd " + str(len(q) - i) + " more...", 1)
+                    embed.set_footer(
+                        text=uniStr("And " + str(len(q) - i) + " more...", 1),
+                    )
                     break
                 if i <= 1 or not auds.stats["shuffle"]:
                     currTime += e["duration"]
-            duration = q[0]["duration"]
-            sym = "⬜⬛"
-            barsize = 16 * (1 + ("v" in flags))
-            r = round(min(1, elapsed / duration) * barsize)
-            bar = sym[0] * r + sym[1] * (barsize - r)
-            countstr = "Currently playing " + uniStr(noHighlight(q[0]["name"])) + "\n"
-            countstr += (
-                "(" + uniStr(dhms(elapsed))
-                + "/" + uniStr(dhms(duration)) + ") "
+            embed.add_field(
+                name="Page " + uniStr(1 + embcnt),
+                value=embstr,
+                inline=False,
             )
-            countstr += bar + "\n"
-            return (
-                "Queue for **" + guild.name + "**: "
-                + info + "\n```css\n"
-                + countstr + show + "```", 1
-            )
+            print(len(embed))
+            print(embed.to_dict())
+            return {
+                "embed": embed,
+            }
         else:
             auds.preparing = True
             output = [None]
@@ -1027,12 +1050,11 @@ class remove:
                     if "f" in flags:
                         auds.queue.clear()
                         auds.new()
-                        #print("Stopped audio playback in " + guild.name)
                         return "```fix\nRemoved all items from the queue.```"
                     raise LookupError
                 curr = auds.queue[pos]
             except LookupError:
-                raise IndexError("Entry " + uniStr(pos) + " is out of range.")
+                response += repr(IndexError("Entry " + uniStr(pos) + " is out of range."))
             if type(curr["skips"]) is list:
                 if "f" in flags or user.id == curr["u_id"] and not "v" in flags:
                     curr["skips"] = None
@@ -1043,12 +1065,15 @@ class remove:
             else:
                 curr["skips"] = None
             if curr["skips"] is not None:
-                response += (
-                    "Voted to remove " + uniStr(noHighlight(curr["name"]))
-                    + " from the queue.\nCurrent vote count: "
-                    + uniStr(len(curr["skips"])) + ", required vote count: "
-                    + uniStr(required) + ".\n"
-                )
+                if len(response) > 1200:
+                    response = limStr(response, 1200)
+                else:
+                    response += (
+                        "Voted to remove " + uniStr(noHighlight(curr["name"]))
+                        + " from the queue.\nCurrent vote count: "
+                        + uniStr(len(curr["skips"])) + ", required vote count: "
+                        + uniStr(required) + ".\n"
+                    )
         count = 0
         i = 0
         while i < len(auds.queue):
@@ -1065,10 +1090,16 @@ class remove:
                     + " has been removed from the queue.\n"
                 )
                 count += 1
-                continue
+                if count >= 4:
+                    break
             else:
                 i += 1
         if not "h" in flags:
+            if count >= 4:
+                return (
+                    "```css\n" + uniStr(count)
+                    + " items have been removed from the queue.```"
+                )
             return response + "```", 1
 
 
@@ -1140,6 +1171,36 @@ class seek:
             )
 
 
+def getDump(auds, guild):
+    try:
+        if len(auds.queue) > 20000:
+            raise OverflowError(
+                "Too many items in queue (" + uniStr(len(auds.queue))
+                + " > " + uniStr(20000) + ")."
+            )
+        q = copy.deepcopy(list(auds.queue))
+        s = copy.deepcopy(auds.stats)
+        for e in q:
+            if "download" in e:
+                e.pop("download")
+            e.pop("added by")
+            e.pop("u_id")
+            e.pop("skips")
+            if random.random() > 0.99:
+                time.sleep(0.001)
+        d = {
+            "stats": s,
+            "queue": q,
+        }
+        if auds.player is not None:
+            d["player"] = auds.player["type"]
+        d["stats"].pop("position")
+        return ["Queue data for **" + guild.name + "**:\n```json\n" + json.dumps(d) + "\n```"]
+    except Exception as ex:
+        print(traceback.format_exc())
+        return repr(ex)
+
+
 class dump:
     is_command = True
     server_only = True
@@ -1154,22 +1215,14 @@ class dump:
     async def __call__(self, guild, channel, user, client, _vars, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if not argv and not len(message.attachments):
-            q = copy.deepcopy(list(auds.queue))
-            s = copy.deepcopy(auds.stats)
-            for e in q:
-                if "download" in e:
-                    e.pop("download")
-                e.pop("added by")
-                e.pop("u_id")
-                e.pop("skips")
-            d = {
-                "stats": s,
-                "queue": q,
-            }
-            if auds.player is not None:
-                d["player"] = auds.player["type"]
-            d["stats"].pop("position")
-            return "Queue data for **" + guild.name + "**:\n```json\n" + json.dumps(d) + "\n```"
+            returns = [None]
+            doParallel(getDump, [auds, guild], returns)
+            while returns[0] is None:
+                await asyncio.sleep(0.3)
+            resp = returns[0]
+            if type(resp) is str:
+                raise eval(resp)
+            return resp[0]
         try:
             if len(message.attachments):
                 url = message.attachments[0].url
@@ -1208,7 +1261,10 @@ class dump:
             auds.stats.update(d["stats"])
             if not "h" in flags:
                 return "```css\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"
-        auds.queue.extend(q)
+        if len(auds.queue) > 1000:
+            doParallel(auds.queue.extend, [q])
+        else:
+            auds.queue.extend(q)
         auds.stats = d["stats"]
         if not "h" in flags:
             return "```css\nSuccessfully appended dump to queue for " + uniStr(guild.name) + ".```"
@@ -1660,7 +1716,7 @@ class updateQueues:
         #print("researching...")
         q = auds.queue
         for i in q:
-            if i in auds.queue and "research" in i:
+            if "research" in i:
                 try:
                     print(i["name"])
                     i.pop("research")
@@ -1669,10 +1725,11 @@ class updateQueues:
                     doParallel(ytdl.extractSingle, [i], returns)
                     while returns[0] is None and time.time() - t < 10:
                         await asyncio.sleep(0.3)
-                    await asyncio.sleep(0.4)
                 except:
                     print(traceback.format_exc())
-        await asyncio.sleep(1)
+            if random.random() > 0.99:
+                await asyncio.sleep(0.4)
+        await asyncio.sleep(2)
         auds.searching = max(auds.searching - 1, 0)
 
     def clearAudioCache(self):

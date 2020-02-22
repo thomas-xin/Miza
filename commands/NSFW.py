@@ -380,7 +380,10 @@ class neko:
         if "v" in flags:
             text = "Pulled from " + url
             return text
-        emb = discord.Embed(url=url)
+        emb = discord.Embed(
+            url=url,
+            colour=colour2Raw(colourCalculation(xrand(1536))),
+        )
         emb.set_image(url=url)
         print(url)
         asyncio.create_task(channel.send(embed=emb))
@@ -409,7 +412,10 @@ class lewd:
                 + "__**"
             )
             return text
-        emb = discord.Embed(url=url)
+        emb = discord.Embed(
+            url=url,
+            colour=colour2Raw(colourCalculation(xrand(1536))),
+        )
         emb.set_image(url=url)
         print(url)
         asyncio.create_task(channel.send(embed=emb))

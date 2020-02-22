@@ -455,7 +455,7 @@ class prefix:
         update = self.data["prefixes"].update
         if not argv:
             return (
-                "```Current command prefix for " + uniStr(guild.name)
+                "```css\nCurrent command prefix for " + uniStr(guild.name)
                 + ": " + _vars.getPrefix(guild) + "```"
             )
         req = inf
@@ -469,7 +469,7 @@ class prefix:
         pref[guild.id] = argv.strip(" ")
         update()
         return (
-            "```Successfully changed command prefix for " + uniStr(guild.name)
+            "```css\nSuccessfully changed command prefix for " + uniStr(guild.name)
             + " to " + argv + "```"
         )
 
