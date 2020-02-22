@@ -9,8 +9,6 @@ class customAudio(discord.AudioSource):
     
     length = 1920
     empty = numpy.zeros(length >> 1, float)
-    bass = butter(2, 1/9, btype="low", output="sos")
-    treble = butter(2, 1/9, btype="high", output="sos")
     filt = butter(1, 1/9, btype="low", output="sos")
     defaults = {
         "volume": 1,
@@ -250,10 +248,13 @@ class customAudio(discord.AudioSource):
                     lbass = numpy.array(left)
                     rbass = numpy.array(right)
                     if self.bassadj is not None:
+                        x = sqrt(abs(bassboost))
+                        f = min(8, 2 + round(x))
+                        g = max(0, (1 - x / 16) / 9)
                         if bassboost > 0:
-                            filt = self.bass
+                            filt = butter(f, 1/9, btype="low", output="sos")
                         else:
-                            filt = self.treble
+                            filt = butter(f, 1/9, btype="high", output="sos")
                         left += sosfilt(filt, numpy.concatenate((self.bassadj[0], left)))[size-16:-16] * bassboost
                         right += sosfilt(filt, numpy.concatenate((self.bassadj[1], right)))[size-16:-16] * bassboost
                     self.bassadj = [lbass, rbass]
