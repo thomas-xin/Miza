@@ -95,6 +95,22 @@ class hex2uni:
         return "```fix\n" + b.decode("utf-8") + "```"
 
 
+class uniFmt:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["fancy", "fancyText"]
+        self.min_level = 0
+        self.description = "Creates a representation of a text string using unicode fonts."
+        self.usage = "<0:font_id> <1:string>"
+
+    async def __call__(self, args, **void):
+        if len(args) < 2:
+            raise IndexError("Input string is empty.")
+        i = await self._vars.evalMath(args[0])
+        return "```fix\n" + uniStr(" ".join(args[1:]), i) + "```"
+
+
 def getTranslate(translator, string, dest, source):
     try:
         resp = translator.translate(string, dest, source)

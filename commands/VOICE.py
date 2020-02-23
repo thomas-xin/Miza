@@ -682,7 +682,7 @@ class queue:
             except discord.NotFound:
                 pass
         elapsed = auds.stats["position"]
-        q = _vars.updaters["playlists"].audio[guild.id].queue
+        q = auds.queue
         if not len(argv.replace(" ", "")):
             v = "v" in flags
             if not len(q):
@@ -812,13 +812,13 @@ class queue:
             for e in q:
                 total_duration += e["duration"]
             if auds.reverse and len(auds.queue):
-                total_duration += elapsed - auds.queue[0]["duration"]
+                total_duration += elapsed - q[0]["duration"]
             else:
                 total_duration -= elapsed
             total_duration = max(total_duration / auds.speed, dur / 128 + frand(0.5) + 2)
             if auds.stats["shuffle"]:
-                added = shuffle(list(added))
-            q.extend(added)
+                added = shuffle(added)
+            auds.queue.extend(added)
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")
             if "v" in flags:
@@ -1742,8 +1742,11 @@ class updateQueues:
             return
         auds.searching += 1
         #print("researching...")
+        searched = 0
         q = auds.queue
         for i in q:
+            if searched >= 32:
+                break
             if "research" in i:
                 try:
                     print(i["name"])
@@ -1752,7 +1755,8 @@ class updateQueues:
                     t = time.time()
                     doParallel(ytdl.extractSingle, [i], returns)
                     while returns[0] is None and time.time() - t < 10:
-                        await asyncio.sleep(0.3)
+                        await asyncio.sleep(0.6)
+                    searched += 1
                 except:
                     print(traceback.format_exc())
                     break

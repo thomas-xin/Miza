@@ -401,7 +401,6 @@ class loop:
         func2 = " ".join(func2.split(" ")[1:])
         for i in range(iters):
             loop = i < iters - 1
-            #print(loop)
             asyncio.create_task(callback(
                 message, func, cb_argv=func2, cb_flags=flags, loop=loop,
             ))
@@ -413,7 +412,7 @@ class state:
     is_command = True
 
     def __init__(self):
-        self.name = []
+        self.name = ["status"]
         self.min_level = 0
         self.description = "Shows the bot's current program state."
         self.usage = ""
@@ -427,14 +426,20 @@ class state:
             "```css"
             + "\nActive servers: " + uniStr(_vars.guilds)
             + ", Active shards: " + uniStr(1)
+            
             + ".\nActive processes: " + uniStr(active[0])
             + ", Active threads: " + uniStr(active[1])
             + ", Active coroutines: " + uniStr(active[2])
+            
             + ".\nPing latency: " + uniStr(latency)
+            
+            + ".\nConnected voice channels: " + uniStr(len(client.voice_clients))
+            
+            + ".\nCached files: " + uniStr(len(os.listdir("cache/")))
+            
             + ".\nCode size: " + uniStr(size[0]) + " bytes"
             + ", " + uniStr(size[1]) + " lines"
-            + ".\nConnected voice channels: " + uniStr(len(client.voice_clients))
-            + ".\nCached files: " + uniStr(len(os.listdir("cache/")))
+            
             + ".\nCPU usage: " + uniStr(round(stats[0], 3)) + "%"
             + ", RAM usage: " + uniStr(round(stats[1] / 1048576, 3)) + " MB"
             + ".```"

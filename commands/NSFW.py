@@ -419,23 +419,3 @@ class lewd:
         emb.set_image(url=url)
         print(url)
         asyncio.create_task(channel.send(embed=emb))
-
-
-class owoify:
-    is_command = True
-    time_consuming = True
-
-    def __init__(self):
-        self.name = ["owo"]
-        self.min_level = 0
-        self.description = "owo-ifies text."
-        self.usage = "<string>"
-
-    async def __call__(self, argv, **void):
-        if not argv:
-            raise IndexError("Input string is empty.")
-        output = ""
-        while argv:
-            output += nekos.owoify(argv[:200])
-            argv = argv[200:]
-        return "```\n" + output + "```"
