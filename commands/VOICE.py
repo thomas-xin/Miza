@@ -524,16 +524,24 @@ class videoDownloader:
                             })
                     else:
                         for entry in entries:
-                            dur = "duration" in entry
-                            temp = {
-                                "id": entry["id"],
-                                "name": entry["title"],
-                                "url": entry["url"],
-                                "duration": entry.get("duration", 60),
-                            }
-                            if not dur:
-                                temp["research"] = True
-                            output.append(temp)
+                            try:
+                                found = "duration" in entry
+                                if "title" in entry:
+                                    title = entry["title"]
+                                else:
+                                    title = entry["url"].split("/")[-1]
+                                    found = False
+                                temp = {
+                                    "id": entry["id"],
+                                    "name": title,
+                                    "url": entry["url"],
+                                    "duration": entry.get("duration", 60),
+                                }
+                                if not found:
+                                    temp["research"] = True
+                                output.append(temp)
+                            except:
+                                print(traceback.format_exc())
                 else:
                     dur = "duration" in resp
                     temp = {
@@ -815,12 +823,14 @@ class queue:
             if not len(names):
                 raise EOFError("No results for " + str(argv) + ".")
             if "v" in flags:
-                names = [subDict(i, "id") for i in added]
+                names = uniStr(hlist(subDict(i, "id") for i in added))
             elif len(names) == 1:
-                names = names[0]
+                names = uniStr(names[0])
+            elif len(names) >= 4:
+                names = uniStr(len(names)) + " items"
             if not "h" in flags:
                 return (
-                    "```css\n🎶 Added " + noHighlight(uniStr(names))
+                    "```css\n🎶 Added " + noHighlight(names)
                     + " to the queue! Estimated time until playing: "
                     + uniStr(sec2Time(total_duration)) + ". 🎶```", 1
                 )

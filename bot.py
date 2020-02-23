@@ -93,7 +93,10 @@ class main_data:
         sys.stdout.write(str(sep).join(str(i) for i in args) + end + suffix)
 
     async def fetch_user(self, u_id):
-        u_id = int(u_id)
+        try:
+            u_id = int(u_id)
+        except (ValueError, TypeError):
+            raise TypeError("Invalid user identifier: " + uniStr(u_id))
         try:
             user = client.get_user(u_id)
             if user is None:
@@ -107,7 +110,10 @@ class main_data:
         return user
 
     async def fetch_guild(self, g_id):
-        g_id = int(g_id)
+        try:
+            g_id = int(g_id)
+        except (ValueError, TypeError):
+            raise TypeError("Invalid server identifier: " + uniStr(g_id))
         try:
             guild = client.get_guild(g_id)
             if guild is None:
@@ -121,7 +127,10 @@ class main_data:
         return guild
 
     async def fetch_channel(self, c_id):
-        c_id = int(c_id)
+        try:        
+            c_id = int(c_id)
+        except (ValueError, TypeError):
+            raise TypeError("Invalid channel identifier: " + uniStr(c_id))
         try:
             channel = client.get_channel(c_id)
             if channel is None:
@@ -135,7 +144,10 @@ class main_data:
         return channel
 
     async def fetch_message(self, m_id, channel=None, user=None):
-        m_id = int(m_id)
+        try:
+            m_id = int(m_id)
+        except (ValueError, TypeError):
+            raise TypeError("Invalid message identifier: " + uniStr(m_id))
         message = None
         if m_id in self.cache["messages"]:
             return self.cache["messages"][m_id]
