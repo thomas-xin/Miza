@@ -1026,12 +1026,12 @@ class remove:
                 raise ValueError("Too many arguments for range input.")
             if l[0]:
                 num = await _vars.evalMath(l[0], guild.id)
-                left = round(num)
+                left = round(num) % len(auds.queue)
             else:
                 left = 0
             if l[1]:
                 num = await _vars.evalMath(l[1], guild.id)
-                right = round(num)
+                right = round(num) % len(auds.queue)
             else:
                 right = len(auds.queue)
             elems = xrange(left, right)

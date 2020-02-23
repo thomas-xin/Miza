@@ -253,7 +253,12 @@ class main_data:
 
     def getModule(self, module):
         try:
-            #print(main_data)
+            f = module
+            if f.endswith(".py"):
+                f = f[:-3]
+            else:
+                f = f[:-4]
+            f, module = module, f
             rename = module.lower()
             print("Loading module " + rename + "...")
             mod = __import__(module)
@@ -300,7 +305,7 @@ class main_data:
                 for c in commands:
                     c.data[u.name] = u
             self.categories[rename] = commands
-            self.modules[module] = mod
+            self.codeSize += getLineCount("commands/" + f)
         except:
             print(traceback.format_exc())
 
@@ -311,18 +316,8 @@ class main_data:
         totalsize = [0,0]
         totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
         totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p))
-        if not hasattr(self, "modules"):
-            self.modules = {}
         for f in files:
-            totalsize += getLineCount("commands/" + f)
-            if f.endswith(".py"):
-                f = f[:-3]
-            else:
-                f = f[:-4]
-            if f in self.modules:
-                importlib.reload(self.modules[f])
-            else:
-                doParallel(self.getModule, [f], state=2)
+            doParallel(self.getModule, [f], state=2)
         self.codeSize = totalsize
         __import__("smath", globals())
         subKill()
