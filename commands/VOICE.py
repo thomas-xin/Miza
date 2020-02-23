@@ -1092,13 +1092,12 @@ class remove:
             song = q[i]
             if song["skips"] is None or len(song["skips"]) >= required:
                 q.pop(i)
-                response += (
-                    uniStr(noHighlight(song["name"]))
-                    + " has been removed from the queue.\n"
-                )
+                if count < 4:
+                    response += (
+                        uniStr(noHighlight(song["name"]))
+                        + " has been removed from the queue.\n"
+                    )
                 count += 1
-                if count >= 4:
-                    break
             else:
                 i += 1
         if auds.queue:
