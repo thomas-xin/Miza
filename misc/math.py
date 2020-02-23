@@ -2,7 +2,157 @@ import sympy, time, sys, traceback
 import sympy.parsing.sympy_parser as parser
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
+
 key = "0"
+BF_PREC = 256
+BF_ALPHA = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+def tryWrapper(func):
+    def __call__(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except:
+            print(traceback.format_exc())
+    return __call__
+
+
+def printFile(s):
+    f = open("log.txt", "ab")
+    f.write(str(s).encode("utf-8"))
+    f.close()
+
+
+class baseFloat(sympy.Float):
+
+    def __base__(self, b):
+        self.base = b
+        return self
+
+    def __repr__(self):
+        if not hasattr(self, "base"):
+            self.base = 10
+        return base(self.__add__(0).__str__(), self.base, sympy.ceiling(self._prec * sympy.log(2, 10)))
+
+    @tryWrapper
+    def evalf(self, prec):
+        temp = baseFloat(self, prec * 1.25)
+        temp.__base__(self.base)
+        s = repr(temp)
+        d = sympy.ceiling(prec / sympy.log(self.base, 10))
+        try:
+            d += s.index(".")
+        except ValueError:
+            pass
+        if len(s) >= d:
+            f = s.lower()
+            up = f != s
+            s = f
+            x = s[d].lower()
+            s = s[:d]
+            if self.base != 64:
+                i = BF_ALPHA.index(x)
+                if i >= self.base / 2:
+                    s = s[:-1] + BF_ALPHA[(1 + BF_ALPHA.index(s[-1])) % len(BF_ALPHA)]
+            if up:
+                s = s.upper()
+        return s
+
+    def nsimplify(self, **void):
+        return self
+    
+    __str__ = __repr__
+
+
+def base(x, b, p, alphabet=None, upper=True):
+    """Converts a number from decimal to another base."""
+    if not alphabet:
+        alphabet = BF_ALPHA
+    x = sympy.Float(str(x), dps=p)
+    b = int(round(float(b)))
+    if b == 64:
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    elif b > len(alphabet):
+        raise ValueError("Invalid number base.")
+    if b < 2:
+        raise ValueError("Invalid number base.")
+    if x <= 0:
+        if x == 0:
+            return alphabet[0]
+        else:
+            return  "-" + base(-x, b, p, alphabet)
+    r = sympy.ceiling(p / sympy.log(b, 10))
+    for i in range(r):
+        if x == round(x):
+            break
+        x *= b
+        i += 1
+    x = int(round(x))
+    dp = bool(i)
+    s = ""
+    for j in range(i):
+        x, d = divmod(x, b)
+        if not j and r >= b / 2:
+            d += 1
+        s = alphabet[d] + s
+    s = "." * dp + s
+    while x:
+        x, d = divmod(x, b)
+        s = alphabet[d] + s
+    if upper:
+        s = s.upper()
+    return s
+
+def debase(x, b=10):
+    """Converts a number from a base to decimal."""
+    b = int(round(float(b)))
+    i = str(x).lower()
+    try:
+        i = str(sympy.Number(i).evalf(BF_PREC))
+    except:
+        pass
+    print(i)
+    try:
+        ind = i.index(".")
+        f = i[ind + 1:]
+        i = i[:ind]
+    except ValueError:
+        f = ""
+    temp = str(int(i, b)) + "."
+    fp = sympy.Rational(0)
+    m = 1
+    while f:
+        m *= b
+        fp += sympy.Rational(int(f[0], b)) / m
+        f = f[1:]
+    s = temp + str(fp.evalf(BF_PREC)).replace("0.", "")
+    print(s)
+    return rounder(sympy.Rational(s))
+
+def h2d(x):
+    return debase(x, 16)
+
+def o2d(x):
+    return debase(x, 8)
+
+def b2d(x):
+    return debase(x, 2)
+
+def arbFloat(x, b):
+    f = baseFloat(x, BF_PREC)
+    return f.__base__(b)
+
+def hexFloat(x):
+    f = baseFloat(x, BF_PREC)
+    return f.__base__(16)
+
+def octFloat(x):
+    f = baseFloat(x, BF_PREC)
+    return f.__base__(8)
+
+def binFloat(x):
+    f = baseFloat(x, BF_PREC)
+    return f.__base__(2)
+
 
 def plot(*args, **kwargs):
     if "show" in kwargs:
@@ -53,6 +203,18 @@ def factorize(*args):
             output.append(k)
     return output
 
+def rounder(x):
+    try:
+        if x == int(x):
+            return int(x)
+        f = int(round(x))
+        if x == f:
+            return f
+    except:
+        pass
+    return x
+
+
 _globals = dict(sympy.__dict__)
 plots = (
     "plot",
@@ -66,6 +228,14 @@ plots = (
 for i in plots:
     _globals[i] = globals()[i]
 _globals.update({
+    "base": arbFloat,
+    "h2d": h2d,
+    "o2d": o2d,
+    "b2d": b2d,
+    "hex": hexFloat,
+    "dec": debase,
+    "oct": octFloat,
+    "bin": binFloat,
     "plt": plot,
     "factors": sympy.factorint,
     "factorize": factorize,
@@ -118,18 +288,6 @@ sym_tr += (
     parser.rationalize,
 )
 
-
-def rounder(x):
-    try:
-        if x == int(x):
-            return int(x)
-        elif x == round(x):
-            return round(x)
-    except:
-        pass
-    return x
-
-
 translators = {
     "√": "sqrt ",
     "°": " deg",
@@ -163,7 +321,6 @@ translators = {
     "ψ": "psi",
     "ω": "omega",
     "∞": "oo",
-    "ℂ": "z",
     "ℯ": "e",
 }
 
@@ -173,6 +330,11 @@ replacers = {
     "NaN": "nan",
     "TRUE": "True",
     "FALSE": "False",
+    "0x": "h2d ",
+    "0o": "o2d ",
+    "0b": "b2d ",
+    "coo": "zoo",
+    "cinf": "zoo",
 }
 
 ftrans = "".maketrans(translators)
@@ -189,19 +351,30 @@ def prettyAns(f):
         mat_symbol_style="bold",
     ).replace("zoo", "ℂ∞").replace("nan", "NaN")
 
-
 def evalSym(f, prec=64, r=False):
+    global BF_PREC
+    BF_PREC = sympy.ceiling(int(prec) * 1.25)
     r = int(r)
     prec = int(prec)
+    f = f.translate(ftrans)
     for i in replacers:
         f = f.replace(i, replacers[i])
     f = parser.parse_expr(
-        f.translate(ftrans),
+        f,
         local_dict=None,
         global_dict=_globals,
         transformations=sym_tr,
     )
     try:
+        if hasattr(f, "__class__") and issubclass(f.__class__, baseFloat):
+            a = str(f.evalf(prec))
+            try:
+                b = str(prettyAns(sympy.Rational(str(f.num))))
+            except:
+                b = str(prettyAns(sympy.Number(str(f.num))))
+            if b == a:
+                b = ""
+            return [a, b]
         f = sympy.simplify(f)
     except:
         p = prettyAns(f)
@@ -209,8 +382,10 @@ def evalSym(f, prec=64, r=False):
             p = ""
         return [f, p]
     for i in sympy.preorder_traversal(f):
-        if isinstance(i, sympy.Float):
+        try:
             f = f.subs(i, rounder(i))
+        except:
+            pass
     if prec:
         try:
             y = f.evalf(prec, chop=True)
@@ -237,7 +412,6 @@ def evalSym(f, prec=64, r=False):
         if p == convAns(f):
             p = ""
         return [f, p]
-
 
 def readline(stream):
     output = ""
@@ -273,6 +447,7 @@ while True:
         sys.stdout.write(repr(s.encode("utf-8")) + "\n")
         sys.stdout.flush()
     except Exception as ex:
+        raise
         sys.stdout.write(repr(ex) + "\n")
         sys.stdout.flush()
     time.sleep(0.01)

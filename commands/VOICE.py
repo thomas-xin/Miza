@@ -1739,6 +1739,7 @@ class updateQueues:
                         await asyncio.sleep(0.3)
                 except:
                     print(traceback.format_exc())
+                    break
             if random.random() > 0.99:
                 await asyncio.sleep(0.4)
         await asyncio.sleep(2)
@@ -1754,10 +1755,11 @@ class updateQueues:
                 should_cache[s] = True
         for path in os.listdir("cache/"):
             found = False
-            for i in should_cache:
-                if i in path:
-                    found = True
-                    break
+            if "mp3" in path:
+                for i in should_cache:
+                    if i in path:
+                        found = True
+                        break
             if not found:
                 try:
                     os.remove("cache/" + path)
