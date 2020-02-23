@@ -992,6 +992,7 @@ async def updateLoop():
 @client.event
 async def on_ready():
     print("Successfully connected as " + str(client.user))
+    await _vars.getState()
     print("Servers: ")
     for guild in client.guilds:
         if guild.unavailable:
