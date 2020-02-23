@@ -166,7 +166,7 @@ class customAudio(discord.AudioSource):
             if shuffle and self.stats["shuffle"]:
                 if len(q) > 1:
                     temp = q.popleft()
-                    q = q.shuffle()
+                    q.shuffle()
                     q.appendleft(temp)
             if self.stats["loop"] and loop:
                 temp["id"] = temp["id"]
@@ -1414,7 +1414,7 @@ class randomize:
                 except KeyError:
                     pass
             temp = auds.queue[0]
-            auds.queue = auds.queue.shuffle()
+            shuffle(auds.queue)
             auds.queue.appendleft(temp)
             doParallel(auds.advance)
         return (
