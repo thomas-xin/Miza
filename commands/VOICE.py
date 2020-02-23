@@ -1085,13 +1085,18 @@ class remove:
                         + uniStr(len(curr["skips"])) + ", required vote count: "
                         + uniStr(required) + ".\n"
                     )
+        pops = deque()
         count = 0
         i = 1
         while i < len(auds.queue):
             q = auds.queue
             song = q[i]
             if song["skips"] is None or len(song["skips"]) >= required:
-                q.pop(i)
+                if count <= 3:
+                    q.pop(i)
+                else:
+                    pops.append(i)
+                    i += 1
                 if count < 4:
                     response += (
                         uniStr(noHighlight(song["name"]))
@@ -1100,6 +1105,7 @@ class remove:
                 count += 1
             else:
                 i += 1
+        auds.queue.pops(pops)
         if auds.queue:
             song = auds.queue[0]
             if song["skips"] is None or len(song["skips"]) >= required:

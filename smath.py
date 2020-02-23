@@ -1685,10 +1685,15 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @blocking
     def delitems(self, iterable):
+        popped = False
         for i in iterable:
             self.data.pop(i + self.offs)
-        self.reconstitute(force=True)
+            popped = True
+        if popped:
+            self.reconstitute(force=True)
         return self
+
+    pops = delitems
 
     def __init__(self, iterable=(), maxoff=__hlist_maxoff__, **void):
         self.chash = None
