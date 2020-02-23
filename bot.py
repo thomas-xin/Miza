@@ -258,7 +258,7 @@ class main_data:
                 f = f[:-3]
             else:
                 f = f[:-4]
-            f, module = module, f
+            path, module = module, f
             rename = module.lower()
             print("Loading module " + rename + "...")
             mod = __import__(module)
@@ -305,7 +305,7 @@ class main_data:
                 for c in commands:
                     c.data[u.name] = u
             self.categories[rename] = commands
-            self.codeSize += getLineCount("commands/" + f)
+            self.codeSize += getLineCount("commands/" + path)
         except:
             print(traceback.format_exc())
 
