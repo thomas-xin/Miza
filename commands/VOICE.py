@@ -1733,7 +1733,7 @@ class updateQueues:
         self.audiocache = {}
         self.clearAudioCache()
 
-    def sendUpdateRequest(self, **void):
+    def sendUpdateRequest(self, *args, **void):
         self._vars.doUpdate = True
 
     async def research(self, auds):

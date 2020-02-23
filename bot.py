@@ -316,9 +316,9 @@ class main_data:
         totalsize = [0,0]
         totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
         totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p))
+        self.codeSize = totalsize
         for f in files:
             doParallel(self.getModule, [f], state=2)
-        self.codeSize = totalsize
         __import__("smath", globals())
         subKill()
 
