@@ -552,7 +552,6 @@ class videoDownloader:
                     if not dur:
                         temp["research"] = True
                     output.append(temp)
-            #sys.stdout.write(repr(output) + "\n\n")
             return output
         except:
             if force != "spotify":
@@ -561,7 +560,7 @@ class videoDownloader:
             return 0
 
     def search(self, item, force=False):
-        item = item.strip("< >").replace("\n", "")
+        item = item.strip("< >\r\n\t")
         while self.requests > 4:
             time.sleep(0.1)
         if time.time() - self.lastsearch > 86400:
@@ -779,14 +778,15 @@ class queue:
             auds.preparing = True
             output = [None]
             doParallel(ytdl.search, [argv], output)
-            await channel.trigger_typing()
+            if not "h" in flags:
+                await channel.trigger_typing()
             while output[0] is None:
                 await asyncio.sleep(0.3)
             res = output[0]
             if type(res) is str:
                 raise ConnectionError(res)
             dur = 0
-            added = []
+            added = deque()
             names = []
             for e in res:
                 name = e["name"]
@@ -1738,10 +1738,8 @@ class updateQueues:
 
     async def research(self, auds):
         if auds.searching >= 1:
-            #print("researching blocked.")
             return
         auds.searching += 1
-        #print("researching...")
         searched = 0
         q = auds.queue
         for i in q:
@@ -1749,13 +1747,13 @@ class updateQueues:
                 break
             if "research" in i:
                 try:
-                    print(i["name"])
                     i.pop("research")
                     returns = [None]
                     t = time.time()
                     doParallel(ytdl.extractSingle, [i], returns)
                     while returns[0] is None and time.time() - t < 10:
                         await asyncio.sleep(0.6)
+                    print(i["name"])
                     searched += 1
                 except:
                     print(traceback.format_exc())
@@ -1808,7 +1806,6 @@ class updateQueues:
                     playing = auds.is_playing and vc.is_playing() or auds.is_loading
                     membs = [m for m in channel.members if m.id != client.user.id]
                     cnt = len(membs)
-                    #print(cnt, client.user.id)
                 except KeyError:
                     continue
                 if not cnt or getattr(auds, "dead", 0):
@@ -1821,7 +1818,6 @@ class updateQueues:
                         )
                         sent = await channel.send(msg)
                         await sent.add_reaction("❎")
-                        #print(msg)
                     except KeyError:
                         pass
                     await vc.disconnect(force=True)

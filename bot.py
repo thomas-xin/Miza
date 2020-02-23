@@ -730,7 +730,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             c = b.replace("<", "'")
                             d = c.replace(">", "'")
                             try:
-                                args = shlex.split(d)
+                                args = shlex.split(d.replace("\n", " ").replace("\r", "").replace("\t", " "))
                             except ValueError:
                                 args = d.split(" ")
                         for a in range(len(args)):
