@@ -177,7 +177,6 @@ class customAudio(discord.AudioSource):
             self.queue = q
         if self.player:
             self.player["time"] = 2
-        return len(q)
 
     async def updatePlayer(self):
         curr = self.player
@@ -1087,16 +1086,12 @@ class remove:
                         + uniStr(required) + ".\n"
                     )
         count = 0
-        i = 0
+        i = 1
         while i < len(auds.queue):
             q = auds.queue
             song = q[i]
             if song["skips"] is None or len(song["skips"]) >= required:
-                if i == 0:
-                    auds.advance(False, not count)
-                    auds.new()
-                else:
-                    q.pop(i)
+                q.pop(i)
                 response += (
                     uniStr(noHighlight(song["name"]))
                     + " has been removed from the queue.\n"
@@ -1106,6 +1101,16 @@ class remove:
                     break
             else:
                 i += 1
+        if auds.queue:
+            song = auds.queue[0]
+            if song["skips"] is None or len(song["skips"]) >= required:
+                doParallel(auds.advance, [False, not count])
+                auds.new()
+                response += (
+                    uniStr(noHighlight(song["name"]))
+                    + " has been removed from the queue.\n"
+                )
+                count += 1
         if not "h" in flags:
             if count >= 4:
                 return (
@@ -1398,9 +1403,15 @@ class randomize:
     async def __call__(self, guild, channel, user, client, _vars, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if len(auds.queue) > 1:
-            temp = auds.queue.popleft()
+            for i in range(3):
+                try:
+                    auds.queue[i].pop("download")
+                except KeyError:
+                    pass
+            temp = auds.queue[0]
             auds.queue = auds.queue.shuffle()
             auds.queue.appendleft(temp)
+            doParallel(auds.advance)
         return (
             "```css\nSuccessfully shuffled audio queue for "
             + uniStr(guild.name) + ".```"
@@ -1880,7 +1891,7 @@ class updateQueues:
                                     pass
                                 auds.preparing = False
                             elif not playing and auds.source is None:
-                                auds.advance()
+                                doParallel(auds.advance)
                         if not len(q) and not auds.preparing:
                             t = pl.get(guild.id, ())
                             if len(t):
