@@ -794,7 +794,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         await sent.add_reaction("❎")
     if not run and message.guild and u_id != client.user.id and orig:
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
-        temp = list(orig.lower())
+        temp = list(reconstitute(orig).lower())
         for i in range(len(temp)):
             if not(temp[i] in s):
                 temp[i] = " "

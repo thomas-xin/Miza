@@ -1,7 +1,9 @@
 import sympy, time, sys, traceback
 import sympy.parsing.sympy_parser as parser
+import sympy.parsing.latex as latex
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
+latex.__builtins__["print"] = lambda *void: None
 
 key = "0"
 BF_PREC = 256
@@ -357,15 +359,21 @@ def evalSym(f, prec=64, r=False):
     BF_PREC = sympy.ceiling(int(prec) * 1.25)
     r = int(r)
     prec = int(prec)
-    f = f.translate(ftrans)
+    f, y = f.translate(ftrans), f
     for i in replacers:
         f = f.replace(i, replacers[i])
-    f = parser.parse_expr(
-        f,
-        local_dict=None,
-        global_dict=_globals,
-        transformations=sym_tr,
-    )
+    try:
+        f = parser.parse_expr(
+            f,
+            local_dict=None,
+            global_dict=_globals,
+            transformations=sym_tr,
+        )
+    except SyntaxError:
+        try:
+            f = latex.parse_latex(y)
+        except:
+            f = latex.parse_latex(f)
     try:
         if hasattr(f, "__class__") and issubclass(f.__class__, baseFloat):
             a = str(f.evalf(prec))
