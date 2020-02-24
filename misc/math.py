@@ -363,6 +363,8 @@ def evalSym(f, prec=64, r=False):
     for i in replacers:
         f = f.replace(i, replacers[i])
     try:
+        if "\\" in y:
+            raise SyntaxError
         f = parser.parse_expr(
             f,
             local_dict=None,
