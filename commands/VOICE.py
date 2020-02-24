@@ -1406,10 +1406,8 @@ class randomize:
                     auds.queue[i].pop("download")
                 except KeyError:
                     pass
-            temp = auds.queue[0]
             shuffle(auds.queue)
-            auds.queue.appendleft(temp)
-            doParallel(auds.advance)
+            auds.seek(inf)
         return (
             "```css\nSuccessfully shuffled audio queue for "
             + uniStr(guild.name) + ".```"
