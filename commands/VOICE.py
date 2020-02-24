@@ -197,6 +197,9 @@ class customAudio(discord.AudioSource):
                 except discord.NotFound:
                     self.player = None
                     print(traceback.format_exc())
+        q = self.stats["quiet"]
+        if q == bool(q):
+            self.stats["quiet"] = bool(q)
         
     def read(self):
         try:
