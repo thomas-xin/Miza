@@ -156,17 +156,17 @@ class customAudio(discord.AudioSource):
         self.stats["position"] = pos
         return self.stats["position"]
 
-    def advance(self, loop=True, shuffle=True):
+    def advance(self, loop=True, shuffled=True):
         q = self.queue
         if q:
             if self.stats["loop"]:
                 temp = q[0]
             self.prev = q[0]["id"]
             q.pop(0)
-            if shuffle and self.stats["shuffle"]:
+            if shuffled and self.stats["shuffle"]:
                 if len(q) > 1:
                     temp = q.popleft()
-                    q.shuffle()
+                    shuffle(q)
                     q.appendleft(temp)
             if self.stats["loop"] and loop:
                 temp["id"] = temp["id"]
@@ -694,7 +694,7 @@ class queue:
             )
             duration = q[0]["duration"]
             sym = "⬜⬛"
-            barsize = 32
+            barsize = 24
             r = round(min(1, elapsed / duration) * barsize)
             bar = sym[0] * r + sym[1] * (barsize - r)
             countstr = "Currently playing [" + q[0]["name"] + "](" + q[0]["url"] + ")\n"
@@ -1014,19 +1014,31 @@ class remove:
             elems = [0]
         elif ":" in argv or ".." in argv:
             l = argv.replace("...", ":").replace("..", ":").split(":")
-            if len(l) > 2:
+            it = None
+            if len(l) > 3:
                 raise ValueError("Too many arguments for range input.")
+            elif len(l) > 2:
+                num = await _vars.evalMath(l[0], guild.id)
+                it = int(round(float(num)))
             if l[0]:
                 num = await _vars.evalMath(l[0], guild.id)
-                left = round(num) % len(auds.queue)
+                if num > len(auds.queue):
+                    num = len(auds.queue)
+                else:
+                    num = round(num) % len(auds.queue)
+                left = num
             else:
                 left = 0
             if l[1]:
                 num = await _vars.evalMath(l[1], guild.id)
-                right = round(num) % len(auds.queue)
+                if num > len(auds.queue):
+                    num = len(auds.queue)
+                else:
+                    num = round(num) % len(auds.queue)
+                right = num
             else:
                 right = len(auds.queue)
-            elems = xrange(left, right)
+            elems = xrange(left, right, it)
         else:
             elems = [0 for i in args]
             for i in range(len(args)):
@@ -1332,7 +1344,7 @@ class volume:
             if op in "loop shuffle quiet":
                 num = bool(orig)
             else:
-                num = round(100. * orig, 9)
+                num = round(100 * orig, 9)
             return (
                 "```css\nCurrent audio " + op
                 + " state" * (type(orig) is bool)
@@ -1457,7 +1469,7 @@ class player:
 	b'\xe2\x8f\x8f': 14,
         b'\xe2\x9b\x94': 15,
         }
-    barsize = 28
+    barsize = 24
 
     def __init__(self):
         self.name = []
@@ -1675,7 +1687,7 @@ class player:
             auds.player["message"] = message
             try:
                 await temp.delete()
-            except discord.NotFound:
+            except (TypeError, discord.NotFound):
                 pass
         if auds.queue and not auds.paused & 1:
             maxdel = auds.queue[0]["duration"] - auds.stats["position"] + 2

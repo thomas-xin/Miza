@@ -104,10 +104,10 @@ class uniFmt:
         self.description = "Creates a representation of a text string using unicode fonts."
         self.usage = "<0:font_id> <1:string>"
 
-    async def __call__(self, args, **void):
+    async def __call__(self, args, guild, **void):
         if len(args) < 2:
             raise IndexError("Input string is empty.")
-        i = await self._vars.evalMath(args[0])
+        i = await self._vars.evalMath(args[0], guild)
         return "```fix\n" + uniStr(" ".join(args[1:]), i) + "```"
 
 

@@ -207,7 +207,7 @@ class owoify:
     async def __call__(self, argv, **void):
         if not argv:
             raise IndexError("Input string is empty.")
-        return "```\n" + output.translate(self.otrans) + "```"
+        return "```\n" + argv.translate(self.otrans) + "```"
 
 
 class updateImages:
