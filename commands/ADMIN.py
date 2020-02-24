@@ -310,6 +310,7 @@ class rainbowRole:
         if not argv:
             if "d" in flags:
                 colours.pop(guild.id)
+                update()
                 return (
                     "```css\nRemoved all active dynamic role colours in "
                     + uniStr(guild.name) + ".```"
