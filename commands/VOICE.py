@@ -399,10 +399,6 @@ async def forceJoin(guild, channel, user, client, _vars):
         raise LookupError("Voice channel not found.")
     return auds
 
-
-class urlBypass(urllib.request.FancyURLopener):
-    version = "Mozilla/6." + str(xrand(10))
-
     
 class videoDownloader:
     
@@ -643,12 +639,8 @@ async def downloadTextFile(url):
         except Exception as ex:
             print(traceback.format_exc())
             return repr(ex)
-        
-    opener = urlBypass()
-    resp = opener.open(url)
-    rescode = resp.getcode()
-    if rescode != 200:
-        raise ConnectionError(rescode)
+
+    resp = urlOpen(url)
     returns = [None]
     doParallel(dreader, [resp], returns)
     while returns[0] is None:
@@ -1195,10 +1187,11 @@ class seek:
 
 def getDump(auds, guild):
     try:
-        if len(auds.queue) > 20000:
+        lim = 20000
+        if len(auds.queue) > lim:
             raise OverflowError(
                 "Too many items in queue (" + uniStr(len(auds.queue))
-                + " > " + uniStr(20000) + ")."
+                + " > " + uniStr(lim) + ")."
             )
         q = copy.deepcopy(list(auds.queue))
         s = copy.deepcopy(auds.stats)
@@ -1249,7 +1242,7 @@ class dump:
             if len(message.attachments):
                 url = message.attachments[0].url
             else:
-                url = _vars.verifyURL(argv)
+                url = verifyURL(argv)
             s = await downloadTextFile(url)
             s = s[s.index("{"):]
             if s[-4:] == "\n```":

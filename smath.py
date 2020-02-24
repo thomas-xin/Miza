@@ -2,9 +2,11 @@
 Adds many useful math-related functions.
 """
 
-import os, sys, asyncio, threading, subprocess, psutil, traceback, time, importlib
+import os, sys, asyncio, threading, subprocess, psutil, traceback, time
 import ctypes, collections, ast, copy, pickle
 import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys
+
+import urllib.request
 
 from scipy import interpolate, special
 from sympy.parsing.sympy_parser import parse_expr
@@ -2516,6 +2518,31 @@ def getLineCount(fn):
 def iscode(fn):
     fn = str(fn)
     return fn.endswith(".py") or fn.endswith(".pyw")# or fn.endswith(".c") or fn.endswith(".cpp")
+
+__umap = {
+    "<": "",
+    ">": "",
+    "|": "",
+    "*": "",
+    " ": "%20",
+}
+__utrans = "".maketrans(__umap)
+
+def verifyURL(f):
+    if "file:" in f:
+        raise PermissionError("Unable to open local file " + f + ".")
+    return f.strip(" ").translate(__utrans)
+
+class urlBypass(urllib.request.FancyURLopener):
+    version = "Mozilla/5." + str(xrand(1, 10))
+
+def urlOpen(url):
+    opener = urlBypass()
+    resp = opener.open(verifyURL(url))
+    if resp.getcode() != 200:
+        raise ConnectionError("Error " + str(resp.code))
+    return resp
+    s = resp.read().decode("utf-8")
 
 
 def logClear():

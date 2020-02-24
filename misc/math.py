@@ -292,6 +292,7 @@ translators = {
     "√": "sqrt ",
     "°": " deg",
     "÷": "/",
+    "×": "*",
     "⋅": "*",
     "·": "*",
     "∑": "sum ",
@@ -447,7 +448,6 @@ while True:
         sys.stdout.write(repr(s.encode("utf-8")) + "\n")
         sys.stdout.flush()
     except Exception as ex:
-        raise
         sys.stdout.write(repr(ex) + "\n")
         sys.stdout.flush()
     time.sleep(0.01)

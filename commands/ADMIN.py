@@ -327,11 +327,11 @@ class rainbowRole:
             if role in r.name.lower():
                 if "d" in flags:
                     try:
-                        colours.pop(r.id)
+                        guild_special.pop(r.id)
                     except KeyError:
                         pass
                 else:
-                    colours[r.id] = delay
+                    guild_special[r.id] = delay
         update()
         return (
             "Changed dynamic role colours for **" + guild.name

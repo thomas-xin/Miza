@@ -1,4 +1,4 @@
-import nekos, rule34, discord, urllib
+import nekos, rule34, discord
 from smath import *
 
 image_forms = [
@@ -12,10 +12,6 @@ image_forms = [
 
 
 def pull_e621(argv, data, thr, delay=5):
-
-    class urlBypass(urllib.request.FancyURLopener):
-        version = "Mozilla/5." + str(xrand(1, 10))
-    
     try:
         v1, v2 = 1, 1
         opener = urlBypass()

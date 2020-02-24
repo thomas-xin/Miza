@@ -1,5 +1,4 @@
 import discord, os, sys, datetime, json
-import urllib.request
 from smath import *
 
 sys.path.insert(1, "commands")
@@ -407,18 +406,6 @@ class main_data:
         ">": "))",
     }
     ctrans = "".maketrans(cmap)
-
-    umap = {
-        "<": "",
-        ">": "",
-        "|": "",
-        "*": "",
-        " ": "%20",
-    }
-    utrans = "".maketrans(umap)
-
-    def verifyURL(self, f):
-        return f.strip(" ").translate(self.utrans)
 
     async def evalMath(self, f, guild):
         try:

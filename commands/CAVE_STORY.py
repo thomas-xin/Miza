@@ -8,10 +8,6 @@ knackpy.__builtins__["print"] = print
 ffmpy.__builtins__["print"] = print
 
 
-class urlBypass(urllib.request.FancyURLopener):
-    version = "Mozilla/5." + str(xrand(1, 10))
-
-
 class DouClub:
     
     def __init__(self, c_id, c_sec):
@@ -65,12 +61,7 @@ def searchForums(query):
         "https://www.cavestory.org/forums/search/1/?q=" + query.replace(" ", "+")
         + "&t=post&c[child_nodes]=1&c[nodes][0]=33&o=date&g=1"
     )
-    opener = urlBypass()
-    resp = opener.open(url)
-    if resp.getcode() != 200:
-        raise ConnectionError("Error " + str(resp.getcode()))
-    s = resp.read().decode("utf-8")
-
+    s = urlOpen(url).read().decode("utf-8")
     output = []
     i = 0
     while i < len(s):
@@ -303,9 +294,9 @@ class cs_org2xm:
             org = message.attachments[0].url
             args = [""] + args
         else:
-            org = args[0]
+            org = verifyURL(args[0])
         if len(args) > 2:
-            wave = _vars.verifyURL(args[1])
+            wave = verifyURL(args[1])
         else:
             wave = None
             #wave = "https://cdn.discordapp.com/attachments/313292557603962881/674183355972976660/ORG210EN.DAT"
@@ -320,7 +311,7 @@ class cs_org2xm:
         doParallel(orgConv, [org, wave, fmt], returns, state=2)
         t = time.time()
         while returns[0] is None and time.time() - t < _vars.timeout - 1:
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.2)
         fn = returns[0]
         if fn is None:
             raise TimeoutError("Request timed out.")
