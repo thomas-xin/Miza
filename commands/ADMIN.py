@@ -542,14 +542,14 @@ class updateColours:
                     try:
                         await role.edit(colour=discord.Colour(col))
                     except KeyError:
-                        _vars.blocked += 1
+                        self._vars.blocked += 1
                         break
                     self.count += 1
                     #print("Edited role " + role.name)
                 await asyncio.sleep(frand(2))
             except discord.HTTPException as ex:
                 print(traceback.format_exc())
-                _vars.blocked += 20
+                self._vars.blocked += 20
                 break
 
     async def __call__(self):

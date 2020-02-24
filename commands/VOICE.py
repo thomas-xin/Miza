@@ -810,7 +810,7 @@ class queue:
                 total_duration += elapsed - q[0]["duration"]
             else:
                 total_duration -= elapsed
-            total_duration = max(total_duration / auds.speed, dur / 128 + frand(0.5) + 2)
+            total_duration = max(total_duration / auds.speed, float(dur / 128 + frand(0.5) + 2))
             if auds.stats["shuffle"]:
                 added = shuffle(added)
             auds.queue.extend(added)
