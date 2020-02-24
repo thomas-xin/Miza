@@ -424,7 +424,8 @@ class state:
         stats = _vars.currState
         return (
             "```css"
-            + "\nActive servers: " + uniStr(_vars.guilds)
+            + "\nActive users: " + uniStr(len(client.users))
+            + ", Active servers: " + uniStr(_vars.guilds)
             + ", Active shards: " + uniStr(1)
             
             + ".\nActive processes: " + uniStr(active[0])
