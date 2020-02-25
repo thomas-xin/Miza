@@ -1,4 +1,4 @@
-import asyncio, os, sys
+import discord, os, sys
 from smath import *
 
 
