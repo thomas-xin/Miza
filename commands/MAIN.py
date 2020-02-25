@@ -347,8 +347,8 @@ class suspend:
         self.usage = "<0:user> <1:value[]>"
 
     async def __call__(self, _vars, user, guild, args, **void):
-        update = self.data["suspended"].update
-        susp = _vars.data["suspended"]
+        update = self.data["users"].update
+        susp = _vars.data["users"]
         if len(args) < 2:
             if len(args) >= 1:
                 user = await _vars.fetch_user(_vars.verifyID(args[0]))
@@ -451,6 +451,7 @@ class info:
         self.usage = "<user>"
 
     async def __call__(self, argv, guild, _vars, user, **void):
+        member = True
         if argv:
             u_id = _vars.verifyID(argv)
             try:
@@ -458,7 +459,11 @@ class info:
                 if u is None:
                     raise EOFError
             except:
-                u = await guild.fetch_member(u_id)
+                try:
+                    u = await guild.fetch_member(u_id)
+                except:
+                    u = await _vars.fetch_user(u_id)
+                    member = False
         else:
             u = user
         name = u.name
@@ -469,37 +474,45 @@ class info:
         is_bot = u.bot
         is_self_owner = u.id == _vars.owner_id
         is_guild_owner = u.id == guild.owner_id
-        joined = getattr(u, "joined_at", guild.created_at)
+        if member:
+            joined = getattr(u, "joined_at", guild.created_at)
+        else:
+            joined = None
         created = u.created_at
         activity = "\n".join(str(i) for i in getattr(u, "activities", []))
         role = ", ".join(str(i) for i in getattr(u, "roles", []) if not i.is_default())
-        coms = _vars.data["users"][u.id]["suspended"]
-        emb = discord.Embed()
+        try:
+            coms = _vars.data["users"][u.id]["commands"]
+        except:
+            coms = 0
+        emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
         emb.set_thumbnail(url=url)
-        emb.set_author(name=name + "#" + disc)
-        if any(activity, is_sys, is_bot, is_self_owner, is_guild_owner):
-            d = "```css\n"
-            d += activity + "\n" * bool(activity)
+        emb.set_author(name=name + "#" + disc, icon_url=url, url=url)
+        d = "<@" + str(u.id) + ">"
+        if activity:
+            d += "```\n" + activity + "```"
+        if any((is_sys, is_bot, is_self_owner, is_guild_owner)):
+            d += "```css\n"
             d += "[Discord staff]\n" * is_sys
             d += "[Bot]\n" * is_bot
             d += "[My owner ❤️]\n" * is_self_owner
             d += "[Server owner]\n" * is_guild_owner
             d = d.strip("\n")
             d += "```"
-        else:
-            d = ""
         emb.description = d
-        emb.add_field(name="ID", value=str(u.id), inline=0)
-        emb.add_field(name="Creation date", value=str(created), inline=0)
-        emb.add_field(name="Join date", value=str(joined), inline=0)
-        emb.add_field(name="Commands used", value=str(coms), inline=0)
+        emb.add_field(name="User ID", value=str(u.id), inline=0)
+        emb.add_field(name="Creation time", value=str(created), inline=1)
+        if joined is not None:
+            emb.add_field(name="Join time", value=str(joined), inline=1)
+        if coms:
+            emb.add_field(name="Commands used", value=str(coms), inline=0)
         if dname and dname != name:
             emb.add_field(name="Nickname", value=dname, inline=0)
         if role:
             emb.add_field(name="Roles", value=role, inline=0)
-        print(embed.to_dict())
+        print(emb.to_dict())
         return {
-            "embed": embed,
+            "embed": emb,
         }
 
 
@@ -596,6 +609,7 @@ class updateUsers:
     async def _command_(self, user, command, **void):
         udata = self.data.setdefault(user.id, {"commands": 0, "suspended": 0})
         udata["commands"] += 1
+        self.update()
         tc = getattr(command, "time_consuming", False)
         self.suspclear = time.time() + 10 + (tc * 2) ** 2
         f = open(self.suspected, "w")

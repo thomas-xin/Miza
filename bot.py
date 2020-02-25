@@ -86,8 +86,8 @@ class main_data:
                         except:
                             pass
                         d = await self.fetch_channel(key)
-                        if d is not None:
-                            continue
+                    if d is not None:
+                        continue
                 except:
                     pass
                 print("Deleting " + str(key) + " from " + str(obj) + "...")
@@ -232,7 +232,7 @@ class main_data:
         u_id = int(u_id)
         if u_id in (self.owner_id, client.user.id):
             return False
-        return self.data["suspended"].get(u_id, False) >= time.time() + self.min_suspend * 86400
+        return self.data["users"].get(u_id, {"suspended": 0})["suspended"] >= time.time() + self.min_suspend * 86400
 
     def updatePart(self, force=False):
         if force:

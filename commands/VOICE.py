@@ -295,8 +295,8 @@ class customAudio(discord.AudioSource):
                         + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 24
                     ) * reverb
                     if self.feedback is not None:
-                        left -= sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size-16:-16]
-                        right -= sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size-16:-16]
+                        left -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size-16:-16]
+                        right -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size-16:-16]
                     self.feedback = (lfeed, rfeed)
                     a = 1 / 16
                     b = 1 - a

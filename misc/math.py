@@ -1,4 +1,4 @@
-import sympy, time, sys, traceback
+import sympy, time, sys, traceback, random
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
 import sympy.plotting as plotter
@@ -215,6 +215,14 @@ def rounder(x):
     except:
         pass
     return x
+
+def random(a=None, b=None):
+    if b is None:
+        x = random.random() * sympy.Float(1) / (random.random() + time.time() % 1)
+        if a is None:
+            return 
+    elif b is None:
+        return random.randint()
 
 
 _globals = dict(sympy.__dict__)
