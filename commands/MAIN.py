@@ -367,6 +367,39 @@ class suspend:
             )
 
 
+class prefix:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["changePrefix"]
+        self.min_level = 0
+        self.description = "Shows or changes the prefix for commands for this server."
+        self.usage = "<prefix[]>"
+
+    async def __call__(self, argv, guild, perm, _vars, **void):
+        pref = _vars.data["prefixes"]
+        update = self.data["prefixes"].update
+        if not argv:
+            return (
+                "```css\nCurrent command prefix for " + uniStr(guild.name)
+                + ": " + _vars.getPrefix(guild) + "```"
+            )
+        req = inf
+        if perm < req:
+            raise PermissionError(
+                "Insufficient priviliges to change command prefix for "
+                + uniStr(channel.name)
+                + ".\nRequred level: " + uniStr(req)
+                + ", Current level: " + uniStr(perm) + "."
+            )
+        pref[guild.id] = argv.strip(" ")
+        update()
+        return (
+            "```css\nSuccessfully changed command prefix for " + uniStr(guild.name)
+            + " to " + argv + "```"
+        )
+
+
 class loop:
     is_command = True
     time_consuming = 3
@@ -408,6 +441,68 @@ class loop:
             return "```css\nLooping [" + func + "] " + uniStr(iters) + " times...```"
 
 
+class info:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["userInfo"]
+        self.min_level = 0
+        self.description = "Shows information about the target user."
+        self.usage = "<user>"
+
+    async def __call__(self, argv, guild, _vars, user, **void):
+        if argv:
+            u_id = _vars.verifyID(argv)
+            try:
+                u = guild.get_member(u_id)
+                if u is None:
+                    raise EOFError
+            except:
+                u = await guild.fetch_member(u_id)
+        else:
+            u = user
+        name = u.name
+        dname = u.display_name
+        disc = u.discriminator
+        url = u.avatar_url
+        is_sys = u.system
+        is_bot = u.bot
+        is_self_owner = u.id == _vars.owner_id
+        is_guild_owner = u.id == guild.owner_id
+        joined = getattr(u, "joined_at", guild.created_at)
+        created = u.created_at
+        activity = "\n".join(str(i) for i in getattr(u, "activities", []))
+        role = ", ".join(str(i) for i in getattr(u, "roles", []) if not i.is_default())
+        coms = _vars.data["users"][u.id]["suspended"]
+        emb = discord.Embed()
+        emb.set_thumbnail(url=url)
+        emb.set_author(name=name + "#" + disc)
+        if any(activity, is_sys, is_bot, is_self_owner, is_guild_owner):
+            d = "```css\n"
+            d += activity + "\n" * bool(activity)
+            d += "[Discord staff]\n" * is_sys
+            d += "[Bot]\n" * is_bot
+            d += "[My owner ❤️]\n" * is_self_owner
+            d += "[Server owner]\n" * is_guild_owner
+            d = d.strip("\n")
+            d += "```"
+        else:
+            d = ""
+        emb.description = d
+        emb.add_field(name="ID", value=str(u.id), inline=0)
+        emb.add_field(name="Creation date", value=str(created), inline=0)
+        emb.add_field(name="Join date", value=str(joined), inline=0)
+        emb.add_field(name="Commands used", value=str(coms), inline=0)
+        if dname and dname != name:
+            emb.add_field(name="Nickname", value=dname, inline=0)
+        if role:
+            emb.add_field(name="Roles", value=role, inline=0)
+        print(embed.to_dict())
+        return {
+            "embed": embed,
+        }
+
+
 class state:
     is_command = True
 
@@ -447,39 +542,6 @@ class state:
         )
 
 
-class prefix:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["changePrefix"]
-        self.min_level = 0
-        self.description = "Shows or changes the prefix for commands for this server."
-        self.usage = "<prefix[]>"
-
-    async def __call__(self, argv, guild, perm, _vars, **void):
-        pref = _vars.data["prefixes"]
-        update = self.data["prefixes"].update
-        if not argv:
-            return (
-                "```css\nCurrent command prefix for " + uniStr(guild.name)
-                + ": " + _vars.getPrefix(guild) + "```"
-            )
-        req = inf
-        if perm < req:
-            raise PermissionError(
-                "Insufficient priviliges to change command prefix for "
-                + uniStr(channel.name)
-                + ".\nRequred level: " + uniStr(req)
-                + ", Current level: " + uniStr(perm) + "."
-            )
-        pref[guild.id] = argv.strip(" ")
-        update()
-        return (
-            "```css\nSuccessfully changed command prefix for " + uniStr(guild.name)
-            + " to " + argv + "```"
-        )
-
-
 class updatePrefix:
     is_update = True
     name = "prefixes"
@@ -502,14 +564,13 @@ class updateEnabled:
         pass
 
 
-class updateSuspended:
+class updateUsers:
     is_update = True
-    name = "suspended"
-    suspected = "suspected.json"
+    name = "users"
+    suspected = "users.json"
     user = True
 
     def __init__(self):
-        self.suspended = self.data
         self.suspclear = inf
         try:
             self.lastsusp = None
@@ -519,22 +580,13 @@ class updateSuspended:
             f.close()
             os.remove(self.suspected)
             if susp:
-                susp = int(susp)
-                if self.suspended.get(susp) is None:
-                    self.suspended[susp] = time.time() + 86400
-                else:
-                    self.suspended[susp] -= time.time()
-                    self.suspended[susp] *= 1.25
-                    if self.suspended[susp] > 86400 * 3.7:
-                        self.suspended[susp] += 86400 * (16 + frand(256))
-                    elif self.suspended[susp] > 86400 * 3.5:
-                        self.suspended[susp] += 86400 * (4 + frand(16))
-                    elif self.suspended[susp] > 86400 * 3:
-                        self.suspended[susp] += 86400 * (2 + frand(4))
-                    self.suspended[susp] += time.time() + 86400
-                self.suspended[susp] = float(self.suspended[susp])
-                print(susp, (self.suspended[susp] - time.time()) / 86400)
-                if (self.suspended[susp] - time.time()) / 86400 >= self._vars.min_suspend - 1:
+                u_id = int(susp)
+                udata = self.data[u_id]
+                days = max(0, (udata["suspended"] - time.time()) / 86400)
+                days **= 4
+                days += 1.125
+                udata["suspended"] = time.time() + days * 86400
+                if days >= self._vars.min_suspend - 1:
                     self.lastsusp = susp
                 self.update()
                 self.update(True)
@@ -542,6 +594,8 @@ class updateSuspended:
             pass
 
     async def _command_(self, user, command, **void):
+        udata = self.data.setdefault(user.id, {"commands": 0, "suspended": 0})
+        udata["commands"] += 1
         tc = getattr(command, "time_consuming", False)
         self.suspclear = time.time() + 10 + (tc * 2) ** 2
         f = open(self.suspected, "w")
@@ -561,12 +615,12 @@ class updateSuspended:
             u_susp = await _vars.fetch_user(self.lastsusp)
             self.lastsusp = None
             channel = await _vars.getDM(u_susp)
-            secs = self.suspended.get(u_susp.id, 0) - time.time()
+            secs = self.data.get(u_susp.id, 0) - time.time()
             msg = (
                 "Apologies for the inconvenience, but your account has been "
                 + "flagged as having attempted a denial-of-service attack.\n"
                 + "This will expire in `" + sec2Time(secs) + "`.\n"
-                + "If you believe this is an error, please notify <@!"
+                + "If you believe this is an error, please notify <@"
                 + str(_vars.owner_id) + "> as soon as possible."
             )
             print(
@@ -574,8 +628,3 @@ class updateSuspended:
                 + sec2Time(secs) + "."
             )
             await channel.send(msg)
-        l = list(self.suspended)
-        for u_id in l:
-            if self.suspended[u_id] < time.time():
-                self.suspended.pop(u_id)
-                self.update()

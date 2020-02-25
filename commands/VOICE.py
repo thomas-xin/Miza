@@ -1,5 +1,4 @@
 import discord, urllib, json, youtube_dl
-from scipy.signal import butter, sosfilt
 from smath import *
 
 youtube_dl.__builtins__["print"] = print
@@ -9,7 +8,7 @@ class customAudio(discord.AudioSource):
     
     length = 1920
     empty = numpy.zeros(length >> 1, float)
-    filt = butter(1, 1/9, btype="low", output="sos")
+    filt = signal.butter(1, 0.125, btype="low", output="sos")
     defaults = {
         "volume": 1,
         "reverb": 0,
@@ -254,12 +253,18 @@ class customAudio(discord.AudioSource):
                         f = min(8, 2 + round(x))
                         if bassboost > 0:
                             g = max(1 / 128, (1 - x / 64) / 9)
-                            filt = butter(f, g, btype="low", output="sos")
+                            filt = signal.butter(f, g, btype="low", output="sos")
                         else:
                             g = min(127 / 128, (1 + x / 64) / 9)
-                            filt = butter(f, g, btype="high", output="sos")
-                        left += sosfilt(filt, numpy.concatenate((self.bassadj[0], left)))[size-16:-16] * bassboost
-                        right += sosfilt(filt, numpy.concatenate((self.bassadj[1], right)))[size-16:-16] * bassboost
+                            filt = signal.butter(f, g, btype="high", output="sos")
+                        left += signal.sosfilt(
+                            filt,
+                            numpy.concatenate((self.bassadj[0], left))
+                        )[size-16:-16] * bassboost
+                        right += signal.sosfilt(
+                            filt,
+                            numpy.concatenate((self.bassadj[1], right))
+                        )[size-16:-16] * bassboost
                     self.bassadj = [lbass, rbass]
                 except:
                     print(traceback.format_exc())
@@ -764,8 +769,6 @@ class queue:
                 value=embstr,
                 inline=False,
             )
-            print(len(embed))
-            print(embed.to_dict())
             return {
                 "embed": embed,
             }
@@ -1238,7 +1241,7 @@ class dump:
 
     def __init__(self):
         self.name = []
-        self.min_level = 2
+        self.min_level = 1
         self.description = "Dumps or loads the currently playing audio queue state."
         self.usage = "<data{attached_file}> <append(?a)> <hide(?h)>"
 
@@ -1271,8 +1274,8 @@ class dump:
             e["added by"] = user.name
             e["u_id"] = user.id
             e["skips"] = []
-        if "player" in d:
-            await createPlayer(auds, p_type=d["player"])
+        if d.get("player", 0) == 1:
+            await createPlayer(auds, p_type=1)
         if auds.player is not None:
             auds.player["time"] = 1
         if auds.stats["shuffle"]:

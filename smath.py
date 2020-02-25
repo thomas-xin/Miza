@@ -8,7 +8,7 @@ import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys
 
 import urllib.request
 
-from scipy import interpolate, special
+from scipy import interpolate, special, signal
 from sympy.parsing.sympy_parser import parse_expr
 
 CalledProcessError = subprocess.CalledProcessError

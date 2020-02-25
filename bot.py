@@ -26,32 +26,6 @@ class main_data:
         "messages": {},
     }
     cachelim = 16384
-
-    class userGuild:
-
-        class userChannel:
-
-            def __init__(self, channel, **void):
-                self.recipient = channel.recipient
-                self.me = client.user.id
-                self.name = "DM"
-                self.id = channel.id
-                self.topic = None
-                self.is_nsfw = lambda: True
-                self.is_news = lambda: False
-                self.send = channel.send
-                self.history = channel.history
-                self.trigger_typing = channel.trigger_typing
-
-        def __init__(self, user, channel, **void):
-            self.channel = self.userChannel(channel)
-            self.id = self.channel.id
-            self.name = self.channel.name
-            self.members = [user, client.user]
-            self.channels = [self.channel]
-            self.me = self.channel.me
-            self.roles = []
-            self.unavailable = False
             
     def __init__(self):
         print("Initializing...")
@@ -176,24 +150,14 @@ class main_data:
         self.limitCache()
         return channel
 
-    async def fetch_message(self, m_id, channel=None, user=None):
+    async def fetch_message(self, m_id, channel=None):
         try:
             m_id = int(m_id)
         except (ValueError, TypeError):
             raise TypeError("Invalid message identifier: " + uniStr(m_id))
-        message = None
         if m_id in self.cache["messages"]:
             return self.cache["messages"][m_id]
-        if message is None and user is not None and user.id != client.user.id:
-            try:
-                message = await user.fetch_message(m_id)
-            except discord.NotFound:
-                pass
-        if message is None and channel is not None:
-            try:
-                message = await channel.fetch_message(m_id)
-            except discord.NotFound:
-                pass
+        message = await channel.fetch_message(m_id)
         if message is not None:
             self.cache["messages"][m_id] = message
             self.limitCache()
@@ -287,10 +251,7 @@ class main_data:
     def getModule(self, module):
         try:
             f = module
-            if f.endswith(".py"):
-                f = f[:-3]
-            else:
-                f = f[:-4]
+            f = ".".join(f.split(".")[:-1])
             path, module = module, f
             rename = module.lower()
             print("Loading module " + rename + "...")
@@ -603,6 +564,46 @@ class main_data:
         else:
             suffix = ""
         self.print(data, suffix=suffix)
+
+    class userGuild:
+
+        class userChannel:
+
+            def __init__(self, channel, **void):
+                self.recipient = channel.recipient
+                self.me = client.user.id
+                self.id = channel.id
+                self.send = channel.send
+                self.history = channel.history
+                self.created_at = channel.created_at
+                self.trigger_typing = channel.trigger_typing
+
+            name = "DM"
+            topic = None
+            is_nsfw = lambda: True
+            is_news = lambda: False
+
+        def __init__(self, user, channel, **void):
+            self.channel = self.system_channel = self.rules_channel = self.userChannel(channel)
+            self.id = self.channel.id
+            self.name = self.channel.name
+            self.members = [user, client.user]
+            self.channels = [self.channel]
+            self.me = self.channel.me
+            self.created_at = self.channel.created_at
+            self.roles = []
+            self.emojis = []
+            self.get_channel = lambda *void1, **void2: self.channel
+            self.owner_id = client.user.id
+            fetch_member = _vars.fetch_user
+
+        filesize_limit = 8388608
+        bitrate_limit = 98304
+        emoji_limit = 0
+        large = False
+        description = ""
+        max_members = 2
+        unavailable = False
 
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_flags=None, loop=False):
@@ -1060,7 +1061,7 @@ async def on_raw_reaction_add(payload):
     try:
         channel = await _vars.fetch_channel(payload.channel_id)
         user = await _vars.fetch_user(payload.user_id)
-        message = await _vars.fetch_message(payload.message_id, channel=channel, user=user)
+        message = await _vars.fetch_message(payload.message_id, channel=channel)
     except discord.NotFound:
         return
     if user.id != client.user.id:
@@ -1074,7 +1075,7 @@ async def on_raw_reaction_remove(payload):
     try:
         channel = await _vars.fetch_channel(payload.channel_id)
         user = await _vars.fetch_user(payload.user_id)
-        message = await _vars.fetch_message(payload.message_id, channel=channel, user=user)
+        message = await _vars.fetch_message(payload.message_id, channel=channel)
     except discord.NotFound:
         return
     if user.id != client.user.id:

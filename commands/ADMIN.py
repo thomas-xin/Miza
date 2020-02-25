@@ -462,6 +462,7 @@ class updateFollows:
                         curr[0] = checker
                         curr[1] = xrand(-1, 2)
                     curr[2] = u_id
+                    print(curr)
             try:
                 for r in following[g_id]["reacts"]:
                     if r in words:
