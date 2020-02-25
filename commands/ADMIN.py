@@ -88,7 +88,10 @@ class ban:
         update = self.data["bans"].update
         bans = _vars.data["bans"]
         dtime = datetime.datetime.utcnow().timestamp()
-        check = args[0].lower()
+        if args:
+            check = args[0].lower()
+        else:
+            check = ""
         if not args or "everyone" in check or "here" in check:
             t_user = None
             t_perm = inf
@@ -179,7 +182,10 @@ class ban:
             secs = tm * 3600
             if tm >= 0:
                 try:
-                    asyncio.create_task(guild.ban(t_user, reason=msg, delete_message_days=0))
+                    if len(users) > 3:
+                        asyncio.create_task(guild.ban(t_user, reason=msg, delete_message_days=0))
+                    else:
+                        await guild.ban(t_user, reason=msg, delete_message_days=0)
                     await asyncio.sleep(0.1)
                 except Exception as ex:
                     response += "\nError: " + repr(ex)
@@ -577,8 +583,6 @@ async def getBans(_vars, guild):
                 "reason": ban.reason,
                 "channel": None,
             }
-    if not len(bans) and guild.id in _vars.data["bans"]:
-        _vars.data["bans"].pop(guild.id)
     return bans
 
 

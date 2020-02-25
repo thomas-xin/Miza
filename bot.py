@@ -91,6 +91,40 @@ class main_data:
             suffix = self.suffix
         sys.stdout.write(str(sep).join(str(i) for i in args) + end + suffix)
 
+    async def verifyDelete(self, obj):
+        started = hasattr(self, "started")
+        if obj.checking:
+            return
+        obj.checking = True
+        data = obj.data
+        for key in tuple(data):
+            if key != 0 and type(key) is not str:
+                try:
+                    if getattr(obj, "user", None):
+                        d = await self.fetch_user(key)
+                    else:
+                        if not len(data[key]) and not started:
+                            raise EOFError
+                        try:
+                            d = await self.fetch_guild(key)
+                            if d is not None:
+                                continue
+                        except:
+                            pass
+                        d = await self.fetch_channel(key)
+                        if d is not None:
+                            continue
+                except:
+                    pass
+                print("Deleting " + str(key) + " from " + str(obj) + "...")
+                data.pop(key)
+                obj.update()
+            if random.random() > .9:
+                await asyncio.sleep(0.2)
+        await asyncio.sleep(2)
+        obj.checking = False
+        self.started = True
+
     async def fetch_user(self, u_id):
         try:
             u_id = int(u_id)
@@ -295,6 +329,7 @@ class main_data:
                         var._vars = self
                         obj = var()
                         obj.busy = False
+                        obj.checking = False
                         self.updaters[obj.name] = obj
                         updates.append(obj)
                         #print("Successfully loaded updater " + obj.__name__ + ".")
@@ -541,6 +576,7 @@ class main_data:
                 self.lastCheck = time.time()
                 for u in self.updaters.values():
                     asyncio.create_task(u())
+                    asyncio.create_task(self.verifyDelete(u))
             except:
                 print(traceback.format_exc())
             self.busy = False

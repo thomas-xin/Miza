@@ -506,6 +506,7 @@ class updateSuspended:
     is_update = True
     name = "suspended"
     suspected = "suspected.json"
+    user = True
 
     def __init__(self):
         self.suspended = self.data
