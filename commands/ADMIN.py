@@ -513,8 +513,8 @@ class updateLogs:
             emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
             emb.set_author(name=name_id, icon_url=url, url=url)
             emb.description = (
-                "Message edited in **"
-                + before.channel.name + "**:"
+                "Message edited in #"
+                + before.channel.name + ":"
             )
             emb.add_field(name="Before", value=strMessage(before))
             emb.add_field(name="After", value=strMessage(after))
@@ -531,19 +531,25 @@ class updateLogs:
             try:
                 al = await guild.audit_logs(
                     limit=16,
-                    action=discord.AuditLogAction.message_delete
+                    action=discord.AuditLogAction.message_delete,
+                    after=datetime.datetime.utcnow() - datetime.timedelta(seconds=3),
                 ).flatten()
-                init = name_id
+                cu_id = self._vars.client.user.id
+                targ = u.id
+                init = "<@" + str(targ) + ">"
                 for e in reversed(al):
-                    if e.target.id == u.id:
-                        init = e.user.name + "#" + e.user.discriminator
+                    if e.target.id == u.id and e.extra.channel.id == message.channel.id:
+                        targ = e.user.id
+                        init = "<@" + str(targ) + ">" #e.user.name + "#" + e.user.discriminator
+                if u.id == targ == cu_id:
+                    return
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
             channel = await self._vars.fetch_channel(c_id)
             emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
             emb.set_author(name=name_id, icon_url=url, url=url)
             emb.description = (
-                "**" + init + "** deleted message from **"
+                init + " deleted message from **#"
                 + message.channel.name + "**:"
             )
             emb.add_field(name="Content", value=strMessage(message))

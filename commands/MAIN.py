@@ -81,7 +81,7 @@ class help:
                             + "\nCategory: " + c
                             + "\nAliases: " + str(com.name)
                             + "\nEffect: " + description
-                            + "\nUsage: ~" + name + " " + usage
+                            + "\nUsage: " + prefix + name + " " + usage
                             + "\nRequired permission level: " + uniStr(min_level)
                             + "```"
                         )
@@ -104,7 +104,7 @@ class help:
                         show.append(
                             "\n" + prefix + com.__name__
                             + "\nEffect: " + com.description
-                            + "\nUsage: ~" + name + " " + usage
+                            + "\nUsage: " + prefix + name + " " + usage
                         )
             return (
                 "Commands for **" + user.name + "** in **" + c_name
@@ -128,10 +128,10 @@ class perms:
             if len(args) < 1:
                 t_user = user
             else:
-                if "everyone" in args[0] or "here" in args[0]:
+                if "@e" in args[0] or "everyone" in args[0] or "here" in args[0]:
                     return (
                         "Current user permissions for **" + guild.name + "**:\n```json\n"
-                        + str(_vars.perms[guild.id]).replace("'", '"') + "```"
+                        + str(_vars.data["perms"].get(guild.id, {})).replace("'", '"') + "```"
                     )
                 else:
                     t_user = await _vars.fetch_user(_vars.verifyID(args[0]))
@@ -701,7 +701,7 @@ class updateMessageCount:
                     data[u] += 1
                 else:
                     data[u] = 1
-                if not i & 4095:
+                if not i & 8191:
                     await asyncio.sleep(0.5)
                 i += 1
         self.data[guild.id] = data
