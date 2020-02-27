@@ -447,8 +447,53 @@ class info:
     def __init__(self):
         self.name = ["userInfo"]
         self.min_level = 0
-        self.description = "Shows information about the target user."
+        self.description = "Shows information about the target user or server."
         self.usage = "<user> <verbose(?v)>"
+
+    async def getGuildData(self, g, flags={}):
+        _vars = self._vars
+        url = str(g.icon_url)
+        name = g.name
+        u = g.owner
+        emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
+        emb.set_thumbnail(url=url)
+        emb.set_author(name=name, icon_url=url, url=url)
+        d = "Owner: <@" + str(u.id) + ">"
+        d += "```\n" + str(g.description) + "```"
+        emb.description = d
+        count = await _vars.updaters["counts"].getUserMessages(None, g)
+        if "v" in flags:
+            users = deque()
+            us = await _vars.updaters["counts"].getGuildMessages(g)
+            if type(us) is str:
+                top = us
+            else:
+                ul = sorted(
+                    us,
+                    key=lambda k: us[k],
+                    reverse=True,
+                )
+                for i in range(3):
+                    u_id = ul[i]
+                    users.append(
+                        "<@" + str(u_id) + ">: "
+                        + str(us[u_id])
+                    )
+                top = "\n".join(users)
+        else:
+            top = None
+        emb.add_field(name="Server ID", value=str(g.id), inline=0)
+        emb.add_field(name="User count", value=str(g.member_count), inline=1)
+        emb.add_field(name="Creation time", value=str(g.created_at), inline=1)
+        if "v" in flags:
+            emb.add_field(name="Region", value=str(g.region), inline=1)
+            emb.add_field(name="Nitro boosts", value=str(g.premium_subscription_count), inline=1)
+        if top is not None:
+            emb.add_field(name="Top users", value=top, inline=0)
+        print(emb.to_dict())
+        return {
+            "embed": emb,
+        }
 
     async def __call__(self, argv, guild, _vars, client, user, flags, **void):
         member = True
@@ -457,20 +502,36 @@ class info:
             try:
                 u = guild.get_member(u_id)
                 if u is None:
-                    raise EOFError
+                    raise LookupError
             except:
                 try:
                     u = await guild.fetch_member(u_id)
                 except:
-                    u = await _vars.fetch_user(u_id)
-                    member = False
+                    try:
+                        u = await _vars.fetch_user(u_id)
+                        member = False
+                    except:
+                        try:
+                            guild = await _vars.fetch_guild(u_id)
+                        except:
+                            channel = await _vars.fetch_channel(u_id)
+                            try:
+                                guild = channel.guild
+                            except AttributeError:
+                                guild = None
+                                u = channel.recipient
+                        if guild is not None:
+                            return await self.getGuildData(guild, flags)                        
         else:
             u = user
         name = u.name
         dname = u.display_name
         disc = u.discriminator
         url = u.avatar_url
-        is_sys = u.system
+        try:
+            is_sys = u.system
+        except AttributeError:
+            is_sys = False
         is_bot = u.bot
         is_self = u.id == client.user.id
         is_self_owner = u.id == _vars.owner_id
@@ -489,7 +550,7 @@ class info:
             except LookupError:
                 pass
             try:
-                msgs = await getUserMessageCount(u, guild)
+                msgs = await _vars.updaters["counts"].getUserMessages(u, guild)
             except LookupError:
                 pass
         emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
@@ -513,11 +574,11 @@ class info:
         if joined is not None:
             emb.add_field(name="Join time", value=str(joined), inline=1)
         if coms:
-            emb.add_field(name="Commands used", value=str(coms), inline=0)
+            emb.add_field(name="Commands used", value=str(coms), inline=1)
         if msgs:
             emb.add_field(name="Post count", value=str(msgs), inline=1)
         if dname and dname != name:
-            emb.add_field(name="Nickname", value=dname, inline=0)
+            emb.add_field(name="Nickname", value=dname, inline=1)
         if role:
             emb.add_field(name="Roles", value=role, inline=0)
         print(emb.to_dict())
@@ -565,39 +626,119 @@ class state:
         )
 
 
-async def getChannelHistory(channel, returns=[None]):
-    try:
-        history = channel.history(limit=None)
-        print(history)
-        messages = await history.flatten()
-        print(len(messages))
-        returns[0] = messages
-    except:
-        print(traceback.format_exc())
-        returns[0] = []
+class updateMessageCount:
+    is_update = True
+    name = "counts"
+    no_file = True
 
+    async def getUserMessages(self, user, guild):
+        c_id = self._vars.client.user.id
+        if guild is None or guild.owner_id == c_id:
+            channel = user.dm_channel
+            if channel is None:
+                return 0
+            messages = await channel.history(limit=None).flatten()
+            count = (1 for m in messages if m.author.id != c_id)
+            return sum(count)
+        if guild.id in self.data:
+            d = self.data[guild.id]
+            if type(d) is str:
+                return d
+            if user is None:
+                return sum(d.values())
+            return d.get(user.id, 0)
+        self.data[guild.id] = "Calculating..."
+        asyncio.create_task(self.getUserMessageCount(guild))
+        return "Calculating..."
 
-async def getUserMessageCount(user, guild):
-    histories = deque()
-    for channel in guild.text_channels:
-        returns = [None]
-        histories.append(returns)
-        asyncio.create_task(getChannelHistory(channel, histories[-1]))
-    while [None] in histories:
-        await asyncio.sleep(0.6)
-    print("Counting...")
-    count = 0
-    i = 0
-    for messages in histories:
-        for message in messages:
-            if message.author.id == user.id:
-                count += 1
-            if i > 1000 and math.sqrt(i / 100) % 1 == 0:
-                await asyncio.sleep(0.3)
+    async def getGuildMessages(self, guild):
+        c_id = self._vars.client.user.id
+        if guild is None or guild.owner_id == c_id:
+            channel = user.dm_channel
+            if channel is None:
+                return 0
+            messages = await channel.history(limit=None).flatten()
+            return len(messages)
+        if guild.id in self.data:
+            return self.data[guild.id]
+        self.data[guild.id] = "Calculating..."
+        asyncio.create_task(self.getUserMessageCount(guild))
+        return "Calculating..."
+
+    async def getUserMessageCount(self, guild):
+
+        async def getChannelHistory(channel, returns=[None]):
+            try:
+                history = channel.history(limit=None)
+                print(history)
+                messages = await history.flatten()
+                print(len(messages))
+                returns[0] = messages
+            except:
+                print(traceback.format_exc())
+                returns[0] = []
+
+        data = {}
+        print(guild)
+        histories = deque()
+        i = 0
+        for channel in guild.text_channels:
+            returns = [None]
+            histories.append(returns)
+            if not i % 5:
+                await asyncio.sleep(10)
+            asyncio.create_task(getChannelHistory(channel, histories[-1]))
             i += 1
-        print(count)
-    print(guild, user, count)
-    return count
+        while [None] in histories:
+            await asyncio.sleep(3)
+        print("Counting...")
+        i = 0
+        for messages in histories:
+            for message in messages[0]:
+                u = message.author.id
+                if u in data:
+                    data[u] += 1
+                else:
+                    data[u] = 1
+                if not i & 8191:
+                    await asyncio.sleep(0.5)
+                i += 1
+        self.data[guild.id] = data
+        print(data)
+
+    def __init__(self):
+        self.scanned = False
+
+    async def __call__(self):
+        if self.scanned:
+            return
+        self.scanned = True
+        guilds = self._vars.client.guilds
+        for guild in guilds:
+            self.data[guild.id] = "Calculating..."
+            asyncio.create_task(self.getUserMessageCount(guild))
+
+    async def _send_(self, message, **void):
+        user = message.author
+        guild = message.guild
+        if guild.id in self.data:
+            d = self.data[guild.id]
+            if type(d) is str:
+                return
+            d[user.id] = d.get(user.id, 0) + 1
+        else:
+            asyncio.create_task(self.getUserMessageCount(guild))
+
+    async def _delete_(self, message, **void):
+        user = message.author
+        guild = message.guild
+        if guild.id in self.data:
+            d = self.data[guild.id]
+            if type(d) is str:
+                return
+            d[user.id] = max(0, d.get(user.id, 0) - 1)
+        else:
+            asyncio.create_task(self.getUserMessageCount(guild))
 
 
 class updatePrefix:

@@ -430,6 +430,126 @@ class react:
         )
 
 
+class messageLog:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = []
+        self.min_level = 3
+        self.description = "Causes Miza to log message events into the current channel."
+        self.usage = "<enable(?e)> <disable(?d)>"
+
+    async def __call__(self, _vars, flags, channel, guild, **void):
+        data = _vars.data["logs"]
+        update = _vars.updaters["logs"].update
+        if "e" in flags:
+            data[guild.id] = channel.id
+            update()
+            return (
+                "```css\nEnabled message logging in " + uniStr(channel.name)
+                + " for " + uniStr(guild.name) + ".```"
+            )
+        elif "d" in flags:
+            if guild.id in data:
+                data.pop(guild.id)
+                update()
+            return (
+                "```css\nDisabled message logging for " + uniStr(guild.name) + ".```"
+            )
+        if guild.id in data:
+            c_id = data[guild.id]
+            channel = await _vars.fetch_channel(c_id)
+            return (
+                "```css\nMessage logging for " + uniStr(guild.name)
+                + " is currently enabled in " + uniStr(channel.name)
+                + ".```"
+            )
+        return (
+            "```css\nMessage logging is currently disabled in "
+            + uniStr(guild.name) + ".```"
+        )
+
+
+def strMessage(message):
+    data = limStr(message.content, 512)
+    if message.reactions:
+        data += " {" + ", ".join(str(i) for i in message.reactions) + "}"
+    if message.embeds:
+        data += " <" + ", ".join(str(i.to_dict()) for i in message.embeds) + ">"
+    if message.attachments:
+        data += " <" + ", ".join(i.url for i in message.attachments) + ">"
+    try:
+        t = message.created_at
+        if message.edited_at:
+            t = message.edited_at
+        data += " (" + str(t) + ")"
+    except AttributeError:
+        pass
+    if not data:
+        data = "[EMPTY MESSAGE]"
+    return limStr(data, 1024)
+
+
+class updateLogs:
+    is_update = True
+    name = "logs"
+
+    def __init__(self):
+        pass
+
+    async def __call__(self):
+        pass
+
+    async def _edit_(self, before, after, **void):
+        guild = before.guild
+        if guild.id in self.data:
+            u = before.author
+            name = u.name
+            name_id = name + bool(u.display_name) * ("#" + u.discriminator)
+            url = u.avatar_url
+            c_id = self.data[guild.id]
+            channel = await self._vars.fetch_channel(c_id)
+            emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
+            emb.set_author(name=name_id, icon_url=url, url=url)
+            emb.description = (
+                "Message edited in **"
+                + before.channel.name + "**:"
+            )
+            emb.add_field(name="Before", value=strMessage(before))
+            emb.add_field(name="After", value=strMessage(after))
+            await channel.send(embed=emb)
+
+    async def _delete_(self, message, **void):
+        guild = message.guild
+        if guild.id in self.data:
+            u = message.author
+            name = u.name
+            name_id = name + bool(u.display_name) * ("#" + u.discriminator)
+            url = u.avatar_url
+            c_id = self.data[guild.id]
+            try:
+                al = await guild.audit_logs(
+                    limit=16,
+                    action=discord.AuditLogAction.message_delete
+                ).flatten()
+                init = name_id
+                for e in reversed(al):
+                    if e.target.id == u.id:
+                        init = e.user.name + "#" + e.user.discriminator
+            except (discord.Forbidden, discord.HTTPException):
+                init = "[UNKNOWN USER]"
+            channel = await self._vars.fetch_channel(c_id)
+            emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
+            emb.set_author(name=name_id, icon_url=url, url=url)
+            emb.description = (
+                "**" + init + "** deleted message from **"
+                + message.channel.name + "**:"
+            )
+            emb.add_field(name="Content", value=strMessage(message))
+            await channel.send(embed=emb)
+
+
 class updateFollows:
     is_update = True
     name = "follows"

@@ -77,7 +77,7 @@ class main_data:
                     if getattr(obj, "user", None):
                         d = await self.fetch_user(key)
                     else:
-                        if not len(data[key]) and not started:
+                        if not data[key] and not started:
                             raise EOFError
                         try:
                             d = await self.fetch_guild(key)
@@ -275,8 +275,8 @@ class main_data:
                 except AttributeError:
                     try:
                         var.is_update
-                        if getattr(var, "name", None):
-                            name = var.name
+                        name = var.name
+                        if not getattr(var, "no_file", False):
                             var.file = "saves/" + name + ".json"
                             var.update = main_data.updatePart
                             var.updated = False
@@ -289,6 +289,8 @@ class main_data:
                                 f.close()
                             except FileNotFoundError:
                                 self.data[name] = var.data = {}
+                        else:
+                            self.data[name] = var.data = {}
                         var._vars = self
                         obj = var()
                         obj.busy = False
@@ -612,6 +614,73 @@ class main_data:
         description = ""
         max_members = 2
         unavailable = False
+
+    class ghostUser:
+        
+        def __init__(self):
+            self.id = 0
+            self.name = "[USER DATA NOT FOUND]"
+            self.discriminator = "0000"
+            self.avatar = "0"
+
+        bot = False
+        system = False
+        history = lambda *void1, **void2: collections.namedtuple(
+            "GhostIterator",
+            "flatten",
+            lambda: [],
+        )
+        dm_channel = None
+        create_dm = lambda self: None
+        relationship = None
+        is_friend = lambda self: None
+        is_blocked = lambda self: None
+        avatar_url = ""
+        color = discord.Colour(16777215)
+        colour = color
+        created_at = 0
+        display_name = ""
+
+    class ghostMessage:
+        
+        def __init__(self):
+            self.author = _vars.ghostUser()
+            self.content = uniStr("```asciidoc\n[MESSAGE DATA NOT FOUND]```")
+            self.channel = None
+            self.guild = None
+            self.id = 0
+
+        tts = False
+        type = "default"
+        nonce = False
+        embeds = ()
+        call = None
+        mention_everyone = False
+        mentions = ()
+        webhook_id = None
+        attachments = ()
+        pinned = False
+        flags = None
+        reactions = ()
+        activity = None
+        clean_content = ""
+        system_content = ""
+        edited_at = None
+        jump_url = "https://discordapp.com/channels/-1/-1/-1"
+        is_system = lambda self: None
+        created_at = 0
+        
+        async def delete(*void1, **void2):
+            pass
+        edit = delete
+        publish = delete
+        pin = delete
+        unpin = delete
+        add_reaction = delete
+        remove_reaction = delete
+        clear_reaction = delete
+        clear_reactions = delete
+        ack = delete
 
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_flags=None, loop=False):
@@ -1095,14 +1164,6 @@ async def on_raw_reaction_remove(payload):
 
 
 @client.event
-async def on_raw_message_delete(payload):
-    m_id = payload.message_id
-    if m_id in _vars.cache["messages"]:
-        _vars.cache["messages"].pop(m_id)
-    await _vars.handleUpdate()
-
-
-@client.event
 async def on_typing(channel, user, when):
     await _vars.handleUpdate()
 
@@ -1133,9 +1194,64 @@ async def handleMessage(message, edit=True):
 @client.event
 async def on_message(message):
     _vars.cache["messages"][message.id] = message
+    guild = message.guild
+    if guild:
+        for u in _vars.updaters.values():
+            f = getattr(u, "_send_", None)
+            if f is not None:
+                try:
+                    await f(message=message)
+                except:
+                    print(traceback.format_exc())
     await _vars.reactCallback(message, None, message.author)
     await handleMessage(message, False)
     await _vars.handleUpdate(True)
+
+
+@client.event
+async def on_raw_message_delete(payload):
+    try:
+        message = payload.cached_message
+        if message is None:
+            raise LookupError
+    except:
+        try:
+            channel = await _vars.fetch_channel(payload.channel_id)
+            message = await _vars.fetch_message(payload.message_id, channel)
+            if message is None:
+                raise LookupError
+        except:
+            message = _vars.ghostMessage()
+            message.channel = await _vars.fetch_channel(payload.channel_id)
+            message.guild = channel.guild
+            message.id = payload.message_id
+    guild = message.guild
+    if guild:
+        for u in _vars.updaters.values():
+            f = getattr(u, "_delete_", None)
+            if f is not None:
+                try:
+                    await f(message=message)
+                except:
+                    print(traceback.format_exc())
+
+
+async def updateEdit(before, after):
+    if before.content == after.content:
+        before = _vars.ghostMessage()
+        before.channel = after.channel
+        before.guild = after.guild
+        before.author = after.author
+        before.id = after.id
+    guild = after.guild
+    if guild:
+        for u in _vars.updaters.values():
+            f = getattr(u, "_edit_", None)
+            if f is not None:
+                try:
+                    await f(before=before, after=after)
+                except:
+                    print(traceback.format_exc())
 
 
 @client.event
@@ -1146,26 +1262,29 @@ async def on_message_edit(before, after):
         _vars.cache["messages"][message.id] = message
         await handleMessage(message)
         await _vars.handleUpdate(True)
+        await updateEdit(before, after)
 
 
 @client.event
 async def on_raw_message_edit(payload):
-    message = None
-    if payload.cached_message is None:
-        try:
-            channel = await _vars.fetch_channel(payload.data["channel_id"])
-            message = await _vars.fetch_message(payload.message_id, channel=channel)
-        except:
-            for guild in client.guilds:
-                for channel in guild.text_channels:
-                    try:
-                        message = await _vars.fetch_message(payload.message_id, channel=channel)
-                    except Exception as ex:
-                        print(traceback.format_exc())
+    if payload.cached_message is not None:
+        return
+    try:
+        c_id = payload.data.get("channel_id", 0)
+        channel = await _vars.fetch_channel(c_id)
+        message = await _vars.fetch_message(payload.message_id, channel)
+        if message is None:
+            raise LookupError
+    except:
+        message = _vars.ghostMessage()
+        message.channel = await _vars.fetch_channel(c_id)
+        message.guild = channel.guild
+        message.id = payload.message_id
     if message:
         _vars.cache["messages"][message.id] = message
         await handleMessage(message)
         await _vars.handleUpdate(True)
+        await updateEdit(message, message)
 
 
 if __name__ == "__main__":
