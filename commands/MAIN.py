@@ -693,15 +693,15 @@ class updateMessageCount:
         while [None] in histories:
             await asyncio.sleep(3)
         print("Counting...")
-        i = 0
         for messages in histories:
+            i = 0
             for message in messages[0]:
                 u = message.author.id
                 if u in data:
                     data[u] += 1
                 else:
                     data[u] = 1
-                if not i & 8191:
+                if not i & 4095:
                     await asyncio.sleep(0.5)
                 i += 1
         self.data[guild.id] = data

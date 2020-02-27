@@ -41,7 +41,7 @@ while not sd in os.listdir():
                 + str(datetime.datetime.now())
                 + "."
             )
-            time.sleep(2)
+            time.sleep(8)
             if hb in os.listdir():
                 alive = False
                 break
