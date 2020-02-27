@@ -1205,7 +1205,7 @@ class seek:
 
 def getDump(auds, guild):
     try:
-        lim = 20000
+        lim = 32767
         if len(auds.queue) > lim:
             raise OverflowError(
                 "Too many items in queue (" + uniStr(len(auds.queue))
@@ -1225,8 +1225,6 @@ def getDump(auds, guild):
             "stats": s,
             "queue": q,
         }
-        if auds.player is not None:
-            d["player"] = auds.player["type"]
         d["stats"].pop("position")
         return ["Queue data for **" + guild.name + "**:\n```json\n" + json.dumps(d) + "\n```"]
     except Exception as ex:
@@ -1274,8 +1272,6 @@ class dump:
             e["added by"] = user.name
             e["u_id"] = user.id
             e["skips"] = []
-        if d.get("player", 0) == 1:
-            await createPlayer(auds, p_type=1)
         if auds.player is not None:
             auds.player["time"] = 1
         if auds.stats["shuffle"]:

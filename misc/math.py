@@ -220,9 +220,14 @@ def random(a=None, b=None):
     if b is None:
         x = random.random() * sympy.Float(1) / (random.random() + time.time() % 1)
         if a is None:
-            return 
-    elif b is None:
-        return random.randint()
+            return x
+        else:
+            return int(x * b)
+    a = sympy.floor(min(a, b))
+    b = sympy.ceiling(max(a, b))
+    if a < b - 1:
+        return random.randint(a, b - 1)
+    return a
 
 
 _globals = dict(sympy.__dict__)

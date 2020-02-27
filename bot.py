@@ -232,7 +232,9 @@ class main_data:
         u_id = int(u_id)
         if u_id in (self.owner_id, client.user.id):
             return False
-        return self.data["users"].get(u_id, {"suspended": 0})["suspended"] >= time.time() + self.min_suspend * 86400
+        return self.data["users"].get(
+            u_id, {"suspended": 0}
+        )["suspended"] >= time.time() + self.min_suspend * 86400
 
     def updatePart(self, force=False):
         if force:
@@ -405,7 +407,12 @@ class main_data:
 
     async def evalMath(self, f, guild):
         try:
-            r = [ast.literal_eval(f)]
+            if f in ("t", "T", "true", "TRUE"):
+                r = [True]
+            elif f in ("f", "F", "false", "FALSE"):
+                r = [False]
+            else:
+                r = [ast.literal_eval(f)]
         except ValueError:
             r = await self.solveMath(f, guild, 16, 0)
         return roundMin(float(r[0]))
@@ -426,7 +433,7 @@ class main_data:
         doParallel(subFunc, args, returns, state=2)
         t = time.time()
         while returns[0] is None:
-            await asyncio.sleep(0.21)
+            await asyncio.sleep(0.25)
         resp = returns[0]
         print(resp)
         if type(resp) is str:
@@ -453,7 +460,7 @@ class main_data:
         for child in proc.children(True):
             try:
                 child.cpu_percent()
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.25)
                 stats += (child.cpu_percent(), child.memory_percent())
             except psutil.NoSuchProcess:
                 pass
@@ -588,7 +595,8 @@ class main_data:
             self.id = self.channel.id
             self.name = self.channel.name
             self.members = [user, client.user]
-            self.channels = [self.channel]
+            self.channels = self.text_channels = [self.channel]
+            self.voice_channels = []
             self.me = self.channel.me
             self.created_at = self.channel.created_at
             self.roles = []
@@ -841,12 +849,15 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         for u in _vars.updaters.values():
             f = getattr(u, "_nocommand_", None)
             if f is not None:
-                await f(
-                    text=temp,
-                    edit=edit,
-                    orig=orig,
-                    message=message,
-                )
+                try:
+                    await f(
+                        text=temp,
+                        edit=edit,
+                        orig=orig,
+                        message=message,
+                    )
+                except:
+                    print(traceback.format_exc())
     if guild is None or _vars.current_channel and (channel.id == _vars.current_channel.id and not edit):
         if guild is None:
             guild = main_data.userGuild(
@@ -990,12 +1001,11 @@ async def inputLoop():
 
 
 async def updateLoop():
-    global _vars
     print("Update loop initiated.")
     autosave = 0
     while True:
         try:
-            if time.time() - autosave > 30:
+            if time.time() - autosave > 60:
                 autosave = time.time()
                 _vars.update()
             while _vars.blocked > 0:

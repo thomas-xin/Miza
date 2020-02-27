@@ -330,9 +330,9 @@ class neko:
 
     async def __call__(self, args, argv, flags, channel, **void):
         isNSFW = is_nsfw(channel)
-        if "l" in flags or (not "r" in flags and not len(args)):
+        if "l" in flags:
             available = []
-            text = "Available tags in **" + channel.name + "**:\n```css\n"
+            text = "Available tags in **" + channel.name + "**:\n```ini\n"
             for key in neko_tags:
                 if isNSFW or not neko_tags[key] == True:
                     available.append(key)
@@ -354,7 +354,7 @@ class neko:
             possible = [i for i in neko_tags if neko_tags[i] <= isNSFW]
             selected.append(possible[xrand(len(possible))])
         if not selected:
-            if not len(argv.replace(" ", "")):
+            if not argv:
                 url = nekos.img("neko")
             else:
                 raise EOFError(

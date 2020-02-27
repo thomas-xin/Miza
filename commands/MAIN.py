@@ -156,10 +156,10 @@ class perms:
                 m_perm = max(t_perm, c_perm, 1) + 1
             if not s_perm <= m_perm and m_perm is not nan:
                 if t_user is None:
-                    if not "c" in flags:
+                    if not "f" in flags:
                         response = uniStr(
                             "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
-                            + "REPEAT COMMAND WITH \"?C\" FLAG TO CONFIRM."
+                            + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
                         )
                         return ("```asciidoc\n[" + response + "]```")
                     for u in guild.members:
@@ -448,9 +448,9 @@ class info:
         self.name = ["userInfo"]
         self.min_level = 0
         self.description = "Shows information about the target user."
-        self.usage = "<user>"
+        self.usage = "<user> <verbose(?v)>"
 
-    async def __call__(self, argv, guild, _vars, user, **void):
+    async def __call__(self, argv, guild, _vars, client, user, flags, **void):
         member = True
         if argv:
             u_id = _vars.verifyID(argv)
@@ -472,6 +472,7 @@ class info:
         url = u.avatar_url
         is_sys = u.system
         is_bot = u.bot
+        is_self = u.id == client.user.id
         is_self_owner = u.id == _vars.owner_id
         is_guild_owner = u.id == guild.owner_id
         if member:
@@ -481,20 +482,27 @@ class info:
         created = u.created_at
         activity = "\n".join(str(i) for i in getattr(u, "activities", []))
         role = ", ".join(str(i) for i in getattr(u, "roles", []) if not i.is_default())
-        try:
-            coms = _vars.data["users"][u.id]["commands"]
-        except:
-            coms = 0
+        coms = msgs = 0
+        if "v" in flags:
+            try:
+                coms = _vars.data["users"][u.id]["commands"]
+            except LookupError:
+                pass
+            try:
+                msgs = await getUserMessageCount(u, guild)
+            except LookupError:
+                pass
         emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
         emb.set_thumbnail(url=url)
         emb.set_author(name=name + "#" + disc, icon_url=url, url=url)
         d = "<@" + str(u.id) + ">"
         if activity:
             d += "```\n" + activity + "```"
-        if any((is_sys, is_bot, is_self_owner, is_guild_owner)):
+        if any((is_sys, is_bot, is_self, is_self_owner, is_guild_owner)):
             d += "```css\n"
             d += "[Discord staff]\n" * is_sys
             d += "[Bot]\n" * is_bot
+            d += "[Myself :3]\n" * is_self
             d += "[My owner ❤️]\n" * is_self_owner
             d += "[Server owner]\n" * is_guild_owner
             d = d.strip("\n")
@@ -506,6 +514,8 @@ class info:
             emb.add_field(name="Join time", value=str(joined), inline=1)
         if coms:
             emb.add_field(name="Commands used", value=str(coms), inline=0)
+        if msgs:
+            emb.add_field(name="Post count", value=str(msgs), inline=1)
         if dname and dname != name:
             emb.add_field(name="Nickname", value=dname, inline=0)
         if role:
@@ -553,6 +563,41 @@ class state:
             + ", RAM usage: " + uniStr(round(stats[1] / 1048576, 3)) + " MB"
             + ".```"
         )
+
+
+async def getChannelHistory(channel, returns=[None]):
+    try:
+        history = channel.history(limit=None)
+        print(history)
+        messages = await history.flatten()
+        print(len(messages))
+        returns[0] = messages
+    except:
+        print(traceback.format_exc())
+        returns[0] = []
+
+
+async def getUserMessageCount(user, guild):
+    histories = deque()
+    for channel in guild.text_channels:
+        returns = [None]
+        histories.append(returns)
+        asyncio.create_task(getChannelHistory(channel, histories[-1]))
+    while [None] in histories:
+        await asyncio.sleep(0.6)
+    print("Counting...")
+    count = 0
+    i = 0
+    for messages in histories:
+        for message in messages:
+            if message.author.id == user.id:
+                count += 1
+            if i > 1000 and math.sqrt(i / 100) % 1 == 0:
+                await asyncio.sleep(0.3)
+            i += 1
+        print(count)
+    print(guild, user, count)
+    return count
 
 
 class updatePrefix:

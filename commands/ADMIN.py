@@ -143,10 +143,10 @@ class ban:
         g_id = guild.id
         g_bans = await getBans(_vars, guild)
         if t_user is None:
-            if not "c" in flags:
+            if not "f" in flags:
                 response = uniStr(
                     "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
-                    + "REPEAT COMMAND WITH \"?C\" FLAG TO CONFIRM."
+                    + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
                 )
                 return ("```asciidoc\n[" + response + "]```")
             if tm >= 0:

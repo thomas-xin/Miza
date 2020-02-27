@@ -149,7 +149,7 @@ def _c2e(string, em1, em2):
         curr = string[i]
         data = chars.get(curr, [15] * 5)
         size = max(1, max(data))
-        lim = max(2, trunc(log(size, 2))) + 1
+        lim = max(2, int(log(size, 2))) + 1
         printed[0] += em2 * (lim + 1)
         printed[6] += em2 * (lim + 1)
         if len(data) == 5:
@@ -207,7 +207,7 @@ class owoify:
     async def __call__(self, argv, **void):
         if not argv:
             raise IndexError("Input string is empty.")
-        return "```\n" + argv.translate(self.otrans) + "```"
+        return "```fix\n" + argv.translate(self.otrans) + "```"
 
 
 class updateImages:

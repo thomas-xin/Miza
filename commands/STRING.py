@@ -13,6 +13,8 @@ class PapagoTrans:
         self.secret = c_sec
 
     def translate(self, string, dest, source="en"):
+        if dest == source:
+            raise ValueError("Source language is the same as destination.")
         url = "https://openapi.naver.com/v1/papago/n2mt"
         enc = urllib.parse.quote(string)
         data = "source=" + source + "&target=" + dest + "&text=" + enc
