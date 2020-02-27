@@ -461,7 +461,7 @@ class info:
         d = "Owner: <@" + str(u.id) + ">"
         d += "```\n" + str(g.description) + "```"
         emb.description = d
-        count = await _vars.updaters["counts"].getUserMessages(None, g)
+        pcount = await _vars.updaters["counts"].getUserMessages(None, g)
         if "v" in flags:
             users = deque()
             us = await _vars.updaters["counts"].getGuildMessages(g)
@@ -483,8 +483,9 @@ class info:
         else:
             top = None
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
-        emb.add_field(name="User count", value=str(g.member_count), inline=1)
         emb.add_field(name="Creation time", value=str(g.created_at), inline=1)
+        emb.add_field(name="User count", value=str(g.member_count), inline=1)
+        emb.add_field(name="Post count", value=str(pcount), inline=1)
         if "v" in flags:
             emb.add_field(name="Region", value=str(g.region), inline=1)
             emb.add_field(name="Nitro boosts", value=str(g.premium_subscription_count), inline=1)
