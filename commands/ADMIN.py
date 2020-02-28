@@ -521,7 +521,7 @@ class updateLogs:
                 emb.add_field(name="After", value=strMessage(after))
                 await channel.send(embed=emb)
 
-    async def _delete_(self, message, **void):
+    async def _delete_(self, message, bulk, **void):
         guild = message.guild
         if guild.id in self.data:
             now = datetime.datetime.utcnow()
@@ -530,11 +530,14 @@ class updateLogs:
             name_id = name + bool(u.display_name) * ("#" + u.discriminator)
             url = u.avatar_url
             c_id = self.data[guild.id]
+            action = (
+                discord.AuditLogAction.message_delete,
+                discord.AuditLogAction.message_bulk_delete,
+            )[bulk]
             try:
                 al = await guild.audit_logs(
-                    limit=None,
-                    action=discord.AuditLogAction.message_delete,
-                    after=now - datetime.timedelta(seconds=60)
+                    limit=7,
+                    action=action,
                 ).flatten()
                 cu_id = self._vars.client.user.id
                 t = u

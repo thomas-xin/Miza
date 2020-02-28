@@ -652,9 +652,10 @@ class updateMessageCount:
                 count = sum(1 for m in messages if m.author.id != c_id)
                 return count
             if guild.id in self.data:
-                d = self.data[guild.id]["counts"]
+                d = self.data[guild.id]
                 if type(d) is str:
                     return d
+                d = d["counts"]
                 if user is None:
                     return sum(d.values())
                 return d.get(user.id, 0)
@@ -674,9 +675,10 @@ class updateMessageCount:
                 avg = sum(self.getMessageLength(m) for m in gen) / len(gen)
                 return avg
             if guild.id in self.data:
-                d = self.data[guild.id]["averages"]
+                d = self.data[guild.id]
                 if type(d) is str:
                     return d
+                d = d["averages"]
                 if user is None:
                     return sum(d.values()) / len(d)
                 return d.get(user.id, 0)
@@ -692,7 +694,10 @@ class updateMessageCount:
                 messages = await channel.history(limit=None).flatten()
                 return len(messages)
             if guild.id in self.data:
-                return self.data[guild.id]["counts"]
+                try:
+                    return self.data[guild.id]["counts"]
+                except:
+                    return self.data[guild.id]
             self.data[guild.id] = "Calculating..."
             asyncio.create_task(self.getUserMessageCount(guild))
         return "Calculating..."

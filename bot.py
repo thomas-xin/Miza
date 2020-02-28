@@ -1215,14 +1215,14 @@ async def on_raw_message_delete(payload):
         if message is None:
             raise LookupError
     except:
+        channel = await _vars.fetch_channel(payload.channel_id)
         try:
-            channel = await _vars.fetch_channel(payload.channel_id)
             message = await _vars.fetch_message(payload.message_id, channel)
             if message is None:
                 raise LookupError
         except:
             message = _vars.ghostMessage()
-            message.channel = await _vars.fetch_channel(payload.channel_id)
+            message.channel = channel
             message.guild = channel.guild
             message.id = payload.message_id
     guild = message.guild
@@ -1234,6 +1234,38 @@ async def on_raw_message_delete(payload):
                     await f(message=message)
                 except:
                     print(traceback.format_exc())
+
+
+@client.event
+async def on_raw_bulk_message_delete(payload):
+    try:
+        messages = payload.cached_messages
+        if messages is None:
+            raise LookupError
+    except:
+        messages = deque()
+        channel = await _vars.fetch_channel(payload.channel_id)
+        for m_id in payload.message_ids:
+            try:
+                message = await _vars.fetch_message(m_id, channel)
+                if message is None:
+                    raise LookupError
+            except:
+                message = _vars.ghostMessage()
+                message.channel = channel
+                message.guild = channel.guild
+                message.id = m_id
+            messages.append(message)
+    for message in messages:
+        guild = message.guild
+        if guild:
+            for u in _vars.updaters.values():
+                f = getattr(u, "_delete_", None)
+                if f is not None:
+                    try:
+                        await f(message=message, bulk=True)
+                    except:
+                        print(traceback.format_exc())
 
 
 async def updateEdit(before, after):
