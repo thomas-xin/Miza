@@ -483,11 +483,11 @@ def strMessage(message):
         t = message.created_at
         if message.edited_at:
             t = message.edited_at
-        data += " (" + str(t) + ")"
+        data += " `(" + str(t) + ")`"
     except AttributeError:
         pass
     if not data:
-        data = "[EMPTY MESSAGE]"
+        data = "```css\n" + uniStr("[EMPTY MESSAGE]") + "```"
     return limStr(data, 1024)
 
 
@@ -502,27 +502,29 @@ class updateLogs:
         pass
 
     async def _edit_(self, before, after, **void):
-        guild = before.guild
-        if guild.id in self.data:
-            u = before.author
-            name = u.name
-            name_id = name + bool(u.display_name) * ("#" + u.discriminator)
-            url = u.avatar_url
-            c_id = self.data[guild.id]
-            channel = await self._vars.fetch_channel(c_id)
-            emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
-            emb.set_author(name=name_id, icon_url=url, url=url)
-            emb.description = (
-                "Message edited in #"
-                + before.channel.name + ":"
-            )
-            emb.add_field(name="Before", value=strMessage(before))
-            emb.add_field(name="After", value=strMessage(after))
-            await channel.send(embed=emb)
+        if not after.author.bot:
+            guild = before.guild
+            if guild.id in self.data:
+                u = before.author
+                name = u.name
+                name_id = name + bool(u.display_name) * ("#" + u.discriminator)
+                url = u.avatar_url
+                c_id = self.data[guild.id]
+                channel = await self._vars.fetch_channel(c_id)
+                emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
+                emb.set_author(name=name_id, icon_url=url, url=url)
+                emb.description = (
+                    "Message edited in <#"
+                    + str(before.channel.id) + ">:"
+                )
+                emb.add_field(name="Before", value=strMessage(before))
+                emb.add_field(name="After", value=strMessage(after))
+                await channel.send(embed=emb)
 
     async def _delete_(self, message, **void):
         guild = message.guild
         if guild.id in self.data:
+            now = datetime.datetime.utcnow()
             u = message.author
             name = u.name
             name_id = name + bool(u.display_name) * ("#" + u.discriminator)
@@ -530,18 +532,21 @@ class updateLogs:
             c_id = self.data[guild.id]
             try:
                 al = await guild.audit_logs(
-                    limit=16,
+                    limit=None,
                     action=discord.AuditLogAction.message_delete,
-                    after=datetime.datetime.utcnow() - datetime.timedelta(seconds=3),
+                    after=now - datetime.timedelta(seconds=60)
                 ).flatten()
                 cu_id = self._vars.client.user.id
-                targ = u.id
-                init = "<@" + str(targ) + ">"
+                t = u
+                init = "<@" + str(t.id) + ">"
                 for e in reversed(al):
-                    if e.target.id == u.id and e.extra.channel.id == message.channel.id:
-                        targ = e.user.id
-                        init = "<@" + str(targ) + ">" #e.user.name + "#" + e.user.discriminator
-                if u.id == targ == cu_id:
+                    #print(e, e.target, now - e.created_at)
+                    if now - e.created_at < datetime.timedelta(seconds=6):
+                        if e.target.id == u.id and e.extra.channel.id == message.channel.id:
+                            t = e.user
+                            init = "<@" + str(t.id) + ">"
+                            print(t, e.target)
+                if t.bot or u.id == t.id == cu_id:
                     return
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
@@ -549,8 +554,8 @@ class updateLogs:
             emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
             emb.set_author(name=name_id, icon_url=url, url=url)
             emb.description = (
-                init + " deleted message from **#"
-                + message.channel.name + "**:"
+                init + " deleted message from <#"
+                + str(message.channel.id) + ">:"
             )
             emb.add_field(name="Content", value=strMessage(message))
             await channel.send(embed=emb)

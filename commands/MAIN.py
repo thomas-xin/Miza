@@ -1,4 +1,4 @@
-import discord, os, sys
+import discord, os, sys, datetime
 from smath import *
 
 
@@ -51,7 +51,7 @@ class help:
                         "```xml\n" + prefix + name
                         + "\nAliases: " + str(com.name)
                         + "\nEffect: " + description
-                        + "\nUsage: ~" + name + " " + usage
+                        + "\nUsage: " + prefix + name + " " + usage
                         + "\nRequired permission level: " + uniStr(min_level)
                         + "```"
                     )
@@ -463,6 +463,7 @@ class info:
         emb.description = d
         pcount = await _vars.updaters["counts"].getUserMessages(None, g)
         if "v" in flags:
+            pavg = await _vars.updaters["counts"].getUserAverage(None, g)
             users = deque()
             us = await _vars.updaters["counts"].getGuildMessages(g)
             if type(us) is str:
@@ -484,11 +485,13 @@ class info:
             top = None
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
         emb.add_field(name="Creation time", value=str(g.created_at), inline=1)
-        emb.add_field(name="User count", value=str(g.member_count), inline=1)
-        emb.add_field(name="Post count", value=str(pcount), inline=1)
         if "v" in flags:
             emb.add_field(name="Region", value=str(g.region), inline=1)
             emb.add_field(name="Nitro boosts", value=str(g.premium_subscription_count), inline=1)
+        emb.add_field(name="User count", value=str(g.member_count), inline=1)
+        emb.add_field(name="Post count", value=str(pcount), inline=1)
+        if "v" in flags:
+            emb.add_field(name="Average post length", value=str(pavg), inline=1)
         if top is not None:
             emb.add_field(name="Top users", value=top, inline=0)
         print(emb.to_dict())
@@ -544,7 +547,7 @@ class info:
         created = u.created_at
         activity = "\n".join(str(i) for i in getattr(u, "activities", []))
         role = ", ".join(str(i) for i in getattr(u, "roles", []) if not i.is_default())
-        coms = msgs = 0
+        coms = msgs = avgs = 0
         if "v" in flags:
             try:
                 coms = _vars.data["users"][u.id]["commands"]
@@ -552,6 +555,7 @@ class info:
                 pass
             try:
                 msgs = await _vars.updaters["counts"].getUserMessages(u, guild)
+                avgs = await _vars.updaters["counts"].getUserAverage(u, guild)
             except LookupError:
                 pass
         emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
@@ -576,10 +580,12 @@ class info:
             emb.add_field(name="Join time", value=str(joined), inline=1)
         if coms:
             emb.add_field(name="Commands used", value=str(coms), inline=1)
-        if msgs:
-            emb.add_field(name="Post count", value=str(msgs), inline=1)
         if dname and dname != name:
             emb.add_field(name="Nickname", value=dname, inline=1)
+        if msgs:
+            emb.add_field(name="Post count", value=str(msgs), inline=1)
+        if avgs:
+            emb.add_field(name="Average post length", value=str(avgs), inline=1)
         if role:
             emb.add_field(name="Roles", value=role, inline=0)
         print(emb.to_dict())
@@ -632,45 +638,72 @@ class updateMessageCount:
     name = "counts"
     no_file = True
 
+    def getMessageLength(self, message):
+        return len(message.content) + sum(len(e) for e in message.embeds)
+
     async def getUserMessages(self, user, guild):
-        c_id = self._vars.client.user.id
-        if guild is None or guild.owner_id == c_id:
-            channel = user.dm_channel
-            if channel is None:
-                return 0
-            messages = await channel.history(limit=None).flatten()
-            count = (1 for m in messages if m.author.id != c_id)
-            return sum(count)
-        if guild.id in self.data:
-            d = self.data[guild.id]
-            if type(d) is str:
-                return d
-            if user is None:
-                return sum(d.values())
-            return d.get(user.id, 0)
-        self.data[guild.id] = "Calculating..."
-        asyncio.create_task(self.getUserMessageCount(guild))
+        if self.scanned == -1:
+            c_id = self._vars.client.user.id
+            if guild is None or guild.owner_id == c_id:
+                channel = user.dm_channel
+                if channel is None:
+                    return 0
+                messages = await channel.history(limit=None).flatten()
+                count = sum(1 for m in messages if m.author.id != c_id)
+                return count
+            if guild.id in self.data:
+                d = self.data[guild.id]["counts"]
+                if type(d) is str:
+                    return d
+                if user is None:
+                    return sum(d.values())
+                return d.get(user.id, 0)
+            self.data[guild.id] = "Calculating..."
+            asyncio.create_task(self.getUserMessageCount(guild))
         return "Calculating..."
 
+    async def getUserAverage(self, user, guild):
+        if self.scanned == -1:
+            c_id = self._vars.client.user.id
+            if guild is None or guild.owner_id == c_id:
+                channel = user.dm_channel
+                if channel is None:
+                    return 0
+                messages = await channel.history(limit=None).flatten()
+                gen = tuple(m for m in messages if m.author.id != c_id)
+                avg = sum(self.getMessageLength(m) for m in gen) / len(gen)
+                return avg
+            if guild.id in self.data:
+                d = self.data[guild.id]["averages"]
+                if type(d) is str:
+                    return d
+                if user is None:
+                    return sum(d.values()) / len(d)
+                return d.get(user.id, 0)
+        return "Calculating..."            
+
     async def getGuildMessages(self, guild):
-        c_id = self._vars.client.user.id
-        if guild is None or guild.owner_id == c_id:
-            channel = user.dm_channel
-            if channel is None:
-                return 0
-            messages = await channel.history(limit=None).flatten()
-            return len(messages)
-        if guild.id in self.data:
-            return self.data[guild.id]
-        self.data[guild.id] = "Calculating..."
-        asyncio.create_task(self.getUserMessageCount(guild))
+        if self.scanned == -1:
+            c_id = self._vars.client.user.id
+            if guild is None or guild.owner_id == c_id:
+                channel = user.dm_channel
+                if channel is None:
+                    return 0
+                messages = await channel.history(limit=None).flatten()
+                return len(messages)
+            if guild.id in self.data:
+                return self.data[guild.id]["counts"]
+            self.data[guild.id] = "Calculating..."
+            asyncio.create_task(self.getUserMessageCount(guild))
         return "Calculating..."
 
     async def getUserMessageCount(self, guild):
 
-        async def getChannelHistory(channel, returns=[None]):
+        async def getChannelHistory(channel, returns):
             try:
-                history = channel.history(limit=None)
+                history = channel.history(
+                    limit=None,
+                )
                 print(history)
                 messages = await history.flatten()
                 print(len(messages))
@@ -679,33 +712,44 @@ class updateMessageCount:
                 print(traceback.format_exc())
                 returns[0] = []
 
-        data = {}
         print(guild)
+        data = {}
+        avgs = {}
         histories = deque()
         i = 0
-        for channel in guild.text_channels:
+        for channel in reversed(guild.text_channels):
             returns = [None]
             histories.append(returns)
             if not i % 5:
-                await asyncio.sleep(10)
-            asyncio.create_task(getChannelHistory(channel, histories[-1]))
+                await asyncio.sleep(5 + random.random() * 10)
+            asyncio.create_task(getChannelHistory(
+                channel,
+                histories[-1],
+            ))
             i += 1
         while [None] in histories:
-            await asyncio.sleep(3)
+            await asyncio.sleep(2)
         print("Counting...")
         for messages in histories:
             i = 0
             for message in messages[0]:
                 u = message.author.id
+                length = self.getMessageLength(message)
                 if u in data:
                     data[u] += 1
+                    avgs[u] += length
                 else:
                     data[u] = 1
+                    avgs[u] = length
                 if not i & 8191:
                     await asyncio.sleep(0.5)
+                if random.randint(0, self._vars.cachelim) > len(self._vars.cache["messages"]):
+                    self._vars.cache["messages"][message.id] = message
                 i += 1
-        self.data[guild.id] = data
-        print(data)
+        for u in data:
+            avgs[u] /= data[u]
+        self.data[guild.id] = {"counts": data, "averages": avgs}
+        print(self.data[guild.id])
 
     def __init__(self):
         self.scanned = False
@@ -714,32 +758,44 @@ class updateMessageCount:
         if self.scanned:
             return
         self.scanned = True
+        year = datetime.timedelta(31556925.216)
         guilds = self._vars.client.guilds
         for guild in guilds:
-            self.data[guild.id] = "Calculating..."
-            asyncio.create_task(self.getUserMessageCount(guild))
+            oneyear = datetime.datetime.utcnow() - guild.created_at < year
+            if guild.member_count < 256 or oneyear:
+                self.data[guild.id] = "Calculating..."
+                asyncio.create_task(self.getUserMessageCount(guild))
+        self.scanned = -1
 
     async def _send_(self, message, **void):
-        user = message.author
-        guild = message.guild
-        if guild.id in self.data:
-            d = self.data[guild.id]
-            if type(d) is str:
-                return
-            d[user.id] = d.get(user.id, 0) + 1
-        else:
-            asyncio.create_task(self.getUserMessageCount(guild))
+        if self.scanned == -1:
+            user = message.author
+            guild = message.guild
+            if guild.id in self.data:
+                d = self.data[guild.id]
+                if type(d) is str:
+                    return
+                count = d["counts"].get(user.id, 0)
+                avg = (d["averages"].get(user.id, 0) * count + self.getMessageLength(message)) / (count + 1)
+                d["averages"][user.id] = avg
+                d["counts"][user.id] = count + 1
+            else:
+                asyncio.create_task(self.getUserMessageCount(guild))
 
     async def _delete_(self, message, **void):
-        user = message.author
-        guild = message.guild
-        if guild.id in self.data:
-            d = self.data[guild.id]
-            if type(d) is str:
-                return
-            d[user.id] = max(0, d.get(user.id, 0) - 1)
-        else:
-            asyncio.create_task(self.getUserMessageCount(guild))
+        if self.scanned == -1:
+            user = message.author
+            guild = message.guild
+            if guild.id in self.data:
+                d = self.data[guild.id]
+                if type(d) is str:
+                    return
+                count = d["counts"].get(user.id, 0)
+                avg = (d["averages"].get(user.id, 0) * count - self.getMessageLength(message)) / (count - 1)
+                d["averages"][user.id] = avg
+                d["counts"][user.id] = count - 1
+            else:
+                asyncio.create_task(self.getUserMessageCount(guild))
 
 
 class updatePrefix:

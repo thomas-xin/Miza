@@ -5,7 +5,7 @@ sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
 
 client = discord.Client(
-    max_messages=2000,
+    max_messages=4096,
 )
 
 
@@ -25,7 +25,7 @@ class main_data:
         "users": {},
         "messages": {},
     }
-    cachelim = 16384
+    cachelim = 262144
             
     def __init__(self):
         print("Initializing...")
@@ -78,7 +78,7 @@ class main_data:
                         d = await self.fetch_user(key)
                     else:
                         if not data[key] and not started:
-                            raise EOFError
+                            raise LookupError
                         try:
                             d = await self.fetch_guild(key)
                             if d is not None:
@@ -335,7 +335,7 @@ class main_data:
             print("Autosaved " + str(saved) + ".")
 
     def verifyID(self, value):
-        return int(str(value).replace("<", "").replace(">", "").replace("@", "").replace("!", ""))
+        return int(str(value).replace("#", "").replace("<", "").replace(">", "").replace("@", "").replace("!", ""))
     
     mmap = {
         "“": '"',

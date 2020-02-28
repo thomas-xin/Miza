@@ -1,4 +1,4 @@
-import sympy, time, sys, traceback, random
+import sympy, time, sys, traceback, random, numpy
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
 import sympy.plotting as plotter
@@ -156,35 +156,46 @@ def binFloat(x):
     return f.__base__(2)
 
 
+def plotArgs(args):
+    if type(args[0]) in (tuple, list):
+        args = list(args)
+        args[0] = sympy.interpolating_spline(
+            3,
+            sympy.Symbol("x"),
+            list(range(len(args[0]))),
+            args[0],
+        )
+    return args
+
 def plot(*args, **kwargs):
     if "show" in kwargs:
         kwargs.pop("show")
-    return plotter.plot(*args, show=False, **kwargs)
+    return plotter.plot(*plotArgs(args), show=False, **kwargs)
 
 def plot_parametric(*args, **kwargs):
     if "show" in kwargs:
         kwargs.pop("show")
-    return plotter.plot_parametric(*args, show=False, **kwargs)
+    return plotter.plot_parametric(*plotArgs(args), show=False, **kwargs)
 
 def plot_implicit(*args, **kwargs):
     if "show" in kwargs:
         kwargs.pop("show")
-    return plotter.plot_implicit(*args, show=False, **kwargs)
+    return plotter.plot_implicit(*plotArgs(args), show=False, **kwargs)
 
 def plot3d(*args, **kwargs):
     if "show" in kwargs:
         kwargs.pop("show")
-    return plotter.plot3d(*args, show=False, **kwargs)
+    return plotter.plot3d(*plotArgs(args), show=False, **kwargs)
 
 def plot3d_parametric_line(*args, **kwargs):
     if "show" in kwargs:
         kwargs.pop("show")
-    return plotter.plot3d_parametric_line(*args, show=False, **kwargs)
+    return plotter.plot3d_parametric_line(*plotArgs(args), show=False, **kwargs)
 
 def plot3d_parametric_surface(*args, **kwargs):
     if "show" in kwargs:
         kwargs.pop("show")
-    return plotter.plot3d_parametric_surface(*args, show=False, **kwargs)
+    return plotter.plot3d_parametric_surface(*plotArgs(args), show=False, **kwargs)
 
 def lim(f, **kwargs):
     for i in kwargs:
@@ -195,7 +206,7 @@ def integrate(*args, **kwargs):
     try:
         return sympy.integrate(*args, **kwargs)
     except ValueError:
-        return sympy.integrate(*args, sympy.Symbol("x"))
+        return sympy.integrate(*plotArgs(args), sympy.Symbol("x"))
 
 def factorize(*args):
     temp = sympy.factorint(*args)
@@ -471,6 +482,7 @@ while True:
         sys.stdout.write(repr(s.encode("utf-8")) + "\n")
         sys.stdout.flush()
     except Exception as ex:
+        raise
         sys.stdout.write(repr(ex) + "\n")
         sys.stdout.flush()
     time.sleep(0.01)
