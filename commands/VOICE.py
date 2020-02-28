@@ -878,6 +878,11 @@ class playlist:
                     s += " " * (int(math.log10(len(items))) - int(math.log10(max(1, i))))
                     s += "[" + uniStr(i) + "] "
                     s += items[i] + "\n"
+            if not s:
+                return (
+                    "```css\nDefault playlist for " + uniStr(guild.name)
+                    + " is currently empty.```"
+                )
             return (
                 "Current default playlist for **" + guild.name + "**: ```ini\n"
                 + s + "```"
