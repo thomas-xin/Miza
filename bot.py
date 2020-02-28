@@ -645,7 +645,7 @@ class main_data:
         
         def __init__(self):
             self.author = _vars.ghostUser()
-            self.content = uniStr("```asciidoc\n[MESSAGE DATA NOT FOUND]```")
+            self.content = "```css\n" + uniStr("[MESSAGE DATA NOT FOUND]") + "```"
             self.channel = None
             self.guild = None
             self.id = 0
@@ -1129,7 +1129,7 @@ async def checkDelete(message, reaction, user):
                     try:
                         temp = message.content
                         await message.delete()
-                        print(temp + " deleted by " + user.name)
+                        #print(temp + " deleted by " + user.name)
                     except discord.NotFound:
                         pass
             await _vars.handleUpdate()
