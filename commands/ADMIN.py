@@ -521,7 +521,7 @@ class updateLogs:
                 emb.add_field(name="After", value=strMessage(after))
                 await channel.send(embed=emb)
 
-    async def _delete_(self, message, bulk, **void):
+    async def _delete_(self, message, bulk=False, **void):
         guild = message.guild
         if guild.id in self.data:
             now = datetime.datetime.utcnow()
