@@ -13,6 +13,7 @@ class main_data:
     
     timeout = 24
     min_suspend = 3
+    website = "https://github.com/thomas-xin/Miza"
     heartbeat = "heartbeat.json"
     suspected = "suspected.json"
     shutdown = "shutdown.json"
@@ -38,7 +39,6 @@ class main_data:
         f.close()
         self.owner_id = int(auth["owner_id"])
         self.token = auth["discord_token"]
-        self.website = auth.get("website", None)
         self.data = {}
         self.proc = psutil.Process()
         doParallel(self.getModules, state=2)

@@ -538,7 +538,7 @@ class updateLogs:
             )[bulk]
             try:
                 al = await guild.audit_logs(
-                    limit=7,
+                    limit=5 * (not bulk) + 1,
                     action=action,
                 ).flatten()
                 cu_id = self._vars.client.user.id
