@@ -551,7 +551,7 @@ class updateLogs:
                     except AttributeError:
                         cnt = int(e.extra.get("count", 1)) - 1
                     h = e.created_at
-                    cs = self.dh.setdefault(h, 0)
+                    cs = self.dc.setdefault(h, 0)
                     c = cnt - cs
                     if c > 0:
                         self.dc[h] += 1
