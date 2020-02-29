@@ -596,7 +596,7 @@ class info:
                         pos += 1
             except LookupError:
                 pass
-        if is_self:
+        if is_self and _vars.website is not None:
             url2 = _vars.website
         else:
             url2 = url

@@ -38,7 +38,7 @@ class main_data:
         f.close()
         self.owner_id = int(auth["owner_id"])
         self.token = auth["discord_token"]
-        self.website = auth["website"]
+        self.website = auth.get("website", None)
         self.data = {}
         self.proc = psutil.Process()
         doParallel(self.getModules, state=2)
