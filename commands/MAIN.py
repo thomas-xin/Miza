@@ -2,7 +2,8 @@ import discord, os, sys, datetime
 from smath import *
 
 
-default_commands = ["string", "admin"]
+default_commands = ["main", "string", "admin"]
+standard_commands = default_commands + ["voice", "nsfw", "image", "game"]
 
 
 class help:
@@ -14,28 +15,28 @@ class help:
         self.description = "Shows a list of usable commands, or gives a detailed description of a command."
         self.usage = "<command{all}> <category{all}> <verbose(?v)>"
 
-    async def __call__(self, args, user, channel, guild, flags, **void):
+    async def __call__(self, args, user, channel, guild, flags, perm, **void):
         _vars = self._vars
         enabled = _vars.data["enabled"]
         g_id = guild.id
         prefix = _vars.getPrefix(g_id)
         enabled = enabled.get(channel.id, list(default_commands))
+        c_name = getattr(channel, "name", "DM")
+        admin = (not inf > perm, perm is nan)[c_name == "DM"]
         categories = _vars.categories
         commands = hlist()
         for catg in categories:
-            if catg in enabled or catg == "main":
+            if catg in enabled or admin:
                 commands.extend(categories[catg])
-        c_name = getattr(channel, "name", "DM")
-        u_perm = _vars.getPerms(user, guild)
         verb = "v" in flags
         argv = " ".join(args).lower().replace(prefix, "")
         show = []
         for a in args:
-            if (a in categories and a in enabled) or a == "main":
+            if (a in categories and a in enabled) or admin:
                 show.append(
                     "\nCommands for **" + user.name
-                    + "** in **" + channel.name
-                    + "** in category **" + a
+                    + "** in <#" + str(channel.id)
+                    + "> in category **" + a
                     + "**:\n"
                 )
                 for com in categories[a]:
@@ -43,7 +44,7 @@ class help:
                     min_level = com.min_level
                     description = com.description
                     usage = com.usage
-                    if min_level > u_perm or (u_perm is not nan and min_level is nan):
+                    if min_level > perm or (perm is not nan and min_level is nan):
                         continue
                     if c_name == "DM" and getattr(com, "server_only", False):
                         continue
@@ -59,14 +60,14 @@ class help:
         if not show:
             for c in categories:
                 catg = categories[c]
-                if not (c in enabled or c == "main"):
+                if not (c in enabled or admin):
                     continue
                 for com in catg:
                     name = com.__name__
                     min_level = com.min_level
                     description = com.description
                     usage = com.usage
-                    if min_level > u_perm or (u_perm is not nan and min_level is nan):
+                    if min_level > perm or (perm is not nan and min_level is nan):
                         continue
                     if c_name == "DM" and getattr(com, "server_only", False):
                         continue
@@ -93,7 +94,7 @@ class help:
                 min_level = com.min_level
                 description = com.description
                 usage = com.usage
-                if min_level > u_perm or (u_perm is not nan and min_level is nan):
+                if min_level > perm or (perm is not nan and min_level is nan):
                     continue
                 if c_name == "DM" and getattr(com, "server_only", False):
                         continue
@@ -107,8 +108,8 @@ class help:
                             + "\nUsage: " + prefix + name + " " + usage
                         )
             return (
-                "Commands for **" + user.name + "** in **" + c_name
-                + "**:\n```xml\n" + "\n".join(show) + "```", 1
+                "Commands for **" + user.name + "** in <#" + str(channel.id)
+                + ">:\n```xml\n" + "\n".join(show) + "```", 1
             )
         return "\n".join(show), 1
 
@@ -198,7 +199,7 @@ class enableCommand:
         self.name = ["ec", "enable"]
         self.min_level = 0
         self.description = "Shows, enables, or disables a command category in the current channel."
-        self.usage = "<command{all}> <enable(?e)> <disable(?d)> <hide(?h)>"
+        self.usage = "<command{all}> <enable(?e)> <disable(?d)> <list(?l)> <hide(?h)>"
 
     async def __call__(self, argv, flags, user, channel, perm, **void):
         update = self.data["enabled"].update
@@ -216,15 +217,19 @@ class enableCommand:
         catg = argv.lower()
         print(catg)
         if not catg:
+            if "l" in flags:
+                return (
+                    "```css\nStandard command categories:\n"
+                    + str(standard_commands) + "```"
+                )
             if "e" in flags:
-                categories = list(_vars.categories)
-                categories.remove("main")
+                categories = list(standard_commands) #list(_vars.categories)
                 enabled[channel.id] = categories
                 update()
                 if "h" in flags:
                     return
                 return (
-                    "```css\nEnabled all command categories in "
+                    "```css\nEnabled standard command categories in "
                     + uniStr(channel.name) + ".```"
                 )
             if "d" in flags:
@@ -237,9 +242,9 @@ class enableCommand:
                     + uniStr(channel.name) + ".```"
                 )
             return (
-                "Currently enabled command categories in **" + channel.name
-                + "**:\n```css\n"
-                + str(["main"] + enabled.get(channel.id, default_commands)) + "```"
+                "Currently enabled command categories in <#" + str(channel.id)
+                + ">:\n```css\n"
+                + str(enabled.get(channel.id, default_commands)) + "```"
             )
         else:
             if not catg in _vars.categories:
@@ -320,11 +325,6 @@ class restart:
             except:
                 print(traceback.format_exc())
                 time.sleep(0.1)
-        try:
-            await client.close()
-        except:
-            del client
-        del _vars
         if perm is nan:
             for i in range(8):
                 try:
@@ -334,6 +334,11 @@ class restart:
                 except:
                     print(traceback.format_exc())
                     time.sleep(0.1)
+        try:
+            await client.close()
+        except:
+            del client
+        del _vars
         sys.exit()
 
 
@@ -343,7 +348,7 @@ class suspend:
     def __init__(self):
         self.name = ["block", "blacklist"]
         self.min_level = nan
-        self.description = "Prevents a user from accessing the bot's commands. Overrides ~perms."
+        self.description = "Prevents a user from accessing the bot's commands. Overrides <perms>."
         self.usage = "<0:user> <1:value[]>"
 
     async def __call__(self, _vars, user, guild, args, **void):
@@ -459,7 +464,8 @@ class info:
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         d = "Owner: <@" + str(u.id) + ">"
-        d += "```\n" + str(g.description) + "```"
+        if g.description is not None:
+            d += "```\n" + str(g.description) + "```"
         emb.description = d
         pcount = await _vars.updaters["counts"].getUserMessages(None, g)
         if "v" in flags:
@@ -474,7 +480,7 @@ class info:
                     key=lambda k: us[k],
                     reverse=True,
                 )
-                for i in range(3):
+                for i in range(min(5, len(us))):
                     u_id = ul[i]
                     users.append(
                         "<@" + str(u_id) + ">: "
@@ -548,6 +554,7 @@ class info:
         activity = "\n".join(str(i) for i in getattr(u, "activities", []))
         role = ", ".join(str(i) for i in getattr(u, "roles", []) if not i.is_default())
         coms = msgs = avgs = 0
+        pos = None
         if "v" in flags:
             try:
                 coms = _vars.data["users"][u.id]["commands"]
@@ -556,6 +563,21 @@ class info:
             try:
                 msgs = await _vars.updaters["counts"].getUserMessages(u, guild)
                 avgs = await _vars.updaters["counts"].getUserAverage(u, guild)
+                if guild.owner.id != client.user.id:
+                    us = await _vars.updaters["counts"].getGuildMessages(guild)
+                    if type(us) is str:
+                        pos = us
+                    else:
+                        ul = sorted(
+                            us,
+                            key=lambda k: us[k],
+                            reverse=True,
+                        )
+                        try:
+                            pos = ul.index(u.id)
+                        except ValueError:
+                            pos = len(ul)
+                        pos += 1
             except LookupError:
                 pass
         emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
@@ -570,7 +592,7 @@ class info:
             d += "[Bot]\n" * is_bot
             d += "[Myself :3]\n" * is_self
             d += "[My owner ❤️]\n" * is_self_owner
-            d += "[Server owner]\n" * is_guild_owner
+            d += "[Server owner]\n" * (is_guild_owner and not is_self)
             d = d.strip("\n")
             d += "```"
         emb.description = d
@@ -586,6 +608,8 @@ class info:
             emb.add_field(name="Post count", value=str(msgs), inline=1)
         if avgs:
             emb.add_field(name="Average post length", value=str(avgs), inline=1)
+        if pos:
+            emb.add_field(name="Server rank", value=str(pos), inline=1)
         if role:
             emb.add_field(name="Roles", value=role, inline=0)
         print(emb.to_dict())
@@ -765,11 +789,14 @@ class updateMessageCount:
         self.scanned = True
         year = datetime.timedelta(31556925.216)
         guilds = self._vars.client.guilds
+        i = 0
         for guild in guilds:
             oneyear = datetime.datetime.utcnow() - guild.created_at < year
             if guild.member_count < 256 or oneyear:
                 self.data[guild.id] = "Calculating..."
                 asyncio.create_task(self.getUserMessageCount(guild))
+            if not i & 63:
+                await asyncio.sleep(20)
         self.scanned = -1
 
     async def _send_(self, message, **void):

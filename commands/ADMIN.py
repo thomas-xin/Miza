@@ -474,16 +474,16 @@ class messageLog:
 def strMessage(message):
     data = limStr(message.content, 512)
     if message.reactions:
-        data += " {" + ", ".join(str(i) for i in message.reactions) + "}"
+        data += "\n{" + ", ".join(str(i) for i in message.reactions) + "}"
     if message.embeds:
-        data += " <" + ", ".join(str(i.to_dict()) for i in message.embeds) + ">"
+        data += "\n<" + ", ".join(str(i.to_dict()) for i in message.embeds) + ">"
     if message.attachments:
-        data += " <" + ", ".join(i.url for i in message.attachments) + ">"
+        data += "\n<" + ", ".join(i.url for i in message.attachments) + ">"
     try:
         t = message.created_at
         if message.edited_at:
             t = message.edited_at
-        data += " `(" + str(t) + ")`"
+        data += "\n`(" + str(t) + ")`"
     except AttributeError:
         pass
     if not data:
@@ -544,8 +544,20 @@ class updateLogs:
                 init = "<@" + str(t.id) + ">"
                 for e in reversed(al):
                     #print(e, e.target, now - e.created_at)
-                    if now - e.created_at < datetime.timedelta(seconds=6):
-                        if e.target.id == u.id and e.extra.channel.id == message.channel.id:
+                    try:
+                        c = e.extra.count - 1
+                    except:
+                        print(e.extra)
+                        c = e.extra.get("count", 0)
+                    s = (10, 3600)[bool(c)]
+                    if not bulk:
+                        ch = e.extra.channel
+                        targ = e.target.id
+                    else:
+                        ch = e.target
+                        targ = u.id
+                    if now - e.created_at < datetime.timedelta(seconds=s):
+                        if targ == u.id and ch == message.channel.id:
                             t = e.user
                             init = "<@" + str(t.id) + ">"
                             print(t, e.target)

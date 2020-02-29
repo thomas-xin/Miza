@@ -120,7 +120,13 @@ class main_data:
         try:
             g_id = int(g_id)
         except (ValueError, TypeError):
-            raise TypeError("Invalid server identifier: " + uniStr(g_id))
+            try:
+                invite = await client.fetch_invite(g_id)
+                return invite.guild
+            except (discord.NotFound, discord.HTTPException) as ex:
+                raise LookupError(str(ex))
+            except:
+                raise TypeError("Invalid server identifier: " + uniStr(g_id))
         try:
             guild = client.get_guild(g_id)
             if guild is None:
@@ -334,8 +340,20 @@ class main_data:
         if saved:
             print("Autosaved " + str(saved) + ".")
 
+    imap = {
+        "#": "",
+        "<": "",
+        ">": "",
+        "@": "",
+        "!": "",
+    }
+    itrans = "".maketrans(imap)
+    
     def verifyID(self, value):
-        return int(str(value).replace("#", "").replace("<", "").replace(">", "").replace("@", "").replace("!", ""))
+        try:
+            return int(str(value).translate(self.itrans))
+        except ValueError:
+            return value
     
     mmap = {
         "“": '"',
@@ -710,11 +728,12 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         try:
             enabled = _vars.data["enabled"][c_id]
         except KeyError:
-            enabled = _vars.data["enabled"][c_id] = ["string", "admin"]
+            enabled = _vars.data["enabled"][c_id] = ["main", "string", "admin"]
             _vars.update()
     else:
         enabled = list(_vars.categories)
     u_perm = _vars.getPerms(u_id, guild)
+    admin = not inf > u_perm
 
     mention = (
         "<@" + str(client.user.id) + ">",
@@ -751,7 +770,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     if op:
         commands = hlist()
         for catg in categories:
-            if catg in enabled or catg == "main":
+            if catg in enabled or admin:
                 commands.extend(categories[catg])
         for command in commands:
             for alias in command.name:

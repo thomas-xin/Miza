@@ -310,8 +310,12 @@ class cs_org2xm:
         returns = [None]
         doParallel(orgConv, [org, wave, fmt], returns, state=2)
         t = time.time()
+        i = 0
         while returns[0] is None and time.time() - t < _vars.timeout - 1:
-            await asyncio.sleep(0.2)
+            if not i % 8:
+                await channel.trigger_typing()
+            await asyncio.sleep(0.5)
+            i += 0.5
         fn = returns[0]
         if fn is None:
             raise TimeoutError("Request timed out.")

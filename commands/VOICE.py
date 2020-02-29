@@ -236,11 +236,19 @@ class customAudio(discord.AudioSource):
                 return temp
             array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
             size = self.length >> 1
+            if abs(volume) > 1 << 32:
+                volume = nan
+            if abs(reverb) > 1 << 32:
+                reverb = nan
+            if abs(bassboost) > 1 << 32:
+                bassboost = nan
+            if abs(pitch) > 1 << 32:
+                pitch = nan
             if not isValid(volume * reverb * bassboost * pitch):
                 array = numpy.random.rand(self.length) * 65536 - 32768
             elif volume != 1 or chorus:
                 try:
-                    array *= volume * (bool(chorus) + 1)
+                    array *= volume * 2 * (bool(chorus) + 1)
                 except:
                     array = numpy.random.rand(self.length) * 65536 - 32768
             left, right = array[::2], array[1::2]
@@ -1145,15 +1153,17 @@ class pause:
     server_only = True
 
     def __init__(self):
-        self.name = ["resume", "unpause"]
+        self.name = ["resume", "unpause", "stop"]
         self.min_level = 1
         self.description = "Pauses or resumes audio playing."
         self.usage = ""
 
     async def __call__(self, _vars, name, guild, client, user, channel, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
+        if name == "stop":
+            auds.seek(0)
         if not auds.paused > 1:
-            auds.paused = name == "pause"
+            auds.paused = name in ("pause", "stop")
         if auds.player is not None:
             auds.player["time"] = 1
         if auds.stats["quiet"] & 2:

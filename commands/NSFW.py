@@ -320,7 +320,6 @@ def is_nsfw(channel):
 
 class neko:
     is_command = True
-    time_consuming = True
 
     def __init__(self):
         self.name = []
