@@ -810,7 +810,7 @@ class updateMessageCount:
         year = datetime.timedelta(31556925.216)
         guilds = self._vars.client.guilds
         i = 0
-        for guild in guilds:
+        for guild in sorted(guilds, key=lambda g: g.member_count, reverse=True):
             oneyear = datetime.datetime.utcnow() - guild.created_at < year
             if guild.member_count < 256 or oneyear:
                 self.data[guild.id] = "Calculating..."

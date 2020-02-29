@@ -549,14 +549,13 @@ class updateLogs:
                     try:
                         cnt = e.extra.count - 1
                     except AttributeError:
-                        cnt = e.extra.get("count", 0) - 1
+                        cnt = int(e.extra.get("count", 1)) - 1
                     h = e.created_at
-                    if h in self.dc:
-                        c = cnt - self.dc[h]
-                    else:
-                        c = cnt
-                    self.dc[h] = cnt
-                    s = (5, 3600)[c > 0 and not bulk]
+                    cs = self.dh.setdefault(h, 0)
+                    c = cnt - cs
+                    if c > 0:
+                        self.dc[h] += 1
+                    s = (5, 3600)[c > 0]
                     if not bulk:
                         c_id = e.extra.channel.id
                         targ = e.target.id
@@ -565,7 +564,6 @@ class updateLogs:
                             c_id = e.target.id
                         except AttributeError:
                             c_id = e._target_id
-                        print(e, c_id)
                         targ = u.id
                     if now - h < datetime.timedelta(seconds=s):
                         if targ == u.id and c_id == message.channel.id:
