@@ -579,7 +579,7 @@ class info:
             try:
                 msgs = await _vars.updaters["counts"].getUserMessages(u, guild)
                 avgs = await _vars.updaters["counts"].getUserAverage(u, guild)
-                if guild.owner.id != client.user.id:
+                if joined and guild.owner.id != client.user.id:
                     us = await _vars.updaters["counts"].getGuildMessages(guild)
                     if type(us) is str:
                         pos = us
@@ -798,6 +798,7 @@ class updateMessageCount:
         for u in data:
             avgs[u] /= data[u]
         self.data[guild.id] = {"counts": data, "averages": avgs}
+        print(guild)
         print(self.data[guild.id])
 
     def __init__(self):
