@@ -131,15 +131,12 @@ class main_data:
                     )
                     for at in g.__slots__:
                         setattr(guild, at, getattr(g, at))
+                    icon = str(guild.icon)
                     guild.icon_url = (
                         "https://cdn.discordapp.com/icons/"
-                        + str(guild.id) + "/" + str(guild.icon)
+                        + str(guild.id) + "/" + icon
+                        + ".gif" * icon.startswith("a_")
                     )
-                    try:
-                        urlOpen(guild.icon_url + ".gif").close()
-                        guild.icon_url += ".gif"
-                    except ConnectionError:
-                        pass
                 else:
                     guild = g
                 return guild
