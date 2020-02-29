@@ -557,16 +557,16 @@ class updateLogs:
                         self.dc[h] += 1
                     s = (5, 3600)[c > 0]
                     if not bulk:
-                        c_id = e.extra.channel.id
+                        cid = e.extra.channel.id
                         targ = e.target.id
                     else:
                         try:
-                            c_id = e.target.id
+                            cid = e.target.id
                         except AttributeError:
-                            c_id = e._target_id
+                            cid = e._target_id
                         targ = u.id
                     if now - h < datetime.timedelta(seconds=s):
-                        if targ == u.id and c_id == message.channel.id:
+                        if targ == u.id and cid == message.channel.id:
                             t = e.user
                             init = "<@" + str(t.id) + ">"
                             #print(t, e.target)
