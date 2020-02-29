@@ -459,45 +459,61 @@ class info:
         _vars = self._vars
         url = str(g.icon_url)
         name = g.name
-        u = g.owner
+        try:
+            u = g.owner
+        except AttributeError:
+            u = None
         emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
-        d = "Owner: <@" + str(u.id) + ">"
+        if u is not None:
+            d = "Owner: <@" + str(u.id) + ">"
+        else:
+            d = ""
         if g.description is not None:
             d += "```\n" + str(g.description) + "```"
         emb.description = d
-        pcount = await _vars.updaters["counts"].getUserMessages(None, g)
-        if "v" in flags:
-            pavg = await _vars.updaters["counts"].getUserAverage(None, g)
-            users = deque()
-            us = await _vars.updaters["counts"].getGuildMessages(g)
-            if type(us) is str:
-                top = us
-            else:
-                ul = sorted(
-                    us,
-                    key=lambda k: us[k],
-                    reverse=True,
-                )
-                for i in range(min(5, len(us))):
-                    u_id = ul[i]
-                    users.append(
-                        "<@" + str(u_id) + ">: "
-                        + str(us[u_id])
+        top = None
+        try:
+            g.region
+            pcount = await _vars.updaters["counts"].getUserMessages(None, g)
+        except AttributeError:
+            pcount = 0
+        try:
+            if "v" in flags:
+                pavg = await _vars.updaters["counts"].getUserAverage(None, g)
+                users = deque()
+                us = await _vars.updaters["counts"].getGuildMessages(g)
+                if type(us) is str:
+                    top = us
+                else:
+                    ul = sorted(
+                        us,
+                        key=lambda k: us[k],
+                        reverse=True,
                     )
-                top = "\n".join(users)
-        else:
-            top = None
+                    for i in range(min(5, len(us))):
+                        u_id = ul[i]
+                        users.append(
+                            "<@" + str(u_id) + ">: "
+                            + str(us[u_id])
+                        )
+                    top = "\n".join(users)
+        except AttributeError:
+            pass
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
         emb.add_field(name="Creation time", value=str(g.created_at), inline=1)
         if "v" in flags:
-            emb.add_field(name="Region", value=str(g.region), inline=1)
-            emb.add_field(name="Nitro boosts", value=str(g.premium_subscription_count), inline=1)
+            try:
+                emb.add_field(name="Region", value=str(g.region), inline=1)
+                emb.add_field(name="Nitro boosts", value=str(g.premium_subscription_count), inline=1)
+            except AttributeError:
+                pass
         emb.add_field(name="User count", value=str(g.member_count), inline=1)
-        emb.add_field(name="Post count", value=str(pcount), inline=1)
-        if "v" in flags:
-            emb.add_field(name="Average post length", value=str(pavg), inline=1)
+        if pcount:
+            emb.add_field(name="Post count", value=str(pcount), inline=1)
+            if "v" in flags:
+                emb.add_field(name="Average post length", value=str(pavg), inline=1)
         if top is not None:
             emb.add_field(name="Top users", value=top, inline=0)
         print(emb.to_dict())

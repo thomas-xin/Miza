@@ -122,7 +122,26 @@ class main_data:
         except (ValueError, TypeError):
             try:
                 invite = await client.fetch_invite(g_id)
-                return invite.guild
+                g = invite.guild
+                if not hasattr(g, "member_count"):
+                    guild = freeClass(
+                        member_count=invite.approximate_member_count,
+                        created_at="N/A",
+                    )
+                    for at in g.__slots__:
+                        setattr(guild, at, getattr(g, at))
+                    guild.icon_url = (
+                        "https://cdn.discordapp.com/icons/"
+                        + str(guild.id) + "/" + str(guild.icon)
+                    )
+                    try:
+                        urlOpen(guild.icon_url + ".gif").close()
+                        guild.icon_url += ".gif"
+                    except ConnectionError:
+                        pass
+                else:
+                    guild = g
+                return guild
             except (discord.NotFound, discord.HTTPException) as ex:
                 raise LookupError(str(ex))
             except:
@@ -541,6 +560,8 @@ class main_data:
                             await sent.add_reaction("❎")
 
     async def handleUpdate(self, force=False):
+        if not hasattr(self, "stat_timer"):
+            self.stat_timer = 0
         if force or time.time() - self.lastCheck > 0.5:
             while self.busy:
                 await asyncio.sleep(0.1)
@@ -549,7 +570,8 @@ class main_data:
             try:
                 #print("Sending update...")
                 guilds = len(client.guilds)
-                if guilds != self.guilds:
+                if guilds != self.guilds or time.time() - self.stat_timer > 60:
+                    self.stat_timer = time.time()
                     self.guilds = guilds
                     u = await self.fetch_user(self.owner_id)
                     n = u.name
