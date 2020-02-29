@@ -817,6 +817,7 @@ class updateMessageCount:
                 asyncio.create_task(self.getUserMessageCount(guild))
             if not i & 63:
                 await asyncio.sleep(20)
+            i += 1
         self.scanned = -1
 
     async def _send_(self, message, **void):
