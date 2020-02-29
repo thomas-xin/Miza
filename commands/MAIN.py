@@ -32,7 +32,7 @@ class help:
         argv = " ".join(args).lower().replace(prefix, "")
         show = []
         for a in args:
-            if (a in categories and a in enabled) or admin:
+            if (a in categories and (a in enabled or admin)):
                 show.append(
                     "\nCommands for **" + user.name
                     + "** in <#" + str(channel.id)
