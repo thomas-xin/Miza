@@ -496,10 +496,12 @@ class updateLogs:
     name = "logs"
 
     def __init__(self):
-        pass
+        self.dc = {}
 
     async def __call__(self):
-        pass
+        for h in tuple(self.dc):
+            if datetime.datetime.utcnow() - h > datetime.timedelta(seconds=3600):
+                self.dc.pop(h)
 
     async def _edit_(self, before, after, **void):
         if not after.author.bot:
@@ -545,22 +547,31 @@ class updateLogs:
                 for e in reversed(al):
                     #print(e, e.target, now - e.created_at)
                     try:
-                        c = e.extra.count - 1
-                    except:
-                        print(e.extra)
-                        c = e.extra.get("count", 0)
-                    s = (10, 3600)[bool(c)]
+                        cnt = e.extra.count - 1
+                    except AttributeError:
+                        cnt = e.extra.get("count", 0) - 1
+                    h = e.created_at
+                    if h in self.dc:
+                        c = cnt - self.dc[h]
+                    else:
+                        c = cnt
+                    self.dc[h] = cnt
+                    s = (5, 3600)[c > 0 and not bulk]
                     if not bulk:
-                        ch = e.extra.channel
+                        c_id = e.extra.channel.id
                         targ = e.target.id
                     else:
-                        ch = e.target
+                        try:
+                            c_id = e.target.id
+                        except AttributeError:
+                            c_id = e._target_id
+                        print(e, c_id)
                         targ = u.id
-                    if now - e.created_at < datetime.timedelta(seconds=s):
-                        if targ == u.id and ch == message.channel.id:
+                    if now - h < datetime.timedelta(seconds=s):
+                        if targ == u.id and c_id == message.channel.id:
                             t = e.user
                             init = "<@" + str(t.id) + ">"
-                            print(t, e.target)
+                            #print(t, e.target)
                 if t.bot or u.id == t.id == cu_id:
                     return
             except (discord.Forbidden, discord.HTTPException):

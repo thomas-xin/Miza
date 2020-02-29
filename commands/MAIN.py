@@ -596,9 +596,13 @@ class info:
                         pos += 1
             except LookupError:
                 pass
+        if is_self:
+            url2 = _vars.website
+        else:
+            url2 = url
         emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
         emb.set_thumbnail(url=url)
-        emb.set_author(name=name + "#" + disc, icon_url=url, url=url)
+        emb.set_author(name=name + "#" + disc, icon_url=url, url=url2)
         d = "<@" + str(u.id) + ">"
         if activity:
             d += "```\n" + activity + "```"

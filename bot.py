@@ -38,6 +38,7 @@ class main_data:
         f.close()
         self.owner_id = int(auth["owner_id"])
         self.token = auth["discord_token"]
+        self.website = auth["website"]
         self.data = {}
         self.proc = psutil.Process()
         doParallel(self.getModules, state=2)
@@ -570,7 +571,8 @@ class main_data:
             try:
                 #print("Sending update...")
                 guilds = len(client.guilds)
-                if guilds != self.guilds or time.time() - self.stat_timer > 60:
+                changed = guilds != self.guilds
+                if changed or time.time() - self.stat_timer > 60:
                     self.stat_timer = time.time()
                     self.guilds = guilds
                     u = await self.fetch_user(self.owner_id)
@@ -580,7 +582,8 @@ class main_data:
                         + " place, to " + uniStr(guilds) + " server"
                         + "s" * (guilds != 1) + "!"
                     )
-                    print("Playing " + gamestr)
+                    if changed:
+                        print("Playing " + gamestr)
                     game = discord.Game(gamestr)
                     await client.change_presence(activity=game)
                 self.lastCheck = time.time()
