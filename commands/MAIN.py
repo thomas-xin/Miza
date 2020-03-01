@@ -759,6 +759,8 @@ class updateMessageCount:
                     try:
                         messages = await history.flatten()
                         break
+                    except discord.Forbidden:
+                        raise
                     except:
                         if i >= 7:
                             raise
