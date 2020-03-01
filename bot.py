@@ -615,10 +615,10 @@ class main_data:
                             place + "to " + uniStr(guilds) + " server"
                             + "s" * (guilds != 1) + "!"
                         ),
-                        url=self.stream,
+                        url=self.website,
                     )
                     activity.game = self.website
-                    activity.twitch_name = self.website
+                    #activity.twitch_name = self.website
                     if changed:
                         print(repr(activity))
                     await client.change_presence(activity=activity)
