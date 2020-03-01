@@ -363,6 +363,7 @@ class main_data:
         ">": "",
         "@": "",
         "!": "",
+        "&": "",
     }
     itrans = "".maketrans(imap)
     
@@ -654,6 +655,7 @@ class main_data:
         description = ""
         max_members = 2
         unavailable = False
+        isDM = True
 
     class ghostUser:
         

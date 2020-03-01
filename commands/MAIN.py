@@ -492,7 +492,7 @@ class info:
                         key=lambda k: us[k],
                         reverse=True,
                     )
-                    for i in range(min(5, len(us))):
+                    for i in range(min(32, flags.get("v", 0) * 5, len(us))):
                         u_id = ul[i]
                         users.append(
                             "<@" + str(u_id) + ">: "
@@ -612,7 +612,7 @@ class info:
             d += "[Bot]\n" * is_bot
             d += "[Myself :3]\n" * is_self
             d += "[My owner ❤️]\n" * is_self_owner
-            d += "[Server owner]\n" * (is_guild_owner and not is_self)
+            d += "[Server owner]\n" * (is_guild_owner and not hasattr(guild, "isDM"))
             d = d.strip("\n")
             d += "```"
         emb.description = d
@@ -688,7 +688,7 @@ class updateMessageCount:
     async def getUserMessages(self, user, guild):
         if self.scanned == -1:
             c_id = self._vars.client.user.id
-            if guild is None or guild.owner_id == c_id:
+            if guild is None or hasattr(guild, "isDM"):
                 channel = user.dm_channel
                 if channel is None:
                     return 0
@@ -710,7 +710,7 @@ class updateMessageCount:
     async def getUserAverage(self, user, guild):
         if self.scanned == -1:
             c_id = self._vars.client.user.id
-            if guild is None or guild.owner_id == c_id:
+            if guild is None or hasattr(guild, "isDM"):
                 channel = user.dm_channel
                 if channel is None:
                     return 0
@@ -731,7 +731,7 @@ class updateMessageCount:
     async def getGuildMessages(self, guild):
         if self.scanned == -1:
             c_id = self._vars.client.user.id
-            if guild is None or guild.owner_id == c_id:
+            if guild is None or hasattr(guild, "isDM"):
                 channel = user.dm_channel
                 if channel is None:
                     return 0
