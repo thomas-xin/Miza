@@ -28,6 +28,7 @@ class main_data:
         "deleted": {},
     }
     cachelim = 262144
+    deleted_user = 456226577798135808
             
     def __init__(self):
         print("Initializing...")
@@ -121,14 +122,19 @@ class main_data:
             u_id = int(u_id)
         except (ValueError, TypeError):
             raise TypeError("Invalid user identifier: " + uniStr(u_id))
-        try:
-            user = client.get_user(u_id)
-            if user is None:
-                raise EOFError
-        except:
-            if u_id in self.cache["users"]:
-                return self.cache["users"][u_id]
-            user = await client.fetch_user(u_id)
+        if u_id == self.deleted_user:
+            user = self.ghostUser()
+            user.id = u_id
+            user.avatar_url = "https://cdn.discordapp.com/embed/avatars/0.png"
+        else:
+            try:
+                user = client.get_user(u_id)
+                if user is None:
+                    raise EOFError
+            except:
+                if u_id in self.cache["users"]:
+                    return self.cache["users"][u_id]
+                user = await client.fetch_user(u_id)
         self.cache["users"][u_id] = user
         self.limitCache("users")
         return user
@@ -610,7 +616,7 @@ class main_data:
                     self.guilds = guilds
                     u = await self.fetch_user(self.owner_id)
                     n = u.name
-                    place = "from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place, "
+                    place = "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place, "
                     activity = discord.Streaming(
                         name=(
                             place + "to " + uniStr(guilds) + " server"
@@ -619,7 +625,6 @@ class main_data:
                         url=self.website,
                     )
                     activity.game = self.website
-                    #activity.twitch_name = self.website
                     if changed:
                         print(repr(activity))
                     await client.change_presence(activity=activity)

@@ -528,6 +528,8 @@ class updateLogs:
                 await channel.send(embed=emb)
 
     async def _delete_(self, message, bulk=False, **void):
+        if bulk:
+            return
         guild = message.guild
         if guild.id in self.data:
             now = datetime.datetime.utcnow()
@@ -548,7 +550,7 @@ class updateLogs:
                     t = self._vars.client.user
                 else:
                     al = await guild.audit_logs(
-                        limit=5 * (not bulk) + 1,
+                        limit=5,
                         action=action,
                     ).flatten()
                     for e in reversed(al):

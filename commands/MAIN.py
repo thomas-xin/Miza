@@ -755,7 +755,15 @@ class updateMessageCount:
                     limit=None,
                 )
                 print(history)
-                messages = await history.flatten()
+                for i in range(8):
+                    try:
+                        messages = await history.flatten()
+                        break
+                    except:
+                        if i >= 7:
+                            raise
+                        print(traceback.format_exc())
+                    await asyncio.sleep(30 * (i ** 2 + 1))
                 print(len(messages))
                 returns[0] = messages
             except:
