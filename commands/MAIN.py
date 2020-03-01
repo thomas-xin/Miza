@@ -725,7 +725,7 @@ class updateMessageCount:
                 t = d["totals"]
                 c = d["counts"]
                 if user is None:
-                    return sum(t.values()) / len(t)
+                    return sum(t.values()) / sum(c.values())
                 return t.get(user.id, 0) / c.get(user.id, 1)
         return "Calculating..."            
 
