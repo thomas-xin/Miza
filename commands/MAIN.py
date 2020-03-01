@@ -683,7 +683,7 @@ class updateMessageCount:
     no_file = True
 
     def getMessageLength(self, message):
-        return len(message.content) + sum(len(e) for e in message.embeds)
+        return len(message.system_content) + sum(len(e) for e in message.embeds)
 
     async def getUserMessages(self, user, guild):
         if self.scanned == -1:
@@ -781,7 +781,7 @@ class updateMessageCount:
         data = {}
         avgs = {}
         histories = deque()
-        i = 0
+        i = 1
         for channel in reversed(guild.text_channels):
             returns = [None]
             histories.append(returns)

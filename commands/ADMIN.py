@@ -720,6 +720,8 @@ class updateColours:
                     self.count += 1
                     #print("Edited role " + role.name)
                 await asyncio.sleep(frand(2))
+            except discord.Forbidden:
+                print(traceback.format_exc())
             except discord.HTTPException as ex:
                 print(traceback.format_exc())
                 self._vars.blocked += 20
