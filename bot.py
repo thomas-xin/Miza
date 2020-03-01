@@ -25,6 +25,7 @@ class main_data:
         "channels": {},
         "users": {},
         "messages": {},
+        "deleted": {},
     }
     cachelim = 262144
             
@@ -34,20 +35,34 @@ class main_data:
             os.mkdir("cache/")
         if not os.path.exists("saves/"):
             os.mkdir("saves/")
-        f = open(self.authdata)
+        try:
+            f = open(self.authdata)
+        except FileNotFoundError:
+            f = open(self.authdata, "w")
+            f.write(
+                '{\n'
+                + '"discord_token":"",\n'
+                + '"owner_id":""\n'
+                + '}'
+            )
+            f.close()
+            raise FileNotFoundError("Please fill in details for " + self.authdata + " to continue.")
         auth = ast.literal_eval(f.read())
         f.close()
-        self.owner_id = int(auth["owner_id"])
-        self.token = auth["discord_token"]
+        try:
+            self.token = auth["discord_token"]
+        except KeyError:
+            raise KeyError("discord_token not found. Unable to login.")
+        try:
+            self.owner_id = int(auth["owner_id"])
+        except KeyError:
+            self.owner_id = 0
+            print("WARNING: owner_id not found. Unable to locate owner.")
         self.data = {}
         self.proc = psutil.Process()
         doParallel(self.getModules, state=2)
         self.current_channel = None
         self.guilds = 0
-        self.blocked = 0
-        self.lastCheck = 0
-        self.doUpdate = False
-        self.busy = False
         self.updated = False
         self.suffix = ">>> "
         print("Initialized.")
@@ -114,7 +129,7 @@ class main_data:
                 return self.cache["users"][u_id]
             user = await client.fetch_user(u_id)
         self.cache["users"][u_id] = user
-        self.limitCache()
+        self.limitCache("users")
         return user
 
     async def fetch_guild(self, g_id):
@@ -153,7 +168,7 @@ class main_data:
                 return self.cache["guilds"][g_id]
             guild = await client.fetch_guild(g_id)
         self.cache["guilds"][g_id] = guild
-        self.limitCache()
+        self.limitCache("guilds")
         return guild
 
     async def fetch_channel(self, c_id):
@@ -170,7 +185,7 @@ class main_data:
                 return self.cache["channels"][c_id]
             channel = await client.fetch_channel(c_id)
         self.cache["channels"][c_id] = channel
-        self.limitCache()
+        self.limitCache("channels")
         return channel
 
     async def fetch_message(self, m_id, channel=None):
@@ -183,7 +198,7 @@ class main_data:
         message = await channel.fetch_message(m_id)
         if message is not None:
             self.cache["messages"][m_id] = message
-            self.limitCache()
+            self.limitCache("messages")
         return message
 
     async def getDM(self, user):
@@ -250,6 +265,21 @@ class main_data:
             if len(c) > self.cachelim:
                 i = iter(c)
                 c.pop(next(i))
+
+    def isDeleted(self, message):
+        try:
+            m_id = int(message.id)
+        except AttributeError:
+            m_id = int(message)
+        return self.cache["deleted"].get(m_id, False)
+
+    def logDelete(self, message):
+        try:
+            m_id = int(message.id)
+        except AttributeError:
+            m_id = int(message)
+        self.cache["deleted"][m_id] = True
+        self.limitCache("deleted")
 
     def isSuspended(self, u_id):
         u_id = int(u_id)
@@ -561,6 +591,10 @@ class main_data:
     async def handleUpdate(self, force=False):
         if not hasattr(self, "stat_timer"):
             self.stat_timer = 0
+        if not hasattr(self, "lastCheck"):
+            self.lastCheck = 0
+        if not hasattr(self, "busy"):
+            self.busy = False
         if force or time.time() - self.lastCheck > 0.5:
             while self.busy:
                 await asyncio.sleep(0.1)
@@ -575,15 +609,19 @@ class main_data:
                     self.guilds = guilds
                     u = await self.fetch_user(self.owner_id)
                     n = u.name
-                    gamestr = (
-                        "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s")
-                        + " place, to " + uniStr(guilds) + " server"
-                        + "s" * (guilds != 1) + "!"
+                    place = "from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place, "
+                    activity = discord.Streaming(
+                        name=(
+                            place + "to " + uniStr(guilds) + " server"
+                            + "s" * (guilds != 1) + "!"
+                        ),
+                        url=self.stream,
                     )
+                    activity.game = self.website
+                    activity.twitch_name = self.website
                     if changed:
-                        print("Playing " + gamestr)
-                    game = discord.Game(gamestr)
-                    await client.change_presence(activity=game)
+                        print(repr(activity))
+                    await client.change_presence(activity=activity)
                 self.lastCheck = time.time()
                 for u in self.updaters.values():
                     asyncio.create_task(u())
@@ -1058,7 +1096,9 @@ async def inputLoop():
                     sent = await ch.send("_ _")
                     await processMessage(sent, reconstitute(proc))
                     try:
+                        d_id = sent.id
                         await sent.delete()
+                        _vars.logDelete(d_id)
                     except discord.NotFound:
                         pass
                     _vars.print(end="")
@@ -1115,6 +1155,8 @@ async def inputLoop():
 async def updateLoop():
     print("Update loop initiated.")
     autosave = 0
+    _vars.blocked = 0
+    _vars.doUpdate = False
     while True:
         try:
             if time.time() - autosave > 60:
@@ -1158,20 +1200,25 @@ async def checkDelete(message, reaction, user):
     if message.author.id == client.user.id:
         u_perm = _vars.getPerms(user.id, message.guild)
         check = False
-        if not u_perm < 1:
+        if not u_perm < 3:
             check = True
         else:
-            for reaction in message.reactions:
-                async for u in reaction.users():
-                    if u.id == client.user.id:
-                        check = True
+            for react in message.reactions:
+                if str(reaction) == str(react):
+                    users = await reaction.users().flatten()
+                    for u in users:
+                        if u.id == client.user.id:
+                            check = True
+                            break
         if check:
             if user.id != client.user.id:
                 s = str(reaction)
                 if s in "❌✖️🇽❎":
                     try:
-                        temp = message.content
+                        #temp = message.content
+                        d_id = message.id
                         await message.delete()
+                        _vars.logDelete(d_id)
                         #print(temp + " deleted by " + user.name)
                     except discord.NotFound:
                         pass

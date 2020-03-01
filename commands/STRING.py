@@ -32,13 +32,19 @@ class PapagoTrans:
         return output
 
 
+translators = {
+    "Google Translate": Translator(["translate.google.com"]),
+}
 f = open("auth.json")
 auth = ast.literal_eval(f.read())
 f.close()
-translators = {
-    "Google Translate": Translator(["translate.google.com"]),
-    "Papago": PapagoTrans(auth["papago_id"], auth["papago_secret"])
-}
+try:
+    translators["Papago"] = PapagoTrans(auth["papago_id"], auth["papago_secret"])
+except KeyError:
+    translators["Papago"] = freeClass(
+        translate=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to use Papago Translate.")'),
+    )
+    print("WARNING: papago_id/papago_secret not found. Unable to use Papago Translate.")
 
 
 class math:

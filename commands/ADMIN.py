@@ -60,12 +60,16 @@ class purge:
                     for i in range(min(len(delM), 100)):
                         delM.popleft()
                 except AttributeError:
+                    d_id = delM[0].id
                     await delM[0].delete()
+                    _vars.logDelete(d_id)
                     deleted += 1
                     delM.popleft()
             except:
                 print(traceback.format_exc())
-                await delM.popleft().delete()
+                m = delM.popleft()
+                await m.delete()
+                _vars.logDelete(m.id)
                 deleted += 1
         if not "h" in flags:
             return (
@@ -352,14 +356,14 @@ follow_default = {
 }
 
                   
-class follow:
+class dogpile:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["dogpile"]
+        self.name = []
         self.min_level = 3
-        self.description = "Causes Miza to automatically imitate users when 3 of the same message is posted in a row."
+        self.description = "Causes Miza to automatically imitate users when 3+ of the same messages are posted in a row."
         self.usage = "<enable(?e)> <disable(?d)>"
 
     async def __call__(self, flags, guild, **void):
@@ -372,15 +376,15 @@ class follow:
         if "d" in flags:
             curr["follow"] = False
             update()
-            return "```css\nDisabled follow imitating for " + uniStr(guild.name) + ".```"
+            return "```css\nDisabled dogpile imitating for " + uniStr(guild.name) + ".```"
         elif "e" in flags:
             curr["follow"] = True
             update()
-            return "```css\nEnabled follow imitating for " + uniStr(guild.name) + ".```"
+            return "```css\nEnabled dogpile imitating for " + uniStr(guild.name) + ".```"
         else:
             return (
                 "```css\nCurrently " + uniStr("not " * (not curr["follow"]))
-                + "follow imitating in " + uniStr(guild.name) + ".```"
+                + "dogpile imitating in " + uniStr(guild.name) + ".```"
             )
 
 
@@ -476,9 +480,9 @@ def strMessage(message):
     if message.reactions:
         data += "\n{" + ", ".join(str(i) for i in message.reactions) + "}"
     if message.embeds:
-        data += "\n<" + ", ".join(str(i.to_dict()) for i in message.embeds) + ">"
+        data += "\n⟨" + ", ".join(str(i.to_dict()) for i in message.embeds) + "⟩"
     if message.attachments:
-        data += "\n<" + ", ".join(i.url for i in message.attachments) + ">"
+        data += "\n[" + ", ".join(i.url for i in message.attachments) + "]"
     try:
         t = message.created_at
         if message.edited_at:
@@ -537,39 +541,42 @@ class updateLogs:
                 discord.AuditLogAction.message_bulk_delete,
             )[bulk]
             try:
-                al = await guild.audit_logs(
-                    limit=5 * (not bulk) + 1,
-                    action=action,
-                ).flatten()
                 cu_id = self._vars.client.user.id
                 t = u
                 init = "<@" + str(t.id) + ">"
-                for e in reversed(al):
-                    #print(e, e.target, now - e.created_at)
-                    try:
-                        cnt = e.extra.count - 1
-                    except AttributeError:
-                        cnt = int(e.extra.get("count", 1)) - 1
-                    h = e.created_at
-                    cs = self.dc.setdefault(h, 0)
-                    c = cnt - cs
-                    if c > 0:
-                        self.dc[h] += 1
-                    s = (5, 3600)[c > 0]
-                    if not bulk:
-                        cid = e.extra.channel.id
-                        targ = e.target.id
-                    else:
+                if _vars.isDeleted(message):
+                    t = self._vars.client.user
+                else:
+                    al = await guild.audit_logs(
+                        limit=5 * (not bulk) + 1,
+                        action=action,
+                    ).flatten()
+                    for e in reversed(al):
+                        #print(e, e.target, now - e.created_at)
                         try:
-                            cid = e.target.id
+                            cnt = e.extra.count - 1
                         except AttributeError:
-                            cid = e._target_id
-                        targ = u.id
-                    if now - h < datetime.timedelta(seconds=s):
-                        if targ == u.id and cid == message.channel.id:
-                            t = e.user
-                            init = "<@" + str(t.id) + ">"
-                            #print(t, e.target)
+                            cnt = int(e.extra.get("count", 1)) - 1
+                        h = e.created_at
+                        cs = self.dc.setdefault(h, 0)
+                        c = cnt - cs
+                        if c > 0:
+                            self.dc[h] += 1
+                        s = (5, 3600)[c > 0]
+                        if not bulk:
+                            cid = e.extra.channel.id
+                            targ = e.target.id
+                        else:
+                            try:
+                                cid = e.target.id
+                            except AttributeError:
+                                cid = e._target_id
+                            targ = u.id
+                        if now - h < datetime.timedelta(seconds=s):
+                            if targ == u.id and cid == message.channel.id:
+                                t = e.user
+                                init = "<@" + str(t.id) + ">"
+                                #print(t, e.target)
                 if t.bot or u.id == t.id == cu_id:
                     return
             except (discord.Forbidden, discord.HTTPException):
@@ -663,7 +670,9 @@ class updateRolegiver:
                             print("Granted role " + r.name + " to " + user.name + ".")
                 if deleter:
                     try:
+                        d_id = message.id
                         await message.delete()
+                        _vars.logDelete(d_id)
                     except discord.NotFound:
                         pass
 

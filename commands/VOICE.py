@@ -1172,8 +1172,9 @@ class pause:
             except discord.NotFound:
                 pass
         else:
+            past = name + "pe" * (name == "stop") + "d"
             return (
-                "```css\nSuccessfully " + name + "d audio playback in "
+                "```css\nSuccessfully " + past + " audio playback in "
                 + uniStr(guild.name) + ".```"
             )
 

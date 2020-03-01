@@ -638,11 +638,11 @@ class info:
         }
 
 
-class state:
+class status:
     is_command = True
 
     def __init__(self):
-        self.name = ["status"]
+        self.name = ["state"]
         self.min_level = 0
         self.description = "Shows the bot's current program state."
         self.usage = ""
@@ -722,10 +722,11 @@ class updateMessageCount:
                 d = self.data[guild.id]
                 if type(d) is str:
                     return d
-                d = d["averages"]
+                t = d["totals"]
+                c = d["counts"]
                 if user is None:
-                    return sum(d.values()) / len(d)
-                return d.get(user.id, 0)
+                    return sum(t.values()) / len(t)
+                return t.get(user.id, 0) / c.get(user.id, 1)
         return "Calculating..."            
 
     async def getGuildMessages(self, guild):
@@ -761,6 +762,11 @@ class updateMessageCount:
                 print(traceback.format_exc())
                 returns[0] = []
 
+        year = datetime.timedelta(31556925.216)
+        oneyear = datetime.datetime.utcnow() - guild.created_at < year
+        if guild.member_count > 256 and not oneyear:
+            self.data["guild.id"] = "ERROR: Server is too large to estimate post counts."
+            return
         print(guild)
         data = {}
         avgs = {}
@@ -780,7 +786,7 @@ class updateMessageCount:
             await asyncio.sleep(2)
         print("Counting...")
         for messages in histories:
-            i = 0
+            i = 1
             for message in messages[0]:
                 u = message.author.id
                 length = self.getMessageLength(message)
@@ -795,9 +801,7 @@ class updateMessageCount:
                 if random.randint(0, self._vars.cachelim) > len(self._vars.cache["messages"]):
                     self._vars.cache["messages"][message.id] = message
                 i += 1
-        for u in data:
-            avgs[u] /= data[u]
-        self.data[guild.id] = {"counts": data, "averages": avgs}
+        self.data[guild.id] = {"counts": data, "totals": avgs}
         print(guild)
         print(self.data[guild.id])
 
@@ -810,7 +814,7 @@ class updateMessageCount:
         self.scanned = True
         year = datetime.timedelta(31556925.216)
         guilds = self._vars.client.guilds
-        i = 0
+        i = 1
         for guild in sorted(guilds, key=lambda g: g.member_count, reverse=True):
             oneyear = datetime.datetime.utcnow() - guild.created_at < year
             if guild.member_count < 256 or oneyear:
@@ -830,8 +834,8 @@ class updateMessageCount:
                 if type(d) is str:
                     return
                 count = d["counts"].get(user.id, 0)
-                avg = (d["averages"].get(user.id, 0) * count + self.getMessageLength(message)) / (count + 1)
-                d["averages"][user.id] = avg
+                total = d["totals"].get(user.id, 0) + self.getMessageLength(message)
+                d["totals"][user.id] = total
                 d["counts"][user.id] = count + 1
             else:
                 asyncio.create_task(self.getUserMessageCount(guild))
@@ -845,8 +849,8 @@ class updateMessageCount:
                 if type(d) is str:
                     return
                 count = d["counts"].get(user.id, 0)
-                avg = (d["averages"].get(user.id, 0) * count - self.getMessageLength(message)) / (count - 1)
-                d["averages"][user.id] = avg
+                total = d["totals"].get(user.id, 0) - self.getMessageLength(message)
+                d["totals"][user.id] = total
                 d["counts"][user.id] = count - 1
             else:
                 asyncio.create_task(self.getUserMessageCount(guild))

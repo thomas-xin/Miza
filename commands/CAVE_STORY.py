@@ -52,7 +52,13 @@ class DouClub:
 f = open("auth.json")
 auth = ast.literal_eval(f.read())
 f.close()
-douclub = DouClub(auth["knack_id"], auth["knack_secret"])
+try:
+    douclub = DouClub(auth["knack_id"], auth["knack_secret"])
+except KeyError:
+    douclub = freeClass(
+        search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to use Doukutsu Club.")'),
+    )
+    print("WARNING: knack_id/knack_secret not found. Unable to use Doukutsu Club.")
 
 
 def searchForums(query):
