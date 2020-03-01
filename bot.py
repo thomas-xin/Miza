@@ -63,6 +63,7 @@ class main_data:
         doParallel(self.getModules, state=2)
         self.current_channel = None
         self.guilds = 0
+        self.blocked = 0
         self.updated = False
         self.suffix = ">>> "
         print("Initialized.")
@@ -864,17 +865,13 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             if argv:
                                 while argv[0] == " ":
                                     argv = argv[1:]
-                            fc = 0
                             if "?" in argv:
                                 for c in range(26):
                                     char = chr(c + 97)
                                     flag = "?" + char
                                     for r in (flag, flag.upper()):
-                                        found = False
                                         while len(argv) >= 4 and r in argv:
-                                            if fc > 256:
-                                                break
-                                            fc += 1
+                                            found = False
                                             i = argv.index(r)
                                             if i == 0 or argv[i - 1] == " " or argv[i - 2] == "?":
                                                 try:
@@ -891,11 +888,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                     char = chr(c + 97)
                                     flag = "?" + char
                                     for r in (flag, flag.upper()):
-                                        found = False
                                         while len(argv) >= 2 and r in argv:
-                                            if fc > 256:
-                                                break
-                                            fc += 1
+                                            found = False
                                             for check in (r + " ", " " + r):
                                                 if check in argv:
                                                     argv = argv.replace(check, "")
@@ -1162,7 +1156,6 @@ async def inputLoop():
 async def updateLoop():
     print("Update loop initiated.")
     autosave = 0
-    _vars.blocked = 0
     _vars.doUpdate = False
     while True:
         try:

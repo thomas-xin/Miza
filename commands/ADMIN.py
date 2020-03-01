@@ -544,7 +544,7 @@ class updateLogs:
                 cu_id = self._vars.client.user.id
                 t = u
                 init = "<@" + str(t.id) + ">"
-                if _vars.isDeleted(message):
+                if self._vars.isDeleted(message):
                     t = self._vars.client.user
                 else:
                     al = await guild.audit_logs(
