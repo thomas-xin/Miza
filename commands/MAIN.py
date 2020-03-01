@@ -772,9 +772,9 @@ class updateMessageCount:
                 print(traceback.format_exc())
                 returns[0] = []
 
-        year = datetime.timedelta(31556925.216)
+        year = datetime.timedelta(seconds=31556925.216)
         oneyear = datetime.datetime.utcnow() - guild.created_at < year
-        if guild.member_count > 256 and not oneyear:
+        if guild.member_count > 512 and not oneyear:
             self.data["guild.id"] = "ERROR: Server is too large to estimate post counts."
             return
         print(guild)
@@ -822,12 +822,12 @@ class updateMessageCount:
         if self.scanned:
             return
         self.scanned = True
-        year = datetime.timedelta(31556925.216)
+        year = datetime.timedelta(seconds=31556925.216)
         guilds = self._vars.client.guilds
         i = 1
         for guild in sorted(guilds, key=lambda g: g.member_count, reverse=True):
             oneyear = datetime.datetime.utcnow() - guild.created_at < year
-            if guild.member_count < 256 or oneyear:
+            if guild.member_count < 512 or oneyear:
                 self.data[guild.id] = "Calculating..."
                 asyncio.create_task(self.getUserMessageCount(guild))
             if not i & 63:
