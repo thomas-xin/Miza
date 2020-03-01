@@ -864,6 +864,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             if argv:
                                 while argv[0] == " ":
                                     argv = argv[1:]
+                            fc = 0
                             if "?" in argv:
                                 for c in range(26):
                                     char = chr(c + 97)
@@ -871,6 +872,9 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                     for r in (flag, flag.upper()):
                                         found = False
                                         while len(argv) >= 4 and r in argv:
+                                            if fc > 256:
+                                                break
+                                            fc += 1
                                             i = argv.index(r)
                                             if i == 0 or argv[i - 1] == " " or argv[i - 2] == "?":
                                                 try:
@@ -889,6 +893,9 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                     for r in (flag, flag.upper()):
                                         found = False
                                         while len(argv) >= 2 and r in argv:
+                                            if fc > 256:
+                                                break
+                                            fc += 1
                                             for check in (r + " ", " " + r):
                                                 if check in argv:
                                                     argv = argv.replace(check, "")
