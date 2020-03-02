@@ -164,9 +164,9 @@ def _c2e(string, em1, em2):
             printed[x] += em2
     output = "\n".join(printed)
     print("[" + em1 + "]", "[" + em2 + "]")
-    if len(em1) == len(em2) == 1:
-        output = "```fix\n" + output + "```"
-    return output
+    if len(em1) + len(em2) > 2 and ":" in em1 + em2:
+        return output
+    return "```fix\n" + output + "```"
 
 
 class char2emoj:

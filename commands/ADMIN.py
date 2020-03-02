@@ -475,26 +475,6 @@ class messageLog:
         )
 
 
-def strMessage(message):
-    data = limStr(message.content, 512)
-    if message.reactions:
-        data += "\n{" + ", ".join(str(i) for i in message.reactions) + "}"
-    if message.embeds:
-        data += "\n⟨" + ", ".join(str(i.to_dict()) for i in message.embeds) + "⟩"
-    if message.attachments:
-        data += "\n[" + ", ".join(i.url for i in message.attachments) + "]"
-    try:
-        t = message.created_at
-        if message.edited_at:
-            t = message.edited_at
-        data += "\n`(" + str(t) + ")`"
-    except AttributeError:
-        pass
-    if not data:
-        data = "```css\n" + uniStr("[EMPTY MESSAGE]") + "```"
-    return limStr(data, 1024)
-
-
 class updateLogs:
     is_update = True
     name = "logs"
@@ -523,8 +503,8 @@ class updateLogs:
                     "Message edited in <#"
                     + str(before.channel.id) + ">:"
                 )
-                emb.add_field(name="Before", value=strMessage(before))
-                emb.add_field(name="After", value=strMessage(after))
+                emb.add_field(name="Before", value=self._vars.strMessage(before))
+                emb.add_field(name="After", value=self._vars.strMessage(after))
                 await channel.send(embed=emb)
 
     async def _delete_(self, message, bulk=False, **void):
@@ -590,7 +570,7 @@ class updateLogs:
                 init + " deleted message from <#"
                 + str(message.channel.id) + ">:"
             )
-            emb.add_field(name="Content", value=strMessage(message))
+            emb.add_field(name="Content", value=self._vars.strMessage(message))
             await channel.send(embed=emb)
 
 
@@ -602,6 +582,8 @@ class updateFollows:
         self.msgFollow = {}
 
     async def _nocommand_(self, text, edit, orig, message, **void):
+        if message.guild is None:
+            return
         g_id = message.guild.id
         u_id = message.author.id
         following = self.data
@@ -626,7 +608,7 @@ class updateFollows:
                         curr[0] = checker
                         curr[1] = xrand(-1, 2)
                     curr[2] = u_id
-                    print(curr)
+                    #print(curr)
             try:
                 for r in following[g_id]["reacts"]:
                     if r in words:
@@ -646,6 +628,8 @@ class updateRolegiver:
         pass
 
     async def _nocommand_(self, text, message, **void):
+        if message.guild is None:
+            return
         user = message.author
         guild = message.guild
         _vars = self._vars
@@ -715,6 +699,7 @@ class updateColours:
                     try:
                         await role.edit(colour=discord.Colour(col))
                     except KeyError:
+                        self.count += 15
                         self._vars.blocked += 1
                         break
                     self.count += 1
@@ -724,7 +709,7 @@ class updateColours:
                 print(traceback.format_exc())
             except discord.HTTPException as ex:
                 print(traceback.format_exc())
-                self._vars.blocked += 20
+                self._vars.blocked += 60
                 break
 
     async def __call__(self):
@@ -733,8 +718,10 @@ class updateColours:
             self.delay = time.time() + 60
             self.count = 0
         for g in self.data:
-            if self.count < 64 and self._vars.blocked <= 0:
+            if self.count < 48 and self._vars.blocked <= 0:
                 asyncio.create_task(self.changeColour(g, self.data[g]))
+            else:
+                break
 
 
 async def getBans(_vars, guild):

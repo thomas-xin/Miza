@@ -319,7 +319,7 @@ class restart:
             await vc.disconnect(force=True)
         for i in range(5):
             try:
-                f = open(_vars.heartbeat, "wb")
+                f = open(_vars.restart, "wb")
                 f.close()
                 break
             except:
@@ -528,7 +528,7 @@ class info:
             try:
                 u = guild.get_member(u_id)
                 if u is None:
-                    raise LookupError
+                    raise LookupError("Unable to find user or server from ID.")
             except:
                 try:
                     u = await guild.fetch_member(u_id)
@@ -539,8 +539,15 @@ class info:
                     except:
                         try:
                             guild = await _vars.fetch_guild(u_id)
+                        except discord.Forbidden:
+                            raise
                         except:
-                            channel = await _vars.fetch_channel(u_id)
+                            try:
+                                channel = await _vars.fetch_channel(u_id)
+                            except discord.Forbidden:
+                                raise
+                            except:
+                                raise LookupError("Unable to find user or server from ID.")
                             try:
                                 guild = channel.guild
                             except AttributeError:
@@ -675,6 +682,139 @@ class status:
             + ", RAM usage: " + uniStr(round(stats[1] / 1048576, 3)) + " MB"
             + ".```"
         )
+
+
+class execute:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["exec", "eval"]
+        self.min_level = nan
+        self.description = "Executes python code on the bot."
+        self.usage = "<code> <enable(?e)> <disable(?d)>"
+
+    async def __call__(self, _vars, flags, channel, **void):
+        data = _vars.data["eval"]
+        if "e" in flags:
+            _vars.updaters["eval"].channel = channel
+            return (
+                "```css\nSuccessfully changed eval channel to "
+                + uniStr(channel.id) + ".```"
+            )
+        elif "d" in flags:
+            _vars.updaters["eval"].channel = freeClass(id=None)
+            return (
+                "```css\nSuccessfully removed eval channel.```"
+            )
+        return (
+            "```css\neval channel is currently set to "
+            + uniStr(_vars.updaters["eval"].channel.id) + ".```"
+        )
+
+
+class updateEval:
+    is_update = True
+    name = "eval"
+
+    def __init__(self):
+        self.prev = hlist()
+        self.channel = self.ch = freeClass(id=None)
+
+    async def __call__(self):
+        pass
+
+    def verifyChannel(self, channel):
+        if channel is None:
+            return None
+        try:
+            if channel.guild is None:
+                raise TypeError
+        except:
+            channel = self._vars.userGuild(channel.recipient, channel).channel
+        return channel
+
+    async def _nocommand_(self, message, **void):
+        _vars = self._vars
+        if message.author.id == _vars.client.user.id:
+            return
+        if message.guild is None:
+            emb = discord.Embed()
+            emb.add_field(
+                name=str(message.author),
+                value=_vars.strMessage(message),
+            )
+            await self.channel.send(embed=emb)
+            return
+        if message.channel.id == self.channel.id:
+            output = None
+            try:
+                proc = message.content
+                if proc[0] == "#":
+                    proc = proc[1:]
+                    if not proc:
+                        self.prev.append(self.ch)
+                        self.ch = freeClass(id=None)
+                        await self.channel.send("Successfully cleared target channel.")
+                        return
+                    elif proc[0] == "#":
+                        self.ch = self.verifyChannel(self.prev.popright())
+                        await self.channel.send(
+                            "Successfully changed target channel to "
+                            + str(self.ch.id) + "."
+                        )
+                        return
+                    self.prev.append(self.ch)
+                    try:
+                        channel = await _vars.fetch_channel(proc)
+                        self.ch = self.verifyChannel(channel)
+                    except:
+                        user = await _vars.fetch_user(proc)
+                        temp = await _vars.getDM(user)
+                        self.ch = _vars.userGuild(user, temp).channel
+                    hist = await self.ch.history(limit=25).flatten()
+                    hist = hlist(hist)
+                    emb = discord.Embed()
+                    for m in reversed(hist):
+                        emb.add_field(
+                            name=str(m.author),
+                            value=_vars.strMessage(m),
+                            inline=0,
+                        )
+                    await self.channel.send(embed=emb)
+                elif proc[0] == "&":
+                    proc = proc[1:]
+                    hist = await self.ch.history(limit=1).flatten()
+                    message = hist[0]
+                    await message.add_reaction(proc)
+                else:
+                    print(proc)
+                    if proc.startswith(">"):
+                        await self.ch.send(proc[1:])
+                    else:
+                        try:
+                            output = await eval(proc, _vars._globals)
+                            await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
+                        except (SyntaxError, TypeError):
+                            try:
+                                output = eval(proc, _vars._globals)
+                                await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
+                            except:
+                                try:
+                                    exec(proc, _vars._globals)
+                                    await self.channel.send("```py\nNone```")
+                                except:
+                                    await self.channel.send(limStr(
+                                        "```py\n" + traceback.format_exc() + "```",
+                                        2000,
+                                    ))
+            except:
+                await self.channel.send(limStr(
+                    "```py\n" + traceback.format_exc() + "```",
+                    2000,
+                ))
+            if output is not None:
+                _vars._globals["output"] = output
+                _vars._globals["_"] = output
 
 
 class updateMessageCount:
@@ -843,10 +983,29 @@ class updateMessageCount:
                 d = self.data[guild.id]
                 if type(d) is str:
                     return
-                count = d["counts"].get(user.id, 0)
+                count = d["counts"].get(user.id, 0) + 1
                 total = d["totals"].get(user.id, 0) + self.getMessageLength(message)
                 d["totals"][user.id] = total
-                d["counts"][user.id] = count + 1
+                d["counts"][user.id] = count
+            else:
+                asyncio.create_task(self.getUserMessageCount(guild))
+
+    async def _edit_(self, before, after, **void):
+        if hasattr(before, "ghost"):
+            return
+        if self.scanned == -1:
+            user = after.author
+            guild = after.guild
+            if guild.id in self.data:
+                d = self.data[guild.id]
+                if type(d) is str:
+                    return
+                total = (
+                    d["totals"].get(user.id, 0)
+                    - self.getMessageLength(before)
+                    + self.getMessageLength(after)
+                )
+                d["totals"][user.id] = total
             else:
                 asyncio.create_task(self.getUserMessageCount(guild))
 
@@ -858,10 +1017,10 @@ class updateMessageCount:
                 d = self.data[guild.id]
                 if type(d) is str:
                     return
-                count = d["counts"].get(user.id, 0)
+                count = d["counts"].get(user.id, 0) - 1
                 total = d["totals"].get(user.id, 0) - self.getMessageLength(message)
                 d["totals"][user.id] = total
-                d["counts"][user.id] = count - 1
+                d["counts"][user.id] = count
             else:
                 asyncio.create_task(self.getUserMessageCount(guild))
 

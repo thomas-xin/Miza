@@ -3,7 +3,7 @@ import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
-latex.__builtins__["print"] = lambda *void: None
+#latex.__builtins__["print"] = lambda *void1, **void2: None
 
 key = "0"
 BF_PREC = 256
@@ -22,6 +22,47 @@ def printFile(s):
     f = open("log.txt", "ab")
     f.write(str(s).encode("utf-8"))
     f.close()
+
+
+class dice(sympy.Basic):
+
+    def __init__(self, a=None, b=None):
+        if a is None:
+            self.a = 0
+            self.b = 1
+            self.isint = False
+        elif b is None:
+            self.a = 0
+            self.b = a
+            self.isint = True
+        else:
+            sgn = sympy.sign(b - a)
+            self.a = sgn * a + (1 - sgn) * b
+            self.b = sgn * b + (1 - sgn) * a + 1
+            self.isint = True
+    
+    def evalf(self, prec):
+        randfloat = sympy.Float(random.random(), dps=prec) / 2.7 ** (prec / 7 - random.random())
+        temp = (sympy.Float(random.random(), dps=prec) / (randfloat + time.time() % 1)) % 1
+        temp *= self.b - self.a
+        temp += self.a
+        if self.isint:
+            temp = sympy.Integer(temp)
+        return temp
+
+    gcd = lambda self, other, *gens, **args: sympy.gcd(self.evalf(BF_PREC), other, *gens, **args)
+    lcm = lambda self, other, *gens, **args: sympy.lcm(self.evalf(BF_PREC), other, *gens, **args)
+    is_Rational = lambda self: True
+    expand = lambda self, **void: self.evalf(BF_PREC)
+    nsimplify = lambda self, **void: self.evalf(BF_PREC)
+    as_coeff_Add = lambda self, *void: (0, self.evalf(BF_PREC))
+    as_coeff_Mul = lambda self, *void: (0, self.evalf(BF_PREC))
+    _eval_power = lambda *void: None
+    _eval_evalf = evalf
+    __abs__ = lambda self: abs(self.evalf(BF_PREC))
+    __neg__ = lambda self: -self.evalf(BF_PREC)
+    __repr__ = lambda self, *void: str(self.evalf(BF_PREC))
+    __str__ = __repr__
 
 
 class baseFloat(sympy.Float):
@@ -227,19 +268,6 @@ def rounder(x):
         pass
     return x
 
-def random(a=None, b=None):
-    if b is None:
-        x = random.random() * sympy.Float(1) / (random.random() + time.time() % 1)
-        if a is None:
-            return x
-        else:
-            return int(x * b)
-    a = sympy.floor(min(a, b))
-    b = sympy.ceiling(max(a, b))
-    if a < b - 1:
-        return random.randint(a, b - 1)
-    return a
-
 
 _globals = dict(sympy.__dict__)
 plots = (
@@ -254,6 +282,9 @@ plots = (
 for i in plots:
     _globals[i] = globals()[i]
 _globals.update({
+    "random": dice,
+    "rand": dice,
+    "dice": dice,
     "base": arbFloat,
     "h2d": h2d,
     "o2d": o2d,
@@ -482,6 +513,7 @@ while True:
         sys.stdout.write(repr(s.encode("utf-8")) + "\n")
         sys.stdout.flush()
     except Exception as ex:
+        raise
         sys.stdout.write(repr(ex) + "\n")
         sys.stdout.flush()
     time.sleep(0.01)

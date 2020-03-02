@@ -15,8 +15,9 @@ class main_data:
     min_suspend = 3
     website = "https://github.com/thomas-xin/Miza"
     heartbeat = "heartbeat.json"
-    suspected = "suspected.json"
+    restart = "restart.json"
     shutdown = "shutdown.json"
+    suspected = "suspected.json"
     savedata = "data.json"
     authdata = "auth.json"
     client = client
@@ -29,6 +30,7 @@ class main_data:
     }
     cachelim = 262144
     deleted_user = 456226577798135808
+    _globals = globals()
             
     def __init__(self):
         print("Initializing...")
@@ -636,28 +638,24 @@ class main_data:
                 print(traceback.format_exc())
             self.busy = False
 
-    def printMessage(self, message, channel, suffix=False):
-        data = (
-            "[" + channel.name + "] "
-            + str(channel.id) + ": "
-            + message.author.name + ": "
-            + limStr(message.content, 512)
-        )
+    def strMessage(self, message):
+        data = limStr(message.content, 512)
         if message.reactions:
-            data += " {" + ", ".join(str(i) for i in message.reactions) + "}"
+            data += "\n{" + ", ".join(str(i) for i in message.reactions) + "}"
         if message.embeds:
-            data += " <" + ", ".join(str(i.to_dict()) for i in message.embeds) + ">"
+            data += "\n⟨" + ", ".join(str(i.to_dict()) for i in message.embeds) + "⟩"
         if message.attachments:
-            data += " <" + ", ".join(i.url for i in message.attachments) + ">"
-        t = message.created_at
-        if message.edited_at:
-            t = message.edited_at
-        data += " (" + str(t) + ")"
-        if suffix:
-            suffix = None
-        else:
-            suffix = ""
-        self.print(data, suffix=suffix)
+            data += "\n[" + ", ".join(i.url for i in message.attachments) + "]"
+        try:
+            t = message.created_at
+            if message.edited_at:
+                t = message.edited_at
+            data += "\n`(" + str(t) + ")`"
+        except AttributeError:
+            pass
+        if not data:
+            data = "```css\n" + uniStr("[EMPTY MESSAGE]") + "```"
+        return limStr(data, 1024)
 
     class userGuild:
 
@@ -700,6 +698,7 @@ class main_data:
         max_members = 2
         unavailable = False
         isDM = True
+        ghost = True
 
     class ghostUser:
         
@@ -726,6 +725,7 @@ class main_data:
         colour = color
         created_at = 0
         display_name = ""
+        ghost = True
 
     class ghostMessage:
         
@@ -767,6 +767,7 @@ class main_data:
         clear_reaction = delete
         clear_reactions = delete
         ack = delete
+        ghost = True
 
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_flags=None, loop=False):
@@ -993,7 +994,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         print(traceback.format_exc())
                         sent = await channel.send(errmsg)
                         await sent.add_reaction("❎")
-    if not run and message.guild and u_id != client.user.id and orig:
+    if not run and u_id != client.user.id and orig:
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
         temp = list(reconstitute(orig).lower())
         for i in range(len(temp)):
@@ -1014,15 +1015,6 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                     )
                 except:
                     print(traceback.format_exc())
-    if guild is None or _vars.current_channel and (channel.id == _vars.current_channel.id and not edit):
-        if guild is None:
-            guild = main_data.userGuild(
-                user=user,
-                channel=channel,
-            )
-            channel = guild.channel
-        _vars.print(suffix="")
-        _vars.printMessage(message, channel, suffix=True)
 
 
 async def heartbeatLoop():
@@ -1040,122 +1032,7 @@ async def heartbeatLoop():
                     print(traceback.format_exc())
             await asyncio.sleep(0.5)
     except asyncio.CancelledError:
-        sys.exit()
-
-
-def sendInput(output):
-    while True:
-        output[0] = input()
-
-
-async def inputLoop():
-
-    def updateChannel():
-        ch = _vars.current_channel
-        if ch is not None:
-            chan = str(ch.id)
-        else:
-            chan = ""
-        suffix = chan + ">>> "
-        _vars.suffix = suffix
-        return ch
-
-    def verifyChannel(channel):
-        if channel is None:
-            return None
-        try:
-            if channel.guild is None:
-                raise TypeError
-        except:
-            channel = _vars.userGuild(channel.recipient, channel).channel
-        return channel
-        
-    print("Input Loop initiated.")
-    msg = [None]
-    doParallel(sendInput, [msg], name="inputter", killable=False)
-    prev = hlist()
-    _vars.print(end="")
-    while True:
-        try:
-            msg[0] = None
-            ch = updateChannel()
-            while msg[0] is None:
-                await asyncio.sleep(0.2)
-            proc = msg[0]
-            if not proc:
-                _vars.print(end="")
-                continue
-            if proc[0] == "!":
-                proc = proc[1:]
-                if not proc:
-                    prev.append(_vars.current_channel)
-                    _vars.current_channel = None
-                    ch = updateChannel()
-                    _vars.print(end="")
-                    continue
-                elif proc[0] == "!":
-                    _vars.current_channel = verifyChannel(prev.popright())
-                    ch = updateChannel()
-                    _vars.print(end="")
-                    continue
-                elif proc[0] == "~":
-                    sent = await ch.send("_ _")
-                    await processMessage(sent, reconstitute(proc))
-                    try:
-                        d_id = sent.id
-                        await sent.delete()
-                        _vars.logDelete(d_id)
-                    except discord.NotFound:
-                        pass
-                    _vars.print(end="")
-                    continue
-                try:
-                    prev.append(_vars.current_channel)
-                    try:
-                        channel = await _vars.fetch_channel(proc)
-                        _vars.current_channel = verifyChannel(channel)
-                        ch = updateChannel()
-                    except:
-                        user = await _vars.fetch_user(proc)
-                        temp = await _vars.getDM(user)
-                        _vars.current_channel = _vars.userGuild(user, temp).channel
-                        ch = updateChannel()
-                    logClear()
-                    hist = await ch.history(limit=512).flatten()
-                    hist = hlist(hist)
-                    for m in reversed(hist):
-                        _vars.printMessage(m, _vars.current_channel)
-                except:
-                    pass
-                _vars.print(end="")
-            elif proc[0] == "&":
-                proc = proc[1:]
-                hist = await ch.history(limit=1).flatten()
-                message = hist[0]
-                await message.add_reaction(proc)
-                _vars.print(end="")
-            else:
-                if ch:
-                    await ch.send(proc)
-                    _vars.print(end="")
-                else:
-                    try:
-                        output = await eval(proc)
-                        _vars.print(output)
-                    except:
-                        #print(traceback.format_exc())
-                        try:
-                            output = eval(proc)
-                            _vars.print(output)
-                        except:
-                            #print(traceback.format_exc())
-                            try:
-                                exec(proc)
-                                _vars.print(None)
-                            except:
-                                _vars.print(traceback.format_exc())
-        except:
-            _vars.print(traceback.format_exc())
+        sys.exit()        
 
 
 async def updateLoop():
@@ -1194,7 +1071,6 @@ async def on_ready():
             print("> " + guild.name)
     await _vars.handleUpdate()
     asyncio.create_task(updateLoop())
-    asyncio.create_task(inputLoop())
     asyncio.create_task(heartbeatLoop())
 ##    print("Users: ")
 ##    for guild in client.guilds:
@@ -1210,7 +1086,7 @@ async def checkDelete(message, reaction, user):
         else:
             for react in message.reactions:
                 if str(reaction) == str(react):
-                    users = await reaction.users().flatten()
+                    users = await react.users().flatten()
                     for u in users:
                         if u.id == client.user.id:
                             check = True
@@ -1259,17 +1135,12 @@ async def on_raw_reaction_remove(payload):
 
 
 @client.event
-async def on_typing(channel, user, when):
-    await _vars.handleUpdate()
-
-
-@client.event
 async def on_voice_state_update(member, before, after):
     if member.id == client.user.id:
         if after.mute or after.deaf:
             print("Unmuted self in " + member.guild.name)
             await member.edit(mute=False, deafen=False)
-    await _vars.handleUpdate()
+        await _vars.handleUpdate()
 
 
 async def handleMessage(message, edit=True):
@@ -1383,7 +1254,6 @@ async def updateEdit(before, after):
 
 @client.event
 async def on_message_edit(before, after):
-    await _vars.handleUpdate()
     if before.content != after.content:
         message = after
         _vars.cache["messages"][message.id] = message

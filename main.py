@@ -12,22 +12,21 @@ def delete(f):
             time.sleep(1)
 
 sd = "shutdown.json"
+rs = "restart.json"
 hb = "heartbeat.json"
 
 delete(sd)
+delete(rs)
 delete(hb)
 
 while not sd in os.listdir():
-    name = '"' + "bot.py: " + str(Process.pid) + '"'
-    proc = None
-    while proc is None:
-        os.system("start " + name + " /abovenormal powershell -command python bot.py")
-        time.sleep(1)
-        for p in psutil.process_iter():
-            if "powershell.exe" in p.name().lower():
-                if time.time() - p.create_time() < 12:
-                    proc = p
-                    break
+    delete(sd)
+    delete(rs)
+    delete(hb)
+    try:
+        proc = psutil.Popen(["python3", "bot.py"])
+    except OSError:
+        proc = psutil.Popen(["python", "bot.py"])
     print("Bot started with PID " + str(proc.pid) + ".")
     time.sleep(8)
     try:
@@ -41,14 +40,25 @@ while not sd in os.listdir():
                 + str(datetime.datetime.now())
                 + "."
             )
-            time.sleep(8)
-            if hb in os.listdir():
+            for i in range(8):
+                time.sleep(1)
+                if rs in os.listdir():
+                    alive = False
+                    break
+            if not alive or hb in os.listdir():
                 alive = False
                 break
-        while True:
+        found = True
+        while found:
+            found = False
             try:
                 for child in proc.children():
                     child.kill()
+                    found = True
+            except psutil.NoSuchProcess:
+                break
+        while True:
+            try:
                 proc.kill()
             except psutil.NoSuchProcess:
                 break
@@ -60,6 +70,7 @@ while not sd in os.listdir():
     time.sleep(0.5)
     
 delete(hb)
+delete(rs)
 delete(sd)
         
 print("Shutdown signal confirmed. Press [ENTER] to close.")

@@ -253,12 +253,13 @@ class text2048:
                 username = user.name
         await self.nextIter(message, gamestate, username, reaction, mode)
 
-    async def __call__(self, _vars, argv, user, flags, **void):
+    async def __call__(self, _vars, argv, user, flags, guild, **void):
         try:
             if not len(argv.replace(" ", "")):
                 size = 4
             else:
-                size = int(_vars.evalMath(argv))
+                ans = await _vars.evalMath(argv, guild)
+                size = int(ans)
                 if not size > 1:
                     raise
         except:
