@@ -1,6 +1,6 @@
-import os, time, datetime, traceback, subprocess, psutil
+import os, time, datetime, traceback, psutil
 
-Process = psutil.Process()
+python = ("python3", "python")[os.name == "nt"]
 
 
 def delete(f):
@@ -23,10 +23,7 @@ while not sd in os.listdir():
     delete(sd)
     delete(rs)
     delete(hb)
-    try:
-        proc = psutil.Popen(["python3", "bot.py"])
-    except OSError:
-        proc = psutil.Popen(["python", "bot.py"])
+    proc = psutil.Popen([python, "bot.py"])
     print("Bot started with PID " + str(proc.pid) + ".")
     time.sleep(8)
     try:
