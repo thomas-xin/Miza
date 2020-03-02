@@ -1160,11 +1160,12 @@ class Pause:
         self.usage = ""
 
     async def __call__(self, _vars, name, guild, client, user, channel, message, **void):
+        name = name.lower()
         auds = await forceJoin(guild, channel, user, client, _vars)
-        if name == "Stop":
+        if name == "stop":
             auds.seek(0)
         if not auds.paused > 1:
-            auds.paused = name in ("Pause", "Stop")
+            auds.paused = name in ("pause", "stop")
         if auds.player is not None:
             auds.player["time"] = 1
         if auds.stats["quiet"] & 2:
@@ -1173,7 +1174,7 @@ class Pause:
             except discord.NotFound:
                 pass
         else:
-            past = name.lower() + "pe" * (name == "Stop") + "d"
+            past = name + "pe" * (name == "stop") + "d"
             return (
                 "```css\nSuccessfully " + past + " audio playback in "
                 + uniStr(guild.name) + ".```"

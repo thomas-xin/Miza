@@ -296,7 +296,7 @@ class Restart:
         self.usage = ""
 
     async def __call__(self, client, channel, user, guild, name, _vars, perm, **void):
-        if name == "Shutdown":
+        if name.lower() == "shutdown":
             if perm is not nan:
                 raise PermissionError("Insufficient priviliges to request shutdown.")
             f = open(_vars.shutdown, "wb")
