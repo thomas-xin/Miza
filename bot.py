@@ -31,6 +31,7 @@ class main_data:
     cachelim = 262144
     deleted_user = 456226577798135808
     _globals = globals()
+    python = ("python3", "python")[os.name == "nt"]
             
     def __init__(self):
         print("Initializing...")
@@ -501,7 +502,7 @@ class main_data:
             g_id = int(guild)
         args = [
             g_id,
-            "python misc/math.py",
+            self.python + " misc/math.py",
             str(f) + "`" + str(int(prec)) + "`" + str(int(r)) + "`" + str(g_id),
             self.timeout / 2,
         ]
