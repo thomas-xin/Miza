@@ -53,12 +53,12 @@ class customAudio(discord.AudioSource):
 
     def new(self, source=None, pos=0):
         self.reverse = self.stats["speed"] < 0
-        self.speed = max(0.01, abs(self.stats["speed"]))
-        if self.speed == 0.01:
+        self.speed = max(0.005, abs(self.stats["speed"]))
+        if self.speed == 0.005:
             self.speed = 1
-            self.paused = 2
+            self.paused |= 2
         else:
-            self.paused = False
+            self.paused &= -3
         self.stats["position"] = pos
         self.is_playing = source is not None
         if getattr(self, "source", None) is not None:
@@ -179,7 +179,7 @@ class customAudio(discord.AudioSource):
 
     async def updatePlayer(self):
         curr = self.player
-        self.stats["quiet"] &= 1
+        self.stats["quiet"] &= -3
         if curr is not None:
             if curr["type"]:
                 self.stats["quiet"] |= 2
@@ -670,12 +670,12 @@ async def downloadTextFile(url):
 ytdl = videoDownloader()
 
 
-class queue:
+class Queue:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["q", "play", "playing", "np", "p"]
+        self.name = ["Q", "Play", "Playing", "NP", "P"]
         self.min_level = 0
         self.description = "Shows the music queue, or plays a song in voice."
         self.usage = "<link[]> <verbose(?v)> <hide(?h)>"
@@ -722,7 +722,7 @@ class queue:
             embed=discord.Embed(
                 title=" ",
                 description=info + countstr,
-                colour=colour2Raw(colourCalculation(xrand(1536))),
+                colour=_vars.randColour(),
             )
             embed.set_author(name="Queue for " + uniStr(guild.name) + ":")
             embstr = ""
@@ -841,12 +841,12 @@ class queue:
                 )
 
 
-class playlist:
+class Playlist:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["defaultplaylist", "pl"]
+        self.name = ["DefaultPlaylist", "PL"]
         self.min_level = 0
         self.description = "Shows, appends, or removes from the default playlist."
         self.usage = "<link[]> <remove(?d)> <verbose(?v)>"
@@ -939,12 +939,12 @@ class playlist:
             )
         
 
-class join:
+class Join:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["summon", "connect"]
+        self.name = ["Summon", "Connect"]
         self.min_level = 0
         self.description = "Summons the bot into a voice channel."
         self.usage = ""
@@ -970,13 +970,13 @@ class join:
             )
 
 
-class leave:
+class Leave:
     is_command = True
     server_only = True
     time_consuming = True
 
     def __init__(self):
-        self.name = ["quit", "dc", "disconnect"]
+        self.name = ["Quit", "DC", "Disconnect"]
         self.min_level = 1
         self.description = "Leaves a voice channel."
         self.usage = ""
@@ -1000,12 +1000,12 @@ class leave:
             raise error
 
 
-class remove:
+class Skip:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["rem", "skip", "s"]
+        self.name = ["Remove", "Rem", "S"]
         self.min_level = 0
         self.description = "Removes an entry from the voice channel queue."
         self.usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
@@ -1148,22 +1148,22 @@ class remove:
             return response + "```", 1
 
 
-class pause:
+class Pause:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["resume", "unpause", "stop"]
+        self.name = ["Resume", "Unpause", "Stop"]
         self.min_level = 1
-        self.description = "Pauses or resumes audio playing."
+        self.description = "Pauses, stops, or resumes audio playing."
         self.usage = ""
 
     async def __call__(self, _vars, name, guild, client, user, channel, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        if name == "stop":
+        if name == "Stop":
             auds.seek(0)
         if not auds.paused > 1:
-            auds.paused = name in ("pause", "stop")
+            auds.paused = name in ("Pause", "Stop")
         if auds.player is not None:
             auds.player["time"] = 1
         if auds.stats["quiet"] & 2:
@@ -1172,14 +1172,14 @@ class pause:
             except discord.NotFound:
                 pass
         else:
-            past = name + "pe" * (name == "stop") + "d"
+            past = name.lower() + "pe" * (name == "Stop") + "d"
             return (
                 "```css\nSuccessfully " + past + " audio playback in "
                 + uniStr(guild.name) + ".```"
             )
 
 
-class seek:
+class Seek:
     is_command = True
     server_only = True
 
@@ -1248,7 +1248,7 @@ def getDump(auds, guild):
         return repr(ex)
 
 
-class dump:
+class Dump:
     is_command = True
     server_only = True
     time_consuming = True
@@ -1315,12 +1315,12 @@ class dump:
             return "```css\nSuccessfully appended dump to queue for " + uniStr(guild.name) + ".```"
             
 
-class volume:
+class Volume:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["vol", "audio", "v", "opt", "set"]
+        self.name = ["Vol", "Audio", "V", "Opt", "Set"]
         self.min_level = 0
         self.description = "Changes the current audio settings for this server."
         self.usage = (
@@ -1418,12 +1418,12 @@ class volume:
             )
 
 
-class randomize:
+class Shuffle:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["shuffle"]
+        self.name = []
         self.min_level = 1
         self.description = "Shuffles the audio queue."
         self.usage = ""
@@ -1444,13 +1444,13 @@ class randomize:
         )
 
 
-class unmute:
+class Unmute:
     is_command = True
     server_only = True
     time_consuming = True
 
     def __init__(self):
-        self.name = ["unmuteall"]
+        self.name = ["Unmuteall"]
         self.min_level = 2
         self.description = "Disables server mute for all members."
         self.usage = ""
@@ -1465,7 +1465,7 @@ class unmute:
         )
 
 
-class player:
+class Player:
     is_command = True
     server_only = True
     time_consuming = True

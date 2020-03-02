@@ -4,8 +4,9 @@ from smath import *
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
 
-client = discord.Client(
+client = discord.AutoShardedClient(
     max_messages=4096,
+    heartbeat_timeout=30,
 )
 
 
@@ -50,13 +51,15 @@ class main_data:
                 + '}'
             )
             f.close()
-            raise FileNotFoundError("Please fill in details for " + self.authdata + " to continue.")
+            self.shutdown()
+            print("ERROR: Please fill in details for " + self.authdata + " to continue.")
         auth = ast.literal_eval(f.read())
         f.close()
         try:
             self.token = auth["discord_token"]
         except KeyError:
-            raise KeyError("discord_token not found. Unable to login.")
+            self.shutdown()
+            print("ERROR: discord_token not found. Unable to login.")
         try:
             self.owner_id = int(auth["owner_id"])
         except KeyError:
@@ -71,6 +74,10 @@ class main_data:
         self.updated = False
         self.suffix = ">>> "
         print("Initialized.")
+
+    def shutdown(self):
+        f = open(self.shutdown, "wb")
+        f.close()
 
     def run(self):
         print("Attempting to authorize with token " + self.token + ":")
@@ -639,6 +646,9 @@ class main_data:
                 print(traceback.format_exc())
             self.busy = False
 
+    def randColour(self):
+        return colour2Raw(colourCalculation(xrand(12) * 128))
+
     def strMessage(self, message):
         data = limStr(message.content, 512)
         if message.reactions:
@@ -658,11 +668,12 @@ class main_data:
             data = "```css\n" + uniStr("[EMPTY MESSAGE]") + "```"
         return limStr(data, 1024)
 
-    class userGuild:
+    class userGuild(discord.abc.Snowflake):
 
-        class userChannel:
+        class userChannel(discord.abc.PrivateChannel):
 
             def __init__(self, channel, **void):
+                self.channel = channel
                 self.recipient = channel.recipient
                 self.me = client.user.id
                 self.id = channel.id
@@ -670,7 +681,12 @@ class main_data:
                 self.history = channel.history
                 self.created_at = channel.created_at
                 self.trigger_typing = channel.trigger_typing
+                self.pins = channel.pins
 
+            def fetch_message(id):
+                return _vars.fetch_message(id, self.channel)
+
+            me = client.user
             name = "DM"
             topic = None
             is_nsfw = lambda: True
@@ -701,7 +717,7 @@ class main_data:
         isDM = True
         ghost = True
 
-    class ghostUser:
+    class ghostUser(discord.abc.User):
         
         def __init__(self):
             self.id = 0
@@ -726,9 +742,10 @@ class main_data:
         colour = color
         created_at = 0
         display_name = ""
+        mention = "<@0>"
         ghost = True
 
-    class ghostMessage:
+    class ghostMessage(discord.abc.Snowflake):
         
         def __init__(self):
             self.author = _vars.ghostUser()
@@ -1073,9 +1090,6 @@ async def on_ready():
     await _vars.handleUpdate()
     asyncio.create_task(updateLoop())
     asyncio.create_task(heartbeatLoop())
-##    print("Users: ")
-##    for guild in client.guilds:
-##        print(guild.members)
 
 
 async def checkDelete(message, reaction, user):
@@ -1097,11 +1111,9 @@ async def checkDelete(message, reaction, user):
                 s = str(reaction)
                 if s in "❌✖️🇽❎":
                     try:
-                        #temp = message.content
                         d_id = message.id
                         await message.delete()
                         _vars.logDelete(d_id)
-                        #print(temp + " deleted by " + user.name)
                     except discord.NotFound:
                         pass
             await _vars.handleUpdate()
@@ -1190,7 +1202,10 @@ async def on_raw_message_delete(payload):
         except:
             message = _vars.ghostMessage()
             message.channel = channel
-            message.guild = channel.guild
+            try:
+                message.guild = channel.guild
+            except AttributeError:
+                message.guild = None
             message.id = payload.message_id
     guild = message.guild
     if guild:
@@ -1220,7 +1235,10 @@ async def on_raw_bulk_message_delete(payload):
             except:
                 message = _vars.ghostMessage()
                 message.channel = channel
-                message.guild = channel.guild
+                try:
+                    message.guild = channel.guild
+                except AttributeError:
+                    message.guild = None
                 message.id = m_id
             messages.append(message)
     for message in messages:

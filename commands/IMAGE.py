@@ -2,7 +2,7 @@ import discord
 from smath import *
 
 
-class img:
+class IMG:
     is_command = True
 
     def __init__(self):
@@ -72,7 +72,7 @@ class img:
             return url
         emb = discord.Embed(
             url=url,
-            colour=colour2Raw(colourCalculation(xrand(1536))),
+            colour=_vars.randColour(),
         )
         emb.set_image(url=url)
         return {
@@ -88,7 +88,7 @@ def _c2e(string, em1, em2):
         '"': [5, 5, 0, 0, 0],
         "#": [10, 31, 10, 31, 10],
         "$": [7, 10, 6, 5, 14],
-        "?": [3, 4, 2, 0, 2],
+        "?": [6, 1, 2, 0, 2],
         "%": [5, 1, 2, 4, 5],
         "&": [4, 10, 4, 10, 7],
         "'": [2, 2, 0, 0, 0],
@@ -169,23 +169,31 @@ def _c2e(string, em1, em2):
     return "```fix\n" + output + "```"
 
 
-class char2emoj:
+class Char2Emoj:
     is_command = True
 
     def __init__(self):
-        self.name = ["c2e"]
+        self.name = ["C2E"]
         self.min_level = 0
         self.description = "Makes emoji blocks using a string."
         self.usage = "<0:string> <1:emoji_1> <2:emoji_2>"
 
     async def __call__(self, args, **extra):
-        for i in range(1,3):
-            if args[i][0] == ":" and args[i][-1] != ":":
-                args[i] = "<" + args[i] + ">"
-        return _c2e(*args[:3])
+        try:
+            if len(args) != 3:
+                raise IndexError
+            for i in range(1,3):
+                if args[i][0] == ":" and args[i][-1] != ":":
+                    args[i] = "<" + args[i] + ">"
+            return _c2e(*args[:3])
+        except IndexError:
+            raise IndexError(
+                "Exactly 3 arguments are required for this command.\n"
+                + "Place <> around arguments containing spaces as required."
+            )
 
 
-class owoify:
+class OwOify:
     is_command = True
 
     omap = {
@@ -199,7 +207,7 @@ class owoify:
     otrans = "".maketrans(omap)
 
     def __init__(self):
-        self.name = ["owo"]
+        self.name = ["OwO"]
         self.min_level = 0
         self.description = "owo-ifies text."
         self.usage = "<string>"

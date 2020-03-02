@@ -6,7 +6,7 @@ default_commands = ["main", "string", "admin"]
 standard_commands = default_commands + ["voice", "nsfw", "image", "game"]
 
 
-class help:
+class Help:
     is_command = True
 
     def __init__(self):
@@ -53,7 +53,7 @@ class help:
                         + "\nAliases: " + str(com.name)
                         + "\nEffect: " + description
                         + "\nUsage: " + prefix + name + " " + usage
-                        + "\nRequired permission level: " + uniStr(min_level)
+                        + "\nLevel: " + uniStr(min_level)
                         + "```"
                     )
                     show.append(newstr)
@@ -83,7 +83,7 @@ class help:
                             + "\nAliases: " + str(com.name)
                             + "\nEffect: " + description
                             + "\nUsage: " + prefix + name + " " + usage
-                            + "\nRequired permission level: " + uniStr(min_level)
+                            + "\nLevel: " + uniStr(min_level)
                             + "```"
                         )
                         if (not len(show)) or len(show[-1]) < len(newstr):
@@ -114,12 +114,12 @@ class help:
         return "\n".join(show), 1
 
 
-class perms:
+class Perms:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["changePerms", "perm", "changePerm"]
+        self.name = ["ChangePerms", "Perm", "ChangePerm", "Permissions"]
         self.min_level = -inf
         self.description = "Shows or changes a user's permission level."
         self.usage = "<0:user{self}> <1:level{curr}> <hide(?h)>"
@@ -191,12 +191,12 @@ class perms:
         )
 
 
-class enableCommand:
+class EnableCommand:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["ec", "enable"]
+        self.name = ["EC", "Enable"]
         self.min_level = 0
         self.description = "Shows, enables, or disables a command category in the current channel."
         self.usage = "<command{all}> <enable(?e)> <disable(?d)> <list(?l)> <hide(?h)>"
@@ -215,7 +215,6 @@ class enableCommand:
                     + ", Current level: " + uniStr(perm) + "."
                 )
         catg = argv.lower()
-        print(catg)
         if not catg:
             if "l" in flags:
                 return (
@@ -286,18 +285,18 @@ class enableCommand:
                 )
 
 
-class restart:
+class Restart:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["shutdown"]
+        self.name = ["Shutdown"]
         self.min_level = inf
         self.description = "Restarts or shuts down the bot."
         self.usage = ""
 
     async def __call__(self, client, channel, user, guild, name, _vars, perm, **void):
-        if name == "shutdown":
+        if name == "Shutdown":
             if perm is not nan:
                 raise PermissionError("Insufficient priviliges to request shutdown.")
             f = open(_vars.shutdown, "wb")
@@ -342,11 +341,11 @@ class restart:
         sys.exit()
 
 
-class suspend:
+class Suspend:
     is_command = True
 
     def __init__(self):
-        self.name = ["block", "blacklist"]
+        self.name = ["Block", "Blacklist"]
         self.min_level = nan
         self.description = "Prevents a user from accessing the bot's commands. Overrides <perms>."
         self.usage = "<0:user> <1:value[]>"
@@ -372,11 +371,11 @@ class suspend:
             )
 
 
-class prefix:
+class Prefix:
     is_command = True
 
     def __init__(self):
-        self.name = ["changePrefix"]
+        self.name = ["ChangePrefix"]
         self.min_level = 0
         self.description = "Shows or changes the prefix for commands for this server."
         self.usage = "<prefix[]>"
@@ -405,12 +404,12 @@ class prefix:
         )
 
 
-class loop:
+class Loop:
     is_command = True
     time_consuming = 3
 
     def __init__(self):
-        self.name = ["for", "rep", "repeat", "while"]
+        self.name = ["For", "Rep", "Repeat", "While"]
         self.min_level = 1
         self.description = "Loops a command."
         self.usage = "<0:iterations> <1:command> <hide(?h)>"
@@ -446,11 +445,11 @@ class loop:
             return "```css\nLooping [" + func + "] " + uniStr(iters) + " times...```"
 
 
-class info:
+class Info:
     is_command = True
 
     def __init__(self):
-        self.name = ["userInfo"]
+        self.name = ["UserInfo", "ServerInfo"]
         self.min_level = 0
         self.description = "Shows information about the target user or server."
         self.usage = "<user> <verbose(?v)>"
@@ -463,7 +462,7 @@ class info:
             u = g.owner
         except AttributeError:
             u = None
-        emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
+        emb = discord.Embed(colour=_vars.randColour())
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         if u is not None:
@@ -607,7 +606,7 @@ class info:
             url2 = _vars.website
         else:
             url2 = url
-        emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
+        emb = discord.Embed(colour=_vars.randColour())
         emb.set_thumbnail(url=url)
         emb.set_author(name=name + "#" + disc, icon_url=url, url=url2)
         d = "<@" + str(u.id) + ">"
@@ -645,11 +644,11 @@ class info:
         }
 
 
-class status:
+class Status:
     is_command = True
 
     def __init__(self):
-        self.name = ["state"]
+        self.name = ["State"]
         self.min_level = 0
         self.description = "Shows the bot's current program state."
         self.usage = ""
@@ -663,7 +662,7 @@ class status:
             "```css"
             + "\nActive users: " + uniStr(len(client.users))
             + ", Active servers: " + uniStr(_vars.guilds)
-            + ", Active shards: " + uniStr(1)
+            + ", Active shards: " + uniStr(len(client.latencies))
             
             + ".\nActive processes: " + uniStr(active[0])
             + ", Active threads: " + uniStr(active[1])
@@ -684,11 +683,11 @@ class status:
         )
 
 
-class execute:
+class Execute:
     is_command = True
 
     def __init__(self):
-        self.name = ["exec", "eval"]
+        self.name = ["Exec", "Eval"]
         self.min_level = nan
         self.description = "Executes python code on the bot."
         self.usage = "<code> <enable(?e)> <disable(?d)>"
@@ -698,16 +697,16 @@ class execute:
         if "e" in flags:
             _vars.updaters["eval"].channel = channel
             return (
-                "```css\nSuccessfully changed eval channel to "
+                "```css\nSuccessfully changed code channel to "
                 + uniStr(channel.id) + ".```"
             )
         elif "d" in flags:
             _vars.updaters["eval"].channel = freeClass(id=None)
             return (
-                "```css\nSuccessfully removed eval channel.```"
+                "```css\nSuccessfully removed code channel.```"
             )
         return (
-            "```css\neval channel is currently set to "
+            "```css\ncode channel is currently set to "
             + uniStr(_vars.updaters["eval"].channel.id) + ".```"
         )
 

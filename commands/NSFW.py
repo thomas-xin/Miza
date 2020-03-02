@@ -318,7 +318,7 @@ def is_nsfw(channel):
         return True
 
 
-class neko:
+class Neko:
     is_command = True
 
     def __init__(self):
@@ -377,14 +377,14 @@ class neko:
             return text
         emb = discord.Embed(
             url=url,
-            colour=colour2Raw(colourCalculation(xrand(1536))),
+            colour=self._vars.randColour(),
         )
         emb.set_image(url=url)
         print(url)
         asyncio.create_task(channel.send(embed=emb))
 
 
-class lewd:
+class Lewd:
     is_command = True
     time_consuming = True
 
@@ -409,7 +409,7 @@ class lewd:
             return text
         emb = discord.Embed(
             url=url,
-            colour=colour2Raw(colourCalculation(xrand(1536))),
+            colour=_vars.randColour(),
         )
         emb.set_image(url=url)
         print(url)

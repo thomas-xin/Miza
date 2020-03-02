@@ -7,9 +7,10 @@ def delete(f):
     while f in os.listdir():
         try:
             os.remove(f)
+            break
         except:
             print(traceback.format_exc())
-            time.sleep(1)
+        time.sleep(1)
 
 sd = "shutdown.json"
 rs = "restart.json"
@@ -20,10 +21,9 @@ delete(rs)
 delete(hb)
 
 while not sd in os.listdir():
-    delete(sd)
     delete(rs)
     delete(hb)
-    proc = psutil.Popen([python, "bot.py"])
+    proc = psutil.Popen([python, "bot.py"], shell=True)
     print("Bot started with PID " + str(proc.pid) + ".")
     time.sleep(8)
     try:
@@ -37,9 +37,10 @@ while not sd in os.listdir():
                 + str(datetime.datetime.now())
                 + "."
             )
-            for i in range(8):
-                time.sleep(1)
-                if rs in os.listdir():
+            for i in range(16):
+                time.sleep(0.5)
+                ld = os.listdir()
+                if rs in ld or sd in ld:
                     alive = False
                     break
             if not alive or hb in os.listdir():

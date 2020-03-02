@@ -2,12 +2,12 @@ import datetime, discord
 from smath import *
 
 
-class purge:
+class Purge:
     is_command = True
     time_consuming = True
 
     def __init__(self):
-        self.name = ["del", "delete"]
+        self.name = ["Del", "Delete"]
         self.min_level = 1
         self.description = "Deletes a number of messages from a certain user in current channel."
         self.usage = "<1:user{bot}(?a)> <0:count[1]> <hide(?h)>"
@@ -78,12 +78,12 @@ class purge:
             )
 
 
-class ban:
+class Ban:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["bans", "unban"]
+        self.name = ["Bans", "Unban"]
         self.min_level = 3
         self.description = "Bans a user for a certain amount of hours, with an optional reason."
         self.usage = "<0:user> <1:hours[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
@@ -111,7 +111,7 @@ class ban:
                     + ".\nRequired level: " + uniStr(t_perm + 1)
                     + ", Current level: " + uniStr(s_perm) + "."
                 )
-        if name == "unban":
+        if name == "Unban":
             tm = -1
             args = ["", ""]
         elif len(args) < 2:
@@ -218,12 +218,12 @@ class ban:
             return response + "```"
 
 
-class roleGiver:
+class RoleGiver:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["verifier"]
+        self.name = ["Verifier"]
         self.min_level = 3
         self.description = "Adds an automated role giver to the current channel."
         self.usage = "<0:react_to[]> <1:role[]> <1:perm[]> <disable(?d)> <remover(?r)>"
@@ -266,12 +266,12 @@ class roleGiver:
         )
 
         
-class defaultPerms:
+class DefaultPerms:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["defaultPerm"]
+        self.name = ["DefaultPerm"]
         self.min_level = 3
         self.description = "Sets the default bot permission levels for all users in current server."
         self.usage = "<level[]>"
@@ -302,12 +302,12 @@ class defaultPerms:
         )
 
 
-class rainbowRole:
+class RainbowRole:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["colourRole"]
+        self.name = ["DynamicRole"]
         self.min_level = 3
         self.description = "Causes target role to randomly change colour."
         self.usage = "<0:role[]> <mim_delay[12]> <disable(?d)>"
@@ -356,7 +356,7 @@ follow_default = {
 }
 
                   
-class dogpile:
+class Dogpile:
     is_command = True
     server_only = True
 
@@ -388,12 +388,12 @@ class dogpile:
             )
 
 
-class react:
+class React:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["autoreact"]
+        self.name = ["AutoReact"]
         self.min_level = 3
         self.description = "Causes Miza to automatically assign a reaction to messages containing the substring."
         self.usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
@@ -434,7 +434,7 @@ class react:
         )
 
 
-class messageLog:
+class MessageLog:
     is_command = True
     server_only = True
 
@@ -497,7 +497,7 @@ class updateLogs:
                 url = u.avatar_url
                 c_id = self.data[guild.id]
                 channel = await self._vars.fetch_channel(c_id)
-                emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
+                emb = discord.Embed(colour=self._vars.randColour())
                 emb.set_author(name=name_id, icon_url=url, url=url)
                 emb.description = (
                     "Message edited in <#"
@@ -564,7 +564,7 @@ class updateLogs:
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
             channel = await self._vars.fetch_channel(c_id)
-            emb = discord.Embed(colour=colour2Raw(colourCalculation(xrand(1536))))
+            emb = discord.Embed(colour=self._vars.randColour())
             emb.set_author(name=name_id, icon_url=url, url=url)
             emb.description = (
                 init + " deleted message from <#"
@@ -695,7 +695,7 @@ class updateColours:
                 role = guild.get_role(r)
                 delay = roles[r]
                 if not (self.counter + r) % delay:
-                    col = colour2Raw(colourCalculation(xrand(1536)))
+                    col = self._vars.randColour()
                     try:
                         await role.edit(colour=discord.Colour(col))
                     except KeyError:

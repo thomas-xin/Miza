@@ -47,12 +47,12 @@ except KeyError:
     print("WARNING: papago_id/papago_secret not found. Unable to use Papago Translate.")
 
 
-class math:
+class Math:
     is_command = True
     time_consuming = True
 
     def __init__(self):
-        self.name = ["python", "py", "sympy", "m"]
+        self.name = ["Python", "PY", "Sympy", "M"]
         self.min_level = 0
         self.description = "Evaluates a math formula."
         self.usage = "<function> <verbose(?v)> <rationalize(?r)>"
@@ -71,11 +71,11 @@ class math:
         return "```py\n" + str(f) + " = " + "\n".join(str(i) for i in resp) + "```"
 
 
-class uni2hex:
+class Uni2Hex:
     is_command = True
 
     def __init__(self):
-        self.name = ["u2h"]
+        self.name = ["U2H"]
         self.min_level = 0
         self.description = "Converts unicode text to hexadecimal numbers."
         self.usage = "<string>"
@@ -87,11 +87,11 @@ class uni2hex:
         return "```fix\n" + bytes2Hex(b) + "```"
 
 
-class hex2uni:
+class Hex2Uni:
     is_command = True
 
     def __init__(self):
-        self.name = ["h2u"]
+        self.name = ["H2U"]
         self.min_level = 0
         self.description = "Converts hexadecimal numbers to unicode text."
         self.usage = "<string>"
@@ -103,11 +103,11 @@ class hex2uni:
         return "```fix\n" + b.decode("utf-8") + "```"
 
 
-class uniFmt:
+class UniFmt:
     is_command = True
 
     def __init__(self):
-        self.name = ["fancy", "fancyText"]
+        self.name = ["Fancy", "FancyText"]
         self.min_level = 0
         self.description = "Creates a representation of a text string using unicode fonts."
         self.usage = "<0:font_id> <1:string>"
@@ -128,12 +128,12 @@ def getTranslate(translator, string, dest, source):
         return ex
 
 
-class translate:
+class Translate:
     is_command = True
     time_consuming = True
 
     def __init__(self):
-        self.name = ["tr"]
+        self.name = ["TR"]
         self.min_level = 0
         self.description = "Translates a string into another language."
         self.usage = "<0:language> <1:string> <verbose(?v)> <google(?g)>"

@@ -280,7 +280,7 @@ def orgConv(org, wave, fmt):
         return repr(ex)
 
 
-class cs_org2xm:
+class CS_org2xm:
     is_command = True
     time_consuming = True
     fmts = [
@@ -290,7 +290,7 @@ class cs_org2xm:
     ]
 
     def __init__(self):
-        self.name = ["org2xm", "convert_org"]
+        self.name = ["CS_o2x", "Org2xm", "Convert_org"]
         self.min_level = 0
         self.description = "Converts a .org file to another file format."
         self.usage = "<0:org_url{attached_file}> <2:wave_url[]> <1:out_format[xm]>"
@@ -370,11 +370,11 @@ def _m2f(mem, val):
     return result
 
 
-class cs_mem2flag:
+class CS_mem2flag:
     is_command = True
 
     def __init__(self):
-        self.name = ["cs_m2f"]
+        self.name = ["CS_m2f"]
         self.min_level = 0
         self.description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
         self.usage = "<0:address> <1:value[1]>"
@@ -386,12 +386,12 @@ class cs_mem2flag:
         return "```css\n" + _m2f(args[0], num) + "```"
 
 
-class cs_hex2xml:
+class CS_hex2xml:
     is_command = True
     time_consuming = True
 
     def __init__(self):
-        self.name = ["cs_h2x"]
+        self.name = ["CS_h2x"]
         self.min_level = 0
         self.description = "Converts a given Cave Story hex patch to an xml file readable by Booster's Lab."
         self.usage = "<hex_data>"
@@ -462,7 +462,7 @@ class cs_hex2xml:
         }
 
 
-class cs_npc:
+class CS_npc:
     is_command = True
     time_consuming = True
 
@@ -503,7 +503,7 @@ class cs_npc:
             raise EOFError("No results found for " + uniStr(argv) + ".")
 
 
-class cs_tsc:
+class CS_tsc:
     is_command = True
     time_consuming = True
 
@@ -544,12 +544,12 @@ class cs_tsc:
             raise EOFError("No results found for " + uniStr(argv) + ".")
 
 
-class cs_mod:
+class CS_mod:
     is_command = True
     time_consuming = True
 
     def __init__(self):
-        self.name = ["cs_search"]
+        self.name = ["CS_search"]
         self.min_level = 0
         self.description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
         self.usage = "<query>"
@@ -561,7 +561,7 @@ class cs_mod:
         data = douclub.search(argv)
         t = time.time()
         while resp[0] is None and time.time() - t < 5:
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.5)
         if resp[0] is not None:
             data += resp[0]
         print(data)

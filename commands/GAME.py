@@ -1,7 +1,7 @@
 from smath import *
 
 
-class text2048:
+class Text2048:
     is_command = True
     time_consuming = True
     directions = {
@@ -36,7 +36,7 @@ class text2048:
     numScore = lambda y, x: x * 2 ** (x + 1)
 
     def __init__(self):
-        self.name = ["2048", "text_2048"]
+        self.name = ["2048", "Text_2048"]
         self.min_level = 0
         self.description = "Plays a game of 2048 using reactions."
         self.usage = (
