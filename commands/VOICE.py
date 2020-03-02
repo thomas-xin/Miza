@@ -401,7 +401,7 @@ async def forceJoin(guild, channel, user, client, _vars):
     found = False
     if guild.id not in _vars.updaters["playlists"].audio:
         for func in _vars.categories["voice"]:
-            if "join" in func.name:
+            if "Join" in func.name:
                 try:
                     await func(client=client, user=user, _vars=_vars, channel=channel, guild=guild)
                 except discord.ClientException:
