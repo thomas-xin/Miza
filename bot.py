@@ -51,15 +51,15 @@ class main_data:
                 + '}'
             )
             f.close()
-            self.shutdown()
             print("ERROR: Please fill in details for " + self.authdata + " to continue.")
+            self.shutdown()
         auth = ast.literal_eval(f.read())
         f.close()
         try:
             self.token = auth["discord_token"]
         except KeyError:
-            self.shutdown()
             print("ERROR: discord_token not found. Unable to login.")
+            self.shutdown()
         try:
             self.owner_id = int(auth["owner_id"])
         except KeyError:
@@ -76,8 +76,10 @@ class main_data:
         print("Initialized.")
 
     def shutdown(self):
+        time.sleep(2)
         f = open(self.shutdown, "wb")
         f.close()
+        sys.exit(1)
 
     def run(self):
         print("Attempting to authorize with token " + self.token + ":")
