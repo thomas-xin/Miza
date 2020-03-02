@@ -24,6 +24,7 @@ class customAudio(discord.AudioSource):
 
     def __init__(self, channel, _vars):
         try:
+            self.paused = False
             self.stats = dict(self.defaults)
             self.new()
             self.queue = hlist()
