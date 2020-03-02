@@ -122,7 +122,7 @@ class Perms:
         self.name = ["ChangePerms", "Perm", "ChangePerm", "Permissions"]
         self.min_level = -inf
         self.description = "Shows or changes a user's permission level."
-        self.usage = "<0:user{self}> <1:level{curr}> <hide(?h)>"
+        self.usage = "<0:user{self}> <1:level[]> <hide(?h)>"
 
     async def __call__(self, _vars, args, user, perm, guild, flags, **void):
         if len(args) < 2:
@@ -650,7 +650,7 @@ class Status:
     def __init__(self):
         self.name = ["State"]
         self.min_level = 0
-        self.description = "Shows the bot's current program state."
+        self.description = "Shows the bot's current internal program state."
         self.usage = ""
 
     async def __call__(self, flags, client, _vars, **void):
@@ -689,8 +689,11 @@ class Execute:
     def __init__(self):
         self.name = ["Exec", "Eval"]
         self.min_level = nan
-        self.description = "Executes python code on the bot."
-        self.usage = "<code> <enable(?e)> <disable(?d)>"
+        self.description = (
+            "Causes all messages in the current channel to be executed as python code on the bot."
+            + " WARNING: DO NOT ALLOW UNTRUSTED USERS TO POST IN CHANNEL."
+        )
+        self.usage = "<enable(?e)> <disable(?d)>"
 
     async def __call__(self, _vars, flags, channel, **void):
         data = _vars.data["eval"]
