@@ -794,21 +794,24 @@ class updateEval:
                         await self.ch.send(proc[1:])
                     else:
                         try:
-                            output = await eval(proc, _vars._globals)
-                            await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
-                        except (SyntaxError, TypeError):
+                            output = eval(proc, _vars._globals)
                             try:
-                                output = eval(proc, _vars._globals)
-                                await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
+                                output = await output
+                            except (SyntaxError, TypeError):
+                                pass
+                            await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
+                        except:
+                            try:
+                                exec(proc, _vars._globals)
+                                await self.channel.send(
+                                    "```py\n" + str(proc)
+                                    + " Successfully executed!```"
+                                )
                             except:
-                                try:
-                                    exec(proc, _vars._globals)
-                                    await self.channel.send("```py\nNone```")
-                                except:
-                                    await self.channel.send(limStr(
-                                        "```py\n" + traceback.format_exc() + "```",
-                                        2000,
-                                    ))
+                                await self.channel.send(limStr(
+                                    "```py\n" + traceback.format_exc() + "```",
+                                    2000,
+                                ))
             except:
                 await self.channel.send(limStr(
                     "```py\n" + traceback.format_exc() + "```",

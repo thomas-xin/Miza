@@ -1,4 +1,4 @@
-import discord
+import discord, nekos, requests
 from smath import *
 
 
@@ -191,6 +191,113 @@ class Char2Emoj:
                 "Exactly 3 arguments are required for this command.\n"
                 + "Place <> around arguments containing spaces as required."
             )
+
+
+f = open("auth.json")
+auth = ast.literal_eval(f.read())
+f.close()
+try:
+    cat_key = auth["cat_api_key"]
+except:
+    cat_key = None
+    print("WARNING: cat_api_key not found. Unable to use API to pull cat images.")
+
+
+class Cat:
+    is_command = True
+    if cat_key:
+        header = {"x-api-key": cat_key}
+    else:
+        header = None
+
+    def __init__(self):
+        self.name = []
+        self.min_level = 0
+        self.description = "Pulls a random image from thecatapi.com or cdn.nekos.life/meow, and embeds it."
+        self.usage = "<verbose(?v)>"
+
+    async def __call__(self, channel, flags, **void):
+        if not self.header or random.random() > 0.9375:
+            url = nekos.cat()
+        else:
+            for attempts in range(8):
+                returns = [None]
+                doParallel(
+                    funcSafe,
+                    [requests.get, "https://api.thecatapi.com/v1/images/search"],
+                    returns,
+                    {"headers": self.header},
+                )
+                while returns[0] is None:
+                    await asyncio.sleep(0.5)
+                if type(returns[0]) is str:
+                    print(eval, returns[0])
+                    raise eval(returns[0])
+                resp = returns[0][-1]
+                try:
+                    d = json.loads(resp.content)
+                except:
+                    d = eval(resp.content, {}, {})
+                try:
+                    if type(d) is list:
+                        d = random.choice(d)
+                    url = d["url"]
+                    break
+                except KeyError:
+                    pass
+        if "v" in flags:
+            text = "Pulled from " + url
+            return text
+        emb = discord.Embed(
+            url=url,
+            colour=self._vars.randColour(),
+        )
+        emb.set_image(url=url)
+        print(url)
+        asyncio.create_task(channel.send(embed=emb))
+
+
+class Dog:
+    is_command = True
+
+    def __init__(self):
+        self.name = []
+        self.min_level = 0
+        self.description = "Pulls a random image from images.dog.ceo and embeds it."
+        self.usage = "<verbose(?v)>"
+
+    async def __call__(self, channel, flags, **void):
+        for attempts in range(8):
+            returns = [None]
+            doParallel(funcSafe, [urlOpen, "https://dog.ceo/api/breeds/image/random"], returns)
+            while returns[0] is None:
+                await asyncio.sleep(0.5)
+            if type(returns[0]) is str:
+                raise eval(returns[0])
+            resp = returns[0][-1]
+            s = resp.read()
+            try:
+                d = json.loads(s)
+            except:
+                d = eval(s, {}, {})
+            try:
+                if type(d) is list:
+                    d = random.choice(d)
+                url = d["message"]
+                break
+            except KeyError:
+                pass
+        url = url.replace("https:\\/\\/", "https://").replace("\\", "/")
+        if "v" in flags:
+            text = "Pulled from " + url
+            return text
+        emb = discord.Embed(
+            url=url,
+            colour=self._vars.randColour(),
+        )
+        emb.set_image(url=url)
+        print(url)
+        asyncio.create_task(channel.send(embed=emb))
 
 
 class OwOify:

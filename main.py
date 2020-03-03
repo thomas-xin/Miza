@@ -60,6 +60,8 @@ while not sd in os.listdir():
                 proc.kill()
             except psutil.NoSuchProcess:
                 break
+        if sd in os.listdir():
+            break
         print("Bot closed without shutdown signal, restarting...")
     except KeyboardInterrupt:
         raise

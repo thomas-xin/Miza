@@ -570,7 +570,7 @@ class updateLogs:
                 init + " deleted message from <#"
                 + str(message.channel.id) + ">:"
             )
-            emb.add_field(name="Content", value=self._vars.strMessage(message))
+            emb.add_field(name="Content", value=self._vars.strMessage(message, limit=2048))
             await channel.send(embed=emb)
 
 

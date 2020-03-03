@@ -1,4 +1,4 @@
-import discord, os, sys, datetime, json
+import discord, os, sys, datetime, json, websockets
 from smath import *
 
 sys.path.insert(1, "commands")
@@ -52,14 +52,14 @@ class main_data:
             )
             f.close()
             print("ERROR: Please fill in details for " + self.authdata + " to continue.")
-            self.shutdown()
+            self.setshutdown()
         auth = ast.literal_eval(f.read())
         f.close()
         try:
             self.token = auth["discord_token"]
         except KeyError:
             print("ERROR: discord_token not found. Unable to login.")
-            self.shutdown()
+            self.setshutdown()
         try:
             self.owner_id = int(auth["owner_id"])
         except KeyError:
@@ -72,10 +72,9 @@ class main_data:
         self.guilds = 0
         self.blocked = 0
         self.updated = False
-        self.suffix = ">>> "
         print("Initialized.")
 
-    def shutdown(self):
+    def setshutdown(self):
         time.sleep(2)
         f = open(self.shutdown, "wb")
         f.close()
@@ -90,10 +89,8 @@ class main_data:
         except SystemExit:
             sys.exit()
 
-    def print(self, *args, sep=" ", end="\n", suffix=None):
-        if suffix is None:
-            suffix = self.suffix
-        sys.stdout.write(str(sep).join(str(i) for i in args) + end + suffix)
+    def print(self, *args, sep=" ", end="\n"):
+        sys.stdout.write(str(sep).join(str(i) for i in args) + end)
 
     async def verifyDelete(self, obj):
         started = hasattr(self, "started")
@@ -639,7 +636,10 @@ class main_data:
                     activity.game = self.website
                     if changed:
                         print(repr(activity))
-                    await client.change_presence(activity=activity)
+                    try:
+                        await client.change_presence(activity=activity)
+                    except websockets.ConnectionClosed:
+                        pass
                 self.lastCheck = time.time()
                 for u in self.updaters.values():
                     asyncio.create_task(u())
@@ -651,8 +651,8 @@ class main_data:
     def randColour(self):
         return colour2Raw(colourCalculation(xrand(12) * 128))
 
-    def strMessage(self, message):
-        data = limStr(message.content, 512)
+    def strMessage(self, message, limit=1024):
+        data = limStr(message.content, limit)
         if message.reactions:
             data += "\n{" + ", ".join(str(i) for i in message.reactions) + "}"
         if message.embeds:
@@ -668,9 +668,9 @@ class main_data:
             pass
         if not data:
             data = "```css\n" + uniStr("[EMPTY MESSAGE]") + "```"
-        return limStr(data, 1024)
+        return limStr(data, limit)
 
-    class userGuild(discord.abc.Snowflake):
+    class userGuild(discord.Object):
 
         class userChannel(discord.abc.PrivateChannel):
 
@@ -702,12 +702,11 @@ class main_data:
             self.channels = self.text_channels = [self.channel]
             self.voice_channels = []
             self.me = self.channel.me
-            self.created_at = self.channel.created_at
             self.roles = []
             self.emojis = []
             self.get_channel = lambda *void1, **void2: self.channel
             self.owner_id = client.user.id
-            fetch_member = _vars.fetch_user
+            self.fetch_member = _vars.fetch_user
 
         filesize_limit = 8388608
         bitrate_limit = 98304
@@ -990,21 +989,29 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                 else:
                                     asyncio.create_task(channel.send(**response))
                             else:
-                                if len(response) <= 2000:
+                                if type(response) is str and len(response) <= 2000:
                                     if react:
                                         sent = await channel.send(response)
                                     else:
                                         asyncio.create_task(channel.send(response))
                                 else:
-                                    fn = "cache/temp.txt"
-                                    f = open(fn, "wb")
-                                    f.write(bytes(response, "utf-8"))
-                                    f.close()
-                                    f = discord.File(fn)
-                                    print("Created file " + fn)
-                                    asyncio.create_task(
-                                        channel.send("Response too long for message.", file=f)
-                                    )
+                                    if type(response) is not bytes:
+                                        response = bytes(repr(response), "utf-8")
+                                        filemsg = "Response too long for message."
+                                    else:
+                                        filemsg = "Response data:"
+                                    if len(response) <= guild.filesize_limit:
+                                        fn = "cache/" + str(guild.id) + ".txt"
+                                        f = open(fn, "wb")
+                                        f.write(response)
+                                        f.close()
+                                        f = discord.File(fn)
+                                        print("Created file " + fn)
+                                        asyncio.create_task(
+                                            channel.send(filemsg, file=f)
+                                        )
+                                    else:
+                                        raise OverflowError("Response too long for file upload.")
                             if sent is not None:
                                 await sent.add_reaction(react)
                     except TimeoutError:

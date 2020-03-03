@@ -221,23 +221,23 @@ def getDuration(filename):
     return max(1 / (1 << 24), n)
 
 
-def orgConv(org, wave, fmt):
+def orgConv(org, wave, fmt, key="temp"):
     try:
         try:
-            os.remove("cache/temp.org")
+            os.remove("cache/" + key + ".org")
         except FileNotFoundError:
             pass
         try:
-            os.remove("cache/temp.xm")
+            os.remove("cache/" + key + ".xm")
         except FileNotFoundError:
             pass
         opener = urlBypass()
-        opener.retrieve(org, "cache/temp.org")
+        opener.retrieve(org, "cache/" + key + ".org")
         if wave is not None:
-            opener.retrieve(wave, "cache/temp.dat")
-            com = "org2xm ../cache/temp.org ../cache/temp.dat"
+            opener.retrieve(wave, "cache/" + key + ".dat")
+            com = "org2xm ../cache/" + key + ".org ../cache/" + key + ".dat"
         else:
-            com = "org2xm ../cache/temp.org ORG210EN.DAT"
+            com = "org2xm ../cache/" + key + ".org ORG210EN.DAT"
         os.chdir("misc")
         try:
             os.system(com)
@@ -245,11 +245,11 @@ def orgConv(org, wave, fmt):
         except:
             os.chdir("..")
             raise
-        fi = "cache/temp.xm"
+        fi = "cache/" + key + ".xm"
         t = time.time()
         while time.time() - t < 12:
             time.sleep(0.01)
-            if "temp.xm" in os.listdir("cache"):
+            if key + ".xm" in os.listdir("cache"):
                 try:
                     f = open(fi, "rb")
                     f.read(32)
@@ -259,7 +259,7 @@ def orgConv(org, wave, fmt):
                     print(repr(ex))                
                     pass
         if fmt != "xm":
-            fn = "cache/temp." + fmt
+            fn = "cache/" + key + "." + fmt
             try:
                 os.remove(fn)
             except FileNotFoundError:
@@ -295,7 +295,7 @@ class CS_org2xm:
         self.description = "Converts a .org file to another file format."
         self.usage = "<0:org_url{attached_file}> <2:wave_url[]> <1:out_format[xm]>"
 
-    async def __call__(self, args, _vars, message, channel, **void):
+    async def __call__(self, args, _vars, message, channel, guild, **void):
         if len(message.attachments):
             org = message.attachments[0].url
             args = [""] + args
@@ -314,7 +314,7 @@ class CS_org2xm:
         if fmt not in self.fmts:
             raise TypeError(fmt + " is not a supported output format.")
         returns = [None]
-        doParallel(orgConv, [org, wave, fmt], returns, state=2)
+        doParallel(orgConv, [org, wave, fmt, str(guild.id)], returns, state=2)
         t = time.time()
         i = 0
         while returns[0] is None and time.time() - t < _vars.timeout - 1:
@@ -450,16 +450,7 @@ class CS_hex2xml:
             + '\t</panel>\n'
             + '</hack>'
         )
-        fn = "cache/temp.xml"
-        f = open(fn, "w")
-        f.write(output)
-        f.close()
-        f = discord.File(fn)
-        print(fn)
-        return {
-            "content": "Hack successfully converted!",
-            "file": f,
-        }
+        return bytes(output, "utf-8")
 
 
 class CS_npc:

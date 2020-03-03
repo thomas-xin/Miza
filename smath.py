@@ -2545,6 +2545,13 @@ def urlOpen(url):
     s = resp.read().decode("utf-8")
 
 
+def funcSafe(func, *args, **kwargs):
+    try:
+        return [func(*args, **kwargs)]
+    except Exception as ex:
+        return repr(ex)
+
+
 def logClear():
     if os.name == 'nt':
         os.system('cls')

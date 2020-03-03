@@ -778,9 +778,9 @@ class Queue:
                 value=embstr,
                 inline=False,
             )
-            return {
+            return ({
                 "embed": embed,
-            }
+            }, 1)
         else:
             auds.preparing = True
             output = [None]
@@ -1271,7 +1271,7 @@ class Dump:
             resp = returns[0]
             if type(resp) is str:
                 raise eval(resp)
-            return resp[0]
+            return bytes(resp[0], "utf-8")
         try:
             if len(message.attachments):
                 url = message.attachments[0].url
