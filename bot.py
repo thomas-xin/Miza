@@ -1086,7 +1086,7 @@ async def updateLoop():
             await _vars.handleUpdate()
             t = time.time()
             while time.time() - t < frand(2) + 2:
-                await asyncio.sleep(0.03)
+                await asyncio.sleep(0.04)
                 if _vars.doUpdate:
                     await _vars.handleUpdate(True)
                     _vars.doUpdate = False

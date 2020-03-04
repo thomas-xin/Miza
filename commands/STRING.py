@@ -185,7 +185,7 @@ class Translate:
         return response + end
 
 
-class Urban:
+class UrbanDictionary:
     is_command = True
     time_consuming = True
     header = {
@@ -194,7 +194,7 @@ class Urban:
     }
 
     def __init__(self):
-        self.name = ["UrbanDictionary"]
+        self.name = ["Urban"]
         self.min_level = 0
         self.description = "Searches Urban Dictionary for an item."
         self.usage = "<string> <verbose(?v)>"

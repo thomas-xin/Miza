@@ -36,6 +36,7 @@ class customAudio(discord.AudioSource):
             self.searching = False
             self.preparing = False
             self.player = None
+            self.timeout = 0
             self._vars = _vars
             _vars.updaters["playlists"].audio[channel.guild.id] = self
         except:
@@ -1012,7 +1013,7 @@ class Skip:
         self.description = "Removes an entry from the voice channel queue."
         self.usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
 
-    async def __call__(self, client, user, _vars, args, argv, guild, flags, message, **void):
+    async def __call__(self, client, user, perm, _vars, args, argv, guild, flags, message, **void):
         found = False
         if guild.id not in _vars.updaters["playlists"].audio:
             raise LookupError("Currently not playing in a voice channel.")
@@ -1023,9 +1024,8 @@ class Skip:
                 await message.delete()
             except discord.NotFound:
                 pass
-        s_perm = _vars.getPerms(user, guild)
-        min_level = 1
-        if "f" in flags and s_perm < 1:
+        req = 1
+        if "f" in flags and perm < req:
             raise PermissionError(
                 "Insufficient privileges to force skip"
                 + ". Required level: " + uniStr(req)
@@ -1375,7 +1375,7 @@ class Volume:
         if op == "settings":
             op = "volume"
         req = 1
-        if s_perm < req:
+        if perm < req:
             raise PermissionError(
                 "Insufficient privileges to modify audio settings for "
                 + uniStr(guild.name) + ". Required level: "
@@ -1834,19 +1834,22 @@ class updateQueues:
                 except KeyError:
                     continue
                 if not cnt or getattr(auds, "dead", 0):
-                    try:
-                        channel = auds.channel
-                        self.audio.pop(guild.id)
-                        msg = (
-                            "```css\n🎵 Successfully disconnected from "
-                            + uniStr(guild.name) + ". 🎵```"
-                        )
-                        sent = await channel.send(msg)
-                        await sent.add_reaction("❎")
-                    except KeyError:
-                        pass
-                    await vc.disconnect(force=True)
+                    auds.timeout += 1
+                    if auds.timeout > 10:
+                        try:
+                            channel = auds.channel
+                            self.audio.pop(guild.id)
+                            msg = (
+                                "```css\n🎵 Successfully disconnected from "
+                                + uniStr(guild.name) + ". 🎵```"
+                            )
+                            sent = await channel.send(msg)
+                            await sent.add_reaction("❎")
+                        except KeyError:
+                            pass
+                        await vc.disconnect(force=True)
                 else:
+                    auds.timeout = 0
                     try:
                         asyncio.create_task(auds.updatePlayer())
                         try:
