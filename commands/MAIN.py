@@ -392,7 +392,7 @@ class Prefix:
         if perm < req:
             raise PermissionError(
                 "Insufficient priviliges to change command prefix for "
-                + uniStr(channel.name)
+                + uniStr(guild.name)
                 + ".\nRequred level: " + uniStr(req)
                 + ", Current level: " + uniStr(perm) + "."
             )
@@ -414,7 +414,7 @@ class Loop:
         self.description = "Loops a command."
         self.usage = "<0:iterations> <1:command> <hide(?h)>"
 
-    async def __call__(self, args, argv, message, callback, _vars, flags, perm, guild, **void):
+    async def __call__(self, args, argv, message, channel, callback, _vars, flags, perm, guild, **void):
         num = await _vars.evalMath(args[0], guild.id)
         iters = round(num)
         scale = 3
@@ -436,13 +436,15 @@ class Loop:
                 if isValid(perm):
                     raise PermissionError("Insufficient priviliges to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
+        if not "h" in flags:
+            await channel.send("```css\nLooping [" + func + "] " + uniStr(iters) + " times...```")
         for i in range(iters):
             loop = i < iters - 1
             asyncio.create_task(callback(
                 message, func, cb_argv=func2, cb_flags=flags, loop=loop,
             ))
-        if not "h" in flags:
-            return "```css\nLooping [" + func + "] " + uniStr(iters) + " times...```"
+            if not i - 1 & 7:
+                await asyncio.sleep(0.5)
 
 
 class Info:

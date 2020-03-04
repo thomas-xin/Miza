@@ -568,9 +568,9 @@ class updateLogs:
             emb.set_author(name=name_id, icon_url=url, url=url)
             emb.description = (
                 init + " deleted message from <#"
-                + str(message.channel.id) + ">:"
+                + str(message.channel.id) + ">:\n"
             )
-            emb.add_field(name="Content", value=self._vars.strMessage(message, limit=2048))
+            emb.description += self._vars.strMessage(message, limit=2048 - len(emb.description))
             await channel.send(embed=emb)
 
 

@@ -244,7 +244,7 @@ class Cat:
                     url = d["url"]
                     break
                 except KeyError:
-                    pass
+                    await asyncio.sleep(0.5)
         if "v" in flags:
             text = "Pulled from " + url
             return text
@@ -286,7 +286,7 @@ class Dog:
                 url = d["message"]
                 break
             except KeyError:
-                pass
+                await asyncio.sleep(0.5)
         url = url.replace("https:\\/\\/", "https://").replace("\\", "/")
         if "v" in flags:
             text = "Pulled from " + url
