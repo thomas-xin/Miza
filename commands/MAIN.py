@@ -352,18 +352,19 @@ class Suspend:
 
     async def __call__(self, _vars, user, guild, args, **void):
         update = self.data["users"].update
-        susp = _vars.data["users"]
+        susp = _vars.data["users"].get(user.id, {"commands": 0, "suspended": 0})
         if len(args) < 2:
             if len(args) >= 1:
                 user = await _vars.fetch_user(_vars.verifyID(args[0]))
             return (
                 "```css\nCurrent suspension status of " + uniStr(user.name) + ": "
-                + uniStr(susp.get(user.id, None)) + ".```"
+                + uniStr(susp) + ".```"
             )
         else:
             user = await _vars.fetch_user(_vars.verifyID(args[0]))
             change = await _vars.evalMath(args[1], guild.id)
-            susp[user.id] = change
+            susp["suspended"] = change
+            _vars.data["users"][user.id] = susp
             update()
             return (
                 "```css\nChanged suspension status of " + uniStr(user.name) + " to "

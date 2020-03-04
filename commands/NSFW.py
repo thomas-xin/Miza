@@ -1,5 +1,4 @@
-import nekos, rule34, discord
-from pybooru import Moebooru, Danbooru
+import nekos, rule34, pybooru, discord
 from smath import *
 
 image_forms = [
@@ -23,7 +22,7 @@ def pull_e621(argv, data, thr, delay=5):
         if resp.getcode() != 200:
             raise ConnectionError("Error " + str(resp.getcode()))
         s = resp.read().decode("utf-8")
-
+        resp.close()
         try:
             ind = s.index('class="next_page" rel="next"')
             s = s[ind - 90 : ind]
@@ -42,6 +41,7 @@ def pull_e621(argv, data, thr, delay=5):
             if resp.getcode() != 200:
                 raise ConnectionError("Error " + str(resp.getcode()))
             s = resp.read().decode("utf-8")
+            resp.close()
         except ValueError:
             pass
 
@@ -75,6 +75,7 @@ def pull_e621(argv, data, thr, delay=5):
             if resp.getcode() != 200:
                 raise ConnectionError("Error " + str(resp.getcode()))
             s = resp.read().decode("utf-8")
+            resp.close()
             search = '<a href="https://static1.e621.net/data/'
             ind1 = s.index(search)
             s = s[ind1 + 9 :]
@@ -92,27 +93,21 @@ def pull_e621(argv, data, thr, delay=5):
     print(data)
 
 
-booruSites = {
-    "konachan.com": True,
-    "yande.re": True,
-    "danbooru.donmai.us": False,
-    "gelbooru.com": True,
-    "capi-beta.sankakucomplex": True,
-}
+booruSites = list(pybooru.resources.SITE_LIST.keys())
 
 
 def pull_booru(argv, data, thr, delay=5):
+    client = pybooru.Moebooru(random.choice(tuple(booruSites)))
     try:
-        booruURL = random.choice(tuple(booruSites))
-        booruType = booruSites[booruURL]
-        client = Moebooru(booruURL) if booruType else Danbooru(booruURL)
-        post = client.post_list(tags=argv, random=True)
-        url = post["file_url"]
-        data[thr] = [url, 0, 1]
+        posts = client.post_list(tags=argv, random=True, limit=10)
+        if not posts:
+            raise EOFError
+        choice = xrand(len(posts))
+        url = posts[0]['file_url']
+        data[thr] = [url, 1, choice + 1]
     except:
-        data[thr] = 0
         print(traceback.format_exc())
-    print(data)
+        return 0    
 
 
 loop = asyncio.new_event_loop()
@@ -178,6 +173,7 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
         if resp.getcode() != 200:
             raise ConnectionError("Error " + str(resp.getcode()))
         s = resp.read().decode("utf-8")
+        resp.close()
         tags = s.split("href='/post/list/")[1:]
         valid = []
         for i in range(len(tags)):
@@ -203,6 +199,7 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
             raise ConnectionError("Error " + str(resp.getcode()))
 
         s = resp.read().decode("utf-8")
+        resp.close()
         try:
             ind = s.index('">Last</a><br>')
             s = s[ind - 5 : ind]
@@ -214,6 +211,7 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
             if resp.getcode() != 200:
                 raise ConnectionError("Error " + str(resp.getcode()))
             s = resp.read().decode("utf-8")
+            resp.close()
         except ValueError:
             pass
         try:
@@ -252,9 +250,10 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
     print(data)
 
 
-async def searchRandomNSFW(argv, delay=9):
+async def searchRandomNSFW(argv, delay=10):
     t = time.time()
     funcs = [
+        pull_booru,
         pull_rule34_paheal,
         pull_rule34_xxx,
         pull_e621,
@@ -265,10 +264,10 @@ async def searchRandomNSFW(argv, delay=9):
     while None in data and time.time() - t < delay:
         await asyncio.sleep(0.6)
     data = [i for i in data if i]
-    i = xrand(len(data))
-    if not len(data) or data[i] is None:
+    if not data:
         raise EOFError("Unable to locate any search results for " + uniStr(argv) + ".")
-    return data[i]
+    item = random.choice(data)
+    return item
 
 
 neko_tags = {
@@ -425,7 +424,7 @@ class Lewd:
     async def __call__(self, _vars, args, flags, channel, **void):
         if not is_nsfw(channel):
             raise PermissionError("This command is only available in NSFW channels.")
-        objs = await searchRandomNSFW(" ".join(args), _vars.timeout-3)
+        objs = await searchRandomNSFW(" ".join(args), _vars.timeout-1)
         url = objs[0]
         if "v" in flags:
             text = (

@@ -52,9 +52,14 @@ class IMG:
                 + " from the image list for " + uniStr(guild.name) + ".```"
             )
         if not argv and not "r" in flags:
+            if images:
+                return (
+                    "Available images in **" + guild.name
+                    + "**: ```ini\n" + str(list(images)).replace("'", '"') + "```"
+                )
             return (
-                "Available images in **" + guild.name
-                + "**: ```ini\n" + str(list(images)).replace("'", '"') + "```"
+                "```css\nImage list for " + uniStr(guild.name)
+                + " is currently empty.```"
             )
         sources = []
         for tag in args:
@@ -65,7 +70,7 @@ class IMG:
         for i in range(r):
             sources.append(images[tuple(images)[xrand(len(images))]])
         if not len(sources):
-            raise EOFError("Target image not found. Use ~img for list.")
+            raise LookupError("Target image " + str(argv) + " not found. Use img for list.")
         v = xrand(len(sources))
         url = sources[v]
         if "v" in flags:
@@ -86,6 +91,9 @@ def _c2e(string, em1, em2):
         "_": [0, 0, 0, 0, 7],
         "!": [2, 2, 2, 0, 2],
         '"': [5, 5, 0, 0, 0],
+        ":": [0, 2, 0, 2, 0],
+        ";": [0, 2, 0, 2, 4],
+        "~": [0, 5, 7, 2, 0],
         "#": [10, 31, 10, 31, 10],
         "$": [7, 10, 6, 5, 14],
         "?": [6, 1, 2, 0, 2],
@@ -276,6 +284,7 @@ class Dog:
                 raise eval(returns[0])
             resp = returns[0][-1]
             s = resp.read()
+            resp.close()
             try:
                 d = json.loads(s)
             except:
@@ -287,7 +296,7 @@ class Dog:
                 break
             except KeyError:
                 await asyncio.sleep(0.5)
-        url = url.replace("https:\\/\\/", "https://").replace("\\", "/")
+        url = url.replace("\\", "/")
         if "v" in flags:
             text = "Pulled from " + url
             return text

@@ -580,7 +580,7 @@ class main_data:
                 argv = "-".join(args[3:])
                 catg = self.categories[catx]
                 for f in catg:
-                    if f.__name__ == func:
+                    if f.__name__.lower() == func.lower():
                         try:
                             await asyncio.wait_for(
                                 f._callback_(
@@ -669,6 +669,14 @@ class main_data:
         if not data:
             data = "```css\n" + uniStr("[EMPTY MESSAGE]") + "```"
         return limStr(data, limit)
+
+    def hasSymbol(self, string):
+        s = "0123456789abcdefghijklmnopqrstuvwxyz"
+        for c in string.lower():
+            x = ord(c)
+            if x > 122 or (x < 97 and x > 57) or x < 48:
+                return False
+        return True
 
     class userGuild(discord.Object):
 

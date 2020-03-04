@@ -1,4 +1,4 @@
-import discord, asyncio, ast, urllib, json
+import discord, asyncio, ast, urllib, requests, json
 from googletrans import Translator
 from smath import *
 
@@ -45,6 +45,11 @@ except KeyError:
         translate=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to use Papago Translate.")'),
     )
     print("WARNING: papago_id/papago_secret not found. Unable to use Papago Translate.")
+try:
+    rapidapi_key = auth["rapidapi_key"]
+except:
+    rapidapi_key = None
+    print("WARNING: rapidapi_key not found. Unable to search Urban Dictionary.")
 
 
 class Math:
@@ -178,3 +183,68 @@ class Translate:
                     if t == trans[-1] and i == count - 1:
                         raise
         return response + end
+
+
+class Urban:
+    is_command = True
+    time_consuming = True
+    header = {
+	"x-rapidapi-host": "mashape-community-urban-dictionary.p.rapidapi.com",
+	"x-rapidapi-key": rapidapi_key,
+    }
+
+    def __init__(self):
+        self.name = ["UrbanDictionary"]
+        self.min_level = 0
+        self.description = "Searches Urban Dictionary for an item."
+        self.usage = "<string> <verbose(?v)>"
+
+    async def __call__(self, argv, flags, **void):
+        url = (
+            "https://mashape-community-urban-dictionary.p.rapidapi.com/define?term="
+            + argv.replace(" ", "%20")
+        )
+        returns = [None]
+        doParallel(
+            funcSafe,
+            [requests.get, url],
+            returns,
+            {"headers": self.header}
+        )
+        while returns[0] is None:
+            await asyncio.sleep(0.4)
+        if type(returns[0]) is str:
+            raise eval(returns[0])
+        resp = returns[0][-1]
+        s = resp.content
+        resp.close()
+        try:
+            d = json.loads(s)
+        except:
+            d = eval(s, {}, {})
+        l = d["list"]
+        if not l:
+            raise LookupError("No results for " + uniStr(argv) + ".")
+        l.sort(
+            key=lambda e: e.get("thumbs_up", 0) - e.get("thumbs_down", 0),
+            reverse=True,
+        )
+        if "v" in flags:
+            output = (
+                "```ini\n" + uniStr(argv) + "\n"
+                + "\n".join(
+                    "[" + uniStr(i) + "] " + l[i].get(
+                        "definition",
+                        "",
+                    ).replace("\n", " ").replace("\r", "") for i in range(
+                        min(len(l), 1 + 2 * flags["v"])
+                    )
+                )
+                + "```"
+            )
+        else:
+            output = (
+                "```ini\n" + uniStr(argv) + "\n"
+                + l[0].get("definition", "") + "```"
+            )
+        return output

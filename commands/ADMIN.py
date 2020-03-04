@@ -429,7 +429,7 @@ class React:
         curr["reacts"][a] = args[1]
         update()
         return (
-            "```css\nAdded " + uniStr(a) + ": " + uniStr(args[1]) + " to the auto react list for "
+            "```css\nAdded " + uniStr(a) + " ==> " + uniStr(args[1]) + " to the auto react list for "
             + uniStr(guild.name) + ".```"
         )
 
@@ -610,9 +610,9 @@ class updateFollows:
                     curr[2] = u_id
                     #print(curr)
             try:
-                for r in following[g_id]["reacts"]:
-                    if r in words:
-                        await message.add_reaction(following[g_id]["reacts"][r])
+                for k in following[g_id]["reacts"]:
+                    if ((k in words) if self._vars.hasSymbol(k) else (k in message.content)):
+                        await message.add_reaction(following[g_id]["reacts"][k])
             except discord.Forbidden:
                 print(traceback.format_exc())
 
@@ -635,7 +635,7 @@ class updateRolegiver:
         _vars = self._vars
         currentSchedule = self.data.get(message.channel.id, {})
         for k in currentSchedule:
-            if k in text:
+            if ((k in text) if self._vars.hasSymbol(k) else (k in message.content)):
                 curr = currentSchedule[k]
                 role = curr["role"]
                 deleter = curr["deleter"]

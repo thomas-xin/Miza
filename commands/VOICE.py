@@ -826,8 +826,8 @@ class Queue:
             if auds.stats["shuffle"]:
                 added = shuffle(added)
             auds.queue.extend(added)
-            if not len(names):
-                raise EOFError("No results for " + str(argv) + ".")
+            if not names:
+                raise LookupError("No results for " + str(argv) + ".")
             if "v" in flags:
                 names = uniStr(hlist(subDict(i, "id") for i in added))
             elif len(names) == 1:
@@ -909,14 +909,14 @@ class Playlist:
         if len(pl) >= 128:
             raise OverflowError(
                 "Playlist size for " + uniStr(guild.name)
-                + " has reached the maximum of 128 items. "
+                + " has reached the maximum of 64 items. "
                 + "Please remove an item to add another."
             )
         output = [None]
         doParallel(ytdl.search, [argv, True], output)
         await channel.trigger_typing()
         while output[0] is None:
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.7)
         res = output[0]
         if type(res) is str:
             raise ConnectionError(res)
@@ -930,14 +930,15 @@ class Playlist:
                 "duration": e["duration"],
                 "id": e["id"],
             })
-        if len(names):
-            pl.sort(key=lambda x: x["name"].lower())
-            update()
-            return (
-                "```css\nAdded " + uniStr(names)
-                + " to the default playlist for "
-                + uniStr(guild.name) + ".```"
-            )
+        if not names:
+            raise LookupError("No results for " + str(argv) + ".")
+        pl.sort(key=lambda x: x["name"].lower())
+        update()
+        return (
+            "```css\nAdded " + uniStr(names)
+            + " to the default playlist for "
+            + uniStr(guild.name) + ".```"
+        )
         
 
 class Join:
@@ -1026,9 +1027,9 @@ class Skip:
         min_level = 1
         if "f" in flags and s_perm < 1:
             raise PermissionError(
-                "Insufficient permissions to force skip. Current permission level: "
-                + uniStr(s_perm) + ", required permission level: "
-                + uniStr(min_level) + "."
+                "Insufficient privileges to force skip"
+                + ". Required level: " + uniStr(req)
+                + ", Current level: " + uniStr(perm) + "."
             )
         if not argv:
             elems = [0]
@@ -1330,7 +1331,7 @@ class Volume:
             + " <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)>"
         )
 
-    async def __call__(self, client, channel, user, guild, _vars, flags, argv, message, **void):
+    async def __call__(self, client, channel, user, guild, _vars, flags, argv, message, perm, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if "d" in flags:
             op = None
@@ -1373,11 +1374,12 @@ class Volume:
             )
         if op == "settings":
             op = "volume"
-        s_perm = _vars.getPerms(user, guild)
-        if s_perm < 1:
+        req = 1
+        if s_perm < req:
             raise PermissionError(
-                "Insufficient permissions to change audio settings. Current permission level: "
-                + uniStr(s_perm) + ", required permission level: " + uniStr(1) + "."
+                "Insufficient privileges to modify audio settings for "
+                + uniStr(guild.name) + ". Required level: "
+                + uniStr(req) + ", Current level: " + uniStr(perm) + "."
             )
         if op is None:
             pos = auds.stats["position"]
