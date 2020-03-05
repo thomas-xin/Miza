@@ -948,7 +948,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             try:
                                 args = shlex.split(d.replace("\n", " ").replace("\r", "").replace("\t", " "))
                             except ValueError:
-                                args = d.split(" ")
+                                args = b.replace("\n", " ").replace("\r", "").replace("\t", " ").split(" ")
                         for a in range(len(args)):
                             args[a] = args[a].replace("", "'").replace("\0", '"')
                         if guild is None:

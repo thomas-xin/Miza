@@ -1835,7 +1835,7 @@ class updateQueues:
                     continue
                 if not cnt or getattr(auds, "dead", 0):
                     auds.timeout += 1
-                    if auds.timeout > 10:
+                    if auds.timeout > 10 or getattr(auds, "dead", 0):
                         try:
                             channel = auds.channel
                             self.audio.pop(guild.id)
