@@ -1305,19 +1305,20 @@ async def on_raw_message_edit(payload):
     try:
         c_id = payload.data.get("channel_id", 0)
         channel = await _vars.fetch_channel(c_id)
-        message = await _vars.fetch_message(payload.message_id, channel)
-        if message is None:
+        before = await _vars.fetch_message(payload.message_id, channel)
+        if before is None:
             raise LookupError
     except:
-        message = _vars.ghostMessage()
-        message.channel = await _vars.fetch_channel(c_id)
-        message.guild = channel.guild
-        message.id = payload.message_id
-    if message:
-        _vars.cache["messages"][message.id] = message
-        await handleMessage(message)
+        before = _vars.ghostMessage()
+        before.channel = await _vars.fetch_channel(c_id)
+        before.guild = channel.guild
+        before.id = payload.message_id
+    if before:
+        after = client.fetch_message(payload.message_id)
+        _vars.cache["messages"][payload.message_id] = after
+        await handleMessage(after)
         await _vars.handleUpdate(True)
-        await updateEdit(message, message)
+        await updateEdit(before, after)
 
 
 if __name__ == "__main__":
