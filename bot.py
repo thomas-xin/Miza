@@ -1314,7 +1314,7 @@ async def on_raw_message_edit(payload):
         before.guild = channel.guild
         before.id = payload.message_id
     if before:
-        after = before.channel.fetch_message(payload.message_id)
+        after = await before.channel.fetch_message(payload.message_id)
         _vars.cache["messages"][payload.message_id] = after
         await handleMessage(after)
         await _vars.handleUpdate(True)
