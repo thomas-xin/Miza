@@ -111,7 +111,7 @@ class Ban:
                     + ".\nRequired level: " + uniStr(t_perm + 1)
                     + ", Current level: " + uniStr(s_perm) + "."
                 )
-        if name == "Unban":
+        if name.lower() == "unban":
             tm = -1
             args = ["", ""]
         elif len(args) < 2:
