@@ -309,31 +309,6 @@ class Dog:
         asyncio.create_task(channel.send(embed=emb))
 
 
-class OwOify:
-    is_command = True
-
-    omap = {
-        "n": "ny",
-        "N": "NY",
-        "r": "w",
-        "R": "W",
-        "l": "w",
-        "L": "W",
-    }
-    otrans = "".maketrans(omap)
-
-    def __init__(self):
-        self.name = ["OwO"]
-        self.min_level = 0
-        self.description = "owo-ifies text."
-        self.usage = "<string>"
-
-    async def __call__(self, argv, **void):
-        if not argv:
-            raise IndexError("Input string is empty.")
-        return "```fix\n" + argv.translate(self.otrans) + "```"
-
-
 class updateImages:
     is_update = True
     name = "images"

@@ -22,13 +22,14 @@ class customAudio(discord.AudioSource):
         "position": 0,
     }
 
-    def __init__(self, channel, _vars):
+    def __init__(self, channel, vc, _vars):
         try:
             self.paused = False
             self.stats = dict(self.defaults)
             self.new()
             self.queue = hlist()
             self.channel = channel
+            self.vc = vc
             self.buffer = []
             self.feedback = None
             self.bassadj = None
@@ -43,7 +44,7 @@ class customAudio(discord.AudioSource):
             print(traceback.format_exc())
 
     def __str__(self):
-        classname = self.__class__.replace("'>", "")
+        classname = str(self.__class__).replace("'>", "")
         classname = classname[classname.index("'") + 1:]
         return (
             "<" + classname + " object at " + hex(id(self)).upper() + ">: {"
@@ -215,7 +216,8 @@ class customAudio(discord.AudioSource):
                 updateQueues.sendUpdateRequest(self, force=True)
                 raise EOFError
             self.stats["position"] = round(
-                self.stats["position"] + self.speed / 50 * (self.reverse * -2 + 1), 4
+                self.stats["position"] + self.speed / 50 * (self.reverse * -2 + 1),
+                4,
             )
             self.is_playing = True
         except:
@@ -435,8 +437,9 @@ class videoDownloader:
 
     def __init__(self):
         self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
-        self.lastsearch = 0
+        self.searched = {}
         self.requests = 0
+        self.lastclear = 0
 
     def extract(self, item, force):
         try:
@@ -453,7 +456,7 @@ class videoDownloader:
                                 raise ConnectionError(rescode)
                             continue
                         except:
-                            time.sleep(1)
+                            time.sleep(i + 1)
                     if force == "spotify":
                         time.sleep(frand(2))
                         it = '<meta property="music:duration" content="'
@@ -577,12 +580,13 @@ class videoDownloader:
         item = item.strip("< >\r\n\t")
         while self.requests > 4:
             time.sleep(0.1)
-        if time.time() - self.lastsearch > 86400:
-            self.lastsearch = time.time()
-            self.searched = {}
-        self.lastsearch = time.time()
         if item in self.searched:
             return self.searched[item]
+        if time.time() - self.lastclear > 3600 << 3:
+            self.searched.clear()
+            self.lastclear = time.time()
+        while len(self.searched) > 262144:
+            self.searched.pop(next(iter(self.searched)))
         try:
             self.requests += 1
             self.searched[item] = output = self.extract(item, force)
@@ -611,16 +615,14 @@ class videoDownloader:
         item = i["url"]
         while self.requests > 4:
             time.sleep(0.1)
-        if time.time() - self.lastsearch > 1800:
-            self.lastsearch = time.time()
-            self.searched = {}
-        self.lastsearch = time.time()
         if item in self.searched:
             it = self.searched[item][-1]
             i["name"] = it["name"]
             i["duration"] = it["duration"]
             i["url"] = it["url"]
             return True
+        while len(self.searched) > 262144:
+            self.searched.pop(next(iter(self.searched)))
         try:
             self.requests += 1
             data = self.downloader.extract_info(item, download=False, process=True)
@@ -677,7 +679,7 @@ class Queue:
     server_only = True
 
     def __init__(self):
-        self.name = ["Q", "Play", "Playing", "NP", "P"]
+        self.name = ["Q", "Play", "Playing", "P"]
         self.min_level = 0
         self.description = "Shows the music queue, or plays a song in voice."
         self.usage = "<link[]> <verbose(?v)> <hide(?h)>"
@@ -954,21 +956,38 @@ class Join:
 
     async def __call__(self, client, user, _vars, channel, guild, **void):
         voice = user.voice
-        vc = voice.channel
+        vc_ = voice.channel
+        joined = False
+        for vc in client.voice_clients:
+            if vc.guild.id == guild.id:
+                joined = True
+                break
+        if not joined:
+            connecting = _vars.updaters["playlists"].connecting
+            try:
+                connecting[guild.id] = True
+                vc = freeClass(is_connected = lambda: False)
+                while not vc.is_connected():
+                    vc = await vc_.connect(timeout=30, reconnect=False)
+                    for i in range(5):
+                        if vc.is_connected():
+                            break
+                        await asyncio.sleep(0.5)
+            except discord.ClientException:
+                pass
         if guild.id not in _vars.updaters["playlists"].audio:
             await channel.trigger_typing()
-            _vars.updaters["playlists"].audio[guild.id] = customAudio(channel, _vars)
+            _vars.updaters["playlists"].audio[guild.id] = customAudio(channel, vc, _vars)
         try:
-            joined = True
-            await vc.connect(timeout=30, reconnect=True)
-        except discord.ClientException:
+            joined = connecting.pop(guild.id)
+        except KeyError:
             joined = False
         for user in guild.members:
             if user.id == client.user.id:
                 asyncio.create_task(user.edit(mute=False,deafen=False))
         if joined:
             return (
-                "```css\n🎵 Successfully connected to " + uniStr(vc.name)
+                "```css\n🎵 Successfully connected to " + uniStr(vc_.name)
                 + " in " + uniStr(guild.name) + ". 🎵```", 1
             )
 
@@ -976,7 +995,6 @@ class Join:
 class Leave:
     is_command = True
     server_only = True
-    time_consuming = True
 
     def __init__(self):
         self.name = ["Quit", "DC", "Disconnect"]
@@ -985,22 +1003,10 @@ class Leave:
         self.usage = ""
 
     async def __call__(self, user, client, _vars, guild, **void):
-        error = None
         try:
-            _vars.updaters["playlists"].audio.pop(guild.id)
+            _vars.updaters["playlists"].audio[guild.id].dead = True
         except KeyError:
-            error = LookupError("Unable to find connected channel.")
-        found = False
-        for vclient in client.voice_clients:
-            if guild.id == vclient.channel.guild.id:
-                await vclient.disconnect(force=True)
-                return (
-                    "```css\n🎵 Successfully disconnected from " 
-                    + uniStr(guild.name) + ". 🎵```", 1
-                )
-        error = LookupError("Unable to find connected channel.")
-        if error is not None:
-            raise error
+            raise LookupError("Unable to find connected channel.")
 
 
 class Skip:
@@ -1422,6 +1428,29 @@ class Volume:
             )
 
 
+class Rotate:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = ["jump"]
+        self.min_level = 1
+        self.description = "Rotates the queue to the left by a certain amount of steps."
+        self.usage = "<position>"
+
+    async def __call__(self, argv, guild, channel, user, client, _vars, **void):
+        auds = await forceJoin(guild, channel, user, client, _vars)
+        if len(auds.queue) > 1:
+            amount = await _vars.evalMath(argv, guild.id)
+            auds.queue.rotate(amount)
+            auds.seek(inf)
+        return (
+            "```css\nSuccessfully rotated the queue "
+            + uniStr(amount) + " step"
+            + "s" * (amount != 1) + ".```"
+        )
+
+
 class Shuffle:
     is_command = True
     server_only = True
@@ -1494,7 +1523,7 @@ class Player:
     barsize = 24
 
     def __init__(self):
-        self.name = []
+        self.name = ["NP", "NowPlaying"]
         self.min_level = 0
         self.description = "Creates an auto-updating virtual audio player for the current server."
         self.usage = "<verbose(?v)> <controllable(?c)> <disable(?d)>"
@@ -1756,6 +1785,7 @@ class updateQueues:
     def __init__(self):
         self.audio = {}
         self.audiocache = {}
+        self.connecting = {}
         self.clearAudioCache()
 
     def sendUpdateRequest(self, *args, **void):
@@ -1798,7 +1828,7 @@ class updateQueues:
                 should_cache[s] = True
         for path in os.listdir("cache/"):
             found = False
-            if "mp3" in path:
+            if ".mp3" in path:
                 for i in should_cache:
                     if i in path:
                         found = True
@@ -1811,151 +1841,154 @@ class updateQueues:
 
     async def __call__(self, **void):
         while self.busy:
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.25)
         self.busy = True
+        _vars = self._vars
+        pl = self.data
+        client = _vars.client
         try:
-            _vars = self._vars
-            pl = self.data
-            client = _vars.client
             should_cache = {}
             for g in pl:
                 for i in pl[g]:
                     should_cache[i["id"]] = True
             for vc in client.voice_clients:
-                if not vc.is_connected():
-                    continue
-                channel = vc.channel
-                guild = channel.guild
-                try:
-                    auds = self.audio[guild.id]
-                    playing = auds.is_playing and vc.is_playing() or auds.is_loading
-                    membs = [m for m in channel.members if m.id != client.user.id]
-                    cnt = len(membs)
-                except KeyError:
-                    continue
-                if not cnt or getattr(auds, "dead", 0):
-                    auds.timeout += 1
-                    if auds.timeout > 10 or getattr(auds, "dead", 0):
-                        try:
-                            channel = auds.channel
-                            self.audio.pop(guild.id)
-                            msg = (
-                                "```css\n🎵 Successfully disconnected from "
-                                + uniStr(guild.name) + ". 🎵```"
-                            )
-                            sent = await channel.send(msg)
-                            await sent.add_reaction("❎")
-                        except KeyError:
-                            pass
+                if not vc.guild.id in self.connecting:
+                    if not vc.guild.id in self.audio:
                         await vc.disconnect(force=True)
-                else:
-                    auds.timeout = 0
-                    try:
-                        asyncio.create_task(auds.updatePlayer())
-                        try:
-                            q = auds.queue
-                        except NameError:
-                            continue
-                        asyncio.create_task(self.research(auds))
-                        dels = deque()
-                        i = 0
-                        for i in range(len(q)):
-                            if i >= len(q) or i > 10000:
-                                break
-                            e = q[i]
-                            e_id = e["id"]
-                            if not e_id:
-                                dels.append(i)
-                                continue
-                            if e_id in self.audiocache:
-                                e["duration"] = self.audiocache[e_id][0]
-                        if len(dels) > 1:
-                            q.delitems(dels)
-                        elif len(dels):
-                            q.pop(dels[0])
-                        if len(q):
-                            for i in range(2):
-                                if i < len(q):
-                                    e_id = q[i]["id"]
-                                    should_cache[e_id] = True
-                                    if not q[i].get("download", 0):
-                                        q[i]["download"] = 1
-                                        if e_id not in self.audiocache:
-                                            search = e_id + ".mp3"
-                                            found = False
-                                            for path in os.listdir("cache"):
-                                                if search in path:
-                                                    found = True
-                                            if not found:
-                                                durc = [q[i]["duration"]]
-                                                self.audiocache[e_id] = durc
-                                                doParallel(
-                                                    ytdl.downloadSingle,
-                                                    [q[i], durc],
-                                                    state=2
-                                                )
-                                            else:
-                                                q[i]["duration"] = ytdl.getDuration("cache/" + search)
-                            if not q[0].get("download", 0) > 1 and not playing:
-                                try:
-                                    path = "cache/" + q[0]["id"] + ".mp3"
-                                    f = open(path, "rb")
-                                    minl = 64
-                                    b = f.read(minl)
-                                    f.close()
-                                    if len(b) < minl:
-                                        raise FileNotFoundError
-                                    q[0]["download"] = 2
-                                    name = q[0]["name"]
-                                    added_by = q[0]["added by"]
-                                    auds = self.audio[guild.id]
-                                    auds.new(path)
-                                    if not vc.is_playing():
-                                        vc.play(auds, after=self.sendUpdateRequest)
-                                    if not auds.stats["quiet"]:
-                                        channel = auds.channel
-                                        sent = await channel.send(
-                                            "```css\n🎵 Now playing "
-                                            + uniStr(noHighlight(name))
-                                            + ", added by " + uniStr(added_by) + "! 🎵```"
-                                        )
-                                        await sent.add_reaction("❎")
-                                except FileNotFoundError:
-                                    pass
-                                auds.preparing = False
-                            elif not playing and auds.source is None:
-                                doParallel(auds.advance)
-                        if not len(q) and not auds.preparing:
-                            t = pl.get(guild.id, ())
-                            if len(t):
-                                d = None
-                                while d is None or d["id"] == auds.prev:
-                                    p = t[xrand(len(t))]
-                                    d = {
-                                        "name": p["name"],
-                                        "url": p["url"],
-                                        "duration": p["duration"],
-                                        "added by": client.user.name,
-                                        "u_id": client.user.id,
-                                        "id": p["id"],
-                                        "skips": (),
-                                    }
-                                    if len(t) <= 1:
-                                        break
-                                q.append(d)
-                    except KeyError as ex:
-                        print(traceback.format_exc())
-                l = list(self.audiocache)
-                for i in l:
-                    if not i in should_cache:
-                        path = "cache/" + i + ".mp3"
-                        try:
-                            os.remove(path)
-                            self.audiocache.pop(i)
-                        except PermissionError:
-                            pass
-                        except FileNotFoundError:
-                            self.audiocache.pop(i)
         except:
             print(traceback.format_exc())
+        for g in tuple(self.audio):
+            try:
+                auds = self.audio[g]
+                vc = auds.vc
+                channel = vc.channel
+                guild = channel.guild
+                if vc.is_connected() or vc.guild.id in self.connecting:
+                    playing = auds.is_playing and vc.is_playing() or auds.is_loading
+                else:
+                    auds.vc = vc = await channel.connect(timeout=30, reconnect=False)
+                    vc.play(auds, after=self.sendUpdateRequest)
+                    playing = auds.is_playing or auds.is_loading
+                cnt = sum(1 for m in channel.members if m.id != client.user.id)
+                dead = getattr(auds, "dead", 0)
+                if auds.timeout > 10 or dead:
+                    try:
+                        channel = auds.channel
+                        self.audio.pop(guild.id)
+                        msg = (
+                            "```css\n🎵 Successfully disconnected from "
+                            + uniStr(guild.name) + ". 🎵```"
+                        )
+                        sent = await channel.send(msg)
+                        await sent.add_reaction("❎")
+                    except KeyError:
+                        pass
+                    await vc.disconnect(force=True)
+                else:
+                    if cnt:
+                        auds.timeout = 0
+                    else:
+                        auds.timeout += 1
+                    q = auds.queue
+                    asyncio.create_task(auds.updatePlayer())
+                    asyncio.create_task(self.research(auds))
+                    dels = deque()
+                    for i in range(len(q)):
+                        if i >= len(q) or i > 8191:
+                            break
+                        e = q[i]
+                        e_id = e["id"]
+                        if not e_id:
+                            dels.append(i)
+                            continue
+                        if e_id in self.audiocache:
+                            e["duration"] = self.audiocache[e_id][-1]
+                    if len(dels) > 1:
+                        q.pops(dels)
+                    elif len(dels):
+                        q.pop(dels[0])
+                    if q:
+                        for i in range(2):
+                            if i < len(q):
+                                e_id = q[i]["id"]
+                                should_cache[e_id] = True
+                                if not q[i].get("download", 0):
+                                    q[i]["download"] = 1
+                                    search = e_id + ".mp3"
+                                    if search not in os.listdir("cache/"):
+                                        durc = [q[i]["duration"]]
+                                        self.audiocache[e_id] = durc
+                                        doParallel(
+                                            ytdl.downloadSingle,
+                                            [q[i], durc],
+                                            state=2,
+                                        )
+                                    else:
+                                        q[i]["duration"] = ytdl.getDuration("cache/" + search)
+                        if not q[0].get("download", 0) > 1 and not playing:
+                            try:
+                                path = "cache/" + q[0]["id"] + ".mp3"
+                                f = open(path, "rb")
+                                minl = 32
+                                b = f.read(minl)
+                                f.close()
+                                if len(b) < minl:
+                                    raise FileNotFoundError
+                                q[0]["download"] = 2
+                                name = q[0]["name"]
+                                added_by = q[0]["added by"]
+                                auds = self.audio[guild.id]
+                                auds.new(path)
+                                if not vc.is_playing():
+                                    vc.play(auds, after=self.sendUpdateRequest)
+                                if not auds.stats["quiet"]:
+                                    channel = auds.channel
+                                    sent = await channel.send(
+                                        "```css\n🎵 Now playing "
+                                        + uniStr(noHighlight(name))
+                                        + ", added by " + uniStr(added_by) + "! 🎵```"
+                                    )
+                                    await sent.add_reaction("❎")
+                            except FileNotFoundError:
+                                pass
+                            auds.preparing = False
+                        elif not playing and auds.source is None:
+                            doParallel(auds.advance)
+                    if not (q or auds.preparing):
+                        t = pl.get(guild.id, ())
+                        if t:
+                            d = None
+                            while d is None or d["id"] == auds.prev:
+                                p = random.choice(t)
+                                d = {
+                                    "name": p["name"],
+                                    "url": p["url"],
+                                    "duration": p["duration"],
+                                    "added by": client.user.name,
+                                    "u_id": client.user.id,
+                                    "id": p["id"],
+                                    "skips": (),
+                                }
+                                if len(t) <= 1:
+                                    break
+                            q.append(d)
+            except:
+                print(traceback.format_exc())
+        for path in os.listdir("cache/"):
+            found = False
+            if ".mp3" in path or ".part" in path:
+                for i in should_cache:
+                    if i in path:
+                        found = True
+                        break
+                if not found:
+                    try:
+                        os.remove("cache/" + path)
+                        for i in tuple(self.audiocache):
+                            if i in path:
+                                self.audiocache.pop(i)
+                    except (KeyError, PermissionError, FileNotFoundError):
+                        pass
+                    except Exception as ex:
+                        print(traceback.format_exc())
         self.busy = False

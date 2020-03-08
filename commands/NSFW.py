@@ -99,15 +99,15 @@ booruSites = list(pybooru.resources.SITE_LIST.keys())
 def pull_booru(argv, data, thr, delay=5):
     client = pybooru.Moebooru(random.choice(tuple(booruSites)))
     try:
-        posts = client.post_list(tags=argv, random=True, limit=10)
+        posts = client.post_list(tags=argv, random=True, limit=16)
         if not posts:
             raise EOFError
         choice = xrand(len(posts))
-        url = posts[0]['file_url']
+        url = posts[0]["file_url"]
         data[thr] = [url, 1, choice + 1]
     except:
-        print(traceback.format_exc())
-        return 0    
+        data[thr] = 0
+    print(data)
 
 
 loop = asyncio.new_event_loop()

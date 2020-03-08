@@ -29,7 +29,6 @@ class main_data:
         "messages": {},
         "deleted": {},
     }
-    cachelim = 262144
     deleted_user = 456226577798135808
     _globals = globals()
     python = ("python3", "python")[os.name == "nt"]
@@ -133,8 +132,10 @@ class main_data:
             raise TypeError("Invalid user identifier: " + uniStr(u_id))
         if u_id == self.deleted_user:
             user = self.ghostUser()
+            user.name = "Deleted User"
             user.id = u_id
             user.avatar_url = "https://cdn.discordapp.com/embed/avatars/0.png"
+            user.create_time = discord.utils.snowflake_time(u_id)
         else:
             try:
                 user = client.get_user(u_id)
@@ -211,6 +212,13 @@ class main_data:
             raise TypeError("Invalid message identifier: " + uniStr(m_id))
         if m_id in self.cache["messages"]:
             return self.cache["messages"][m_id]
+        if channel is None:
+            raise LookupError("Message data not found.")
+        try:
+            int(channel)
+            channel = await self.fetch_channel(channel)
+        except TypeError:
+            pass
         message = await channel.fetch_message(m_id)
         if message is not None:
             self.cache["messages"][m_id] = message
@@ -221,17 +229,36 @@ class main_data:
         try:
             int(user)
             user = await self.fetch_user(user)
-        except:
+        except TypeError:
             pass
         channel = user.dm_channel
         if channel is None:
             channel = await user.create_dm()
         return channel
 
+    def cacheMessage(self, message):
+        self.cache["messages"][message.id] = message
+        self.limitCache("messages")
+
+    def deleteMessage(self, message):
+        try:
+            self.cache["messages"].pop(message.id)
+        except KeyError:
+            pass
+
+    def limitCache(self, cache=None):
+        if cache is not None:
+            caches = [self.cache[cache]]
+        else:
+            caches = self.cache.values()
+        for c in caches:
+            while len(c) > 1048576:
+                c.pop(next(iter(c)))
+
     def getPrefix(self, guild):
         try:
             g_id = guild.id
-        except:
+        except AttributeError:
             try:
                 g_id = int(guild)
             except TypeError:
@@ -271,16 +298,6 @@ class main_data:
         g_perm = perms.setdefault(guild.id, {})
         g_perm.update({u_id: value})
         self.updaters["perms"].update()
-
-    def limitCache(self, cache=None):
-        if cache is not None:
-            cache = [self.cache[cache]]
-        else:
-            cache = self.cache.values()
-        for c in cache:
-            if len(c) > self.cachelim:
-                i = iter(c)
-                c.pop(next(i))
 
     def isDeleted(self, message):
         try:
@@ -364,6 +381,7 @@ class main_data:
                         obj = var()
                         obj.busy = False
                         obj.checking = False
+                        obj._globals = vd
                         self.updaters[obj.name] = obj
                         updates.append(obj)
                         #print("Successfully loaded updater " + obj.__name__ + ".")
@@ -552,6 +570,15 @@ class main_data:
         stats[1] *= psutil.virtual_memory().total / 100
         self.currState = stats
         return stats
+
+    async def sendFile(self, channel, filemsg, file, filename):
+        await channel.send(filemsg, file=file)
+        try:
+            os.remove(filename)
+        except FileNotFoundError:
+            pass
+        except:
+            print(traceback.format_exc())
 
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:
@@ -898,42 +925,43 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             if argv:
                                 while argv[0] == " ":
                                     argv = argv[1:]
-                            if "?" in argv:
-                                for c in range(26):
-                                    char = chr(c + 97)
-                                    flag = "?" + char
-                                    for r in (flag, flag.upper()):
-                                        while len(argv) >= 4 and r in argv:
-                                            found = False
-                                            i = argv.index(r)
-                                            if i == 0 or argv[i - 1] == " " or argv[i - 2] == "?":
-                                                try:
-                                                    if argv[i + 2] == " " or argv[i + 2] == "?":
-                                                        argv = argv[:i] + argv[i + 2:]
+                            for q in "?-":
+                                if q in argv:
+                                    for c in range(26):
+                                        char = chr(c + 97)
+                                        flag = q + char
+                                        for r in (flag, flag.upper()):
+                                            while len(argv) >= 4 and r in argv:
+                                                found = False
+                                                i = argv.index(r)
+                                                if i == 0 or argv[i - 1] == " " or argv[i - 2] == q:
+                                                    try:
+                                                        if argv[i + 2] == " " or argv[i + 2] == q:
+                                                            argv = argv[:i] + argv[i + 2:]
+                                                            addDict(flags, {char: 1})
+                                                            found = True
+                                                    except (IndexError, KeyError):
+                                                        pass
+                                                if not found:
+                                                    break
+                                if q in argv:
+                                    for c in range(26):
+                                        char = chr(c + 97)
+                                        flag = q + char
+                                        for r in (flag, flag.upper()):
+                                            while len(argv) >= 2 and r in argv:
+                                                found = False
+                                                for check in (r + " ", " " + r):
+                                                    if check in argv:
+                                                        argv = argv.replace(check, "")
                                                         addDict(flags, {char: 1})
                                                         found = True
-                                                except (IndexError, KeyError):
-                                                    pass
-                                            if not found:
-                                                break
-                            if "?" in argv:
-                                for c in range(26):
-                                    char = chr(c + 97)
-                                    flag = "?" + char
-                                    for r in (flag, flag.upper()):
-                                        while len(argv) >= 2 and r in argv:
-                                            found = False
-                                            for check in (r + " ", " " + r):
-                                                if check in argv:
-                                                    argv = argv.replace(check, "")
+                                                if argv == r:
+                                                    argv = ""
                                                     addDict(flags, {char: 1})
                                                     found = True
-                                            if argv == r:
-                                                argv = ""
-                                                addDict(flags, {char: 1})
-                                                found = True
-                                            if not found:
-                                                break
+                                                if not found:
+                                                    break
                         if argv:
                             while argv[0] == " ":
                                 argv = argv[1:]
@@ -1016,7 +1044,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                         f = discord.File(fn)
                                         print("Created file " + fn)
                                         asyncio.create_task(
-                                            channel.send(filemsg, file=f)
+                                            _vars.sendFile(channel, filemsg, f, fn),
                                         )
                                     else:
                                         raise OverflowError("Response too long for file upload.")
@@ -1189,7 +1217,7 @@ async def handleMessage(message, edit=True):
 
 @client.event
 async def on_message(message):
-    _vars.cache["messages"][message.id] = message
+    _vars.cacheMessage(message)
     guild = message.guild
     if guild:
         for u in _vars.updaters.values():
@@ -1233,6 +1261,7 @@ async def on_raw_message_delete(payload):
                     await f(message=message)
                 except:
                     print(traceback.format_exc())
+    _vars.deleteMessage(message)
 
 
 @client.event
@@ -1268,6 +1297,7 @@ async def on_raw_bulk_message_delete(payload):
                         await f(message=message, bulk=True)
                     except:
                         print(traceback.format_exc())
+        _vars.deleteMessage(message)
 
 
 async def updateEdit(before, after):
@@ -1291,9 +1321,8 @@ async def updateEdit(before, after):
 @client.event
 async def on_message_edit(before, after):
     if before.content != after.content:
-        message = after
-        _vars.cache["messages"][message.id] = message
-        await handleMessage(message)
+        _vars.cacheMessage(after)
+        await handleMessage(after)
         await _vars.handleUpdate(True)
         await updateEdit(before, after)
 
@@ -1315,7 +1344,7 @@ async def on_raw_message_edit(payload):
         before.id = payload.message_id
     if before:
         after = await before.channel.fetch_message(payload.message_id)
-        _vars.cache["messages"][payload.message_id] = after
+        _vars.cacheMessage(after)
         await handleMessage(after)
         await _vars.handleUpdate(True)
         await updateEdit(before, after)

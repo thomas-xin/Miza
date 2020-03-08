@@ -500,7 +500,7 @@ class updateLogs:
                 emb = discord.Embed(colour=self._vars.randColour())
                 emb.set_author(name=name_id, icon_url=url, url=url)
                 emb.description = (
-                    "Message edited in <#"
+                    "**Message edited in** <#"
                     + str(before.channel.id) + ">:"
                 )
                 emb.add_field(name="Before", value=self._vars.strMessage(before))
@@ -567,7 +567,7 @@ class updateLogs:
             emb = discord.Embed(colour=self._vars.randColour())
             emb.set_author(name=name_id, icon_url=url, url=url)
             emb.description = (
-                init + " deleted message from <#"
+                init + " **deleted message from** <#"
                 + str(message.channel.id) + ">:\n"
             )
             emb.description += self._vars.strMessage(message, limit=2048 - len(emb.description))

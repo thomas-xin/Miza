@@ -432,13 +432,16 @@ class Loop:
         if func:
             while func[0] == " ":
                 func = func[1:]
-        for n in self.name:
-            if func.startswith("~" + n):
-                if isValid(perm):
+        if isValid(perm):
+            for n in self.name:
+                if (_vars.getPrefix(guild) + n).upper() in func.replace(" ", "").upper():
                     raise PermissionError("Insufficient priviliges to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
         if not "h" in flags:
-            await channel.send("```css\nLooping [" + func + "] " + uniStr(iters) + " times...```")
+            await channel.send(
+                "```css\nLooping [" + func + "] " + uniStr(iters)
+                + " time" + "s" * (iters != 1) + "...```"
+            )
         for i in range(iters):
             loop = i < iters - 1
             asyncio.create_task(callback(
@@ -588,7 +591,7 @@ class Info:
             try:
                 msgs = await _vars.updaters["counts"].getUserMessages(u, guild)
                 avgs = await _vars.updaters["counts"].getUserAverage(u, guild)
-                if joined and guild.owner.id != client.user.id:
+                if guild.owner.id != client.user.id:
                     us = await _vars.updaters["counts"].getGuildMessages(guild)
                     if type(us) is str:
                         pos = us
@@ -599,10 +602,13 @@ class Info:
                             reverse=True,
                         )
                         try:
-                            pos = ul.index(u.id)
+                            i = ul.index(u.id)
+                            while i >= 1 and us[ul[i - 1]] == us[ul[i]]:
+                                i -= 1
+                            pos = i + 1
                         except ValueError:
-                            pos = len(ul)
-                        pos += 1
+                            if joined:
+                                pos = len(ul) + 1
             except LookupError:
                 pass
         if is_self and _vars.website is not None:
@@ -833,6 +839,10 @@ class updateMessageCount:
     def getMessageLength(self, message):
         return len(message.system_content) + sum(len(e) for e in message.embeds)
 
+    def startCalculate(self, guild):
+        self.data[guild.id] = {"counts": {}, "totals": {}}
+        asyncio.create_task(self.getUserMessageCount(guild))
+
     async def getUserMessages(self, user, guild):
         if self.scanned == -1:
             c_id = self._vars.client.user.id
@@ -847,12 +857,13 @@ class updateMessageCount:
                 d = self.data[guild.id]
                 if type(d) is str:
                     return d
-                d = d["counts"]
+                elif 0 not in d:
+                    return "Calculating..."
+                c = d["counts"]
                 if user is None:
-                    return sum(d.values())
-                return d.get(user.id, 0)
-            self.data[guild.id] = "Calculating..."
-            asyncio.create_task(self.getUserMessageCount(guild))
+                    return sum(c.values())
+                return c.get(user.id, 0)
+            self.startCalculate(guild)
         return "Calculating..."
 
     async def getUserAverage(self, user, guild):
@@ -870,6 +881,8 @@ class updateMessageCount:
                 d = self.data[guild.id]
                 if type(d) is str:
                     return d
+                elif 0 not in d:
+                    return "Calculating..."
                 t = d["totals"]
                 c = d["counts"]
                 if user is None:
@@ -891,7 +904,7 @@ class updateMessageCount:
                     return self.data[guild.id]["counts"]
                 except:
                     return self.data[guild.id]
-            self.data[guild.id] = "Calculating..."
+            self.startCalculate(guild)
             asyncio.create_task(self.getUserMessageCount(guild))
         return "Calculating..."
 
@@ -943,7 +956,10 @@ class updateMessageCount:
         while [None] in histories:
             await asyncio.sleep(2)
         print("Counting...")
+        mmax = 65536 / len(histories)
+        caches = hlist()
         for messages in histories:
+            temp = hlist()
             i = 1
             for message in messages[0]:
                 u = message.author.id
@@ -956,10 +972,17 @@ class updateMessageCount:
                     avgs[u] = length
                 if not i & 8191:
                     await asyncio.sleep(0.5)
-                if random.randint(0, self._vars.cachelim) > len(self._vars.cache["messages"]):
-                    self._vars.cache["messages"][message.id] = message
+                temp.append(message)
+                while len(temp) > mmax:
+                    temp.popleft()
                 i += 1
-        self.data[guild.id] = {"counts": data, "totals": avgs}
+            caches.append(temp)
+            while sum(len(temp) for temp in caches) > 32768:
+                caches.popleft()
+        addDict(self.data[guild.id], {"counts": data, "totals": avgs, 0: True})
+        for temp in caches:
+            for message in temp:
+                self._vars.cacheMessage(message)
         print(guild)
         print(self.data[guild.id])
 
@@ -976,8 +999,7 @@ class updateMessageCount:
         for guild in sorted(guilds, key=lambda g: g.member_count, reverse=True):
             oneyear = datetime.datetime.utcnow() - guild.created_at < year
             if guild.member_count < 512 or oneyear:
-                self.data[guild.id] = "Calculating..."
-                asyncio.create_task(self.getUserMessageCount(guild))
+                self.startCalculate(guild)
             if not i & 63:
                 await asyncio.sleep(20)
             i += 1
@@ -996,7 +1018,7 @@ class updateMessageCount:
                 d["totals"][user.id] = total
                 d["counts"][user.id] = count
             else:
-                asyncio.create_task(self.getUserMessageCount(guild))
+                self.startCalculate(guild)
 
     async def _edit_(self, before, after, **void):
         if hasattr(before, "ghost"):
@@ -1015,7 +1037,7 @@ class updateMessageCount:
                 )
                 d["totals"][user.id] = total
             else:
-                asyncio.create_task(self.getUserMessageCount(guild))
+                self.startCalculate(guild)
 
     async def _delete_(self, message, **void):
         if self.scanned == -1:
@@ -1030,7 +1052,7 @@ class updateMessageCount:
                 d["totals"][user.id] = total
                 d["counts"][user.id] = count
             else:
-                asyncio.create_task(self.getUserMessageCount(guild))
+                self.startCalculate(guild)
 
 
 class updatePrefix:

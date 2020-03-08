@@ -52,6 +52,67 @@ except:
     print("WARNING: rapidapi_key not found. Unable to search Urban Dictionary.")
 
 
+def getTranslate(translator, string, dest, source):
+    try:
+        resp = translator.translate(string, dest, source)
+        return resp
+    except Exception as ex:
+        print(traceback.format_exc())
+        return ex
+
+
+class Translate:
+    is_command = True
+    time_consuming = True
+
+    def __init__(self):
+        self.name = ["TR"]
+        self.min_level = 0
+        self.description = "Translates a string into another language."
+        self.usage = "<0:language> <1:string> <verbose(?v)> <google(?g)>"
+
+    async def __call__(self, args, flags, user, **void):
+        dest = args[0]
+        string = " ".join(args[1:])
+        detected = translators["Google Translate"].detect(string)
+        source = detected.lang
+        trans = ["Papago", "Google Translate"]
+        if "g" in flags:
+            trans = trans[::-1]
+        if "v" in flags:
+            count = 2
+            end = "\nDetected language: **" + str(source) + "**"
+        else:
+            count = 1
+            end = ""
+        response = "**" + user.name + "**:"
+        print(string, dest, source)
+        for i in range(count):
+            for t in trans:
+                try:
+                    dest = dest[:2] + dest[2:].upper()
+                    returns = [None]
+                    doParallel(getTranslate, [translators[t], string, dest, source], returns)
+                    while returns[0] is None:
+                        await asyncio.sleep(0.5)
+                    output = returns[0]
+                    ex = issubclass(output.__class__, Exception)
+                    try:
+                        ex = issubclass(output, Exception)
+                    except TypeError:
+                        pass
+                    if ex:
+                        raise output
+                    output = output.text
+                    response += "\n" + output + "  `" + t + "`"
+                    source, dest = dest, source
+                    break
+                except:
+                    if t == trans[-1] and i == count - 1:
+                        raise
+        return response + end    
+
+
 class Math:
     is_command = True
     time_consuming = True
@@ -124,65 +185,28 @@ class UniFmt:
         return "```fix\n" + uniStr(" ".join(args[1:]), i) + "```"
 
 
-def getTranslate(translator, string, dest, source):
-    try:
-        resp = translator.translate(string, dest, source)
-        return resp
-    except Exception as ex:
-        print(traceback.format_exc())
-        return ex
-
-
-class Translate:
+class OwOify:
     is_command = True
-    time_consuming = True
+    omap = {
+        "n": "ny",
+        "N": "NY",
+        "r": "w",
+        "R": "W",
+        "l": "w",
+        "L": "W",
+    }
+    otrans = "".maketrans(omap)
 
     def __init__(self):
-        self.name = ["TR"]
+        self.name = ["OwO"]
         self.min_level = 0
-        self.description = "Translates a string into another language."
-        self.usage = "<0:language> <1:string> <verbose(?v)> <google(?g)>"
+        self.description = "owo-ifies text."
+        self.usage = "<string>"
 
-    async def __call__(self, args, flags, user, **void):
-        dest = args[0]
-        string = " ".join(args[1:])
-        detected = translators["Google Translate"].detect(string)
-        source = detected.lang
-        trans = ["Papago", "Google Translate"]
-        if "g" in flags:
-            trans = trans[::-1]
-        if "v" in flags:
-            count = 2
-            end = "\nDetected language: **" + str(source) + "**"
-        else:
-            count = 1
-            end = ""
-        response = "**" + user.name + "**:"
-        print(string, dest, source)
-        for i in range(count):
-            for t in trans:
-                try:
-                    dest = dest[:2] + dest[2:].upper()
-                    returns = [None]
-                    doParallel(getTranslate, [translators[t], string, dest, source], returns)
-                    while returns[0] is None:
-                        await asyncio.sleep(0.5)
-                    output = returns[0]
-                    ex = issubclass(output.__class__, Exception)
-                    try:
-                        ex = issubclass(output, Exception)
-                    except TypeError:
-                        pass
-                    if ex:
-                        raise output
-                    output = output.text
-                    response += "\n" + output + "  `" + t + "`"
-                    source, dest = dest, source
-                    break
-                except:
-                    if t == trans[-1] and i == count - 1:
-                        raise
-        return response + end
+    async def __call__(self, argv, **void):
+        if not argv:
+            raise IndexError("Input string is empty.")
+        return "```fix\n" + argv.translate(self.otrans) + "```"
 
 
 class UrbanDictionary:
@@ -233,7 +257,7 @@ class UrbanDictionary:
             output = (
                 "```ini\n" + uniStr(argv) + "\n"
                 + "\n".join(
-                    "[" + uniStr(i) + "] " + l[i].get(
+                    "[" + uniStr(i + 1) + "] " + l[i].get(
                         "definition",
                         "",
                     ).replace("\n", " ").replace("\r", "") for i in range(

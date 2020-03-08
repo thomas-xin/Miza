@@ -474,7 +474,14 @@ def addDict(a, b, replace=True):
     else:
         r = dict(a)
     for k in b:
-        r[k] = b[k] + a.get(k, 0)
+        temp = a.get(k, None)
+        if temp is None:
+            r[k] = b[k]
+            continue
+        if type(temp) is dict or type(b[k]) is dict:
+            r[k] = addDict(b[k], temp, replace)
+            continue
+        r[k] = b[k] + temp
     return r
 
 def subDict(d, key):
