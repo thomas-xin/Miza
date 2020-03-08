@@ -299,8 +299,6 @@ class Restart:
         if name.lower() == "shutdown":
             if perm is not nan:
                 raise PermissionError("Insufficient priviliges to request shutdown.")
-            f = open(_vars.shutdown, "wb")
-            f.close()
             await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
@@ -337,6 +335,9 @@ class Restart:
             await client.close()
         except:
             del client
+        if name.lower() == "shutdown":
+            f = open(_vars.shutdown, "wb")
+            f.close()
         del _vars
         sys.exit()
 

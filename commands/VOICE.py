@@ -252,7 +252,9 @@ class customAudio(discord.AudioSource):
                 array = numpy.random.rand(self.length) * 65536 - 32768
             elif volume != 1 or chorus:
                 try:
-                    array *= volume * 2 * (bool(chorus) + 1)
+                    if chorus:
+                        volume *= 2
+                    array *= volume * (bool(chorus) + 1)
                 except:
                     array = numpy.random.rand(self.length) * 65536 - 32768
             left, right = array[::2], array[1::2]
@@ -1864,11 +1866,12 @@ class updateQueues:
                 channel = vc.channel
                 guild = channel.guild
                 if vc.is_connected() or vc.guild.id in self.connecting:
-                    playing = auds.is_playing and vc.is_playing() or auds.is_loading
+                    playing = auds.is_playing or auds.is_loading
                 else:
                     auds.vc = vc = await channel.connect(timeout=30, reconnect=False)
-                    vc.play(auds, after=self.sendUpdateRequest)
                     playing = auds.is_playing or auds.is_loading
+                if not vc.is_playing():
+                    vc.play(auds, after=self.sendUpdateRequest)
                 cnt = sum(1 for m in channel.members if m.id != client.user.id)
                 dead = getattr(auds, "dead", 0)
                 if auds.timeout > 10 or dead:
@@ -1939,8 +1942,6 @@ class updateQueues:
                                 added_by = q[0]["added by"]
                                 auds = self.audio[guild.id]
                                 auds.new(path)
-                                if not vc.is_playing():
-                                    vc.play(auds, after=self.sendUpdateRequest)
                                 if not auds.stats["quiet"]:
                                     channel = auds.channel
                                     sent = await channel.send(
