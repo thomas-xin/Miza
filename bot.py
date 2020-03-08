@@ -1,10 +1,11 @@
 import discord, os, sys, datetime, json, websockets
+from dateutil import parser as tparser
 from smath import *
 
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
 
-client = discord.AutoShardedClient(
+client = discord.Client(
     max_messages=4096,
     heartbeat_timeout=30,
 )
@@ -508,6 +509,7 @@ class main_data:
     ctrans = "".maketrans(cmap)
 
     async def evalMath(self, f, guild):
+        f = f.strip(" ")
         try:
             if f in ("t", "T", "true", "TRUE"):
                 r = [True]
@@ -520,6 +522,7 @@ class main_data:
         return roundMin(float(r[0]))
 
     async def solveMath(self, f, guild, prec, r):
+        f = f.strip(" ")
         try:
             g_id = guild.id
         except AttributeError:
@@ -544,6 +547,58 @@ class main_data:
         if type(resp) is str:
             raise eval(resp)
         return resp
+
+    timeChecks = {
+        "galactic year": ("gy", "galactic year", "galactic years"),
+        "millenium": ("ml", "millenium", "millenia"),
+        "century": ("c", "century", "centuries"),
+        "decade": ("dc", "decade", "decades"),
+        "year": ("y", "year", "years"),
+        "month": ("mo", "mth", "month", "mos", "mths", "months"),
+        "week": ("w", "wk", "week", "wks", "weeks"),
+        "day": ("d", "day", "days"),
+        "hour": ("h", "hr", "hour", "hrs", "hours"),
+        "minute": ("m", "min", "minute", "mins", "minutes"),
+        "second": ("s", "sec", "second", "secs", "seconds"),
+    }
+    alphabet = "abcdefghijklmnopqrstuvwxyz"
+
+    async def evalTime(self, f, guild):
+        t = 0
+        if f:
+            try:
+                if ":" in f:
+                    data = f.split(":")
+                    mult = 1
+                    while len(data):
+                        t += await self.evalMath(data[-1], guild.id) * mult
+                        data = data[:-1]
+                        if mult <= 60:
+                            mult *= 60
+                        elif mult <= 3600:
+                            mult *= 24
+                        elif len(data):
+                            raise TypeError("Too many time arguments.")
+                else:
+                    f = f.lower()
+                    for tc in self.timeChecks:
+                        for check in reversed(self.timeChecks[tc]):
+                            if check in f:
+                                i = f.index(check)
+                                isin = i + len(check) < len(f) and f[i + len(check)] in self.alphabet
+                                if not i or f[i - 1] in self.alphabet or isin:
+                                    continue
+                                n = await self.evalMath(f[:i], guild.id)
+                                s = TIMEUNITS[tc]
+                                if type(s) is list:
+                                    s = s[0]
+                                t += s * n
+                                f = f[i + len(check):]
+                    if f.strip(" "):
+                        t += await self.evalMath(f, guild.id)
+            except:
+                t = tparser.parse(f).timestamp() - tparser.parse("0s").timestamp()
+        return t
 
     def getActive(self):
         procs = 2 + sum(1 for c in self.proc.children(True))

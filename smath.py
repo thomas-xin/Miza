@@ -1264,7 +1264,7 @@ def htmlDecode(s):
     return s.replace("&quot;", '"').replace("&apos;", "'")
 
 
-__units = {
+TIMEUNITS = {
     "galactic year": 7157540528801820.28133333333333,
     "millenium": [31556925216., "millenia"],
     "century": [3155692521.6, "centuries"],
@@ -1285,9 +1285,9 @@ def timeConv(s):
     r = s < 0
     s = abs(s)
     taken = []
-    for i in __units:
+    for i in TIMEUNITS:
         a = None
-        t = m = __units[i]
+        t = m = TIMEUNITS[i]
         if type(t) is list:
             t = t[0]
         if type(t) is int:
@@ -1338,7 +1338,7 @@ def noHighlight(s):
     s = s.replace("@", "＠")
     return s
 
-__fmts = [
+UNIFMTS = [
     "𝟎𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙",
     "𝟢𝟣𝟤𝟥𝟦𝟧𝟨𝟩𝟪𝟫𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩",
     "𝟢𝟣𝟤𝟥𝟦𝟧𝟨𝟩𝟪𝟫𝒶𝒷𝒸𝒹𝑒𝒻𝑔𝒽𝒾𝒿𝓀𝓁𝓂𝓃𝑜𝓅𝓆𝓇𝓈𝓉𝓊𝓋𝓌𝓍𝓎𝓏𝒜𝐵𝒞𝒟𝐸𝐹𝒢𝐻𝐼𝒥𝒦𝐿𝑀𝒩𝒪𝒫𝒬𝑅𝒮𝒯𝒰𝒱𝒲𝒳𝒴𝒵",
@@ -1356,14 +1356,14 @@ __fmts = [
     "0123456789ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖqʳˢᵗᵘᵛʷˣʸᶻ🇦🇧🇨🇩🇪🇫🇬🇭🇮🇯🇰🇱🇲🇳🇴🇵🇶🇷🇸🇹🇺🇻🇼🇽🇾🇿",
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
 ]
-__map = {__fmts[k][i]: __fmts[-1][i] for k in range(len(__fmts) - 1) for i in range(len(__fmts[k]))}
+__map = {UNIFMTS[k][i]: UNIFMTS[-1][i] for k in range(len(UNIFMTS) - 1) for i in range(len(UNIFMTS[k]))}
 __trans = "".maketrans(__map)
 
 def uniStr(s, fmt=0):
     if type(s) is not str:
         s = str(s)
-    for i in range(len(__fmts[-1])):
-        s = s.replace(__fmts[-1][i], __fmts[fmt][i])
+    for i in range(len(UNIFMTS[-1])):
+        s = s.replace(UNIFMTS[-1][i], UNIFMTS[fmt][i])
     return s
 
 def reconstitute(s):

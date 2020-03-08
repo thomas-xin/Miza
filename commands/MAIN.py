@@ -666,13 +666,17 @@ class Status:
     async def __call__(self, flags, client, _vars, **void):
         active = _vars.getActive()
         latency = sec2Time(client.latency)
+        try:
+            shards = len(client.latencies)
+        except AttributeError:
+            shards = 1
         size = _vars.codeSize
         stats = _vars.currState
         return (
             "```css"
             + "\nActive users: " + uniStr(len(client.users))
             + ", Active servers: " + uniStr(_vars.guilds)
-            + ", Active shards: " + uniStr(len(client.latencies))
+            + ", Active shards: " + uniStr(shards)
             
             + ".\nActive processes: " + uniStr(active[0])
             + ", Active threads: " + uniStr(active[1])

@@ -964,8 +964,8 @@ class Join:
             if vc.guild.id == guild.id:
                 joined = True
                 break
+        connecting = _vars.updaters["playlists"].connecting
         if not joined:
-            connecting = _vars.updaters["playlists"].connecting
             try:
                 connecting[guild.id] = True
                 vc = freeClass(is_connected = lambda: False)
@@ -1202,19 +1202,7 @@ class Seek:
 
     async def __call__(self, argv, _vars, guild, client, user, channel, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        pos = 0
-        if argv:
-            data = argv.split(":")
-            mult = 1
-            while len(data):
-                pos += await _vars.evalMath(data[-1], guild.id) * mult
-                data = data[:-1]
-                if mult <= 60:
-                    mult *= 60
-                elif mult <= 3600:
-                    mult *= 24
-                elif len(data):
-                    raise ValueError("Too many time arguments.")
+        pos = await _vars.evalTime(argv, guild)
         pos = auds.seek(pos)
         if auds.player is not None:
             auds.player["time"] = 1
@@ -1317,7 +1305,7 @@ class Dump:
             auds.stats.update(d["stats"])
             if not "h" in flags:
                 return "```css\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"
-        if len(auds.queue) > 1000:
+        if len(auds.queue) > 1024:
             doParallel(auds.queue.extend, [q])
         else:
             auds.queue.extend(q)
@@ -1326,25 +1314,35 @@ class Dump:
             return "```css\nSuccessfully appended dump to queue for " + uniStr(guild.name) + ".```"
             
 
-class Volume:
+class AudioSettings:
     is_command = True
     server_only = True
-
+    other_settings = {
+        "V": "volume",
+        "Vol": "volume",
+        "Volume": "volume",
+        "Speed": "speed",
+        "Pitch": "pitch",
+        "Bassboost": "bassboost",
+        "Reverb": "reverb",
+        "Chorus": "chorus",
+        "LoopQueue": "loop",
+        "ShuffleQueue": "shuffle",
+        "Quiet": "quiet",
+    }
     def __init__(self):
-        self.name = ["Vol", "Audio", "V", "Opt", "Set"]
+        self.name = ["Audio"] + list(self.other_settings)
         self.min_level = 0
         self.description = "Changes the current audio settings for this server."
         self.usage = (
-            "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <bassboost(?b)> <reverb(?r)> <chorus(?c)>"
+            "<value[]> <volume()> <speed(?s)> <pitch(?p)> <bassboost(?b)> <reverb(?r)> <chorus(?c)>"
             + " <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)>"
         )
 
-    async def __call__(self, client, channel, user, guild, _vars, flags, argv, message, perm, **void):
+    async def __call__(self, client, channel, user, guild, _vars, flags, argv, name, message, perm, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if "d" in flags:
             op = None
-        elif "v" in flags:
-            op = "volume"
         elif "s" in flags:
             op = "speed"
         elif "p" in flags:
@@ -1361,6 +1359,8 @@ class Volume:
             op = "shuffle"
         elif "q" in flags:
             op = "quiet"
+        elif name in self.other_settings:
+            op = self.other_settings[name]
         else:
             op = "settings"
         if not argv and op is not None:
@@ -1875,6 +1875,7 @@ class updateQueues:
                 cnt = sum(1 for m in channel.members if m.id != client.user.id)
                 dead = getattr(auds, "dead", 0)
                 if auds.timeout > 10 or dead:
+                    await vc.disconnect(force=True)
                     try:
                         channel = auds.channel
                         self.audio.pop(guild.id)
@@ -1886,7 +1887,6 @@ class updateQueues:
                         await sent.add_reaction("❎")
                     except KeyError:
                         pass
-                    await vc.disconnect(force=True)
                 else:
                     if cnt:
                         auds.timeout = 0
@@ -1906,10 +1906,11 @@ class updateQueues:
                             continue
                         if e_id in self.audiocache:
                             e["duration"] = self.audiocache[e_id][-1]
-                    if len(dels) > 1:
+                    if len(dels) > 2:
                         q.pops(dels)
-                    elif len(dels):
-                        q.pop(dels[0])
+                    elif dels:
+                        while dels:
+                            q.pop(dels.popleft())
                     if q:
                         for i in range(2):
                             if i < len(q):

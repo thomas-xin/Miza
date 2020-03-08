@@ -85,8 +85,8 @@ class Ban:
     def __init__(self):
         self.name = ["Bans", "Unban"]
         self.min_level = 3
-        self.description = "Bans a user for a certain amount of hours, with an optional reason."
-        self.usage = "<0:user> <1:hours[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
+        self.description = "Bans a user for a certain amount of time, with an optional reason."
+        self.usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
 
     async def __call__(self, _vars, args, user, channel, guild, flags, perm, name, **void):
         update = self.data["bans"].update
@@ -138,7 +138,7 @@ class Ban:
                 )
             tm = 0
         else:
-            tm = await _vars.evalMath(args[1], guild.id)
+            tm = await _vars.evalTime(args[1], guild)
         await channel.trigger_typing()
         if len(args) >= 3:
             msg = args[2]

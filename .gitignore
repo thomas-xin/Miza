@@ -2,6 +2,7 @@ __pycache__
 *.json
 *.yml
 *.zip
+*.vs
 cache
 saves
 log.txt

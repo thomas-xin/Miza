@@ -25,7 +25,7 @@ def pull_e621(argv, data, thr, delay=5):
         resp.close()
         try:
             ind = s.index('class="next_page" rel="next"')
-            s = s[ind - 90 : ind]
+            s = s[ind - 90:ind]
             d = s.split(" ")
             i = -1
             while True:
@@ -33,7 +33,7 @@ def pull_e621(argv, data, thr, delay=5):
                     break
                 i -= 1
             u = d[i][:-4]
-            u = u[u.index(">") + 1 :]
+            u = u[u.index(">") + 1:]
             v1 = xrand(1, int(u))
 
             url = baseurl + str(v1) + "/" + items
@@ -56,7 +56,7 @@ def pull_e621(argv, data, thr, delay=5):
         while True:
             try:
                 ind1 = s.index(search)
-                s = s[ind1 + len(search) :]
+                s = s[ind1 + len(search):]
                 ind2 = s.index('"')
                 target = s[:ind2]
                 try:
@@ -78,7 +78,7 @@ def pull_e621(argv, data, thr, delay=5):
             resp.close()
             search = '<a href="https://static1.e621.net/data/'
             ind1 = s.index(search)
-            s = s[ind1 + 9 :]
+            s = s[ind1 + 9:]
             ind2 = s.index('"')
             s = s[:ind2]
             url = s
@@ -202,7 +202,7 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
         resp.close()
         try:
             ind = s.index('">Last</a><br>')
-            s = s[ind - 5 : ind]
+            s = s[ind - 5:ind]
             v1 = xrand(1, int(s.split("/")[-1]))
             url = url[:-1] + str(v1)
 
@@ -227,7 +227,7 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
         while True:
             try:
                 ind1 = s.index(search)
-                s = s[ind1 + len(search) :]
+                s = s[ind1 + len(search):]
                 ind2 = s.index('"')
                 target = s[:ind2]
                 if not "." in target:
@@ -424,7 +424,7 @@ class Lewd:
     async def __call__(self, _vars, args, flags, channel, **void):
         if not is_nsfw(channel):
             raise PermissionError("This command is only available in NSFW channels.")
-        objs = await searchRandomNSFW(" ".join(args), _vars.timeout-1)
+        objs = await searchRandomNSFW(" ".join(args), _vars.timeout - 1)
         url = objs[0]
         if "v" in flags:
             text = (

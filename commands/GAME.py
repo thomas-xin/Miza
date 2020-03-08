@@ -19,7 +19,6 @@ class Text2048:
         b'\xf0\x9f\x94\x84': [16, 11],
         b'\xf0\x9f\x92\xa0': [16, 12],
         b'\xf0\x9f\x92\xaf': [16, 13],
-        b'\xf0\x9f\x94\xa2': [16, 14],
     }
     multis = {
         5: [0, 1],
@@ -31,7 +30,6 @@ class Text2048:
         11: [0,1,2,3],
         12: [i for i in range(16)],
         13: [i for i in range(100)],
-        14: [i for i in range(1234)],
     }
     numScore = lambda y, x: x * 2 ** (x + 1)
 
@@ -48,60 +46,57 @@ class Text2048:
         tiles = copy.deepcopy(gamestate[0])
         width = len(tiles)
         i = direction & 3
+        if i & 2:
+            r = reversed(range(width))
+            z = -1
+        else:
+            r = range(width)
+            z = 1
         a = 1
         for w in range(width - 1):
-            if i & 1 == 0:
-                z = (i ^ 2) - 1
-                for x in range(width):
-                    for y in range(width):
-                        if x - z >= 0 and x - z < width:
+            changed = False
+            if not i & 1:
+                for x in r:
+                    for y in r:
+                        if x - z in r:
                             if tiles[x][y] > 0:
                                 if tiles[x - z][y] <= 0:
                                     tiles[x - z][y] = tiles[x][y]
-                                    tiles[x][y] = 0
-                                    a = 0
                                 elif type(tiles[x][y]) is float:
                                     if type(tiles[x - z][y]) is int:
                                         tiles[x - z][y] += round(tiles[x][y] * 10)
-                                        tiles[x][y] = 0
                                     else:
                                         tiles[x - z][y] += tiles[x][y]
-                                        tiles[x][y] = 0
-                                    a = 0
                                 elif type(tiles[x - z][y]) is float:
                                     tiles[x - z][y] = round(tiles[x - z][y] * 10) + tiles[x][y]
-                                    tiles[x][y] = 0
-                                    a = 0
                                 elif tiles[x - z][y] == tiles[x][y]:
                                     tiles[x - z][y] += 1
-                                    tiles[x][y] = 0
-                                    a = 0
+                                else:
+                                    continue
+                                tiles[x][y] = a = 0
+                                changed = True
             else:
-                z = (i ^ 2) - 2
-                for x in range(width):
-                    for y in range(width):
-                        if y - z >= 0 and y - z < width:
+                for x in r:
+                    for y in r:
+                        if y - z in r:
                             if tiles[x][y] > 0:
                                 if tiles[x][y - z] <= 0:
                                     tiles[x][y - z] = tiles[x][y]
-                                    tiles[x][y] = 0
-                                    a = 0
                                 elif type(tiles[x][y]) is float:
                                     if type(tiles[x][y - z]) is int:
                                         tiles[x][y - z] += round(tiles[x][y] * 10)
-                                        tiles[x][y] = 0
                                     else:
                                         tiles[x][y - z] += tiles[x][y]
-                                        tiles[x][y] = 0
-                                    a = 0
                                 elif type(tiles[x][y - z]) is float:
                                     tiles[x][y - z] = round(tiles[x][y - z] * 10) + tiles[x][y]
-                                    tiles[x][y] = 0
-                                    a = 0
                                 elif tiles[x][y - z] == tiles[x][y]:
                                     tiles[x][y - z] += 1
-                                    tiles[x][y] = 0
-                                    a = 0
+                                else:
+                                    continue
+                                tiles[x][y] = a = 0
+                                changed = True
+            if not changed:
+                break
         return tiles, a
 
     def randomSpam(self, gamestate, mode, pool, returns):
