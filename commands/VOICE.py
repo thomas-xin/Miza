@@ -1341,28 +1341,31 @@ class AudioSettings:
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, name, message, perm, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        if "d" in flags:
-            op = None
-        elif "s" in flags:
-            op = "speed"
-        elif "p" in flags:
-            op = "pitch"
-        elif "b" in flags:
-            op = "bassboost"
-        elif "c" in flags:
-            op = "chorus"
-        elif "r" in flags:
-            op = "reverb"
-        elif "l" in flags:
-            op = "loop"
-        elif "x" in flags:
-            op = "shuffle"
-        elif "q" in flags:
-            op = "quiet"
-        elif name in self.other_settings:
-            op = self.other_settings[name]
-        else:
-            op = "settings"
+        op = None
+        if not "d" in flags:
+            if "s" in flags:
+                op = "speed"
+            elif "p" in flags:
+                op = "pitch"
+            elif "b" in flags:
+                op = "bassboost"
+            elif "c" in flags:
+                op = "chorus"
+            elif "r" in flags:
+                op = "reverb"
+            elif "l" in flags:
+                op = "loop"
+            elif "x" in flags:
+                op = "shuffle"
+            elif "q" in flags:
+                op = "quiet"
+            else:
+                for i in self.other_settings:
+                    if name == i.lower():
+                        op = self.other_settings[i]
+                        break
+                if op is None:
+                    op = "settings"
         if not argv and op is not None:
             if op == "settings":
                 return (
