@@ -183,7 +183,6 @@ class Ban:
                 )
         response = "```css"
         for t_user in users:
-            secs = tm * 3600
             if tm >= 0:
                 try:
                     if len(users) > 3:
@@ -195,7 +194,7 @@ class Ban:
                     response += "\nError: " + repr(ex)
                     continue
             g_bans[t_user.id] = {
-                "unban": secs + dtime,
+                "unban": tm + dtime,
                 "reason": msg,
                 "channel": channel.id,
             }
@@ -204,13 +203,13 @@ class Ban:
                 response += (
                     "\nUpdated ban for " + uniStr(t_user.name)
                     + " from " + uniStr(sec2Time(is_banned))
-                    + " to " + uniStr(sec2Time(secs)) + "."
+                    + " to " + uniStr(sec2Time(tm)) + "."
                 )
             elif tm >= 0:
                 response += (
                     "\n" + uniStr(t_user.name)
                     + " has been banned from " + uniStr(guild.name)
-                    + " for " + uniStr(sec2Time(secs)) + "."
+                    + " for " + uniStr(sec2Time(tm)) + "."
                 )
             if msg is not None and tm >= 0:
                 response += " Reason: " + uniStr(msg) + "."
