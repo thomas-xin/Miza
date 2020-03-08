@@ -720,7 +720,7 @@ class main_data:
                 self.trigger_typing = channel.trigger_typing
                 self.pins = channel.pins
 
-            def fetch_message(id):
+            def fetch_message(self, id):
                 return _vars.fetch_message(id, self.channel)
 
             me = client.user
@@ -763,11 +763,7 @@ class main_data:
 
         bot = False
         system = False
-        history = lambda *void1, **void2: collections.namedtuple(
-            "GhostIterator",
-            "flatten",
-            lambda: [],
-        )
+        history = lambda *void1, **void2: None
         dm_channel = None
         create_dm = lambda self: None
         relationship = None
@@ -810,7 +806,7 @@ class main_data:
         is_system = lambda self: None
         created_at = 0
         
-        async def delete(*void1, **void2):
+        async def delete(self, *void1, **void2):
             pass
         edit = delete
         publish = delete

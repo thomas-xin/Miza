@@ -895,7 +895,7 @@ class updateMessageCount:
         if self.scanned == -1:
             c_id = self._vars.client.user.id
             if guild is None or hasattr(guild, "isDM"):
-                channel = user.dm_channel
+                channel = guild.channel
                 if channel is None:
                     return 0
                 messages = await channel.history(limit=None).flatten()

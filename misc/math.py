@@ -249,8 +249,8 @@ def integrate(*args, **kwargs):
     except ValueError:
         return sympy.integrate(*plotArgs(args), sympy.Symbol("x"))
 
-def factorize(*args):
-    temp = sympy.factorint(*args)
+def factorize(*args, **kwargs):
+    temp = sympy.factorint(*args, **kwargs)
     output = []
     for k in temp:
         for i in range(temp[k]):
@@ -461,7 +461,7 @@ def evalSym(f, prec=64, r=False):
             e = rounder(y)
         except TypeError:
             e = y
-            for i in preorder_traversal(e):
+            for i in sympy.preorder_traversal(e):
                 if isinstance(i, sympy.Float):
                     e = e.subs(i, rounder(i))
         if r:

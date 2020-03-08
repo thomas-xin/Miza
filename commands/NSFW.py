@@ -132,7 +132,7 @@ def pull_rule34_xxx(argv, data, thr, delay=5):
                 pass
         if sources:
             attempts = 0
-            while attempts < 1000:
+            while attempts < 256:
                 v2 = xrand(len(sources))
                 url = sources[v2].file_url
                 found = False
@@ -143,12 +143,12 @@ def pull_rule34_xxx(argv, data, thr, delay=5):
                 if found:
                     break
                 attempts += 1
-            if attempts >= 1000:
-                raise
+            if attempts >= 256:
+                raise TimeoutError
             v1 = 1
             data[thr] = [url, v1, v2 + 1]
         else:
-            raise
+            raise EOFError
     except:
         data[thr] = 0
     print(data)

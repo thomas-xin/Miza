@@ -464,7 +464,6 @@ def getFactors(x):
     f = factorize(x)
     f.append(1)
     s = {}
-    l = len(f)
     print(s)
 
 
@@ -563,7 +562,6 @@ def lcm2(x, y=1):
 def lcm(*x):
     try:
         while True:
-            y = x
             x = [i for j in x for i in j]
     except:
         if 0 in x:
@@ -585,20 +583,16 @@ def mean(*nums):
 
 
 def pwr(x, power=2):
-    if number.real >= 0:
-        return roundMin(number ** power)
+    if x.real >= 0:
+        return roundMin(x ** power)
     else:
-        return roundMin(-((-number) ** power))
+        return roundMin(-((-x) ** power))
 
 
 def pulse(x, y=0.5):
     p = y * tau
-    x = x * (0.5 / length * (x < p) + 0.5 / (1 - length) * (x >= p))
+    x *= 0.5 / len(x) * (x < p) + 0.5 / (1 - len(x)) * (x >= p)
     return x
-
-
-def hypot(*coordinates):
-    return math.hypot(*coordinates)
 
 
 def isValid(x):
@@ -979,7 +973,7 @@ def cartesianCoords(x, y, pos=None):
         d = array(x, y)
     else:
         d = array(x, y) - array(pos)
-    return array([hypot(d), atan2(*reversed(d))])
+    return array([hypot(*d), atan2(*reversed(d))])
 
 
 def convertRect(rect, edge=0):
@@ -1065,7 +1059,7 @@ def diffExpT(r, s, d):
 def predictTrajectory(src, dest, vel, spd, dec=1, boundary=None, edge=0):
     pos = array(dest)
     dist = hypot(*(src - dest))
-    for x in range(0, 64):
+    for i in range(0, 64):
         time = diffExpT(dec, spd, dist)
         new_pos = dest + vel * min(time, 1 << 32)
         if boundary:
@@ -1731,7 +1725,7 @@ lookup time for all elements. Includes many array and numeric operations."""
         raise AttributeError("Deleting attributes is not permitted.")
 
     @waiting
-    def __call__(self, arg=1, **void):
+    def __call__(self, arg=1, *void1, **void2):
         if arg == 1:
             return self.copy()
         return self * arg
@@ -2549,7 +2543,6 @@ def urlOpen(url):
     if resp.getcode() != 200:
         raise ConnectionError("Error " + str(resp.code))
     return resp
-    s = resp.read().decode("utf-8")
 
 
 def funcSafe(func, *args, **kwargs):

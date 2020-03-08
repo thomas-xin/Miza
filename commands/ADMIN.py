@@ -228,7 +228,7 @@ class RoleGiver:
         self.description = "Adds an automated role giver to the current channel."
         self.usage = "<0:react_to[]> <1:role[]> <1:perm[]> <disable(?d)> <remover(?r)>"
 
-    async def __call__(self, argv, args, user, channel, guild, flags, **void):
+    async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
         update = self.data["rolegivers"].update
         _vars = self._vars
         scheduled = _vars.data["rolegivers"]
@@ -245,8 +245,7 @@ class RoleGiver:
         react = args[0].lower()
         try:
             role = float(args[1])
-            s_perm = _vars.getPerms(user, guild)
-            if s_perm < role + 1 or role is nan:
+            if perm < role + 1 or role is nan:
                 raise PermissionError(
                     "Insufficient priviliges to assign permission giver to " + uniStr(guild.name)
                     + " with value " + uniStr(role)
@@ -276,7 +275,7 @@ class DefaultPerms:
         self.description = "Sets the default bot permission levels for all users in current server."
         self.usage = "<level[]>"
 
-    async def __call__(self, _vars, argv, user, guild, **void):
+    async def __call__(self, _vars, argv, user, guild, perm, **void):
         update = self.data["perms"].update
         perms = _vars.data["perms"]
         currPerm = perms.setdefault("defaults", {}).get(guild.id, 0)
@@ -285,9 +284,8 @@ class DefaultPerms:
                 "```css\nCurrent default permission level for " + uniStr(guild.name)
                 + ": " + uniStr(currPerm) + ".```"
             )
-        s_perm = _vars.getPerms(user, guild.id)
         c_perm = await _vars.evalMath(argv, guild.id)
-        if s_perm < c_perm + 1 or c_perm is nan:
+        if perm < c_perm + 1 or c_perm is nan:
             raise PermissionError(
                 "Insufficient priviliges to change default permission level for " + uniStr(guild.name)
                 + " to " + uniStr(c_perm)

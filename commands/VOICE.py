@@ -1444,7 +1444,7 @@ class Rotate:
         auds = await forceJoin(guild, channel, user, client, _vars)
         if len(auds.queue) > 1:
             amount = await _vars.evalMath(argv, guild.id)
-            auds.queue.rotate(amount)
+            auds.queue.rotate(-amount)
             auds.seek(inf)
         return (
             "```css\nSuccessfully rotated the queue "
@@ -1767,7 +1767,7 @@ class Player:
                     reason = "create controllable"
                 raise PermissionError(
                     "Insufficient privileges to " + reason
-                    + " virtual audio player for " + uniStr(guild.name)
+                    + " virtual audio player for " + uniStr(channel.guild.name)
                     + ". Required level: " + uniStr(req)
                     + ", Current level: " + uniStr(perm) + "."
                 )

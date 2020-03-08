@@ -261,7 +261,7 @@ class Text2048:
                 ans = await _vars.evalMath(argv, guild)
                 size = int(ans)
                 if not size > 1:
-                    raise
+                    raise IndexError
         except:
             raise ValueError("Invalid board size.")
         if size > 11:
