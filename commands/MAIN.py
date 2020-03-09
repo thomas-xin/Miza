@@ -728,6 +728,45 @@ class Execute:
         )
 
 
+class Reminder:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["RemindMe"]
+        self.min_level = 0
+        self.description = "Sets a reminder for a certain date and time."
+        self.usage = "<1:message> <0:time> <disable(?d)>"
+
+    async def __call__(self, argv, args, flags, _vars, user, guild, **void):
+        rems = _vars.data["reminders"].get(user.id, hlist())
+        if not argv:
+            s = strIter(rems, key=lambda x: limStr(x, 64))
+            return (
+                "Current reminders set for **" + user.name 
+                + "**:```ini" + s + "```"
+            )
+        if len(rems) > 32:
+            raise OverflowError("You have reached the maximum of 32 reminders. Please remove one to add another.")
+        if "in" in argv:
+            spl = argv.split("in")
+            msg = "in".join(spl[:-1])
+            t = _vars.evalTime(spl[-1])
+        elif "at" in argv:
+            spl = argv.split("at")
+            msg = "at".join(spl[:-1])
+            t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
+        else:
+            msg = " ".join(args[:-1])
+            t = _vars.evalTime(args[-1], guild)
+        rems[t] = msg
+        _vars.data["reminders"].append(rems)
+        return (
+            "```css\nSuccessfully set reminder for "
+            + uniStr(user.name) + " in " + uniStr(sec2Time(t)) + ":\n"
+            + msg + "```"
+        )
+
+
 class updateEval:
     is_update = True
     name = "eval"

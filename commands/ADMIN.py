@@ -238,9 +238,11 @@ class RoleGiver:
         if not argv:
             return (
                 "Currently active permission givers in channel **" + channel.name
-                + "**:\n```css\n" + repr(currentSchedule) + "```"
+                + "**:\n```ini\n" + strIter(currentSchedule) + "```"
             )
         react = args[0].lower()
+        if len(react) > 64:
+            raise OverflowError("Search tag too long.")
         try:
             role = float(args[1])
             if perm < role + 1 or role is nan:
@@ -323,7 +325,7 @@ class RainbowRole:
                 )
             return (
                 "Currently active dynamic role colours in **" + guild.name
-                + "**:\n```css\n" + str(guild_special) + "```"
+                + "**:\n```ini\n" + strIter(guild_special) + "```"
             )
         role = args[0].lower()
         if len(args) < 2:
@@ -342,7 +344,7 @@ class RainbowRole:
         update()
         return (
             "Changed dynamic role colours for **" + guild.name
-            + "** to:\n```css\n" + str(guild_special) + "```"
+            + "** to:\n```ini\n" + strIter(guild_special) + "```"
         )
         
 
@@ -408,8 +410,8 @@ class React:
                 return "```css\nRemoved all auto reacts for " + uniStr(guild.name) + ".```"
             else:
                 return (
-                    "Currently active auto reacts for " + uniStr(guild.name) + ":\n```json\n"
-                    + str(curr) + "```"
+                    "Currently active auto reacts for " + uniStr(guild.name) 
+                    + ":\n```ini\n" + strIter(curr) + "```"
                 )
         a = args[0].lower()
         if "d" in flags:

@@ -26,6 +26,8 @@ class IMG:
                 )
             if "e" in flags:
                 key = args[0].lower()
+                if len(key) > 64:
+                    raise OverflowError("Image tag too long.")
                 url = verifyURL(args[1])
                 images[key] = url
                 sort(images)
@@ -55,7 +57,7 @@ class IMG:
             if images:
                 return (
                     "Available images in **" + guild.name
-                    + "**: ```ini\n" + str(list(images)).replace("'", '"') + "```"
+                    + "**: ```ini\n" + strIter(images).replace("'", '"') + "```"
                 )
             return (
                 "```css\nImage list for " + uniStr(guild.name)

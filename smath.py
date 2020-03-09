@@ -9,6 +9,7 @@ import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys
 import urllib.request
 
 from scipy import interpolate, special, signal
+from dateutil import parser as tparser
 from sympy.parsing.sympy_parser import parse_expr
 
 CalledProcessError = subprocess.CalledProcessError
@@ -57,13 +58,6 @@ true, false = True, False
 
 def nop(*args):
     pass
-
-
-class freeClass:
-    
-    def __init__(self, **kwargs):
-        for i in kwargs:
-            self.__setattr__(i, kwargs[i])
 
 
 def shuffle(it):
@@ -1264,6 +1258,34 @@ def htmlDecode(s):
     return s.replace("&quot;", '"').replace("&apos;", "'")
 
 
+def strIter(it, key=None, limit=1728):
+    try:
+        try:
+            len(it)
+        except TypeError:
+            it = hlist(i for i in it)
+    except:
+        it = hlist(it)
+    if type(it) is dict:
+        keys = it.keys()
+    else:
+        keys = range(len(it))
+    s = ""
+    i = 0
+    for k in keys:
+        s += (
+            "\n["
+            + " " * (int(math.log10(len(it))) - int(math.log10(max(1, i))))
+            + str(k) + "] "
+        )
+        if key is None:
+            s += str(it[k])
+        else:
+            s += str(key(it[k]))
+        i += 1
+    return limStr(s, limit)
+
+
 TIMEUNITS = {
     "galactic year": 7157540528801820.28133333333333,
     "millenium": [31556925216., "millenia"],
@@ -1735,14 +1757,9 @@ lookup time for all elements. Includes many array and numeric operations."""
             self.chash = hash(tuple(self))
         return self.chash
 
-    def __str__(self):
-        return "⟨" + ", ".join(str(i) for i in iter(self)) + "⟩"
-
-    def __repr__(self):
-        return "hlist(" + str(tuple(self)) + ")"
-
-    def __bool__(self):
-        return bool(len(self.data))
+    __str__ = lambda self: "⟨" + ", ".join(str(i) for i in iter(self)) + "⟩"
+    __repr__ = lambda self: "hlist(" + str(tuple(self)) + ")"
+    __bool__ = lambda self: bool(len(self.data))
 
     @blocking
     def __iadd__(self, other):
@@ -2011,14 +2028,10 @@ lookup time for all elements. Includes many array and numeric operations."""
         temp = numpy.array(tuple(self))
         return hlist(numpy.ceil(temp).astype(int))
 
-    def __index__(self):
-        return round(numpy.sum(tuple(self)))
+    __index__ = lambda self: round(numpy.sum(tuple(self)))
     
     __radd__ = __add__
-
-    def __rsub__(self, other):
-        return -self + other
-    
+    __rsub__ = lambda self, other: -self + other
     __rmul__ = __mul__
     __rmatmul__ = __matmul__
 
@@ -2196,16 +2209,10 @@ lookup time for all elements. Includes many array and numeric operations."""
             return temp
         self.pop(key, force=True)
 
-    def __len__(self):
-        return len(self.data)
-
+    __len__ = lambda self: len(self.data)
     __length_hint__ = __len__
-
-    def __iter__(self):
-        return self.iterator()
-
-    def __reversed__(self):
-        return self.iterator(True)
+    __iter__ = lambda self: self.iterator()
+    __reversed__ = lambda self: self.iterator(True)
 
     @waiting
     def __bytes__(self):
@@ -2220,14 +2227,29 @@ lookup time for all elements. Includes many array and numeric operations."""
                 return True
         return False
 
-    def __copy__(self):
-        return self.copy()
+    __copy__ = lambda self: self.copy()
 
 def hrange(a, b=None, c=None, maxoff=__hlist_maxoff__):
     return hlist(xrange(a, b, c), maxoff)
 
 def hzero(size, maxoff=__hlist_maxoff__):
     return hlist((0 for i in range(size)), maxoff)
+
+
+class freeClass(collections.abc.Mapping):
+    
+    def __init__(self, **kwargs):
+        for i in kwargs:
+            self.__setattr__(i, kwargs[i])
+        for i in dir(self.__dict__):
+            if not hasattr(self, i):
+                setattr(self, i, getattr(self.__dict__, i))
+    
+    __iter__ = lambda self: iter(self.__dict__)
+    __len__ = lambda self: len(self.__dict__)
+    __setitem__ = lambda self, key, value: self.__dict__.__setitem__(key, value)
+    __getitem__ = lambda self, key: self.__dict__.__getitem__(key)
+    __repr__ = lambda self: "freeClass(**" + repr(self.__dict__) + ")"
 
 
 class pickled:

@@ -120,7 +120,7 @@ class customAudio(discord.AudioSource):
                     B += str(round(decay, 3))
                     speed = (2 + i * 0.61 * neg) % 4.5 + 0.5
                     C += str(round(speed, 3))
-                    depth = (1.5 + i * 0.43 * neg) % 4 + 0.5
+                    depth = (i * 0.43 * neg) % 4 + 0.5
                     D += str(round(depth, 3))
                 b = 0.5 / sqrt(ceil(chorus + 1))
                 d["options"] += (
@@ -211,16 +211,22 @@ class customAudio(discord.AudioSource):
             if self.paused:
                 self.is_playing = True
                 raise EOFError
-            temp = self.source.read()
-            if not len(temp):
-                updateQueues.sendUpdateRequest(self, force=True)
+            try:
+                temp = self.source.read()
+                if not len(temp):
+                    raise EOFError
+            except:
+                try:
+                    updateQueues.sendUpdateRequest(self, force=True)
+                except:
+                    print(traceback.format_exc())
                 raise EOFError
             self.stats["position"] = round(
                 self.stats["position"] + self.speed / 50 * (self.reverse * -2 + 1),
                 4,
             )
             self.is_playing = True
-        except:
+        except EOFError:
             if not self.paused and not self.is_loading:
                 if self.is_playing:
                     self._vars.doUpdate |= True
@@ -879,28 +885,20 @@ class Playlist:
                     "```css\nRemoved all entries from the default playlist for "
                     + uniStr(guild.name) + ".```"
                 )
-            if "v" in flags:
-                return (
-                    "Current default playlist for **" + guild.name + "**: ```json\n"
-                    + str(pl).replace("'", '"') + "```"
-                )
-            else:
-                items = []
-                for i in pl:
-                    items.append(limStr(noHighlight(i["name"]), 32))
-                s = ""
-                for i in range(len(items)):
-                    s += " " * (int(math.log10(len(items))) - int(math.log10(max(1, i))))
-                    s += "[" + uniStr(i) + "] "
-                    s += items[i] + "\n"
-            if not s:
+            if not pl:
                 return (
                     "```css\nDefault playlist for " + uniStr(guild.name)
                     + " is currently empty.```"
                 )
+            if "v" in flags:
+                key = lambda x: str(x)
+                s = strIter(pl, key=key).replace("'", '"')
+            else:
+                key = lambda x: limStr(x["name"], 40)
+                s = strIter(pl, key=key)
             return (
-                "Current default playlist for **" + guild.name + "**: ```ini\n"
-                + s + "```"
+                "Current default playlist for **" + guild.name 
+                + "**: ```ini\n" + s + "```"
             )
         if "d" in flags:
             i = await _vars.evalMath(argv, guild.id)
@@ -1880,7 +1878,10 @@ class updateQueues:
                 if vc.is_connected() or vc.guild.id in self.connecting:
                     playing = auds.is_playing or auds.is_loading
                 else:
-                    auds.vc = vc = await channel.connect(timeout=30, reconnect=False)
+                    try:
+                        auds.vc = vc = await channel.connect(timeout=30, reconnect=False)
+                    except discord.Forbidden:
+                        auds.dead = True
                     playing = auds.is_playing or auds.is_loading
                 if not vc.is_playing():
                     vc.play(auds, after=self.sendUpdateRequest)

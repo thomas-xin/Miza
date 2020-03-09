@@ -1,5 +1,4 @@
 import discord, os, sys, datetime, json
-from dateutil import parser as tparser
 from smath import *
 
 sys.path.insert(1, "commands")
@@ -916,7 +915,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
         "<@" + str(client.user.id) + ">",
         "<@!" + str(client.user.id) + ">",
     )
-    prefix = _vars.getPrefix(guild)
+    if u_id == client.user.id:
+        prefix = "~"
+    else:
+        prefix = _vars.getPrefix(guild)
     op = False
     comm = msg
     for check in (prefix, *mention):

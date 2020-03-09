@@ -124,7 +124,6 @@ class Math:
         self.usage = "<function> <verbose(?v)> <rationalize(?r)>"
 
     async def __call__(self, _vars, argv, channel, flags, guild, **void):
-        tm = time.time()
         f = argv
         if not len(f):
             raise IndexError("Function is empty.")
