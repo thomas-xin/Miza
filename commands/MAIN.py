@@ -808,18 +808,24 @@ class updateReminders:
             return
         t = datetime.datetime.utcnow()
         i = 1
+        changed = False
         for u_id in tuple(self.data):
             temp = self.data[u_id]
             if not len(temp):
                 self.data.pop(u_id)
+                changed = True
                 continue
             x = temp[0]
             if t >= x.t:
                 temp.popleft()
+                changed = True
                 ch = await self._vars.getDM(u_id)
                 await ch.send("```asciidoc\n" + x.msg + "```")
             if not i & 16383:
                 await asyncio.sleep(0.4)
+            i += 1
+        if changed:
+            self.update()
         self.busy = False
 
 
