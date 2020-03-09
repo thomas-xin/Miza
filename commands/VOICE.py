@@ -1449,8 +1449,13 @@ class Rotate:
 
     async def __call__(self, argv, guild, channel, user, client, _vars, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
+        amount = await _vars.evalMath(argv, guild.id)
         if len(auds.queue) > 1:
-            amount = await _vars.evalMath(argv, guild.id)
+            for i in range(3):
+                try:
+                    auds.queue[i].pop("download")
+                except KeyError:
+                    pass
             auds.queue.rotate(-amount)
             auds.seek(inf)
         return (
