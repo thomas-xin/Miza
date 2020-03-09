@@ -60,16 +60,15 @@ class Purge:
                     for i in range(min(len(delM), 100)):
                         delM.popleft()
                 except AttributeError:
-                    d_id = delM[0].id
+                    _vars.logDelete(delM[0].id)
                     await delM[0].delete()
-                    _vars.logDelete(d_id)
                     deleted += 1
                     delM.popleft()
             except:
                 print(traceback.format_exc())
                 m = delM.popleft()
-                await m.delete()
                 _vars.logDelete(m.id)
+                await m.delete()
                 deleted += 1
         if not "h" in flags:
             return (
@@ -653,9 +652,8 @@ class updateRolegiver:
                             print("Granted role " + r.name + " to " + user.name + ".")
                 if deleter:
                     try:
-                        d_id = message.id
+                        _vars.logDelete(message.id)
                         await message.delete()
-                        _vars.logDelete(d_id)
                     except discord.NotFound:
                         pass
 

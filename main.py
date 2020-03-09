@@ -1,6 +1,10 @@
 import os, time, datetime, traceback, psutil
 
 python = ("python3", "python")[os.name == "nt"]
+try:
+    os.system("color")
+except:
+    print(traceback.format_exc())
 
 
 def delete(f):
@@ -24,16 +28,16 @@ while not sd in os.listdir():
     delete(rs)
     delete(hb)
     proc = psutil.Popen([python, "bot.py"], shell=True)
-    print("Bot started with PID " + str(proc.pid) + ".")
+    print("Bot started with PID \033[1;34;40m" + str(proc.pid) + "\033[1;37;40m.")
     time.sleep(8)
     try:
-        print("Heartbeat started.")
+        print("\033[1;32;40mHeartbeat started.")
         alive = True
         while alive:
             f = open(hb, "wb")
             f.close()
             print(
-                "Heartbeat at "
+                "\033[1;36;40m Heartbeat at "
                 + str(datetime.datetime.now())
                 + "."
             )
@@ -62,7 +66,7 @@ while not sd in os.listdir():
                 break
         if sd in os.listdir():
             break
-        print("Bot closed without shutdown signal, restarting...")
+        print("\033[1;31;40mBot closed without shutdown signal, restarting...")
     except KeyboardInterrupt:
         raise
     except:

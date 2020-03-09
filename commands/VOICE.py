@@ -332,8 +332,9 @@ class customAudio(discord.AudioSource):
         return False
 
     def cleanup(self):
-        if getattr(self, "source", None) is not None:
-            return self.source.cleanup()
+        return
+        # if getattr(self, "source", None) is not None:
+        #     return self.source.cleanup()
 
 
 async def createPlayer(auds, p_type=0, verbose=False):
@@ -407,7 +408,7 @@ async def forceJoin(guild, channel, user, client, _vars):
     found = False
     if guild.id not in _vars.updaters["playlists"].audio:
         for func in _vars.categories["voice"]:
-            if "Join" in func.name:
+            if "join" in (name.lower() for name in func.name):
                 try:
                     await func(client=client, user=user, _vars=_vars, channel=channel, guild=guild)
                 except discord.ClientException:
@@ -986,7 +987,10 @@ class Join:
             joined = False
         for user in guild.members:
             if user.id == client.user.id:
-                asyncio.create_task(user.edit(mute=False,deafen=False))
+                if user.VoiceState is not None:
+                    if not (user.VoiceState.deaf or user.VoiceState.mute):
+                        break
+                    asyncio.create_task(user.edit(mute=False,deafen=False))
         if joined:
             return (
                 "```css\n🎵 Successfully connected to " + uniStr(vc_.name)

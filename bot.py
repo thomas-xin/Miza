@@ -1,11 +1,11 @@
-import discord, os, sys, datetime, json, websockets
+import discord, os, sys, datetime, json
 from dateutil import parser as tparser
 from smath import *
 
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
 
-client = discord.Client(
+client = discord.AutoShardedClient(
     max_messages=4096,
     heartbeat_timeout=30,
 )
@@ -186,11 +186,11 @@ class main_data:
                 return self.cache["guilds"][g_id]
             guild = await client.fetch_guild(g_id)
         self.cache["guilds"][g_id] = guild
-        self.limitCache("guilds")
+        self.limitCache("guilds", limit=65536)
         return guild
 
     async def fetch_channel(self, c_id):
-        try:        
+        try:
             c_id = int(c_id)
         except (ValueError, TypeError):
             raise TypeError("Invalid channel identifier: " + uniStr(c_id))
@@ -247,13 +247,13 @@ class main_data:
         except KeyError:
             pass
 
-    def limitCache(self, cache=None):
+    def limitCache(self, cache=None, limit=1048576):
         if cache is not None:
             caches = [self.cache[cache]]
         else:
             caches = self.cache.values()
         for c in caches:
-            while len(c) > 1048576:
+            while len(c) > limit:
                 c.pop(next(iter(c)))
 
     def getPrefix(self, guild):
@@ -313,7 +313,7 @@ class main_data:
         except AttributeError:
             m_id = int(message)
         self.cache["deleted"][m_id] = True
-        self.limitCache("deleted")
+        self.limitCache("deleted", limit=4096)
 
     def isSuspended(self, u_id):
         u_id = int(u_id)
@@ -720,7 +720,10 @@ class main_data:
                         print(repr(activity))
                     try:
                         await client.change_presence(activity=activity)
-                    except websockets.ConnectionClosed:
+                    except discord.HTTPException:
+                        print(traceback.format_exc())
+                        await asyncio.sleep(3)
+                    except:
                         pass
                 self.lastCheck = time.time()
                 for u in self.updaters.values():
@@ -1207,9 +1210,8 @@ async def checkDelete(message, reaction, user):
                 s = str(reaction)
                 if s in "❌✖️🇽❎":
                     try:
-                        d_id = message.id
+                        _vars.logDelete(message.id)
                         await message.delete()
-                        _vars.logDelete(d_id)
                     except discord.NotFound:
                         pass
             await _vars.handleUpdate()
