@@ -1,4 +1,4 @@
-import discord, asyncio, ast, urllib, requests, json
+import discord, urllib, requests, json
 from googletrans import Translator
 from smath import *
 

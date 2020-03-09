@@ -1,4 +1,4 @@
-import discord, os, sys, datetime, json
+import discord, json
 from smath import *
 
 sys.path.insert(1, "commands")

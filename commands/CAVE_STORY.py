@@ -1,4 +1,4 @@
-import requests, csv, knackpy, ast, discord, urllib, os, ffmpy
+import requests, csv, knackpy, discord, urllib, ffmpy
 from prettytable import PrettyTable as ptable
 from smath import *
 

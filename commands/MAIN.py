@@ -1,4 +1,4 @@
-import discord, os, sys, datetime
+import discord
 from smath import *
 
 
@@ -732,15 +732,34 @@ class Reminder:
     is_command = True
 
     def __init__(self):
-        self.name = ["RemindMe"]
+        self.name = ["RemindMe", "Reminders"]
         self.min_level = 0
         self.description = "Sets a reminder for a certain date and time."
         self.usage = "<1:message> <0:time> <disable(?d)>"
 
     async def __call__(self, argv, args, flags, _vars, user, guild, **void):
         rems = _vars.data["reminders"].get(user.id, hlist())
+        update = _vars.updaters["reminders"].update
+        if "d" in flags:
+            if not argv:
+                i = 0
+            else:
+                i = await _vars.evalMath(argv, guild)
+            x = rems.pop(i)
+            update()
+            return (
+                "```css\nSuccessfully removed "
+                + uniStr(x.msg) + " from reminders list for "
+                + uniStr(user.name) + ".```"
+            )
         if not argv:
-            s = strIter(rems, key=lambda x: limStr(x, 64))
+            if not len(rems):
+                return (
+                    "```css\nNo reminders currently set for "
+                    + uniStr(user.name) + ".```"
+                )
+            d = datetime.datetime.utcnow()
+            s = strIter(rems, key=lambda x: limStr(x.msg, 64) + "➡️" + sec2Time((x.t - d).total_seconds()))
             return (
                 "Current reminders set for **" + user.name 
                 + "**:```ini" + s + "```"
@@ -750,21 +769,58 @@ class Reminder:
         if "in" in argv:
             spl = argv.split("in")
             msg = "in".join(spl[:-1])
-            t = _vars.evalTime(spl[-1])
+            t = await _vars.evalTime(args[-1], guild)
         elif "at" in argv:
             spl = argv.split("at")
             msg = "at".join(spl[:-1])
             t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
         else:
             msg = " ".join(args[:-1])
-            t = _vars.evalTime(args[-1], guild)
-        rems[t] = msg
-        _vars.data["reminders"].append(rems)
+            t = await _vars.evalTime(args[-1], guild)
+        msg = msg.strip("< >")
+        if not msg:
+            msg = "[SAMPLE REMINDER]"
+        elif len(msg) > 256:
+            raise OverflowError("Reminder message too long.")
+        rems.append(freeClass(
+            msg=msg,
+            t=datetime.timedelta(seconds=t) + datetime.datetime.utcnow(),
+        ))
+        _vars.data["reminders"][user.id] = sort(rems, key=lambda x: x.t)
+        update()
         return (
             "```css\nSuccessfully set reminder for "
             + uniStr(user.name) + " in " + uniStr(sec2Time(t)) + ":\n"
             + msg + "```"
         )
+
+
+class updateReminders:
+    is_update = True
+    name = "reminders"
+    user = True
+
+    def __init__(self):
+        pass
+
+    async def __call__(self):
+        if self.busy:
+            return
+        t = datetime.datetime.utcnow()
+        i = 1
+        for u_id in tuple(self.data):
+            temp = self.data[u_id]
+            if not len(temp):
+                self.data.pop(u_id)
+                continue
+            x = temp[0]
+            if t >= x.t:
+                temp.popleft()
+                ch = await self._vars.getDM(u_id)
+                await ch.send("```asciidoc\n" + x.msg + "```")
+            if not i & 16383:
+                await asyncio.sleep(0.4)
+        self.busy = False
 
 
 class updateEval:

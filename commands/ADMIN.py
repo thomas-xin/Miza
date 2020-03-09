@@ -1,4 +1,4 @@
-import datetime, discord
+import discord
 from smath import *
 
 
@@ -427,7 +427,7 @@ class React:
         curr["reacts"][a] = args[1]
         update()
         return (
-            "```css\nAdded " + uniStr(a) + " ==> " + uniStr(args[1]) + " to the auto react list for "
+            "```css\nAdded " + uniStr(a) + "➡️" + uniStr(args[1]) + " to the auto react list for "
             + uniStr(guild.name) + ".```"
         )
 

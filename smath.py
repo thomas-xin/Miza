@@ -2,7 +2,7 @@
 Adds many useful math-related functions.
 """
 
-import os, sys, asyncio, threading, subprocess, psutil, traceback, time
+import os, sys, asyncio, threading, subprocess, psutil, traceback, time, datetime
 import ctypes, collections, ast, copy, pickle
 import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys
 
@@ -113,7 +113,7 @@ def sort(it, key=lambda x: x, reverse=False):
         it = sorted(it, key=key, reverse=reverse)
         return deque(it)
     elif isinstance(it, hlist):
-        hlist(sorted(it, key=key, reverse=reverse))
+        it = hlist(sorted(it, key=key, reverse=reverse))
         return it
     else:
         try:
@@ -2244,12 +2244,20 @@ class freeClass(collections.abc.Mapping):
         for i in dir(self.__dict__):
             if not hasattr(self, i):
                 setattr(self, i, getattr(self.__dict__, i))
+
+    def __repr__(self, nofunc=True):
+        d = dict(self.__dict__)
+        if nofunc:
+            for k in tuple(d):
+                if callable(d[k]):
+                    d.pop(k)
+        return "freeClass(**" + repr(d) + ")"
     
     __iter__ = lambda self: iter(self.__dict__)
     __len__ = lambda self: len(self.__dict__)
     __setitem__ = lambda self, key, value: self.__dict__.__setitem__(key, value)
     __getitem__ = lambda self, key: self.__dict__.__getitem__(key)
-    __repr__ = lambda self: "freeClass(**" + repr(self.__dict__) + ")"
+    __str__ = lambda self: self.__repr__(nofunc=False)
 
 
 class pickled:
