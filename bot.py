@@ -739,9 +739,15 @@ class main_data:
                     except:
                         pass
                 self.lastCheck = time.time()
-                for u in self.updaters.values():
-                    asyncio.create_task(u())
-                    asyncio.create_task(self.verifyDelete(u))
+                if force:
+                    for k in self.doUpdate:
+                        u = self.updaters[k]
+                        asyncio.create_task(u())
+                        asyncio.create_task(self.verifyDelete(u))
+                else:
+                    for u in self.updaters.values():
+                        asyncio.create_task(u())
+                        asyncio.create_task(self.verifyDelete(u))
             except:
                 print(traceback.format_exc())
             self.busy = False
@@ -1167,7 +1173,7 @@ async def heartbeatLoop():
 async def updateLoop():
     print("Update loop initiated.")
     autosave = 0
-    _vars.doUpdate = False
+    _vars.doUpdate = {}
     while True:
         try:
             if time.time() - autosave > 60:
@@ -1183,7 +1189,7 @@ async def updateLoop():
                 await asyncio.sleep(0.04)
                 if _vars.doUpdate:
                     await _vars.handleUpdate(True)
-                    _vars.doUpdate = False
+                    _vars.doUpdate.clear()
         except:
             print(traceback.format_exc())
         

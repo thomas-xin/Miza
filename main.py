@@ -31,7 +31,7 @@ while not sd in os.listdir():
     print("Bot started with PID \033[1;34;40m" + str(proc.pid) + "\033[1;37;40m.")
     time.sleep(8)
     try:
-        print("\033[1;32;40mHeartbeat started.")
+        print("\033[1;32;40mHeartbeat started\033[1;37;40m.")
         alive = True
         while alive:
             f = open(hb, "wb")
@@ -39,7 +39,7 @@ while not sd in os.listdir():
             print(
                 "\033[1;36;40m Heartbeat at "
                 + str(datetime.datetime.now())
-                + "."
+                + "\033[1;37;40m."
             )
             for i in range(16):
                 time.sleep(0.5)
@@ -66,7 +66,7 @@ while not sd in os.listdir():
                 break
         if sd in os.listdir():
             break
-        print("\033[1;31;40mBot closed without shutdown signal, restarting...")
+        print("\033[1;31;40mBot closed without shutdown signal, restarting...\033[1;37;40m")
     except KeyboardInterrupt:
         raise
     except:

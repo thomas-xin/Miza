@@ -146,7 +146,7 @@ class customAudio(discord.AudioSource):
             if self.reverse and len(self.queue):
                 self.stats["position"] = self.queue[0]["duration"]
         if self.source is not None and self.player:
-            self.player["time"] = 2
+            self.player["time"] = 2 + time.time()
 
     def seek(self, pos):
         duration = self.queue[0]["duration"]
@@ -178,7 +178,7 @@ class customAudio(discord.AudioSource):
             self.preparing = False
             self.queue = q
         if self.player:
-            self.player["time"] = 2
+            self.player["time"] = 2 + time.time()
 
     async def updatePlayer(self):
         curr = self.player
@@ -229,7 +229,7 @@ class customAudio(discord.AudioSource):
         except EOFError:
             if not self.paused and not self.is_loading:
                 if self.is_playing:
-                    self._vars.doUpdate |= True
+                    self._vars.doUpdate["playlists"] = True
                 self.new()
             temp = numpy.zeros(self.length, numpy.uint16).tobytes()
         try:
@@ -1179,7 +1179,7 @@ class Pause:
         if not auds.paused > 1:
             auds.paused = name in ("pause", "stop")
         if auds.player is not None:
-            auds.player["time"] = 1
+            auds.player["time"] = 1 + time.time()
         if "h" not in flags:
             past = name + "pe" * (name == "stop") + "d"
             return (
@@ -1206,7 +1206,7 @@ class Seek:
         pos = await _vars.evalTime(argv, guild)
         pos = auds.seek(pos)
         if auds.player is not None:
-            auds.player["time"] = 1
+            auds.player["time"] = 1 + time.time()
         if "h" not in flags:
             return (
                 "```css\nSuccessfully moved audio position to "
@@ -1287,7 +1287,7 @@ class Dump:
             e["u_id"] = user.id
             e["skips"] = []
         if auds.player is not None:
-            auds.player["time"] = 1
+            auds.player["time"] = 1 + time.time()
         if auds.stats["shuffle"]:
             shuffle(q)
         if "a" not in flags:
@@ -1308,7 +1308,7 @@ class Dump:
             doParallel(auds.queue.extend, [q])
         else:
             auds.queue.extend(q)
-        auds.stats = d["stats"]
+        auds.stats.update(d["stats"])
         if "h" not in flags:
             return "```css\nSuccessfully appended dump to queue for " + uniStr(guild.name) + ".```"
             
@@ -1793,8 +1793,7 @@ class updateQueues:
         self.connecting = {}
         self.clearAudioCache()
 
-    def sendUpdateRequest(self, *args, **void):
-        self._vars.doUpdate = True
+    sendUpdateRequest = lambda self, *void1, **void2: self._vars.doUpdate.setdefault("playlists", True)
 
     async def research(self, auds):
         if auds.searching >= 1:
@@ -1841,8 +1840,16 @@ class updateQueues:
             if not found:
                 try:
                     os.remove("cache/" + path)
-                except Exception as ex:
+                except:
                     print(traceback.format_exc())
+
+    async def _send_(self, message, **void):
+        if message.guild.id in self.audio:
+            auds = self.audio[message.guild.id]
+            if auds.player is not None and message.channel.id == auds.channel.id:
+                t = time.time() + 10
+                if auds.player["time"] < t:
+                    auds.player["time"] = t
 
     async def __call__(self, **void):
         while self.busy:
@@ -1880,7 +1887,7 @@ class updateQueues:
                     vc.play(auds, after=self.sendUpdateRequest)
                 cnt = sum(1 for m in channel.members if m.id != client.user.id)
                 dead = getattr(auds, "dead", 0)
-                if auds.timeout > 10 or dead:
+                if not cnt and auds.timeout < time.time() - 20 or dead:
                     await vc.disconnect(force=True)
                     try:
                         channel = auds.channel
@@ -1895,9 +1902,7 @@ class updateQueues:
                         pass
                 else:
                     if cnt:
-                        auds.timeout = 0
-                    else:
-                        auds.timeout += 1
+                        auds.timeout = time.time()
                     q = auds.queue
                     asyncio.create_task(auds.updatePlayer())
                     asyncio.create_task(self.research(auds))
