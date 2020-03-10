@@ -701,7 +701,7 @@ class Queue:
         self.description = "Shows the music queue, or plays a song in voice."
         self.usage = "<link[]> <verbose(?v)> <hide(?h)>"
 
-    async def __call__(self, client, user, _vars, argv, channel, guild, flags, message, **void):
+    async def __call__(self, _vars, client, user, message, channel, guild, flags, name, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if auds.stats["quiet"] & 2:
             flags.setdefault("h", 1)
@@ -709,9 +709,9 @@ class Queue:
         q = auds.queue
         if not len(argv.replace(" ", "")):
             v = "v" in flags
-            if not v and len(q) and auds.paused & 1:
-                auds.paused &= -3
-                return "``css\nSuccessfully resumed audio playback in " + uniStr(guild.name) + ".```", 1
+            if not v and len(q) and auds.paused & 1 and "p" in name:
+                auds.paused &= -2
+                return "```css\nSuccessfully resumed audio playback in " + uniStr(guild.name) + ".```", 1
             if not len(q):
                 return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```", 1
             if auds.stats["loop"]:
