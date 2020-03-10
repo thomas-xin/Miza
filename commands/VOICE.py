@@ -1169,11 +1169,11 @@ class Pause:
         self.usage = "<hide(?h)>"
 
     async def __call__(self, _vars, name, guild, client, user, perm, channel, message, flags, **void):
+        name = name.lower()
+        auds = await forceJoin(guild, channel, user, client, _vars)
         if name in ("pause", "stop"):
             if not isAlone(auds, user) and perm < 1:
                 self.PermError(perm, 1, "to " + name + " while other users are in voice")
-        name = name.lower()
-        auds = await forceJoin(guild, channel, user, client, _vars)
         if name == "stop":
             auds.seek(0)
         if not auds.paused > 1:
