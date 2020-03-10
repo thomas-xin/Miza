@@ -405,7 +405,7 @@ def prettyAns(f):
     return sympy.pretty(
         f,
         use_unicode=True,
-        num_columns=2000,
+        num_columns=2147483647,
         mat_symbol_style="bold",
     ).replace("zoo", "ℂ∞").replace("nan", "NaN")
 
@@ -489,6 +489,8 @@ def readline(stream):
         else:
             time.sleep(0.003)
             if time.time() - t > 900:
+                time.sleep(1)
+            elif time.time() - t > 12:
                 time.sleep(0.5)
     return output
 
