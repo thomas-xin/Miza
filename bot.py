@@ -846,7 +846,7 @@ class main_data:
         relationship = None
         is_friend = lambda self: None
         is_blocked = lambda self: None
-        avatar_url = ""
+        avatar_url = "0"
         color = discord.Colour(16777215)
         colour = color
         created_at = 0

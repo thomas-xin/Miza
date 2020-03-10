@@ -133,8 +133,8 @@ class Perms:
             else:
                 if "@e" in args[0] or "everyone" in args[0] or "here" in args[0]:
                     return (
-                        "Current user permissions for **" + guild.name + "**:\n```json\n"
-                        + str(_vars.data["perms"].get(guild.id, {})).replace("'", '"') + "```"
+                        "Current user permissions for **" + guild.name + "**:\n```ini\n"
+                        + strIter(_vars.data["perms"].get(guild.id, {})) + "```"
                     )
                 else:
                     t_user = await _vars.fetch_user(_vars.verifyID(args[0]))
@@ -529,15 +529,16 @@ class Info:
 
     async def __call__(self, argv, guild, _vars, client, user, flags, **void):
         member = True
+        g, guild = guild, None
         if argv:
             u_id = _vars.verifyID(argv)
             try:
-                u = guild.get_member(u_id)
+                u = g.get_member(u_id)
                 if u is None:
                     raise LookupError("Unable to find user or server from ID.")
             except:
                 try:
-                    u = await guild.fetch_member(u_id)
+                    u = await g.fetch_member(u_id)
                 except:
                     try:
                         u = await _vars.fetch_user(u_id)
@@ -545,17 +546,37 @@ class Info:
                     except:
                         try:
                             guild = await _vars.fetch_guild(u_id)
-                        except discord.Forbidden:
-                            raise
                         except:
                             try:
                                 channel = await _vars.fetch_channel(u_id)
-                            except discord.Forbidden:
-                                raise
                             except:
-                                raise LookupError("Unable to find user or server from ID.")
+                                try:
+                                    webhooks = await g.webhooks()
+                                    for w in webhooks:
+                                        if w.id == u_id:
+                                            u = _vars.ghostUser()
+                                            u.id = u_id
+                                            u.name = w.name
+                                            u.created_at = u.joined_at = w.created_at
+                                            u.discriminator = "0000"
+                                            u.avatar = w.avatar
+                                            u.avatar_url = w.avatar_url
+                                            raise StopIteration
+                                    raise EOFError
+                                except StopIteration:
+                                    pass
+                                except EOFError:
+                                    u = None
+                                    if g.id in _vars.data["counts"]:
+                                        if u_id in _vars.data["counts"][g.id]["counts"]:
+                                            u = _vars.ghostUser()
+                                            u.id = u_id
+                                    if u is None:
+                                        raise LookupError("Unable to find user or server from ID.")
                             try:
                                 guild = channel.guild
+                            except NameError:
+                                pass
                             except AttributeError:
                                 guild = None
                                 u = channel.recipient
@@ -563,6 +584,7 @@ class Info:
                             return await self.getGuildData(guild, flags)                        
         else:
             u = user
+        guild = g
         name = u.name
         dname = u.display_name
         disc = u.discriminator
@@ -1022,7 +1044,7 @@ class updateMessageCount:
                     limit=None,
                 )
                 print(history)
-                for i in range(8):
+                for i in range(16):
                     try:
                         messages = await history.flatten()
                         break
@@ -1032,7 +1054,7 @@ class updateMessageCount:
                         if i >= 7:
                             raise
                         print(traceback.format_exc())
-                    await asyncio.sleep(30 * (i ** 2 + 1))
+                    await asyncio.sleep(20 * (i ** 2 + 1))
                 print(len(messages))
                 returns[0] = messages
             except:
@@ -1205,7 +1227,7 @@ class updateUsers:
                 days = max(0, (udata["suspended"] - time.time()) / 86400)
                 try:
                     days **= 4
-                except:
+                except (OverflowError, ValueError, TypeError):
                     days = inf
                 days += 1.125
                 udata["suspended"] = time.time() + days * 86400

@@ -2237,7 +2237,9 @@ def hzero(size, maxoff=__hlist_maxoff__):
 
 class freeClass(collections.abc.Mapping):
     
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
+        for i in range(len(args)):
+            self.__dict__[i] = args[i]
         for i in kwargs:
             self.__setattr__(i, kwargs[i])
         for i in dir(self.__dict__):

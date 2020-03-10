@@ -23,6 +23,12 @@ class IMG:
                 reason = "to change image list for " + uniStr(guild.name)
                 self.permError(perm, req, reason)
             if "e" in flags:
+                if len(images) > 64:
+                    raise OverflowError(
+                        "Image list for " + uniStr(guild.name)
+                        + " has reached the maximum of 64 items. "
+                        + "Please remove an item to add another."
+                    )
                 key = args[0].lower()
                 if len(key) > 64:
                     raise OverflowError("Image tag too long.")
@@ -53,9 +59,13 @@ class IMG:
             )
         if not argv and not "r" in flags:
             if images:
+                if "v" in flags:
+                    key = lambda x: x
+                else:
+                    key = lambda x: limStr(x, 32)
                 return (
                     "Available images in **" + guild.name
-                    + "**: ```ini\n" + strIter(images).replace("'", '"') + "```"
+                    + "**: ```ini\n" + strIter(images, key=key).replace("'", '"') + "```"
                 )
             return (
                 "```css\nImage list for " + uniStr(guild.name)

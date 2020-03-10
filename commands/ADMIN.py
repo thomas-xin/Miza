@@ -31,8 +31,12 @@ class Purge:
             num = await _vars.evalMath(a2, guild.id)
             count = round(num)
             if t_user == -1:
-                t_user = await _vars.fetch_user(_vars.verifyID(a1))
-        if t_user != client.user:
+                u_id = _vars.verifyID(a1)
+                try:
+                    t_user = await _vars.fetch_user(u_id)
+                except:
+                    t_user = freeClass(id=u_id)
+        if t_user is not None and t_user.id != client.user.id:
             req = 3
             if perm < req:
                 reason = (

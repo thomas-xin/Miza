@@ -918,7 +918,7 @@ class Playlist:
                 + " from the default playlist for "
                 + uniStr(guild.name) + ".```"
             )
-        if len(pl) >= 128:
+        if len(pl) >= 64:
             raise OverflowError(
                 "Playlist size for " + uniStr(guild.name)
                 + " has reached the maximum of 64 items. "
@@ -1377,9 +1377,15 @@ class AudioSettings:
                     op = "settings"
         if not argv and op is not None and op not in "loop shuffle quiet":
             if op == "settings":
+                key = lambda x: (x*100, x)[type(x) is bool]
+                d = dict(auds.stats)
+                try:
+                    d.pop("position")
+                except KeyError:
+                    pass
                 return (
-                    "Current audio settings for **" + guild.name + "**:\n```json\n"
-                    + strIter(auds.stats).replace("'", '"') + "```"
+                    "Current audio settings for **" + guild.name + "**:\n```ini\n"
+                    + strIter(d, key=key).replace("'", '"') + "```"
                 )
             orig = _vars.updaters["playlists"].audio[guild.id].stats[op]
             num = round(100 * orig, 9)
