@@ -1016,7 +1016,15 @@ class updateMessageCount:
                 c = d["counts"]
                 if user is None:
                     return sum(t.values()) / sum(c.values())
-                return t.get(user.id, 0) / c.get(user.id, 1)
+                try:
+                    return t.get(user.id, 0) / c.get(user.id, 1)
+                except ZeroDivisionError:
+                    c.pop(user.id)
+                    try:
+                        t.pop(user.id)
+                    except KeyError:
+                        pass
+                    return 0
         return "Calculating..."            
 
     async def getGuildMessages(self, guild):
