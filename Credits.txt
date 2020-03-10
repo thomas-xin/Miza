@@ -12,6 +12,9 @@ Virtanen, Pauli and Gommers, Ralf and Oliphant, Travis E. and Haberland, Matt an
 Rapptz and others
 -discord.py: A modern, easy to use, feature-rich, and async ready API wrapper for Discord written in Python. {https://github.com/Rapptz/discord.py}
 
+Sergey M. and others
+-youtube_dl: Command-line program to download videos from YouTube.com and other video sites {https://github.com/ytdl-org/youtube-dl}
+
 
 
 MISC:

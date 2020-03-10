@@ -561,6 +561,7 @@ class Info:
                                             u.discriminator = "0000"
                                             u.avatar = w.avatar
                                             u.avatar_url = w.avatar_url
+                                            u.bot = True
                                             raise StopIteration
                                     raise EOFError
                                 except StopIteration:
@@ -1085,6 +1086,8 @@ class updateMessageCount:
         while [None] in histories:
             await asyncio.sleep(2)
         print("Counting...")
+        while [] in histories:
+            histories.remove([])
         mmax = 65536 / len(histories)
         caches = hlist()
         for messages in histories:
@@ -1101,17 +1104,18 @@ class updateMessageCount:
                     avgs[u] = length
                 if not i & 8191:
                     await asyncio.sleep(0.5)
-                temp.append(message)
-                while len(temp) > mmax:
-                    temp.popleft()
+                if len(temp) < mmax:
+                    temp.append(message)
                 i += 1
             caches.append(temp)
-            while sum(len(temp) for temp in caches) > 32768:
-                caches.popleft()
         addDict(self.data[guild.id], {"counts": data, "totals": avgs, 0: True})
         for temp in caches:
+            print("[" + str(len(temp)) + "]")
             for message in temp:
                 self._vars.cacheMessage(message)
+                if not i & 8191:
+                    await asyncio.sleep(0.5)
+                i += 1
         print(guild)
         print(self.data[guild.id])
 

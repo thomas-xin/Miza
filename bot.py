@@ -135,7 +135,7 @@ class main_data:
             user.name = "Deleted User"
             user.id = u_id
             user.avatar_url = "https://cdn.discordapp.com/embed/avatars/0.png"
-            user.create_time = discord.utils.snowflake_time(u_id)
+            user.created_at = discord.utils.snowflake_time(u_id)
         else:
             try:
                 user = client.get_user(u_id)
@@ -830,15 +830,17 @@ class main_data:
         isDM = True
         ghost = True
 
-    class ghostUser(discord.abc.User):
+    class ghostUser(discord.abc.Snowflake):
         
         def __init__(self):
             self.id = 0
             self.name = "[USER DATA NOT FOUND]"
             self.discriminator = "0000"
-            self.avatar = "0"
+            self.avatar = ""
+            self.avatar_url = ""
+            self.bot = False
+            self.display_name = ""
 
-        bot = False
         system = False
         history = lambda *void1, **void2: None
         dm_channel = None
@@ -846,12 +848,9 @@ class main_data:
         relationship = None
         is_friend = lambda self: None
         is_blocked = lambda self: None
-        avatar_url = "0"
-        color = discord.Colour(16777215)
-        colour = color
-        created_at = 0
-        display_name = ""
+        colour = color = discord.Colour(16777215)
         mention = "<@0>"
+        created_at = 0
         ghost = True
 
     class ghostMessage(discord.abc.Snowflake):
@@ -862,6 +861,9 @@ class main_data:
             self.channel = None
             self.guild = None
             self.id = 0
+
+        async def delete(self, *void1, **void2):
+            pass
 
         tts = False
         type = "default"
@@ -882,9 +884,6 @@ class main_data:
         jump_url = "https://discordapp.com/channels/-1/-1/-1"
         is_system = lambda self: None
         created_at = 0
-        
-        async def delete(self, *void1, **void2):
-            pass
         edit = delete
         publish = delete
         pin = delete
