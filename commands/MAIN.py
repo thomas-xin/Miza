@@ -1203,7 +1203,10 @@ class updateUsers:
                 u_id = int(susp)
                 udata = self.data[u_id]
                 days = max(0, (udata["suspended"] - time.time()) / 86400)
-                days **= 4
+                try:
+                    days **= 4
+                except:
+                    days = inf
                 days += 1.125
                 udata["suspended"] = time.time() + days * 86400
                 if days >= self._vars.min_suspend - 1:

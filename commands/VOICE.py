@@ -899,10 +899,10 @@ class Playlist:
                     + " is currently empty.```"
                 )
             if "v" in flags:
-                key = lambda x: str(x)
+                key = lambda x: noHighlight(x)
                 s = strIter(pl, key=key).replace("'", '"')
             else:
-                key = lambda x: limStr(x["name"], 40)
+                key = lambda x: limStr(noHighlight(x["name"]), 40)
                 s = strIter(pl, key=key)
             return (
                 "Current default playlist for **" + guild.name 

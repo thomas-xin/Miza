@@ -1273,11 +1273,10 @@ def strIter(it, key=None, limit=1728):
     s = ""
     i = 0
     for k in keys:
-        s += (
-            "\n["
-            + " " * (int(math.log10(len(it))) - int(math.log10(max(1, i)))) if type(k) is str else ""
-            + str(k) + "] "
-        )
+        s += "\n["
+        if type(k) is not str:
+            s += " " * (int(math.log10(len(it))) - int(math.log10(max(1, i))))
+        s += str(k) + "] "
         if key is None:
             s += str(it[k])
         else:
