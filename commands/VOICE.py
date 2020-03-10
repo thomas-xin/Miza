@@ -1391,7 +1391,7 @@ class AudioSettings:
             )
         if op == "settings":
             op = "volume"
-        elif op in "loop shuffle quiet":
+        elif type(op) is str and op in "loop shuffle quiet":
             argv = str(not _vars.updaters["playlists"].audio[guild.id].stats[op])
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to modify audio settings while other users are in voice")
