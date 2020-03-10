@@ -1215,13 +1215,13 @@ class Seek:
 
 def getDump(auds, guild):
     try:
-        lim = 32767
+        lim = 32768
         if len(auds.queue) > lim:
             raise OverflowError(
                 "Too many items in queue (" + uniStr(len(auds.queue))
                 + " > " + uniStr(lim) + ")."
             )
-        q = copy.deepcopy(list(auds.queue))
+        q = [dict(e) for e in auds.queue if random.random() < 0.99 or not time.sleep(0.001)]
         s = copy.deepcopy(auds.stats)
         for e in q:
             if "download" in e:

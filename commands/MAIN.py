@@ -1036,6 +1036,7 @@ class updateMessageCount:
                 print(len(messages))
                 returns[0] = messages
             except:
+                print(channel.name)
                 print(traceback.format_exc())
                 returns[0] = []
 
