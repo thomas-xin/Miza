@@ -9,6 +9,7 @@ class Purge:
     def __init__(self):
         self.name = ["Del", "Delete"]
         self.min_level = 1
+        self.min_display = "1~3"
         self.description = "Deletes a number of messages from a certain user in current channel."
         self.usage = "<1:user{bot}(?a)> <0:count[1]> <hide(?h)>"
 
@@ -32,12 +33,12 @@ class Purge:
             if t_user == -1:
                 t_user = await _vars.fetch_user(_vars.verifyID(a1))
         if t_user != client.user:
-            if perm < 3:
-                raise PermissionError (
-                    "Insufficient priviliges for command " + uniStr(name)
-                    + " for target user.\nRequred level: " + uniStr(3)
-                    + ", Current level: " + uniStr(perm) + "."
+            req = 3
+            if perm < req:
+                reason = (
+                    "to purge messages from target user"
                 )
+                self.permError(perm, req, reason)
         lim = count * 2 + 16
         if lim < 0:
             lim = 0
@@ -84,6 +85,7 @@ class Ban:
     def __init__(self):
         self.name = ["Bans", "Unban"]
         self.min_level = 3
+        self.min_display = "3+"
         self.description = "Bans a user for a certain amount of time, with an optional reason."
         self.usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
 
@@ -101,15 +103,13 @@ class Ban:
         else:
             t_user = await _vars.fetch_user(_vars.verifyID(args[0]))
             t_perm = _vars.getPerms(t_user, guild)
-        s_perm = perm
-        if t_perm + 1 > s_perm or t_perm is nan:
+        if t_perm + 1 > perm or t_perm is nan:
             if len(args) > 1:
-                raise PermissionError (
-                    "Insufficient priviliges to ban " + uniStr(t_user.name)
+                reason = (
+                    "to ban " + uniStr(t_user.name)
                     + " from " + uniStr(guild.name)
-                    + ".\nRequired level: " + uniStr(t_perm + 1)
-                    + ", Current level: " + uniStr(s_perm) + "."
                 )
+                self.permError(perm, t_perm + 1, reason)
         if name.lower() == "unban":
             tm = -1
             args = ["", ""]
@@ -223,6 +223,7 @@ class RoleGiver:
     def __init__(self):
         self.name = ["Verifier"]
         self.min_level = 3
+        self.min_display = "3+"
         self.description = "Adds an automated role giver to the current channel."
         self.usage = "<0:react_to[]> <1:role[]> <1:perm[]> <disable(?d)> <remover(?r)>"
 
@@ -246,12 +247,11 @@ class RoleGiver:
         try:
             role = float(args[1])
             if perm < role + 1 or role is nan:
-                raise PermissionError(
-                    "Insufficient priviliges to assign permission giver to " + uniStr(guild.name)
+                reason = (
+                    "to assign permission giver to " + uniStr(guild.name)
                     + " with value " + uniStr(role)
-                    + ".\nRequred level: " + uniStr(role + 1)
-                    + ", Current level: " + uniStr(perm) + "."
                 )
+                self.permError(perm, role + 1, reason)
             r_type = "perm"
         except ValueError:
             role = args[1].lower()
@@ -272,6 +272,7 @@ class DefaultPerms:
     def __init__(self):
         self.name = ["DefaultPerm"]
         self.min_level = 3
+        self.min_display = "3+"
         self.description = "Sets the default bot permission levels for all users in current server."
         self.usage = "<level[]>"
 
@@ -286,16 +287,15 @@ class DefaultPerms:
             )
         c_perm = await _vars.evalMath(argv, guild.id)
         if perm < c_perm + 1 or c_perm is nan:
-            raise PermissionError(
-                "Insufficient priviliges to change default permission level for " + uniStr(guild.name)
+            reason = (
+                "to change default permission level for " + uniStr(guild.name)
                 + " to " + uniStr(c_perm)
-                + ".\nRequred level: " + uniStr(c_perm + 1)
-                + ", Current level: " + uniStr(perm) + "."
             )
+            self.permError(perm, c_perm + 1, reason)
         perms["defaults"][guild.id] = c_perm
         update()
         return (
-            "```css\nChanged default permission level of " + uniStr(guild.name)
+            "```css\nChanged default permission level for " + uniStr(guild.name)
             + " to " + uniStr(c_perm) + ".```"
         )
 
@@ -308,7 +308,7 @@ class RainbowRole:
         self.name = ["DynamicRole"]
         self.min_level = 3
         self.description = "Causes target role to randomly change colour."
-        self.usage = "<0:role[]> <mim_delay[12]> <disable(?d)>"
+        self.usage = "<0:role[]> <mim_delay[16]> <disable(?d)>"
 
     async def __call__(self, _vars, flags, args, argv, guild, **void):
         update = self.data["rolecolours"].update
@@ -329,7 +329,7 @@ class RainbowRole:
             )
         role = args[0].lower()
         if len(args) < 2:
-            delay = 12
+            delay = 16
         else:
             delay = await _vars.evalMath(" ".join(args[1:]), guild.id)
         for r in guild.roles:
@@ -691,7 +691,7 @@ class updateColours:
             try:
                 role = guild.get_role(r)
                 delay = roles[r]
-                if not (self.counter + r) % delay:
+                if not random.randint(0, ceil(delay)):
                     col = self._vars.randColour()
                     try:
                         await role.edit(colour=discord.Colour(col))

@@ -683,6 +683,14 @@ async def downloadTextFile(url):
 ytdl = videoDownloader()
 
 
+def isAlone(auds, user):
+    i = (auds._vars.client.user.id, user.id)
+    for m in auds.vc.channel.members:
+        if m.id not in i:
+            return False
+    return True
+
+
 class Queue:
     is_command = True
     server_only = True
@@ -846,7 +854,7 @@ class Queue:
                 names = uniStr(names[0])
             elif len(names) >= 4:
                 names = uniStr(len(names)) + " items"
-            if not "h" in flags:
+            if "h" not in flags:
                 return (
                     "```css\n🎶 Added " + noHighlight(names)
                     + " to the queue! Estimated time until playing: "
@@ -861,6 +869,7 @@ class Playlist:
     def __init__(self):
         self.name = ["DefaultPlaylist", "PL"]
         self.min_level = 0
+        self.min_display = "0~2"
         self.description = "Shows, appends, or removes from the default playlist."
         self.usage = "<link[]> <remove(?d)> <verbose(?v)>"
 
@@ -871,11 +880,11 @@ class Playlist:
         if argv or "d" in flags:
             req = 2
             if perm < req:
-                raise PermissionError(
-                    "Insufficient privileges to modify default playlist for "
-                    + uniStr(guild.name) + ". Required level: "
-                    + uniStr(req) + ", Current level: " + uniStr(perm) + "."
+                reason = (
+                    "to modify default playlist for "
+                    + uniStr(guild.name)
                 )
+                self.permError(perm, req, reason)
         pl = pl.setdefault(guild.id, [])
         if not argv:
             if "d" in flags:
@@ -1002,15 +1011,19 @@ class Leave:
 
     def __init__(self):
         self.name = ["Quit", "DC", "Disconnect"]
-        self.min_level = 1
+        self.min_level = 0
+        self.min_display = "0~1"
         self.description = "Leaves a voice channel."
         self.usage = ""
 
-    async def __call__(self, user, client, _vars, guild, **void):
+    async def __call__(self, user, _vars, guild, perm, **void):
         try:
-            _vars.updaters["playlists"].audio[guild.id].dead = True
+            auds = _vars.updaters["playlists"].audio[guild.id]
         except KeyError:
             raise LookupError("Unable to find connected channel.")
+        if not isAlone(auds, user) and perm < 1:
+            self.permError(perm, 1, "to disconnect while other users are in voice")
+        auds.dead = True
 
 
 class Skip:
@@ -1020,27 +1033,16 @@ class Skip:
     def __init__(self):
         self.name = ["Remove", "Rem", "S"]
         self.min_level = 0
+        self.min_display = "0~1"
         self.description = "Removes an entry from the voice channel queue."
         self.usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
 
-    async def __call__(self, client, user, perm, _vars, args, argv, guild, flags, message, **void):
-        found = False
+    async def __call__(self, client, user, perm, _vars, name, args, argv, guild, flags, message, **void):
         if guild.id not in _vars.updaters["playlists"].audio:
             raise LookupError("Currently not playing in a voice channel.")
         auds = _vars.updaters["playlists"].audio[guild.id]
-        if auds.stats["quiet"] & 2:
-            flags["h"] = 1
-            try:
-                await message.delete()
-            except discord.NotFound:
-                pass
-        req = 1
-        if "f" in flags and perm < req:
-            raise PermissionError(
-                "Insufficient privileges to force skip"
-                + ". Required level: " + uniStr(req)
-                + ", Current level: " + uniStr(perm) + "."
-            )
+        if not isAlone(auds, user) and perm < 1:
+            self.permError(perm, 1, "to skip while other users are in voice")
         if not argv:
             elems = [0]
         elif ":" in argv or ".." in argv:
@@ -1082,12 +1084,7 @@ class Skip:
                     break
             if not valid:
                 elems = range(len(auds.queue))
-        members = 0
-        for vc in client.voice_clients:
-            if vc.channel.guild.id == guild.id:
-                for memb in vc.channel.members:
-                    if not memb.bot:
-                        members += 1
+        members = sum(1 for m in auds.vc.channel.members if not m.bot)
         required = 1 + members >> 1
         response = "```css\n"
         for pos in elems:
@@ -1151,7 +1148,7 @@ class Skip:
                     + " has been removed from the queue.\n"
                 )
                 count += 1
-        if not "h" in flags:
+        if "h" not in flags:
             if count >= 4:
                 return (
                     "```css\n" + uniStr(count)
@@ -1166,11 +1163,15 @@ class Pause:
 
     def __init__(self):
         self.name = ["Resume", "Unpause", "Stop"]
-        self.min_level = 1
+        self.min_level = 0
+        self.min_display = "0~1"
         self.description = "Pauses, stops, or resumes audio playing."
-        self.usage = ""
+        self.usage = "<hide(?h)>"
 
-    async def __call__(self, _vars, name, guild, client, user, channel, message, **void):
+    async def __call__(self, _vars, name, guild, client, user, perm, channel, message, flags, **void):
+        if name in ("pause", "stop"):
+            if not isAlone(auds, user) and perm < 1:
+                self.PermError(perm, 1, "to " + name + " while other users are in voice")
         name = name.lower()
         auds = await forceJoin(guild, channel, user, client, _vars)
         if name == "stop":
@@ -1179,12 +1180,7 @@ class Pause:
             auds.paused = name in ("pause", "stop")
         if auds.player is not None:
             auds.player["time"] = 1
-        if auds.stats["quiet"] & 2:
-            try:
-                await message.delete()
-            except discord.NotFound:
-                pass
-        else:
+        if "h" not in flags:
             past = name + "pe" * (name == "stop") + "d"
             return (
                 "```css\nSuccessfully " + past + " audio playback in "
@@ -1198,22 +1194,20 @@ class Seek:
 
     def __init__(self):
         self.name = []
-        self.min_level = 1
+        self.min_level = 0
+        self.min_display = "0~1"
         self.description = "Seeks to a position in the current audio file."
-        self.usage = "<position[0]>"
+        self.usage = "<position[0]> <hide(?h)>"
 
-    async def __call__(self, argv, _vars, guild, client, user, channel, message, **void):
+    async def __call__(self, argv, _vars, guild, client, user, perm, channel, message, flags, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
+        if not isAlone(auds, user) and perm < 1:
+            self.permError(perm, 1, "to seek while other users are in voice")
         pos = await _vars.evalTime(argv, guild)
         pos = auds.seek(pos)
         if auds.player is not None:
             auds.player["time"] = 1
-        if auds.stats["quiet"] & 2:
-            try:
-                await message.delete()
-            except discord.NotFound:
-                pass
-        else:
+        if "h" not in flags:
             return (
                 "```css\nSuccessfully moved audio position to "
                 + uniStr(sec2Time(pos)) + ".```"
@@ -1256,11 +1250,12 @@ class Dump:
 
     def __init__(self):
         self.name = []
-        self.min_level = 1
+        self.min_level = 0
+        self.min_display = "0~1"
         self.description = "Dumps or loads the currently playing audio queue state."
         self.usage = "<data{attached_file}> <append(?a)> <hide(?h)>"
 
-    async def __call__(self, guild, channel, user, client, _vars, argv, flags, message, **void):
+    async def __call__(self, guild, channel, user, client, _vars, perm, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if not argv and not len(message.attachments):
             returns = [None]
@@ -1271,6 +1266,8 @@ class Dump:
             if type(resp) is str:
                 raise eval(resp)
             return bytes(resp[0], "utf-8")
+        if not isAlone(auds, user) and perm < 1:
+            self.permError(perm, 1, "to dump while other users are in voice")
         try:
             if len(message.attachments):
                 url = message.attachments[0].url
@@ -1293,7 +1290,7 @@ class Dump:
             auds.player["time"] = 1
         if auds.stats["shuffle"]:
             shuffle(q)
-        if not "a" in flags:
+        if "a" not in flags:
             auds.new()
             del auds.queue
             auds.queue = hlist(q)
@@ -1312,7 +1309,7 @@ class Dump:
         else:
             auds.queue.extend(q)
         auds.stats = d["stats"]
-        if not "h" in flags:
+        if "h" not in flags:
             return "```css\nSuccessfully appended dump to queue for " + uniStr(guild.name) + ".```"
             
 
@@ -1335,10 +1332,11 @@ class AudioSettings:
     def __init__(self):
         self.name = ["Audio"] + list(self.other_settings)
         self.min_level = 0
+        self.min_display = "0~1"
         self.description = "Changes the current audio settings for this server."
         self.usage = (
             "<value[]> <volume()> <speed(?s)> <pitch(?p)> <bassboost(?b)> <reverb(?r)> <chorus(?c)>"
-            + " <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)>"
+            + " <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)> <hide(?h)>"
         )
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, name, message, perm, **void):
@@ -1372,7 +1370,7 @@ class AudioSettings:
             if op == "settings":
                 return (
                     "Current audio settings for **" + guild.name + "**:\n```json\n"
-                    + str(auds.stats).replace("'", '"') + "```"
+                    + strIter(auds.stats).replace("'", '"') + "```"
                 )
             orig = _vars.updaters["playlists"].audio[guild.id].stats[op]
             if op in "loop shuffle quiet":
@@ -1387,13 +1385,8 @@ class AudioSettings:
             )
         if op == "settings":
             op = "volume"
-        req = 1
-        if perm < req:
-            raise PermissionError(
-                "Insufficient privileges to modify audio settings for "
-                + uniStr(guild.name) + ". Required level: "
-                + uniStr(req) + ", Current level: " + uniStr(perm) + "."
-            )
+        if not isAlone(auds, user) and perm < 1:
+            self.permError(perm, 1, "to modify audio settings while other users are in voice")
         if op is None:
             pos = auds.stats["position"]
             auds.stats = dict(auds.defaults)
@@ -1420,12 +1413,7 @@ class AudioSettings:
             origVol[op] = val
         if op in "speed pitch chorus":
             auds.new(auds.file, auds.stats["position"])
-        if auds.stats["quiet"] & 2:
-            try:
-                await message.delete()
-            except discord.NotFound:
-                pass
-        else:
+        if "h" not in flags:
             return (
                 "```css\nChanged audio " + op
                 + " state" * (type(orig) is bool)
@@ -1441,14 +1429,17 @@ class Rotate:
 
     def __init__(self):
         self.name = ["jump"]
-        self.min_level = 1
+        self.min_level = 0
+        self.min_display = "0~1"
         self.description = "Rotates the queue to the left by a certain amount of steps."
-        self.usage = "<position>"
+        self.usage = "<position> <hide(?h)>"
 
-    async def __call__(self, argv, guild, channel, user, client, _vars, **void):
+    async def __call__(self, perm, argv, flags, guild, channel, user, client, _vars, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         amount = await _vars.evalMath(argv, guild.id)
-        if len(auds.queue) > 1:
+        if len(auds.queue) > 1 and amount:
+            if not isAlone(auds, user) and perm < 1:
+                self.permError(perm, 1, "to rotate queue while other users are in voice")
             for i in range(3):
                 try:
                     auds.queue[i].pop("download")
@@ -1456,11 +1447,12 @@ class Rotate:
                     pass
             auds.queue.rotate(-amount)
             auds.seek(inf)
-        return (
-            "```css\nSuccessfully rotated the queue "
-            + uniStr(amount) + " step"
-            + "s" * (amount != 1) + ".```"
-        )
+        if "h" not in flags:
+            return (
+                "```css\nSuccessfully rotated the queue "
+                + uniStr(amount) + " step"
+                + "s" * (amount != 1) + ".```"
+            )
 
 
 class Shuffle:
@@ -1469,13 +1461,16 @@ class Shuffle:
 
     def __init__(self):
         self.name = []
-        self.min_level = 1
+        self.min_level = 0
+        self.min_display = "0~1"
         self.description = "Shuffles the audio queue."
-        self.usage = ""
+        self.usage = "<hide(?h)>"
 
-    async def __call__(self, guild, channel, user, client, _vars, **void):
+    async def __call__(self, perm, flags, guild, channel, user, client, _vars, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if len(auds.queue) > 1:
+            if not isAlone(auds, user) and perm < 1:
+                self.permError(perm, 1, "to shuffle queue while other users are in voice")
             for i in range(3):
                 try:
                     auds.queue[i].pop("download")
@@ -1483,10 +1478,11 @@ class Shuffle:
                     pass
             shuffle(auds.queue)
             auds.seek(inf)
-        return (
-            "```css\nSuccessfully shuffled audio queue for "
-            + uniStr(guild.name) + ".```"
-        )
+        if "h" not in flags:
+            return (
+                "```css\nSuccessfully shuffled audio queue for "
+                + uniStr(guild.name) + ".```"
+            )
 
 
 class Unmute:
@@ -1498,16 +1494,17 @@ class Unmute:
         self.name = ["Unmuteall"]
         self.min_level = 2
         self.description = "Disables server mute for all members."
-        self.usage = ""
+        self.usage = "<hide(?h)>"
 
-    async def __call__(self, guild, **void):
+    async def __call__(self, guild, flags, **void):
         for vc in guild.voice_channels:
             for user in vc.members:
                 asyncio.create_task(user.edit(mute=False, deafen=False))
-        return (
-            "```css\nSuccessfully unmuted all users in voice channels in "
-            + uniStr(guild.name) + ".```"
-        )
+        if "h" not in flags:
+            return (
+                "```css\nSuccessfully unmuted all users in voice channels in "
+                + uniStr(guild.name) + ".```"
+            )
 
 
 class Player:
@@ -1537,6 +1534,7 @@ class Player:
     def __init__(self):
         self.name = ["NP", "NowPlaying"]
         self.min_level = 0
+        self.min_display = "0~2"
         self.description = "Creates an auto-updating virtual audio player for the current server."
         self.usage = "<verbose(?v)> <controllable(?c)> <disable(?d)>"
 
@@ -1763,7 +1761,7 @@ class Player:
             delay = inf
         auds.player["time"] = time.time() + delay
 
-    async def __call__(self, channel, user, client, _vars, flags, perm, **void):
+    async def __call__(self, guild, channel, user, client, _vars, flags, perm, **void):
         auds = await forceJoin(channel.guild, channel, user, client, _vars)
         if "c" in flags or auds.stats["quiet"] & 2:
             req = 1
@@ -1775,12 +1773,7 @@ class Player:
                         reason = "override"
                 else:
                     reason = "create controllable"
-                raise PermissionError(
-                    "Insufficient privileges to " + reason
-                    + " virtual audio player for " + uniStr(channel.guild.name)
-                    + ". Required level: " + uniStr(req)
-                    + ", Current level: " + uniStr(perm) + "."
-                )
+                self.permError(perm, req, "to " + reason + " virtual audio player for " + uniStr(guild.name))
         if "d" in flags:
             auds.player = None
             return (

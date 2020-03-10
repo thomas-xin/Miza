@@ -29,7 +29,6 @@ class Help:
             if catg in enabled or admin:
                 commands.extend(categories[catg])
         verb = "v" in flags
-        argv = " ".join(args).lower().replace(prefix, "")
         show = []
         for a in args:
             if (a in categories and (a in enabled or admin)):
@@ -52,8 +51,10 @@ class Help:
                         "```xml\n" + prefix + name
                         + "\nAliases: " + str(com.name)
                         + "\nEffect: " + description
-                        + "\nUsage: " + prefix + name + " " + usage
-                        + "\nLevel: " + uniStr(min_level)
+                        + (
+                            "\nUsage: " + prefix + name + " " + usage
+                            + "\nLevel: " + uniStr(com.min_display)
+                        ) * ("v" in flags)
                         + "```"
                     )
                     show.append(newstr)
@@ -82,8 +83,10 @@ class Help:
                             + "\nCategory: " + c
                             + "\nAliases: " + str(com.name)
                             + "\nEffect: " + description
-                            + "\nUsage: " + prefix + name + " " + usage
-                            + "\nLevel: " + uniStr(min_level)
+                            + (
+                                "\nUsage: " + prefix + name + " " + usage
+                                + "\nLevel: " + uniStr(com.min_display)
+                            )
                             + "```"
                         )
                         if (not len(show)) or len(show[-1]) < len(newstr):
@@ -103,9 +106,8 @@ class Help:
                         show.append(prefix + name + " " + usage)
                     else:
                         show.append(
-                            "\n" + prefix + com.__name__
+                            "\nUsage: " + prefix + name + " " + usage
                             + "\nEffect: " + com.description
-                            + "\nUsage: " + prefix + name + " " + usage
                         )
             return (
                 "Commands for **" + user.name + "** in <#" + str(channel.id)
@@ -140,8 +142,6 @@ class Perms:
             t_perm = _vars.getPerms(t_user.id, guild)
         else:
             c_perm = await _vars.evalMath(" ".join(args[1:]), guild.id)
-            s_user = user
-            s_perm = perm
             check = args[0].lower()
             if "everyone" in check or "here" in check:
                 t_user = None
@@ -155,7 +155,7 @@ class Perms:
                 m_perm = nan
             else:
                 m_perm = max(t_perm, c_perm, 1) + 1
-            if not s_perm <= m_perm and m_perm is not nan:
+            if not perm <= m_perm and m_perm is not nan:
                 if t_user is None:
                     if not "f" in flags:
                         response = uniStr(
@@ -176,14 +176,13 @@ class Perms:
                     + " to " + uniStr(c_perm) + ".```"
                 )
             else:
-                raise PermissionError(
-                    "Insufficient priviliges to change permissions for " + uniStr(name)
+                reason = (
+                    "to change permissions for " + uniStr(name)
                     + " in " + uniStr(guild.name)
                     + " from " + uniStr(t_perm)
                     + " to " + uniStr(c_perm)
-                    + ".\nRequired level: " + uniStr(m_perm)
-                    + ", Current level: " + uniStr(s_perm) + "."
                 )
+                self.permError(perm, m_perm, reason)
         return (
             "```css\nCurrent permissions for " + uniStr(t_user.name)
             + " in " + uniStr(guild.name)
@@ -198,6 +197,7 @@ class EnableCommand:
     def __init__(self):
         self.name = ["EC", "Enable"]
         self.min_level = 0
+        self.min_display = "0~3"
         self.description = "Shows, enables, or disables a command category in the current channel."
         self.usage = "<command{all}> <enable(?e)> <disable(?d)> <list(?l)> <hide(?h)>"
 
@@ -208,12 +208,11 @@ class EnableCommand:
         if "e" in flags or "d" in flags:
             req = 3
             if perm < req:
-                raise PermissionError(
-                    "Insufficient priviliges to change command list for "
+                reason = (
+                    "to change command list for "
                     + uniStr(channel.name)
-                    + ".\nRequred level: " + uniStr(req)
-                    + ", Current level: " + uniStr(perm) + "."
                 )
+                self.permError(perm, req, reason)
         catg = argv.lower()
         if not catg:
             if "l" in flags:
@@ -247,7 +246,7 @@ class EnableCommand:
             )
         else:
             if not catg in _vars.categories:
-                raise KeyError("Unknown command category " + uniStr(argv) + ".")
+                raise LookupError("Unknown command category " + uniStr(argv) + ".")
             else:
                 enabled = enabled.setdefault(channel.id, {})
                 if "e" in flags:
@@ -298,7 +297,7 @@ class Restart:
     async def __call__(self, client, channel, user, guild, name, _vars, perm, **void):
         if name.lower() == "shutdown":
             if perm is not nan:
-                raise PermissionError("Insufficient priviliges to request shutdown.")
+                self.permError(perm, nan, "for command " + self.name[0])
             await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
@@ -379,6 +378,7 @@ class Prefix:
     def __init__(self):
         self.name = ["ChangePrefix"]
         self.min_level = 0
+        self.min_display = "0~3"
         self.description = "Shows or changes the prefix for commands for this server."
         self.usage = "<prefix[]>"
 
@@ -390,14 +390,13 @@ class Prefix:
                 "```css\nCurrent command prefix for " + uniStr(guild.name)
                 + ": " + _vars.getPrefix(guild) + "```"
             )
-        req = inf
+        req = 3
         if perm < req:
-            raise PermissionError(
-                "Insufficient priviliges to change command prefix for "
+            reason = (
+                "to change command prefix for "
                 + uniStr(guild.name)
-                + ".\nRequred level: " + uniStr(req)
-                + ", Current level: " + uniStr(perm) + "."
             )
+            self.permError(perm, req, reason)
         pref[guild.id] = argv.strip(" ")
         update()
         return (
@@ -413,6 +412,7 @@ class Loop:
     def __init__(self):
         self.name = ["For", "Rep", "Repeat", "While"]
         self.min_level = 1
+        self.min_display = "1+"
         self.description = "Loops a command."
         self.usage = "<0:iterations> <1:command> <hide(?h)>"
 
@@ -422,11 +422,11 @@ class Loop:
         scale = 3
         limit = perm * scale
         if iters > limit:
-            raise PermissionError(
-                "insufficient priviliges to execute loop of " + uniStr(iters)
-                + " iterations. Required level: " + uniStr(ceil(iters / scale))
-                + ", Current level: " + uniStr(perm) + "."
+            reason = (
+                "to execute loop of " + uniStr(iters)
+                + " iterations"
             )
+            self.permError(perm, ceil(iters / scale), reason)
         func = func2 = " ".join(args[1:])
         if flags:
             func += " ?" + "?".join(flags)
@@ -436,7 +436,7 @@ class Loop:
         if isValid(perm):
             for n in self.name:
                 if (_vars.getPrefix(guild) + n).upper() in func.replace(" ", "").upper():
-                    raise PermissionError("Insufficient priviliges to execute nested loop.")
+                    raise PermissionError("Must be server owner to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
         if not "h" in flags:
             await channel.send(

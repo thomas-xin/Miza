@@ -336,6 +336,17 @@ class main_data:
             self.updated = True
         return False
 
+    def permError(self, perm, req=None, reason=None):
+        if req is None:
+            req = self.min_level
+        if reason is None:
+            reason = "for command " + self.name[-1]
+        raise PermissionError(
+            "Insufficient priviliges " + str(reason)
+            + ".\nRequred level: " + uniStr(req)
+            + ", Current level: " + uniStr(perm) + "."
+        )
+
     def getModule(self, module):
         try:
             f = module
@@ -356,6 +367,9 @@ class main_data:
                     obj.data = {}
                     obj.__name__ = var.__name__
                     obj.name.append(obj.__name__)
+                    if not hasattr(obj, "min_display"):
+                        obj.min_display = obj.min_level
+                    obj.permError = main_data.permError
                     commands.append(obj)
                     #print("Successfully loaded command " + obj.__name__ + ".")
                 except AttributeError:
@@ -966,11 +980,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                     req = command.min_level
                     try:
                         if req > u_perm or (u_perm is not nan and req is nan):
-                            raise PermissionError(
-                                "Insufficient priviliges for command " + alias
-                                + ".\nRequred level: " + uniStr(req)
-                                + ", Current level: " + uniStr(u_perm) + "."
-                            )
+                            command.permError(u_perm, req, "for command " + alias)
                         if cb_argv is not None:
                             argv = cb_argv
                             flags = cb_flags
@@ -1088,7 +1098,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                         asyncio.create_task(channel.send(response))
                                 else:
                                     if type(response) is not bytes:
-                                        response = bytes(repr(response), "utf-8")
+                                        response = bytes(str(response), "utf-8")
                                         filemsg = "Response too long for message."
                                     else:
                                         filemsg = "Response data:"

@@ -8,6 +8,7 @@ class IMG:
     def __init__(self):
         self.name = []
         self.min_level = 0
+        self.min_display = "0~2"
         self.description = "Sends an image in the current chat from a list."
         self.usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <enable(?e)> <disable(?d)> <hide(?h)>"
 
@@ -19,11 +20,8 @@ class IMG:
         if "e" in flags or "d" in flags:
             req = 2
             if perm < req:
-                raise PermissionError(
-                    "Insufficient priviliges to change image list for " + uniStr(guild.name)
-                    + ".\nRequred level: " + uniStr(req)
-                    + ", Current level: " + uniStr(perm) + "."
-                )
+                reason = "to change image list for " + uniStr(guild.name)
+                self.permError(perm, req, reason)
             if "e" in flags:
                 key = args[0].lower()
                 if len(key) > 64:

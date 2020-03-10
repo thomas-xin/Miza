@@ -350,7 +350,7 @@ class Neko:
 
     def __init__(self):
         self.name = []
-        self.min_level = 1
+        self.min_level = 0
         self.description = "Pulls a random image from nekos.life and embeds it."
         self.usage = "<tags[neko]> <random(?r)> <verbose(?v)> <list(?l)>"
 
