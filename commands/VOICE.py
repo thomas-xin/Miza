@@ -696,7 +696,7 @@ class Queue:
     server_only = True
 
     def __init__(self):
-        self.name = ["Q", "Play", "Playing", "P"]
+        self.name = ["Q", "Play", "P"]
         self.min_level = 0
         self.description = "Shows the music queue, or plays a song in voice."
         self.usage = "<link[]> <verbose(?v)> <hide(?h)>"
@@ -704,15 +704,14 @@ class Queue:
     async def __call__(self, client, user, _vars, argv, channel, guild, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if auds.stats["quiet"] & 2:
-            flags["h"] = 1
-            try:
-                await message.delete()
-            except discord.NotFound:
-                pass
+            flags.setdefault("h", 1)
         elapsed = auds.stats["position"]
         q = auds.queue
         if not len(argv.replace(" ", "")):
             v = "v" in flags
+            if not v and len(q) and auds.paused & 1:
+                auds.paused &= -3
+                return "``css\nSuccessfully resumed audio playback in " + uniStr(guild.name) + ".```", 1
             if not len(q):
                 return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```", 1
             if auds.stats["loop"]:
@@ -1184,7 +1183,7 @@ class Pause:
             past = name + "pe" * (name == "stop") + "d"
             return (
                 "```css\nSuccessfully " + past + " audio playback in "
-                + uniStr(guild.name) + ".```"
+                + uniStr(guild.name) + ".```", 1
             )
 
 
@@ -1210,7 +1209,7 @@ class Seek:
         if "h" not in flags:
             return (
                 "```css\nSuccessfully moved audio position to "
-                + uniStr(sec2Time(pos)) + ".```"
+                + uniStr(sec2Time(pos)) + ".```", 1
             )
 
 
@@ -1303,22 +1302,26 @@ class Dump:
                     d["stats"][k] = float(d["stats"][k])
             auds.stats.update(d["stats"])
             if not "h" in flags:
-                return "```css\nSuccessfully reinstated audio queue for " + uniStr(guild.name) + ".```"
+                return (
+                    "```css\nSuccessfully reinstated audio queue for " 
+                    + uniStr(guild.name) + ".```", 1
+                )
         if len(auds.queue) > 1024:
             doParallel(auds.queue.extend, [q])
         else:
             auds.queue.extend(q)
         auds.stats.update(d["stats"])
         if "h" not in flags:
-            return "```css\nSuccessfully appended dump to queue for " + uniStr(guild.name) + ".```"
+            return (
+                "```css\nSuccessfully appended dump to queue for " 
+                + uniStr(guild.name) + ".```", 1
+            )
             
 
 class AudioSettings:
     is_command = True
     server_only = True
     other_settings = {
-        "V": "volume",
-        "Vol": "volume",
         "Volume": "volume",
         "Speed": "speed",
         "Pitch": "pitch",
@@ -1328,6 +1331,10 @@ class AudioSettings:
         "LoopQueue": "loop",
         "ShuffleQueue": "shuffle",
         "Quiet": "quiet",
+        "Vol": "volume",
+        "V": "volume",
+        "LQ": "loop",
+        "SQ": "shuffle",
     }
     def __init__(self):
         self.name = ["Audio"] + list(self.other_settings)
@@ -1335,7 +1342,7 @@ class AudioSettings:
         self.min_display = "0~1"
         self.description = "Changes the current audio settings for this server."
         self.usage = (
-            "<value[]> <volume()> <speed(?s)> <pitch(?p)> <bassboost(?b)> <reverb(?r)> <chorus(?c)>"
+            "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <bassboost(?b)> <reverb(?r)> <chorus(?c)>"
             + " <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)> <hide(?h)>"
         )
 
@@ -1343,7 +1350,9 @@ class AudioSettings:
         auds = await forceJoin(guild, channel, user, client, _vars)
         op = None
         if not "d" in flags:
-            if "s" in flags:
+            if "v" in flags:
+                op = "volume"
+            elif "s" in flags:
                 op = "speed"
             elif "p" in flags:
                 op = "pitch"
@@ -1366,17 +1375,14 @@ class AudioSettings:
                         break
                 if op is None:
                     op = "settings"
-        if not argv and op is not None:
+        if not argv and op is not None and op not in "loop shuffle quiet":
             if op == "settings":
                 return (
                     "Current audio settings for **" + guild.name + "**:\n```json\n"
                     + strIter(auds.stats).replace("'", '"') + "```"
                 )
             orig = _vars.updaters["playlists"].audio[guild.id].stats[op]
-            if op in "loop shuffle quiet":
-                num = bool(orig)
-            else:
-                num = round(100 * orig, 9)
+            num = round(100 * orig, 9)
             return (
                 "```css\nCurrent audio " + op
                 + " state" * (type(orig) is bool)
@@ -1385,6 +1391,8 @@ class AudioSettings:
             )
         if op == "settings":
             op = "volume"
+        elif op in "loop shuffle quiet":
+            argv = str(not _vars.updaters["playlists"].audio[guild.id].stats[op])
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to modify audio settings while other users are in voice")
         if op is None:
@@ -1419,7 +1427,7 @@ class AudioSettings:
                 + " state" * (type(orig) is bool)
                 + " in " + uniStr(guild.name)
                 + " from " + uniStr(orig)
-                + " to " + uniStr(new) + ".```"
+                + " to " + uniStr(new) + ".```", 1
             )
 
 
@@ -1451,7 +1459,7 @@ class Rotate:
             return (
                 "```css\nSuccessfully rotated the queue "
                 + uniStr(amount) + " step"
-                + "s" * (amount != 1) + ".```"
+                + "s" * (amount != 1) + ".```", 1
             )
 
 
@@ -1481,7 +1489,7 @@ class Shuffle:
         if "h" not in flags:
             return (
                 "```css\nSuccessfully shuffled audio queue for "
-                + uniStr(guild.name) + ".```"
+                + uniStr(guild.name) + ".```", 1
             )
 
 
@@ -1503,7 +1511,7 @@ class Unmute:
         if "h" not in flags:
             return (
                 "```css\nSuccessfully unmuted all users in voice channels in "
-                + uniStr(guild.name) + ".```"
+                + uniStr(guild.name) + ".```", 1
             )
 
 
@@ -1532,7 +1540,7 @@ class Player:
     barsize = 24
 
     def __init__(self):
-        self.name = ["NP", "NowPlaying"]
+        self.name = ["NP", "NowPlaying", "Playing"]
         self.min_level = 0
         self.min_display = "0~2"
         self.description = "Creates an auto-updating virtual audio player for the current server."
@@ -1923,10 +1931,12 @@ class updateQueues:
                         while dels:
                             q.pop(dels.popleft())
                     if q:
+                        for i in range(256):
+                            if i < len(q):
+                                should_cache[q[i]["id"]] = True
                         for i in range(2):
                             if i < len(q):
                                 e_id = q[i]["id"]
-                                should_cache[e_id] = True
                                 if not q[i].get("download", 0):
                                     q[i]["download"] = 1
                                     search = e_id + ".mp3"

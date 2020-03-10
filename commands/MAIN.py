@@ -519,7 +519,7 @@ class Info:
         if pcount:
             emb.add_field(name="Post count", value=str(pcount), inline=1)
             if "v" in flags:
-                emb.add_field(name="Average post length", value=str(pavg), inline=1)
+                emb.add_field(name="Average post length", value=str(round(pavg, 9)), inline=1)
         if top is not None:
             emb.add_field(name="Top users", value=top, inline=0)
         print(emb.to_dict())
@@ -643,7 +643,7 @@ class Info:
         if msgs:
             emb.add_field(name="Post count", value=str(msgs), inline=1)
         if avgs:
-            emb.add_field(name="Average post length", value=str(avgs), inline=1)
+            emb.add_field(name="Average post length", value=str(round(avgs, 9)), inline=1)
         if pos:
             emb.add_field(name="Server rank", value=str(pos), inline=1)
         if role:
