@@ -993,7 +993,7 @@ class Join:
             joined = False
         for user in guild.members:
             if user.id == client.user.id:
-                if user.VoiceState is not None:
+                if hasattr(user, "VoiceState") and user.VoiceState is not None:
                     if not (user.VoiceState.deaf or user.VoiceState.mute):
                         break
                     asyncio.create_task(user.edit(mute=False,deafen=False))

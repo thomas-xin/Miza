@@ -528,6 +528,12 @@ class main_data:
                 r = [True]
             elif f in ("f", "F", "false", "FALSE"):
                 r = [False]
+            elif f.lower() == "inf":
+                r = [inf]
+            elif f.lower() == "-inf":
+                r = [-inf]
+            elif f.lower() in ("nan", "-nan"):
+                r = [nan]
             else:
                 r = [ast.literal_eval(f)]
         except ValueError:

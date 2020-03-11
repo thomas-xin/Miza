@@ -352,7 +352,8 @@ translators = {
     "×": "*",
     "⋅": "*",
     "·": "*",
-    "∑": "sum ",
+    "Σ": "Sum ",
+    "∑": "Sum ",
     "∫": "intg ",
     "Γ": "gamma ",
     "α": "alpha",
@@ -425,12 +426,34 @@ def evalSym(f, prec=64, r=False):
             local_dict=None,
             global_dict=_globals,
             transformations=sym_tr,
+            evaluate=False,
         )
     except SyntaxError:
         try:
             f = latex.parse_latex(y)
         except:
             f = latex.parse_latex(f)
+    for i in sympy.preorder_traversal(f):
+        try:
+            f = f.subs(i, rounder(i))
+        except:
+            pass
+        if hasattr(i, "doit"):
+            try:
+                f = f.subs(i, i.doit())
+            except:
+                pass
+    f = sympy.simplify(f)
+    for i in sympy.preorder_traversal(f):
+        try:
+            f = f.subs(i, rounder(i))
+        except:
+            pass
+        if hasattr(i, "doit"):
+            try:
+                f = f.subs(i, i.doit())
+            except:
+                pass
     try:
         if hasattr(f, "__class__") and issubclass(f.__class__, baseFloat):
             a = str(f.evalf(prec))
@@ -441,17 +464,11 @@ def evalSym(f, prec=64, r=False):
             if b == a:
                 b = ""
             return [a, b]
-        f = sympy.simplify(f)
     except:
         p = prettyAns(f)
         if p == convAns(f):
             p = ""
         return [f, p]
-    for i in sympy.preorder_traversal(f):
-        try:
-            f = f.subs(i, rounder(i))
-        except:
-            pass
     if prec:
         try:
             y = f.evalf(prec, chop=True)

@@ -1049,19 +1049,18 @@ class updateMessageCount:
 
         async def getChannelHistory(channel, returns):
             try:
-                history = channel.history(
-                    limit=None,
-                )
-                print(history)
+                messages = []
                 for i in range(16):
+                    history = channel.history(
+                        limit=None,
+                    )
+                    print(history)
                     try:
                         messages = await history.flatten()
                         break
                     except discord.Forbidden:
                         raise
                     except:
-                        if i >= 7:
-                            raise
                         print(traceback.format_exc())
                     await asyncio.sleep(20 * (i ** 2 + 1))
                 print(len(messages))
