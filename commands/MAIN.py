@@ -876,10 +876,10 @@ class updateEval:
             return
         if message.channel.id == self.channel.id:
             proc = message.content
-            if proc.startswith("//") or proc.startswith("||"):
-                return
             while proc[0] == " ":
                 proc = proc[1:]
+            if proc.startswith("//") or proc.startswith("||") or proc.startswith("#"):
+                return
             if proc.startswith("```") and proc.endswith("```"):
                 proc = proc.strip("`")
             output = None
