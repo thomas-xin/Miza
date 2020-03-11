@@ -599,7 +599,7 @@ class Info:
         is_self_owner = u.id == _vars.owner_id
         is_guild_owner = u.id == guild.owner_id
         if member:
-            joined = getattr(u, "joined_at", guild.created_at)
+            joined = getattr(u, "joined_at", None)
         else:
             joined = None
         created = u.created_at
