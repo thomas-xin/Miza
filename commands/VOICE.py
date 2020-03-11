@@ -1442,7 +1442,7 @@ class Rotate:
     server_only = True
 
     def __init__(self):
-        self.name = ["jump"]
+        self.name = ["Jump"]
         self.min_level = 0
         self.min_display = "0~1"
         self.description = "Rotates the queue to the left by a certain amount of steps."
@@ -1918,6 +1918,12 @@ class updateQueues:
                     if cnt:
                         auds.timeout = time.time()
                     q = auds.queue
+                    i = 1
+                    while len(q) > 65536:
+                        q.pop()
+                        if not i & 8191:
+                            await asyncio.sleep(0.2)
+                        i += 1
                     asyncio.create_task(auds.updatePlayer())
                     asyncio.create_task(self.research(auds))
                     dels = deque()

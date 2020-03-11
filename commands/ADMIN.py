@@ -415,7 +415,7 @@ class React:
             else:
                 return (
                     "Currently active auto reacts for " + uniStr(guild.name) 
-                    + ":\n```ini\n" + strIter(curr) + "```"
+                    + ":\n```ini\n" + strIter(curr.get("reacts", {})) + "```"
                 )
         a = args[0].lower()
         if "d" in flags:

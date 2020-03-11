@@ -369,7 +369,7 @@ class main_data:
                     obj.name.append(obj.__name__)
                     if not hasattr(obj, "min_display"):
                         obj.min_display = obj.min_level
-                    obj.permError = main_data.permError
+                    var.permError = main_data.permError
                     commands.append(obj)
                     #print("Successfully loaded command " + obj.__name__ + ".")
                 except AttributeError:
@@ -520,6 +520,44 @@ class main_data:
         ">": "))",
     }
     ctrans = "".maketrans(cmap)
+
+    class returns:
+
+        def __init__(self, data):
+            self.data = data
+
+    async def parasync(self, coro, returns):
+        try:
+            resp = await coro
+            returns.data = self.returns(resp)
+        except Exception as ex:
+            returns.data = repr(ex)
+        return returns.data
+
+    async def recursiveCoro(self, item):
+        returns = hlist()
+        for i in range(len(item)):
+            if type(item[i]) in (tuple, set, list, hlist):
+                returns.append(self.returns(None))
+                asyncio.create_task(self.parasync(self.recursiveCoro(item[i]), returns[-1]))
+            elif asyncio.iscoroutine(item[i]):
+                returns.append(self.returns(None))
+                asyncio.create_task(self.parasync(item[i], returns[-1]))
+            else:
+                returns.append(self.returns(item[i]))
+        full = False
+        while not full:
+            full = True
+            for i in returns:
+                if i.data is None:
+                    full = False
+            await asyncio.sleep(0.2)
+        output = hlist()
+        for i in returns:
+            while isinstance(i, self.returns):
+                i = i.data
+            output.append(i)
+        return output
 
     async def evalMath(self, f, guild):
         f = f.strip(" ")

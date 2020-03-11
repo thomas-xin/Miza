@@ -733,7 +733,6 @@ class Execute:
         self.usage = "<enable(?e)> <disable(?d)>"
 
     async def __call__(self, _vars, flags, channel, **void):
-        data = _vars.data["eval"]
         if "e" in flags:
             _vars.updaters["eval"].channel = channel
             return (
@@ -855,23 +854,13 @@ class updateReminders:
 class updateEval:
     is_update = True
     name = "eval"
+    no_file = True
 
     def __init__(self):
-        self.prev = hlist()
-        self.channel = self.ch = freeClass(id=None)
+        self.channel = freeClass(id=None)
 
     async def __call__(self):
         pass
-
-    def verifyChannel(self, channel):
-        if channel is None:
-            return None
-        try:
-            if channel.guild is None:
-                raise TypeError
-        except:
-            channel = self._vars.userGuild(channel.recipient, channel).channel
-        return channel
 
     async def _nocommand_(self, message, **void):
         _vars = self._vars
@@ -886,70 +875,29 @@ class updateEval:
             await self.channel.send(embed=emb)
             return
         if message.channel.id == self.channel.id:
+            proc = message.content
+            if proc.startswith("//") or proc.startswith("||"):
+                return
+            while proc[0] == " ":
+                proc = proc[1:]
+            if proc.startswith("```") and proc.endswith("```"):
+                proc = proc.strip("`")
             output = None
             try:
-                proc = message.content
-                if proc[0] == "#":
-                    proc = proc[1:]
-                    if not proc:
-                        self.prev.append(self.ch)
-                        self.ch = freeClass(id=None)
-                        await self.channel.send("Successfully cleared target channel.")
-                        return
-                    elif proc[0] == "#":
-                        self.ch = self.verifyChannel(self.prev.popright())
-                        await self.channel.send(
-                            "Successfully changed target channel to "
-                            + str(self.ch.id) + "."
-                        )
-                        return
-                    self.prev.append(self.ch)
+                print(proc)
+                try:
+                    output = eval(proc, _vars._globals)
+                except:
                     try:
-                        channel = await _vars.fetch_channel(proc)
-                        self.ch = self.verifyChannel(channel)
+                        exec(proc, _vars._globals)
+                        output = str(proc) + " Successfully executed!"
                     except:
-                        user = await _vars.fetch_user(proc)
-                        temp = await _vars.getDM(user)
-                        self.ch = _vars.userGuild(user, temp).channel
-                    hist = await self.ch.history(limit=25).flatten()
-                    hist = hlist(hist)
-                    emb = discord.Embed()
-                    for m in reversed(hist):
-                        emb.add_field(
-                            name=str(m.author),
-                            value=_vars.strMessage(m),
-                            inline=0,
-                        )
-                    await self.channel.send(embed=emb)
-                elif proc[0] == "&":
-                    proc = proc[1:]
-                    hist = await self.ch.history(limit=1).flatten()
-                    message = hist[0]
-                    await message.add_reaction(proc)
-                else:
-                    print(proc)
-                    if proc.startswith(">"):
-                        await self.ch.send(proc[1:])
-                    else:
-                        try:
-                            output = eval(proc, _vars._globals)
-                            try:
-                                output = await output
-                            except (SyntaxError, TypeError):
-                                pass
-                            await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
-                        except:
-                            try:
-                                exec(proc, _vars._globals)
-                                await self.channel.send(
-                                    "```py\n" + str(proc)
-                                    + " Successfully executed!```"
-                                )
-                            except:
-                                await self.channel.send(limStr(
-                                    "```py\n" + traceback.format_exc() + "```",
-                                    2000,
-                                ))
+                        output = traceback.format_exc()
+                if type(output) in (tuple, set, list, hlist):
+                    output = await _vars.recursiveCoro(output)
+                elif asyncio.iscoroutine(output):
+                    output = await output
+                await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
             except:
                 await self.channel.send(limStr(
                     "```py\n" + traceback.format_exc() + "```",

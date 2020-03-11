@@ -426,7 +426,7 @@ def evalSym(f, prec=64, r=False):
             local_dict=None,
             global_dict=_globals,
             transformations=sym_tr,
-            evaluate=False,
+            evaluate=True,
         )
     except SyntaxError:
         try:
@@ -443,7 +443,12 @@ def evalSym(f, prec=64, r=False):
                 f = f.subs(i, i.doit())
             except:
                 pass
-    f = sympy.simplify(f)
+    try:
+        f = sympy.simplify(f)
+        if isinstance(f, Plot):
+            return [f]
+    except:
+        pass
     for i in sympy.preorder_traversal(f):
         try:
             f = f.subs(i, rounder(i))
