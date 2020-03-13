@@ -1,4 +1,7 @@
-from smath import *
+try:
+    from smath import *
+except:
+    pass
 
 
 class Text2048:

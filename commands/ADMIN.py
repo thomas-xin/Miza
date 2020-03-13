@@ -1,5 +1,8 @@
 import discord
-from smath import *
+try:
+    from smath import *
+except ModuleNotFoundError:
+    pass
 
 
 class Purge:
@@ -243,8 +246,8 @@ class RoleGiver:
         currentSchedule = scheduled.setdefault(channel.id, {})
         if not argv:
             return (
-                "Currently active permission givers in channel **" + channel.name
-                + "**:\n```ini\n" + strIter(currentSchedule) + "```"
+                "Currently active permission givers in channel <#" + str(channel.id)
+                + ">:\n```ini\n" + strIter(currentSchedule) + "```"
             )
         react = args[0].lower()
         if len(react) > 64:
@@ -415,8 +418,8 @@ class React:
                 return "```css\nRemoved all auto reacts for " + uniStr(guild.name) + ".```"
             else:
                 return (
-                    "Currently active auto reacts for " + uniStr(guild.name) 
-                    + ":\n```ini\n" + strIter(curr.get("reacts", {})) + "```"
+                    "Currently active auto reacts for **" + guild.name
+                    + "**:\n```ini\n" + strIter(curr.get("reacts", {})) + "```"
                 )
         a = args[0].lower()
         if "d" in flags:

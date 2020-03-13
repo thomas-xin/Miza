@@ -1,5 +1,8 @@
 import discord, json
-from smath import *
+try:
+    from smath import *
+except ModuleNotFoundError:
+    pass
 
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")

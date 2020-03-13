@@ -1,5 +1,8 @@
 import discord
-from smath import *
+try:
+    from smath import *
+except ModuleNotFoundError:
+    pass
 
 
 default_commands = ["main", "string", "admin"]
@@ -291,6 +294,7 @@ class Restart:
     def __init__(self):
         self.name = ["Shutdown"]
         self.min_level = inf
+        self.min_display = "inf~nan"
         self.description = "Restarts or shuts down the bot."
         self.usage = ""
 
@@ -301,15 +305,6 @@ class Restart:
             await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
-        if perm is nan or frand() > 0.75:
-            for i in range(64):
-                try:
-                    if _vars.suspected in os.listdir():
-                        os.remove(_vars.suspected)
-                    break
-                except:
-                    print(traceback.format_exc())
-                    time.sleep(0.1)
         _vars.update()
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
@@ -330,13 +325,22 @@ class Restart:
                 except:
                     print(traceback.format_exc())
                     time.sleep(0.1)
+        if perm is nan or frand() > 0.75:
+            for i in range(64):
+                try:
+                    if _vars.suspected in os.listdir():
+                        os.remove(_vars.suspected)
+                    break
+                except:
+                    print(traceback.format_exc())
+                    time.sleep(0.1)
+        if name.lower() == "shutdown":
+            f = open(_vars.shutdown, "wb")
+            f.close()
         try:
             await client.close()
         except:
             del client
-        if name.lower() == "shutdown":
-            f = open(_vars.shutdown, "wb")
-            f.close()
         del _vars
         sys.exit()
 
@@ -531,11 +535,14 @@ class Info:
         member = True
         g, guild = guild, None
         if argv:
-            u_id = _vars.verifyID(argv)
+            try:
+                u_id = _vars.verifyID(argv)
+            except:
+                u_id = argv
             try:
                 u = g.get_member(u_id)
                 if u is None:
-                    raise LookupError("Unable to find user or server from ID.")
+                    raise EOFError
             except:
                 try:
                     u = await g.fetch_member(u_id)
@@ -544,43 +551,49 @@ class Info:
                         u = await _vars.fetch_user(u_id)
                         member = False
                     except:
-                        try:
-                            guild = await _vars.fetch_guild(u_id)
-                        except:
+                        if "everyone" in u_id or "here" in u_id:
+                            guild = g
+                        else:
                             try:
-                                channel = await _vars.fetch_channel(u_id)
+                                guild = await _vars.fetch_guild(u_id)
                             except:
                                 try:
-                                    webhooks = await g.webhooks()
-                                    for w in webhooks:
-                                        if w.id == u_id:
-                                            u = _vars.ghostUser()
-                                            u.id = u_id
-                                            u.name = w.name
-                                            u.created_at = u.joined_at = w.created_at
-                                            u.discriminator = "0000"
-                                            u.avatar = w.avatar
-                                            u.avatar_url = w.avatar_url
-                                            u.bot = True
-                                            raise StopIteration
-                                    raise EOFError
-                                except StopIteration:
+                                    channel = await _vars.fetch_channel(u_id)
+                                except:
+                                    try:
+                                        try:
+                                            webhooks = await g.webhooks()
+                                        except AttributeError:
+                                            raise EOFError
+                                        for w in webhooks:
+                                            if w.id == u_id:
+                                                u = _vars.ghostUser()
+                                                u.id = u_id
+                                                u.name = w.name
+                                                u.created_at = u.joined_at = w.created_at
+                                                u.discriminator = "0000"
+                                                u.avatar = w.avatar
+                                                u.avatar_url = w.avatar_url
+                                                u.bot = True
+                                                raise StopIteration
+                                        raise EOFError
+                                    except StopIteration:
+                                        pass
+                                    except EOFError:
+                                        u = None
+                                        if g.id in _vars.data["counts"]:
+                                            if u_id in _vars.data["counts"][g.id]["counts"]:
+                                                u = _vars.ghostUser()
+                                                u.id = u_id
+                                        if u is None:
+                                            raise LookupError("Unable to find user or server from ID.")
+                                try:
+                                    guild = channel.guild
+                                except NameError:
                                     pass
-                                except EOFError:
-                                    u = None
-                                    if g.id in _vars.data["counts"]:
-                                        if u_id in _vars.data["counts"][g.id]["counts"]:
-                                            u = _vars.ghostUser()
-                                            u.id = u_id
-                                    if u is None:
-                                        raise LookupError("Unable to find user or server from ID.")
-                            try:
-                                guild = channel.guild
-                            except NameError:
-                                pass
-                            except AttributeError:
-                                guild = None
-                                u = channel.recipient
+                                except AttributeError:
+                                    guild = None
+                                    u = channel.recipient
                         if guild is not None:
                             return await self.getGuildData(guild, flags)                        
         else:

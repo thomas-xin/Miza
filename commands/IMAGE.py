@@ -1,5 +1,8 @@
 import discord, nekos, requests
-from smath import *
+try:
+    from smath import *
+except ModuleNotFoundError:
+    pass
 
 
 class IMG:

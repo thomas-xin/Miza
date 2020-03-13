@@ -1,6 +1,9 @@
 import requests, csv, knackpy, discord, urllib, ffmpy
 from prettytable import PrettyTable as ptable
-from smath import *
+try:
+    from smath import *
+except:
+    pass
 
 FFRuntimeError = ffmpy.FFRuntimeError
 
@@ -335,6 +338,26 @@ class CS_org2xm:
         }
 
 
+def _n2f(n):
+    flag = int(n)
+    offset = max(0, (999 - flag) // 1000)
+    flag += offset * 1000
+    output = ""
+    for i in range(0, 3):
+        a = 10 ** i
+        b = flag // a
+        char = b % 10
+        char += 48
+        output += chr(char)
+    char = flag // 1000
+    char += 48
+    char -= offset
+    try:
+        return chr(char) + output[::-1]
+    except ValueError:
+        return "(0x" + hex((char + 256) & 255).upper()[2:] + ")" + output[::-1]
+
+
 def _m2f(mem, val):
     val1 = mem
     val2 = val
@@ -343,27 +366,12 @@ def _m2f(mem, val):
     while val2:
         difference = int(val1, 16) - 4840864 + curr / 8
         flag = difference * 8
-        offset = max(0, int((-flag + 999.9) / 1000))
-        flag += offset * 1000
-        output = ""
-        for i in range(0, 3):
-            a = 10 ** i
-            b = int(flag / a)
-            char = b % 10
-            char += 48
-            output += chr(char)
-        char = int(flag / 1000)
-        char += 48
-        char -= offset
+        output = _n2f(flag)
         if val2 & 1:
             operation = "+"
         else:
             operation = "-"
-        try:
-            output += chr(char)
-            output = "<FL" + operation + output[::-1]
-        except ValueError:
-            output = "<FL" + operation + "(0x" + hex((char + 256) & 255).upper()[2:] + ")" + output[::-1]
+        output = "<FL" + operation + output
         result += output
         val2 >>= 1
         curr += 1

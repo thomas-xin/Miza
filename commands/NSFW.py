@@ -1,5 +1,8 @@
 import nekos, rule34, pybooru, discord
-from smath import *
+try:
+    from smath import *
+except ModuleNotFoundError:
+    pass
 
 image_forms = [
     ".gif",

@@ -1,6 +1,9 @@
 import discord, urllib, requests, json
 from googletrans import Translator
-from smath import *
+try:
+    from smath import *
+except ModuleNotFoundError:
+    pass
 
 
 class PapagoTrans:
