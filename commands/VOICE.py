@@ -1932,14 +1932,19 @@ class updateQueues:
                     playing = auds.is_playing or auds.is_loading
                 else:
                     try:
+                        auds.att = getattr(auds, "att", 0) + 1
                         auds.vc = vc = await channel.connect(timeout=30, reconnect=False)
-                    except discord.Forbidden:
+                        del auds.att
+                    except (discord.Forbidden, discord.HTTPException):
                         auds.dead = True
+                    except:
+                        if auds.att > 5:
+                            auds.dead = True
                     playing = auds.is_playing or auds.is_loading
                 if not vc.is_playing():
                     vc.play(auds, after=self.sendUpdateRequest)
                 cnt = sum(1 for m in channel.members if m.id != client.user.id)
-                dead = getattr(auds, "dead", 0)
+                dead = getattr(auds, "dead", False)
                 if not cnt and auds.timeout < time.time() - 20 or dead:
                     await vc.disconnect(force=True)
                     try:

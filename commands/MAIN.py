@@ -747,19 +747,19 @@ class Execute:
 
     async def __call__(self, _vars, flags, channel, **void):
         if "e" in flags:
-            _vars.updaters["eval"].channel = channel
+            _vars.updaters["exec"].channel = channel
             return (
                 "```css\nSuccessfully changed code channel to "
                 + uniStr(channel.id) + ".```"
             )
         elif "d" in flags:
-            _vars.updaters["eval"].channel = freeClass(id=None)
+            _vars.updaters["exec"].channel = freeClass(id=None)
             return (
                 "```css\nSuccessfully removed code channel.```"
             )
         return (
             "```css\ncode channel is currently set to "
-            + uniStr(_vars.updaters["eval"].channel.id) + ".```"
+            + uniStr(_vars.updaters["exec"].channel.id) + ".```"
         )
 
 
@@ -864,9 +864,9 @@ class updateReminders:
         self.busy = False
 
 
-class updateEval:
+class updateExec:
     is_update = True
-    name = "eval"
+    name = "exec"
     no_file = True
 
     def __init__(self):
@@ -891,10 +891,12 @@ class updateEval:
             proc = message.content
             while proc[0] == " ":
                 proc = proc[1:]
-            if proc.startswith("//") or proc.startswith("||") or proc.startswith("#"):
+            if proc.startswith("//") or proc.startswith("||") or proc.startswith("\\\\") or proc.startswith("#"):
                 return
-            if proc.startswith("```") and proc.endswith("```"):
+            if proc.startswith("`") and proc.endswith("`"):
                 proc = proc.strip("`")
+            if not proc:
+                return
             output = None
             try:
                 print(proc)
