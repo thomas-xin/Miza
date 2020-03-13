@@ -443,17 +443,18 @@ class Loop:
                     raise PermissionError("Must be server owner to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
         if not "h" in flags:
-            await channel.send(
+            sent = await channel.send(
                 "```css\nLooping [" + func + "] " + uniStr(iters)
                 + " time" + "s" * (iters != 1) + "...```"
             )
+            await sent.add_reaction("❎")
         for i in range(iters):
             loop = i < iters - 1
             asyncio.create_task(callback(
                 message, func, cb_argv=func2, cb_flags=flags, loop=loop,
             ))
-            if not i - 1 & 7:
-                await asyncio.sleep(0.5)
+            if perm is not nan or not i - 1 & 7:
+                await asyncio.sleep(1)
 
 
 class Info:

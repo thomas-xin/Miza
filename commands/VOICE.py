@@ -1027,7 +1027,7 @@ class Join:
                 if hasattr(user, "VoiceState") and user.VoiceState is not None:
                     if not (user.VoiceState.deaf or user.VoiceState.mute):
                         break
-                    asyncio.create_task(user.edit(mute=False,deafen=False))
+                asyncio.create_task(user.edit(mute=False,deafen=False))
         if joined:
             return (
                 "```css\n🎵 Successfully connected to " + uniStr(vc_.name)
@@ -1934,6 +1934,12 @@ class updateQueues:
                     try:
                         auds.att = getattr(auds, "att", 0) + 1
                         auds.vc = vc = await channel.connect(timeout=30, reconnect=False)
+                        for user in guild.members:
+                            if user.id == client.user.id:
+                                if hasattr(user, "VoiceState") and user.VoiceState is not None:
+                                    if not (user.VoiceState.deaf or user.VoiceState.mute):
+                                        break
+                                asyncio.create_task(user.edit(mute=False,deafen=False))
                         del auds.att
                     except (discord.Forbidden, discord.HTTPException):
                         auds.dead = True
