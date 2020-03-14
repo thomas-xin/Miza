@@ -15,7 +15,7 @@ class customAudio(discord.AudioSource):
     empty = numpy.zeros(length >> 1, float)
     filt = signal.butter(1, 0.125, btype="low", output="sos")
     #fff = numpy.abs(numpy.fft.fftfreq(960, 1/48000))[:481]
-    static = lambda *args: numpy.random.rand(self.length) * 65536 - 32768
+    static = lambda self, *args: numpy.random.rand(self.length) * 65536 - 32768
     defaults = {
         "volume": 1,
         "reverb": 0,
@@ -765,7 +765,7 @@ class videoDownloader:
             self.searched.pop(next(iter(self.searched)))
         try:
             self.requests += 1
-            data = self.extract_info(item)
+            data = self.downloader.extract_info(item, download=False, process=True)
             if "entries" in data:
                 data = data["entries"][-1]
             self.searched[item] = data = [{

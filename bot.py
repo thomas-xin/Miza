@@ -820,6 +820,9 @@ class main_data:
     def randColour(self):
         return colour2Raw(colourCalculation(xrand(12) * 128))
 
+    def strURL(self, url):
+        return str(url).replace(".webp", ".png")
+
     def strMessage(self, message, limit=1024):
         c = message.content
         s = getattr(message, "system_content", "")

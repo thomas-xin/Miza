@@ -549,9 +549,9 @@ class updateUserLogs:
             guild = after.guild
         elif guild.get_member(after.id) is None:
             try:
-                guild.fetch_member(after.id)
+                if guild.fetch_member(after.id) is None:
+                    raise EOFError
             except:
-                print(traceback.format_exc())
                 return
         if guild.id in self.data:
             c_id = self.data[guild.id]
@@ -562,27 +562,41 @@ class updateUserLogs:
                 self.update()
                 return
             emb = discord.Embed(colour=self._vars.randColour())
-            url = after.avatar_url
-            emb.set_author(name=str(after), icon_url=url, url=url)
+            b_url = self._vars.strURL(before.avatar_url)
+            a_url = self._vars.strURL(after.avatar_url)
+            emb.set_author(name=str(after), icon_url=a_url, url=a_url)
             emb.description = (
                 "<@" + str(after.id)
                 + "> has been updated:"
             )
             change = False
             if str(before) != str(after):
-                emb.add_field(name="Username", value=str(before) + " ➡️ " + str(after))
+                emb.add_field(name="Username", value=str(before) + " <:arrow:688320024586223620> " + str(after))
                 change = True
             if hasattr(before, "guild"):
                 if before.display_name != after.display_name:
-                    emb.add_field(name="Nickname", value=before.display_name + " ➡️ " + after.display_name)
+                    emb.add_field(name="Nickname", value=before.display_name + " <:arrow:688320024586223620> " + after.display_name)
                     change = True
                 if len(before.roles) != len(after.roles):
-                    b_role = ", ".join(str(i) for i in getattr(before, "roles", ()) if not i.is_default())
-                    a_role = ", ".join(str(i) for i in getattr(after, "roles", ()) if not i.is_default())
-                    emb.add_field(name="Roles", value=b_role + " ➡️ " + a_role)
-                    change = True
-            if before.avatar_url != after.avatar_url:
-                emb.add_field(name="Avatar", value="[Before](" + str(before.avatar_url) + ") ➡️ [After](" + str(after.avatar_url) + ")")
+                    sub = hlist()
+                    add = hlist()
+                    for r in before.roles:
+                        if r not in after.roles:
+                            sub.append(r)
+                    for r in after.roles:
+                        if r not in before.roles:
+                            add.append(r)
+                    rchange = ""
+                    if sub:
+                        rchange = "<:minus:688316020359823364> " + ", ".join(str(r) for r in sub)
+                    if add:
+                        rchange += "\n" * bool(rchange) + "<:plus:688316007093370910> " + ", ".join(str(r) for r in add)
+                    if rchange:
+                        emb.add_field(name="Roles", value=rchange)
+                        emb.set_thumbnail(url=a_url)
+                        change = True
+            if b_url != a_url:
+                emb.add_field(name="Avatar", value="[Before](" + str(b_url) + ") <:arrow:688320024586223620> [After](" + str(a_url) + ")")
                 change = True
             if change:
                 await channel.send(embed=emb)
@@ -598,7 +612,7 @@ class updateUserLogs:
                 self.update()
                 return
             emb = discord.Embed(colour=self._vars.randColour())
-            url = user.avatar_url
+            url = self._vars.strURL(user.avatar_url)
             emb.set_author(name=str(user), icon_url=url, url=url)
             emb.description = (
                 "<@" + str(user.id)
@@ -617,7 +631,7 @@ class updateUserLogs:
                 self.update()
                 return
             emb = discord.Embed(colour=self._vars.randColour())
-            url = user.avatar_url
+            url = self._vars.strURL(user.avatar_url)
             emb.set_author(name=str(user), icon_url=url, url=url)
             emb.description = (
                 "<@" + str(user.id)
@@ -652,7 +666,7 @@ class updateMessageLogs:
                 u = before.author
                 name = u.name
                 name_id = name + bool(u.display_name) * ("#" + u.discriminator)
-                url = u.avatar_url
+                url = self._vars.strURL(u.avatar_url)
                 emb = discord.Embed(colour=self._vars.randColour())
                 emb.set_author(name=name_id, icon_url=url, url=url)
                 emb.description = (
@@ -679,7 +693,7 @@ class updateMessageLogs:
             u = message.author
             name = u.name
             name_id = name + bool(u.display_name) * ("#" + u.discriminator)
-            url = u.avatar_url
+            url = self._vars.strURL(u.avatar_url)
             action = (
                 discord.AuditLogAction.message_delete,
                 discord.AuditLogAction.message_bulk_delete,

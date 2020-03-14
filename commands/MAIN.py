@@ -459,7 +459,7 @@ class Info:
 
     async def getGuildData(self, g, flags={}):
         _vars = self._vars
-        url = str(g.icon_url)
+        url = _vars.strURL(g.icon_url)
         name = g.name
         try:
             u = g.owner
@@ -594,7 +594,7 @@ class Info:
         name = u.name
         dname = u.display_name
         disc = u.discriminator
-        url = u.avatar_url
+        url = _vars.strURL(u.avatar_url)
         try:
             is_sys = u.system
         except AttributeError:
