@@ -257,7 +257,7 @@ class customAudio(discord.AudioSource):
         except EOFError:
             if not self.paused and not self.is_loading:
                 if self.is_playing:
-                    self._vars.doUpdate["playlists"] = True
+                    updateQueues.sendUpdateRequest(self, force=True)
                 self.new()
             temp = numpy.zeros(self.length, numpy.uint16).tobytes()
         try:
@@ -513,6 +513,7 @@ class videoDownloader:
                             r = op.open(item)
                             rescode = r.getcode()
                             if rescode != 200:
+                                r.close()
                                 raise ConnectionError(rescode)
                             continue
                         except:
@@ -591,7 +592,7 @@ class videoDownloader:
                     entries = list(resp["entries"])
                     if force or len(entries) <= 1:
                         for entry in entries:
-                            data = self.extract_info(entry["id"])
+                            data = self.downloader.extract_info(entry["id"], download=False, process=True)
                             output.append({
                                 "id": data["id"],
                                 "name": data["title"],
@@ -734,7 +735,7 @@ class videoDownloader:
         except Exception as ex:
             print(traceback.format_exc())
             self.requests = max(self.requests - 1, 0)
-            return str(ex)
+            return repr(ex)
         
     def downloadSingle(self, i, durc=None):
         new_opts = dict(self.ydl_opts)
@@ -940,7 +941,11 @@ class Queue:
                 await asyncio.sleep(0.3)
             res = output[0]
             if type(res) is str:
-                raise ConnectionError(res)
+                try:
+                    ex = eval(res)
+                except NameError:
+                    ex = ConnectionError(res[res.index("(") + 1:res.index(")")])
+                raise ex
             dur = 0
             added = deque()
             names = []
@@ -1061,7 +1066,11 @@ class Playlist:
             await asyncio.sleep(0.7)
         res = output[0]
         if type(res) is str:
-            raise ConnectionError(res)
+            try:
+                ex = eval(res)
+            except NameError:
+                ex = ConnectionError(res[res.index("(") + 1:res.index(")")])
+            raise ex
         names = []
         for e in res:
             name = e["name"]
@@ -1155,7 +1164,7 @@ class Leave:
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to disconnect while other users are in voice")
         auds.dead = True
-        _vars.doUpdate.setdefault("playlists", True)
+        updateQueues.sendUpdateRequest(self, force=True)
 
 
 class Skip:
@@ -1230,7 +1239,9 @@ class Skip:
                     if "f" in flags:
                         auds.queue.clear()
                         auds.new()
-                        return "```fix\nRemoved all items from the queue.```"
+                        if "h" not in flags:
+                            return "```fix\nRemoved all items from the queue.```", 1
+                        return
                     raise LookupError
                 curr = auds.queue[pos]
             except LookupError:
@@ -1647,7 +1658,7 @@ class Unmute:
 
     def __init__(self):
         self.name = ["Unmuteall"]
-        self.min_level = 2
+        self.min_level = 3
         self.description = "Disables server mute for all members."
         self.usage = "<hide(?h)>"
 
@@ -1689,7 +1700,7 @@ class Player:
     def __init__(self):
         self.name = ["NP", "NowPlaying", "Playing"]
         self.min_level = 0
-        self.min_display = "0~2"
+        self.min_display = "0~3"
         self.description = "Creates an auto-updating virtual audio player for the current server."
         self.usage = "<verbose(?v)> <controllable(?c)> <disable(?d)>"
 
@@ -1919,7 +1930,7 @@ class Player:
     async def __call__(self, guild, channel, user, client, _vars, flags, perm, **void):
         auds = await forceJoin(channel.guild, channel, user, client, _vars)
         if "c" in flags or auds.stats["quiet"] & 2:
-            req = 1
+            req = 3
             if perm < req:
                 if auds.stats["quiet"] & 2:
                     if "d" in flags:

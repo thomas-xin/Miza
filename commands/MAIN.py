@@ -105,7 +105,7 @@ class Help:
                 if min_level > perm or (perm is not nan and min_level is nan):
                     continue
                 if c_name == "DM" and getattr(com, "server_only", False):
-                        continue
+                    continue
                 if description != "":
                     if not verb:
                         show.append(prefix + name + " " + usage)
@@ -871,14 +871,6 @@ class updateExec:
         _vars = self._vars
         if message.author.id == _vars.client.user.id:
             return
-        if message.guild is None:
-            emb = discord.Embed()
-            emb.add_field(
-                name=str(message.author),
-                value=_vars.strMessage(message),
-            )
-            await self.channel.send(embed=emb)
-            return
         if message.channel.id == self.channel.id:
             proc = message.content
             while proc[0] == " ":
@@ -907,12 +899,19 @@ class updateExec:
                 await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
             except:
                 await self.channel.send(limStr(
-                    "```py\n" + traceback.format_exc() + "```",
+                    "```py\n" + traceback.format_exc().replace("```", "") + "```",
                     2000,
                 ))
             if output is not None:
                 _vars._globals["output"] = output
                 _vars._globals["_"] = output
+        elif message.guild is None:
+            emb = discord.Embed()
+            emb.add_field(
+                name=str(message.author),
+                value=_vars.strMessage(message),
+            )
+            await self.channel.send(embed=emb)
 
 
 class updateMessageCount:

@@ -821,7 +821,11 @@ class main_data:
         return colour2Raw(colourCalculation(xrand(12) * 128))
 
     def strMessage(self, message, limit=1024):
-        data = limStr(message.content, limit)
+        c = message.content
+        s = getattr(message, "system_content", "")
+        if s and len(s) > len(c):
+            c = s
+        data = limStr(c, limit)
         if message.reactions:
             data += "\n{" + ", ".join(str(i) for i in message.reactions) + "}"
         if message.embeds:
@@ -962,8 +966,6 @@ class main_data:
 
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_flags=None, loop=False):
-    perms = _vars.data["perms"]
-    bans = _vars.data["bans"]
     categories = _vars.categories
     if msg[:2] == "> ":
         msg = msg[2:]
@@ -1375,6 +1377,50 @@ async def on_message(message):
     await _vars.reactCallback(message, None, message.author)
     await handleMessage(message, False)
     await _vars.handleUpdate(True)
+
+
+@client.event
+async def on_user_update(before, after):
+    for u in _vars.updaters.values():
+        f = getattr(u, "_user_update_", None)
+        if f is not None:
+            try:
+                await f(before=before, after=after)
+            except:
+                print(traceback.format_exc())
+
+
+@client.event
+async def on_member_update(before, after):
+    for u in _vars.updaters.values():
+        f = getattr(u, "_member_update_", None)
+        if f is not None:
+            try:
+                await f(before=before, after=after)
+            except:
+                print(traceback.format_exc())
+
+
+@client.event
+async def on_member_join(member):
+    for u in _vars.updaters.values():
+        f = getattr(u, "_join_", None)
+        if f is not None:
+            try:
+                await f(user=member)
+            except:
+                print(traceback.format_exc())
+
+            
+@client.event
+async def on_member_remove(member):
+    for u in _vars.updaters.values():
+        f = getattr(u, "_leave_", None)
+        if f is not None:
+            try:
+                await f(user=member)
+            except:
+                print(traceback.format_exc())
 
 
 @client.event

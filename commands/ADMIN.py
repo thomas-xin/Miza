@@ -253,7 +253,7 @@ class RoleGiver:
             )
         react = args[0].lower()
         if len(react) > 64:
-            raise OverflowError("Search tag too long.")
+            raise OverflowError("Search substring too long.")
         try:
             role = float(args[1])
             if perm < role + 1 or role is nan:
@@ -269,8 +269,8 @@ class RoleGiver:
         currentSchedule[react] = {"role": role, "deleter": "r" in flags}
         update()
         return (
-            "```css\nAdded role giver with reaction to " + uniStr(react)
-            + " and " + r_type + " " + uniStr(role)
+            "```css\nAdded " + uniStr(react)
+            + "➡️" + r_type + " " + uniStr(role)
             + " to channel " + uniStr(channel.name) + ".```"
         )
 
@@ -370,7 +370,7 @@ class Dogpile:
 
     def __init__(self):
         self.name = []
-        self.min_level = 3
+        self.min_level = 2
         self.description = "Causes Miza to automatically imitate users when 3+ of the same messages are posted in a row."
         self.usage = "<enable(?e)> <disable(?d)>"
 
@@ -402,7 +402,7 @@ class React:
 
     def __init__(self):
         self.name = ["AutoReact"]
-        self.min_level = 3
+        self.min_level = 2
         self.description = "Causes Miza to automatically assign a reaction to messages containing the substring."
         self.usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
 
@@ -423,7 +423,7 @@ class React:
                     "Currently active auto reacts for **" + guild.name
                     + "**:\n```ini\n" + strIter(curr.get("reacts", {})) + "```"
                 )
-        a = args[0].lower()
+        a = args[0].lower()[:64]
         if "d" in flags:
             if a in curr["reacts"]:
                 curr["reacts"].pop(a)
@@ -434,6 +434,12 @@ class React:
                 )
             else:
                 raise LookupError(uniStr(a) + " is not in the auto react list.")
+        if len(curr["reacts"]) > 256:
+            raise OverflowError(
+                "React list for " + uniStr(guild.name)
+                + " has reached the maximum of 256 items. "
+                + "Please remove an item to add another."
+            )
         curr["reacts"][a] = args[1]
         update()
         return (
@@ -453,8 +459,8 @@ class MessageLog:
         self.usage = "<enable(?e)> <disable(?d)>"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
-        data = _vars.data["logs"]
-        update = _vars.updaters["logs"].update
+        data = _vars.data["logM"]
+        update = _vars.updaters["logM"].update
         if "e" in flags:
             data[guild.id] = channel.id
             update()
@@ -483,9 +489,146 @@ class MessageLog:
         )
 
 
-class updateLogs:
+class UserLog:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = []
+        self.min_level = 3
+        self.description = "Causes Miza to log user join events into the current channel."
+        self.usage = "<enable(?e)> <disable(?d)>"
+
+    async def __call__(self, _vars, flags, channel, guild, **void):
+        data = _vars.data["logU"]
+        update = _vars.updaters["logU"].update
+        if "e" in flags:
+            data[guild.id] = channel.id
+            update()
+            return (
+                "```css\nEnabled user logging in " + uniStr(channel.name)
+                + " for " + uniStr(guild.name) + ".```"
+            )
+        elif "d" in flags:
+            if guild.id in data:
+                data.pop(guild.id)
+                update()
+            return (
+                "```css\nDisabled user logging for " + uniStr(guild.name) + ".```"
+            )
+        if guild.id in data:
+            c_id = data[guild.id]
+            channel = await _vars.fetch_channel(c_id)
+            return (
+                "```css\nUser logging for " + uniStr(guild.name)
+                + " is currently enabled in " + uniStr(channel.name)
+                + ".```"
+            )
+        return (
+            "```css\nUser logging is currently disabled in "
+            + uniStr(guild.name) + ".```"
+        )
+
+
+class updateUserLogs:
     is_update = True
-    name = "logs"
+    name = "logU"
+
+    def __init__(self):
+        pass
+
+    async def __call__(self):
+        pass
+
+    async def _user_update_(self, before, after, **void):
+        for guild in self._vars.client.guilds:
+            asyncio.create_task(self._member_update_(before, after, guild))
+
+    async def _member_update_(self, before, after, guild=None):
+        if guild is None:
+            guild = after.guild
+        elif guild.get_member(after.id) is None:
+            try:
+                guild.fetch_member(after.id)
+            except:
+                print(traceback.format_exc())
+                return
+        if guild.id in self.data:
+            c_id = self.data[guild.id]
+            try:
+                channel = await self._vars.fetch_channel(c_id)
+            except (EOFError, discord.NotFound):
+                self.data.pop(guild.id)
+                self.update()
+                return
+            emb = discord.Embed(colour=self._vars.randColour())
+            url = after.avatar_url
+            emb.set_author(name=str(after), icon_url=url, url=url)
+            emb.description = (
+                "<@" + str(after.id)
+                + "> has been updated:"
+            )
+            change = False
+            if str(before) != str(after):
+                emb.add_field(name="Username", value=str(before) + " ➡️ " + str(after))
+                change = True
+            if hasattr(before, "guild"):
+                if before.display_name != after.display_name:
+                    emb.add_field(name="Nickname", value=before.display_name + " ➡️ " + after.display_name)
+                    change = True
+                if len(before.roles) != len(after.roles):
+                    b_role = ", ".join(str(i) for i in getattr(before, "roles", ()) if not i.is_default())
+                    a_role = ", ".join(str(i) for i in getattr(after, "roles", ()) if not i.is_default())
+                    emb.add_field(name="Roles", value=b_role + " ➡️ " + a_role)
+                    change = True
+            if before.avatar_url != after.avatar_url:
+                emb.add_field(name="Avatar", value="[Before](" + str(before.avatar_url) + ") ➡️ [After](" + str(after.avatar_url) + ")")
+                change = True
+            if change:
+                await channel.send(embed=emb)
+
+    async def _join_(self, user, **void):
+        guild = getattr(user, "guild", None)
+        if guild is not None and guild.id in self.data:
+            c_id = self.data[guild.id]
+            try:
+                channel = await self._vars.fetch_channel(c_id)
+            except (EOFError, discord.NotFound):
+                self.data.pop(guild.id)
+                self.update()
+                return
+            emb = discord.Embed(colour=self._vars.randColour())
+            url = user.avatar_url
+            emb.set_author(name=str(user), icon_url=url, url=url)
+            emb.description = (
+                "<@" + str(user.id)
+                + "> has joined the server."
+            )
+            await channel.send(embed=emb)
+    
+    async def _leave_(self, user, **void):
+        guild = getattr(user, "guild", None)
+        if guild is not None and guild.id in self.data:
+            c_id = self.data[guild.id]
+            try:
+                channel = await self._vars.fetch_channel(c_id)
+            except (EOFError, discord.NotFound):
+                self.data.pop(guild.id)
+                self.update()
+                return
+            emb = discord.Embed(colour=self._vars.randColour())
+            url = user.avatar_url
+            emb.set_author(name=str(user), icon_url=url, url=url)
+            emb.description = (
+                "<@" + str(user.id)
+                + "> has left the server."
+            )
+            await channel.send(embed=emb)
+
+
+class updateMessageLogs:
+    is_update = True
+    name = "logM"
 
     def __init__(self):
         self.dc = {}
@@ -505,6 +648,7 @@ class updateLogs:
                 except (EOFError, discord.NotFound):
                     self.data.pop(guild.id)
                     self.update()
+                    return
                 u = before.author
                 name = u.name
                 name_id = name + bool(u.display_name) * ("#" + u.discriminator)
@@ -530,6 +674,7 @@ class updateLogs:
             except (EOFError, discord.NotFound):
                 self.data.pop(guild.id)
                 self.update()
+                return
             now = datetime.datetime.utcnow()
             u = message.author
             name = u.name
