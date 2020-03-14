@@ -271,7 +271,10 @@ class main_data:
         return self.data["prefixes"].get(g_id, "~")
 
     def getPerms(self, user, guild):
-        perms = self.data["perms"]
+        try:
+            perms = self.data["perms"]
+        except KeyError:
+            return 0
         try:
             u_id = user.id
         except AttributeError:
@@ -348,7 +351,7 @@ class main_data:
             reason = "for command " + self.name[-1]
         raise PermissionError(
             "Insufficient priviliges " + str(reason)
-            + ".\nRequred level: " + uniStr(req)
+            + ".\nRequired level: " + uniStr(req)
             + ", Current level: " + uniStr(perm) + "."
         )
 
@@ -777,25 +780,28 @@ class main_data:
                 if changed or time.time() - self.stat_timer > 60:
                     self.stat_timer = time.time()
                     self.guilds = guilds
-                    u = await self.fetch_user(self.owner_id)
-                    n = u.name
-                    place = "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place, "
-                    activity = discord.Streaming(
-                        name=(
-                            place + "to " + uniStr(guilds) + " server"
-                            + "s" * (guilds != 1) + "!"
-                        ),
-                        url=self.website,
-                    )
-                    activity.game = self.website
-                    if changed:
-                        print(repr(activity))
                     try:
-                        await client.change_presence(activity=activity)
-                    except discord.HTTPException:
-                        print(traceback.format_exc())
-                        await asyncio.sleep(3)
-                    except:
+                        u = await self.fetch_user(self.owner_id)
+                        n = u.name
+                        place = "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place, "
+                        activity = discord.Streaming(
+                            name=(
+                                place + "to " + uniStr(guilds) + " server"
+                                + "s" * (guilds != 1) + "!"
+                            ),
+                            url=self.website,
+                        )
+                        activity.game = self.website
+                        if changed:
+                            print(repr(activity))
+                        try:
+                            await client.change_presence(activity=activity)
+                        except discord.HTTPException:
+                            print(traceback.format_exc())
+                            await asyncio.sleep(3)
+                        except:
+                            pass
+                    except discord.NotFound:
                         pass
                 self.lastCheck = time.time()
                 if force:
@@ -1344,8 +1350,8 @@ async def handleMessage(message, edit=True):
             processMessage(message, reconstitute(msg), edit, msg), timeout=_vars.timeout
         )
     except Exception as ex:
-        print(traceback.format_exc())
         errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)
+        print(traceback.format_exc())
         asyncio.create_task(_vars.sendReact(
             message.channel,
             errmsg,

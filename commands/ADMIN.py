@@ -41,7 +41,7 @@ class Purge:
                     t_user = await _vars.fetch_user(u_id)
                 except:
                     t_user = freeClass(id=u_id)
-        if t_user is not None and t_user.id != client.user.id:
+        if t_user is None or t_user.id != client.user.id:
             req = 3
             if perm < req:
                 reason = (
@@ -499,12 +499,16 @@ class updateLogs:
         if not after.author.bot:
             guild = before.guild
             if guild.id in self.data:
+                c_id = self.data[guild.id]
+                try:
+                    channel = await self._vars.fetch_channel(c_id)
+                except (EOFError, discord.NotFound):
+                    self.data.pop(guild.id)
+                    self.update()
                 u = before.author
                 name = u.name
                 name_id = name + bool(u.display_name) * ("#" + u.discriminator)
                 url = u.avatar_url
-                c_id = self.data[guild.id]
-                channel = await self._vars.fetch_channel(c_id)
                 emb = discord.Embed(colour=self._vars.randColour())
                 emb.set_author(name=name_id, icon_url=url, url=url)
                 emb.description = (
@@ -520,12 +524,17 @@ class updateLogs:
             return
         guild = message.guild
         if guild.id in self.data:
+            c_id = self.data[guild.id]
+            try:
+                channel = await self._vars.fetch_channel(c_id)
+            except (EOFError, discord.NotFound):
+                self.data.pop(guild.id)
+                self.update()
             now = datetime.datetime.utcnow()
             u = message.author
             name = u.name
             name_id = name + bool(u.display_name) * ("#" + u.discriminator)
             url = u.avatar_url
-            c_id = self.data[guild.id]
             action = (
                 discord.AuditLogAction.message_delete,
                 discord.AuditLogAction.message_bulk_delete,
@@ -571,7 +580,6 @@ class updateLogs:
                     return
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
-            channel = await self._vars.fetch_channel(c_id)
             emb = discord.Embed(colour=self._vars.randColour())
             emb.set_author(name=name_id, icon_url=url, url=url)
             emb.description = (

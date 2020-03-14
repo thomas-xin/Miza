@@ -322,14 +322,6 @@ class Restart:
             except:
                 print(traceback.format_exc())
                 time.sleep(0.1)
-        for i in range(64):
-            try:
-                if _vars.suspected in os.listdir():
-                    os.remove(_vars.suspected)
-                break
-            except:
-                print(traceback.format_exc())
-                time.sleep(0.1)
         if name.lower() == "shutdown":
             f = open(_vars.shutdown, "wb")
             f.close()
@@ -1192,7 +1184,6 @@ class updateUsers:
             self.lastsusp = None
             f = open(self.suspected, "r")
             susp = f.read()
-            print(susp)
             f.close()
             os.remove(self.suspected)
             if susp:
@@ -1206,9 +1197,10 @@ class updateUsers:
                 days += 1.125
                 udata["suspended"] = time.time() + days * 86400
                 if days >= self._vars.min_suspend - 1:
-                    self.lastsusp = susp
+                    self.lastsusp = u_id
                 self.update()
                 self.update(True)
+            print(self.lastsusp)
         except FileNotFoundError:
             pass
 
@@ -1216,11 +1208,12 @@ class updateUsers:
         udata = self.data.setdefault(user.id, {"commands": 0, "suspended": 0})
         udata["commands"] += 1
         self.update()
-        tc = getattr(command, "time_consuming", False)
-        self.suspclear = time.time() + 10 + (tc * 2) ** 2
-        f = open(self.suspected, "w")
-        f.write(str(user.id))
-        f.close()
+        if user.id not in (self._vars.client.user.id, self._vars.owner_id):
+            tc = getattr(command, "time_consuming", False)
+            self.suspclear = time.time() + 10 + (tc * 2) ** 2
+            f = open(self.suspected, "w")
+            f.write(str(user.id))
+            f.close()
 
     async def __call__(self, **void):
         if time.time() - self.suspclear:
@@ -1235,7 +1228,7 @@ class updateUsers:
             u_susp = await _vars.fetch_user(self.lastsusp)
             self.lastsusp = None
             channel = await _vars.getDM(u_susp)
-            secs = self.data.get(u_susp.id, 0) - time.time()
+            secs = self.data.get(u_susp.id, {"suspended":0})["suspended"] - time.time()
             msg = (
                 "Apologies for the inconvenience, but your account has been "
                 + "flagged as having attempted a denial-of-service attack.\n"
