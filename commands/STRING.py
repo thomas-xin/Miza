@@ -3,7 +3,9 @@ from googletrans import Translator
 try:
     from smath import *
 except ModuleNotFoundError:
-    pass
+    import os
+    os.chdir("..")
+    from smath import *
 
 
 class PapagoTrans:

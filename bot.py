@@ -2,7 +2,9 @@ import discord, json
 try:
     from smath import *
 except ModuleNotFoundError:
-    pass
+    import os
+    os.chdir("..")
+    from smath import *
 
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
@@ -70,7 +72,7 @@ class main_data:
         self.data = {}
         self.proc = psutil.Process()
         doParallel(self.getModules, state=2)
-        self.current_channel = None
+        self.doUpdate = {}
         self.guilds = 0
         self.blocked = 0
         self.updated = False
@@ -358,6 +360,7 @@ class main_data:
             rename = module.lower()
             print("Loading module " + rename + "...")
             mod = __import__(module)
+            self._globals[module] = mod
             commands = hlist()
             updates = hlist()
             vd = mod.__dict__
@@ -686,6 +689,14 @@ class main_data:
         self.currState = stats
         return stats
 
+    async def sendReact(self, channel, *args, reacts=(), **kwargs):
+        try:
+            sent = await channel.send(*args, **kwargs)
+            for react in reacts:
+                await sent.add_reaction(react)
+        except:
+            print(traceback.format_exc())
+
     async def sendFile(self, channel, filemsg, file, filename):
         await channel.send(filemsg, file=file)
         try:
@@ -741,10 +752,11 @@ class main_data:
                             return
                         except Exception as ex:
                             print(traceback.format_exc())
-                            sent = await message.channel.send(
-                                "```py\nError: " + repr(ex) + "\n```"
-                            )
-                            await sent.add_reaction("❎")
+                            asyncio.create_task(self.sendReact(
+                                message.channel,
+                                "```py\nError: " + repr(ex) + "\n```",
+                                reacts=["❎"],
+                            ))
 
     async def handleUpdate(self, force=False):
         if not hasattr(self, "stat_timer"):
@@ -996,20 +1008,25 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     suspended = _vars.isSuspended(u_id)
     if (suspended and op) or msg.replace(" ", "") in mention:
         if not u_perm < 0 and not suspended:
-            sent = await channel.send(
-		"Hi, did you require my services for anything? Use `"
-                + prefix + "?` or `" + prefix + "help` for help."
-	    )
+            asyncio.create_task(_vars.sendReact(
+                channel,
+                (
+                    "Hi, did you require my services for anything? Use `"
+                    + prefix + "?` or `" + prefix + "help` for help."
+                ),
+                reacts=["❎"],
+            ))
         else:
             print(
                 "Ignoring command from suspended user "
                 + user.name + " (" + str(u_id) + "): "
                 + limStr(message.content, 256)
             )
-            sent = await channel.send(
-                "Sorry, you are currently not permitted to request my services."
-            )
-        await sent.add_reaction("❎")
+            asyncio.create_task(_vars.sendReact(
+                channel,
+                "Sorry, you are currently not permitted to request my services.",
+                reacts=["❎"],
+            ))
         return
     run = False
     if op:
@@ -1173,8 +1190,11 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                     except Exception as ex:
                         errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)
                         print(traceback.format_exc())
-                        sent = await channel.send(errmsg)
-                        await sent.add_reaction("❎")
+                        asyncio.create_task(_vars.sendReact(
+                            channel,
+                            errmsg,
+                            reacts=["❎"],
+                        ))
     if not run and u_id != client.user.id and orig:
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
         temp = list(reconstitute(orig).lower())
@@ -1219,7 +1239,6 @@ async def heartbeatLoop():
 async def updateLoop():
     print("Update loop initiated.")
     autosave = 0
-    _vars.doUpdate = {}
     while True:
         try:
             if time.time() - autosave > 60:
@@ -1327,8 +1346,11 @@ async def handleMessage(message, edit=True):
     except Exception as ex:
         print(traceback.format_exc())
         errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)
-        sent = await message.channel.send(errmsg)
-        await sent.add_reaction("❎")
+        asyncio.create_task(_vars.sendReact(
+            message.channel,
+            errmsg,
+            reacts=["❎"],
+        ))
     return
 
 

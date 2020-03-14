@@ -1,7 +1,9 @@
 try:
     from smath import *
-except:
-    pass
+except ModuleNotFoundError:
+    import os
+    os.chdir("..")
+    from smath import *
 
 
 class Text2048:
@@ -45,61 +47,60 @@ class Text2048:
             + "<insanity_mode(?i)> <special_controls(?c)> <easy_mode(?e)>"
         )
 
-    def moveTiles(self, gamestate, direction):
-        tiles = copy.deepcopy(gamestate[0])
+    def shiftTile(self, tiles, p1, p2):
+        print(p1, p2)
+        x1, y1 = p1
+        x2, y2 = p2
+        if tiles[x2][y2] <= 0:
+            tiles[x2][y2] = tiles[x1][y1]
+        elif type(tiles[x1][y1]) is float:
+            if type(tiles[x2][y2]) is int:
+                tiles[x2][y2] += round(tiles[x1][y1] * 10)
+            else:
+                tiles[x2][y2] += tiles[x1][y1]
+        elif type(tiles[x2][y2]) is float:
+            tiles[x2][y2] = round(tiles[x2][y2] * 10) + tiles[x1][y1]
+        elif tiles[x2][y2] == tiles[x1][y1]:
+            tiles[x2][y2] += 1
+        else:
+            return
+        tiles[x1][y1] = 0
+
+    def moveTiles(self, gamestate, direction, copy=False):
+        if copy:
+            tiles = copy.deepcopy(gamestate[0])
+        else:
+            tiles = gamestate[0]
         width = len(tiles)
         i = direction & 3
         if i & 2:
             r = reversed(range(width))
-            z = -1
+            d = -1
         else:
             r = range(width)
-            z = 1
+            d = 1
         a = 1
         for w in range(width - 1):
             changed = False
             if not i & 1:
                 for x in r:
-                    for y in r:
-                        if x - z in r:
+                    z = x - d
+                    if z in r:
+                        for y in r:
                             if tiles[x][y] > 0:
-                                if tiles[x - z][y] <= 0:
-                                    tiles[x - z][y] = tiles[x][y]
-                                elif type(tiles[x][y]) is float:
-                                    if type(tiles[x - z][y]) is int:
-                                        tiles[x - z][y] += round(tiles[x][y] * 10)
-                                    else:
-                                        tiles[x - z][y] += tiles[x][y]
-                                elif type(tiles[x - z][y]) is float:
-                                    tiles[x - z][y] = round(tiles[x - z][y] * 10) + tiles[x][y]
-                                elif tiles[x - z][y] == tiles[x][y]:
-                                    tiles[x - z][y] += 1
-                                else:
-                                    continue
-                                tiles[x][y] = a = 0
+                                self.shiftTile(tiles, (x, y), (z, y))
                                 changed = True
             else:
-                for x in r:
-                    for y in r:
-                        if y - z in r:
+                for y in r:
+                    z = y - d
+                    if z in r:
+                        for x in r:
                             if tiles[x][y] > 0:
-                                if tiles[x][y - z] <= 0:
-                                    tiles[x][y - z] = tiles[x][y]
-                                elif type(tiles[x][y]) is float:
-                                    if type(tiles[x][y - z]) is int:
-                                        tiles[x][y - z] += round(tiles[x][y] * 10)
-                                    else:
-                                        tiles[x][y - z] += tiles[x][y]
-                                elif type(tiles[x][y - z]) is float:
-                                    tiles[x][y - z] = round(tiles[x][y - z] * 10) + tiles[x][y]
-                                elif tiles[x][y - z] == tiles[x][y]:
-                                    tiles[x][y - z] += 1
-                                else:
-                                    continue
-                                tiles[x][y] = a = 0
+                                self.shiftTile(tiles, (x, y), (x, z))
                                 changed = True
             if not changed:
                 break
+            a = 0
         return tiles, a
 
     def randomSpam(self, gamestate, mode, pool, returns):
@@ -150,7 +151,6 @@ class Text2048:
                 if returns[0] is None:
                     return
                 self.gamestate, a = returns[0]
-        print(a)
         if not a:
             gsr = str(gamestate).replace("[", "A").replace("]", "B").replace(",", "C").replace("-", "D").replace(" ", "")
             orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]).split("-")
@@ -178,7 +178,7 @@ class Text2048:
                 ("+" + "-" * size) * width + "+" + "\nPlayer: "
                 + username + "\nScore: " + str(score) + "```"
             )
-            print(text)
+            #print(text)
             await message.edit(content=text)
         elif not mode & 1:
             count = 0
@@ -189,7 +189,7 @@ class Text2048:
             if count >= width ** 2:
                 a = 1
                 for i in range(4):
-                    dump, b = self.moveTiles(gamestate, i)
+                    dump, b = self.moveTiles(gamestate, i, copy=True)
                     a &= b
                 if a:
                     await message.clear_reactions()

@@ -4,9 +4,9 @@ Adds many useful math-related functions.
 
 import os, sys, asyncio, threading, subprocess, psutil, traceback, time, datetime
 import ctypes, collections, ast, copy, pickle
-import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys
+import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys, re
 
-import urllib.request
+import urllib.request, urllib.parse
 
 from scipy import interpolate, special, signal
 from dateutil import parser as tparser
@@ -14,6 +14,7 @@ from sympy.parsing.sympy_parser import parse_expr
 
 CalledProcessError = subprocess.CalledProcessError
 Process = psutil.Process()
+urlParse = urllib.parse.quote
 
 np = numpy
 array = numpy.array
@@ -1354,6 +1355,22 @@ def dhms(s):
     return output
 
 
+def rdhms(ts):
+    data = ts.split(":")
+    t = 0
+    mult = 1
+    while len(data):
+        t += int(data[-1]) * mult
+        data = data[:-1]
+        if mult <= 60:
+            mult *= 60
+        elif mult <= 3600:
+            mult *= 24
+        elif len(data):
+            raise TypeError("Too many time arguments.")
+    return t
+
+
 def noHighlight(s):
     s = str(s).replace("[", "⦍").replace("]", "⦎")
     s = s.replace("@", "＠")
@@ -2569,6 +2586,37 @@ def verifyURL(f):
     if "file:" in f:
         raise PermissionError("Unable to open local file " + f + ".")
     return f.strip(" ").translate(__utrans)
+
+DOMAIN_FORMAT = re.compile(
+    r"(?:^(\w{1,255}):(.{1,255})@|^)"
+    r"(?:(?:(?=\S{0,253}(?:$|:))"
+    r"((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
+    r"(?:[a-z0-9]{1,63})))"
+    r"|localhost)"
+    r"(:\d{1,5})?",
+    re.IGNORECASE
+)
+SCHEME_FORMAT = re.compile(
+    r"^(http|hxxp|ftp|fxp)s?$",
+    re.IGNORECASE
+)
+
+def isURL(url):
+    url = url.strip()
+    if not url:
+        return None
+    result = urllib.parse.urlparse(url)
+    scheme = result.scheme
+    domain = result.netloc
+    if not scheme:
+        return False
+    if not re.fullmatch(SCHEME_FORMAT, scheme):
+        return False
+    if not domain:
+        return False
+    if not re.fullmatch(DOMAIN_FORMAT, domain):
+        return False
+    return True
 
 class urlBypass(urllib.request.FancyURLopener):
     version = "Mozilla/5." + str(xrand(1, 10))

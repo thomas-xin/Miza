@@ -2,7 +2,9 @@ import nekos, rule34, pybooru, discord
 try:
     from smath import *
 except ModuleNotFoundError:
-    pass
+    import os
+    os.chdir("..")
+    from smath import *
 
 image_forms = [
     ".gif",

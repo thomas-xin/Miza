@@ -2,8 +2,10 @@ import requests, csv, knackpy, discord, urllib, ffmpy
 from prettytable import PrettyTable as ptable
 try:
     from smath import *
-except:
-    pass
+except ModuleNotFoundError:
+    import os
+    os.chdir("..")
+    from smath import *
 
 FFRuntimeError = ffmpy.FFRuntimeError
 

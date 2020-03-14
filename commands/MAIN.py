@@ -2,7 +2,9 @@ import discord
 try:
     from smath import *
 except ModuleNotFoundError:
-    pass
+    import os
+    os.chdir("..")
+    from smath import *
 
 
 default_commands = ["main", "string", "admin"]
@@ -289,19 +291,15 @@ class EnableCommand:
 
 class Restart:
     is_command = True
-    server_only = True
 
     def __init__(self):
         self.name = ["Shutdown"]
-        self.min_level = inf
-        self.min_display = "inf~nan"
+        self.min_level = nan
         self.description = "Restarts or shuts down the bot."
         self.usage = ""
 
-    async def __call__(self, client, channel, user, guild, name, _vars, perm, **void):
+    async def __call__(self, client, channel, user, guild, name, _vars, **void):
         if name.lower() == "shutdown":
-            if perm is not nan:
-                self.permError(perm, nan, "for command " + self.name[0])
             await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
@@ -316,24 +314,22 @@ class Restart:
             except:
                 print(traceback.format_exc())
                 time.sleep(0.1)
-        if perm is nan:
-            for i in range(8):
-                try:
-                    if "log.txt" in os.listdir():
-                        os.remove("log.txt")
-                    break
-                except:
-                    print(traceback.format_exc())
-                    time.sleep(0.1)
-        if perm is nan or frand() > 0.75:
-            for i in range(64):
-                try:
-                    if _vars.suspected in os.listdir():
-                        os.remove(_vars.suspected)
-                    break
-                except:
-                    print(traceback.format_exc())
-                    time.sleep(0.1)
+        for i in range(8):
+            try:
+                if "log.txt" in os.listdir():
+                    os.remove("log.txt")
+                break
+            except:
+                print(traceback.format_exc())
+                time.sleep(0.1)
+        for i in range(64):
+            try:
+                if _vars.suspected in os.listdir():
+                    os.remove(_vars.suspected)
+                break
+            except:
+                print(traceback.format_exc())
+                time.sleep(0.1)
         if name.lower() == "shutdown":
             f = open(_vars.shutdown, "wb")
             f.close()
@@ -443,11 +439,14 @@ class Loop:
                     raise PermissionError("Must be server owner to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
         if not "h" in flags:
-            sent = await channel.send(
-                "```css\nLooping [" + func + "] " + uniStr(iters)
-                + " time" + "s" * (iters != 1) + "...```"
-            )
-            await sent.add_reaction("❎")
+            asyncio.create_task(_vars.sendReact(
+                channel,
+                (
+                    "```css\nLooping [" + func + "] " + uniStr(iters)
+                    + " time" + "s" * (iters != 1) + "...```"
+                ),
+                reacts=["❎"],
+            ))
         for i in range(iters):
             loop = i < iters - 1
             asyncio.create_task(callback(
@@ -552,7 +551,7 @@ class Info:
                         u = await _vars.fetch_user(u_id)
                         member = False
                     except:
-                        if "everyone" in u_id or "here" in u_id:
+                        if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
                             guild = g
                         else:
                             try:
