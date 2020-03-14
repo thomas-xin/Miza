@@ -431,7 +431,7 @@ class Loop:
                     raise PermissionError("Must be server owner to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
         if not "h" in flags:
-            asyncio.create_task(_vars.sendReact(
+            create_task(_vars.sendReact(
                 channel,
                 (
                     "```css\nLooping [" + func + "] " + uniStr(iters)
@@ -441,11 +441,109 @@ class Loop:
             ))
         for i in range(iters):
             loop = i < iters - 1
-            asyncio.create_task(callback(
+            create_task(callback(
                 message, func, cb_argv=func2, cb_flags=flags, loop=loop,
             ))
             if perm is not nan or not i - 1 & 7:
                 await asyncio.sleep(1)
+
+
+class Avatar:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["PFP"]
+        self.min_level = 0
+        self.description = "Sends a link to the avatar of a user or server."
+        self.usage = "<user>"
+
+    async def getGuildData(self, g):
+        _vars = self._vars
+        url = _vars.strURL(g.icon_url)
+        name = g.name
+        emb = discord.Embed(colour=_vars.randColour())
+        emb.set_thumbnail(url=url)
+        emb.set_image(url=url)
+        emb.set_author(name=name, icon_url=url, url=url)
+        emb.description = "[" + name + "](" + url + ")"
+        print(emb.to_dict())
+        return {
+            "embed": emb,
+        }
+
+    async def __call__(self, argv, guild, _vars, client, user, **void):
+        g, guild = guild, None
+        if argv:
+            try:
+                u_id = _vars.verifyID(argv)
+            except:
+                u_id = argv
+            try:
+                u = g.get_member(u_id)
+                if u is None:
+                    raise EOFError
+            except:
+                try:
+                    u = await g.fetch_member(u_id)
+                except:
+                    try:
+                        u = await _vars.fetch_user(u_id)
+                    except:
+                        if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
+                            guild = g
+                        else:
+                            try:
+                                guild = await _vars.fetch_guild(u_id)
+                            except:
+                                try:
+                                    channel = await _vars.fetch_channel(u_id)
+                                except:
+                                    try:
+                                        try:
+                                            webhooks = await g.webhooks()
+                                        except AttributeError:
+                                            raise EOFError
+                                        for w in webhooks:
+                                            if w.id == u_id:
+                                                u = _vars.ghostUser()
+                                                u.name = w.name
+                                                u.avatar = w.avatar
+                                                u.avatar_url = w.avatar_url
+                                                raise StopIteration
+                                        raise EOFError
+                                    except StopIteration:
+                                        pass
+                                    except EOFError:
+                                        u = None
+                                        if g.id in _vars.data["counts"]:
+                                            if u_id in _vars.data["counts"][g.id]["counts"]:
+                                                u = _vars.ghostUser()
+                                                u.id = u_id
+                                        if u is None:
+                                            raise LookupError("Unable to find user or server from ID.")
+                                try:
+                                    guild = channel.guild
+                                except NameError:
+                                    pass
+                                except AttributeError:
+                                    guild = None
+                                    u = channel.recipient
+                        if guild is not None:
+                            return await self.getGuildData(guild)                        
+        else:
+            u = user
+        guild = g
+        name = str(u)
+        url = _vars.strURL(u.avatar_url)
+        emb = discord.Embed(colour=_vars.randColour())
+        emb.set_thumbnail(url=url)
+        emb.set_image(url=url)
+        emb.set_author(name=name, icon_url=url, url=url)
+        emb.description = "[" + name + "](" + url + ")"
+        print(emb.to_dict())
+        return {
+            "embed": emb,
+        }
 
 
 class Info:
@@ -563,7 +661,6 @@ class Info:
                                                 u.id = u_id
                                                 u.name = w.name
                                                 u.created_at = u.joined_at = w.created_at
-                                                u.discriminator = "0000"
                                                 u.avatar = w.avatar
                                                 u.avatar_url = w.avatar_url
                                                 u.bot = True
@@ -591,9 +688,8 @@ class Info:
         else:
             u = user
         guild = g
-        name = u.name
+        name = str(u)
         dname = u.display_name
-        disc = u.discriminator
         url = _vars.strURL(u.avatar_url)
         try:
             is_sys = u.system
@@ -646,7 +742,7 @@ class Info:
             url2 = url
         emb = discord.Embed(colour=_vars.randColour())
         emb.set_thumbnail(url=url)
-        emb.set_author(name=name + "#" + disc, icon_url=url, url=url2)
+        emb.set_author(name=name, icon_url=url, url=url2)
         d = "<@" + str(u.id) + ">"
         if activity:
             d += "```\n" + activity + "```"
@@ -924,7 +1020,7 @@ class updateMessageCount:
 
     def startCalculate(self, guild):
         self.data[guild.id] = {"counts": {}, "totals": {}}
-        asyncio.create_task(self.getUserMessageCount(guild))
+        create_task(self.getUserMessageCount(guild))
 
     async def getUserMessages(self, user, guild):
         if self.scanned == -1:
@@ -996,7 +1092,7 @@ class updateMessageCount:
                 except:
                     return self.data[guild.id]
             self.startCalculate(guild)
-            asyncio.create_task(self.getUserMessageCount(guild))
+            create_task(self.getUserMessageCount(guild))
         return "Calculating..."
 
     async def getUserMessageCount(self, guild):
@@ -1039,7 +1135,7 @@ class updateMessageCount:
             histories.append(returns)
             if not i % 5:
                 await asyncio.sleep(5 + random.random() * 10)
-            asyncio.create_task(getChannelHistory(
+            create_task(getChannelHistory(
                 channel,
                 histories[-1],
             ))

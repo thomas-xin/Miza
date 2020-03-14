@@ -12,6 +12,11 @@ from scipy import interpolate, special, signal
 from dateutil import parser as tparser
 from sympy.parsing.sympy_parser import parse_expr
 
+if hasattr(asyncio, "create_task"):
+    create_task = asyncio.create_task
+else:
+    create_task = asyncio.ensure_future
+
 CalledProcessError = subprocess.CalledProcessError
 Process = psutil.Process()
 urlParse = urllib.parse.quote

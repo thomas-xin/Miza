@@ -413,7 +413,7 @@ class Neko:
         )
         emb.set_image(url=url)
         print(url)
-        asyncio.create_task(channel.send(embed=emb))
+        create_task(channel.send(embed=emb))
 
 
 class Lewd:
@@ -445,4 +445,4 @@ class Lewd:
         )
         emb.set_image(url=url)
         print(url)
-        asyncio.create_task(channel.send(embed=emb))
+        create_task(channel.send(embed=emb))

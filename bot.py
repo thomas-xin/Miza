@@ -548,10 +548,10 @@ class main_data:
         for i in range(len(item)):
             if type(item[i]) in (tuple, set, list, hlist):
                 returns.append(self.returns(None))
-                asyncio.create_task(self.parasync(self.recursiveCoro(item[i]), returns[-1]))
+                create_task(self.parasync(self.recursiveCoro(item[i]), returns[-1]))
             elif asyncio.iscoroutine(item[i]):
                 returns.append(self.returns(None))
-                asyncio.create_task(self.parasync(item[i], returns[-1]))
+                create_task(self.parasync(item[i], returns[-1]))
             else:
                 returns.append(self.returns(item[i]))
         full = False
@@ -755,7 +755,7 @@ class main_data:
                             return
                         except Exception as ex:
                             print(traceback.format_exc())
-                            asyncio.create_task(self.sendReact(
+                            create_task(self.sendReact(
                                 message.channel,
                                 "```py\nError: " + repr(ex) + "\n```",
                                 reacts=["❎"],
@@ -772,7 +772,7 @@ class main_data:
             while self.busy:
                 await asyncio.sleep(0.1)
             self.busy = True
-            asyncio.create_task(self.getState())
+            create_task(self.getState())
             try:
                 #print("Sending update...")
                 guilds = len(client.guilds)
@@ -807,12 +807,12 @@ class main_data:
                 if force:
                     for k in self.doUpdate:
                         u = self.updaters[k]
-                        asyncio.create_task(u())
-                        asyncio.create_task(self.verifyDelete(u))
+                        create_task(u())
+                        create_task(self.verifyDelete(u))
                 else:
                     for u in self.updaters.values():
-                        asyncio.create_task(u())
-                        asyncio.create_task(self.verifyDelete(u))
+                        create_task(u())
+                        create_task(self.verifyDelete(u))
             except:
                 print(traceback.format_exc())
             self.busy = False
@@ -913,6 +913,7 @@ class main_data:
             self.bot = False
             self.display_name = ""
 
+        __repr__ = lambda self: str(self.name) + "#" + str(self.discriminator)
         system = False
         history = lambda *void1, **void2: None
         dm_channel = None
@@ -937,6 +938,12 @@ class main_data:
         async def delete(self, *void1, **void2):
             pass
 
+        __repr__ = lambda self: str(
+            (
+                self.system_content,
+                self.content
+            )[len(self.system_content) > len(self.content)]
+        )
         tts = False
         type = "default"
         nonce = False
@@ -1019,7 +1026,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
     suspended = _vars.isSuspended(u_id)
     if (suspended and op) or msg.replace(" ", "") in mention:
         if not u_perm < 0 and not suspended:
-            asyncio.create_task(_vars.sendReact(
+            create_task(_vars.sendReact(
                 channel,
                 (
                     "Hi, did you require my services for anything? Use `"
@@ -1033,7 +1040,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                 + user.name + " (" + str(u_id) + "): "
                 + limStr(message.content, 256)
             )
-            asyncio.create_task(_vars.sendReact(
+            create_task(_vars.sendReact(
                 channel,
                 "Sorry, you are currently not permitted to request my services.",
                 reacts=["❎"],
@@ -1135,7 +1142,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                 raise ReferenceError("This command is only available in servers.")
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
-                            asyncio.create_task(channel.trigger_typing())
+                            create_task(channel.trigger_typing())
                         for u in _vars.updaters.values():
                             f = getattr(u, "_command_", None)
                             if f is not None:
@@ -1164,18 +1171,18 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                             sent = None
                             if type(response) is list:
                                 for r in response:
-                                    asyncio.create_task(channel.send(r))
+                                    create_task(channel.send(r))
                             elif type(response) is dict:
                                 if react:
                                     sent = await channel.send(**response)
                                 else:
-                                    asyncio.create_task(channel.send(**response))
+                                    create_task(channel.send(**response))
                             else:
                                 if type(response) is str and len(response) <= 2000:
                                     if react:
                                         sent = await channel.send(response)
                                     else:
-                                        asyncio.create_task(channel.send(response))
+                                        create_task(channel.send(response))
                                 else:
                                     if type(response) is not bytes:
                                         response = bytes(str(response), "utf-8")
@@ -1189,7 +1196,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                         f.close()
                                         f = discord.File(fn)
                                         print("Created file " + fn)
-                                        asyncio.create_task(
+                                        create_task(
                                             _vars.sendFile(channel, filemsg, f, fn),
                                         )
                                     else:
@@ -1201,7 +1208,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                     except Exception as ex:
                         errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)
                         print(traceback.format_exc())
-                        asyncio.create_task(_vars.sendReact(
+                        create_task(_vars.sendReact(
                             channel,
                             errmsg,
                             reacts=["❎"],
@@ -1281,8 +1288,8 @@ async def on_ready():
         else:
             print("> " + guild.name)
     await _vars.handleUpdate()
-    asyncio.create_task(updateLoop())
-    asyncio.create_task(heartbeatLoop())
+    create_task(updateLoop())
+    create_task(heartbeatLoop())
 
 
 async def checkDelete(message, reaction, user):
@@ -1322,7 +1329,7 @@ async def on_raw_reaction_add(payload):
     if user.id != client.user.id:
         reaction = str(payload.emoji)
         await _vars.reactCallback(message, reaction, user)
-        asyncio.create_task(checkDelete(message, reaction, user))
+        create_task(checkDelete(message, reaction, user))
 
 
 @client.event
@@ -1336,7 +1343,7 @@ async def on_raw_reaction_remove(payload):
     if user.id != client.user.id:
         reaction = str(payload.emoji)
         await _vars.reactCallback(message, reaction, user)
-        asyncio.create_task(checkDelete(message, reaction, user))
+        create_task(checkDelete(message, reaction, user))
 
 
 @client.event
@@ -1357,7 +1364,7 @@ async def handleMessage(message, edit=True):
     except Exception as ex:
         errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)
         print(traceback.format_exc())
-        asyncio.create_task(_vars.sendReact(
+        create_task(_vars.sendReact(
             message.channel,
             errmsg,
             reacts=["❎"],

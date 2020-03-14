@@ -167,7 +167,7 @@ class Ban:
                 users = await it.flatten()
             else:
                 users = []
-                asyncio.create_task(channel.send(
+                create_task(channel.send(
                     "```css\nUnbanning all users from "
                     + uniStr(guild.name) + "...```"
                 ))
@@ -195,7 +195,7 @@ class Ban:
             if tm >= 0:
                 try:
                     if len(users) > 3:
-                        asyncio.create_task(guild.ban(t_user, reason=msg, delete_message_days=0))
+                        create_task(guild.ban(t_user, reason=msg, delete_message_days=0))
                     else:
                         await guild.ban(t_user, reason=msg, delete_message_days=0)
                     await asyncio.sleep(0.1)
@@ -542,7 +542,7 @@ class updateUserLogs:
 
     async def _user_update_(self, before, after, **void):
         for guild in self._vars.client.guilds:
-            asyncio.create_task(self._member_update_(before, after, guild))
+            create_task(self._member_update_(before, after, guild))
 
     async def _member_update_(self, before, after, guild=None):
         if guild is None:
@@ -593,10 +593,10 @@ class updateUserLogs:
                         rchange += "\n" * bool(rchange) + "<:plus:688316007093370910> " + ", ".join(str(r) for r in add)
                     if rchange:
                         emb.add_field(name="Roles", value=rchange)
-                        emb.set_thumbnail(url=a_url)
                         change = True
             if b_url != a_url:
                 emb.add_field(name="Avatar", value="[Before](" + str(b_url) + ") <:arrow:688320024586223620> [After](" + str(a_url) + ")")
+                emb.set_thumbnail(url=a_url)
                 change = True
             if change:
                 await channel.send(embed=emb)
@@ -776,7 +776,7 @@ class updateFollows:
                         if curr[1] >= 3:
                             curr[1] = xrand(-3) + 1
                             if len(checker):
-                                asyncio.create_task(message.channel.send(checker))
+                                create_task(message.channel.send(checker))
                     else:
                         if len(checker) > 100:
                             checker = ""
@@ -893,7 +893,7 @@ class updateColours:
             self.count = 0
         for g in self.data:
             if self.count < 48 and self._vars.blocked <= 0:
-                asyncio.create_task(self.changeColour(g, self.data[g]))
+                create_task(self.changeColour(g, self.data[g]))
             else:
                 break
 
@@ -935,7 +935,7 @@ class updateBans:
             if not self.synced:
                 self.synced = True
                 for guild in _vars.client.guilds:
-                    asyncio.create_task(getBans(_vars, guild))
+                    create_task(getBans(_vars, guild))
                 changed = True
             for g in list(bans):
                 for b in list(bans[g]):

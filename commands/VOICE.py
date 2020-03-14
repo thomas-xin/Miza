@@ -222,7 +222,7 @@ class customAudio(discord.AudioSource):
                     if hasattr(user, "VoiceState") and user.VoiceState is not None:
                         if not (user.VoiceState.deaf or user.VoiceState.mute):
                             break
-                    asyncio.create_task(user.edit(mute=False,deafen=False))
+                    create_task(user.edit(mute=False,deafen=False))
                     break
             self.att = 0
         except (discord.Forbidden, discord.HTTPException):
@@ -1135,7 +1135,7 @@ class Join:
                 if hasattr(user, "VoiceState") and user.VoiceState is not None:
                     if not (user.VoiceState.deaf or user.VoiceState.mute):
                         break
-                asyncio.create_task(user.edit(mute=False,deafen=False))
+                create_task(user.edit(mute=False,deafen=False))
                 break
         if joined:
             updateQueues.sendUpdateRequest(self, force=True)
@@ -1665,7 +1665,7 @@ class Unmute:
     async def __call__(self, guild, flags, **void):
         for vc in guild.voice_channels:
             for user in vc.members:
-                asyncio.create_task(user.edit(mute=False, deafen=False))
+                create_task(user.edit(mute=False, deafen=False))
         if "h" not in flags:
             return (
                 "```css\nSuccessfully unmuted all users in voice channels in "
@@ -2010,7 +2010,7 @@ class updateQueues:
                     print(traceback.format_exc())
 
     async def _send_(self, message, **void):
-        if message.guild.id in self.audio:
+        if message.guild.id in self.audio and message.author.id != self._vars.client.user.id:
             auds = self.audio[message.guild.id]
             if auds.player is not None and message.channel.id == auds.channel.id:
                 t = time.time() + 10
@@ -2032,7 +2032,7 @@ class updateQueues:
             for vc in client.voice_clients:
                 if not vc.guild.id in self.connecting:
                     if not vc.guild.id in self.audio:
-                        asyncio.create_task(vc.disconnect(force=True))
+                        create_task(vc.disconnect(force=True))
         except:
             print(traceback.format_exc())
         for g in tuple(self.audio):
@@ -2042,14 +2042,14 @@ class updateQueues:
                 channel = vc.channel
                 guild = channel.guild
                 if getattr(auds, "dead", False):
-                    asyncio.create_task(vc.disconnect(force=True))
+                    create_task(vc.disconnect(force=True))
                     try:
                         self.audio.pop(g)
                         msg = (
                             "```css\n🎵 Successfully disconnected from "
                             + uniStr(guild.name) + ". 🎵```"
                         )
-                        asyncio.create_task(_vars.sendReact(
+                        create_task(_vars.sendReact(
                             auds.channel,
                             msg,
                             reacts=["❎"],
@@ -2060,7 +2060,7 @@ class updateQueues:
                 if vc.is_connected() or vc.guild.id in self.connecting:
                     playing = auds.is_playing or auds.is_loading
                 else:
-                    asyncio.create_task(auds.reconnect())
+                    create_task(auds.reconnect())
                     continue
                 if not vc.is_playing():
                     try:
@@ -2082,8 +2082,8 @@ class updateQueues:
                     if not i & 8191:
                         await asyncio.sleep(0.2)
                     i += 1
-                asyncio.create_task(auds.updatePlayer())
-                asyncio.create_task(self.research(auds))
+                create_task(auds.updatePlayer())
+                create_task(self.research(auds))
                 dels = deque()
                 for i in range(len(q)):
                     if i >= len(q) or i > 8191:
@@ -2141,7 +2141,7 @@ class updateQueues:
                                     + uniStr(noHighlight(name))
                                     + ", added by " + uniStr(added_by) + "! 🎵```"
                                 )
-                                asyncio.create_task(_vars.sendReact(
+                                create_task(_vars.sendReact(
                                     auds.channel,
                                     msg,
                                     reacts=["❎"],
