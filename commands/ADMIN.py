@@ -455,7 +455,7 @@ class MessageLog:
     def __init__(self):
         self.name = []
         self.min_level = 3
-        self.description = "Causes Miza to log message events into the current channel."
+        self.description = "Causes Miza to log message events in the current channel."
         self.usage = "<enable(?e)> <disable(?d)>"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
@@ -496,7 +496,7 @@ class UserLog:
     def __init__(self):
         self.name = []
         self.min_level = 3
-        self.description = "Causes Miza to log user join events into the current channel."
+        self.description = "Causes Miza to log user events in the current channel."
         self.usage = "<enable(?e)> <disable(?d)>"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
@@ -549,7 +549,8 @@ class updateUserLogs:
             guild = after.guild
         elif guild.get_member(after.id) is None:
             try:
-                if guild.fetch_member(after.id) is None:
+                memb = await guild.fetch_member(after.id)
+                if memb is None:
                     raise EOFError
             except:
                 return
@@ -571,11 +572,17 @@ class updateUserLogs:
             )
             change = False
             if str(before) != str(after):
-                emb.add_field(name="Username", value=str(before) + " <:arrow:688320024586223620> " + str(after))
+                emb.add_field(
+                    name="Username",
+                    value=str(before) + " <:arrow:688320024586223620> " + str(after),
+                )
                 change = True
             if hasattr(before, "guild"):
                 if before.display_name != after.display_name:
-                    emb.add_field(name="Nickname", value=before.display_name + " <:arrow:688320024586223620> " + after.display_name)
+                    emb.add_field(
+                        name="Nickname",
+                        value=before.display_name + " <:arrow:688320024586223620> " + after.display_name,
+                    )
                     change = True
                 if len(before.roles) != len(after.roles):
                     sub = hlist()
@@ -590,12 +597,22 @@ class updateUserLogs:
                     if sub:
                         rchange = "<:minus:688316020359823364> " + ", ".join(str(r) for r in sub)
                     if add:
-                        rchange += "\n" * bool(rchange) + "<:plus:688316007093370910> " + ", ".join(str(r) for r in add)
+                        rchange += (
+                            "\n" * bool(rchange) + "<:plus:688316007093370910> " 
+                            + ", ".join(str(r) for r in add)
+                        )
                     if rchange:
                         emb.add_field(name="Roles", value=rchange)
                         change = True
             if b_url != a_url:
-                emb.add_field(name="Avatar", value="[Before](" + str(b_url) + ") <:arrow:688320024586223620> [After](" + str(a_url) + ")")
+                emb.add_field(
+                    name="Avatar",
+                    value=(
+                        "[Before](" + str(b_url) 
+                        + ") <:arrow:688320024586223620> [After](" 
+                        + str(a_url) + ")"
+                    ),
+                )
                 emb.set_thumbnail(url=a_url)
                 change = True
             if change:
