@@ -256,7 +256,7 @@ class EnableCommand:
                 enabled = enabled.setdefault(channel.id, {})
                 if "e" in flags:
                     if catg in enabled:
-                        raise OverflowError(
+                        raise ValueError(
                             "Command category " + uniStr(catg)
                             + " is already enabled in " + uniStr(channel.name) + "."
                         )
@@ -270,7 +270,7 @@ class EnableCommand:
                     )
                 if "d" in flags:
                     if catg not in enabled:
-                        raise OverflowError(
+                        raise ValueError(
                             "Command category " + uniStr(catg)
                             + " is not currently enabled in " + uniStr(channel.name) + "."
                         )
@@ -762,7 +762,7 @@ class Info:
             emb.add_field(name="Join time", value=str(joined), inline=1)
         if coms:
             emb.add_field(name="Commands used", value=str(coms), inline=1)
-        if dname and dname != name:
+        if dname and dname != u.name:
             emb.add_field(name="Nickname", value=dname, inline=1)
         if msgs:
             emb.add_field(name="Post count", value=str(msgs), inline=1)
@@ -887,7 +887,7 @@ class Reminder:
                 "Current reminders set for **" + user.name 
                 + "**:```ini" + s + "```"
             )
-        if len(rems) > 32:
+        if len(rems) >= 32:
             raise OverflowError("You have reached the maximum of 32 reminders. Please remove one to add another.")
         if "in" in argv:
             spl = argv.split("in")
@@ -904,7 +904,7 @@ class Reminder:
         if not msg:
             msg = "[SAMPLE REMINDER]"
         elif len(msg) > 256:
-            raise OverflowError("Reminder message too long.")
+            raise OverflowError("Reminder message too long (" + str(len(msg)) + "> 256).")
         rems.append(freeClass(
             msg=msg,
             t=datetime.timedelta(seconds=t) + datetime.datetime.utcnow(),

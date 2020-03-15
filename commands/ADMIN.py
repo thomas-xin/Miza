@@ -251,6 +251,12 @@ class RoleGiver:
                 "Currently active permission givers in channel <#" + str(channel.id)
                 + ">:\n```ini\n" + strIter(currentSchedule) + "```"
             )
+        if len(currentSchedule) >= 16:
+            raise OverflowError(
+                "Rolegiver list for " + uniStr(channel.name)
+                + " has reached the maximum of 16 items. "
+                + "Please remove an item to add another."
+            )
         react = args[0].lower()
         if len(react) > 64:
             raise OverflowError("Search substring too long.")
@@ -336,6 +342,12 @@ class RainbowRole:
             return (
                 "Currently active dynamic role colours in **" + guild.name
                 + "**:\n```ini\n" + strIter(guild_special) + "```"
+            )
+        if len(curr["guild_special"]) >= 7:
+            raise OverflowError(
+                "Rainbow role list for " + uniStr(guild.name)
+                + " has reached the maximum of 7 items. "
+                + "Please remove an item to add another."
             )
         role = args[0].lower()
         if len(args) < 2:
@@ -434,7 +446,7 @@ class React:
                 )
             else:
                 raise LookupError(uniStr(a) + " is not in the auto react list.")
-        if len(curr["reacts"]) > 256:
+        if len(curr["reacts"]) >= 256:
             raise OverflowError(
                 "React list for " + uniStr(guild.name)
                 + " has reached the maximum of 256 items. "
@@ -562,7 +574,7 @@ class updateUserLogs:
                 self.data.pop(guild.id)
                 self.update()
                 return
-            emb = discord.Embed(colour=self._vars.randColour())
+            emb = discord.Embed()
             b_url = self._vars.strURL(before.avatar_url)
             a_url = self._vars.strURL(after.avatar_url)
             emb.set_author(name=str(after), icon_url=a_url, url=a_url)
@@ -570,6 +582,7 @@ class updateUserLogs:
                 "<@" + str(after.id)
                 + "> has been updated:"
             )
+            colour = [0] * 3
             change = False
             if str(before) != str(after):
                 emb.add_field(
@@ -577,6 +590,7 @@ class updateUserLogs:
                     value=str(before) + " <:arrow:688320024586223620> " + str(after),
                 )
                 change = True
+                colour[0] += 255
             if hasattr(before, "guild"):
                 if before.display_name != after.display_name:
                     emb.add_field(
@@ -584,6 +598,7 @@ class updateUserLogs:
                         value=before.display_name + " <:arrow:688320024586223620> " + after.display_name,
                     )
                     change = True
+                    colour[0] += 255
                 if len(before.roles) != len(after.roles):
                     sub = hlist()
                     add = hlist()
@@ -604,6 +619,7 @@ class updateUserLogs:
                     if rchange:
                         emb.add_field(name="Roles", value=rchange)
                         change = True
+                        colour[1] += 255
             if b_url != a_url:
                 emb.add_field(
                     name="Avatar",
@@ -615,7 +631,9 @@ class updateUserLogs:
                 )
                 emb.set_thumbnail(url=a_url)
                 change = True
+                colour[2] += 255
             if change:
+                emb.colour = colour2Raw(colour)
                 await channel.send(embed=emb)
 
     async def _join_(self, user, **void):
@@ -628,7 +646,7 @@ class updateUserLogs:
                 self.data.pop(guild.id)
                 self.update()
                 return
-            emb = discord.Embed(colour=self._vars.randColour())
+            emb = discord.Embed(colour=16777214)
             url = self._vars.strURL(user.avatar_url)
             emb.set_author(name=str(user), icon_url=url, url=url)
             emb.description = (
@@ -647,7 +665,7 @@ class updateUserLogs:
                 self.data.pop(guild.id)
                 self.update()
                 return
-            emb = discord.Embed(colour=self._vars.randColour())
+            emb = discord.Embed(colour=1)
             url = self._vars.strURL(user.avatar_url)
             emb.set_author(name=str(user), icon_url=url, url=url)
             emb.description = (
@@ -684,7 +702,7 @@ class updateMessageLogs:
                 name = u.name
                 name_id = name + bool(u.display_name) * ("#" + u.discriminator)
                 url = self._vars.strURL(u.avatar_url)
-                emb = discord.Embed(colour=self._vars.randColour())
+                emb = discord.Embed(colour=colour2Raw([0, 0, 255]))
                 emb.set_author(name=name_id, icon_url=url, url=url)
                 emb.description = (
                     "**Message edited in** <#"
@@ -756,7 +774,7 @@ class updateMessageLogs:
                     return
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
-            emb = discord.Embed(colour=self._vars.randColour())
+            emb = discord.Embed(colour=colour2Raw([255, 0, 0]))
             emb.set_author(name=name_id, icon_url=url, url=url)
             emb.description = (
                 init + " **deleted message from** <#"

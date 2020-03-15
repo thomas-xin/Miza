@@ -90,6 +90,10 @@ class customAudio(discord.AudioSource):
             if pitchscale != 1 or self.stats["speed"] != 1:
                 speed = self.speed / pitchscale
                 speed = max(0.005, speed)
+                if speed > 2147483647:
+                    self.source = None
+                    self.file = None
+                    return
                 opts = ""
                 while speed > 2:
                     opts += "atempo=2,"
@@ -102,6 +106,10 @@ class customAudio(discord.AudioSource):
             else:
                 d["options"] = ""
             if pitchscale != 1:
+                if abs(pitchscale) > 2147483647:
+                    self.source = None
+                    self.file = None
+                    return
                 #br = getBitrate(source)
                 d["options"] += ",asetrate=r=" + str(48000 * pitchscale)
             if self.reverse:
@@ -275,15 +283,15 @@ class customAudio(discord.AudioSource):
                 return temp
             array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
             size = self.length >> 1
-            if abs(volume) > 1 << 32:
+            if abs(volume) > 1 << 31:
                 volume = nan
-            if abs(reverb) > 1 << 32:
+            if abs(reverb) > 1 << 31:
                 reverb = nan
-            if abs(bassboost) > 1 << 32:
+            if abs(bassboost) > 1 << 31:
                 bassboost = nan
-            if abs(pitch) > 1 << 32:
+            if abs(pitch) > 1 << 31:
                 pitch = nan
-            #if abs(detune) > 1 << 32:
+            #if abs(detune) > 1 << 31:
                 #detune = nan
             if not isValid(volume * reverb * bassboost * pitch):# * detune):
                 array = self.static()
@@ -933,6 +941,8 @@ class Queue:
                     break
                 if i <= 1 or not auds.stats["shuffle"]:
                     currTime += e["duration"]
+                if not 1 + i & 8191:
+                    await asyncio.sleep(0.3)
             embed.add_field(
                 name="Page " + uniStr(1 + embcnt),
                 value=embstr,
@@ -1204,7 +1214,9 @@ class Skip:
         if not argv:
             elems = [0]
         elif ":" in argv or ".." in argv:
-            l = argv.replace("...", ":").replace("..", ":").split(":")
+            while "..." in argv:
+                argv = argv.replace("...", "..")
+            l = argv.replace("..", ":").split(":")
             it = None
             if len(l) > 3:
                 raise ValueError("Too many arguments for range input.")
@@ -1509,6 +1521,7 @@ class AudioSettings:
             "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <bassboost(?b)> <reverb(?r)> <chorus(?c)>"# <detune(?f)>"
             + " <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)> <hide(?h)>"
         )
+        self.setting_map = {k.lower():self.other_settings[k] for k in self.other_settings}
 
     async def __call__(self, client, channel, user, guild, _vars, flags, argv, name, message, perm, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1535,15 +1548,10 @@ class AudioSettings:
             elif "q" in flags:
                 op = "quiet"
             else:
-                for i in self.other_settings:
-                    if name == i.lower():
-                        op = self.other_settings[i]
-                        break
-                if op is None:
-                    op = "settings"
+                op = self.setting_map.get(name.lower(), "settings")
         if not argv and op is not None and op not in "loop shuffle quiet":
             if op == "settings":
-                key = lambda x: (x*100, x)[type(x) is bool]
+                key = lambda x: (round(x*100, 9), x)[type(x) is bool]
                 d = dict(auds.stats)
                 try:
                     d.pop("position")
@@ -1735,6 +1743,8 @@ class Player:
             output += "🔄"
         if auds.stats["shuffle"]:
             output += "🔀"
+        if auds.stats["quiet"]:
+            output += "🔕"
         output += "\n"
         v = abs(auds.stats["volume"])
         if v == 0:
@@ -1910,7 +1920,7 @@ class Player:
                     except discord.NotFound:
                         pass
                     return
-        text = orig + self.showCurr(auds) + "```"
+        text = limStr(orig + self.showCurr(auds) + "```", 2000)
         last = message.channel.last_message
         if last is not None and (auds.player["type"] or message.id == last.id):
             auds.player["events"] += 1

@@ -350,8 +350,17 @@ translators = {
     "°": " deg",
     "÷": "/",
     "×": "*",
-    "⋅": "*",
     "·": "*",
+    "·": "*",
+    "᛫": "*",
+    "•": "*",
+    "‧": "*",
+    "∙": "*",
+    "⋅": "*",
+    "⸱": "*",
+    "・": "*",
+    "ꞏ": "*",
+    "･": "*",
     "Σ": "Sum ",
     "∑": "Sum ",
     "∫": "intg ",
@@ -408,7 +417,7 @@ def prettyAns(f):
         use_unicode=True,
         num_columns=2147483647,
         mat_symbol_style="bold",
-    ).replace("zoo", "ℂ∞").replace("nan", "NaN")
+    ).replace("zoo", "ℂ∞").replace("nan", "NaN").replace("⋅", "∙")
 
 def evalSym(f, prec=64, r=False):
     global BF_PREC
@@ -443,10 +452,10 @@ def evalSym(f, prec=64, r=False):
                 f = f.subs(i, i.doit())
             except:
                 pass
+    if isinstance(f, Plot):
+        return [f]
     try:
         f = sympy.simplify(f)
-        if isinstance(f, Plot):
-            return [f]
     except:
         pass
     for i in sympy.preorder_traversal(f):
@@ -501,31 +510,15 @@ def evalSym(f, prec=64, r=False):
             p = ""
         return [f, p]
 
-def readline(stream):
-    output = ""
-    t = time.time()
-    while not "\n" in output:
-        c = stream.read(1)
-        if c:
-            output += c
-        else:
-            time.sleep(0.003)
-            if time.time() - t > 900:
-                time.sleep(1)
-            elif time.time() - t > 12:
-                time.sleep(0.5)
-    return output
-
 
 while True:
     try:
-        i = eval(readline(sys.stdin)).decode("utf-8").replace("\n", "").split("`")
+        i = eval(sys.stdin.readline()).decode("utf-8").replace("\n", "").split("`")
         if len(i) <= 1:
             i.append("0")
         key = i[-1]
         resp = evalSym(*i[:-1])
         if isinstance(resp[0], Plot):
-            resp[0].margin = 0.5
             fn = "cache/" + key + ".png"
             try:
                 resp[0].save(fn)

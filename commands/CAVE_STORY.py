@@ -169,12 +169,12 @@ class SheetPull:
 
 
 entity_list = SheetPull(
-    "https://docs.google.com/spreadsheets/d/12iC9uRGNZ2MnrhpS4s_KvIRYH\
-hC56mPXCnCcsDjxit0/export?format=csv&id=12iC9uRGNZ2MnrhpS4s_KvIRYHhC56mPXCnCcsDjxit0&gid=0"
+    "https://docs.google.com/spreadsheets/d/12iC9uRGNZ2MnrhpS4s_KvIRYHhC56mPXCnCcsDjxit0\
+/export?format=csv&id=12iC9uRGNZ2MnrhpS4s_KvIRYHhC56mPXCnCcsDjxit0&gid=0"
 )
 tsc_list = SheetPull(
-    "https://docs.google.com/spreadsheets/d/11LL7T_jDPcWuhkJycsEoBGa9i\
--rjRjgMW04Gdz9EO6U/export?format=csv&id=11LL7T_jDPcWuhkJycsEoBGa9i-rjRjgMW04Gdz9EO6U&gid=0"
+    "https://docs.google.com/spreadsheets/d/11LL7T_jDPcWuhkJycsEoBGa9i-rjRjgMW04Gdz9EO6U\
+/export?format=csv&id=11LL7T_jDPcWuhkJycsEoBGa9i-rjRjgMW04Gdz9EO6U&gid=0"
 )
 
 
@@ -460,7 +460,13 @@ class CS_hex2xml:
             + '\t</panel>\n'
             + '</hack>'
         )
-        return bytes(output, "utf-8")
+        data = bytes(output, "utf-8")
+        fn = "cache/" + str(channel.id) + ".xml"
+        f = open(fn, "wb")
+        f.write(data)
+        f.close()
+        f = discord.File(fn)
+        create_task(self._vars.sendFile(channel, "Hack successfully converted!", f, fn))
 
 
 class CS_npc:

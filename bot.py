@@ -976,6 +976,7 @@ class main_data:
 
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_flags=None, loop=False):
+    cpy = msg
     categories = _vars.categories
     if msg[:2] == "> ":
         msg = msg[2:]
@@ -1190,7 +1191,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                                     else:
                                         filemsg = "Response data:"
                                     if len(response) <= guild.filesize_limit:
-                                        fn = "cache/" + str(guild.id) + ".txt"
+                                        fn = "cache/" + str(channel.id) + ".txt"
                                         f = open(fn, "wb")
                                         f.write(response)
                                         f.close()
@@ -1215,7 +1216,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
                         ))
     if not run and u_id != client.user.id and orig:
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
-        temp = list(reconstitute(orig).lower())
+        temp = list(cpy.lower())
         for i in range(len(temp)):
             if not(temp[i] in s):
                 temp[i] = " "
@@ -1358,8 +1359,12 @@ async def on_voice_state_update(member, before, after):
 async def handleMessage(message, edit=True):
     msg = message.content
     try:
+        if msg and msg[0] == "\\":
+            cpy = msg[1:]
+        else:
+            cpy = reconstitute(msg)
         await asyncio.wait_for(
-            processMessage(message, reconstitute(msg), edit, msg), timeout=_vars.timeout
+            processMessage(message, cpy, edit, msg), timeout=_vars.timeout
         )
     except Exception as ex:
         errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)

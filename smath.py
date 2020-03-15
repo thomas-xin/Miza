@@ -2665,8 +2665,7 @@ class __logPrinter():
         outfunc(enc("Logging started...\n"))
         while True:
             if self.print_temp:
-                if len(self.print_temp) > 4096 or self.print_temp.count("\n") > 48:
-                    self.print_temp = limStr(self.print_temp, 2048)
+                self.print_temp = limStr(self.print_temp, 4096)
                 data = enc(self.print_temp)
                 #sys.stdout.write(repr(data))
                 outfunc(data)
