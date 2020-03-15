@@ -689,7 +689,7 @@ class Info:
             u = user
         guild = g
         name = str(u)
-        dname = u.display_name
+        dname = u.display_name * (u.display_name != u.name)
         url = _vars.strURL(u.avatar_url)
         try:
             is_sys = u.system
@@ -762,7 +762,7 @@ class Info:
             emb.add_field(name="Join time", value=str(joined), inline=1)
         if coms:
             emb.add_field(name="Commands used", value=str(coms), inline=1)
-        if dname and dname != u.name:
+        if dname:
             emb.add_field(name="Nickname", value=dname, inline=1)
         if msgs:
             emb.add_field(name="Post count", value=str(msgs), inline=1)

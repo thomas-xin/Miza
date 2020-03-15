@@ -1820,7 +1820,7 @@ class Player:
                 "type": int(vals),
                 "events": 0,
             }
-            if vals:
+            if auds.player["type"]:
                 auds.stats["quiet"] |= 2
         elif auds.player is None or auds.player["message"].id != message.id:
             await message.clear_reactions()
