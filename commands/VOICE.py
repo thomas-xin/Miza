@@ -602,17 +602,27 @@ class videoDownloader:
                     else:
                         for entry in entries:
                             try:
-                                found = "duration" in entry
+                                found = True
                                 if "title" in entry:
                                     title = entry["title"]
                                 else:
                                     title = entry["url"].split("/")[-1]
                                     found = False
+                                if "id" in entry:
+                                    e_id = entry["id"]
+                                else:
+                                    e_id = str(hash(entry["url"]) & 4294967295)
+                                    found = False
+                                if "duration" in entry:
+                                    dur = float(entry[duration])
+                                else:
+                                    dur = 60
+                                    found = False
                                 temp = {
-                                    "id": entry["id"],
+                                    "id": e_id,
                                     "name": title,
                                     "url": entry["url"],
-                                    "duration": entry.get("duration", 60),
+                                    "duration": dur,
                                 }
                                 if not found:
                                     temp["research"] = True
@@ -1104,6 +1114,8 @@ class Join:
 
     async def __call__(self, client, user, _vars, channel, guild, **void):
         voice = user.voice
+        if voice is None:
+            raise LookupError("Unable to find voice channel.")
         vc_ = voice.channel
         joined = False
         for vc in client.voice_clients:
@@ -1397,15 +1409,17 @@ class Dump:
     time_consuming = True
 
     def __init__(self):
-        self.name = []
+        self.name = ["Save", "Load"]
         self.min_level = 0
         self.min_display = "0~1"
         self.description = "Dumps or loads the currently playing audio queue state."
         self.usage = "<data{attached_file}> <append(?a)> <hide(?h)>"
 
-    async def __call__(self, guild, channel, user, client, _vars, perm, argv, flags, message, **void):
+    async def __call__(self, guild, channel, user, client, _vars, perm, name, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        if not argv and not len(message.attachments):
+        if not argv and not len(message.attachments) or name.lower() == "save":
+            if name.lower() == "load":
+                raise EOFError("Please input a file, URL or json data to load.")
             returns = [None]
             doParallel(getDump, [auds, guild], returns)
             while returns[0] is None:
@@ -1537,7 +1551,7 @@ class AudioSettings:
                     pass
                 return (
                     "Current audio settings for **" + guild.name + "**:\n```ini\n"
-                    + strIter(d, key=key).replace("'", '"') + "```"
+                    + strIter(d, key=key) + "```"
                 )
             orig = _vars.updaters["playlists"].audio[guild.id].stats[op]
             num = round(100 * orig, 9)
@@ -2009,6 +2023,14 @@ class updateQueues:
                 except:
                     print(traceback.format_exc())
 
+    async def _typing_(self, channel, user, **void):
+        if channel.guild.id in self.audio and user.id != self._vars.client.user.id:
+            auds = self.audio[channel.guild.id]
+            if auds.player is not None and channel.id == auds.channel.id:
+                t = time.time() + 10
+                if auds.player["time"] < t:
+                    auds.player["time"] = t
+
     async def _send_(self, message, **void):
         if message.guild.id in self.audio and message.author.id != self._vars.client.user.id:
             auds = self.audio[message.guild.id]
@@ -2030,9 +2052,14 @@ class updateQueues:
                 for i in pl[g]:
                     should_cache[i["id"]] = True
             for vc in client.voice_clients:
-                if not vc.guild.id in self.connecting:
-                    if not vc.guild.id in self.audio:
-                        create_task(vc.disconnect(force=True))
+                if not vc.guild.id in self.connecting and not vc.guild.id in self.audio:
+                    create_task(vc.disconnect(force=True))
+            for g in client.guilds:
+                if not g.id in self.connecting and not g.id in self.audio:
+                    for c in g.voice_channels:
+                        for m in c.members:
+                            if m.id == client.user.id:
+                                create_task(m.move_to(None))
         except:
             print(traceback.format_exc())
         for g in tuple(self.audio):

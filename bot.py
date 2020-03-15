@@ -1373,6 +1373,19 @@ async def handleMessage(message, edit=True):
 
 
 @client.event
+async def on_typing(channel, user, when):
+    guild = channel.guild
+    if guild:
+        for u in _vars.updaters.values():
+            f = getattr(u, "_typing_", None)
+            if f is not None:
+                try:
+                    await f(channel=channel, user=user)
+                except:
+                    print(traceback.format_exc())
+
+
+@client.event
 async def on_message(message):
     _vars.cacheMessage(message)
     guild = message.guild

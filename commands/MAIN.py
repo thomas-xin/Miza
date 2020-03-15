@@ -1004,7 +1004,7 @@ class updateExec:
         elif message.guild is None:
             emb = discord.Embed()
             emb.add_field(
-                name=str(message.author),
+                name=str(message.author) + "(" + str(message.author.id) + ")",
                 value=_vars.strMessage(message),
             )
             await self.channel.send(embed=emb)
