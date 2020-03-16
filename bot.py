@@ -1379,7 +1379,7 @@ async def handleMessage(message, edit=True):
 
 @client.event
 async def on_typing(channel, user, when):
-    guild = channel.guild
+    guild = getattr(channel, "guild", None)
     if guild:
         for u in _vars.updaters.values():
             f = getattr(u, "_typing_", None)
