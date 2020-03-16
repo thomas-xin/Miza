@@ -227,10 +227,10 @@ class customAudio(discord.AudioSource):
             self.vc = await self.vc.channel.connect(timeout=30, reconnect=False)
             for user in guild.members:
                 if user.id == client.user.id:
-                    if hasattr(user, "VoiceState") and user.VoiceState is not None:
-                        if not (user.VoiceState.deaf or user.VoiceState.mute):
+                    if getattr(user, "voice", None) is not None:
+                        if not (user.voice.deaf or user.voice.mute or user.voice.afk):
                             break
-                    create_task(user.edit(mute=False,deafen=False))
+                    create_task(user.edit(mute=False, deafen=False))
                     break
             self.att = 0
         except (discord.Forbidden, discord.HTTPException):
@@ -1154,10 +1154,10 @@ class Join:
             joined = False
         for user in guild.members:
             if user.id == client.user.id:
-                if hasattr(user, "VoiceState") and user.VoiceState is not None:
-                    if not (user.VoiceState.deaf or user.VoiceState.mute):
+                if hasattr(user, "voice") and user.voice is not None:
+                    if not (user.voice.deaf or user.voice.mute or user.voice.afk):
                         break
-                create_task(user.edit(mute=False,deafen=False))
+                create_task(user.edit(mute=False, deafen=False))
                 break
         if joined:
             updateQueues.sendUpdateRequest(self, force=True)
@@ -1687,7 +1687,9 @@ class Unmute:
     async def __call__(self, guild, flags, **void):
         for vc in guild.voice_channels:
             for user in vc.members:
-                create_task(user.edit(mute=False, deafen=False))
+                if user.voice is not None:
+                    if user.voice.deaf or user.voice.mute or user.voice.afk:
+                        create_task(user.edit(mute=False, deafen=False))
         if "h" not in flags:
             return (
                 "```css\nSuccessfully unmuted all users in voice channels in "
@@ -2070,6 +2072,11 @@ class updateQueues:
                         for m in c.members:
                             if m.id == client.user.id:
                                 create_task(m.move_to(None))
+                else:
+                    m = g.get_member(client.user.id)
+                    if m.voice is not None:
+                        if m.voice.deaf or m.voice.mute or m.voice.afk:
+                            create_task(user.edit(mute=False, deafen=False))
         except:
             print(traceback.format_exc())
         for g in tuple(self.audio):

@@ -1350,10 +1350,12 @@ async def on_raw_reaction_remove(payload):
 @client.event
 async def on_voice_state_update(member, before, after):
     if member.id == client.user.id:
-        if after.mute or after.deaf:
-            print("Unmuted self in " + member.guild.name)
-            await member.edit(mute=False, deafen=False)
-        await _vars.handleUpdate()
+        after = member.voice
+        if after is not None:
+            if after.mute or after.deaf:
+                print("Unmuted self in " + member.guild.name)
+                await member.edit(mute=False, deafen=False)
+            await _vars.handleUpdate()
 
 
 async def handleMessage(message, edit=True):
