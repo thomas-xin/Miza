@@ -88,32 +88,37 @@ class customAudio(discord.AudioSource):
             pitchscale = 2 ** (self.stats["pitch"] / 12)
             chorus = min(32, abs(self.stats["chorus"]))
             if pitchscale != 1 or self.stats["speed"] != 1:
-                speed = self.speed / pitchscale
-                speed = max(0.005, speed)
-                if speed > 2147483647:
-                    self.source = None
-                    self.file = None
-                    return
-                opts = ""
-                while speed > 2:
-                    opts += "atempo=2,"
-                    speed /= 2
-                while speed < 0.5:
-                    opts += "atempo=0.5,"
-                    speed /= 0.5
-                opts += "atempo=" + str(speed)
-                d["options"] = "-af " + opts
+                speed = round(self.speed / pitchscale, 9)
+                if speed != 1:
+                    speed = max(0.005, speed)
+                    if speed > 2147483647:
+                        self.source = None
+                        self.file = None
+                        return
+                    opts = ""
+                    while speed > 2:
+                        opts += "atempo=2,"
+                        speed /= 2
+                    while speed < 0.5:
+                        opts += "atempo=0.5,"
+                        speed /= 0.5
+                    opts += "atempo=" + str(speed)
+                    d["options"] = "-af " + opts
+                else:
+                    d["options"] = "-af "
             else:
                 d["options"] = ""
+            if d["options"] and d["options"][-1] != " ":
+                d["options"] += ","
             if pitchscale != 1:
                 if abs(pitchscale) > 2147483647:
                     self.source = None
                     self.file = None
                     return
                 #br = getBitrate(source)
-                d["options"] += ",asetrate=r=" + str(48000 * pitchscale)
+                d["options"] += "asetrate=r=" + str(48000 * pitchscale)
             if self.reverse:
-                d["options"] += ",areverse"
+                d["options"] += "areverse"
             if chorus:
                 if not d["options"]:
                     d["options"] = "-af "
@@ -1503,6 +1508,7 @@ class AudioSettings:
         "Bassboost": "bassboost",
         "Reverb": "reverb",
         "Chorus": "chorus",
+        "Nightcore": "nightcore",
         #"Detune": "detune",
         "LoopQueue": "loop",
         "ShuffleQueue": "shuffle",
@@ -1519,7 +1525,7 @@ class AudioSettings:
         self.description = "Changes the current audio settings for this server."
         self.usage = (
             "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <bassboost(?b)> <reverb(?r)> <chorus(?c)>"# <detune(?f)>"
-            + " <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)> <hide(?h)>"
+            + " <nightcore(?n)> <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)> <hide(?h)>"
         )
         self.setting_map = {k.lower():self.other_settings[k] for k in self.other_settings}
 
@@ -1539,8 +1545,8 @@ class AudioSettings:
                 op = "reverb"
             elif "c" in flags:
                 op = "chorus"
-            # elif "f" in flags:
-            #     op = "detune"
+            elif "n" in flags:
+                op = "nightcore"
             elif "l" in flags:
                 op = "loop"
             elif "x" in flags:
@@ -1561,7 +1567,10 @@ class AudioSettings:
                     "Current audio settings for **" + guild.name + "**:\n```ini\n"
                     + strIter(d, key=key) + "```"
                 )
-            orig = _vars.updaters["playlists"].audio[guild.id].stats[op]
+            if op == "nightcore":
+                orig = _vars.updaters["playlists"].audio[guild.id].stats["pitch"]
+            else:
+                orig = _vars.updaters["playlists"].audio[guild.id].stats[op]
             num = round(100 * orig, 9)
             return (
                 "```css\nCurrent audio " + op
@@ -1592,14 +1601,20 @@ class AudioSettings:
         origVol = _vars.updaters["playlists"].audio[guild.id].stats
         num = await _vars.evalMath(argv, guild.id)
         val = roundMin(float(num / 100))
-        orig = round(origVol[op] * 100, 9)
+        if op == "nightcore":
+            orig = round(origVol["pitch"] * 100, 9)
+        else:
+            orig = round(origVol[op] * 100, 9)
         new = round(val * 100, 9)
         if op in "loop shuffle quiet":
             origVol[op] = new = bool(val)
             orig = bool(orig)
+        elif op == "nightcore":
+            origVol["speed"] = 2 ** (val / 12)
+            origVol["pitch"] = val
         else:
             origVol[op] = val
-        if op in "speed pitch chorus":
+        if op in "speed pitch chorus nightcore":
             auds.new(auds.file, auds.stats["position"])
         if "h" not in flags:
             return (
