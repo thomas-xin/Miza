@@ -2076,7 +2076,7 @@ class updateQueues:
                     m = g.get_member(client.user.id)
                     if m.voice is not None:
                         if m.voice.deaf or m.voice.mute or m.voice.afk:
-                            create_task(user.edit(mute=False, deafen=False))
+                            create_task(m.edit(mute=False, deafen=False))
         except:
             print(traceback.format_exc())
         for g in tuple(self.audio):
