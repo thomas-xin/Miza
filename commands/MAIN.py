@@ -449,8 +449,7 @@ class Loop:
             create_task(callback(
                 message, func, cb_argv=func2, loop=loop,
             ))
-            if perm is not nan or not i - 1 & 7:
-                await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
 
 
 class Avatar:
