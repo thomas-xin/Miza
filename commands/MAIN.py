@@ -19,6 +19,7 @@ class Help:
         self.min_level = -inf
         self.description = "Shows a list of usable commands, or gives a detailed description of a command."
         self.usage = "<command{all}> <category{all}> <verbose(?v)>"
+        self.flags = "v"
 
     async def __call__(self, args, user, channel, guild, flags, perm, **void):
         _vars = self._vars
@@ -29,10 +30,6 @@ class Help:
         c_name = getattr(channel, "name", "DM")
         admin = (not inf > perm, perm is nan)[c_name == "DM"]
         categories = _vars.categories
-        commands = hlist()
-        for catg in categories:
-            if catg in enabled or admin:
-                commands.extend(categories[catg])
         verb = "v" in flags
         show = []
         for a in args:
@@ -53,7 +50,7 @@ class Help:
                     if c_name == "DM" and getattr(com, "server_only", False):
                         continue
                     newstr = (
-                        "```xml\n" + prefix + name
+                        ("```xml\n", "```ini\n")["v" in flags] + prefix + name
                         + "\nAliases: " + str(com.name)
                         + "\nEffect: " + description
                         + (
@@ -97,6 +94,10 @@ class Help:
                         if (not len(show)) or len(show[-1]) < len(newstr):
                             show = [newstr]
         if not show:
+            commands = hlist()
+            for catg in categories:
+                if catg in enabled or admin:
+                    commands.extend(categories[catg])
             for com in commands:
                 name = com.__name__
                 min_level = com.min_level
@@ -130,6 +131,7 @@ class Perms:
         self.min_level = -inf
         self.description = "Shows or changes a user's permission level."
         self.usage = "<0:user{self}> <1:level[]> <hide(?h)>"
+        self.flags = "fh"
 
     async def __call__(self, _vars, args, user, perm, guild, flags, **void):
         if len(args) < 2:
@@ -205,6 +207,7 @@ class EnableCommand:
         self.min_display = "0~3"
         self.description = "Shows, enables, or disables a command category in the current channel."
         self.usage = "<command{all}> <enable(?e)> <disable(?d)> <list(?l)> <hide(?h)>"
+        self.flags = "edlh"
 
     async def __call__(self, argv, flags, user, channel, perm, **void):
         update = self.data["enabled"].update
@@ -306,7 +309,7 @@ class Restart:
         _vars.update()
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
-        for i in range(5):
+        for _ in loop(5):
             try:
                 f = open(_vars.restart, "wb")
                 f.close()
@@ -314,7 +317,7 @@ class Restart:
             except:
                 print(traceback.format_exc())
                 time.sleep(0.1)
-        for i in range(8):
+        for _ in loop(8):
             try:
                 if "log.txt" in os.listdir():
                     os.remove("log.txt")
@@ -373,8 +376,9 @@ class Prefix:
         self.min_display = "0~3"
         self.description = "Shows or changes the prefix for commands for this server."
         self.usage = "<prefix[]>"
+        self.flags = "h"
 
-    async def __call__(self, argv, guild, perm, _vars, **void):
+    async def __call__(self, argv, guild, perm, _vars, flags, **void):
         pref = _vars.data["prefixes"]
         update = self.data["prefixes"].update
         if not argv:
@@ -389,12 +393,16 @@ class Prefix:
                 + uniStr(guild.name)
             )
             self.permError(perm, req, reason)
-        pref[guild.id] = argv.strip(" ")
+        prefix = argv
+        if prefix.startswith("\\"):
+            raise TypeError("Prefix must not begin with backslash.")
+        pref[guild.id] = prefix
         update()
-        return (
-            "```css\nSuccessfully changed command prefix for " + uniStr(guild.name)
-            + " to " + argv + "```"
-        )
+        if "h" not in flags:
+            return (
+                "```css\nSuccessfully changed command prefix for " + uniStr(guild.name)
+                + " to " + argv + "```"
+            )
 
 
 class Loop:
@@ -406,9 +414,9 @@ class Loop:
         self.min_level = 1
         self.min_display = "1+"
         self.description = "Loops a command."
-        self.usage = "<0:iterations> <1:command> <hide(?h)>"
+        self.usage = "<0:iterations> <1:command>"
 
-    async def __call__(self, args, argv, message, channel, callback, _vars, flags, perm, guild, **void):
+    async def __call__(self, args, argv, message, channel, callback, _vars, perm, guild, **void):
         num = await _vars.evalMath(args[0], guild.id)
         iters = round(num)
         scale = 3
@@ -420,8 +428,6 @@ class Loop:
             )
             self.permError(perm, ceil(iters / scale), reason)
         func = func2 = " ".join(args[1:])
-        if flags:
-            func += " ?" + "?".join(flags)
         if func:
             while func[0] == " ":
                 func = func[1:]
@@ -430,19 +436,18 @@ class Loop:
                 if (_vars.getPrefix(guild) + n).upper() in func.replace(" ", "").upper():
                     raise PermissionError("Must be server owner to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
-        if not "h" in flags:
-            create_task(_vars.sendReact(
-                channel,
-                (
-                    "```css\nLooping [" + func + "] " + uniStr(iters)
-                    + " time" + "s" * (iters != 1) + "...```"
-                ),
-                reacts=["❎"],
-            ))
+        create_task(_vars.sendReact(
+            channel,
+            (
+                "```css\nLooping [" + func + "] " + uniStr(iters)
+                + " time" + "s" * (iters != 1) + "...```"
+            ),
+            reacts=["❎"],
+        ))
         for i in range(iters):
             loop = i < iters - 1
             create_task(callback(
-                message, func, cb_argv=func2, cb_flags=flags, loop=loop,
+                message, func, cb_argv=func2, loop=loop,
             ))
             if perm is not nan or not i - 1 & 7:
                 await asyncio.sleep(1)
@@ -554,6 +559,7 @@ class Info:
         self.min_level = 0
         self.description = "Shows information about the target user or server."
         self.usage = "<user> <verbose(?v)>"
+        self.flags = "v"
 
     async def getGuildData(self, g, flags={}):
         _vars = self._vars
@@ -821,36 +827,6 @@ class Status:
         )
 
 
-class Execute:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["Exec", "Eval"]
-        self.min_level = nan
-        self.description = (
-            "Causes all messages in the current channel to be executed as python code on the bot."
-            + " WARNING: DO NOT ALLOW UNTRUSTED USERS TO POST IN CHANNEL."
-        )
-        self.usage = "<enable(?e)> <disable(?d)>"
-
-    async def __call__(self, _vars, flags, channel, **void):
-        if "e" in flags:
-            _vars.updaters["exec"].channel = channel
-            return (
-                "```css\nSuccessfully changed code channel to "
-                + uniStr(channel.id) + ".```"
-            )
-        elif "d" in flags:
-            _vars.updaters["exec"].channel = freeClass(id=None)
-            return (
-                "```css\nSuccessfully removed code channel.```"
-            )
-        return (
-            "```css\ncode channel is currently set to "
-            + uniStr(_vars.updaters["exec"].channel.id) + ".```"
-        )
-
-
 class Reminder:
     is_command = True
 
@@ -859,6 +835,7 @@ class Reminder:
         self.min_level = 0
         self.description = "Sets a reminder for a certain date and time."
         self.usage = "<1:message> <0:time> <disable(?d)>"
+        self.flags = "ed"
 
     async def __call__(self, argv, args, flags, _vars, user, guild, **void):
         rems = _vars.data["reminders"].get(user.id, hlist())
@@ -890,12 +867,18 @@ class Reminder:
         if len(rems) >= 32:
             raise OverflowError("You have reached the maximum of 32 reminders. Please remove one to add another.")
         if "in" in argv:
-            spl = argv.split("in")
-            msg = "in".join(spl[:-1])
+            if " in " in argv:
+                spl = argv.split(" in ")
+            elif argv.startswith("in "):
+                spl = argv[3:]
+            msg = " in ".join(spl[:-1])
             t = await _vars.evalTime(args[-1], guild)
         elif "at" in argv:
-            spl = argv.split("at")
-            msg = "at".join(spl[:-1])
+            if " at " in argv:
+                spl = argv.split(" at ")
+            elif argv.startswith("at "):
+                spl = argv[3:]
+            msg = " at ".join(spl[:-1])
             t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
         else:
             msg = " ".join(args[:-1])
@@ -919,7 +902,7 @@ class Reminder:
 
 
 class updateReminders:
-    is_update = True
+    is_database = True
     name = "reminders"
     user = True
 
@@ -952,66 +935,8 @@ class updateReminders:
         self.busy = False
 
 
-class updateExec:
-    is_update = True
-    name = "exec"
-    no_file = True
-
-    def __init__(self):
-        self.channel = freeClass(id=None)
-
-    async def __call__(self):
-        pass
-
-    async def _nocommand_(self, message, **void):
-        _vars = self._vars
-        if message.author.id == _vars.client.user.id:
-            return
-        if message.channel.id == self.channel.id:
-            proc = message.content
-            while proc[0] == " ":
-                proc = proc[1:]
-            if proc.startswith("//") or proc.startswith("||") or proc.startswith("\\\\") or proc.startswith("#"):
-                return
-            if proc.startswith("`") and proc.endswith("`"):
-                proc = proc.strip("`")
-            if not proc:
-                return
-            output = None
-            try:
-                print(proc)
-                try:
-                    output = eval(proc, _vars._globals)
-                except:
-                    try:
-                        exec(proc, _vars._globals)
-                        output = str(proc) + " Successfully executed!"
-                    except:
-                        output = traceback.format_exc()
-                if type(output) in (tuple, set, list, hlist):
-                    output = await _vars.recursiveCoro(output)
-                elif asyncio.iscoroutine(output):
-                    output = await output
-                await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
-            except:
-                await self.channel.send(limStr(
-                    "```py\n" + traceback.format_exc().replace("```", "") + "```",
-                    2000,
-                ))
-            if output is not None:
-                _vars._globals["output"] = output
-                _vars._globals["_"] = output
-        elif message.guild is None:
-            emb = discord.Embed()
-            emb.add_field(
-                name=str(message.author) + "(" + str(message.author.id) + ")",
-                value=_vars.strMessage(message),
-            )
-            await self.channel.send(embed=emb)
-
-
 class updateMessageCount:
-    is_update = True
+    is_database = True
     name = "counts"
     no_file = True
 
@@ -1246,7 +1171,7 @@ class updateMessageCount:
 
 
 class updatePrefix:
-    is_update = True
+    is_database = True
     name = "prefixes"
 
     def __init__(self):
@@ -1257,7 +1182,7 @@ class updatePrefix:
 
 
 class updateEnabled:
-    is_update = True
+    is_database = True
     name = "enabled"
 
     def __init__(self):
@@ -1268,7 +1193,7 @@ class updateEnabled:
 
 
 class updateUsers:
-    is_update = True
+    is_database = True
     name = "users"
     suspected = "users.json"
     user = True

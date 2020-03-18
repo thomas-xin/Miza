@@ -358,6 +358,7 @@ class Neko:
         self.min_level = 0
         self.description = "Pulls a random image from nekos.life and embeds it."
         self.usage = "<tags[neko]> <random(?r)> <verbose(?v)> <list(?l)>"
+        self.flags = "lrv"
 
     async def __call__(self, args, argv, flags, channel, **void):
         isNSFW = is_nsfw(channel)
@@ -381,7 +382,7 @@ class Neko:
                             "This command is only available in " + uniStr("NSFW") + " channels."
                             )
                 selected.append(tag)
-        for x in range(flags.get("r", 0)):
+        for _ in loop(flags.get("r", 0)):
             possible = [i for i in neko_tags if neko_tags[i] <= isNSFW]
             selected.append(possible[xrand(len(possible))])
         if not selected:
@@ -425,6 +426,7 @@ class Lewd:
         self.min_level = 1
         self.description = "Pulls a random image from a search on Rule34 and e621, and embeds it."
         self.usage = "<query> <verbose(?v)>"
+        self.flags = "v"
 
     async def __call__(self, _vars, args, flags, channel, **void):
         if not is_nsfw(channel):

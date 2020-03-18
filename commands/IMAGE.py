@@ -16,6 +16,7 @@ class IMG:
         self.min_display = "0~2"
         self.description = "Sends an image in the current chat from a list."
         self.usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <enable(?e)> <disable(?d)> <hide(?h)>"
+        self.flags = "vredh"
 
     async def __call__(self, flags, args, argv, guild, perm, **void):
         update = self.data["images"].update
@@ -82,7 +83,7 @@ class IMG:
             if t in images:
                 sources.append(images[t])
         r = flags.get("r", 0)
-        for i in range(r):
+        for _ in loop(r):
             sources.append(images[tuple(images)[xrand(len(images))]])
         if not len(sources):
             raise LookupError("Target image " + str(argv) + " not found. Use img for list.")
@@ -238,12 +239,13 @@ class Cat:
         self.min_level = 0
         self.description = "Pulls a random image from thecatapi.com or cdn.nekos.life/meow, and embeds it."
         self.usage = "<verbose(?v)>"
+        self.flags = "v"
 
     async def __call__(self, channel, flags, **void):
         if not self.header or random.random() > 0.9375:
             url = nekos.cat()
         else:
-            for attempts in range(8):
+            for _ in loop(8):
                 returns = [None]
                 doParallel(
                     funcSafe,
@@ -288,9 +290,10 @@ class Dog:
         self.min_level = 0
         self.description = "Pulls a random image from images.dog.ceo and embeds it."
         self.usage = "<verbose(?v)>"
+        self.flags = "v"
 
     async def __call__(self, channel, flags, **void):
-        for attempts in range(8):
+        for _ in loop(8):
             returns = [None]
             doParallel(funcSafe, [urlOpen, "https://dog.ceo/api/breeds/image/random"], returns)
             while returns[0] is None:
@@ -325,7 +328,7 @@ class Dog:
 
 
 class updateImages:
-    is_update = True
+    is_database = True
     name = "images"
 
     def __init__(self):

@@ -11,11 +11,14 @@ import urllib.request, urllib.parse
 from scipy import interpolate, special, signal
 from dateutil import parser as tparser
 from sympy.parsing.sympy_parser import parse_expr
+from itertools import repeat
 
 if hasattr(asyncio, "create_task"):
     create_task = asyncio.create_task
 else:
     create_task = asyncio.ensure_future
+
+loop = lambda x: repeat(None, x)
 
 CalledProcessError = subprocess.CalledProcessError
 Process = psutil.Process()
@@ -97,6 +100,33 @@ def shuffle(it):
             it = list(it)
             random.shuffle(it)
             return it
+        except TypeError:
+            raise TypeError("Shuffling " + type(it) + " is not supported.")
+
+def reverse(it):
+    if type(it) is list:
+        return list(reversed(it))
+    elif type(it) is tuple:
+        return list(reversed(it))
+    elif type(it) is dict:
+        ir = tuple(reversed(it))
+        new = {}
+        for i in ir:
+            new[i] = it[i]
+        it.clear()
+        it.update(new)
+        return it
+    elif type(it) is deque:
+        return deque(reversed(it))
+    elif isinstance(it, hlist):
+        temp = it.reverse()
+        it.data = temp.data
+        it.offs = temp.offs
+        del temp
+        return it
+    else:
+        try:
+            return list(reversed(it))
         except TypeError:
             raise TypeError("Shuffling " + type(it) + " is not supported.")
 
@@ -1431,7 +1461,7 @@ lookup time for all elements. Includes many array and numeric operations."""
         def call(self, *args, force=False, **kwargs):
             if not force:
                 while self.block:
-                    time.sleep(0.00001)
+                    time.sleep(0.001)
             return func(self, *args, **kwargs)
         return call
 
@@ -1439,7 +1469,7 @@ lookup time for all elements. Includes many array and numeric operations."""
         def call(self, *args, force=False, **kwargs):
             if not force:
                 while self.block:
-                    time.sleep(0.00001)
+                    time.sleep(0.001)
             self.block = True
             self.chash = None
             try:
@@ -1509,6 +1539,10 @@ lookup time for all elements. Includes many array and numeric operations."""
         temp = list(self)
         return hlist(shuffle(temp))
 
+    @waiting
+    def reverse(self):
+        return hlist(reversed(self))
+
     @blocking
     def rotate(self, steps):
         s = len(self.data)
@@ -1518,9 +1552,13 @@ lookup time for all elements. Includes many array and numeric operations."""
         if steps < 0:
             for i in xrange(steps):
                 self.appendleft(self.popright(force=True), force=True)
+                if not i - 1 & 8191:
+                    time.sleep(0.01)
         else:
             for i in range(steps):
                 self.append(self.popleft(force=True), force=True)
+                if not i + 1 & 8191:
+                    time.sleep(0.01)
         return self
 
     @blocking
@@ -1573,10 +1611,14 @@ lookup time for all elements. Includes many array and numeric operations."""
         if index < len(self.data) / 2:
             for i in range(index + self.offs, self.offs, -1):
                 self.data[i] = self.data[i - 1]
+                if not 1 + i & 4095:
+                    time.sleep(0.01)
             self.popleft(force=True)
         else:
             for i in range(index + self.offs, self.offs + len(self.data) - 1):
                 self.data[i] = self.data[i + 1]
+                if not 1 + i & 4095:
+                    time.sleep(0.01)
             self.popright(force=True)
         self.isempty(force=True)
         return temp
@@ -1591,11 +1633,15 @@ lookup time for all elements. Includes many array and numeric operations."""
         if index < len(self.data) / 2:
             for i in range(self.offs, self.offs + index):
                 self.data[i - 1] = self.data[i]
+                if not 1 + i & 4095:
+                    time.sleep(0.01)
             self.offs -= 1
             self.data[index + self.offs] = value
         else:
             for i in range(self.offs + len(self.data) - 1, index + self.offs - 1, - 1):
                 self.data[i + 1] = self.data[i]
+                if not 1 + i & 4095:
+                    time.sleep(0.01)
             self.data[index + self.offs] = value
         return self
 
@@ -1730,16 +1776,24 @@ lookup time for all elements. Includes many array and numeric operations."""
             data = self.data
         values = deque()
         l = sorted(data)
+        x = 1
         for i in l:
             values.append(data.pop(i))
+            if not x & 8191:
+                time.sleep(0.01)
+            x += 1
         self.__init__(values)
 
     @blocking
     def delitems(self, iterable):
         popped = False
+        x = 1
         for i in iterable:
             self.data.pop(i + self.offs)
             popped = True
+            if not x & 8191:
+                time.sleep(0.01)
+            x += 1
         if popped:
             self.reconstitute(force=True)
         return self
@@ -1763,6 +1817,8 @@ lookup time for all elements. Includes many array and numeric operations."""
                     try:
                         d[i] = next(iterable)
                         i += 1
+                        if not i & 8191:
+                            time.sleep(0.01)
                     except StopIteration:
                         break
             except TypeError:

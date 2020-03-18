@@ -46,6 +46,7 @@ class Text2048:
             "<board_size[4]> <verbose(?v)> <special_tiles(?s)> <public(?p)> "
             + "<insanity_mode(?i)> <special_controls(?c)> <easy_mode(?e)>"
         )
+        self.flags = "vspice"
 
     def shiftTile(self, tiles, p1, p2):
         print(p1, p2)
@@ -80,7 +81,7 @@ class Text2048:
             r = range(width)
             d = 1
         a = 1
-        for w in range(width - 1):
+        for _ in loop(width - 1):
             changed = False
             if not i & 1:
                 for x in r:

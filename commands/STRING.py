@@ -75,6 +75,7 @@ class Translate:
         self.min_level = 0
         self.description = "Translates a string into another language."
         self.usage = "<0:language> <1:string> <verbose(?v)> <google(?g)>"
+        self.flags = "gv"
 
     async def __call__(self, args, flags, user, **void):
         dest = args[0]
@@ -127,6 +128,7 @@ class Math:
         self.min_level = 0
         self.description = "Evaluates a math formula."
         self.usage = "<function> <verbose(?v)> <rationalize(?r)>"
+        self.flags = "rv"
 
     async def __call__(self, _vars, argv, channel, flags, guild, **void):
         f = argv
@@ -226,6 +228,7 @@ class UrbanDictionary:
         self.min_level = 0
         self.description = "Searches Urban Dictionary for an item."
         self.usage = "<string> <verbose(?v)>"
+        self.flags = "v"
 
     async def __call__(self, argv, flags, **void):
         url = (

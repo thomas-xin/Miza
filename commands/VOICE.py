@@ -108,16 +108,18 @@ class customAudio(discord.AudioSource):
                     d["options"] = "-af "
             else:
                 d["options"] = ""
-            if d["options"] and d["options"][-1] != " ":
-                d["options"] += ","
             if pitchscale != 1:
                 if abs(pitchscale) > 2147483647:
                     self.source = None
                     self.file = None
                     return
                 #br = getBitrate(source)
+                if d["options"] and d["options"][-1] != " ":
+                    d["options"] += ","
                 d["options"] += "asetrate=r=" + str(48000 * pitchscale)
             if self.reverse:
+                if d["options"] and d["options"][-1] != " ":
+                    d["options"] += ","
                 d["options"] += "areverse"
             if chorus:
                 if not d["options"]:
@@ -475,7 +477,6 @@ def getBitrate(filename):
 
 
 async def forceJoin(guild, channel, user, client, _vars):
-    found = False
     if guild.id not in _vars.updaters["playlists"].audio:
         for func in _vars.categories["voice"]:
             if "join" in (name.lower() for name in func.name):
@@ -854,6 +855,7 @@ class Queue:
         self.min_level = 0
         self.description = "Shows the music queue, or plays a song in voice."
         self.usage = "<link[]> <verbose(?v)> <hide(?h)>"
+        self.flags = "hv"
 
     async def __call__(self, _vars, client, user, message, channel, guild, flags, name, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1031,6 +1033,7 @@ class Playlist:
         self.min_display = "0~2"
         self.description = "Shows, appends, or removes from the default playlist."
         self.usage = "<link[]> <remove(?d)> <verbose(?v)>"
+        self.flags = "edv"
 
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
         update = self.data["playlists"].update
@@ -1144,7 +1147,7 @@ class Join:
                 vc = freeClass(is_connected = lambda: False)
                 while not vc.is_connected():
                     vc = await vc_.connect(timeout=30, reconnect=False)
-                    for i in range(5):
+                    for _ in loop(5):
                         if vc.is_connected():
                             break
                         await asyncio.sleep(0.5)
@@ -1191,6 +1194,8 @@ class Leave:
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to disconnect while other users are in voice")
         auds.dead = True
+        if guild.id in _vars.updaters["playlists"].connecting:
+            _vars.updaters["playlists"].connecting.pop(guild.id)
         updateQueues.sendUpdateRequest(self, force=True)
 
 
@@ -1204,6 +1209,7 @@ class Skip:
         self.min_display = "0~1"
         self.description = "Removes an entry or range of entries from the voice channel queue."
         self.usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
+        self.flags = "fhv"
 
     async def __call__(self, client, user, perm, _vars, name, args, argv, guild, flags, message, **void):
         if guild.id not in _vars.updaters["playlists"].audio:
@@ -1344,6 +1350,7 @@ class Pause:
         self.min_display = "0~1"
         self.description = "Pauses, stops, or resumes audio playing."
         self.usage = "<hide(?h)>"
+        self.flags = "h"
 
     async def __call__(self, _vars, name, guild, client, user, perm, channel, message, flags, **void):
         name = name.lower()
@@ -1375,6 +1382,7 @@ class Seek:
         self.min_display = "0~1"
         self.description = "Seeks to a position in the current audio file."
         self.usage = "<position[0]> <hide(?h)>"
+        self.flags = "h"
 
     async def __call__(self, argv, _vars, guild, client, user, perm, channel, message, flags, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1391,7 +1399,7 @@ class Seek:
             )
 
 
-def getDump(auds, guild):
+def getDump(auds):
     try:
         lim = 32768
         if len(auds.queue) > lim:
@@ -1414,7 +1422,7 @@ def getDump(auds, guild):
             "queue": q,
         }
         d["stats"].pop("position")
-        return ["Queue data for **" + guild.name + "**:\n```json\n" + json.dumps(d) + "\n```"]
+        return [json.dumps(d)]
     except Exception as ex:
         print(traceback.format_exc())
         return repr(ex)
@@ -1429,8 +1437,9 @@ class Dump:
         self.name = ["Save", "Load"]
         self.min_level = 0
         self.min_display = "0~1"
-        self.description = "Dumps or loads the currently playing audio queue state."
+        self.description = "Saves or loads the currently playing audio queue state."
         self.usage = "<data{attached_file}> <append(?a)> <hide(?h)>"
+        self.flags = "ah"
 
     async def __call__(self, guild, channel, user, client, _vars, perm, name, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1438,7 +1447,7 @@ class Dump:
             if name.lower() == "load":
                 raise EOFError("Please input a file, URL or json data to load.")
             returns = [None]
-            doParallel(getDump, [auds, guild], returns)
+            doParallel(getDump, [auds], returns)
             while returns[0] is None:
                 await asyncio.sleep(0.3)
             resp = returns[0]
@@ -1446,7 +1455,7 @@ class Dump:
                 raise eval(resp)
             return bytes(resp[0], "utf-8")
         if not isAlone(auds, user) and perm < 1:
-            self.permError(perm, 1, "to dump while other users are in voice")
+            self.permError(perm, 1, "to load while other users are in voice")
         try:
             if len(message.attachments):
                 url = message.attachments[0].url
@@ -1501,63 +1510,83 @@ class Dump:
 class AudioSettings:
     is_command = True
     server_only = True
-    other_settings = {
+    aliasMap = {
         "Volume": "volume",
         "Speed": "speed",
         "Pitch": "pitch",
-        "Bassboost": "bassboost",
+        "BassBoost": "bassboost",
         "Reverb": "reverb",
         "Chorus": "chorus",
-        "Nightcore": "nightcore",
-        #"Detune": "detune",
+        "NightCore": "nightcore",
         "LoopQueue": "loop",
         "ShuffleQueue": "shuffle",
         "Quiet": "quiet",
+        "Reset": "reset",
+    }
+    aliasExt = {
+        "Audio": None,
+        "A": None,
         "Vol": "volume",
         "V": "volume",
+        "SP": "speed",
+        "PI": "pitch",
+        "BB": "bassboost",
+        "RV": "reverb",
+        "CH": "chorus",
+        "NC": "nightcore",
         "LQ": "loop",
         "SQ": "shuffle",
     }
+
     def __init__(self):
-        self.name = ["Audio"] + list(self.other_settings)
+        self.alias = list(self.aliasMap) + list(self.aliasExt)
+        self.name = list(self.aliasMap)
         self.min_level = 0
         self.min_display = "0~1"
         self.description = "Changes the current audio settings for this server."
         self.usage = (
-            "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <bassboost(?b)> <reverb(?r)> <chorus(?c)>"# <detune(?f)>"
+            "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <bassboost(?b)> <reverb(?r)> <chorus(?c)>"
             + " <nightcore(?n)> <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)> <hide(?h)>"
         )
-        self.setting_map = {k.lower():self.other_settings[k] for k in self.other_settings}
+        self.flags = "vspbrcnlxqdh"
+        self.map = {k.lower():self.aliasMap[k] for k in self.aliasMap}
+        addDict(self.map, {k.lower():self.aliasExt[k] for k in self.aliasExt})
 
-    async def __call__(self, client, channel, user, guild, _vars, flags, argv, name, message, perm, **void):
+    async def __call__(self, client, channel, user, guild, _vars, flags, name, argv, perm, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        op = None
-        if not "d" in flags:
-            if "v" in flags:
-                op = "volume"
-            elif "s" in flags:
-                op = "speed"
-            elif "p" in flags:
-                op = "pitch"
-            elif "b" in flags:
-                op = "bassboost"
-            elif "r" in flags:
-                op = "reverb"
-            elif "c" in flags:
-                op = "chorus"
-            elif "n" in flags:
-                op = "nightcore"
-            elif "l" in flags:
-                op = "loop"
-            elif "x" in flags:
-                op = "shuffle"
-            elif "q" in flags:
-                op = "quiet"
+        ops = hlist()
+        op1 = self.map[name]
+        if op1 == "reset":
+            flags.clear()
+            flags["d"] = True
+        elif op1 is not None:
+            ops.append(op1)
+        disable = "d" in flags
+        if "v" in flags:
+            ops.append("volume")
+        if "s" in flags:
+            ops.append("speed")
+        if "p" in flags:
+            ops.append("pitch")
+        if "b" in flags:
+            ops.append("bassboost")
+        if "r" in flags:
+            ops.append("reverb")
+        if "c" in flags:
+            ops.append("chorus")
+        if "n" in flags:
+            ops.append("nightcore")
+        if "l" in flags:
+            ops.append("loop")
+        if "x" in flags:
+            ops.append("shuffle")
+        if "q" in flags:
+            ops.append("quiet")
+        if not disable and not argv and (len(ops) != 1 or ops[-1] not in "loop shuffle quiet"):
+            if len(ops) == 1:
+                op = ops[0]
             else:
-                op = self.setting_map.get(name.lower(), "settings")
-        if not argv and op is not None and op not in "loop shuffle quiet":
-            if op == "settings":
-                key = lambda x: (round(x*100, 9), x)[type(x) is bool]
+                key = lambda x: (round(x * 100, 9), x)[type(x) is bool]
                 d = dict(auds.stats)
                 try:
                     d.pop("position")
@@ -1578,52 +1607,61 @@ class AudioSettings:
                 + " in " + uniStr(guild.name)
                 + ": " + uniStr(num) + ".```"
             )
-        if op == "settings":
-            op = "volume"
-        elif type(op) is str and op in "loop shuffle quiet" and not argv:
-            argv = str(not _vars.updaters["playlists"].audio[guild.id].stats[op])
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to modify audio settings while other users are in voice")
-        if op is None:
-            pos = auds.stats["position"]
-            auds.stats = dict(auds.defaults)
-            auds.new(auds.file, pos)
-            if auds.stats["quiet"] & 2:
-                try:
-                    await message.delete()
-                except discord.NotFound:
-                    pass
-            else:
+        if not ops:
+            if disable:
+                pos = auds.stats["position"]
+                auds.stats = dict(auds.defaults)
+                auds.new(auds.file, pos)
                 return (
                     "```css\nSuccessfully reset all audio settings for "
                     + uniStr(guild.name) + ".```"
                 )
-        origVol = _vars.updaters["playlists"].audio[guild.id].stats
-        num = await _vars.evalMath(argv, guild.id)
-        val = roundMin(float(num / 100))
-        if op == "nightcore":
-            orig = round(origVol["pitch"] * 100, 9)
-        else:
-            orig = round(origVol[op] * 100, 9)
-        new = round(val * 100, 9)
-        if op in "loop shuffle quiet":
-            origVol[op] = new = bool(val)
-            orig = bool(orig)
-        elif op == "nightcore":
-            origVol["speed"] = 2 ** (val / 12)
-            origVol["pitch"] = val
-        else:
-            origVol[op] = val
-        if op in "speed pitch chorus nightcore":
-            auds.new(auds.file, auds.stats["position"])
-        if "h" not in flags:
-            return (
-                "```css\nChanged audio " + op
+            else:
+                ops.append("volume")
+        s = ""
+        for op in ops:
+            if type(op) is str and op in "loop shuffle quiet" and not argv:
+                argv = str(not _vars.updaters["playlists"].audio[guild.id].stats[op])
+            if disable:
+                val = auds.defaults[op]
+                if type(val) is not bool:
+                    val *= 100
+                argv = str(val)
+            origVol = _vars.updaters["playlists"].audio[guild.id].stats
+            _op = None
+            for operator in ("+=", "-=", "*=", "/=", "%="):
+                if argv.startswith(operator):
+                    argv = argv[2:].strip(" ")
+                    _op = operator[0]
+            num = await _vars.evalMath(argv, guild.id)
+            if op == "nightcore":
+                orig = round(origVol["pitch"] * 100, 9)
+            else:
+                orig = round(origVol[op] * 100, 9)
+            if _op is not None:
+                num = eval(str(orig) + _op + str(num))
+            val = roundMin(float(num / 100))
+            new = round(val * 100, 9)
+            if op in "loop shuffle quiet":
+                origVol[op] = new = bool(val)
+                orig = bool(orig)
+            elif op == "nightcore":
+                origVol["speed"] = 2 ** (val / 12)
+                origVol["pitch"] = val
+            else:
+                origVol[op] = val
+            if op in "speed pitch chorus nightcore":
+                auds.new(auds.file, auds.stats["position"])
+            s += (
+                "\nChanged audio " + str(op)
                 + " state" * (type(orig) is bool)
-                + " in " + uniStr(guild.name)
                 + " from " + uniStr(orig)
-                + " to " + uniStr(new) + ".```", 1
+                + " to " + uniStr(new) + "."
             )
+        if "h" not in flags:
+            return "```css" + s + "```", 1
 
 
 class Rotate:
@@ -1636,6 +1674,7 @@ class Rotate:
         self.min_display = "0~1"
         self.description = "Rotates the queue to the left by a certain amount of steps."
         self.usage = "<position> <hide(?h)>"
+        self.flags = "h"
 
     async def __call__(self, perm, argv, flags, guild, channel, user, client, _vars, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1646,7 +1685,7 @@ class Rotate:
             for i in range(3):
                 try:
                     auds.queue[i].pop("download")
-                except KeyError:
+                except (KeyError, IndexError):
                     pass
             auds.queue.rotate(-amount)
             auds.seek(inf)
@@ -1668,6 +1707,7 @@ class Shuffle:
         self.min_display = "0~1"
         self.description = "Shuffles the audio queue."
         self.usage = "<hide(?h)>"
+        self.flags = "h"
 
     async def __call__(self, perm, flags, guild, channel, user, client, _vars, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1677,13 +1717,44 @@ class Shuffle:
             for i in range(3):
                 try:
                     auds.queue[i].pop("download")
-                except KeyError:
+                except (KeyError, IndexError):
                     pass
             shuffle(auds.queue)
             auds.seek(inf)
         if "h" not in flags:
             return (
                 "```css\nSuccessfully shuffled audio queue for "
+                + uniStr(guild.name) + ".```", 1
+            )
+
+
+class Reverse:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = []
+        self.min_level = 0
+        self.min_display = "0~1"
+        self.description = "Reverses the audio queue direction."
+        self.usage = "<hide(?h)>"
+        self.flags = "h"
+
+    async def __call__(self, perm, flags, guild, channel, user, client, _vars, **void):
+        auds = await forceJoin(guild, channel, user, client, _vars)
+        if len(auds.queue) > 1:
+            if not isAlone(auds, user) and perm < 1:
+                self.permError(perm, 1, "to reverse queue while other users are in voice")
+            for i in range(1, 3):
+                try:
+                    auds.queue[i].pop("download")
+                except (KeyError, IndexError):
+                    pass
+            reverse(auds.queue)
+            auds.queue.rotate(-1)
+        if "h" not in flags:
+            return (
+                "```css\nSuccessfully reversed audio queue for "
                 + uniStr(guild.name) + ".```", 1
             )
 
@@ -1698,6 +1769,7 @@ class Unmute:
         self.min_level = 3
         self.description = "Disables server mute for all members."
         self.usage = "<hide(?h)>"
+        self.flags = "h"
 
     async def __call__(self, guild, flags, **void):
         for vc in guild.voice_channels:
@@ -1742,6 +1814,7 @@ class Player:
         self.min_display = "0~3"
         self.description = "Creates an auto-updating virtual audio player for the current server."
         self.usage = "<verbose(?v)> <controllable(?c)> <disable(?d)>"
+        self.flags = "cdev"
 
     def showCurr(self, auds):
         q = auds.queue
@@ -1991,7 +2064,7 @@ class Player:
 
 
 class updateQueues:
-    is_update = True
+    is_database = True
     name = "playlists"
 
     def __init__(self):
@@ -2066,6 +2139,14 @@ class updateQueues:
                 if auds.player["time"] < t:
                     auds.player["time"] = t
 
+    async def _dc(self, member):
+        try:
+            await m.move_to(None)
+        except discord.Forbidden:
+            pass
+        except:
+            print(traceback.format_exc())
+
     async def __call__(self, **void):
         while self.busy:
             await asyncio.sleep(0.2)
@@ -2075,18 +2156,18 @@ class updateQueues:
         client = _vars.client
         try:
             should_cache = {}
-            for g in pl:
+            for g in tuple(pl):
                 for i in pl[g]:
                     should_cache[i["id"]] = True
             for vc in client.voice_clients:
-                if not vc.guild.id in self.connecting and not vc.guild.id in self.audio:
+                if vc.guild.id not in self.connecting and vc.guild.id not in self.audio:
                     create_task(vc.disconnect(force=True))
             for g in client.guilds:
-                if not g.id in self.connecting and not g.id in self.audio:
+                if g.id not in self.connecting and g.id not in self.audio:
                     for c in g.voice_channels:
                         for m in c.members:
                             if m.id == client.user.id:
-                                create_task(m.move_to(None))
+                                self._dc(m)
                 else:
                     m = g.get_member(client.user.id)
                     if m.voice is not None:
@@ -2100,6 +2181,8 @@ class updateQueues:
                 vc = auds.vc
                 channel = vc.channel
                 guild = channel.guild
+                if guild.id != g:
+                    auds.dead = True
                 if getattr(auds, "dead", False):
                     create_task(vc.disconnect(force=True))
                     try:

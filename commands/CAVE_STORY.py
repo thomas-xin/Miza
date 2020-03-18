@@ -477,10 +477,11 @@ class CS_npc:
         self.name = []
         self.min_level = 0
         self.description = "Searches the Cave Story NPC list for an NPC by name or ID."
-        self.usage = "<query>"
+        self.usage = "<query> <condensed(?c)>"
+        self.flags = "c"
 
     async def __call__(self, _vars, args, flags, **void):
-        lim = ("c" in flags) * 40 + 20
+        lim = ("c" not in flags) * 40 + 20
         argv = " ".join(args)
         data = entity_list.search(argv, lim)
         if len(data):
@@ -518,7 +519,8 @@ class CS_tsc:
         self.name = []
         self.min_level = 0
         self.description = "Searches the Cave Story OOB flags list for a memory variable."
-        self.usage = "<query>"
+        self.usage = "<query> <condensed(?c)>"
+        self.flags = "c"
 
     async def __call__(self, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20

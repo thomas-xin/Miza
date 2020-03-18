@@ -17,6 +17,7 @@ class Purge:
         self.min_display = "1~3"
         self.description = "Deletes a number of messages from a certain user in current channel."
         self.usage = "<1:user{bot}(?a)> <0:count[1]> <hide(?h)>"
+        self.flags = "ah"
 
     async def __call__(self, client, _vars, argv, args, channel, name, flags, perm, guild, **void):
         t_user = -1
@@ -67,7 +68,7 @@ class Purge:
                 if hasattr(channel, "delete_messages"):
                     await channel.delete_messages(delM[:100])
                     deleted += min(len(delM), 100)
-                    for i in range(min(len(delM), 100)):
+                    for _ in loop(min(len(delM), 100)):
                         delM.popleft()
                 else:
                     _vars.logDelete(delM[0].id)
@@ -76,7 +77,7 @@ class Purge:
                     delM.popleft()
             except:
                 print(traceback.format_exc())
-                for i in range(min(5, len(delM))):
+                for _ in loop(min(5, len(delM))):
                     m = delM.popleft()
                     _vars.logDelete(m.id)
                     await m.delete()
@@ -98,6 +99,7 @@ class Ban:
         self.min_display = "3+"
         self.description = "Bans a user for a certain amount of time, with an optional reason."
         self.usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
+        self.flags = "hv"
 
     async def __call__(self, _vars, args, user, channel, guild, flags, perm, name, **void):
         update = self.data["bans"].update
@@ -135,7 +137,7 @@ class Ban:
                 for u_id in g_bans:
                     user = await _vars.fetch_user(u_id)
                     output += (
-                        "[" + user.name + "] "
+                        "[" + str(user) + "] "
                         + uniStr(sec2Time(g_bans[u_id]["unban"] - dtime))
                     )
                     if "v" in flags:
@@ -153,7 +155,6 @@ class Ban:
             msg = args[2]
         else:
             msg = None
-        g_id = guild.id
         g_bans = await getBans(_vars, guild)
         if t_user is None:
             if not "f" in flags:
@@ -236,6 +237,7 @@ class RoleGiver:
         self.min_display = "3+"
         self.description = "Adds an automated role giver to the current channel."
         self.usage = "<0:react_to[]> <1:role[]> <1:perm[]> <disable(?d)> <remover(?r)>"
+        self.flags = "edr"
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
         update = self.data["rolegivers"].update
@@ -325,6 +327,7 @@ class RainbowRole:
         self.min_level = 3
         self.description = "Causes target role to randomly change colour."
         self.usage = "<0:role[]> <mim_delay[16]> <disable(?d)>"
+        self.flags = "ed"
 
     async def __call__(self, _vars, flags, args, argv, guild, **void):
         update = self.data["rolecolours"].update
@@ -385,6 +388,7 @@ class Dogpile:
         self.min_level = 2
         self.description = "Causes Miza to automatically imitate users when 3+ of the same messages are posted in a row."
         self.usage = "<enable(?e)> <disable(?d)>"
+        self.flags = "ed"
 
     async def __call__(self, flags, guild, **void):
         update = self.data["follows"].update
@@ -417,6 +421,7 @@ class React:
         self.min_level = 2
         self.description = "Causes Miza to automatically assign a reaction to messages containing the substring."
         self.usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
+        self.flags = "ed"
 
     async def __call__(self, _vars, flags, guild, argv, args, **void):
         update = self.data["follows"].update
@@ -469,6 +474,7 @@ class MessageLog:
         self.min_level = 3
         self.description = "Causes Miza to log message events in the current channel."
         self.usage = "<enable(?e)> <disable(?d)>"
+        self.flags = "ed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
         data = _vars.data["logM"]
@@ -510,6 +516,7 @@ class UserLog:
         self.min_level = 3
         self.description = "Causes Miza to log user events in the current channel."
         self.usage = "<enable(?e)> <disable(?d)>"
+        self.flags = "ed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
         data = _vars.data["logU"]
@@ -543,7 +550,7 @@ class UserLog:
 
 
 class updateUserLogs:
-    is_update = True
+    is_database = True
     name = "logU"
 
     def __init__(self):
@@ -676,7 +683,7 @@ class updateUserLogs:
 
 
 class updateMessageLogs:
-    is_update = True
+    is_database = True
     name = "logM"
 
     def __init__(self):
@@ -785,7 +792,7 @@ class updateMessageLogs:
 
 
 class updateFollows:
-    is_update = True
+    is_database = True
     name = "follows"
 
     def __init__(self):
@@ -831,7 +838,7 @@ class updateFollows:
 
 
 class updateRolegiver:
-    is_update = True
+    is_database = True
     name = "rolegivers"
 
     def __init__(self):
@@ -876,7 +883,7 @@ class updateRolegiver:
 
 
 class updatePerms:
-    is_update = True
+    is_database = True
     name = "perms"
 
     def __init__(self):
@@ -887,7 +894,7 @@ class updatePerms:
 
 
 class updateColours:
-    is_update = True
+    is_database = True
     name = "rolecolours"
 
     def __init__(self):
@@ -952,7 +959,7 @@ async def getBans(_vars, guild):
 
 
 class updateBans:
-    is_update = True
+    is_database = True
     name = "bans"
 
     def __init__(self):

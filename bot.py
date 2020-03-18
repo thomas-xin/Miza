@@ -375,6 +375,10 @@ class main_data:
                     obj = var()
                     obj.data = {}
                     obj.__name__ = var.__name__
+                    if not hasattr(obj, "alias"):
+                        obj.alias = obj.name
+                    else:
+                        obj.alias.append(obj.__name__)
                     obj.name.append(obj.__name__)
                     if not hasattr(obj, "min_display"):
                         obj.min_display = obj.min_level
@@ -383,7 +387,7 @@ class main_data:
                     #print("Successfully loaded command " + obj.__name__ + ".")
                 except AttributeError:
                     try:
-                        var.is_update
+                        var.is_database
                         name = var.name
                         if not getattr(var, "no_file", False):
                             var.file = "saves/" + name + ".json"
@@ -546,7 +550,11 @@ class main_data:
     async def recursiveCoro(self, item):
         returns = hlist()
         for i in range(len(item)):
-            if type(item[i]) in (tuple, set, list, hlist):
+            try:
+                item[i] = tuple(item[i])
+            except TypeError:
+                pass
+            if type(item[i]) is tuple:
                 returns.append(self.returns(None))
                 create_task(self.parasync(self.recursiveCoro(item[i]), returns[-1]))
             elif asyncio.iscoroutine(item[i]):
@@ -568,6 +576,30 @@ class main_data:
             output.append(i)
         return output
 
+    async def evalEQ(self, f, guild):
+        f = f.strip(" ")
+        try:
+            if f in ("t", "T", "true", "TRUE"):
+                r = [True]
+            elif f in ("f", "F", "false", "FALSE"):
+                r = [False]
+            elif f.lower() == "inf":
+                r = [inf]
+            elif f.lower() == "-inf":
+                r = [-inf]
+            elif f.lower() in ("nan", "-nan"):
+                r = [nan]
+            else:
+                r = [ast.literal_eval(f)]
+        except ValueError:
+            r = await self.solveMath(f, guild, 16, 0)
+        x = r[0]
+        try:
+            x = tuple(x)[0]
+        except TypeError:
+            pass
+        return parse_expr(x)
+
     async def evalMath(self, f, guild):
         f = f.strip(" ")
         try:
@@ -585,7 +617,12 @@ class main_data:
                 r = [ast.literal_eval(f)]
         except ValueError:
             r = await self.solveMath(f, guild, 16, 0)
-        return roundMin(float(r[0]))
+        x = r[0]
+        try:
+            x = tuple(x)[0]
+        except TypeError:
+            pass
+        return roundMin(float(x))
 
     async def solveMath(self, f, guild, prec, r):
         f = f.strip(" ")
@@ -651,8 +688,8 @@ class main_data:
                         for check in reversed(self.timeChecks[tc]):
                             if check in f:
                                 i = f.index(check)
-                                isin = i + len(check) < len(f) and f[i + len(check)] in self.alphabet
-                                if not i or f[i - 1] in self.alphabet or isin:
+                                isnt = i + len(check) < len(f) and f[i + len(check)] in self.alphabet
+                                if not i or f[i - 1] in self.alphabet or isnt:
                                     continue
                                 n = await self.evalMath(f[:i], guild.id)
                                 s = TIMEUNITS[tc]
@@ -803,6 +840,9 @@ class main_data:
                             pass
                     except discord.NotFound:
                         pass
+            except:
+                print(traceback.format_exc())
+            try:
                 self.lastCheck = time.time()
                 if force:
                     for k in self.doUpdate:
@@ -975,7 +1015,7 @@ class main_data:
         ghost = True
 
 
-async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_flags=None, loop=False):
+async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=False):
     cpy = msg
     categories = _vars.categories
     if msg[:2] == "> ":
@@ -1054,73 +1094,68 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, cb_fl
             if catg in enabled or admin:
                 commands.extend(categories[catg])
         for command in commands:
-            for alias in command.name:
+            for alias in command.alias:
                 alias = alias.lower()
                 length = len(alias)
                 check = comm[:length].lower()
                 argv = comm[length:]
                 match = check == alias and (
-                    len(comm) == length or comm[length] == " " or comm[length] == "?"
+                    len(comm) == length or comm[length] == " " or comm[length] in "?-"
                 )
                 if match:
                     run = True
-                    print(user.name + " (" + str(u_id) + ") issued command " + msg)
+                    print(str(user) + " (" + str(u_id) + ") issued command " + msg)
                     req = command.min_level
                     try:
                         if req > u_perm or (u_perm is not nan and req is nan):
                             command.permError(u_perm, req, "for command " + alias)
+                        flags = {}
                         if cb_argv is not None:
                             argv = cb_argv
-                            flags = cb_flags
                             if loop:
                                 addDict(flags, {"h": 1})
-                        else:
-                            flags = {}
-                            if argv:
-                                while argv[0] == " ":
-                                    argv = argv[1:]
-                            for q in "?-":
-                                if q in argv:
-                                    for c in range(26):
-                                        char = chr(c + 97)
-                                        flag = q + char
-                                        for r in (flag, flag.upper()):
-                                            while len(argv) >= 4 and r in argv:
-                                                found = False
-                                                i = argv.index(r)
-                                                if i == 0 or argv[i - 1] == " " or argv[i - 2] == q:
-                                                    try:
-                                                        if argv[i + 2] == " " or argv[i + 2] == q:
-                                                            argv = argv[:i] + argv[i + 2:]
+                        if argv:
+                            argv = argv.strip(" ")
+                            if hasattr(command, "flags"):
+                                flaglist = command.flags
+                                for q in "?-":
+                                    if q in argv:
+                                        for char in flaglist:
+                                            flag = q + char
+                                            for r in (flag, flag.upper()):
+                                                while len(argv) >= 4 and r in argv:
+                                                    found = False
+                                                    i = argv.index(r)
+                                                    if i == 0 or argv[i - 1] == " " or argv[i - 2] == q:
+                                                        try:
+                                                            if argv[i + 2] == " " or argv[i + 2] == q:
+                                                                argv = argv[:i] + argv[i + 2:]
+                                                                addDict(flags, {char: 1})
+                                                                found = True
+                                                        except (IndexError, KeyError):
+                                                            pass
+                                                    if not found:
+                                                        break
+                                    if q in argv:
+                                        for char in flaglist:
+                                            flag = q + char
+                                            for r in (flag, flag.upper()):
+                                                while len(argv) >= 2 and r in argv:
+                                                    found = False
+                                                    for check in (r + " ", " " + r):
+                                                        if check in argv:
+                                                            argv = argv.replace(check, "")
                                                             addDict(flags, {char: 1})
                                                             found = True
-                                                    except (IndexError, KeyError):
-                                                        pass
-                                                if not found:
-                                                    break
-                                if q in argv:
-                                    for c in range(26):
-                                        char = chr(c + 97)
-                                        flag = q + char
-                                        for r in (flag, flag.upper()):
-                                            while len(argv) >= 2 and r in argv:
-                                                found = False
-                                                for check in (r + " ", " " + r):
-                                                    if check in argv:
-                                                        argv = argv.replace(check, "")
+                                                    if argv == r:
+                                                        argv = ""
                                                         addDict(flags, {char: 1})
                                                         found = True
-                                                if argv == r:
-                                                    argv = ""
-                                                    addDict(flags, {char: 1})
-                                                    found = True
-                                                if not found:
-                                                    break
+                                                    if not found:
+                                                        break
                         if argv:
-                            while argv[0] == " ":
-                                argv = argv[1:]
-                        if not len(argv.replace(" ", "")):
-                            argv = ""
+                            argv = argv.strip(" ")
+                        if not argv:
                             args = []
                         else:
                             a = argv.replace('"', "\0")
