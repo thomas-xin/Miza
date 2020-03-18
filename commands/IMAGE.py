@@ -314,7 +314,9 @@ class Dog:
                 break
             except KeyError:
                 await asyncio.sleep(0.5)
-        url = url.replace("\\", "/").replace("///", "//")
+        url = url.replace("\\", "/")
+        while "///" in url:
+            url = url.replace("///", "//")
         if "v" in flags:
             text = "Pulled from " + url
             return text
