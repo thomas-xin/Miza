@@ -781,6 +781,20 @@ class Info:
         return {
             "embed": emb,
         }
+        
+
+class Hello:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["Hi", "Ping", "👋", "'sup", "Hey", "Greetings", "Welcome"]
+        self.min_level = 0
+        self.description = "Sends a waving emoji. Useful for checking whether the bot is online."
+        self.usage = ""
+    
+    async def __call__(self, channel, _vars, **void):
+        return "👋"
+
 
 
 class Status:

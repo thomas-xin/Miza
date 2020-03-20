@@ -551,6 +551,8 @@ class main_data:
         returns = hlist()
         for i in range(len(item)):
             try:
+                if type(item[i]) in (str, bytes):
+                    raise TypeError
                 item[i] = tuple(item[i])
             except TypeError:
                 pass
@@ -576,34 +578,12 @@ class main_data:
             output.append(i)
         return output
 
-    async def evalEQ(self, f, guild):
-        f = f.strip(" ")
-        try:
-            if f in ("t", "T", "true", "TRUE"):
-                r = [True]
-            elif f in ("f", "F", "false", "FALSE"):
-                r = [False]
-            elif f.lower() == "inf":
-                r = [inf]
-            elif f.lower() == "-inf":
-                r = [-inf]
-            elif f.lower() in ("nan", "-nan"):
-                r = [nan]
-            else:
-                r = [ast.literal_eval(f)]
-        except ValueError:
-            r = await self.solveMath(f, guild, 16, 0)
-        x = r[0]
-        try:
-            x = tuple(x)[0]
-        except TypeError:
-            pass
-        return parse_expr(x)
-
     async def evalMath(self, f, guild):
         f = f.strip(" ")
         try:
-            if f in ("t", "T", "true", "TRUE"):
+            if not f:
+                r = [0]
+            elif f in ("t", "T", "true", "TRUE"):
                 r = [True]
             elif f in ("f", "F", "false", "FALSE"):
                 r = [False]

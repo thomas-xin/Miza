@@ -1142,17 +1142,17 @@ class Join:
                 break
         connecting = _vars.updaters["playlists"].connecting
         if not joined:
-            try:
-                connecting[guild.id] = True
-                vc = freeClass(is_connected = lambda: False)
-                while not vc.is_connected():
+            connecting[guild.id] = True
+            vc = freeClass(is_connected = lambda: False)
+            while not vc.is_connected():
+                try:
                     vc = await vc_.connect(timeout=30, reconnect=False)
                     for _ in loop(5):
                         if vc.is_connected():
                             break
                         await asyncio.sleep(0.5)
-            except discord.ClientException:
-                pass
+                except discord.ClientException:
+                    await asyncio.sleep(1)
         if guild.id not in _vars.updaters["playlists"].audio:
             await channel.trigger_typing()
             _vars.updaters["playlists"].audio[guild.id] = customAudio(channel, vc, _vars)
@@ -2141,7 +2141,7 @@ class updateQueues:
 
     async def _dc(self, member):
         try:
-            await m.move_to(None)
+            await member.move_to(None)
         except discord.Forbidden:
             pass
         except:
@@ -2167,7 +2167,7 @@ class updateQueues:
                     for c in g.voice_channels:
                         for m in c.members:
                             if m.id == client.user.id:
-                                self._dc(m)
+                                create_task(self._dc(m))
                 else:
                     m = g.get_member(client.user.id)
                     if m.voice is not None:
@@ -2178,11 +2178,6 @@ class updateQueues:
         for g in tuple(self.audio):
             try:
                 auds = self.audio[g]
-                vc = auds.vc
-                channel = vc.channel
-                guild = channel.guild
-                if guild.id != g:
-                    auds.dead = True
                 if getattr(auds, "dead", False):
                     create_task(vc.disconnect(force=True))
                     try:
@@ -2199,6 +2194,15 @@ class updateQueues:
                     except KeyError:
                         pass
                     continue
+                vc = auds.vc
+                if not hasattr(vc, "channel"):
+                    auds.dead = True
+                    continue
+                channel = vc.channel
+                guild = channel.guild
+                if guild.id != g:
+                    auds.dead = True
+                    continue
                 if vc.is_connected() or vc.guild.id in self.connecting:
                     playing = auds.is_playing or auds.is_loading
                 else:
@@ -2212,9 +2216,11 @@ class updateQueues:
                         auds.att = getattr(auds, "att", 0) + 1
                         if auds.att > 5:
                             auds.dead = True
+                            continue
                 cnt = sum(1 for m in channel.members if m.id != client.user.id)
                 if not cnt and auds.timeout < time.time() - 20:
                     auds.dead = True
+                    continue
                 if cnt:
                     auds.timeout = time.time()
                 q = auds.queue
@@ -2249,8 +2255,9 @@ class updateQueues:
                     for i in range(2):
                         if i < len(q):
                             e_id = q[i]["id"]
-                            if not q[i].get("download", 0):
-                                q[i]["download"] = 1
+                            dtime = q[i].get("download", 0)
+                            if dtime >= 0 and dtime < time.time() - 4:
+                                q[i]["download"] = time.time()
                                 search = e_id + ".mp3"
                                 if search not in os.listdir("cache/"):
                                     durc = [q[i]["duration"]]
@@ -2262,7 +2269,7 @@ class updateQueues:
                                     )
                                 else:
                                     q[i]["duration"] = ytdl.getDuration("cache/" + search)
-                    if not q[0].get("download", 0) > 1 and not playing:
+                    if q[0].get("download", 0) and not playing:
                         try:
                             path = "cache/" + q[0]["id"] + ".mp3"
                             f = open(path, "rb")
@@ -2271,7 +2278,7 @@ class updateQueues:
                             f.close()
                             if len(b) < minl:
                                 raise FileNotFoundError
-                            q[0]["download"] = 2
+                            q[0]["download"] = -1
                             name = q[0]["name"]
                             added_by = q[0]["added by"]
                             auds = self.audio[guild.id]

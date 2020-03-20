@@ -75,6 +75,8 @@ class updateExec:
                     except:
                         output = traceback.format_exc()
                 try:
+                    if type(output) in (str, bytes):
+                        raise TypeError
                     output = tuple(output)
                 except TypeError:
                     pass

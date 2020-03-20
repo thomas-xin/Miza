@@ -2376,6 +2376,8 @@ def readline(stream, timeout=10):
         c = stream.read(1)
         if c:
             output += c
+            if not len(output) & 4095:
+                time.sleep(0.01)
         else:
             time.sleep(0.002)
     print(output)
@@ -2398,7 +2400,18 @@ def subKill():
         sub.kill()
     __subs__.clear()
 
-def subFunc(key, com, data_in, timeout):    
+def subFunc(key, com, data_in, timeout):
+    while len(__subs__) > 256:
+        i = iter(__subs__)
+        try:
+            while i:
+                k = next(i)
+                if __subs__[k].kill is not None:
+                    __subs__[k].kill()
+                    __subs__.pop(next(iter(__subs__)))
+                    break
+        except (StopIteration, KeyError):
+            pass
     if key in __subs__:
         try:
             while __subs__[key].busy:
@@ -2408,7 +2421,8 @@ def subFunc(key, com, data_in, timeout):
     else:
         __subs__[key] = freeClass(
             busy=True,
-            is_running=lambda: True
+            is_running=lambda: True,
+            kill=None,
         )
     if isinstance(__subs__[key], psutil.Popen):
         proc = __subs__[key]
@@ -2441,6 +2455,7 @@ def subFunc(key, com, data_in, timeout):
         print(resp)
         if issubclass(resp.__class__, Exception):
             raise resp
+        time.sleep(0.001)
         resp = eval(resp.decode("utf-8"))
         if issubclass(resp.__class__, Exception):
             raise resp
