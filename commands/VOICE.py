@@ -171,7 +171,7 @@ class customAudio(discord.AudioSource):
             if self.reverse and len(self.queue):
                 self.stats["position"] = self.queue[0]["duration"]
         if self.source is not None and self.player:
-            self.player["time"] = 2 + time.time()
+            self.player["time"] = 1 + time.time()
 
     def seek(self, pos):
         duration = self.queue[0]["duration"]
@@ -183,7 +183,7 @@ class customAudio(discord.AudioSource):
         self.stats["position"] = pos
         return self.stats["position"]
 
-    def advance(self, loop=True, shuffled=True):
+    def advance(self, looped=True, shuffled=True):
         q = self.queue
         if q:
             if self.stats["loop"]:
@@ -195,7 +195,7 @@ class customAudio(discord.AudioSource):
                     temp = q.popleft()
                     shuffle(q)
                     q.appendleft(temp)
-            if self.stats["loop"] and loop:
+            if self.stats["loop"] and looped:
                 temp["id"] = temp["id"]
                 if "download" in temp:
                     temp.pop("download")
@@ -203,7 +203,7 @@ class customAudio(discord.AudioSource):
             self.preparing = False
             self.queue = q
         if self.player:
-            self.player["time"] = 2 + time.time()
+            self.player["time"] = 1 + time.time()
 
     async def updatePlayer(self):
         curr = self.player
@@ -2269,7 +2269,7 @@ class updateQueues:
                                     )
                                 else:
                                     q[i]["duration"] = ytdl.getDuration("cache/" + search)
-                    if q[0].get("download", 0) and not playing:
+                    if q[0].get("download", 0) > 0 and not playing:
                         try:
                             path = "cache/" + q[0]["id"] + ".mp3"
                             f = open(path, "rb")
