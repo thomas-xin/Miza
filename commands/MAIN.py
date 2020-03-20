@@ -787,7 +787,7 @@ class Hello:
     is_command = True
 
     def __init__(self):
-        self.name = ["Hi", "Ping", "👋", "'sup", "Hey", "Greetings", "Welcome"]
+        self.name = ["Hi", "Ping", "👋", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
         self.min_level = 0
         self.description = "Sends a waving emoji. Useful for checking whether the bot is online."
         self.usage = ""
@@ -879,23 +879,29 @@ class Reminder:
             )
         if len(rems) >= 32:
             raise OverflowError("You have reached the maximum of 32 reminders. Please remove one to add another.")
-        if "in" in argv:
-            if " in " in argv:
-                spl = argv.split(" in ")
-            elif argv.startswith("in "):
-                spl = argv[3:]
-            msg = " in ".join(spl[:-1])
-            t = await _vars.evalTime(args[-1], guild)
-        elif "at" in argv:
-            if " at " in argv:
-                spl = argv.split(" at ")
-            elif argv.startswith("at "):
-                spl = argv[3:]
-            msg = " at ".join(spl[:-1])
-            t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
-        else:
+        while True:
+            spl = None
+            if "in" in argv:
+                if " in " in argv:
+                    spl = argv.split(" in ")
+                elif argv.startswith("in "):
+                    spl = argv[3:]
+                if spl is not None:
+                    msg = " in ".join(spl[:-1])
+                    t = await _vars.evalTime(args[-1], guild)
+                    break
+            if "at" in argv:
+                if " at " in argv:
+                    spl = argv.split(" at ")
+                elif argv.startswith("at "):
+                    spl = argv[3:]
+                if spl is not None:
+                    msg = " at ".join(spl[:-1])
+                    t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
+                    break
             msg = " ".join(args[:-1])
             t = await _vars.evalTime(args[-1], guild)
+            break
         msg = msg.strip("< >")
         if not msg:
             msg = "[SAMPLE REMINDER]"

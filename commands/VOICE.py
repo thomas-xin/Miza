@@ -766,14 +766,18 @@ class videoDownloader:
         fn = "cache/" + i["id"] + ".mp3"
         new_opts["outtmpl"] = fn
         downloader = youtube_dl.YoutubeDL(new_opts)
-        try:
-            downloader.download([i["url"]])
-            if durc is not None:
-                durc[0] = getDuration(fn)
-        except:
-            i["id"] = ""
-            print(traceback.format_exc())
-        return True
+        exc = None
+        for _ in loop(5):
+            try:
+                downloader.download([i["url"]])
+                if durc is not None:
+                    durc[0] = getDuration(fn)
+                return
+            except:
+                exc = traceback.format_exc()
+                time.sleep(1)
+        i["id"] = ""
+        print(exc)
 
     def extractSingle(self, i):
         item = i["url"]
@@ -1479,8 +1483,8 @@ class Dump:
         if auds.stats["shuffle"]:
             shuffle(q)
         if "a" not in flags:
+            auds.preparing = True
             auds.new()
-            del auds.queue
             auds.queue = hlist(q)
             for k in d["stats"]:
                 if k not in auds.stats:
@@ -2184,7 +2188,7 @@ class updateQueues:
                         self.audio.pop(g)
                         msg = (
                             "```css\n🎵 Successfully disconnected from "
-                            + uniStr(guild.name) + ". 🎵```"
+                            + uniStr(vc.guild.name) + ". 🎵```"
                         )
                         create_task(_vars.sendReact(
                             auds.channel,
