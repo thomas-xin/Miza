@@ -599,6 +599,8 @@ class main_data:
             r = await self.solveMath(f, guild, 16, 0)
         x = r[0]
         try:
+            if type(x) is str:
+                raise TypeError
             x = tuple(x)[0]
         except TypeError:
             pass
