@@ -910,6 +910,7 @@ class main_data:
             self.emojis = []
             self.get_channel = lambda *void1, **void2: self.channel
             self.owner_id = client.user.id
+            self.owner = client.user
             self.fetch_member = _vars.fetch_user
 
         filesize_limit = 8388608

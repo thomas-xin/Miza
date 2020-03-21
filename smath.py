@@ -1089,7 +1089,7 @@ def diffExpT(r, s, d):
 def predictTrajectory(src, dest, vel, spd, dec=1, boundary=None, edge=0):
     pos = array(dest)
     dist = hypot(*(src - dest))
-    for i in range(0, 64):
+    for _ in loop(64):
         time = diffExpT(dec, spd, dist)
         new_pos = dest + vel * min(time, 1 << 32)
         if boundary:

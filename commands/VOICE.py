@@ -2182,6 +2182,7 @@ class updateQueues:
         for g in tuple(self.audio):
             try:
                 auds = self.audio[g]
+                vc = auds.vc
                 if getattr(auds, "dead", False):
                     create_task(vc.disconnect(force=True))
                     try:
@@ -2198,7 +2199,6 @@ class updateQueues:
                     except KeyError:
                         pass
                     continue
-                vc = auds.vc
                 if not hasattr(vc, "channel"):
                     auds.dead = True
                     continue
