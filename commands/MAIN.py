@@ -511,7 +511,7 @@ class Avatar:
                                     channel = await _vars.fetch_channel(u_id)
                                 except:
                                     try:
-                                        user = await _vars.fetch_whuser(u_id, g)
+                                        u = await _vars.fetch_whuser(u_id, g)
                                     except EOFError:
                                         u = None
                                         if g.id in _vars.data["counts"]:
@@ -651,7 +651,7 @@ class Info:
                                     channel = await _vars.fetch_channel(u_id)
                                 except:
                                     try:
-                                        user = await _vars.fetch_whuser(u_id, g)
+                                        u = await _vars.fetch_whuser(u_id, g)
                                     except EOFError:
                                         u = None
                                         if g.id in _vars.data["counts"]:
