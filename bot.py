@@ -134,7 +134,7 @@ class main_data:
         try:
             u_id = int(u_id)
         except (ValueError, TypeError):
-            raise TypeError("Invalid user identifier: " + uniStr(u_id))
+            raise TypeError("Invalid user identifier: " + str(u_id))
         if u_id == self.deleted_user:
             user = self.ghostUser()
             user.name = "Deleted User"
@@ -153,6 +153,57 @@ class main_data:
         self.cache["users"][u_id] = user
         self.limitCache("users")
         return user
+
+    async def fetch_member(self, u_id, guild=None):
+        try:
+            u_id = int(u_id)
+        except:
+            pass
+        member = None
+        if type(u_id) is int:
+            member = guild.get_member(u_id)
+        if member is None:
+            if type(u_id) is int:
+                try:
+                    member = await guild.fetch_member(u_id)
+                except discord.NotFound:
+                    pass
+            if member is None:
+                check = str(u_id)
+                check2 = reconstitute(check).lower()
+                members = guild.members
+                if not members:
+                    members = await guild.fetch_members(limit=None)
+                cache = [{}, {}]
+                x = 1
+                for m in shuffle(members):
+                    for name in (str(m), reconstitute(m.name), reconstitute(m.display_name)):
+                        if check == name:
+                            member = m
+                            break
+                        if check2 == name.lower():
+                            member = m
+                            break
+                        if name.lower().startswith(check2):
+                            i = len(name)
+                            if i not in cache[0]:
+                                cache[0][i] = m
+                        elif check.lower() in name.lower():
+                            i = len(name)
+                            if i not in cache[1]:
+                                cache[1][i] = m
+                    if member is not None:
+                        break
+                    if not x & 1023:
+                        await asyncio.sleep(0.5)
+                if member is None:
+                    for c in cache:
+                        if c:
+                            member = c[min(c)]
+                            break
+                    if member is None:
+                        raise LookupError("Unable to find member data.")
+        return member
 
     async def fetch_whuser(self, u_id, guild=None):
         try:
@@ -181,6 +232,8 @@ class main_data:
             self.cache["users"][u_id] = user
             self.limitCache("users")
             return user
+        except EOFError:
+            raise LookupError("Unable to find target user.")
 
     async def fetch_guild(self, g_id):
         try:
@@ -208,7 +261,7 @@ class main_data:
             except (discord.NotFound, discord.HTTPException) as ex:
                 raise LookupError(str(ex))
             except:
-                raise TypeError("Invalid server identifier: " + uniStr(g_id))
+                raise TypeError("Invalid server identifier: " + str(g_id))
         try:
             guild = client.get_guild(g_id)
             if guild is None:
@@ -225,7 +278,7 @@ class main_data:
         try:
             c_id = int(c_id)
         except (ValueError, TypeError):
-            raise TypeError("Invalid channel identifier: " + uniStr(c_id))
+            raise TypeError("Invalid channel identifier: " + str(c_id))
         try:
             channel = client.get_channel(c_id)
             if channel is None:
@@ -242,7 +295,7 @@ class main_data:
         try:
             m_id = int(m_id)
         except (ValueError, TypeError):
-            raise TypeError("Invalid message identifier: " + uniStr(m_id))
+            raise TypeError("Invalid message identifier: " + str(m_id))
         if m_id in self.cache["messages"]:
             return self.cache["messages"][m_id]
         if channel is None:

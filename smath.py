@@ -1445,7 +1445,7 @@ def uniStr(s, fmt=0):
     return s
 
 def reconstitute(s):
-    return s.translate(__trans)
+    return str(s).translate(__trans)
 
 
 __hlist_maxoff__ = (1 << 31) - 1

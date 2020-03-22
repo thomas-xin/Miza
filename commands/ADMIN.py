@@ -40,8 +40,11 @@ class Purge:
                 u_id = _vars.verifyID(a1)
                 try:
                     t_user = await _vars.fetch_user(u_id)
-                except:
-                    t_user = freeClass(id=u_id)
+                except (TypeError, discord.NotFound):
+                    try:
+                        t_user = await _vars.fetch_member(u_id, guild)
+                    except LookupError:
+                        t_user = freeClass(id=u_id)
         if t_user is None or t_user.id != client.user.id:
             req = 3
             if perm < req:
@@ -115,8 +118,11 @@ class Ban:
             u_id = _vars.verifyID(args[0])
             try:
                 t_user = await _vars.fetch_user(u_id)
-            except discord.NotFound:
-                t_user = await _vars.fetch_whuser(u_id, guild)
+            except (TypeError, discord.NotFound):
+                try:
+                    t_user = await _vars.fetch_member(u_id, guild)
+                except LookupError:
+                    t_user = await _vars.fetch_whuser(u_id, guild)
             t_perm = _vars.getPerms(t_user, guild)
         if t_perm + 1 > perm or t_perm is nan:
             if len(args) > 1:

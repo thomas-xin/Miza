@@ -147,8 +147,11 @@ class Perms:
                     u_id = _vars.verifyID(args[0])
                     try:
                         t_user = await _vars.fetch_user(u_id)
-                    except discord.NotFound:
-                        t_user = await _vars.fetch_whuser(u_id, guild)
+                    except (TypeError, discord.NotFound):
+                        try:
+                            t_user = await _vars.fetch_member(u_id, guild)
+                        except LookupError:
+                            t_user = await _vars.fetch_whuser(u_id, guild)
             print(t_user)
             t_perm = _vars.getPerms(t_user.id, guild)
         else:
@@ -162,8 +165,11 @@ class Perms:
                 u_id = _vars.verifyID(args[0])
                 try:
                     t_user = await _vars.fetch_user(u_id)
-                except discord.NotFound:
-                    t_user = await _vars.fetch_whuser(u_id, guild)
+                except (TypeError, discord.NotFound):
+                    try:
+                        t_user = await _vars.fetch_member(u_id, guild)
+                    except LookupError:
+                        t_user = await _vars.fetch_whuser(u_id, guild)
                 t_perm = _vars.getPerms(t_user.id, guild)
                 name = t_user.name
             if t_perm is nan or c_perm is nan:
@@ -491,44 +497,39 @@ class Avatar:
             except:
                 u_id = argv
             try:
-                u = g.get_member(u_id)
-                if u is None:
-                    raise EOFError
+                u = await _vars.fetch_member(u_id, g)
             except:
                 try:
-                    u = await g.fetch_member(u_id)
+                    u = await _vars.fetch_user(u_id)
                 except:
-                    try:
-                        u = await _vars.fetch_user(u_id)
-                    except:
-                        if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
-                            guild = g
-                        else:
+                    if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
+                        guild = g
+                    else:
+                        try:
+                            guild = await _vars.fetch_guild(u_id)
+                        except:
                             try:
-                                guild = await _vars.fetch_guild(u_id)
+                                channel = await _vars.fetch_channel(u_id)
                             except:
                                 try:
-                                    channel = await _vars.fetch_channel(u_id)
-                                except:
-                                    try:
-                                        u = await _vars.fetch_whuser(u_id, g)
-                                    except EOFError:
-                                        u = None
-                                        if g.id in _vars.data["counts"]:
-                                            if u_id in _vars.data["counts"][g.id]["counts"]:
-                                                u = _vars.ghostUser()
-                                                u.id = u_id
-                                        if u is None:
-                                            raise LookupError("Unable to find user or server from ID.")
-                                try:
-                                    guild = channel.guild
-                                except NameError:
-                                    pass
-                                except AttributeError:
-                                    guild = None
-                                    u = channel.recipient
-                        if guild is not None:
-                            return await self.getGuildData(guild)                        
+                                    u = await _vars.fetch_whuser(u_id, g)
+                                except EOFError:
+                                    u = None
+                                    if g.id in _vars.data["counts"]:
+                                        if u_id in _vars.data["counts"][g.id]["counts"]:
+                                            u = _vars.ghostUser()
+                                            u.id = u_id
+                                    if u is None:
+                                        raise LookupError("Unable to find user or server from ID.")
+                            try:
+                                guild = channel.guild
+                            except NameError:
+                                pass
+                            except AttributeError:
+                                guild = None
+                                u = channel.recipient
+                    if guild is not None:
+                        return await self.getGuildData(guild)                        
         else:
             u = user
         guild = g
@@ -630,45 +631,40 @@ class Info:
             except:
                 u_id = argv
             try:
-                u = g.get_member(u_id)
-                if u is None:
-                    raise EOFError
+                u = await _vars.fetch_member(u_id, g)
             except:
                 try:
-                    u = await g.fetch_member(u_id)
+                    u = await _vars.fetch_user(u_id)
+                    member = False
                 except:
-                    try:
-                        u = await _vars.fetch_user(u_id)
-                        member = False
-                    except:
-                        if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
-                            guild = g
-                        else:
+                    if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
+                        guild = g
+                    else:
+                        try:
+                            guild = await _vars.fetch_guild(u_id)
+                        except:
                             try:
-                                guild = await _vars.fetch_guild(u_id)
+                                channel = await _vars.fetch_channel(u_id)
                             except:
                                 try:
-                                    channel = await _vars.fetch_channel(u_id)
-                                except:
-                                    try:
-                                        u = await _vars.fetch_whuser(u_id, g)
-                                    except EOFError:
-                                        u = None
-                                        if g.id in _vars.data["counts"]:
-                                            if u_id in _vars.data["counts"][g.id]["counts"]:
-                                                u = _vars.ghostUser()
-                                                u.id = u_id
-                                        if u is None:
-                                            raise LookupError("Unable to find user or server from ID.")
-                                try:
-                                    guild = channel.guild
-                                except NameError:
-                                    pass
-                                except AttributeError:
-                                    guild = None
-                                    u = channel.recipient
-                        if guild is not None:
-                            return await self.getGuildData(guild, flags)                        
+                                    u = await _vars.fetch_whuser(u_id, g)
+                                except EOFError:
+                                    u = None
+                                    if g.id in _vars.data["counts"]:
+                                        if u_id in _vars.data["counts"][g.id]["counts"]:
+                                            u = _vars.ghostUser()
+                                            u.id = u_id
+                                    if u is None:
+                                        raise LookupError("Unable to find user or server from ID.")
+                            try:
+                                guild = channel.guild
+                            except NameError:
+                                pass
+                            except AttributeError:
+                                guild = None
+                                u = channel.recipient
+                    if guild is not None:
+                        return await self.getGuildData(guild, flags)                        
         else:
             u = user
         guild = g
