@@ -103,7 +103,6 @@ class Ban:
 
     async def __call__(self, _vars, args, user, channel, guild, flags, perm, name, **void):
         update = self.data["bans"].update
-        bans = _vars.data["bans"]
         dtime = datetime.datetime.utcnow().timestamp()
         if args:
             check = args[0].lower()
@@ -113,7 +112,11 @@ class Ban:
             t_user = None
             t_perm = inf
         else:
-            t_user = await _vars.fetch_user(_vars.verifyID(args[0]))
+            u_id = _vars.verifyID(args[0])
+            try:
+                t_user = await _vars.fetch_user(u_id)
+            except discord.NotFound:
+                t_user = await _vars.fetch_whuser(u_id, guild)
             t_perm = _vars.getPerms(t_user, guild)
         if t_perm + 1 > perm or t_perm is nan:
             if len(args) > 1:
@@ -135,14 +138,17 @@ class Ban:
                     )
                 output = ""
                 for u_id in g_bans:
-                    user = await _vars.fetch_user(u_id)
-                    output += (
-                        "[" + str(user) + "] "
-                        + uniStr(sec2Time(g_bans[u_id]["unban"] - dtime))
-                    )
-                    if "v" in flags:
-                        output += " .ID: " + str(user.id)
-                    output += " .Reason: " + str(g_bans[u_id]["reason"]) + "\n"
+                    try:
+                        user = await _vars.fetch_user(u_id)
+                        output += (
+                            "[" + str(user) + "] "
+                            + uniStr(sec2Time(g_bans[u_id]["unban"] - dtime))
+                        )
+                        if "v" in flags:
+                            output += " .ID: " + str(user.id)
+                        output += " .Reason: " + str(g_bans[u_id]["reason"]) + "\n"
+                    except:
+                        print(traceback.format_exc())
                 return (
                     "Currently banned users from **" + guild.name + "**:\n```css\n"
                     + output.strip("\n") + "```"
@@ -195,20 +201,27 @@ class Ban:
         for t_user in users:
             if tm >= 0:
                 try:
-                    if len(users) > 3:
-                        create_task(guild.ban(t_user, reason=msg, delete_message_days=0))
+                    if hasattr(t_user, "webhook"):
+                        coro = t_user.webhook.delete()
                     else:
-                        await guild.ban(t_user, reason=msg, delete_message_days=0)
+                        coro = guild.ban(t_user, reason=msg, delete_message_days=0)
+                    if len(users) > 3:
+                        create_task(coro)
+                    else:
+                        await coro
                     await asyncio.sleep(0.1)
                 except Exception as ex:
                     response += "\nError: " + repr(ex)
                     continue
-            g_bans[t_user.id] = {
-                "unban": tm + dtime,
-                "reason": msg,
-                "channel": channel.id,
-            }
-            update()
+            if not hasattr(t_user, "webhook"):
+                g_bans[t_user.id] = {
+                    "unban": tm + dtime,
+                    "reason": msg,
+                    "channel": channel.id,
+                }
+                update()
+            else:
+                tm = inf
             if is_banned:
                 response += (
                     "\nUpdated ban for " + uniStr(t_user.name)

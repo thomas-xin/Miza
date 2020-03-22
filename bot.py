@@ -154,6 +154,34 @@ class main_data:
         self.limitCache("users")
         return user
 
+    async def fetch_whuser(self, u_id, guild=None):
+        try:
+            try:
+                g_id = guild.id
+            except AttributeError:
+                g_id = guild
+            guild = await self.fetch_guild(g_id)
+            try:
+                webhooks = await guild.webhooks()
+            except AttributeError:
+                raise EOFError
+            for w in webhooks:
+                if w.id == u_id:
+                    user = _vars.ghostUser()
+                    user.id = u_id
+                    user.name = w.name
+                    user.created_at = user.joined_at = w.created_at
+                    user.avatar = w.avatar
+                    user.avatar_url = w.avatar_url
+                    user.bot = True
+                    user.webhook = w
+                    raise StopIteration
+            raise EOFError
+        except StopIteration:
+            self.cache["users"][u_id] = user
+            self.limitCache("users")
+            return user
+
     async def fetch_guild(self, g_id):
         try:
             g_id = int(g_id)
@@ -595,13 +623,14 @@ class main_data:
                 r = [nan]
             else:
                 r = [ast.literal_eval(f)]
-        except ValueError:
+        except (ValueError, TypeError, SyntaxError):
             r = await self.solveMath(f, guild, 16, 0)
         x = r[0]
         try:
-            if type(x) is str:
-                raise TypeError
-            x = tuple(x)[0]
+            while True:
+                if type(x) is str:
+                    raise TypeError
+                x = tuple(x)[0]
         except TypeError:
             pass
         return roundMin(float(x))

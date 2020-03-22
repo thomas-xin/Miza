@@ -144,7 +144,11 @@ class Perms:
                         + strIter(_vars.data["perms"].get(guild.id, {})) + "```"
                     )
                 else:
-                    t_user = await _vars.fetch_user(_vars.verifyID(args[0]))
+                    u_id = _vars.verifyID(args[0])
+                    try:
+                        t_user = await _vars.fetch_user(u_id)
+                    except discord.NotFound:
+                        t_user = await _vars.fetch_whuser(u_id, guild)
             print(t_user)
             t_perm = _vars.getPerms(t_user.id, guild)
         else:
@@ -155,7 +159,11 @@ class Perms:
                 t_perm = inf
                 name = "everyone"
             else:
-                t_user = await _vars.fetch_user(_vars.verifyID(args[0]))
+                u_id = _vars.verifyID(args[0])
+                try:
+                    t_user = await _vars.fetch_user(u_id)
+                except discord.NotFound:
+                    t_user = await _vars.fetch_whuser(u_id, guild)
                 t_perm = _vars.getPerms(t_user.id, guild)
                 name = t_user.name
             if t_perm is nan or c_perm is nan:
@@ -456,7 +464,7 @@ class Avatar:
     is_command = True
 
     def __init__(self):
-        self.name = ["PFP"]
+        self.name = ["PFP", "Icon"]
         self.min_level = 0
         self.description = "Sends a link to the avatar of a user or server."
         self.usage = "<user>"
@@ -503,20 +511,7 @@ class Avatar:
                                     channel = await _vars.fetch_channel(u_id)
                                 except:
                                     try:
-                                        try:
-                                            webhooks = await g.webhooks()
-                                        except AttributeError:
-                                            raise EOFError
-                                        for w in webhooks:
-                                            if w.id == u_id:
-                                                u = _vars.ghostUser()
-                                                u.name = w.name
-                                                u.avatar = w.avatar
-                                                u.avatar_url = w.avatar_url
-                                                raise StopIteration
-                                        raise EOFError
-                                    except StopIteration:
-                                        pass
+                                        user = await _vars.fetch_whuser(u_id, g)
                                     except EOFError:
                                         u = None
                                         if g.id in _vars.data["counts"]:
@@ -656,23 +651,7 @@ class Info:
                                     channel = await _vars.fetch_channel(u_id)
                                 except:
                                     try:
-                                        try:
-                                            webhooks = await g.webhooks()
-                                        except AttributeError:
-                                            raise EOFError
-                                        for w in webhooks:
-                                            if w.id == u_id:
-                                                u = _vars.ghostUser()
-                                                u.id = u_id
-                                                u.name = w.name
-                                                u.created_at = u.joined_at = w.created_at
-                                                u.avatar = w.avatar
-                                                u.avatar_url = w.avatar_url
-                                                u.bot = True
-                                                raise StopIteration
-                                        raise EOFError
-                                    except StopIteration:
-                                        pass
+                                        user = await _vars.fetch_whuser(u_id, g)
                                     except EOFError:
                                         u = None
                                         if g.id in _vars.data["counts"]:

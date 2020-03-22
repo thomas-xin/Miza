@@ -2260,8 +2260,8 @@ class updateQueues:
                         if i < len(q):
                             e_id = q[i]["id"]
                             dtime = q[i].get("download", 0)
-                            if dtime >= 0 and dtime < time.time() - 4:
-                                q[i]["download"] = time.time()
+                            if not dtime:
+                                q[i]["download"] = 1
                                 search = e_id + ".mp3"
                                 if search not in os.listdir("cache/"):
                                     durc = [q[i]["duration"]]
