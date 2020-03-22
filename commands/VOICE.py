@@ -48,6 +48,7 @@ class customAudio(discord.AudioSource):
             self.preparing = False
             self.player = None
             self.timeout = 0
+            self.pausec = False
             self._vars = _vars
             _vars.updaters["playlists"].audio[channel.guild.id] = self
         except:
@@ -287,6 +288,7 @@ class customAudio(discord.AudioSource):
                 self.buffer = []
                 self.feedback = None
                 self.bassadj = None
+                self.pausec = self.paused and not (max(temp) or min(temp))
                 return temp
             array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
             size = self.length >> 1
@@ -396,7 +398,8 @@ class customAudio(discord.AudioSource):
                 array = numpy.stack((left, right), axis=-1).flatten()
             numpy.clip(array, -32767, 32767, out=array)
             temp = array.astype(numpy.int16).tobytes()
-        except Exception as ex:
+            self.pausec = self.paused and not (max(temp) or min(temp))
+        except:
             print(traceback.format_exc())
         return temp
 
@@ -2212,9 +2215,11 @@ class updateQueues:
                 else:
                     create_task(auds.reconnect())
                     continue
+                q = auds.queue
                 if not vc.is_playing():
                     try:
-                        vc.play(auds, after=self.sendUpdateRequest)
+                        if q and not auds.pausec:
+                            vc.play(auds, after=self.sendUpdateRequest)
                         auds.att = 0
                     except:
                         auds.att = getattr(auds, "att", 0) + 1
@@ -2227,7 +2232,6 @@ class updateQueues:
                     continue
                 if cnt:
                     auds.timeout = time.time()
-                q = auds.queue
                 i = 1
                 while len(q) > 65536:
                     q.pop()
@@ -2322,6 +2326,8 @@ class updateQueues:
                             if len(t) <= 1:
                                 break
                         q.append(d)
+                if auds.pausec:
+                    vc.stop()
             except:
                 print(traceback.format_exc())
         for path in os.listdir("cache/"):

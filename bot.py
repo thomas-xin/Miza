@@ -579,7 +579,7 @@ class main_data:
         returns = hlist()
         for i in range(len(item)):
             try:
-                if type(item[i]) in (str, bytes):
+                if type(item[i]) in (str, bytes, dict):
                     raise TypeError
                 item[i] = tuple(item[i])
             except TypeError:
