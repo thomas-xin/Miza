@@ -13,8 +13,7 @@ class Purge:
 
     def __init__(self):
         self.name = ["Del", "Delete"]
-        self.min_level = 1
-        self.min_display = "1~3"
+        self.min_level = 3
         self.description = "Deletes a number of messages from a certain user in current channel."
         self.usage = "<1:user{bot}(?a)> <0:count[1]> <hide(?h)>"
         self.flags = "ah"
@@ -45,13 +44,6 @@ class Purge:
                         t_user = await _vars.fetch_member(u_id, guild)
                     except LookupError:
                         t_user = freeClass(id=u_id)
-        if t_user is None or t_user.id != client.user.id:
-            req = 3
-            if perm < req:
-                reason = (
-                    "to purge messages from target user"
-                )
-                self.permError(perm, req, reason)
         lim = count * 2 + 16
         if lim < 0:
             lim = 0
@@ -59,11 +51,12 @@ class Purge:
             lim = None
         hist = await channel.history(limit=lim).flatten()
         delM = hlist()
+        isbot = t_user is not None and t_user.id == client.user.id
         deleted = 0
         for m in hist:
             if count <= 0:
                 break
-            if t_user is None or m.author.id == t_user.id:
+            if t_user is None or isbot and m.author.bot or m.author.id == t_user.id:
                 delM.append(m)
                 count -= 1
         while len(delM):
@@ -625,7 +618,7 @@ class updateUserLogs:
                     )
                     change = True
                     colour[0] += 255
-                if len(before.roles) != len(after.roles):
+                if hash(tuple(r.id for r in before.roles)) != hash(tuple(r.id for r in after.roles)):
                     sub = hlist()
                     add = hlist()
                     for r in before.roles:
@@ -923,7 +916,6 @@ class updateColours:
 
     async def changeColour(self, g_id, roles):
         guild = await self._vars.fetch_guild(g_id)
-        colTime = 12
         l = list(roles)
         for r in l:
             try:

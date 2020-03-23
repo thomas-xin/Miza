@@ -896,7 +896,7 @@ class main_data:
                         if changed:
                             print(repr(activity))
                         try:
-                            await client.change_presence(activity=activity)
+                            await client.change_presence(activity=activity, status=discord.Status.idle)
                         except discord.HTTPException:
                             print(traceback.format_exc())
                             await asyncio.sleep(3)
@@ -949,6 +949,12 @@ class main_data:
         if not data:
             data = "```css\n" + uniStr("[EMPTY MESSAGE]") + "```"
         return limStr(data, limit)
+
+    def strActivity(self, activity):
+        if hasattr(activity, "type") and activity.type != discord.ActivityType.custom:
+            t = activity.type.name
+            return t[0].upper() + t[1:] + " " + activity.name
+        return str(activity)
 
     def hasSymbol(self, string):
         s = "0123456789abcdefghijklmnopqrstuvwxyz"

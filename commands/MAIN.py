@@ -684,7 +684,7 @@ class Info:
         else:
             joined = None
         created = u.created_at
-        activity = "\n".join(str(i) for i in getattr(u, "activities", []))
+        activity = "\n".join(_vars.strActivity(i) for i in getattr(u, "activities", []))
         role = ", ".join(str(i) for i in getattr(u, "roles", []) if not i.is_default())
         coms = msgs = avgs = 0
         pos = None

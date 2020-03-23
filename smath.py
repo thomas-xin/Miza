@@ -1515,15 +1515,9 @@ lookup time for all elements. Includes many array and numeric operations."""
         except TypeError:
             return self.constantIterator(other)
 
-    def deleteobj(self, item):
-        del item
-
     @blocking
     def clear(self):
-        temp = self.data
-        self.data = {}
-        self.offs = 0
-        doParallel(self.deleteobj, [temp], name="deleter", killable=False)
+        self.data.clear()
         return self
 
     @waiting
@@ -1577,7 +1571,7 @@ lookup time for all elements. Includes many array and numeric operations."""
                 temp = self.data
                 self.data = {0: self.data[self.offs]}
                 self.offs = 0
-                doParallel(self.deleteobj, [temp], killable=False)
+                temp.clear()
             return False
         self.offs = 0
         return True
@@ -2522,7 +2516,7 @@ class _parallel:
                 try:
                     if self.actions:
                         self.state = max(i.get("state", 1) for i in self.actions)
-                    time.sleep(0.009 * (random.random() + 1))
+                    time.sleep(0.01 * (random.random() + 1))
                     if self.actions is None:
                         print("EXIT")
                         return
@@ -2570,7 +2564,7 @@ class _parallel:
                 except KeyError:
                     pass
                 if not destroy and type(self.id) is not str:
-                    processes.running[self.id] = processes.new(self.id)
+                    threads.running[self.id] = threads.new(self.id)
             elif type(self.id) is str:
                 self.actions = None
                 try:
@@ -2597,7 +2591,7 @@ Performs an action using parallel threads."""
                 break
             t += 1
         while p.state > 1 or len(p.actions) >= 64:
-            time.sleep(0.005)
+            time.sleep(0.01)
             d = xrand(threads.max)
             p = ps[d]
     action = kws

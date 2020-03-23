@@ -768,9 +768,9 @@ class videoDownloader:
         new_opts = dict(self.ydl_opts)
         fn = "cache/" + i["id"] + ".mp3"
         new_opts["outtmpl"] = fn
-        downloader = youtube_dl.YoutubeDL(new_opts)
         exc = None
         for _ in loop(5):
+            downloader = youtube_dl.YoutubeDL(new_opts)
             try:
                 downloader.download([i["url"]])
                 if durc is not None:
@@ -874,6 +874,7 @@ class Queue:
             v = "v" in flags
             if not v and len(q) and auds.paused & 1 and "p" in name:
                 auds.paused &= -2
+                auds.pausec = False
                 return "```css\nSuccessfully resumed audio playback in " + uniStr(guild.name) + ".```", 1
             if not len(q):
                 return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```", 1
@@ -978,7 +979,7 @@ class Queue:
                 try:
                     ex = eval(res)
                 except NameError:
-                    ex = ConnectionError(res[res.index("(") + 1:res.index(")")])
+                    ex = ConnectionError(res[res.index("(") + 1:res.index(")")].strip("'"))
                 raise ex
             dur = 0
             added = deque()
@@ -1211,7 +1212,7 @@ class Skip:
     server_only = True
 
     def __init__(self):
-        self.name = ["Remove", "Rem", "S", "ClearQueue", "Clear"]
+        self.name = ["Remove", "Rem", "S", "SK", "ClearQueue", "Clear", "CQ"]
         self.min_level = 0
         self.min_display = "0~1"
         self.description = "Removes an entry or range of entries from the voice channel queue."
@@ -1222,7 +1223,7 @@ class Skip:
         if guild.id not in _vars.updaters["playlists"].audio:
             raise LookupError("Currently not playing in a voice channel.")
         auds = _vars.updaters["playlists"].audio[guild.id]
-        if "clear" in name.lower():
+        if name.lower().startswith("c"):
             argv = "inf"
             args = [argv]
             flags["f"] = True
@@ -1287,7 +1288,8 @@ class Skip:
                     raise LookupError
                 curr = auds.queue[pos]
             except LookupError:
-                response += repr(IndexError("Entry " + uniStr(pos) + " is out of range."))
+                response += "\n" + repr(IndexError("Entry " + uniStr(pos) + " is out of range."))
+                continue
             if type(curr["skips"]) is list:
                 if "f" in flags or user.id == curr["u_id"] and not "v" in flags:
                     curr["skips"] = None
@@ -1333,10 +1335,11 @@ class Skip:
             if song["skips"] is None or len(song["skips"]) >= required:
                 doParallel(auds.advance, [False, not count])
                 auds.new()
-                response += (
-                    uniStr(noHighlight(song["name"]))
-                    + " has been removed from the queue.\n"
-                )
+                if count < 4:
+                    response += (
+                        uniStr(noHighlight(song["name"]))
+                        + " has been removed from the queue.\n"
+                    )
                 count += 1
         if "h" not in flags:
             if count >= 4:
@@ -1369,6 +1372,7 @@ class Pause:
             auds.seek(0)
         if not auds.paused > 1:
             auds.paused = name in ("pause", "stop")
+            auds.pausec = False
         if auds.player is not None:
             auds.player["time"] = 1 + time.time()
         if "h" not in flags:
@@ -1462,7 +1466,7 @@ class Dump:
                 raise eval(resp)
             return bytes(resp[0], "utf-8")
         if not isAlone(auds, user) and perm < 1:
-            self.permError(perm, 1, "to load while other users are in voice")
+            self.permError(perm, 1, "to load new queue while other users are in voice")
         try:
             if len(message.attachments):
                 url = message.attachments[0].url
@@ -1502,7 +1506,7 @@ class Dump:
                     "```css\nSuccessfully reinstated audio queue for " 
                     + uniStr(guild.name) + ".```", 1
                 )
-        if len(auds.queue) > 1024:
+        if len(auds.queue) > 8192:
             doParallel(auds.queue.extend, [q])
         else:
             auds.queue.extend(q)
@@ -2326,7 +2330,7 @@ class updateQueues:
                             if len(t) <= 1:
                                 break
                         q.append(d)
-                if auds.pausec:
+                if auds.pausec and auds.paused:
                     vc.stop()
             except:
                 print(traceback.format_exc())

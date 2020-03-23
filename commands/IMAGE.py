@@ -329,6 +329,20 @@ class Dog:
         create_task(channel.send(embed=emb))
 
 
+# class Mimic:
+#     is_command = True
+#     server_only = True
+
+#     def __init__(self):
+#         self.name = ["RolePlay"]
+#         self.min_level = 3
+#         self.description = "Spawns a webhook mimic for the current server."
+#         self.usage = "<1:user[]> <0:prefix(&)>"
+    
+#     async def __call__(self, channel, flags, **void):
+#         for 
+
+
 class updateImages:
     is_database = True
     name = "images"
