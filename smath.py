@@ -1819,7 +1819,7 @@ lookup time for all elements. Includes many array and numeric operations."""
                 d[0] = iterable
         self.block = False
 
-    def __delattr__(self, name, value):
+    def __delattr__(self, *void1, **void2):
         raise AttributeError("Deleting attributes is not permitted.")
 
     @waiting

@@ -489,6 +489,20 @@ class Avatar:
             "embed": emb,
         }
 
+    def getMimicData(self, p):
+        _vars = self._vars
+        url = _vars.strURL(p.url)
+        name = p.name
+        emb = discord.Embed(colour=_vars.randColour())
+        emb.set_thumbnail(url=url)
+        emb.set_image(url=url)
+        emb.set_author(name=name, icon_url=url, url=url)
+        emb.description = "[" + name + "](" + url + ")"
+        print(emb.to_dict())
+        return {
+            "embed": emb,
+        }
+
     async def __call__(self, argv, guild, _vars, client, user, **void):
         g, guild = guild, None
         if argv:
@@ -497,39 +511,43 @@ class Avatar:
             except:
                 u_id = argv
             try:
-                u = await _vars.fetch_member(u_id, g)
+                p = _vars.get_mimic(u_id)
+                return self.getMimicData(p)
             except:
                 try:
-                    u = await _vars.fetch_user(u_id)
+                    u = await _vars.fetch_member(u_id, g)
                 except:
-                    if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
-                        guild = g
-                    else:
-                        try:
-                            guild = await _vars.fetch_guild(u_id)
-                        except:
+                    try:
+                        u = await _vars.fetch_user(u_id)
+                    except:
+                        if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
+                            guild = g
+                        else:
                             try:
-                                channel = await _vars.fetch_channel(u_id)
+                                guild = await _vars.fetch_guild(u_id)
                             except:
                                 try:
-                                    u = await _vars.fetch_whuser(u_id, g)
-                                except EOFError:
-                                    u = None
-                                    if g.id in _vars.data["counts"]:
-                                        if u_id in _vars.data["counts"][g.id]["counts"]:
-                                            u = _vars.ghostUser()
-                                            u.id = u_id
-                                    if u is None:
-                                        raise LookupError("Unable to find user or server from ID.")
-                            try:
-                                guild = channel.guild
-                            except NameError:
-                                pass
-                            except AttributeError:
-                                guild = None
-                                u = channel.recipient
-                    if guild is not None:
-                        return await self.getGuildData(guild)                        
+                                    channel = await _vars.fetch_channel(u_id)
+                                except:
+                                    try:
+                                        u = await _vars.fetch_whuser(u_id, g)
+                                    except EOFError:
+                                        u = None
+                                        if g.id in _vars.data["counts"]:
+                                            if u_id in _vars.data["counts"][g.id]["counts"]:
+                                                u = _vars.ghostUser()
+                                                u.id = u_id
+                                        if u is None:
+                                            raise LookupError("Unable to find user or server from ID.")
+                                try:
+                                    guild = channel.guild
+                                except NameError:
+                                    pass
+                                except AttributeError:
+                                    guild = None
+                                    u = channel.recipient
+                        if guild is not None:
+                            return await self.getGuildData(guild)                        
         else:
             u = user
         guild = g
@@ -571,20 +589,20 @@ class Info:
             d = "Owner: <@" + str(u.id) + ">"
         else:
             d = ""
-        if g.description is not None:
+        if g.description:
             d += "```\n" + str(g.description) + "```"
         emb.description = d
         top = None
         try:
             g.region
-            pcount = await _vars.updaters["counts"].getUserMessages(None, g)
+            pcount = await _vars.database["counts"].getUserMessages(None, g)
         except AttributeError:
             pcount = 0
         try:
             if "v" in flags:
-                pavg = await _vars.updaters["counts"].getUserAverage(None, g)
+                pavg = await _vars.database["counts"].getUserAverage(None, g)
                 users = deque()
-                us = await _vars.updaters["counts"].getGuildMessages(g)
+                us = await _vars.database["counts"].getGuildMessages(g)
                 if type(us) is str:
                     top = us
                 else:
@@ -622,6 +640,45 @@ class Info:
             "embed": emb,
         }
 
+    def getMimicData(self, p, flags={}):
+        _vars = self._vars
+        url = _vars.strURL(p.url)
+        name = p.name
+        emb = discord.Embed(colour=_vars.randColour())
+        emb.set_thumbnail(url=url)
+        emb.set_author(name=name, icon_url=url, url=url)
+        if p.description:
+            d = "```fix\n" + p.id + "``````\n" + str(p.description) + "```"
+        else:
+            d = ""
+        emb.description = d
+        pcnt = 0
+        try:
+            if "v" in flags:
+                ptot = p.total
+                pcnt = p.count
+                pavg = ptot / pcnt
+        except (AttributeError, KeyError):
+            pass
+        emb.add_field(name="Mimic ID", value=str(p.id), inline=0)
+        emb.add_field(name="Name", value=str(p.name), inline=0)
+        emb.add_field(name="Prefix", value=str(p.prefix), inline=1)
+        emb.add_field(name="Creation time", value=str(p.created_at), inline=1)
+        if "v" in flags:
+            emb.add_field(name="Gender", value=str(p.gender), inline=1)
+            ctime = p.birthday
+            age = (datetime.datetime.utcnow() - ctime).total_seconds() / TIMEUNITS["year"]
+            emb.add_field(name="Birthday", value=str(ctime), inline=1)
+            emb.add_field(name="Age", value=str(roundMin(round(age, 1))), inline=1)
+        if pcnt:
+            emb.add_field(name="Post count", value=str(pcnt), inline=1)
+            if "v" in flags:
+                emb.add_field(name="Average post length", value=str(round(pavg, 9)), inline=1)
+        print(emb.to_dict())
+        return {
+            "embed": emb,
+        }
+
     async def __call__(self, argv, guild, _vars, client, user, flags, **void):
         member = True
         g, guild = guild, None
@@ -631,40 +688,44 @@ class Info:
             except:
                 u_id = argv
             try:
-                u = await _vars.fetch_member(u_id, g)
+                p = _vars.get_mimic(u_id)
+                return self.getMimicData(p, flags)
             except:
                 try:
-                    u = await _vars.fetch_user(u_id)
-                    member = False
+                    u = await _vars.fetch_member(u_id, g)
                 except:
-                    if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
-                        guild = g
-                    else:
-                        try:
-                            guild = await _vars.fetch_guild(u_id)
-                        except:
+                    try:
+                        u = await _vars.fetch_user(u_id)
+                        member = False
+                    except:
+                        if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
+                            guild = g
+                        else:
                             try:
-                                channel = await _vars.fetch_channel(u_id)
+                                guild = await _vars.fetch_guild(u_id)
                             except:
                                 try:
-                                    u = await _vars.fetch_whuser(u_id, g)
-                                except EOFError:
-                                    u = None
-                                    if g.id in _vars.data["counts"]:
-                                        if u_id in _vars.data["counts"][g.id]["counts"]:
-                                            u = _vars.ghostUser()
-                                            u.id = u_id
-                                    if u is None:
-                                        raise LookupError("Unable to find user or server from ID.")
-                            try:
-                                guild = channel.guild
-                            except NameError:
-                                pass
-                            except AttributeError:
-                                guild = None
-                                u = channel.recipient
-                    if guild is not None:
-                        return await self.getGuildData(guild, flags)                        
+                                    channel = await _vars.fetch_channel(u_id)
+                                except:
+                                    try:
+                                        u = await _vars.fetch_whuser(u_id, g)
+                                    except EOFError:
+                                        u = None
+                                        if g.id in _vars.data["counts"]:
+                                            if u_id in _vars.data["counts"][g.id]["counts"]:
+                                                u = _vars.ghostUser()
+                                                u.id = u_id
+                                        if u is None:
+                                            raise LookupError("Unable to find user or server from ID.")
+                                try:
+                                    guild = channel.guild
+                                except NameError:
+                                    pass
+                                except AttributeError:
+                                    guild = None
+                                    u = channel.recipient
+                        if guild is not None:
+                            return await self.getGuildData(guild, flags)                        
         else:
             u = user
         guild = g
@@ -694,10 +755,10 @@ class Info:
             except LookupError:
                 pass
             try:
-                msgs = await _vars.updaters["counts"].getUserMessages(u, guild)
-                avgs = await _vars.updaters["counts"].getUserAverage(u, guild)
+                msgs = await _vars.database["counts"].getUserMessages(u, guild)
+                avgs = await _vars.database["counts"].getUserAverage(u, guild)
                 if guild.owner.id != client.user.id:
-                    us = await _vars.updaters["counts"].getGuildMessages(guild)
+                    us = await _vars.database["counts"].getGuildMessages(guild)
                     if type(us) is str:
                         pos = us
                     else:
@@ -827,7 +888,7 @@ class Reminder:
 
     async def __call__(self, argv, args, flags, _vars, user, guild, **void):
         rems = _vars.data["reminders"].get(user.id, hlist())
-        update = _vars.updaters["reminders"].update
+        update = _vars.database["reminders"].update
         if "d" in flags:
             if not argv:
                 i = 0
@@ -838,18 +899,18 @@ class Reminder:
             return (
                 "```css\nSuccessfully removed "
                 + uniStr(x.msg) + " from reminders list for "
-                + uniStr(user.name) + ".```"
+                + uniStr(user) + ".```"
             )
         if not argv:
             if not len(rems):
                 return (
                     "```css\nNo reminders currently set for "
-                    + uniStr(user.name) + ".```"
+                    + uniStr(user) + ".```"
                 )
             d = datetime.datetime.utcnow()
             s = strIter(rems, key=lambda x: limStr(x.msg, 64) + "➡️" + sec2Time((x.t - d).total_seconds()))
             return (
-                "Current reminders set for **" + user.name 
+                "Current reminders set for **" + str(user)
                 + "**:```ini" + s + "```"
             )
         if len(rems) >= 32:
@@ -890,7 +951,7 @@ class Reminder:
         update()
         return (
             "```css\nSuccessfully set reminder for "
-            + uniStr(user.name) + " in " + uniStr(sec2Time(t)) + ":\n"
+            + uniStr(user) + " in " + uniStr(sec2Time(t)) + ":\n"
             + msg + "```"
         )
 

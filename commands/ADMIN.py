@@ -67,16 +67,14 @@ class Purge:
                     for _ in loop(min(len(delM), 100)):
                         delM.popleft()
                 else:
-                    _vars.logDelete(delM[0].id)
-                    await delM[0].delete()
+                    await _vars.silentDelete(delM[0], exc=True)
                     deleted += 1
                     delM.popleft()
             except:
                 print(traceback.format_exc())
                 for _ in loop(min(5, len(delM))):
                     m = delM.popleft()
-                    _vars.logDelete(m.id)
-                    await m.delete()
+                    await _vars.silentDelete(m, exc=True)
                     deleted += 1
         if not "h" in flags:
             return (
@@ -490,7 +488,7 @@ class MessageLog:
 
     async def __call__(self, _vars, flags, channel, guild, **void):
         data = _vars.data["logM"]
-        update = _vars.updaters["logM"].update
+        update = _vars.database["logM"].update
         if "e" in flags:
             data[guild.id] = channel.id
             update()
@@ -532,7 +530,7 @@ class UserLog:
 
     async def __call__(self, _vars, flags, channel, guild, **void):
         data = _vars.data["logU"]
-        update = _vars.updaters["logU"].update
+        update = _vars.database["logU"].update
         if "e" in flags:
             data[guild.id] = channel.id
             update()
@@ -885,8 +883,7 @@ class updateRolegiver:
                             print("Granted role " + r.name + " to " + user.name + ".")
                 if deleter:
                     try:
-                        _vars.logDelete(message.id)
-                        await message.delete()
+                        await _vars.silentDelete(message, exc=True)
                     except discord.NotFound:
                         pass
 

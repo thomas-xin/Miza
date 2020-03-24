@@ -39,6 +39,7 @@ class main_data:
     python = ("python3", "python")[os.name == "nt"]
             
     def __init__(self):
+        print("Time: " + str(datetime.datetime.now()))
         print("Initializing...")
         if not os.path.exists("cache/"):
             os.mkdir("cache/")
@@ -88,9 +89,7 @@ class main_data:
         print("Attempting to authorize with token " + self.token + ":")
         try:
             self.client.run(self.token)
-        except KeyboardInterrupt:
-            sys.exit()
-        except SystemExit:
+        except (KeyboardInterrupt, SystemExit):
             sys.exit()
 
     def print(self, *args, sep=" ", end="\n"):
@@ -310,6 +309,18 @@ class main_data:
             self.cache["messages"][m_id] = message
             self.limitCache("messages")
         return message
+    
+    def get_mimic(self, m_id):
+        try:
+            try:
+                m_id = int(m_id)
+            except (ValueError, TypeError):
+                pass
+            m_id = "&" + str(m_id)
+            mimic = self.data["mimics"][m_id]
+            return mimic
+        except KeyError:
+            raise LookupError("Unable to find target mimic.")
 
     async def getDM(self, user):
         try:
@@ -386,7 +397,7 @@ class main_data:
             u_id = user
         g_perm = perms.setdefault(guild.id, {})
         g_perm.update({u_id: value})
-        self.updaters["perms"].update()
+        self.database["perms"].update()
 
     def isDeleted(self, message):
         try:
@@ -402,6 +413,18 @@ class main_data:
             m_id = int(message)
         self.cache["deleted"][m_id] = True
         self.limitCache("deleted", limit=4096)
+    
+    async def silentDelete(self, message, exc=False):
+        try:
+            self.logDelete(message)
+            await message.delete()
+        except:
+            try:
+                self.cache["deleted"].pop(message.id)
+            except KeyError:
+                pass
+            if exc:
+                raise
 
     def isSuspended(self, u_id):
         u_id = int(u_id)
@@ -446,7 +469,7 @@ class main_data:
             mod = __import__(module)
             self._globals[module] = mod
             commands = hlist()
-            updates = hlist()
+            dataitems = hlist()
             vd = mod.__dict__
             for k in vd:
                 var = vd[k]
@@ -490,12 +513,12 @@ class main_data:
                         obj.busy = False
                         obj.checking = False
                         obj._globals = vd
-                        self.updaters[obj.name] = obj
-                        updates.append(obj)
-                        #print("Successfully loaded updater " + obj.__name__ + ".")
+                        self.database[obj.name] = obj
+                        dataitems.append(obj)
+                        #print("Successfully loaded database " + obj.__name__ + ".")
                     except AttributeError:
                         pass
-            for u in updates:
+            for u in dataitems:
                 for c in commands:
                     c.data[u.name] = u
             self.categories[rename] = commands
@@ -506,7 +529,7 @@ class main_data:
     def getModules(self, reload=False):
         files = (i for i in os.listdir("commands") if iscode(i))
         self.categories = {}
-        self.updaters = {}
+        self.database = {}
         totalsize = [0,0]
         totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
         totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p))
@@ -519,12 +542,12 @@ class main_data:
     def update(self):
         saved = hlist()
         try:
-            for i in self.updaters:
-                u = self.updaters[i]
+            for i in self.database:
+                u = self.database[i]
                 if getattr(u, "update", None) is not None:
                     if u.update(True):
                         saved.append(i)
-        except Exception as ex:
+        except:
             print(traceback.format_exc())
         if saved:
             print("Autosaved " + str(saved) + ".")
@@ -617,8 +640,11 @@ class main_data:
 
     class returns:
 
-        def __init__(self, data):
+        def __init__(self, data=None):
             self.data = data
+
+        def __bool__(self):
+            return self.data is not None
 
     async def parasync(self, coro, returns):
         try:
@@ -638,10 +664,10 @@ class main_data:
             except TypeError:
                 pass
             if type(item[i]) is tuple:
-                returns.append(self.returns(None))
+                returns.append(self.returns())
                 create_task(self.parasync(self.recursiveCoro(item[i]), returns[-1]))
             elif asyncio.iscoroutine(item[i]):
-                returns.append(self.returns(None))
+                returns.append(self.returns())
                 create_task(self.parasync(item[i], returns[-1]))
             else:
                 returns.append(self.returns(item[i]))
@@ -649,7 +675,7 @@ class main_data:
         while not full:
             full = True
             for i in returns:
-                if i.data is None:
+                if not i:
                     full = False
             await asyncio.sleep(0.2)
         output = hlist()
@@ -802,13 +828,15 @@ class main_data:
             print(traceback.format_exc())
 
     async def sendFile(self, channel, filemsg, file, filename):
-        await channel.send(filemsg, file=file)
+        message = await channel.send(filemsg, file=file)
         try:
             os.remove(filename)
         except FileNotFoundError:
             pass
         except:
             print(traceback.format_exc())
+        if message.attachments:
+            await message.edit(content=message.content + "\n" + "\n".join(tuple(a.url for a in message.attachments)))
 
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:
@@ -910,11 +938,11 @@ class main_data:
                 self.lastCheck = time.time()
                 if force:
                     for k in self.doUpdate:
-                        u = self.updaters[k]
+                        u = self.database[k]
                         create_task(u())
                         create_task(self.verifyDelete(u))
                 else:
-                    for u in self.updaters.values():
+                    for u in self.database.values():
                         create_task(u())
                         create_task(self.verifyDelete(u))
             except:
@@ -957,12 +985,19 @@ class main_data:
         return str(activity)
 
     def hasSymbol(self, string):
-        s = "0123456789abcdefghijklmnopqrstuvwxyz"
         for c in string.lower():
             x = ord(c)
             if x > 122 or (x < 97 and x > 57) or x < 48:
                 return False
         return True
+
+    async def ensureWebhook(self, channel):
+        wlist = await channel.webhooks()
+        if not wlist:
+            w = await channel.create_webhook(name=_vars.client.user.name)
+        else:
+            w = wlist[0]
+        return w
 
     class userGuild(discord.Object):
 
@@ -1250,7 +1285,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
                             create_task(channel.trigger_typing())
-                        for u in _vars.updaters.values():
+                        for u in _vars.database.values():
                             f = getattr(u, "_command_", None)
                             if f is not None:
                                 await f(user, command)
@@ -1329,7 +1364,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         temp = "".join(temp)
         while "  " in temp:
             temp = temp.replace("  ", " ")
-        for u in _vars.updaters.values():
+        for u in _vars.database.values():
             f = getattr(u, "_nocommand_", None)
             if f is not None:
                 try:
@@ -1338,6 +1373,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         edit=edit,
                         orig=orig,
                         message=message,
+                        perm=u_perm,
                     )
                 except:
                     print(traceback.format_exc())
@@ -1395,8 +1431,10 @@ async def on_ready():
         else:
             print("> " + guild.name)
     await _vars.handleUpdate()
-    create_task(updateLoop())
-    create_task(heartbeatLoop())
+    if not hasattr(_vars, "started"):
+        _vars.started = True
+        create_task(updateLoop())
+        create_task(heartbeatLoop())
 
 
 async def checkDelete(message, reaction, user):
@@ -1418,8 +1456,7 @@ async def checkDelete(message, reaction, user):
                 s = str(reaction)
                 if s in "❌✖️🇽❎":
                     try:
-                        _vars.logDelete(message.id)
-                        await message.delete()
+                        await _vars.silentDelete(message, exc=True)
                     except discord.NotFound:
                         pass
             await _vars.handleUpdate()
@@ -1489,7 +1526,7 @@ async def handleMessage(message, edit=True):
 async def on_typing(channel, user, when):
     guild = getattr(channel, "guild", None)
     if guild:
-        for u in _vars.updaters.values():
+        for u in _vars.database.values():
             f = getattr(u, "_typing_", None)
             if f is not None:
                 try:
@@ -1503,7 +1540,7 @@ async def on_message(message):
     _vars.cacheMessage(message)
     guild = message.guild
     if guild:
-        for u in _vars.updaters.values():
+        for u in _vars.database.values():
             f = getattr(u, "_send_", None)
             if f is not None:
                 try:
@@ -1517,7 +1554,7 @@ async def on_message(message):
 
 @client.event
 async def on_user_update(before, after):
-    for u in _vars.updaters.values():
+    for u in _vars.database.values():
         f = getattr(u, "_user_update_", None)
         if f is not None:
             try:
@@ -1528,7 +1565,7 @@ async def on_user_update(before, after):
 
 @client.event
 async def on_member_update(before, after):
-    for u in _vars.updaters.values():
+    for u in _vars.database.values():
         f = getattr(u, "_member_update_", None)
         if f is not None:
             try:
@@ -1539,7 +1576,7 @@ async def on_member_update(before, after):
 
 @client.event
 async def on_member_join(member):
-    for u in _vars.updaters.values():
+    for u in _vars.database.values():
         f = getattr(u, "_join_", None)
         if f is not None:
             try:
@@ -1550,7 +1587,7 @@ async def on_member_join(member):
             
 @client.event
 async def on_member_remove(member):
-    for u in _vars.updaters.values():
+    for u in _vars.database.values():
         f = getattr(u, "_leave_", None)
         if f is not None:
             try:
@@ -1581,7 +1618,7 @@ async def on_raw_message_delete(payload):
             message.id = payload.message_id
     guild = message.guild
     if guild:
-        for u in _vars.updaters.values():
+        for u in _vars.database.values():
             f = getattr(u, "_delete_", None)
             if f is not None:
                 try:
@@ -1617,7 +1654,7 @@ async def on_raw_bulk_message_delete(payload):
     for message in messages:
         guild = message.guild
         if guild:
-            for u in _vars.updaters.values():
+            for u in _vars.database.values():
                 f = getattr(u, "_delete_", None)
                 if f is not None:
                     try:
@@ -1636,7 +1673,7 @@ async def updateEdit(before, after):
         before.id = after.id
     guild = after.guild
     if guild:
-        for u in _vars.updaters.values():
+        for u in _vars.database.values():
             f = getattr(u, "_edit_", None)
             if f is not None:
                 try:

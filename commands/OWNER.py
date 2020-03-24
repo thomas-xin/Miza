@@ -22,19 +22,19 @@ class Execute:
 
     async def __call__(self, _vars, flags, channel, **void):
         if "e" in flags:
-            _vars.updaters["exec"].channel = channel
+            _vars.database["exec"].channel = channel
             return (
                 "```css\nSuccessfully changed code channel to "
                 + uniStr(channel.id) + ".```"
             )
         elif "d" in flags:
-            _vars.updaters["exec"].channel = freeClass(id=None)
+            _vars.database["exec"].channel = freeClass(id=None)
             return (
                 "```css\nSuccessfully removed code channel.```"
             )
         return (
             "```css\ncode channel is currently set to "
-            + uniStr(_vars.updaters["exec"].channel.id) + ".```"
+            + uniStr(_vars.database["exec"].channel.id) + ".```"
         )
         
 

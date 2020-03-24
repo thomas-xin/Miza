@@ -253,7 +253,7 @@ def factorize(*args, **kwargs):
     temp = sympy.factorint(*args, **kwargs)
     output = []
     for k in temp:
-        for i in range(temp[k]):
+        for _ in range(temp[k]):
             output.append(k)
     return output
 

@@ -190,7 +190,7 @@ class Text2048:
             if count >= width ** 2:
                 a = 1
                 for i in range(4):
-                    dump, b = self.moveTiles(gamestate, i, copy=True)
+                    _, b = self.moveTiles(gamestate, i, copy=True)
                     a &= b
                 if a:
                     await message.clear_reactions()

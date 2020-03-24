@@ -50,7 +50,7 @@ class customAudio(discord.AudioSource):
             self.timeout = 0
             self.pausec = False
             self._vars = _vars
-            _vars.updaters["playlists"].audio[channel.guild.id] = self
+            _vars.database["playlists"].audio[channel.guild.id] = self
         except:
             print(traceback.format_exc())
 
@@ -480,7 +480,7 @@ def getBitrate(filename):
 
 
 async def forceJoin(guild, channel, user, client, _vars):
-    if guild.id not in _vars.updaters["playlists"].audio:
+    if guild.id not in _vars.database["playlists"].audio:
         for func in _vars.categories["voice"]:
             if "join" in (name.lower() for name in func.name):
                 try:
@@ -490,7 +490,7 @@ async def forceJoin(guild, channel, user, client, _vars):
                 except AttributeError:
                     pass
     try:
-        auds = _vars.updaters["playlists"].audio[guild.id]
+        auds = _vars.database["playlists"].audio[guild.id]
         auds.channel = channel
     except KeyError:
         raise LookupError("Voice channel not found.")
@@ -1148,7 +1148,7 @@ class Join:
             if vc.guild.id == guild.id:
                 joined = True
                 break
-        connecting = _vars.updaters["playlists"].connecting
+        connecting = _vars.database["playlists"].connecting
         if not joined:
             connecting[guild.id] = True
             vc = freeClass(is_connected = lambda: False)
@@ -1161,9 +1161,9 @@ class Join:
                         await asyncio.sleep(0.5)
                 except discord.ClientException:
                     await asyncio.sleep(1)
-        if guild.id not in _vars.updaters["playlists"].audio:
+        if guild.id not in _vars.database["playlists"].audio:
             await channel.trigger_typing()
-            _vars.updaters["playlists"].audio[guild.id] = customAudio(channel, vc, _vars)
+            _vars.database["playlists"].audio[guild.id] = customAudio(channel, vc, _vars)
         try:
             joined = connecting.pop(guild.id)
         except KeyError:
@@ -1196,14 +1196,14 @@ class Leave:
 
     async def __call__(self, user, _vars, guild, perm, **void):
         try:
-            auds = _vars.updaters["playlists"].audio[guild.id]
+            auds = _vars.database["playlists"].audio[guild.id]
         except KeyError:
             raise LookupError("Unable to find connected channel.")
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to disconnect while other users are in voice")
         auds.dead = True
-        if guild.id in _vars.updaters["playlists"].connecting:
-            _vars.updaters["playlists"].connecting.pop(guild.id)
+        if guild.id in _vars.database["playlists"].connecting:
+            _vars.database["playlists"].connecting.pop(guild.id)
         updateQueues.sendUpdateRequest(self, force=True)
 
 
@@ -1220,9 +1220,9 @@ class Skip:
         self.flags = "fhv"
 
     async def __call__(self, client, user, perm, _vars, name, args, argv, guild, flags, message, **void):
-        if guild.id not in _vars.updaters["playlists"].audio:
+        if guild.id not in _vars.database["playlists"].audio:
             raise LookupError("Currently not playing in a voice channel.")
-        auds = _vars.updaters["playlists"].audio[guild.id]
+        auds = _vars.database["playlists"].audio[guild.id]
         if name.lower().startswith("c"):
             argv = "inf"
             args = [argv]
@@ -1375,6 +1375,7 @@ class Pause:
             auds.pausec = False
         if auds.player is not None:
             auds.player["time"] = 1 + time.time()
+        updateQueues.sendUpdateRequest(self, force=True)
         if "h" not in flags:
             past = name + "pe" * (name == "stop") + "d"
             return (
@@ -1608,9 +1609,9 @@ class AudioSettings:
                     + strIter(d, key=key) + "```"
                 )
             if op == "nightcore":
-                orig = _vars.updaters["playlists"].audio[guild.id].stats["pitch"]
+                orig = _vars.database["playlists"].audio[guild.id].stats["pitch"]
             else:
-                orig = _vars.updaters["playlists"].audio[guild.id].stats[op]
+                orig = _vars.database["playlists"].audio[guild.id].stats[op]
             num = round(100 * orig, 9)
             return (
                 "```css\nCurrent audio " + op
@@ -1634,13 +1635,13 @@ class AudioSettings:
         s = ""
         for op in ops:
             if type(op) is str and op in "loop shuffle quiet" and not argv:
-                argv = str(not _vars.updaters["playlists"].audio[guild.id].stats[op])
+                argv = str(not _vars.database["playlists"].audio[guild.id].stats[op])
             if disable:
                 val = auds.defaults[op]
                 if type(val) is not bool:
                     val *= 100
                 argv = str(val)
-            origVol = _vars.updaters["playlists"].audio[guild.id].stats
+            origVol = _vars.database["playlists"].audio[guild.id].stats
             _op = None
             for operator in ("+=", "-=", "*=", "/=", "%="):
                 if argv.startswith(operator):
@@ -1910,10 +1911,10 @@ class Player:
     async def _callback_(self, message, guild, channel, reaction, _vars, perm, vals, **void):
         if message is None:
             return
-        if not guild.id in _vars.updaters["playlists"].audio:
+        if not guild.id in _vars.database["playlists"].audio:
             await message.clear_reactions()
             return
-        auds = _vars.updaters["playlists"].audio[guild.id]
+        auds = _vars.database["playlists"].audio[guild.id]
         if reaction is None:
             auds.player = {
                 "time": inf,
@@ -2009,17 +2010,11 @@ class Player:
                 elif i == 14:
                     auds.dead = True
                     auds.player = None
-                    try:
-                        await message.delete()
-                    except discord.NotFound:
-                        pass
+                    await _vars.silentDelete(message)
                     return
                 else:
                     auds.player = None
-                    try:
-                        await message.delete()
-                    except discord.NotFound:
-                        pass
+                    await _vars.silentDelete(message)
                     return
         text = limStr(orig + self.showCurr(auds) + "```", 2000)
         last = message.channel.last_message
@@ -2037,10 +2032,7 @@ class Player:
                 content=text,
             )
             auds.player["message"] = message
-            try:
-                await temp.delete()
-            except (TypeError, discord.NotFound):
-                pass
+            await _vars.silentDelete(temp)
         if auds.queue and not auds.paused & 1:
             maxdel = auds.queue[0]["duration"] - auds.stats["position"] + 2
             delay = min(maxdel, auds.queue[0]["duration"] / self.barsize / abs(auds.stats["speed"]))
