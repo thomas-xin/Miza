@@ -1002,9 +1002,10 @@ class main_data:
             self.cw_cache = {}
         wlist = None
         if channel.id in self.cw_cache:
-            if time.time() - self.cw_cache[channel.id].time > 60:
+            if time.time() - self.cw_cache[channel.id].time > 300:
                 self.cw_cache.pop(channel.id)
             else:
+                self.cw_cache[channel.id].time = time.time()
                 wlist = [self.cw_cache[channel.id].webhook]
         if not wlist:
             wlist = await channel.webhooks()

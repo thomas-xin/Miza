@@ -418,6 +418,12 @@ class Mimic:
                 "```css\nSuccessfully removed webhook mimic " + uniStr(mimic.name)
                 + " for " + uniStr(user) + ".```"
             )
+        if sum(len(i) for i in iter(mimics.values())) >= 256:
+            raise OverflowError(
+                "Mimic list for " + uniStr(user)
+                + " has reached the maximum of 256 items. "
+                + "Please remove an item to add another."
+            )
         ctime = datetime.datetime.utcnow()
         mid = discord.utils.time_snowflake(ctime)
         m_id = "&" + str(mid)
@@ -504,9 +510,8 @@ class updateMimics:
                 database = self.data[user.id]
                 msg = message.content
                 try:
+                    sending = {}
                     channel = message.channel
-                    w = await _vars.ensureWebhook(channel)
-                    found = False
                     for line in msg.split("\n"):
                         if len(line) > 2 and " " in line:
                             i = line.index(" ")
@@ -516,15 +521,19 @@ class updateMimics:
                                 mimics = database[prefix]
                                 if mimics:
                                     for m in mimics:
-                                        mimic = self.data[m]
-                                        await w.send(line, username=mimic.name, avatar_url=mimic.url)
-                                        mimic.count += 1
-                                        mimic.total += len(line)
-                                    if not found:
-                                        await _vars.silentDelete(message)
-                                    found = True
-                        elif not found:
+                                        sending[m] = line
+                        elif not sending:
                             break
+                        else:
+                            sending[tuple(sending.keys())[-1]] += "\n" + line
+                    if sending:
+                        create_task(_vars.silentDelete(message))
+                        w = await _vars.ensureWebhook(channel)
+                        for k in sending:
+                            mimic = self.data[k]
+                            await w.send(sending[k], username=mimic.name, avatar_url=mimic.url)
+                            mimic.count += 1
+                            mimic.total += len(line)
                 except Exception as ex:
                     await channel.send(repr(ex))
 
