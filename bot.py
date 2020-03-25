@@ -362,7 +362,9 @@ class main_data:
                 g_id = 0
         return self.data["prefixes"].get(g_id, "~")
 
-    def getPerms(self, user, guild):
+    def getPerms(self, user, guild=None):
+        if guild is None:
+            return inf
         try:
             perms = self.data["perms"]
         except KeyError:
@@ -897,6 +899,8 @@ class main_data:
             self.lastCheck = 0
         if not hasattr(self, "busy"):
             self.busy = False
+        if not hasattr(self, "status_iter"):
+            self.status_iter = 0
         if force or time.time() - self.lastCheck > 0.5:
             while self.busy:
                 await asyncio.sleep(0.1)
@@ -906,7 +910,7 @@ class main_data:
                 #print("Sending update...")
                 guilds = len(client.guilds)
                 changed = guilds != self.guilds
-                if changed or time.time() - self.stat_timer > 60:
+                if changed or time.time() - self.stat_timer > 20:
                     self.stat_timer = time.time()
                     self.guilds = guilds
                     try:
@@ -923,8 +927,9 @@ class main_data:
                         activity.game = self.website
                         if changed:
                             print(repr(activity))
+                        status = (discord.Status.online, discord.Status.dnd, discord.Status.idle)[self.status_iter]
                         try:
-                            await client.change_presence(activity=activity, status=discord.Status.idle)
+                            await client.change_presence(activity=activity, status=status)
                         except discord.HTTPException:
                             print(traceback.format_exc())
                             await asyncio.sleep(3)
@@ -932,6 +937,7 @@ class main_data:
                             pass
                     except discord.NotFound:
                         pass
+                    self.status_iter = (self.status_iter + 1) % 3
             except:
                 print(traceback.format_exc())
             try:
@@ -992,11 +998,21 @@ class main_data:
         return True
 
     async def ensureWebhook(self, channel):
-        wlist = await channel.webhooks()
+        if not hasattr(self, "cw_cache"):
+            self.cw_cache = {}
+        wlist = None
+        if channel.id in self.cw_cache:
+            if time.time() - self.cw_cache[channel.id].time > 60:
+                self.cw_cache.pop(channel.id)
+            else:
+                wlist = [self.cw_cache[channel.id].webhook]
+        if not wlist:
+            wlist = await channel.webhooks()
         if not wlist:
             w = await channel.create_webhook(name=_vars.client.user.name)
         else:
             w = wlist[0]
+        self.cw_cache[channel.id] = freeClass(time=time.time(), webhook=w)
         return w
 
     class userGuild(discord.Object):
@@ -1264,16 +1280,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         if not argv:
                             args = []
                         else:
-                            a = argv.replace('"', "\0")
-                            b = a.replace("'", "")
-                            c = b.replace("<", "'")
-                            d = c.replace(">", "'")
                             try:
-                                args = shlex.split(d.replace("\n", " ").replace("\r", "").replace("\t", " "))
+                                args = shlex.split(argv.replace("\n", " ").replace("\r", "").replace("\t", " "))
                             except ValueError:
-                                args = b.replace("\n", " ").replace("\r", "").replace("\t", " ").split(" ")
-                        for a in range(len(args)):
-                            args[a] = args[a].replace("", "'").replace("\0", '"')
+                                args = argv.replace("\n", " ").replace("\r", "").replace("\t", " ").split(" ")
                         if guild is None:
                             guild = main_data.userGuild(
                                 user=user,

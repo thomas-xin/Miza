@@ -1,3 +1,4 @@
+import discord
 try:
     from smath import *
 except ModuleNotFoundError:
@@ -287,3 +288,245 @@ class Text2048:
             + str(u_id) + "_" + str(mode) + "-" + gsr + "\nStarting Game...```"
         )
         return text
+
+
+class MimicConfig:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["PluralConfig", "MC", "PC"]
+        self.min_level = 0
+        self.description = "Modifies an existing webhook mimic's attributes."
+        self.usage = "<0:mimic_id> <1:option(prefix)([name][username][nickname])([avatar][icon][url])([status][description])(gender)(birthday)> <2:new>"
+    
+    async def __call__(self, _vars, user, perm, flags, args, **void):
+        mimicdb = _vars.data["mimics"]
+        update = _vars.database["mimics"].update
+        m_id = "&" + str(_vars.verifyID(args.pop(0)))
+        if m_id not in mimicdb:
+            raise LookupError("Target mimic ID not found.")
+        if perm is not nan:
+            mimics = mimicdb.setdefault(user.id, {})
+            found = False
+            for prefix in mimics:
+                for mid in mimics[prefix]:
+                    if mid == m_id:
+                        found = True
+            if not found:
+                raise PermissionError("Target mimic does not belong to you.")
+        else:
+            mimics = mimicdb[mimicdb[m_id].u_id]
+            found = True
+        opt = args.pop(0)
+        if args:
+            new = " ".join(args)
+        else:
+            new = None
+        mimic = mimicdb[m_id]
+        if opt in ("name", "username", "nickname"):
+            setting = "name"
+        elif opt in ("avatar", "icon", "url"):
+            setting = "url"
+        elif opt in ("status", "description"):
+            setting = "description"
+        elif opt in ("gender", "birthday", "prefix"):
+            setting = opt
+        else:
+            raise TypeError("Invalid target attribute.")
+        if new is None:
+            return (
+                "```css\nCurrent " + setting + " for " 
+                + uniStr(mimic.name) + ": " + str(mimic[setting]) + ".```"
+            )
+        if setting == "birthday":
+            new = tparser.parse(new)
+        elif setting == "prefix":
+            if len(new) > 16:
+                raise OverflowError("Must be 16 or fewer in length.")
+            for prefix in mimics:
+                for mid in mimics[prefix]:
+                    if mid == m_id:
+                        mimics[prefix].remove(m_id)
+            if new in mimics:
+                mimics[new].append(m_id)
+            else:
+                mimics[new] = hlist([m_id])
+        elif setting != "description":
+            if len(new) > 256:
+                raise OverflowError("Must be 256 or fewer in length.")
+        mimic[setting] = new
+        update()
+        return (
+            "```css\nChanged " + setting + " for " 
+            + uniStr(mimic.name) + " to " + str(new) + ".```"
+        )
+
+
+class Mimic:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["RolePlay", "Plural", "RP"]
+        self.min_level = 0
+        self.description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes."
+        self.usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)>"
+        self.flags = "ed"
+    
+    async def __call__(self, _vars, message, user, flags, args, argv, **void):
+        mimicdb = _vars.data["mimics"]
+        mimics = mimicdb.setdefault(user.id, {})
+        update = _vars.database["mimics"].update
+        if not argv:
+            if "d" in flags:
+                _vars.data["mimics"].pop(user.id)
+                update()
+                return (
+                    "```css\nSuccessfully removed all webhook mimics for "
+                    + uniStr(user) + ".```"
+                )
+            if not mimics:
+                return (
+                    "```css\nNo webhook mimics currently enabled for "
+                    + uniStr(user) + ".```"
+                )
+            key = lambda x: "⟨" + ", ".join(i + ": " + str(_vars.data["mimics"][i].name) for i in iter(x)) + "⟩"
+            return (
+                "Currently enabled webhook mimics for **"
+                + str(user) + "**: ```ini\n"
+                + strIter(mimics, key=key) + "```"
+            )
+        u_id = user.id
+        prefix = args.pop(0)
+        if not prefix:
+            raise IndexError("Prefix must not be empty.")
+        if "d" in flags:
+            try:
+                mlist = mimics[prefix]
+            except KeyError:
+                raise TypeError("Please enter prefix of mimic to delete.")
+            if len(mlist):
+                m_id = mlist.popleft()
+                mimic = _vars.data["mimics"].pop(m_id)
+            else:
+                mimicdb.pop(prefix)
+                update()
+                raise KeyError("Unable to find webhook mimic.")
+            if not mlist:
+                mimics.pop(prefix)
+            update()
+            return (
+                "```css\nSuccessfully removed webhook mimic " + uniStr(mimic.name)
+                + " for " + uniStr(user) + ".```"
+            )
+        ctime = datetime.datetime.utcnow()
+        mid = discord.utils.time_snowflake(ctime)
+        m_id = "&" + str(mid)
+        mimic = None
+        if len(args):
+            if len(args) > 1:
+                url = args[-1]
+                name = " ".join(args[:-1])
+            else:
+                mim = 0
+                try:
+                    mim = _vars.verifyID(args[-1])
+                    user = await _vars.fetch_user(mim)
+                    if user is None:
+                        raise EOFError
+                    name = user.name
+                    url = str(user.avatar_url)
+                except:
+                    try:
+                        mimi = _vars.get_mimic(mim)
+                        mimic = copy.deepcopy(mimi)
+                        mimic.id = m_id
+                        mimic.u_id = u_id
+                        mimic.prefix = prefix
+                        mimic.count = mimic.total = 0
+                        mimic.created_at = ctime
+                    except:
+                        name = args[0]
+                        url = "https://cdn.discordapp.com/embed/avatars/0.png"
+        else:
+            name = user.name
+            url = str(user.avatar_url)
+        while m_id in mimics:
+            mid += 1
+            m_id = "&" + str(mid)
+        if mimic is None:
+            mimic = freeClass(
+                id=m_id,
+                u_id=u_id,
+                prefix=prefix,
+                name=name,
+                url=url,
+                description="",
+                gender="N/A",
+                birthday=ctime,
+                created_at=ctime,
+                count=0,
+                total=0,
+            )
+        mimicdb[m_id] = mimic
+        if prefix in mimics:
+            mimics[prefix].append(m_id)
+        else:
+            mimics[prefix] = hlist([m_id])
+        update()
+        return (
+            "```css\nSuccessfully added webhook mimic " + uniStr(name)
+            + " with prefix " + prefix + " and ID " + m_id + ".```"
+        )
+
+
+class updateMimics:
+    is_database = True
+    name = "mimics"
+    user = True
+
+    def __init__(self):
+        pass
+
+    async def _nocommand_(self, message, **void):
+        user = message.author
+        if user.id in self.data:
+            _vars = self._vars
+            perm = _vars.getPerms(user.id, message.guild)
+            admin = not inf > perm
+            if message.guild is not None:
+                try:
+                    enabled = _vars.data["enabled"][message.channel.id]
+                except KeyError:
+                    enabled = ()
+            else:
+                enabled = list(_vars.categories)
+            if admin or "game" in enabled:
+                database = self.data[user.id]
+                msg = message.content
+                try:
+                    channel = message.channel
+                    w = await _vars.ensureWebhook(channel)
+                    found = False
+                    for line in msg.split("\n"):
+                        if len(line) > 2 and " " in line:
+                            i = line.index(" ")
+                            prefix = line[:i]
+                            line = line[i + 1:].strip(" ")
+                            if prefix in database:
+                                mimics = database[prefix]
+                                if mimics:
+                                    for m in mimics:
+                                        mimic = self.data[m]
+                                        await w.send(line, username=mimic.name, avatar_url=mimic.url)
+                                        mimic.count += 1
+                                        mimic.total += len(line)
+                                    if not found:
+                                        await _vars.silentDelete(message)
+                                    found = True
+                        elif not found:
+                            break
+                except Exception as ex:
+                    await channel.send(repr(ex))
+
+    async def __call__(self):
+        pass
