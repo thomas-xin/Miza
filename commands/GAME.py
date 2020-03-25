@@ -335,7 +335,7 @@ class MimicConfig:
             raise TypeError("Invalid target attribute.")
         if new is None:
             return (
-                "```css\nCurrent " + setting + " for " 
+                "```fix\nCurrent " + setting + " for " 
                 + uniStr(mimic.name) + ": " + str(mimic[setting]) + ".```"
             )
         if setting == "birthday":
@@ -354,11 +354,12 @@ class MimicConfig:
         elif setting != "description":
             if len(new) > 256:
                 raise OverflowError("Must be 256 or fewer in length.")
+        name = mimic.name
         mimic[setting] = new
         update()
         return (
-            "```css\nChanged " + setting + " for " 
-            + uniStr(mimic.name) + " to " + str(new) + ".```"
+            "```fix\nChanged " + setting + " for " 
+            + name + " to " + str(new) + ".```"
         )
 
 
@@ -422,7 +423,7 @@ class Mimic:
                 mimicdb.pop(mimic.id)
             update()
             return (
-                "```css\nSuccessfully removed webhook mimic " + uniStr(mimic.name)
+                "```css\nSuccessfully removed webhook mimic " + mimic.name
                 + " for " + uniStr(user) + ".```"
             )
         if sum(len(i) for i in iter(mimics.values())) >= 256:
@@ -487,8 +488,8 @@ class Mimic:
             mimics[prefix] = hlist([m_id])
         update()
         return (
-            "```css\nSuccessfully added webhook mimic " + uniStr(name)
-            + " with prefix " + prefix + " and ID " + m_id + ".```"
+            "```fix\nSuccessfully added webhook mimic " + mimic.name
+            + " with prefix " + mimic.prefix + " and ID " + mimic.id + ".```"
         )
 
 
