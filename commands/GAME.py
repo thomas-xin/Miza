@@ -294,7 +294,7 @@ class MimicConfig:
     is_command = True
 
     def __init__(self):
-        self.name = ["PluralConfig", "MC", "PC"]
+        self.name = ["PluralConfig", "RPConfig"]
         self.min_level = 0
         self.description = "Modifies an existing webhook mimic's attributes."
         self.usage = "<0:mimic_id> <1:option(prefix)([name][username][nickname])([avatar][icon][url])([status][description])(gender)(birthday)> <2:new>"
@@ -366,7 +366,7 @@ class Mimic:
     is_command = True
 
     def __init__(self):
-        self.name = ["RolePlay", "Plural", "RP"]
+        self.name = ["RolePlay", "Plural", "RP", "RPCreate"]
         self.min_level = 0
         self.description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes."
         self.usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)>"
@@ -402,17 +402,24 @@ class Mimic:
         if "d" in flags:
             try:
                 mlist = mimics[prefix]
+                if len(mlist):
+                    m_id = mlist.popleft()
+                    mimic = _vars.data["mimics"].pop(m_id)
+                else:
+                    mimicdb.pop(prefix)
+                    update()
+                    raise KeyError("Unable to find webhook mimic.")
+                if not mlist:
+                    mimics.pop(prefix)
             except KeyError:
-                raise TypeError("Please enter prefix of mimic to delete.")
-            if len(mlist):
-                m_id = mlist.popleft()
-                mimic = _vars.data["mimics"].pop(m_id)
-            else:
-                mimicdb.pop(prefix)
-                update()
-                raise KeyError("Unable to find webhook mimic.")
-            if not mlist:
-                mimics.pop(prefix)
+                mimic = _vars.get_mimic(prefix)
+                mimics = mimicdb[mimic.u_id]
+                m_id = mimic.id
+                for prefix in mimics:
+                    for mid in mimics[prefix]:
+                        if mid == m_id:
+                            mimics[prefix].remove(m_id)
+                mimicdb.pop(mimic.id)
             update()
             return (
                 "```css\nSuccessfully removed webhook mimic " + uniStr(mimic.name)

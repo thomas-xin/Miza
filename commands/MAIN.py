@@ -647,10 +647,9 @@ class Info:
         emb = discord.Embed(colour=_vars.randColour())
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
+        d = "<@" + str(p.u_id) + ">```fix\n" + p.id + "```"
         if p.description:
-            d = "```fix\n" + p.id + "``````\n" + str(p.description) + "```"
-        else:
-            d = ""
+            d += "```\n" + str(p.description) + "```"
         emb.description = d
         pcnt = 0
         try:
