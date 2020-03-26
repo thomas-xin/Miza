@@ -122,12 +122,12 @@ class Ban:
                     + " from " + uniStr(guild.name)
                 )
                 self.permError(perm, t_perm + 1, reason)
+        g_bans = await getBans(_vars, guild)
         if name.lower() == "unban":
             tm = -1
             args = ["", ""]
         elif len(args) < 2:
             if t_user is None:
-                g_bans = await getBans(_vars, guild)
                 if not g_bans:
                     return (
                         "```css\nNo currently banned users for "
@@ -152,13 +152,22 @@ class Ban:
                 )
             tm = 0
         else:
-            tm = await _vars.evalTime(args[1], guild)
+            orig = g_bans.get(t_user.id, 0)
+            expr = " ".join(args[1:-1])
+            _op = None
+            for operator in ("+=", "-=", "*=", "/=", "%="):
+                if expr.startswith(operator):
+                    expr = expr[2:].strip(" ")
+                    _op = operator[0]
+            num = await _vars.evalTime(expr, guild)
+            if _op is not None:
+                num = eval(str(orig) + _op + str(num), {}, {})
+            tm = num
         await channel.trigger_typing()
         if len(args) >= 3:
-            msg = args[2]
+            msg = args[-1]
         else:
             msg = None
-        g_bans = await getBans(_vars, guild)
         if t_user is None:
             if not "f" in flags:
                 response = uniStr(

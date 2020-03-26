@@ -864,7 +864,7 @@ class Queue:
         self.usage = "<link[]> <verbose(?v)> <hide(?h)> <force(?f)>"
         self.flags = "hvf"
 
-    async def __call__(self, _vars, client, user, message, channel, guild, flags, name, argv, **void):
+    async def __call__(self, _vars, client, user, perm, message, channel, guild, flags, name, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if auds.stats["quiet"] & 2:
             flags.setdefault("h", 1)
@@ -935,7 +935,7 @@ class Queue:
                     if i <= 1 or not auds.stats["shuffle"]:
                         curr += estimate
                     else:
-                        curr += "(" + estimate + ")"
+                        curr += "(" + discord.utils.escape_markdown(estimate, as_needed=True) + ")"
                 else:
                     curr += "Remaining time: " + uniStr(sec2Time((estim + e["duration"]) / auds.speed))
                 curr += "```\n"
@@ -967,6 +967,9 @@ class Queue:
                 "embed": embed,
             }, 1)
         else:
+            if "f" in flags:
+                if not isAlone(auds, user) and perm < 1:
+                    self.permError(perm, 1, "to force play while other users are in voice")
             auds.preparing = True
             output = [None]
             doParallel(ytdl.search, [argv], output)
@@ -1014,7 +1017,7 @@ class Queue:
             if auds.stats["shuffle"]:
                 added = shuffle(added)
             auds.queue.extend(added)
-            total_duration = float(dur / 128 + frand(0.5) + 2)
+            tdur = float(dur / 128 + frand(0.5) + 2)
             if "f" in flags:
                 for i in range(3):
                     try:
@@ -1023,8 +1026,9 @@ class Queue:
                         pass
                 auds.queue.rotate(len(added))
                 auds.seek(inf)
+                total_duration = tdur
             else:
-                total_duration = max(total_duration / auds.speed, total_duration)
+                total_duration = max(total_duration / auds.speed, tdur)
             if not names:
                 raise LookupError("No results for " + str(argv) + ".")
             if "v" in flags:
@@ -1663,7 +1667,7 @@ class AudioSettings:
             else:
                 orig = round(origVol[op] * 100, 9)
             if _op is not None:
-                num = eval(str(orig) + _op + str(num))
+                num = eval(str(orig) + _op + str(num), {}, {})
             val = roundMin(float(num / 100))
             new = round(val * 100, 9)
             if op in "loop shuffle quiet":

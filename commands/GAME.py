@@ -76,11 +76,12 @@ class Text2048:
         width = len(tiles)
         i = direction & 3
         if i & 2:
-            r = reversed(range(width))
+            r = range(width - 1, -1, -1)
             d = -1
         else:
             r = range(width)
             d = 1
+        print(direction, i, list(r), d)
         a = 1
         for _ in loop(width - 1):
             changed = False
@@ -307,11 +308,9 @@ class MimicConfig:
             raise LookupError("Target mimic ID not found.")
         if perm is not nan:
             mimics = mimicdb.setdefault(user.id, {})
-            found = False
+            found = 0
             for prefix in mimics:
-                for mid in mimics[prefix]:
-                    if mid == m_id:
-                        found = True
+                found += mimics.count(m_id)
             if not found:
                 raise PermissionError("Target mimic does not belong to you.")
         else:

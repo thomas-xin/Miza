@@ -155,7 +155,6 @@ class Perms:
             print(t_user)
             t_perm = _vars.getPerms(t_user.id, guild)
         else:
-            c_perm = await _vars.evalMath(" ".join(args[1:]), guild.id)
             check = args[0].lower()
             if "everyone" in check or "here" in check:
                 t_user = None
@@ -172,6 +171,17 @@ class Perms:
                         t_user = await _vars.fetch_whuser(u_id, guild)
                 t_perm = _vars.getPerms(t_user.id, guild)
                 name = t_user.name
+            orig = t_perm
+            expr = " ".join(args[1:])
+            _op = None
+            for operator in ("+=", "-=", "*=", "/=", "%="):
+                if expr.startswith(operator):
+                    expr = expr[2:].strip(" ")
+                    _op = operator[0]
+            num = await _vars.evalMath(expr, guild)
+            if _op is not None:
+                num = eval(str(orig) + _op + str(num), {}, {})
+            c_perm = num
             if t_perm is nan or c_perm is nan:
                 m_perm = nan
             else:
@@ -441,14 +451,16 @@ class Loop:
                 + " iterations"
             )
             self.permError(perm, ceil(iters / scale), reason)
+        elif perm is not nan and iters > 256:
+            raise PermissionError("Must be owner to execute loop of >256 iterations.")
         func = func2 = " ".join(args[1:])
         if func:
             while func[0] == " ":
                 func = func[1:]
-        if isValid(perm):
+        if perm is not nan:
             for n in self.name:
                 if (_vars.getPrefix(guild) + n).upper() in func.replace(" ", "").upper():
-                    raise PermissionError("Must be server owner to execute nested loop.")
+                    raise PermissionError("Must be owner to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
         create_task(_vars.sendReact(
             channel,

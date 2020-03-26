@@ -660,7 +660,7 @@ class main_data:
         returns = hlist()
         for i in range(len(item)):
             try:
-                if type(item[i]) in (str, bytes, dict):
+                if type(item[i]) in (str, bytes, dict) or isinstance(item[i], freeClass):
                     raise TypeError
                 item[i] = tuple(item[i])
             except TypeError:
@@ -910,8 +910,8 @@ class main_data:
                 #print("Sending update...")
                 guilds = len(client.guilds)
                 changed = guilds != self.guilds
-                if changed or time.time() - self.stat_timer > 20:
-                    self.stat_timer = time.time()
+                if changed or time.time() > self.stat_timer:
+                    self.stat_timer = time.time() + float(frand(5)) + 12
                     self.guilds = guilds
                     try:
                         u = await self.fetch_user(self.owner_id)
@@ -1519,8 +1519,12 @@ async def handleMessage(message, edit=True):
             cpy = msg[1:]
         else:
             cpy = reconstitute(msg)
+        if message.author.id == client.user.id:
+            timeout = _vars.timeout << 4
+        else:
+            timeout = _vars.timeout
         await asyncio.wait_for(
-            processMessage(message, cpy, edit, msg), timeout=_vars.timeout
+            processMessage(message, cpy, edit, msg), timeout=timeout
         )
     except Exception as ex:
         errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)
