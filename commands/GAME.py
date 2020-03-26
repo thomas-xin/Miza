@@ -373,7 +373,7 @@ class Mimic:
         self.usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)>"
         self.flags = "ed"
     
-    async def __call__(self, _vars, message, user, flags, args, argv, **void):
+    async def __call__(self, _vars, message, user, perm, flags, args, argv, **void):
         mimicdb = _vars.data["mimics"]
         mimics = mimicdb.setdefault(user.id, {})
         update = _vars.database["mimics"].update
@@ -414,6 +414,8 @@ class Mimic:
                     mimics.pop(prefix)
             except KeyError:
                 mimic = _vars.get_mimic(prefix)
+                if perm is not nan and mimic.u_id != user.id:
+                    raise PermissionError("Target mimic does not belong to you.")
                 mimics = mimicdb[mimic.u_id]
                 m_id = mimic.id
                 for prefix in mimics:
@@ -518,9 +520,10 @@ class updateMimics:
                 database = self.data[user.id]
                 msg = message.content
                 try:
-                    sending = {}
+                    sending = hlist()
                     channel = message.channel
                     for line in msg.split("\n"):
+                        found = False
                         if len(line) > 2 and " " in line:
                             i = line.index(" ")
                             prefix = line[:i]
@@ -529,19 +532,20 @@ class updateMimics:
                                 mimics = database[prefix]
                                 if mimics:
                                     for m in mimics:
-                                        sending[m] = line
-                        elif not sending:
+                                        sending.append(freeClass(m_id=m, msg=line))
+                                    found = True
+                        if not sending:
                             break
-                        else:
-                            sending[tuple(sending.keys())[-1]] += "\n" + line
+                        if not found:
+                            sending[-1].msg += "\n" + line
                     if sending:
                         create_task(_vars.silentDelete(message))
                         w = await _vars.ensureWebhook(channel)
                         for k in sending:
-                            mimic = self.data[k]
-                            await w.send(sending[k], username=mimic.name, avatar_url=mimic.url)
+                            mimic = self.data[k.m_id]
+                            await w.send(k.msg, username=mimic.name, avatar_url=mimic.url)
                             mimic.count += 1
-                            mimic.total += len(line)
+                            mimic.total += len(k.msg)
                 except Exception as ex:
                     await channel.send(repr(ex))
 
