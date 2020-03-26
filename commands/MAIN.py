@@ -495,7 +495,7 @@ class Avatar:
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
-        emb.description = "[" + name + "](" + url + ")"
+        emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
         print(emb.to_dict())
         return {
             "embed": emb,
@@ -509,7 +509,7 @@ class Avatar:
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
-        emb.description = "[" + name + "](" + url + ")"
+        emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
         print(emb.to_dict())
         return {
             "embed": emb,
@@ -569,7 +569,7 @@ class Avatar:
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
-        emb.description = "[" + name + "](" + url + ")"
+        emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
         print(emb.to_dict())
         return {
             "embed": emb,
@@ -1007,7 +1007,7 @@ class updateMessageCount:
     no_file = True
 
     def getMessageLength(self, message):
-        return len(message.system_content) + sum(len(e) for e in message.embeds)
+        return len(message.system_content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
 
     def startCalculate(self, guild):
         self.data[guild.id] = {"counts": {}, "totals": {}}

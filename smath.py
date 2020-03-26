@@ -3,7 +3,7 @@ Adds many useful math-related functions.
 """
 
 import os, sys, asyncio, threading, subprocess, psutil, traceback, time, datetime
-import ctypes, collections, ast, copy, pickle
+import ctypes, collections, ast, copy, pickle, io
 import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys, re
 
 import urllib.request, urllib.parse

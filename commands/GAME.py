@@ -50,7 +50,7 @@ class Text2048:
         self.flags = "vspice"
 
     def shiftTile(self, tiles, p1, p2):
-        print(p1, p2)
+        # print(p1, p2)
         x1, y1 = p1
         x2, y2 = p2
         if tiles[x2][y2] <= 0:
@@ -69,11 +69,8 @@ class Text2048:
         tiles[x1][y1] = 0
         return True
 
-    def moveTiles(self, gamestate, direction, copy=False):
-        if copy:
-            tiles = copy.deepcopy(gamestate[0])
-        else:
-            tiles = gamestate[0]
+    def moveTiles(self, gamestate, direction):
+        tiles = gamestate[0]
         width = len(tiles)
         i = direction & 3
         if i & 2:
@@ -82,7 +79,7 @@ class Text2048:
         else:
             r = range(width)
             d = 1
-        print(direction, i, list(r), d)
+        # print(direction, i, list(r), d)
         a = 1
         for _ in loop(width - 1):
             changed = False
@@ -107,7 +104,7 @@ class Text2048:
 
     def randomSpam(self, gamestate, mode, pool, returns):
         gamestate[1] = gamestate[0]
-        a = 1
+        a = i = 1
         moved = {}
         shuffle(pool)
         while pool:
@@ -123,6 +120,9 @@ class Text2048:
                 else:
                     moved = {}
             pool = pool[1:]
+            if not i % 20:
+                time.sleep(0.01)
+            i += 1
         returns[0] = (gamestate, a)
                                         
     async def nextIter(self, message, gamestate, username, direction, mode):
@@ -180,7 +180,7 @@ class Text2048:
                 ("+" + "-" * size) * width + "+" + "\nPlayer: "
                 + username + "\nScore: " + str(score) + "```"
             )
-            #print(text)
+            # print(text)
             await message.edit(content=text)
         elif not mode & 1:
             count = 0
@@ -189,10 +189,15 @@ class Text2048:
                     if gamestate[0][x][y] > 0:
                         count += 1
             if count >= width ** 2:
+                gamecopy = list(gamestate)
+                gamecopy[0] = [list(l) for l in gamestate[0]]
                 a = 1
                 for i in range(4):
-                    _, b = self.moveTiles(gamestate, i, copy=True)
-                    a &= b
+                    try:
+                        gamecopy, b = self.moveTiles(gamecopy, i)
+                        a &= b
+                    except TypeError:
+                        pass
                 if a:
                     await message.clear_reactions()
                     gameover = ["🇬","🇦","🇲","🇪","⬛","🇴","🇻","3️⃣","🇷"]
@@ -224,7 +229,7 @@ class Text2048:
                 i += 1
 
     async def _callback_(self, _vars, message, reaction, argv, user, perm, vals, **void):
-        print(user, message, reaction, argv)
+        # print(user, message, reaction, argv)
         u_id, mode = [int(x) for x in vals.split("_")]
         if reaction is not None and u_id != user.id and u_id != 0 and perm < 3:
             return
@@ -234,13 +239,13 @@ class Text2048:
             if not reac in self.directions:
                 return
             r = self.directions[reac]
-            if not (r[0] & mode or r[0] == 0):
+            if not (r[0] & mode or not r[0]):
                 return
             reaction = r[1]
         else:
             for react in self.directions:
                 rval = self.directions[react][0]
-                if rval & mode or rval == 0:
+                if rval & mode or not rval:
                     await message.add_reaction(react.decode("utf-8"))
             self.spawn(gamestate[0], mode, 1)
         if u_id == 0:
@@ -438,7 +443,7 @@ class Mimic:
         mimic = None
         if len(args):
             if len(args) > 1:
-                url = args[-1]
+                url = verifyURL(args[-1])
                 name = " ".join(args[:-1])
             else:
                 mim = 0

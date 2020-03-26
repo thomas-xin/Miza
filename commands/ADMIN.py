@@ -484,6 +484,48 @@ class React:
         )
 
 
+class UserLog:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = []
+        self.min_level = 3
+        self.description = "Causes Miza to log user events from the server, in the current channel."
+        self.usage = "<enable(?e)> <disable(?d)>"
+        self.flags = "ed"
+
+    async def __call__(self, _vars, flags, channel, guild, **void):
+        data = _vars.data["logU"]
+        update = _vars.database["logU"].update
+        if "e" in flags:
+            data[guild.id] = channel.id
+            update()
+            return (
+                "```css\nEnabled user logging in " + uniStr(channel.name)
+                + " for " + uniStr(guild.name) + ".```"
+            )
+        elif "d" in flags:
+            if guild.id in data:
+                data.pop(guild.id)
+                update()
+            return (
+                "```css\nDisabled user logging for " + uniStr(guild.name) + ".```"
+            )
+        if guild.id in data:
+            c_id = data[guild.id]
+            channel = await _vars.fetch_channel(c_id)
+            return (
+                "```css\nUser logging for " + uniStr(guild.name)
+                + " is currently enabled in " + uniStr(channel.name)
+                + ".```"
+            )
+        return (
+            "```css\nUser logging is currently disabled in "
+            + uniStr(guild.name) + ".```"
+        )
+
+
 class MessageLog:
     is_command = True
     server_only = True
@@ -491,7 +533,7 @@ class MessageLog:
     def __init__(self):
         self.name = []
         self.min_level = 3
-        self.description = "Causes Miza to log message events in the current channel."
+        self.description = "Causes Miza to log message events from the server, in the current channel."
         self.usage = "<enable(?e)> <disable(?d)>"
         self.flags = "ed"
 
@@ -526,25 +568,25 @@ class MessageLog:
         )
 
 
-class UserLog:
+class FileLog:
     is_command = True
     server_only = True
 
     def __init__(self):
         self.name = []
         self.min_level = 3
-        self.description = "Causes Miza to log user events in the current channel."
+        self.description = "Causes Miza to log deleted files from the server, in the current channel."
         self.usage = "<enable(?e)> <disable(?d)>"
         self.flags = "ed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
-        data = _vars.data["logU"]
-        update = _vars.database["logU"].update
+        data = _vars.data["logF"]
+        update = _vars.database["logF"].update
         if "e" in flags:
             data[guild.id] = channel.id
             update()
             return (
-                "```css\nEnabled user logging in " + uniStr(channel.name)
+                "```css\nEnabled file logging in " + uniStr(channel.name)
                 + " for " + uniStr(guild.name) + ".```"
             )
         elif "d" in flags:
@@ -552,18 +594,18 @@ class UserLog:
                 data.pop(guild.id)
                 update()
             return (
-                "```css\nDisabled user logging for " + uniStr(guild.name) + ".```"
+                "```css\nDisabled file logging for " + uniStr(guild.name) + ".```"
             )
         if guild.id in data:
             c_id = data[guild.id]
             channel = await _vars.fetch_channel(c_id)
             return (
-                "```css\nUser logging for " + uniStr(guild.name)
+                "```css\nFile logging for " + uniStr(guild.name)
                 + " is currently enabled in " + uniStr(channel.name)
                 + ".```"
             )
         return (
-            "```css\nUser logging is currently disabled in "
+            "```css\nFile logging is currently disabled in "
             + uniStr(guild.name) + ".```"
         )
 
@@ -808,6 +850,76 @@ class updateMessageLogs:
             )
             emb.description += self._vars.strMessage(message, limit=2048 - len(emb.description))
             await channel.send(embed=emb)
+
+
+class updateFileLogs:
+    is_database = True
+    name = "logF"
+
+    def __init__(self):
+        pass
+
+    async def __call__(self):
+        pass
+
+    async def _user_update_(self, before, after, **void):
+        for guild in self._vars.client.guilds:
+            create_task(self._member_update_2(before, after, guild))
+
+    async def _member_update_2(self, before, after, guild=None):
+        if guild is None:
+            guild = after.guild
+        elif guild.get_member(after.id) is None:
+            try:
+                memb = await guild.fetch_member(after.id)
+                if memb is None:
+                    raise EOFError
+            except:
+                return
+        if guild.id in self.data:
+            c_id = self.data[guild.id]
+            try:
+                channel = await self._vars.fetch_channel(c_id)
+            except (EOFError, discord.NotFound):
+                self.data.pop(guild.id)
+                self.update()
+                return
+            b_url = self._vars.strURL(before.avatar_url)
+            a_url = self._vars.strURL(after.avatar_url)
+            if b_url != a_url:
+                obj = before.avatar_url_as(format="gif", static_format="png", size=4096)
+                msg = None
+                try:
+                    b = await obj.read()
+                    fil = discord.File(io.BytesIO(b), filename=str(obj).split("/")[-1])
+                except:
+                    msg = str(obj)
+                emb = discord.Embed(colour=self._vars.randColour())
+                emb.description = "File deleted from <@" + str(before.id) + ">"
+                await channel.send(msg, embed=emb, file=fil)
+
+    async def _delete_(self, message, bulk=False, **void):
+        guild = message.guild
+        if guild.id in self.data:
+            c_id = self.data[guild.id]
+            if message.attachments:
+                try:
+                    channel = await self._vars.fetch_channel(c_id)
+                except (EOFError, discord.NotFound):
+                    self.data.pop(guild.id)
+                    self.update()
+                    return
+                fils = []
+                for a in message.attachments:
+                    try:
+                        b = await a.read(use_cached=True)
+                    except (discord.HTTPException, discord.NotFound):
+                        b = await a.read(use_cached=False)
+                    fil = discord.File(io.BytesIO(b), filename=str(a).split("/")[-1])
+                    fils.append(fil)
+                emb = discord.Embed(colour=self._vars.randColour())
+                emb.description = "File" + "s" * (len(fils) != 1) + " deleted from <@" + str(message.author.id) + ">"
+                await channel.send(embed=emb, files=fils)
 
 
 class updateFollows:

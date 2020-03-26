@@ -744,7 +744,7 @@ class videoDownloader:
         #         raise ex
 
     def search(self, item, force=False):
-        item = item.strip("< >\r\n\t")
+        item = verifyURL(item)
         while self.requests > 4:
             time.sleep(0.1)
         if item in self.searched:
@@ -1518,7 +1518,7 @@ class Dump:
             auds.stats.update(d["stats"])
             if not "h" in flags:
                 return (
-                    "```css\nSuccessfully reinstated audio queue for " 
+                    "```css\nSuccessfully loaded audio queue data for " 
                     + uniStr(guild.name) + ".```", 1
                 )
         if len(auds.queue) > 8192:
@@ -1528,7 +1528,7 @@ class Dump:
         auds.stats.update(d["stats"])
         if "h" not in flags:
             return (
-                "```css\nSuccessfully appended dump to queue for " 
+                "```css\nSuccessfully appended loaded data to queue for " 
                 + uniStr(guild.name) + ".```", 1
             )
             
