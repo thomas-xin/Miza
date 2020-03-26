@@ -65,8 +65,9 @@ class Text2048:
         elif tiles[x2][y2] == tiles[x1][y1]:
             tiles[x2][y2] += 1
         else:
-            return
+            return False
         tiles[x1][y1] = 0
+        return True
 
     def moveTiles(self, gamestate, direction, copy=False):
         if copy:
@@ -91,16 +92,14 @@ class Text2048:
                     if z in r:
                         for y in r:
                             if tiles[x][y] > 0:
-                                self.shiftTile(tiles, (x, y), (z, y))
-                                changed = True
+                                changed |= self.shiftTile(tiles, (x, y), (z, y))
             else:
                 for y in r:
                     z = y - d
                     if z in r:
                         for x in r:
                             if tiles[x][y] > 0:
-                                self.shiftTile(tiles, (x, y), (x, z))
-                                changed = True
+                                changed |= self.shiftTile(tiles, (x, y), (x, z))
             if not changed:
                 break
             a = 0
