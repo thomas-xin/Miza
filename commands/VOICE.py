@@ -861,8 +861,8 @@ class Queue:
         self.name = ["Q", "Play", "P"]
         self.min_level = 0
         self.description = "Shows the music queue, or plays a song in voice."
-        self.usage = "<link[]> <verbose(?v)> <hide(?h)>"
-        self.flags = "hv"
+        self.usage = "<link[]> <verbose(?v)> <hide(?h)> <force(?f)>"
+        self.flags = "hvf"
 
     async def __call__(self, _vars, client, user, message, channel, guild, flags, name, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1011,10 +1011,20 @@ class Queue:
                 total_duration += elapsed - q[0]["duration"]
             else:
                 total_duration -= elapsed
-            total_duration = max(total_duration / auds.speed, float(dur / 128 + frand(0.5) + 2))
             if auds.stats["shuffle"]:
                 added = shuffle(added)
             auds.queue.extend(added)
+            total_duration = float(dur / 128 + frand(0.5) + 2)
+            if "f" in flags:
+                for i in range(3):
+                    try:
+                        auds.queue[i].pop("download")
+                    except (KeyError, IndexError):
+                        pass
+                auds.queue.rotate(len(added))
+                auds.seek(inf)
+            else:
+                total_duration = max(total_duration / auds.speed, total_duration)
             if not names:
                 raise LookupError("No results for " + str(argv) + ".")
             if "v" in flags:
@@ -1419,7 +1429,7 @@ def getDump(auds):
                 "Too many items in queue (" + uniStr(len(auds.queue))
                 + " > " + uniStr(lim) + ")."
             )
-        q = [dict(e) for e in auds.queue if random.random() < 0.99 or not time.sleep(0.001)]
+        q = [dict(e) for e in auds.queue if random.random() < 0.99 or not time.sleep(0.01)]
         s = copy.deepcopy(auds.stats)
         for e in q:
             if "download" in e:
@@ -1428,7 +1438,7 @@ def getDump(auds):
             e.pop("u_id")
             e.pop("skips")
             if random.random() > 0.99:
-                time.sleep(0.001)
+                time.sleep(0.01)
         d = {
             "stats": s,
             "queue": q,

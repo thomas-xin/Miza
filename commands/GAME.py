@@ -344,9 +344,7 @@ class MimicConfig:
             if len(new) > 16:
                 raise OverflowError("Must be 16 or fewer in length.")
             for prefix in mimics:
-                for mid in mimics[prefix]:
-                    if mid == m_id:
-                        mimics[prefix].remove(m_id)
+                mimics[prefix].remove(m_id)
             if new in mimics:
                 mimics[new].append(m_id)
             else:
@@ -385,6 +383,10 @@ class Mimic:
                     "```css\nSuccessfully removed all webhook mimics for "
                     + uniStr(user) + ".```"
                 )
+            for k in tuple(mimics):
+                if not mimics[k]:
+                    mimics.pop(k)
+                    update()
             if not mimics:
                 return (
                     "```css\nNo webhook mimics currently enabled for "
@@ -407,7 +409,7 @@ class Mimic:
                     m_id = mlist.popleft()
                     mimic = _vars.data["mimics"].pop(m_id)
                 else:
-                    mimicdb.pop(prefix)
+                    mimics.pop(prefix)
                     update()
                     raise KeyError("Unable to find webhook mimic.")
                 if not mlist:
@@ -419,9 +421,7 @@ class Mimic:
                 mimics = mimicdb[mimic.u_id]
                 m_id = mimic.id
                 for prefix in mimics:
-                    for mid in mimics[prefix]:
-                        if mid == m_id:
-                            mimics[prefix].remove(m_id)
+                    mimics[prefix].remove(m_id)
                 mimicdb.pop(mimic.id)
             update()
             return (
@@ -550,4 +550,25 @@ class updateMimics:
                     await channel.send(repr(ex))
 
     async def __call__(self):
-        pass
+        if self.busy:
+            return
+        self.busy = True
+        try:
+            i = 1
+            for m_id in tuple(self.data):
+                if type(m_id) is str:
+                    mimic = self.data[m_id]
+                    try:
+                        if mimic.u_id not in self.data or mimic.id not in self.data[mimic.u_id][mimic.prefix]:
+                            self.data.pop(m_id)
+                            self.update()
+                    except:
+                        self.data.pop(m_id)
+                        self.update()
+                if not i % 8191:
+                    await asyncio.sleep(0.45)
+                i += 1
+        except:
+            print(traceback.format_exc())
+        await asyncio.sleep(2)
+        self.busy = False
