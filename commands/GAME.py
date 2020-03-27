@@ -320,7 +320,7 @@ class MimicConfig:
         else:
             mimics = mimicdb[mimicdb[m_id].u_id]
             found = True
-        opt = args.pop(0)
+        opt = args.pop(0).lower()
         if args:
             new = " ".join(args)
         else:
@@ -355,6 +355,8 @@ class MimicConfig:
         elif setting != "description":
             if len(new) > 256:
                 raise OverflowError("Must be 256 or fewer in length.")
+        elif setting == "url":
+            new = verifyURL(new)
         name = mimic.name
         mimic[setting] = new
         update()

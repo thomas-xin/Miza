@@ -261,7 +261,8 @@ class customAudio(discord.AudioSource):
                     raise EOFError
             except:
                 try:
-                    updateQueues.sendUpdateRequest(self, force=True)
+                    if self.queue or _vars.data["playlists"].get(self.vc.guild.id, None):
+                        updateQueues.sendUpdateRequest(self, force=True)
                 except:
                     print(traceback.format_exc())
                 raise EOFError
