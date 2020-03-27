@@ -719,7 +719,10 @@ class main_data:
     async def solveMath(self, f, guild, prec, r):
         f = f.strip(" ")
         try:
-            g_id = guild.id
+            if hasattr(guild, "ghost"):
+                g_id = self.deleted_user
+            else:
+                g_id = guild.id
         except AttributeError:
             g_id = int(guild)
         args = [
@@ -829,14 +832,15 @@ class main_data:
         except:
             print(traceback.format_exc())
 
-    async def sendFile(self, channel, filemsg, file, filename):
+    async def sendFile(self, channel, filemsg, file, filename=None):
         message = await channel.send(filemsg, file=file)
-        try:
-            os.remove(filename)
-        except FileNotFoundError:
-            pass
-        except:
-            print(traceback.format_exc())
+        if filename is not None:
+            try:
+                os.remove(filename)
+            except FileNotFoundError:
+                pass
+            except:
+                print(traceback.format_exc())
         if message.attachments:
             await message.edit(content=message.content + "\n" + "\n".join(tuple(a.url for a in message.attachments)))
 
@@ -1343,14 +1347,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                     else:
                                         filemsg = "Response data:"
                                     if len(response) <= guild.filesize_limit:
-                                        fn = "cache/" + str(channel.id) + ".txt"
-                                        f = open(fn, "wb")
-                                        f.write(response)
-                                        f.close()
-                                        f = discord.File(fn)
-                                        print("Created file " + fn)
+                                        b = io.BytesIO(response)
+                                        f = discord.File(b, filename="message.txt")
                                         create_task(
-                                            _vars.sendFile(channel, filemsg, f, fn),
+                                            _vars.sendFile(channel, filemsg, f),
                                         )
                                     else:
                                         raise OverflowError("Response too long for file upload.")

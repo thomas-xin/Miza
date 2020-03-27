@@ -438,7 +438,7 @@ class CS_hex2xml:
             + '\t\t<panel title="Description">\n'
             + '\t\t</panel>\n'
             + '\t\t<field type="info">\n'
-            + '\t\t\tHex patch converted by Miza.\n'
+            + '\t\t\tHex patch converted by ' + client.user.name + '.\n'
             + '\t\t</field>\n'
             + '\t\t<panel title="Data">\n'
             + '\t\t</panel>\n'
@@ -461,12 +461,9 @@ class CS_hex2xml:
             + '</hack>'
         )
         data = bytes(output, "utf-8")
-        fn = "cache/" + str(channel.id) + ".xml"
-        f = open(fn, "wb")
-        f.write(data)
-        f.close()
-        f = discord.File(fn)
-        create_task(self._vars.sendFile(channel, "Hack successfully converted!", f, fn))
+        b = io.BytesIO(data)
+        f = discord.File(b, filename="patch.xml")
+        create_task(self._vars.sendFile(channel, "Patch successfully converted!", f))
 
 
 class CS_npc:
