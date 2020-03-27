@@ -887,13 +887,21 @@ class updateFileLogs:
             b_url = self._vars.strURL(before.avatar_url)
             a_url = self._vars.strURL(after.avatar_url)
             if b_url != a_url:
-                obj = before.avatar_url_as(format="gif", static_format="png", size=4096)
+                try:
+                    obj = before.avatar_url_as(format="gif", static_format="png", size=4096)
+                except discord.InvalidArgument:
+                    obj = before.avatar_url_as(format="png", size=4096)
+                if ".gif" in str(obj):
+                    fmt = ".gif"
+                else:
+                    fmt = ".png"
                 msg = None
                 try:
                     b = await obj.read()
-                    fil = discord.File(io.BytesIO(b), filename=str(obj).split("/")[-1])
+                    fil = discord.File(io.BytesIO(b), filename=str(before.id) + fmt)
                 except:
                     msg = str(obj)
+                    fil=None
                 emb = discord.Embed(colour=self._vars.randColour())
                 emb.description = "File deleted from <@" + str(before.id) + ">"
                 await channel.send(msg, embed=emb, file=fil)
@@ -909,17 +917,23 @@ class updateFileLogs:
                     self.data.pop(guild.id)
                     self.update()
                     return
+                msg = ""
                 fils = []
                 for a in message.attachments:
                     try:
-                        b = await a.read(use_cached=True)
-                    except (discord.HTTPException, discord.NotFound):
-                        b = await a.read(use_cached=False)
-                    fil = discord.File(io.BytesIO(b), filename=str(a).split("/")[-1])
-                    fils.append(fil)
+                        try:
+                            b = await a.read(use_cached=True)
+                        except (discord.HTTPException, discord.NotFound):
+                            b = await a.read(use_cached=False)
+                        fil = discord.File(io.BytesIO(b), filename=str(a).split("/")[-1])
+                        fils.append(fil)
+                    except:
+                        msg += str(a) + "\n"
                 emb = discord.Embed(colour=self._vars.randColour())
                 emb.description = "File" + "s" * (len(fils) != 1) + " deleted from <@" + str(message.author.id) + ">"
-                await channel.send(embed=emb, files=fils)
+                if not msg:
+                    msg = None
+                await channel.send(msg, embed=emb, files=fils)
 
 
 class updateFollows:
