@@ -273,7 +273,7 @@ class customAudio(discord.AudioSource):
             self.is_playing = True
         except EOFError:
             if not self.paused and not self.is_loading:
-                if self.is_playing:
+                if self.is_playing and (self.queue or _vars.data["playlists"].get(self.vc.guild.id, None)):
                     updateQueues.sendUpdateRequest(self, force=True)
                 self.new()
             temp = numpy.zeros(self.length, numpy.uint16).tobytes()
