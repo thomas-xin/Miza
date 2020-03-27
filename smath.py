@@ -2657,6 +2657,17 @@ def verifyURL(f):
         raise PermissionError("Unable to open local file " + f + ".")
     return f.strip(" ").translate(__utrans)
 
+__smap = {
+    "<": "",
+    ">": "",
+    "|": "",
+    "*": "",
+}
+__strans = "".maketrans(__smap)
+
+def verifySearch(f):
+    return f.strip(" ").translate(__strans)
+
 DOMAIN_FORMAT = re.compile(
     r"(?:^(\w{1,255}):(.{1,255})@|^)"
     r"(?:(?:(?=\S{0,253}(?:$|:))"

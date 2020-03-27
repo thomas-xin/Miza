@@ -744,7 +744,7 @@ class videoDownloader:
         #         raise ex
 
     def search(self, item, force=False):
-        item = verifyURL(item)
+        item = verifySearch(item)
         while self.requests > 4:
             time.sleep(0.1)
         if item in self.searched:
@@ -756,6 +756,7 @@ class videoDownloader:
             self.searched.pop(next(iter(self.searched)))
         try:
             self.requests += 1
+            print(item)
             self.searched[item] = output = self.extract(item, force)
             self.requests = max(self.requests - 1, 0)
             return output
