@@ -890,7 +890,7 @@ class updateFileLogs:
                 try:
                     obj = before.avatar_url_as(format="gif", static_format="png", size=4096)
                 except discord.InvalidArgument:
-                    obj = before.avatar_url_as(format="png", size=4096)
+                    obj = before.avatar_url_as(format="png", static_format="png", size=4096)
                 if ".gif" in str(obj):
                     fmt = ".gif"
                 else:
@@ -928,9 +928,9 @@ class updateFileLogs:
                         fil = discord.File(io.BytesIO(b), filename=str(a).split("/")[-1])
                         fils.append(fil)
                     except:
-                        msg += str(a) + "\n"
+                        msg += a.url + "\n"
                 emb = discord.Embed(colour=self._vars.randColour())
-                emb.description = "File" + "s" * (len(fils) != 1) + " deleted from <@" + str(message.author.id) + ">"
+                emb.description = "File" + "s" * (len(fils) + len(msg) != 1) + " deleted from <@" + str(message.author.id) + ">"
                 if not msg:
                     msg = None
                 await channel.send(msg, embed=emb, files=fils)

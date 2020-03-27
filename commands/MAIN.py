@@ -490,6 +490,9 @@ class Avatar:
     async def getGuildData(self, g):
         _vars = self._vars
         url = _vars.strURL(g.icon_url)
+        for size in ("?size=1024", "?size=2048"):
+            if url.endswith(size):
+                url = url[:-len(size)] + "?size=4096"
         name = g.name
         emb = discord.Embed(colour=_vars.randColour())
         emb.set_thumbnail(url=url)
@@ -565,6 +568,9 @@ class Avatar:
         guild = g
         name = str(u)
         url = _vars.strURL(u.avatar_url)
+        for size in ("?size=1024", "?size=2048"):
+            if url.endswith(size):
+                url = url[:-len(size)] + "?size=4096"
         emb = discord.Embed(colour=_vars.randColour())
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
