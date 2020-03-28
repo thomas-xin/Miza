@@ -263,6 +263,8 @@ class customAudio(discord.AudioSource):
                 try:
                     if self.queue or self._vars.data["playlists"].get(self.vc.guild.id, None):
                         updateQueues.sendUpdateRequest(self, force=True)
+                    else:
+                        self.vc.stop()
                 except:
                     print(traceback.format_exc())
                 raise EOFError
@@ -275,6 +277,8 @@ class customAudio(discord.AudioSource):
             if not self.paused and not self.is_loading:
                 if self.is_playing and (self.queue or self._vars.data["playlists"].get(self.vc.guild.id, None)):
                     updateQueues.sendUpdateRequest(self, force=True)
+                else:
+                    self.vc.stop()
                 self.new()
             temp = numpy.zeros(self.length, numpy.uint16).tobytes()
         try:
@@ -2363,7 +2367,7 @@ class updateQueues:
                                 self.audiocache.pop(i)
                     except (KeyError, PermissionError, FileNotFoundError):
                         pass
-                    except Exception as ex:
+                    except:
                         print(traceback.format_exc())
         await asyncio.sleep(0.2)
         self.busy = max(0, self.busy - 1)
