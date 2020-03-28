@@ -261,7 +261,7 @@ class customAudio(discord.AudioSource):
                     raise EOFError
             except:
                 try:
-                    if self.queue or _vars.data["playlists"].get(self.vc.guild.id, None):
+                    if self.queue or self._vars.data["playlists"].get(self.vc.guild.id, None):
                         updateQueues.sendUpdateRequest(self, force=True)
                 except:
                     print(traceback.format_exc())
@@ -273,7 +273,7 @@ class customAudio(discord.AudioSource):
             self.is_playing = True
         except EOFError:
             if not self.paused and not self.is_loading:
-                if self.is_playing and (self.queue or _vars.data["playlists"].get(self.vc.guild.id, None)):
+                if self.is_playing and (self.queue or self._vars.data["playlists"].get(self.vc.guild.id, None)):
                     updateQueues.sendUpdateRequest(self, force=True)
                 self.new()
             temp = numpy.zeros(self.length, numpy.uint16).tobytes()
@@ -1292,6 +1292,7 @@ class Skip:
         members = sum(1 for m in auds.vc.channel.members if not m.bot)
         required = 1 + members >> 1
         response = "```css\n"
+        i = 1
         for pos in elems:
             try:
                 if not isValid(pos):
@@ -1325,6 +1326,9 @@ class Skip:
                         + uniStr(len(curr["skips"])) + ", required vote count: "
                         + uniStr(required) + ".\n"
                     )
+            if not i & 2047:
+                await asyncio.sleep(0.2)
+            i += 1
         pops = deque()
         count = 0
         i = 1
@@ -1437,14 +1441,16 @@ def getDump(auds):
             )
         q = [dict(e) for e in auds.queue if random.random() < 0.99 or not time.sleep(0.01)]
         s = copy.deepcopy(auds.stats)
+        i = 1
         for e in q:
             if "download" in e:
                 e.pop("download")
             e.pop("added by")
             e.pop("u_id")
             e.pop("skips")
-            if random.random() > 0.99:
-                time.sleep(0.01)
+            if not i & 2047:
+                time.sleep(0.1)
+            i += 1
         d = {
             "stats": s,
             "queue": q,
@@ -2167,9 +2173,9 @@ class updateQueues:
             print(traceback.format_exc())
 
     async def __call__(self, **void):
-        while self.busy:
-            await asyncio.sleep(0.2)
-        self.busy = True
+        if self.busy > 1:
+            return
+        self.busy += 1
         _vars = self._vars
         pl = self.data
         client = _vars.client
@@ -2247,7 +2253,7 @@ class updateQueues:
                 i = 1
                 while len(q) > 65536:
                     q.pop()
-                    if not i & 8191:
+                    if not i & 4095:
                         await asyncio.sleep(0.2)
                     i += 1
                 create_task(auds.updatePlayer())
@@ -2360,4 +2366,4 @@ class updateQueues:
                     except Exception as ex:
                         print(traceback.format_exc())
         await asyncio.sleep(0.2)
-        self.busy = False
+        self.busy = max(0, self.busy)
