@@ -2366,4 +2366,4 @@ class updateQueues:
                     except Exception as ex:
                         print(traceback.format_exc())
         await asyncio.sleep(0.2)
-        self.busy = max(0, self.busy)
+        self.busy = max(0, self.busy - 1)
