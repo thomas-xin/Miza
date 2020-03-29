@@ -1032,11 +1032,13 @@ class Queue:
                 auds.pausec = False
                 auds.preparing = False
                 if auds.stats["position"] <= 0:
-                    if "download" in auds.queue[0]:
+                    if auds.queue and "download" in auds.queue[0]:
                         auds.queue[0].pop("download")
                 auds.update()
                 return "```css\nSuccessfully resumed audio playback in " + uniStr(guild.name) + ".```", 1
             if not len(q):
+                auds.preparing = False
+                auds.update()
                 return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```", 1
             if auds.stats["loop"]:
                 totalTime = inf
@@ -1552,7 +1554,7 @@ class Pause:
             if not isAlone(auds, user) and perm < 1:
                 self.PermError(perm, 1, "to " + name + " while other users are in voice")
         elif auds.stats["position"] <= 0:
-            if "download" in auds.queue[0]:
+            if auds.queue and "download" in auds.queue[0]:
                 auds.queue[0].pop("download")
         if name == "stop":
             auds.seek(0)
