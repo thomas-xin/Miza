@@ -298,7 +298,9 @@ class customAudio(discord.AudioSource):
                                 state=2,
                             )
                         else:
-                            q[i]["duration"] = ytdl.getDuration("cache/" + search)
+                            dur = ytdl.getDuration("cache/" + search)
+                            if i < len(q):
+                                q[i]["duration"] = dur
             if q and q[0].get("download", 0) > 0 and not playing:
                 try:
                     path = "cache/" + q[0]["id"] + ".mp3"

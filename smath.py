@@ -2256,7 +2256,10 @@ lookup time for all elements. Includes many array and numeric operations."""
         elif type(key) is not int:
             key = complex(key)
             return get(self, key, 1)
-        index = self.offs + key % len(self.data)
+        try:
+            index = self.offs + key % len(self.data)
+        except ZeroDivisionError:
+            raise IndexError("Attempted read from empty Hashed List.")
         return self.data[index]
 
     @blocking
