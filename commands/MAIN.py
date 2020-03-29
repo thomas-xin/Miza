@@ -459,7 +459,11 @@ class Loop:
                 func = func[1:]
         if perm is not nan:
             for n in self.name:
-                if (_vars.getPrefix(guild) + n).upper() in func.replace(" ", "").upper():
+                if (
+                    (_vars.getPrefix(guild) + n).upper() in func.replace(" ", "").upper()
+                ) or (
+                    (str(_vars.client.user.id) + ">" + n).upper() in func.replace(" ", "").upper()
+                ):
                     raise PermissionError("Must be owner to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
         create_task(_vars.sendReact(
@@ -938,16 +942,18 @@ class Reminder:
                 if " in " in argv:
                     spl = argv.split(" in ")
                 elif argv.startswith("in "):
-                    spl = argv[3:]
+                    spl = [argv[3:]]
+                    msg = ""
                 if spl is not None:
                     msg = " in ".join(spl[:-1])
-                    t = await _vars.evalTime(args[-1], guild)
+                    t = await _vars.evalTime(spl[-1], guild)
                     break
             if "at" in argv:
                 if " at " in argv:
                     spl = argv.split(" at ")
                 elif argv.startswith("at "):
-                    spl = argv[3:]
+                    spl = [argv[3:]]
+                    msg = ""
                 if spl is not None:
                     msg = " at ".join(spl[:-1])
                     t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
@@ -967,7 +973,7 @@ class Reminder:
         _vars.data["reminders"][user.id] = sort(rems, key=lambda x: x.t)
         update()
         return (
-            "```css\nSuccessfully set reminder for "
+            "```asciidoc\nSuccessfully set reminder for "
             + uniStr(user) + " in " + uniStr(sec2Time(t)) + ":\n"
             + msg + "```"
         )

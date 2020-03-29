@@ -73,7 +73,6 @@ class main_data:
         self.data = {}
         self.proc = psutil.Process()
         doParallel(self.getModules, state=2)
-        self.doUpdate = {}
         self.guilds = 0
         self.blocked = 0
         self.updated = False
@@ -905,7 +904,7 @@ class main_data:
             self.busy = False
         if not hasattr(self, "status_iter"):
             self.status_iter = 0
-        if force or time.time() - self.lastCheck > 0.5:
+        if time.time() - self.lastCheck > 0.5:
             while self.busy:
                 await asyncio.sleep(0.1)
             self.busy = True
@@ -946,15 +945,9 @@ class main_data:
                 print(traceback.format_exc())
             try:
                 self.lastCheck = time.time()
-                if force:
-                    for k in self.doUpdate:
-                        u = self.database[k]
-                        create_task(u())
-                        create_task(self.verifyDelete(u))
-                else:
-                    for u in self.database.values():
-                        create_task(u())
-                        create_task(self.verifyDelete(u))
+                for u in self.database.values():
+                    create_task(u())
+                    create_task(self.verifyDelete(u))
             except:
                 print(traceback.format_exc())
             self.busy = False
@@ -1421,12 +1414,7 @@ async def updateLoop():
                 _vars.blocked -= 1
                 await asyncio.sleep(1)
             await _vars.handleUpdate()
-            t = time.time()
-            while time.time() - t < frand(2) + 2:
-                await asyncio.sleep(0.04)
-                if _vars.doUpdate:
-                    await _vars.handleUpdate(True)
-                    _vars.doUpdate.clear()
+            await asyncio.sleep(frand(2) + 2)
         except:
             print(traceback.format_exc())
         
