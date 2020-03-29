@@ -1030,6 +1030,11 @@ class Queue:
             if not v and len(q) and auds.paused & 1 and "p" in name:
                 auds.paused &= -2
                 auds.pausec = False
+                auds.preparing = False
+                if auds.stats["position"] <= 0:
+                    if "download" in auds.queue[0]:
+                        auds.queue[0].pop("download")
+                auds.update()
                 return "```css\nSuccessfully resumed audio playback in " + uniStr(guild.name) + ".```", 1
             if not len(q):
                 return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```", 1
@@ -1542,6 +1547,7 @@ class Pause:
     async def __call__(self, _vars, name, guild, client, user, perm, channel, message, flags, **void):
         name = name.lower()
         auds = await forceJoin(guild, channel, user, client, _vars)
+        auds.preparing = False
         if name in ("pause", "stop"):
             if not isAlone(auds, user) and perm < 1:
                 self.PermError(perm, 1, "to " + name + " while other users are in voice")
