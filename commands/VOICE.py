@@ -1657,7 +1657,9 @@ class Dump:
             resp = returns[0]
             if type(resp) is str:
                 raise eval(resp)
-            return bytes(resp[0], "utf-8")
+            f = discord.File(io.BytesIO(bytes(resp[0], "utf-8")), filename="dump.json")
+            create_task(_vars.sendFile(channel, "Queue data for **" + guild.name + "**:", f))
+            return
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to load new queue while other users are in voice")
         try:

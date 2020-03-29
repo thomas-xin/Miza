@@ -279,7 +279,7 @@ def orgConv(org, wave, fmt, key="temp"):
             ff.run()
         else:
             fn = fi
-        return fn
+        return [fn]
     except Exception as ex:
         print(traceback.format_exc())
         return repr(ex)
@@ -292,6 +292,7 @@ class CS_org2xm:
         "mp3",
         "ogg",
         "xm",
+        "webm"
     ]
 
     def __init__(self):
@@ -318,6 +319,7 @@ class CS_org2xm:
             fmt = "xm"
         if fmt not in self.fmts:
             raise TypeError(fmt + " is not a supported output format.")
+        name = org.split("/")[-1].replace(".org", "") + "." + fmt
         returns = [None]
         doParallel(orgConv, [org, wave, fmt, str(guild.id)], returns, state=2)
         t = time.time()
@@ -331,13 +333,10 @@ class CS_org2xm:
         if fn is None:
             raise TimeoutError("Request timed out.")
         try:
-            f = discord.File(fn)
-        except:
+            f = discord.File(fn[0], filename=name)
+        except TypeError:
             raise eval(fn)
-        return {
-            "content": "Org successfully converted!",
-            "file": f,
-        }
+        create_task(_vars.sendFile(channel, "Org successfully converted!", f))
 
 
 def _n2f(n):

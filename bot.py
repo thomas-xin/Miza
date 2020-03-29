@@ -831,8 +831,8 @@ class main_data:
         except:
             print(traceback.format_exc())
 
-    async def sendFile(self, channel, filemsg, file, filename=None):
-        message = await channel.send(filemsg, file=file)
+    async def sendFile(self, channel, msg, file, filename=None):
+        message = await channel.send(msg, file=file)
         if filename is not None:
             try:
                 os.remove(filename)
