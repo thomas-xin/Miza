@@ -2357,6 +2357,7 @@ class Download:
                 argv = " ".join(spl)[:-1]
         else:
             fmt = "ogg"
+        argv = verifySearch(argv)
         res = []
         if isURL(argv):
             returns = [None]
@@ -2369,8 +2370,8 @@ class Download:
                 data = returns[0][0]
                 res += data
         if not res:
-            sc = min(6, flags.get("v", 0) + 1)
-            yt = min(10, sc << 1)
+            sc = min(4, flags.get("v", 0) + 1)
+            yt = min(6, sc << 1)
             searches = ["ytsearch" + str(yt), "scsearch" + str(sc)]
             returns = [[None], [None]]
             for r in range(len(returns)):

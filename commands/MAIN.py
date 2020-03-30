@@ -1277,10 +1277,7 @@ class updateUsers:
     user = True
 
     def __init__(self):
-        for u in self.data:
-            if "suspended" in self.data[u]:
-                self.data[u].pop("suspended")
-                self.update()
+        pass
 
     async def _command_(self, user, command, **void):
         udata = self.data.setdefault(user.id, {"commands": 0})
