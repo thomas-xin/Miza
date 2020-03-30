@@ -973,10 +973,10 @@ class videoDownloader:
                     dur = info["entries"][0]["duration"]
                 else:
                     dur = info["duration"]
+                if dur > 960:
+                    raise OverflowError("Maximum time limit is 16 minutes.")
             except KeyError:
                 pass
-            if dur > 960:
-                raise OverflowError("Maximum time limit is 16 minutes.")
             downloader.extract_info(url, download=True, process=True)
             dur = getDuration(fn)
             if dur > 960:
@@ -2341,11 +2341,10 @@ class Download:
         self.flags = "v"
 
     async def __call__(self, _vars, message, argv, flags, user, **void):
+        for a in message.attachments:
+            argv = a.url + " " + argv
         if not argv:
-            if message.attachments:
-                argv = message.attachments[0].url
-            else:
-                raise IndexError("Please input a search term, URL, or file.")
+            raise IndexError("Please input a search term, URL, or file.")
         if " " in argv:
             spl = argv.split(" ")
             fmt = spl[-1]
