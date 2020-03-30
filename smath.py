@@ -2717,10 +2717,12 @@ def urlOpen(url):
     return resp
 
 
-def funcSafe(func, *args, **kwargs):
+def funcSafe(func, *args, print_exc=False, **kwargs):
     try:
         return [func(*args, **kwargs)]
     except Exception as ex:
+        if print_exc:
+            print(traceback.format_exc())
         return repr(ex)
 
 

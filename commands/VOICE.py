@@ -968,20 +968,21 @@ class videoDownloader:
             new_opts["outtmpl"] = fn
             downloader = youtube_dl.YoutubeDL(new_opts)
             info = downloader.extract_info(url, download=False, process=True)
+            ov = OverflowError("Maximum time limit is 16 minutes.")
             try:
                 if "entries" in info:
                     dur = info["entries"][0]["duration"]
                 else:
                     dur = info["duration"]
                 if dur > 960:
-                    raise OverflowError("Maximum time limit is 16 minutes.")
+                    raise ov
             except KeyError:
                 pass
             downloader.extract_info(url, download=True, process=True)
             dur = getDuration(fn)
             if dur > 960:
-                raise OverflowError("Maximum time limit is 16 minutes.")
-            br = max(32, min(256, floor(((fl - 1024) / dur / 128) / 16) * 16))
+                raise ov
+            br = max(32, min(256, floor(((fl - 1024) / dur / 128) / 8) * 8))
             out = fn + "." + fmt
             ff = ffmpy.FFmpeg(
                 global_options=["-y", "-hide_banner", "-loglevel panic"],
@@ -2354,16 +2355,17 @@ class Download:
                 if fmt not in ("mp3", "ogg", "webm"):
                     fmt = "ogg"
                 else:
-                    argv = " ".join(spl)[:-1]
+                    argv = " ".join(spl[:-1])
             else:
                 fmt = "ogg"
         else:
             fmt = "ogg"
+        print(argv, fmt)
         argv = verifySearch(argv)
         res = []
         if isURL(argv):
             returns = [None]
-            doParallel(funcSafe, [ytdl.extract, argv], returns)
+            doParallel(funcSafe, [ytdl.extract, argv], returns, kwargs={"print_exc": True})
             while returns[0] is None:
                 await asyncio.sleep(0.4)
             if returns[0]:
@@ -2381,7 +2383,7 @@ class Download:
                     funcSafe,
                     [ytdl.downloader.extract_info, searches[r] + ":" + argv.replace(":", "~")],
                     returns[r],
-                    kwargs=freeClass(download=False, process=r).to_dict(),
+                    kwargs=freeClass(download=False, process=r, print_exc=True).to_dict(),
                 )
             while [None] in returns:
                 await asyncio.sleep(0.6)
@@ -2442,7 +2444,12 @@ class Download:
                     data = ast.literal_eval(hex2Bytes(spl[2]).decode("utf-8"))
                     url = data[num]
                     returns = [None]
-                    doParallel(funcSafe, [ytdl.downloadAs, url, guild.filesize_limit, spl[3]], returns)
+                    doParallel(
+                        funcSafe,
+                        [ytdl.downloadAs, url, guild.filesize_limit, spl[3]],
+                        returns,
+                        kwargs={"print_exc": True},
+                    )
                     await message.edit(
                         content="```ini\nDownloading " + url + "...```",
                         embed=None,
