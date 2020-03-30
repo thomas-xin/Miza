@@ -294,7 +294,7 @@ class customAudio(discord.AudioSource):
                             self._vars.database["playlists"].audiocache[e_id] = durc
                             doParallel(
                                 ytdl.downloadSingle,
-                                [q[i], durc, auds],
+                                [q[i], durc, self],
                                 state=2,
                             )
                         else:
@@ -2346,14 +2346,17 @@ class Download:
         if not argv:
             raise IndexError("Please input a search term, URL, or file.")
         if " " in argv:
-            spl = argv.split(" ")
-            fmt = spl[-1]
-            if fmt.startswith("."):
-                fmt = fmt[1:]
-            if fmt not in ("mp3", "ogg", "webm"):
-                fmt = "ogg"
+            spl = shlex.split(argv)
+            if len(spl) > 1:
+                fmt = spl[-1]
+                if fmt.startswith("."):
+                    fmt = fmt[1:]
+                if fmt not in ("mp3", "ogg", "webm"):
+                    fmt = "ogg"
+                else:
+                    argv = " ".join(spl)[:-1]
             else:
-                argv = " ".join(spl)[:-1]
+                fmt = "ogg"
         else:
             fmt = "ogg"
         argv = verifySearch(argv)
