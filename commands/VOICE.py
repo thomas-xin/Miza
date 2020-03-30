@@ -805,7 +805,7 @@ class videoDownloader:
                 else:
                     found = "duration" in resp
                     if found:
-                        dur = res["duration"]
+                        dur = resp["duration"]
                     else:
                         dur = "300"
                     temp = {
@@ -2413,6 +2413,11 @@ class Download:
             + "Search results for " + uniStr(argv) + ":```"
         )
         emb = discord.Embed(colour=_vars.randColour())
+        url = _vars.strURL(user.avatar_url)
+        for size in ("?size=1024", "?size=2048"):
+            if url.endswith(size):
+                url = url[:-len(size)] + "?size=4096"
+        emb.set_author(name=str(user), url=url, icon_url=url)
         emb.description = "\n".join(
             ["`【" + str(i) + "】` [" + discord.utils.escape_markdown(e["name"] + "](" + e["url"] + ")") for i in range(len(res)) for e in [res[i]]]
         )

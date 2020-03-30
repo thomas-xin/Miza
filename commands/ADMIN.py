@@ -655,7 +655,7 @@ class updateUserLogs:
             if str(before) != str(after):
                 emb.add_field(
                     name="Username",
-                    value=discord.utils.escape_markdown(str(before) + " <:arrow:688320024586223620> " + str(after)),
+                    value=discord.utils.escape_markdown(str(before)) + " <:arrow:688320024586223620> " + discord.utils.escape_markdown(str(after)),
                 )
                 change = True
                 colour[0] += 255
@@ -663,7 +663,7 @@ class updateUserLogs:
                 if before.display_name != after.display_name:
                     emb.add_field(
                         name="Nickname",
-                        value=discord.utils.escape_markdown(before.display_name + " <:arrow:688320024586223620> " + after.display_name),
+                        value=discord.utils.escape_markdown(before.display_name) + " <:arrow:688320024586223620> " + discord.utils.escape_markdown(after.display_name),
                     )
                     change = True
                     colour[0] += 255
@@ -678,14 +678,14 @@ class updateUserLogs:
                             add.append(r)
                     rchange = ""
                     if sub:
-                        rchange = "<:minus:688316020359823364> " + ", ".join(str(r) for r in sub)
+                        rchange = "<:minus:688316020359823364> " + discord.utils.escape_markdown(", ".join(str(r) for r in sub))
                     if add:
                         rchange += (
                             "\n" * bool(rchange) + "<:plus:688316007093370910> " 
-                            + ", ".join(str(r) for r in add)
+                            + discord.utils.escape_markdown(", ".join(str(r) for r in add))
                         )
                     if rchange:
-                        emb.add_field(name="Roles", value=discord.utils.escape_markdown(rchange))
+                        emb.add_field(name="Roles", value=rchange)
                         change = True
                         colour[1] += 255
             if b_url != a_url:
