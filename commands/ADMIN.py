@@ -655,7 +655,7 @@ class updateUserLogs:
             if str(before) != str(after):
                 emb.add_field(
                     name="Username",
-                    value=str(before) + " <:arrow:688320024586223620> " + str(after),
+                    value=discord.utils.escape_markdown(str(before) + " <:arrow:688320024586223620> " + str(after)),
                 )
                 change = True
                 colour[0] += 255
@@ -663,7 +663,7 @@ class updateUserLogs:
                 if before.display_name != after.display_name:
                     emb.add_field(
                         name="Nickname",
-                        value=before.display_name + " <:arrow:688320024586223620> " + after.display_name,
+                        value=discord.utils.escape_markdown(before.display_name + " <:arrow:688320024586223620> " + after.display_name),
                     )
                     change = True
                     colour[0] += 255
@@ -685,7 +685,7 @@ class updateUserLogs:
                             + ", ".join(str(r) for r in add)
                         )
                     if rchange:
-                        emb.add_field(name="Roles", value=rchange)
+                        emb.add_field(name="Roles", value=discord.utils.escape_markdown(rchange))
                         change = True
                         colour[1] += 255
             if b_url != a_url:

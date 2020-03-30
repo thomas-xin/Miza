@@ -226,7 +226,7 @@ def getDuration(filename):
     return max(1 / (1 << 24), n)
 
 
-def orgConv(org, wave, fmt, key="temp"):
+def orgConv(org, wave, fmt, key="temp", fl=8388608):
     try:
         try:
             os.remove("cache/" + key + ".org")
@@ -253,7 +253,7 @@ def orgConv(org, wave, fmt, key="temp"):
         fi = "cache/" + key + ".xm"
         t = time.time()
         while time.time() - t < 12:
-            time.sleep(0.01)
+            time.sleep(0.2)
             if key + ".xm" in os.listdir("cache"):
                 try:
                     f = open(fi, "rb")
@@ -270,7 +270,7 @@ def orgConv(org, wave, fmt, key="temp"):
             except FileNotFoundError:
                 pass
             dur = getDuration(fi)
-            br = max(64, min(256, floor(((8388608 - 1024) / dur / 128) / 16) * 16))
+            br = max(32, min(256, floor(((fl - 1024) / dur / 128) / 16) * 16))
             ff = ffmpy.FFmpeg(
                 global_options=["-y", "-hide_banner", "-loglevel panic"],
                 inputs={fi: None},
@@ -321,7 +321,7 @@ class CS_org2xm:
             raise TypeError(fmt + " is not a supported output format.")
         name = org.split("/")[-1].replace(".org", "") + "." + fmt
         returns = [None]
-        doParallel(orgConv, [org, wave, fmt, str(guild.id)], returns, state=2)
+        doParallel(orgConv, [org, wave, fmt, str(guild.id), guild.filesize_limit], returns, state=2)
         t = time.time()
         i = 0
         while returns[0] is None and time.time() - t < _vars.timeout - 1:

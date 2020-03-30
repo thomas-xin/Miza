@@ -431,9 +431,9 @@ class main_data:
         u_id = int(u_id)
         if u_id in (self.owner_id, client.user.id):
             return False
-        return self.data["users"].get(
-            u_id, {"suspended": 0}
-        )["suspended"] >= time.time() + self.min_suspend * 86400
+        return self.data["blacklist"].get(
+            u_id, 0
+        ) >= time.time() + self.min_suspend * 86400
 
     def updatePart(self, force=False):
         if force:
@@ -841,7 +841,7 @@ class main_data:
             except:
                 print(traceback.format_exc())
         if message.attachments:
-            await message.edit(content=message.content + "\n" + "\n".join(tuple(a.url for a in message.attachments)))
+            await message.edit(content=message.content + "\n" + "\n".join(tuple("<" + a.url + ">" for a in message.attachments)))
 
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:
@@ -872,6 +872,7 @@ class main_data:
                 for f in catg:
                     if f.__name__.lower() == func.lower():
                         try:
+                            timeout = getattr(f, "_timeout_", self.timeout)
                             await asyncio.wait_for(
                                 f._callback_(
                                     client=client,
@@ -885,7 +886,7 @@ class main_data:
                                     argv=argv,
                                     _vars=self,
                                 ),
-                                timeout=self.timeout)
+                                timeout=timeout)
                             return
                         except Exception as ex:
                             print(traceback.format_exc())

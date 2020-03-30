@@ -100,3 +100,72 @@ class updateExec:
                 value=_vars.strMessage(message),
             )
             await self.channel.send(embed=emb)
+
+
+class updateBlacklist:
+    is_database = True
+    name = "blacklist"
+    suspected = "blacklist.json"
+    user = True
+
+    def __init__(self):
+        self.suspclear = inf
+        try:
+            self.lastsusp = None
+            f = open(self.suspected, "r")
+            susp = f.read()
+            f.close()
+            os.remove(self.suspected)
+            if susp:
+                u_id = int(susp)
+                udata = self.data[u_id]
+                days = max(0, (udata - time.time()) / 86400)
+                try:
+                    days **= 4
+                except (OverflowError, ValueError, TypeError):
+                    days = inf
+                days += 1.125
+                udata = time.time() + days * 86400
+                if days >= self._vars.min_suspend - 1:
+                    self.lastsusp = u_id
+                self.update()
+                self.update(True)
+            print(self.lastsusp)
+        except FileNotFoundError:
+            pass
+
+    async def _command_(self, user, command, **void):
+        if user.id not in (self._vars.client.user.id, self._vars.owner_id):
+            tc = getattr(command, "time_consuming", 0)
+            self.suspclear = time.time() + 10 + (tc * 2) ** 2
+            f = open(self.suspected, "w")
+            f.write(str(user.id))
+            f.close()
+            self.update()
+
+    async def __call__(self, **void):
+        if time.time() - self.suspclear:
+            self.suspclear = inf
+            try:
+                if self.suspected in os.listdir():
+                    os.remove(self.suspected)
+            except:
+                print(traceback.format_exc())
+        _vars = self._vars
+        if self.lastsusp is not None:
+            u_susp = await _vars.fetch_user(self.lastsusp)
+            self.lastsusp = None
+            channel = await _vars.getDM(u_susp)
+            secs = self.data.get(u_susp.id, 0) - time.time()
+            msg = (
+                "Apologies for the inconvenience, but your account has been "
+                + "flagged as having attempted a denial-of-service attack.\n"
+                + "This will expire in `" + sec2Time(secs) + "`.\n"
+                + "If you believe this is an error, please notify <@"
+                + str(_vars.owner_id) + "> as soon as possible."
+            )
+            print(
+                u_susp.name + " may be attempting a DDOS attack. Expires in "
+                + sec2Time(secs) + "."
+            )
+            await channel.send(msg)

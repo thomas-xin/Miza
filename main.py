@@ -68,7 +68,7 @@ while not sd in os.listdir():
                 break
         if sd in os.listdir():
             break
-        if time.time() - start > 30:
+        if time.time() - start < 30:
             att += 1
         else:
             att = 0

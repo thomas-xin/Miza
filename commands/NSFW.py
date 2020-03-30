@@ -115,8 +115,8 @@ def pull_booru(argv, data, thr, delay=5):
     print(data)
 
 
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
+e_loop = asyncio.new_event_loop()
+asyncio.set_event_loop(e_loop)
 rule34_sync = rule34.Sync()
 
 
@@ -270,7 +270,7 @@ async def searchRandomNSFW(argv, delay=10):
         await asyncio.sleep(0.6)
     data = [i for i in data if i]
     if not data:
-        raise EOFError("Unable to locate any search results for " + uniStr(argv) + ".")
+        raise EOFError("No results for " + uniStr(argv) + ".")
     item = random.choice(data)
     return item
 

@@ -2327,12 +2327,16 @@ class freeClass(collections.abc.Mapping):
                 setattr(self, i, getattr(self.__dict__, i))
 
     def __repr__(self, nofunc=True):
+        d = self.to_dict(nofunc)
+        return "freeClass(**" + repr(d) + ")"
+
+    def to_dict(self, nofunc=True):
         d = dict(self.__dict__)
         if nofunc:
             for k in tuple(d):
                 if callable(d[k]):
                     d.pop(k)
-        return "freeClass(**" + repr(d) + ")"
+        return d
     
     __iter__ = lambda self: iter(self.__dict__)
     __len__ = lambda self: len(self.__dict__)
