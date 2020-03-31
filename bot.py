@@ -362,28 +362,25 @@ class main_data:
         return self.data["prefixes"].get(g_id, "~")
 
     def getPerms(self, user, guild=None):
+        try:
+            u_id = user.id
+        except AttributeError:
+            u_id = int(user)
+        if u_id in (self.owner_id, client.user.id):
+            return nan
         if guild is None:
             return inf
         try:
             perms = self.data["perms"]
         except KeyError:
             return 0
-        try:
-            u_id = user.id
-        except AttributeError:
-            u_id = int(user)
         if guild:
             try:
                 g_id = guild.id
             except AttributeError:
                 g_id = int(guild)
             g_perm = perms.setdefault(g_id, {})
-            if u_id in (self.owner_id, client.user.id):
-                u_perm = nan
-            else:
-                u_perm = g_perm.get(u_id, perms.setdefault("defaults", {}).get(g_id, 0))
-        elif u_id in (self.owner_id, client.user.id):
-            u_perm = nan
+            u_perm = g_perm.get(u_id, perms.setdefault("defaults", {}).get(g_id, 0))
         else:
             u_perm = inf
         if u_perm is not nan and u_id == getattr(guild, "owner_id", 0):
@@ -1168,7 +1165,6 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         enabled = list(_vars.categories)
     u_perm = _vars.getPerms(u_id, guild)
     admin = not inf > u_perm
-
     mention = (
         "<@" + str(client.user.id) + ">",
         "<@!" + str(client.user.id) + ">",

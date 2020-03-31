@@ -44,10 +44,10 @@ class Text2048:
         self.min_level = 0
         self.description = "Plays a game of 2048 using reactions."
         self.usage = (
-            "<board_size[4]> <verbose(?v)> <special_tiles(?s)> <public(?p)> "
+            "<board_size[4]>  <show_debug(?z)> <special_tiles(?s)> <public(?p)> "
             + "<insanity_mode(?i)> <special_controls(?c)> <easy_mode(?e)>"
         )
-        self.flags = "vspice"
+        self.flags = "vzpice"
 
     def shiftTile(self, tiles, p1, p2):
         # print(p1, p2)
@@ -282,7 +282,7 @@ class Text2048:
             mode |= 8
         if "i" in flags:
             mode |= 4
-        if "s" in flags:
+        if "z" in flags:
             mode |= 2
         if "e" in flags:
             mode |= 1

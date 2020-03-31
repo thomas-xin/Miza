@@ -960,7 +960,7 @@ class videoDownloader:
         print(exc)
         raise exl
     
-    def downloadAs(self, url, fl=8388608, fmt="ogg"):
+    def downloadAs(self, url, fl=8388608, fmt="ogg", message=None, aloop=None):
         try:
             name = "&" + str(discord.utils.time_snowflake(datetime.datetime.utcnow()))
             new_opts = dict(self.ydl_opts)
@@ -982,7 +982,12 @@ class videoDownloader:
             dur = getDuration(fn)
             if dur > 960:
                 raise ov
-            br = max(32, min(256, floor(((fl - 1024) / dur / 128) / 8) * 8))
+            if message is not None:
+                aloop.create_task(message.edit(
+                    content="```ini\nConverting [" + name + "]...```",
+                    embed=None,
+                ))
+            br = max(32, min(256, floor(((fl - 1024) / dur / 128) / 4) * 4))
             out = fn + "." + fmt
             ff = ffmpy.FFmpeg(
                 global_options=["-y", "-hide_banner", "-loglevel panic"],
@@ -2088,8 +2093,8 @@ class Player:
         self.min_level = 0
         self.min_display = "0~3"
         self.description = "Creates an auto-updating virtual audio player for the current server."
-        self.usage = "<verbose(?v)> <controllable(?c)> <disable(?d)>"
-        self.flags = "cdev"
+        self.usage = "<controllable(?c)> <disable(?d)> <show_debug(?z)>"
+        self.flags = "cdez"
 
     def showCurr(self, auds):
         q = auds.queue
@@ -2326,7 +2331,7 @@ class Player:
                 "```css\nSuccessfully disabled active virtual audio players in "
                 + uniStr(channel.guild.name) + ".```"
             )
-        await createPlayer(auds, p_type="c" in flags, verbose="v" in flags)
+        await createPlayer(auds, p_type="c" in flags, verbose="z" in flags)
 
 
 class Download:
@@ -2338,8 +2343,8 @@ class Download:
         self.name = ["Search", "YTDL", "Youtube_DL", "Convert"]
         self.min_level = 0
         self.description = "Searches and/or downloads a song from a YouTube/SoundCloud query or link."
-        self.usage = "<0:search_link> <-1:out_format[ogg]> <verbose(?v)>"
-        self.flags = "v"
+        self.usage = "<0:search_link> <-1:out_format[ogg]> <verbose(?v)> <show_debug(?z)>"
+        self.flags = "vz"
 
     async def __call__(self, _vars, message, argv, flags, user, **void):
         for a in message.attachments:
@@ -2360,7 +2365,7 @@ class Download:
                 fmt = "ogg"
         else:
             fmt = "ogg"
-        print(argv, fmt)
+        # print(argv, fmt)
         argv = verifySearch(argv)
         res = []
         if isURL(argv):
@@ -2393,10 +2398,16 @@ class Download:
                         data = r[0][0]
                         for e in data["entries"]:
                             if "webpage_url" in e:
-                                res.append({
-                                    "name": e["title"],
-                                    "url": e["webpage_url"],
-                                })
+                                if "title" in e:
+                                    res.append({
+                                        "name": e["title"],
+                                        "url": e["webpage_url"],
+                                    })
+                                else:
+                                    res.append({
+                                        "name": e["id"],
+                                        "url": e["webpage_url"],
+                                    })
                             else:
                                 if e["ie_key"].lower() == "youtube":
                                     res.append({
@@ -2413,7 +2424,7 @@ class Download:
         res = res[:10]
         url_list = bytes2Hex(bytes(str([e["url"] for e in res]), "utf-8")).replace(" ", "")
         msg = (
-            "```callback-voice-download-" + str(user.id) + "_" + str(len(res)) + "_" + url_list + "_" + fmt + "\n"
+            "```" + "\n" * ("z" in flags) + "callback-voice-download-" + str(user.id) + "_" + str(len(res)) + "_" + url_list + "_" + fmt + "\n"
             + "Search results for " + uniStr(argv) + ":```"
         )
         emb = discord.Embed(colour=_vars.randColour())
@@ -2444,14 +2455,18 @@ class Download:
                     data = ast.literal_eval(hex2Bytes(spl[2]).decode("utf-8"))
                     url = data[num]
                     returns = [None]
+                    if guild is None:
+                        fl = 8388608
+                    else:
+                        fl = guild.filesize_limit
                     doParallel(
                         funcSafe,
-                        [ytdl.downloadAs, url, guild.filesize_limit, spl[3]],
+                        [ytdl.downloadAs, url, fl, spl[3], message, asyncio.get_event_loop()],
                         returns,
                         kwargs={"print_exc": True},
                     )
                     await message.edit(
-                        content="```ini\nDownloading " + url + "...```",
+                        content="```ini\nDownloading [" + noHighlight(url) + "]...```",
                         embed=None,
                     )
                     await channel.trigger_typing()
@@ -2462,13 +2477,17 @@ class Download:
                     fn = returns[0][0][0]
                     out = returns[0][0][1]
                     f = discord.File(fn, out)
-                    create_task(_vars.silentDelete(message))
+                    create_task(message.edit(
+                        content="```ini\nUploading [" + noHighlight(out) + "]...```",
+                        embed=None,
+                    ))
                     await _vars.sendFile(
                         channel=channel,
                         msg="",
                         file=f,
                         filename=fn
                     )
+                    create_task(_vars.silentDelete(message))
 
 class updateQueues:
     is_database = True
@@ -2615,6 +2634,8 @@ class updateQueues:
                     await asyncio.sleep(0.2)
                 a += 1
             for path in os.listdir("cache/"):
+                if path.startswith("&"):
+                    continue
                 if ".mp3" in path or ".part" in path:
                     key = path.replace(".mp3", "").replace(".part", "")
                     if key in should_cache:
