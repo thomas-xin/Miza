@@ -2372,7 +2372,6 @@ class Download:
             except:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
         else:
-            end = "Search results for " + uniStr(argv) + ":```"
             if " " in argv:
                 try:
                     spl = shlex.split(argv)
@@ -2447,6 +2446,7 @@ class Download:
             if not res:
                 raise LookupError("No results for " + uniStr(argv) + ".")
             res = res[:10]
+            end = "Search results for " + uniStr(argv) + ":```"
         url_list = bytes2Hex(bytes(str([e["url"] for e in res]), "utf-8")).replace(" ", "")
         msg = (
             "```" + "\n" * ("z" in flags) + "callback-voice-download-" + str(user.id) 
