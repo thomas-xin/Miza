@@ -2467,6 +2467,7 @@ class Download:
         )
         for i in range(len(res)):
             await sent.add_reaction(str(i) + b"\xef\xb8\x8f\xe2\x83\xa3".decode("utf-8"))
+        await sent.add_reaction("❎")
 
     async def _callback_(self, message, guild, channel, reaction, _vars, perm, vals, user, **void):
         if reaction is None or user.id == _vars.client.user.id:
