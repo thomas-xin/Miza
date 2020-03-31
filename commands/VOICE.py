@@ -2340,7 +2340,7 @@ class Player:
         if "d" in flags:
             auds.player = None
             return (
-                "```css\nSuccessfully disabled active virtual audio players in "
+                "```css\nSuccessfully disabled virtual audio players in "
                 + uniStr(channel.guild.name) + ".```"
             )
         await createPlayer(auds, p_type="c" in flags, verbose="z" in flags)
@@ -2368,9 +2368,11 @@ class Download:
                     raise EOFError
                 res = [{"name": e["name"], "url": e["url"]} for e in auds.queue[:10]]
                 fmt = "ogg"
+                end = "Current items in queue for " + uniStr(channel.guild.name) + ":```"
             except:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
         else:
+            end = "Search results for " + uniStr(argv) + ":```"
             if " " in argv:
                 try:
                     spl = shlex.split(argv)
@@ -2447,8 +2449,8 @@ class Download:
             res = res[:10]
         url_list = bytes2Hex(bytes(str([e["url"] for e in res]), "utf-8")).replace(" ", "")
         msg = (
-            "```" + "\n" * ("z" in flags) + "callback-voice-download-" + str(user.id) + "_" + str(len(res)) + "_" + url_list + "_" + fmt + "\n"
-            + "Search results for " + uniStr(argv) + ":```"
+            "```" + "\n" * ("z" in flags) + "callback-voice-download-" + str(user.id) 
+            + "_" + str(len(res)) + "_" + url_list + "_" + fmt + "\n" + end
         )
         emb = discord.Embed(colour=_vars.randColour())
         url = _vars.strURL(user.avatar_url)
