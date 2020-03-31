@@ -1772,7 +1772,6 @@ class Dump:
         if "a" not in flags:
             auds.new()
             auds.preparing = True
-            auds.update()
             auds.queue = hlist(q)
             for k in d["stats"]:
                 if k not in auds.stats:
@@ -1782,6 +1781,7 @@ class Dump:
                 else:
                     d["stats"][k] = float(d["stats"][k])
             auds.stats.update(d["stats"])
+            auds.update()
             if not "h" in flags:
                 return (
                     "```css\nSuccessfully loaded audio queue data for " 

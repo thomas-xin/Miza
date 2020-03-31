@@ -241,12 +241,10 @@ class main_data:
                 invite = await client.fetch_invite(g_id)
                 g = invite.guild
                 if not hasattr(g, "member_count"):
-                    guild = freeClass(
-                        member_count=invite.approximate_member_count,
-                        created_at="N/A",
-                    )
+                    guild = freeClass(member_count=invite.approximate_member_count)
                     for at in g.__slots__:
                         setattr(guild, at, getattr(g, at))
+                    guild.created_at = discord.utils.snowflake_time(guild.id)
                     icon = str(guild.icon)
                     guild.icon_url = (
                         "https://cdn.discordapp.com/icons/"
