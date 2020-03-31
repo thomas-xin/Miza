@@ -277,6 +277,14 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
                 outputs={str(br) + "k": "-b:a", fn: None},
             )
             ff.run()
+            try:
+                os.remove("cache/" + key + ".org")
+            except FileNotFoundError:
+                pass
+            try:
+                os.remove("cache/" + key + ".xm")
+            except FileNotFoundError:
+                pass
         else:
             fn = fi
         return [fn]
@@ -336,7 +344,7 @@ class CS_org2xm:
             f = discord.File(fn[0], filename=name)
         except TypeError:
             raise eval(fn)
-        create_task(_vars.sendFile(channel, "Org successfully converted!", f))
+        create_task(_vars.sendFile(channel, "Org successfully converted!", f, fn[0]))
 
 
 def _n2f(n):

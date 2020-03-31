@@ -1242,7 +1242,7 @@ class Queue:
                     temp["research"] = True
                 added.append(temp)
                 if not dur:
-                    dur = duration
+                    dur = float(duration)
                 names.append(name)
             total_duration = 0
             for e in q:
