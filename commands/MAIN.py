@@ -109,7 +109,7 @@ class Help:
                     continue
                 if description != "":
                     if not verb:
-                        show.append(prefix + name + " " + usage)
+                        show.append(prefix + name)
                     else:
                         show.append(
                             "\nUsage: " + prefix + name + " " + usage
@@ -201,7 +201,7 @@ class Perms:
                 if "h" in flags:
                     return
                 return (
-                    "```css\nChanged permissions for "+ uniStr(name)
+                    "```css\nChanged permissions for " + uniStr(name)
                     + " in " + uniStr(guild.name)
                     + " from " + uniStr(t_perm)
                     + " to " + uniStr(c_perm) + ".```"
@@ -360,37 +360,6 @@ class Restart:
         sys.exit()
 
 
-class Suspend:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["Block", "Blacklist"]
-        self.min_level = nan
-        self.description = "Prevents a user from accessing the bot's commands. Overrides <perms>."
-        self.usage = "<0:user> <1:value[]>"
-
-    async def __call__(self, _vars, user, guild, args, **void):
-        update = self.data["users"].update
-        susp = _vars.data["users"].get(user.id, {"commands": 0, "suspended": 0})
-        if len(args) < 2:
-            if len(args) >= 1:
-                user = await _vars.fetch_user(_vars.verifyID(args[0]))
-            return (
-                "```css\nCurrent suspension status of " + uniStr(user.name) + ": "
-                + uniStr(susp) + ".```"
-            )
-        else:
-            user = await _vars.fetch_user(_vars.verifyID(args[0]))
-            change = await _vars.evalMath(args[1], guild.id)
-            susp["suspended"] = change
-            _vars.data["users"][user.id] = susp
-            update()
-            return (
-                "```css\nChanged suspension status of " + uniStr(user.name) + " to "
-                + uniStr(change) + ".```"
-            )
-
-
 class Prefix:
     is_command = True
 
@@ -452,7 +421,7 @@ class Loop:
             )
             self.permError(perm, ceil(iters / scale), reason)
         elif perm is not nan and iters > 256:
-            raise PermissionError("Must be owner to execute loop of >256 iterations.")
+            raise PermissionError("Must be owner to execute loop of more than 256 iterations.")
         func = func2 = " ".join(args[1:])
         if func:
             while func[0] == " ":

@@ -102,6 +102,36 @@ class updateExec:
             await self.channel.send(embed=emb)
 
 
+class Suspend:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["Block", "Blacklist"]
+        self.min_level = nan
+        self.description = "Prevents a user from accessing the bot's commands. Overrides <perms>."
+        self.usage = "<0:user> <1:value[]>"
+
+    async def __call__(self, _vars, user, guild, args, **void):
+        update = self.data["blacklist"].update
+        if len(args) < 2:
+            if len(args) >= 1:
+                user = await _vars.fetch_user(_vars.verifyID(args[0]))
+            susp = _vars.data["blacklist"].get(user.id, None)
+            return (
+                "```css\nCurrent suspension status of " + uniStr(user.name) + ": "
+                + uniStr(susp) + ".```"
+            )
+        else:
+            user = await _vars.fetch_user(_vars.verifyID(args[0]))
+            change = await _vars.evalMath(args[1], guild.id)
+            _vars.data["blacklist"][user.id] = change
+            update()
+            return (
+                "```css\nChanged suspension status of " + uniStr(user.name) + " to "
+                + uniStr(change) + ".```"
+            )
+
+
 class updateBlacklist:
     is_database = True
     name = "blacklist"

@@ -1591,7 +1591,10 @@ class Skip:
         if auds.queue:
             song = auds.queue[0]
             if song["skips"] is None or len(song["skips"]) >= required:
-                doParallel(auds.advance, [False, not count])
+                if len(auds.queue) > 256:
+                    doParallel(auds.advance, [False, not count])
+                else:
+                    auds.advance(False, not count)
                 auds.new()
                 auds.update()
                 if count < 4:
@@ -1663,8 +1666,17 @@ class Seek:
         auds = await forceJoin(guild, channel, user, client, _vars)
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to seek while other users are in voice")
-        pos = await _vars.evalTime(argv, guild)
-        pos = auds.seek(pos)
+        orig = auds.stats["position"]
+        expr = argv
+        _op = None
+        for operator in ("+=", "-=", "*=", "/=", "%="):
+            if expr.startswith(operator):
+                expr = expr[2:].strip(" ")
+                _op = operator[0]
+        num = await _vars.evalTime(expr, guild)
+        if _op is not None:
+            num = eval(str(orig) + _op + str(num), {}, {})
+        pos = auds.seek(num)
         if auds.player is not None:
             auds.player["time"] = 1 + time.time()
         if "h" not in flags:
@@ -2346,82 +2358,93 @@ class Download:
         self.usage = "<0:search_link> <-1:out_format[ogg]> <verbose(?v)> <show_debug(?z)>"
         self.flags = "vz"
 
-    async def __call__(self, _vars, message, argv, flags, user, **void):
+    async def __call__(self, _vars, channel, message, argv, flags, user, **void):
         for a in message.attachments:
             argv = a.url + " " + argv
         if not argv:
-            raise IndexError("Please input a search term, URL, or file.")
-        if " " in argv:
-            spl = shlex.split(argv)
-            if len(spl) > 1:
-                fmt = spl[-1]
-                if fmt.startswith("."):
-                    fmt = fmt[1:]
-                if fmt not in ("mp3", "ogg", "webm"):
-                    fmt = "ogg"
+            try:
+                auds = await forceJoin(channel.guild, channel, user, _vars.client, _vars)
+                if not auds.queue:
+                    raise EOFError
+                res = [{"name": e["name"], "url": e["url"]} for e in auds.queue[:10]]
+                fmt = "ogg"
+            except:
+                raise IndexError("Queue not found. Please input a search term, URL, or file.")
+        else:
+            if " " in argv:
+                try:
+                    spl = shlex.split(argv)
+                except ValueError:
+                    spl = argv.split(" ")
+                if len(spl) > 1:
+                    fmt = spl[-1]
+                    if fmt.startswith("."):
+                        fmt = fmt[1:]
+                    if fmt not in ("mp3", "ogg", "webm"):
+                        fmt = "ogg"
+                    else:
+                        argv = " ".join(spl[:-1])
                 else:
-                    argv = " ".join(spl[:-1])
+                    fmt = "ogg"
             else:
                 fmt = "ogg"
-        else:
-            fmt = "ogg"
-        # print(argv, fmt)
-        argv = verifySearch(argv)
-        res = []
-        if isURL(argv):
-            returns = [None]
-            doParallel(funcSafe, [ytdl.extract, argv], returns, kwargs={"print_exc": True})
-            while returns[0] is None:
-                await asyncio.sleep(0.4)
-            if returns[0]:
-                if type(returns[0]) is str:
-                    raise eval(returns[0])
-                data = returns[0][0]
-                res += data
-        if not res:
-            sc = min(4, flags.get("v", 0) + 1)
-            yt = min(6, sc << 1)
-            searches = ["ytsearch" + str(yt), "scsearch" + str(sc)]
-            returns = [[None], [None]]
-            for r in range(len(returns)):
-                doParallel(
-                    funcSafe,
-                    [ytdl.downloader.extract_info, searches[r] + ":" + argv.replace(":", "~")],
-                    returns[r],
-                    kwargs=freeClass(download=False, process=r, print_exc=True).to_dict(),
-                )
-            while [None] in returns:
-                await asyncio.sleep(0.6)
-            for r in returns:
-                try:
-                    if type(r[0]) is not str:
-                        data = r[0][0]
-                        for e in data["entries"]:
-                            if "webpage_url" in e:
-                                if "title" in e:
-                                    res.append({
-                                        "name": e["title"],
-                                        "url": e["webpage_url"],
-                                    })
+            # print(argv, fmt)
+            argv = verifySearch(argv)
+            res = []
+            if isURL(argv):
+                returns = [None]
+                doParallel(funcSafe, [ytdl.extract, argv], returns, kwargs={"print_exc": True})
+                while returns[0] is None:
+                    await asyncio.sleep(0.4)
+                if returns[0]:
+                    if type(returns[0]) is str:
+                        raise eval(returns[0])
+                    data = returns[0][0]
+                    res += data
+            if not res:
+                sc = min(4, flags.get("v", 0) + 1)
+                yt = min(6, sc << 1)
+                searches = ["ytsearch" + str(yt), "scsearch" + str(sc)]
+                returns = [[None], [None]]
+                for r in range(len(returns)):
+                    doParallel(
+                        funcSafe,
+                        [ytdl.downloader.extract_info, searches[r] + ":" + argv.replace(":", "~")],
+                        returns[r],
+                        kwargs=freeClass(download=False, process=r, print_exc=True).to_dict(),
+                    )
+                while [None] in returns:
+                    await asyncio.sleep(0.6)
+                for r in returns:
+                    try:
+                        if type(r[0]) is not str:
+                            data = r[0][0]
+                            for e in data["entries"]:
+                                if "webpage_url" in e:
+                                    if "title" in e:
+                                        res.append({
+                                            "name": e["title"],
+                                            "url": e["webpage_url"],
+                                        })
+                                    else:
+                                        res.append({
+                                            "name": e["id"],
+                                            "url": e["webpage_url"],
+                                        })
                                 else:
-                                    res.append({
-                                        "name": e["id"],
-                                        "url": e["webpage_url"],
-                                    })
-                            else:
-                                if e["ie_key"].lower() == "youtube":
-                                    res.append({
-                                        "name": e["title"],
-                                        "url": "https://www.youtube.com/watch?v=" + e["url"],
-                                    })
-                    else:
+                                    if e["ie_key"].lower() == "youtube":
+                                        res.append({
+                                            "name": e["title"],
+                                            "url": "https://www.youtube.com/watch?v=" + e["url"],
+                                        })
+                        else:
+                            print(r[0])
+                    except:
                         print(r[0])
-                except:
-                    print(r[0])
-                    print(traceback.format_exc())
-        if not res:
-            raise LookupError("No results for " + uniStr(argv) + ".")
-        res = res[:10]
+                        print(traceback.format_exc())
+            if not res:
+                raise LookupError("No results for " + uniStr(argv) + ".")
+            res = res[:10]
         url_list = bytes2Hex(bytes(str([e["url"] for e in res]), "utf-8")).replace(" ", "")
         msg = (
             "```" + "\n" * ("z" in flags) + "callback-voice-download-" + str(user.id) + "_" + str(len(res)) + "_" + url_list + "_" + fmt + "\n"
