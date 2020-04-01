@@ -627,19 +627,19 @@ class serverProtector:
         try:
             await guild.kick(user)
             create_task(guild.owner.send(
-                "Apologies for the inconvenience, but " + str(user) + " (" + user.id + ") has triggered an "
+                "Apologies for the inconvenience, but " + str(user) + " (" + str(user.id) + ") has triggered an "
                 + "automated warning due to multiple channel deletions in **" + noHighlight(guild) + "** (" + str(guild.id) + "), "
                 + "and has been removed from the server to prevent any potential further attacks."
             ))
         except discord.Forbidden:
             create_task(guild.owner.send(
-                "Apologies for the inconvenience, but " + str(user) + " (" + user.id + ") has triggered an "
+                "Apologies for the inconvenience, but " + str(user) + " (" + str(user.id) + ") has triggered an "
                 + "automated warning due to multiple channel deletions in **" + noHighlight(guild) + "** (" + str(guild.id) + "), "
                 + "and were unable to be automatically removed from the server; please watch them carefully to prevent any potential further attacks."
             ))
 
     async def _channel_delete_(self, channel, guild, **void):
-        audits = await guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
+        audits = await guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete).flatten()
         ts = datetime.datetime.utcnow().timestamp()
         dels = {}
         for log in audits:
@@ -654,14 +654,14 @@ class serverProtector:
                         continue
                     user = guild.owner
                     create_task(guild.owner.send(
-                        "Apologies for the inconvenience, but your account " + str(user) + " (" + user.id + ") has triggered an "
+                        "Apologies for the inconvenience, but your account " + str(user) + " (" + str(user.id) + ") has triggered an "
                         + "automated warning due to multiple channel deletions in **" + noHighlight(guild) + "** (" + str(guild.id) + "). "
                         + "If this was intentional, please ignore this message."
                     ))
                 elif u_id == user.id:
                     create_task(guild.leave())
                     create_task(guild.owner.send(
-                        "Apologies for the inconvenience, but " + str(user) + " (" + user.id + ") has triggered an "
+                        "Apologies for the inconvenience, but " + str(user) + " (" + str(user.id)+ ") has triggered an "
                         + "automated warning due to multiple channel deletions in **" + noHighlight(guild) + "** (" + str(guild.id) + "), "
                         + "and will promptly leave the server to prevent any potential further attacks."
                     ))
