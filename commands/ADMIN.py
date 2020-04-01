@@ -667,18 +667,18 @@ class serverProtector:
     async def __call__(self):
         pass
 
-    async def kickWarn(self, u_id, guild):
+    async def kickWarn(self, u_id, guild, owner):
         user = await self._vars.fetch_user(u_id)
         try:
             await guild.kick(user, reason="Triggered automated server protection response for channel deletion.")
-            create_task(guild.owner.send(
-                "Apologies for the inconvenience, but `" + str(user) + " (" + str(user.id) + ")` has triggered an "
+            create_task(owner.send(
+                "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
                 + "automated warning due to multiple channel deletions in `" + noHighlight(guild) + " (" + str(guild.id) + ")`, "
                 + "and has been removed from the server to prevent any potential further attacks."
             ))
         except discord.Forbidden:
-            create_task(guild.owner.send(
-                "Apologies for the inconvenience, but `" + str(user) + " (" + str(user.id) + ")` has triggered an "
+            create_task(owner.send(
+                "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
                 + "automated warning due to multiple channel deletions in `" + noHighlight(guild) + " (" + str(guild.id) + ")`, "
                 + "and were unable to be automatically removed from the server; please watch them carefully to prevent any potential further attacks."
             ))
@@ -688,30 +688,33 @@ class serverProtector:
         ts = datetime.datetime.utcnow().timestamp()
         dels = {}
         for log in audits:
-            if ts - log.created_at.timestamp() < 300:
+            if ts - log.created_at.timestamp() < 120:
                 addDict(dels, {log.user.id: 1})
         user = self._vars.client.user
         for u_id in dels:
-            if dels[u_id] > 1:
+            if dels[u_id] > 2:
+                owner = guild.owner
+                if owner.id == user.id:
+                    owner = await self._vars.fetch_user(self._vars.owner_id)
                 if u_id == guild.owner.id:
                     if u_id == user.id:
-                        print("Channel Deletion warning in " + str(guild) + ".")
+                        print("Channel Deletion warning by <@" + str(user.id) + "> in " + str(guild) + ".")
                         continue
                     user = guild.owner
-                    create_task(guild.owner.send(
-                        "Apologies for the inconvenience, but your account `" + str(user) + " (" + str(user.id) + ")` has triggered an "
+                    create_task(owner.send(
+                        "Apologies for the inconvenience, but your account <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
                         + "automated warning due to multiple channel deletions in `" + noHighlight(guild) + "** (" + str(guild.id) + ")`. "
                         + "If this was intentional, please ignore this message."
                     ))
                 elif u_id == user.id:
                     create_task(guild.leave())
-                    create_task(guild.owner.send(
-                        "Apologies for the inconvenience, but `" + str(user) + " (" + str(user.id)+ ")` has triggered an "
+                    create_task(owner.send(
+                        "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id)+ ")` has triggered an "
                         + "automated warning due to multiple channel deletions in `" + noHighlight(guild) + " (" + str(guild.id) + ")`, "
                         + "and will promptly leave the server to prevent any potential further attacks."
                     ))
                 else:
-                    create_task(self.kickWarn(u_id, guild))
+                    create_task(self.kickWarn(u_id, guild, owner))
 
 
 class updateUserLogs:

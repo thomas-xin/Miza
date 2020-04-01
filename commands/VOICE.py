@@ -1171,10 +1171,9 @@ class Queue:
                     curr += "Time until playing: ["
                     estimate = sec2Time(estim / auds.speed)
                     if i <= 1 or not auds.stats["shuffle"]:
-                        curr += estimate
+                        curr += "[" + estimate + "]"
                     else:
-                        curr += "(" + discord.utils.escape_markdown(estimate, as_needed=True) + ")"
-                    curr += "]"
+                        curr += "{" + estimate + "}"
                 else:
                     curr += "Remaining time: [" + sec2Time((estim + float(e["duration"])) / auds.speed) + "]"
                 curr += "```\n"

@@ -495,8 +495,8 @@ class Mimic:
             mimics[prefix] = hlist([m_id])
         update()
         return (
-            "```fix\nSuccessfully added webhook mimic " + mimic.name
-            + " with prefix " + mimic.prefix + " and ID " + mimic.id + ".```"
+            "```css\nSuccessfully added webhook mimic [" + mimic.name
+            + "] with prefix [" + mimic.prefix + "] and ID [" + mimic.id + "].```"
         )
 
 
