@@ -625,7 +625,7 @@ class serverProtector:
     async def kickWarn(self, u_id, guild):
         user = await self._vars.fetch_user(u_id)
         try:
-            await guild.kick(user)
+            await guild.kick(user, reason="Triggered automated server protection response for channel deletion.")
             create_task(guild.owner.send(
                 "Apologies for the inconvenience, but " + str(user) + " (" + str(user.id) + ") has triggered an "
                 + "automated warning due to multiple channel deletions in **" + noHighlight(guild) + "** (" + str(guild.id) + "), "
