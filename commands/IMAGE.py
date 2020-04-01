@@ -26,12 +26,12 @@ class IMG:
         if "e" in flags or "d" in flags:
             req = 2
             if perm < req:
-                reason = "to change image list for " + uniStr(guild.name)
+                reason = "to change image list for " + guild.name
                 self.permError(perm, req, reason)
             if "e" in flags:
                 if len(images) > 64:
                     raise OverflowError(
-                        "Image list for " + uniStr(guild.name)
+                        "Image list for " + guild.name
                         + " has reached the maximum of 64 items. "
                         + "Please remove an item to add another."
                     )
@@ -45,23 +45,23 @@ class IMG:
                 update()
                 if not "h" in flags:
                     return (
-                        "```css\nSuccessfully added " + uniStr(key)
-                        + " to the image list for " + uniStr(guild.name) + ".```"
+                        "```css\nSuccessfully added [" + noHighlight(key)
+                        + "] to the image list for [" + noHighlight(guild.name) + "].```"
                     )
             if not args:
                 imglists[guild.id] = {}
                 update()
                 return (
-                    "```css\nSuccessfully removed all images from the image list for "
-                    + uniStr(guild.name) + ".```"
+                    "```css\nSuccessfully removed all images from the image list for ["
+                    + noHighlight(guild.name) + "].```"
                 )
             key = args[0].lower()
             images.pop(key)
             imglists[guild.id] = images
             update()
             return (
-                "```css\nSuccessfully removed " + uniStr(key)
-                + " from the image list for " + uniStr(guild.name) + ".```"
+                "```css\nSuccessfully removed [" + noHighlight(key)
+                + "] from the image list for [" + noHighlight(guild.name) + "].```"
             )
         if not argv and not "r" in flags:
             if images:
@@ -74,8 +74,8 @@ class IMG:
                     + "**: ```ini\n" + strIter(images, key=key).replace("'", '"') + "```"
                 )
             return (
-                "```css\nImage list for " + uniStr(guild.name)
-                + " is currently empty.```"
+                "```ini\nImage list for [" + noHighlight(guild.name)
+                + "] is currently empty.```"
             )
         sources = []
         for tag in args:
@@ -86,7 +86,7 @@ class IMG:
         for _ in loop(r):
             sources.append(images[tuple(images)[xrand(len(images))]])
         if not len(sources):
-            raise LookupError("Target image " + str(argv) + " not found. Use img for list.")
+            raise LookupError("Target image " + argv + " not found. Use img for list.")
         v = xrand(len(sources))
         url = sources[v]
         if "v" in flags:

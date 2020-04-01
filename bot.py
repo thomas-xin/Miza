@@ -364,8 +364,10 @@ class main_data:
             u_id = user.id
         except AttributeError:
             u_id = int(user)
-        if u_id in (self.owner_id, client.user.id):
+        if u_id == self.owner_id:
             return nan
+        if u_id == client.user.id:
+            return inf
         if guild is None:
             return inf
         try:
@@ -451,8 +453,8 @@ class main_data:
             reason = "for command " + self.name[-1]
         raise PermissionError(
             "Insufficient priviliges " + str(reason)
-            + ".\nRequired level: " + uniStr(req)
-            + ", Current level: " + uniStr(perm) + "."
+            + ".\nRequired level: " + str(req)
+            + ", Current level: " + str(perm) + "."
         )
 
     def getModule(self, module):
@@ -1347,7 +1349,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                     except TimeoutError:
                         raise TimeoutError("Request timed out.")
                     except Exception as ex:
-                        errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)
+                        errmsg = limStr("```py\nError: " + discord.utils.escape_markdown(repr(ex)) + "\n```", 2000)
                         print(traceback.format_exc())
                         create_task(_vars.sendReact(
                             channel,
@@ -1510,7 +1512,7 @@ async def handleMessage(message, edit=True):
             processMessage(message, cpy, edit, msg), timeout=timeout
         )
     except Exception as ex:
-        errmsg = limStr("```py\nError: " + repr(ex) + "\n```", 2000)
+        errmsg = limStr("```py\nError: " + discord.utils.escape_markdown(repr(ex)) + "\n```", 2000)
         print(traceback.format_exc())
         create_task(_vars.sendReact(
             message.channel,
@@ -1660,6 +1662,19 @@ async def on_raw_bulk_message_delete(payload):
                     except:
                         print(traceback.format_exc())
         _vars.deleteMessage(message)
+
+
+@client.event
+async def on_guild_channel_delete(channel):
+    guild = channel.guild
+    if guild:
+        for u in _vars.database.values():
+            f = getattr(u, "_channel_delete_", None)
+            if f is not None:
+                try:
+                    await f(channel=channel, guild=guild)
+                except:
+                    print(traceback.format_exc())
 
 
 async def updateEdit(before, after):

@@ -338,8 +338,8 @@ class MimicConfig:
             raise TypeError("Invalid target attribute.")
         if new is None:
             return (
-                "```fix\nCurrent " + setting + " for " 
-                + uniStr(mimic.name) + ": " + str(mimic[setting]) + ".```"
+                "```ini\nCurrent " + setting + " for [" 
+                + noHighlight(mimic.name) + "]: [" + noHighlight(mimic[setting]) + "].```"
             )
         if setting == "birthday":
             new = tparser.parse(new)
@@ -361,8 +361,8 @@ class MimicConfig:
         mimic[setting] = new
         update()
         return (
-            "```fix\nChanged " + setting + " for " 
-            + name + " to " + str(new) + ".```"
+            "```css\nChanged " + setting + " for [" 
+            + noHighlight(name) + "] to [" + noHighlight(new) + "].```"
         )
 
 
@@ -385,8 +385,8 @@ class Mimic:
                 _vars.data["mimics"].pop(user.id)
                 update()
                 return (
-                    "```css\nSuccessfully removed all webhook mimics for "
-                    + uniStr(user) + ".```"
+                    "```css\nSuccessfully removed all webhook mimics for ["
+                    + noHighlight(user) + "].```"
                 )
             for k in tuple(mimics):
                 if not mimics[k]:
@@ -394,13 +394,13 @@ class Mimic:
                     update()
             if not mimics:
                 return (
-                    "```css\nNo webhook mimics currently enabled for "
-                    + uniStr(user) + ".```"
+                    "```ini\nNo webhook mimics currently enabled for ["
+                    + noHighlight(user) + "].```"
                 )
-            key = lambda x: "⟨" + ", ".join(i + ": " + str(_vars.data["mimics"][i].name) for i in iter(x)) + "⟩"
+            key = lambda x: limStr("⟨" + ", ".join(i + ": " + str(_vars.data["mimics"][i].name) for i in iter(x)) + "⟩", 1900 / len(mimics))
             return (
                 "Currently enabled webhook mimics for **"
-                + str(user) + "**: ```ini\n"
+                + discord.utils.escape_markdown(str(user)) + "**: ```ini\n"
                 + strIter(mimics, key=key) + "```"
             )
         u_id = user.id
@@ -430,12 +430,12 @@ class Mimic:
                 mimicdb.pop(mimic.id)
             update()
             return (
-                "```css\nSuccessfully removed webhook mimic " + mimic.name
-                + " for " + uniStr(user) + ".```"
+                "```css\nSuccessfully removed webhook mimic [" + mimic.name
+                + "] for [" + noHighlight(user) + "].```"
             )
         if sum(len(i) for i in iter(mimics.values())) >= 256:
             raise OverflowError(
-                "Mimic list for " + uniStr(user)
+                "Mimic list for " + str(user)
                 + " has reached the maximum of 256 items. "
                 + "Please remove an item to add another."
             )

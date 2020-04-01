@@ -55,7 +55,7 @@ class Help:
                         + "\nEffect: " + description
                         + (
                             "\nUsage: " + prefix + name + " " + usage
-                            + "\nLevel: " + uniStr(com.min_display)
+                            + "\nLevel: [" + str(com.min_display) + "]"
                         ) * ("v" in flags)
                         + "```"
                     )
@@ -87,7 +87,7 @@ class Help:
                             + "\nEffect: " + description
                             + (
                                 "\nUsage: " + prefix + name + " " + usage
-                                + "\nLevel: " + uniStr(com.min_display)
+                                + "\nLevel: [" + str(com.min_display) + "]"
                             )
                             + "```"
                         )
@@ -201,23 +201,23 @@ class Perms:
                 if "h" in flags:
                     return
                 return (
-                    "```css\nChanged permissions for " + uniStr(name)
-                    + " in " + uniStr(guild.name)
-                    + " from " + uniStr(t_perm)
-                    + " to " + uniStr(c_perm) + ".```"
+                    "```css\nChanged permissions for [" + noHighlight(name)
+                    + "] in [" + noHighlight(guild.name)
+                    + "] from [" + noHighlight(t_perm)
+                    + "] to [" + noHighlight(c_perm) + "].```"
                 )
             else:
                 reason = (
-                    "to change permissions for " + uniStr(name)
-                    + " in " + uniStr(guild.name)
-                    + " from " + uniStr(t_perm)
-                    + " to " + uniStr(c_perm)
+                    "to change permissions for " + str(name)
+                    + " in " + str(guild.name)
+                    + " from " + str(t_perm)
+                    + " to " + str(c_perm)
                 )
                 self.permError(perm, m_perm, reason)
         return (
-            "```css\nCurrent permissions for " + uniStr(t_user.name)
-            + " in " + uniStr(guild.name)
-            + ": " + uniStr(t_perm) + ".```"
+            "```css\nCurrent permissions for [" + noHighlight(t_user.name)
+            + "] in [" + noHighlight(guild.name)
+            + "]: [" + noHighlight(t_perm) + "].```"
         )
 
 
@@ -242,7 +242,7 @@ class EnableCommand:
             if perm < req:
                 reason = (
                     "to change command list for "
-                    + uniStr(channel.name)
+                    + channel.name
                 )
                 self.permError(perm, req, reason)
         catg = argv.lower()
@@ -259,8 +259,8 @@ class EnableCommand:
                 if "h" in flags:
                     return
                 return (
-                    "```css\nEnabled standard command categories in "
-                    + uniStr(channel.name) + ".```"
+                    "```css\nEnabled standard command categories in ["
+                    + noHighlight(channel.name) + "].```"
                 )
             if "d" in flags:
                 enabled[channel.id] = []
@@ -268,8 +268,8 @@ class EnableCommand:
                 if "h" in flags:
                     return
                 return (
-                    "```css\nDisabled all command categories in "
-                    + uniStr(channel.name) + ".```"
+                    "```css\nDisabled all command categories in ["
+                    + noHighlight(channel.name) + "].```"
                 )
             return (
                 "Currently enabled command categories in <#" + str(channel.id)
@@ -278,41 +278,41 @@ class EnableCommand:
             )
         else:
             if not catg in _vars.categories:
-                raise LookupError("Unknown command category " + uniStr(argv) + ".")
+                raise LookupError("Unknown command category " + argv + ".")
             else:
                 enabled = enabled.setdefault(channel.id, {})
                 if "e" in flags:
                     if catg in enabled:
                         raise ValueError(
-                            "Command category " + uniStr(catg)
-                            + " is already enabled in " + uniStr(channel.name) + "."
+                            "Command category " + catg
+                            + " is already enabled in " + channel.name + "."
                         )
                     enabled.append(catg)
                     update()
                     if "h" in flags:
                         return
                     return (
-                        "```css\nEnabled command category " + uniStr(catg)
-                        + " in " + uniStr(channel.name) + ".```"
+                        "```css\nEnabled command category [" + noHighlight(catg)
+                        + "] in [" + noHighlight(channel.name) + "].```"
                     )
                 if "d" in flags:
                     if catg not in enabled:
                         raise ValueError(
-                            "Command category " + uniStr(catg)
-                            + " is not currently enabled in " + uniStr(channel.name) + "."
+                            "Command category " + catg
+                            + " is not currently enabled in " + channel.name + "."
                         )
                     enabled.remove(catg)
                     update()
                     if "h" in flags:
                         return
                     return (
-                        "```css\nDisabled command category " + uniStr(catg)
-                        + " in " + uniStr(channel.name) + ".```"
+                        "```css\nDisabled command category [" + noHighlight(catg)
+                        + "] in [" + noHighlight(channel.name) + "].```"
                     )
                 return (
-                    "```css\nCommand category " + uniStr(catg)
-                    + " is currently" + uniStr(" not" * (catg not in enabled))
-                    + " enabled in " + uniStr(channel.name) + ".```"
+                    "```css\nCommand category [" + noHighlight(catg)
+                    + "] is currently" + " not" * (catg not in enabled)
+                    + "] enabled in [" + noHighlight(channel.name) + "].```"
                 )
 
 
@@ -376,14 +376,14 @@ class Prefix:
         update = self.data["prefixes"].update
         if not argv:
             return (
-                "```css\nCurrent command prefix for " + uniStr(guild.name)
-                + ": " + _vars.getPrefix(guild) + "```"
+                "```css\nCurrent command prefix for [" + noHighlight(guild.name)
+                + "]: [" + noHighlight(_vars.getPrefix(guild)) + "].```"
             )
         req = 3
         if perm < req:
             reason = (
                 "to change command prefix for "
-                + uniStr(guild.name)
+                + guild.name
             )
             self.permError(perm, req, reason)
         prefix = argv
@@ -393,8 +393,8 @@ class Prefix:
         update()
         if "h" not in flags:
             return (
-                "```css\nSuccessfully changed command prefix for " + uniStr(guild.name)
-                + " to " + argv + "```"
+                "```css\nSuccessfully changed command prefix for [" + noHighlight(guild.name)
+                + "] to [" + noHighlight(argv) + "].```"
             )
 
 
@@ -416,7 +416,7 @@ class Loop:
         limit = perm * scale
         if iters > limit:
             reason = (
-                "to execute loop of " + uniStr(iters)
+                "to execute loop of " + str(iters)
                 + " iterations"
             )
             self.permError(perm, ceil(iters / scale), reason)
@@ -438,7 +438,7 @@ class Loop:
         create_task(_vars.sendReact(
             channel,
             (
-                "```css\nLooping [" + func + "] " + uniStr(iters)
+                "```css\nLooping [" + func + "] " + str(iters)
                 + " time" + "s" * (iters != 1) + "...```"
             ),
             reacts=["❎"],
@@ -851,14 +851,15 @@ class Status:
             + ", Active threads: " + uniStr(active[1])
             + ", Active coroutines: " + uniStr(active[2])
             
-            + ".\nPing latency: " + uniStr(latency)
-            
             + ".\nConnected voice channels: " + uniStr(len(client.voice_clients))
             
             + ".\nCached files: " + uniStr(len(os.listdir("cache/")))
             
             + ".\nCode size: " + uniStr(size[0]) + " bytes"
             + ", " + uniStr(size[1]) + " lines"
+
+            + ".\nSystem time: " + uniStr(datetime.datetime.now())
+            + ".\nPing latency: " + uniStr(latency)
             
             + ".\nCPU usage: " + uniStr(round(stats[0], 3)) + "%"
             + ", RAM usage: " + uniStr(round(stats[1] / 1048576, 3)) + " MB"
@@ -887,20 +888,20 @@ class Reminder:
             x = rems.pop(i)
             update()
             return (
-                "```css\nSuccessfully removed "
-                + uniStr(x.msg) + " from reminders list for "
-                + uniStr(user) + ".```"
+                "```css\nSuccessfully removed ["
+                + noHighlight(x.msg) + "] from reminders list for ["
+                + noHighlight(user) + "].```"
             )
         if not argv:
             if not len(rems):
                 return (
-                    "```css\nNo reminders currently set for "
-                    + uniStr(user) + ".```"
+                    "```ini\nNo reminders currently set for ["
+                    + noHighlight(user) + "].```"
                 )
             d = datetime.datetime.utcnow()
             s = strIter(rems, key=lambda x: limStr(x.msg, 64) + "➡️" + sec2Time((x.t - d).total_seconds()))
             return (
-                "Current reminders set for **" + str(user)
+                "Current reminders set for **" + discord.utils.escape_markdown(str(user))
                 + "**:```ini" + s + "```"
             )
         if len(rems) >= 32:
@@ -942,8 +943,8 @@ class Reminder:
         _vars.data["reminders"][user.id] = sort(rems, key=lambda x: x.t)
         update()
         return (
-            "```asciidoc\nSuccessfully set reminder for "
-            + uniStr(user) + " in " + uniStr(sec2Time(t)) + ":\n"
+            "```asciidoc\nSuccessfully set reminder for ["
+            + noHighlight(user) + "] in [" + noHighlight(sec2Time(t)) + "]:\n"
             + msg + "```"
         )
 

@@ -78,8 +78,8 @@ class Purge:
                     deleted += 1
         if not "h" in flags:
             return (
-                "```css\nDeleted " + uniStr(deleted)
-                + " message" + "s" * (deleted != 1) + "!```"
+                "```css\nDeleted [" + noHighlight(deleted)
+                + "] message" + "s" * (deleted != 1) + "!```"
             )
 
 
@@ -118,8 +118,8 @@ class Ban:
         if t_perm + 1 > perm or t_perm is nan:
             if len(args) > 1:
                 reason = (
-                    "to ban " + uniStr(t_user.name)
-                    + " from " + uniStr(guild.name)
+                    "to ban " + t_user.name
+                    + " from " + guild.name
                 )
                 self.permError(perm, t_perm + 1, reason)
         g_bans = await getBans(_vars, guild)
@@ -130,8 +130,8 @@ class Ban:
             if t_user is None:
                 if not g_bans:
                     return (
-                        "```css\nNo currently banned users for "
-                        + uniStr(guild.name) + ".```"
+                        "```css\nNo currently banned users for ["
+                        + noHighlight(guild.name) + "].```"
                     )
                 output = ""
                 for u_id in g_bans:
@@ -139,15 +139,16 @@ class Ban:
                         user = await _vars.fetch_user(u_id)
                         output += (
                             "[" + str(user) + "] "
-                            + uniStr(sec2Time(g_bans[u_id]["unban"] - dtime))
+                            + noHighlight(sec2Time(g_bans[u_id]["unban"] - dtime))
                         )
                         if "v" in flags:
                             output += " .ID: " + str(user.id)
-                        output += " .Reason: " + str(g_bans[u_id]["reason"]) + "\n"
+                        output += " .Reason: " + noHighlight(g_bans[u_id]["reason"]) + "\n"
                     except:
                         print(traceback.format_exc())
                 return (
-                    "Currently banned users from **" + guild.name + "**:\n```css\n"
+                    "Currently banned users from **" 
+                    + discord.utils.escape_markdown(guild.name) + "**:\n```css\n"
                     + output.strip("\n") + "```"
                 )
             tm = 0
@@ -181,8 +182,8 @@ class Ban:
             else:
                 users = []
                 create_task(channel.send(
-                    "```css\nUnbanning all users from "
-                    + uniStr(guild.name) + "...```"
+                    "```css\nUnbanning all users from ["
+                    + noHighlight(guild.name) + "]...```"
                 ))
             for u_id in g_bans:
                 users.append(await _vars.fetch_user(u_id))
@@ -194,14 +195,14 @@ class Ban:
                 is_banned = is_banned["unban"] - dtime
                 if len(args) < 2:
                     return (
-                        "```css\nCurrent ban for " + uniStr(t_user.name)
-                        + " from " + uniStr(guild.name) + ": "
-                        + uniStr(sec2Time(is_banned)) + ".```"
+                        "```css\nCurrent ban for [" + noHighlight(t_user.name)
+                        + "] from [" + noHighlight(guild.name) + "]: ["
+                        + noHighlight(sec2Time(is_banned)) + "].```"
                     )
             elif len(args) < 2:
                 return (
-                    "```css\n" + uniStr(t_user.name)
-                    + " is currently not banned from " + uniStr(guild.name) + ".```"
+                    "```css\n[" + noHighlight(t_user.name)
+                    + "] is currently not banned from [" + noHighlight(guild.name) + "].```"
                 )
         response = "```css"
         for t_user in users:
@@ -230,18 +231,18 @@ class Ban:
                 tm = inf
             if is_banned:
                 response += (
-                    "\nUpdated ban for " + uniStr(t_user.name)
-                    + " from " + uniStr(sec2Time(is_banned))
-                    + " to " + uniStr(sec2Time(tm)) + "."
+                    "\nUpdated ban for [" + noHighlight(t_user.name)
+                    + "] from [" + noHighlight(sec2Time(is_banned))
+                    + "] to [" + noHighlight(sec2Time(tm)) + "]."
                 )
             elif tm >= 0:
                 response += (
-                    "\n" + uniStr(t_user.name)
-                    + " has been banned from " + uniStr(guild.name)
-                    + " for " + uniStr(sec2Time(tm)) + "."
+                    "\n[" + noHighlight(t_user.name)
+                    + "] has been banned from [" + noHighlight(guild.name)
+                    + "] for [" + noHighlight(sec2Time(tm)) + "]."
                 )
             if msg is not None and tm >= 0:
-                response += " Reason: " + uniStr(msg) + "."
+                response += " Reason: [" + noHighlight(msg) + "]."
         if len(response) > 6 and "h" not in flags:
             return response + "```"
 
@@ -265,7 +266,7 @@ class RoleGiver:
         if "d" in flags:
             scheduled[channel.id] = {}
             update()
-            return "```css\nRemoved all automated role givers from channel " + uniStr(channel.name) + ".```"
+            return "```css\nRemoved all automated role givers from channel [" + noHighlight(channel.name) + "].```"
         currentSchedule = scheduled.setdefault(channel.id, {})
         if not argv:
             return (
@@ -274,7 +275,7 @@ class RoleGiver:
             )
         if len(currentSchedule) >= 16:
             raise OverflowError(
-                "Rolegiver list for " + uniStr(channel.name)
+                "Rolegiver list for " + channel.name
                 + " has reached the maximum of 16 items. "
                 + "Please remove an item to add another."
             )
@@ -285,8 +286,8 @@ class RoleGiver:
             role = float(args[1])
             if perm < role + 1 or role is nan:
                 reason = (
-                    "to assign permission giver to " + uniStr(guild.name)
-                    + " with value " + uniStr(role)
+                    "to assign permission giver to " + guild.name
+                    + " with value " + str(role) + "."
                 )
                 self.permError(perm, role + 1, reason)
             r_type = "perm"
@@ -296,9 +297,9 @@ class RoleGiver:
         currentSchedule[react] = {"role": role, "deleter": "r" in flags}
         update()
         return (
-            "```css\nAdded " + uniStr(react)
-            + "➡️" + r_type + " " + uniStr(role)
-            + " to channel " + uniStr(channel.name) + ".```"
+            "```css\nAdded [" + noHighlight(react)
+            + "] ➡️ " + r_type + " [" + noHighlight(role)
+            + "] to channel [" + noHighlight(channel.name) + "].```"
         )
 
         
@@ -319,21 +320,21 @@ class DefaultPerms:
         currPerm = perms.setdefault("defaults", {}).get(guild.id, 0)
         if not argv:
             return (
-                "```css\nCurrent default permission level for " + uniStr(guild.name)
-                + ": " + uniStr(currPerm) + ".```"
+                "```css\nCurrent default permission level for [" + noHighlight(guild.name)
+                + "]: [" + str(currPerm) + "].```"
             )
         c_perm = await _vars.evalMath(argv, guild.id)
         if perm < c_perm + 1 or c_perm is nan:
             reason = (
-                "to change default permission level for " + uniStr(guild.name)
-                + " to " + uniStr(c_perm)
+                "to change default permission level for " + guild.name
+                + " to " + str(c_perm) + "."
             )
             self.permError(perm, c_perm + 1, reason)
         perms["defaults"][guild.id] = c_perm
         update()
         return (
-            "```css\nChanged default permission level for " + uniStr(guild.name)
-            + " to " + uniStr(c_perm) + ".```"
+            "```css\nChanged default permission level for [" + noHighlight(guild.name)
+            + "] to [" + str(c_perm) + "].```"
         )
 
 
@@ -358,8 +359,8 @@ class RainbowRole:
                 colours.pop(guild.id)
                 update()
                 return (
-                    "```css\nRemoved all active dynamic role colours in "
-                    + uniStr(guild.name) + ".```"
+                    "```css\nRemoved all active dynamic role colours in ["
+                    + noHighlight(guild.name) + "].```"
                 )
             return (
                 "Currently active dynamic role colours in **" + guild.name
@@ -367,7 +368,7 @@ class RainbowRole:
             )
         if len(curr["guild_special"]) >= 7:
             raise OverflowError(
-                "Rainbow role list for " + uniStr(guild.name)
+                "Rainbow role list for " + guild.name
                 + " has reached the maximum of 7 items. "
                 + "Please remove an item to add another."
             )
@@ -419,15 +420,15 @@ class Dogpile:
         if "d" in flags:
             curr["follow"] = False
             update()
-            return "```css\nDisabled dogpile imitating for " + uniStr(guild.name) + ".```"
+            return "```css\nDisabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
         elif "e" in flags:
             curr["follow"] = True
             update()
-            return "```css\nEnabled dogpile imitating for " + uniStr(guild.name) + ".```"
+            return "```css\nEnabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
         else:
             return (
-                "```css\nCurrently " + uniStr("not " * (not curr["follow"]))
-                + "dogpile imitating in " + uniStr(guild.name) + ".```"
+                "```css\nCurrently " + "not " * (not curr["follow"])
+                + "dogpile imitating in [" + noHighlight(guild.name) + "].```"
             )
 
 
@@ -453,10 +454,10 @@ class React:
             if "d" in flags:
                 curr["reacts"] = {}
                 update()
-                return "```css\nRemoved all auto reacts for " + uniStr(guild.name) + ".```"
+                return "```css\nRemoved all auto reacts for [" + noHighlight(guild.name) + "].```"
             else:
                 return (
-                    "Currently active auto reacts for **" + guild.name
+                    "Currently active auto reacts for **" + discord.utils.escape_markdown(guild.name)
                     + "**:\n```ini\n" + strIter(curr.get("reacts", {})) + "```"
                 )
         a = args[0].lower()[:64]
@@ -465,22 +466,22 @@ class React:
                 curr["reacts"].pop(a)
                 update()
                 return (
-                    "```css\nRemoved " + uniStr(a) + " from the auto react list for "
-                    + uniStr(guild.name) + ".```"
+                    "```css\nRemoved [" + noHighlight(a) + "] from the auto react list for ["
+                    + noHighlight(guild.name) + "].```"
                 )
             else:
-                raise LookupError(uniStr(a) + " is not in the auto react list.")
+                raise LookupError(str(a) + " is not in the auto react list.")
         if len(curr["reacts"]) >= 256:
             raise OverflowError(
-                "React list for " + uniStr(guild.name)
+                "React list for " + guild.name
                 + " has reached the maximum of 256 items. "
                 + "Please remove an item to add another."
             )
         curr["reacts"][a] = args[1]
         update()
         return (
-            "```css\nAdded " + uniStr(a) + "➡️" + uniStr(args[1]) + " to the auto react list for "
-            + uniStr(guild.name) + ".```"
+            "```css\nAdded [" + noHighlight(a) + "] ➡️ [" + noHighlight(args[1]) + "] to the auto react list for ["
+            + noHighlight(guild.name) + "].```"
         )
 
 
@@ -502,27 +503,27 @@ class UserLog:
             data[guild.id] = channel.id
             update()
             return (
-                "```css\nEnabled user logging in " + uniStr(channel.name)
-                + " for " + uniStr(guild.name) + ".```"
+                "```css\nEnabled user logging in [" + noHighlight(channel.name)
+                + "] for [" + noHighlight(guild.name) + "].```"
             )
         elif "d" in flags:
             if guild.id in data:
                 data.pop(guild.id)
                 update()
             return (
-                "```css\nDisabled user logging for " + uniStr(guild.name) + ".```"
+                "```css\nDisabled user logging for [" + noHighlight(guild.name) + "].```"
             )
         if guild.id in data:
             c_id = data[guild.id]
             channel = await _vars.fetch_channel(c_id)
             return (
-                "```css\nUser logging for " + uniStr(guild.name)
-                + " is currently enabled in " + uniStr(channel.name)
-                + ".```"
+                "```css\nUser logging for [" + noHighlight(guild.name)
+                + "] is currently enabled in [" + noHighlight(channel.name)
+                + "].```"
             )
         return (
-            "```css\nUser logging is currently disabled in "
-            + uniStr(guild.name) + ".```"
+            "```css\nUser logging is currently disabled in ["
+            + noHighlight(guild.name) + "].```"
         )
 
 
@@ -544,27 +545,27 @@ class MessageLog:
             data[guild.id] = channel.id
             update()
             return (
-                "```css\nEnabled message logging in " + uniStr(channel.name)
-                + " for " + uniStr(guild.name) + ".```"
+                "```css\nEnabled message logging in [" + noHighlight(channel.name)
+                + "] for [" + noHighlight(guild.name) + "].```"
             )
         elif "d" in flags:
             if guild.id in data:
                 data.pop(guild.id)
                 update()
             return (
-                "```css\nDisabled message logging for " + uniStr(guild.name) + ".```"
+                "```css\nDisabled message logging for [" + noHighlight(guild.name) + "].```"
             )
         if guild.id in data:
             c_id = data[guild.id]
             channel = await _vars.fetch_channel(c_id)
             return (
-                "```css\nMessage logging for " + uniStr(guild.name)
-                + " is currently enabled in " + uniStr(channel.name)
-                + ".```"
+                "```css\nMessage logging for [" + noHighlight(guild.name)
+                + "] is currently enabled in [" + noHighlight(channel.name)
+                + "].```"
             )
         return (
-            "```css\nMessage logging is currently disabled in "
-            + uniStr(guild.name) + ".```"
+            "```css\nMessage logging is currently disabled in ["
+            + noHighlight(guild.name) + "].```"
         )
 
 
@@ -586,28 +587,86 @@ class FileLog:
             data[guild.id] = channel.id
             update()
             return (
-                "```css\nEnabled file logging in " + uniStr(channel.name)
-                + " for " + uniStr(guild.name) + ".```"
+                "```css\nEnabled file logging in [" + noHighlight(channel.name)
+                + "] for [" + noHighlight(guild.name) + "].```"
             )
         elif "d" in flags:
             if guild.id in data:
                 data.pop(guild.id)
                 update()
             return (
-                "```css\nDisabled file logging for " + uniStr(guild.name) + ".```"
+                "```css\nDisabled file logging for [" + noHighlight(guild.name) + "].```"
             )
         if guild.id in data:
             c_id = data[guild.id]
             channel = await _vars.fetch_channel(c_id)
             return (
-                "```css\nFile logging for " + uniStr(guild.name)
-                + " is currently enabled in " + uniStr(channel.name)
-                + ".```"
+                "```css\nFile logging for [" + noHighlight(guild.name)
+                + "] is currently enabled in [" + noHighlight(channel.name)
+                + "].```"
             )
         return (
-            "```css\nFile logging is currently disabled in "
-            + uniStr(guild.name) + ".```"
+            "```css\nFile logging is currently disabled in ["
+            + noHighlight(guild.name) + "].```"
         )
+
+
+class serverProtector:
+    is_database = True
+    name = "prot"
+    no_file = True
+
+    def __init__(self):
+        pass
+
+    async def __call__(self):
+        pass
+
+    async def kickWarn(self, u_id, guild):
+        user = await self._vars.fetch_user(u_id)
+        try:
+            await guild.kick(user)
+            create_task(guild.owner.send(
+                "Apologies for the inconvenience, but " + str(user) + " (" + user.id + ") has triggered an "
+                + "automated warning due to multiple channel deletions in **" + noHighlight(guild) + "** (" + str(guild.id) + "), "
+                + "and has been removed from the server to prevent any potential further attacks."
+            ))
+        except discord.Forbidden:
+            create_task(guild.owner.send(
+                "Apologies for the inconvenience, but " + str(user) + " (" + user.id + ") has triggered an "
+                + "automated warning due to multiple channel deletions in **" + noHighlight(guild) + "** (" + str(guild.id) + "), "
+                + "and were unable to be automatically removed from the server; please watch them carefully to prevent any potential further attacks."
+            ))
+
+    async def _channel_delete(self, channel, guild, **void):
+        audits = await guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
+        ts = datetime.datetime.utcnow().timestamp()
+        dels = {}
+        for log in audits:
+            if ts - log.created_at.timestamp() < 300:
+                addDict(dels, {log.user.id: 1})
+        user = self._vars.client.user
+        for u_id in dels:
+            if dels[u_id] > 1:
+                if u_id == guild.owner.id:
+                    if u_id == user.id:
+                        print("Channel Deletion warning in " + str(guild) + ".")
+                        continue
+                    user = guild.owner
+                    create_task(guild.owner.send(
+                        "Apologies for the inconvenience, but your account " + str(user) + " (" + user.id + ") has triggered an "
+                        + "automated warning due to multiple channel deletions in **" + noHighlight(guild) + "** (" + str(guild.id) + "). "
+                        + "If this was intentional, please ignore this message."
+                    ))
+                elif u_id == user.id:
+                    create_task(guild.leave())
+                    create_task(guild.owner.send(
+                        "Apologies for the inconvenience, but " + str(user) + " (" + user.id + ") has triggered an "
+                        + "automated warning due to multiple channel deletions in **" + noHighlight(guild) + "** (" + str(guild.id) + "), "
+                        + "and will promptly leave the server to prevent any potential further attacks."
+                    ))
+                else:
+                    create_task(self.kickWarn(u_id, guild))
 
 
 class updateUserLogs:
@@ -1142,14 +1201,14 @@ class updateBans:
                                 await g_target.unban(u_target)
                                 if c_id is not None:
                                     await c_target.send(
-                                        "```css\n" + uniStr(u_target.name)
-                                        + " has been unbanned from " + uniStr(g_target.name) + ".```"
+                                        "```css\n[" + noHighlight(u_target.name)
+                                        + "] has been unbanned from [" + noHighlight(g_target.name) + "].```"
                                     )
                             except:
                                 if c_id is not None:
                                     await c_target.send(
-                                        "```css\nUnable to unban " + uniStr(u_target.name)
-                                        + " from " + uniStr(g_target.name) + ".```"
+                                        "```css\nUnable to unban [" + noHighlight(u_target.name)
+                                        + "] from [" + noHighlight(g_target.name) + "].```"
                                     )
                                 print(traceback.format_exc())
                             bans[g].pop(b)

@@ -220,8 +220,8 @@ class customAudio(discord.AudioSource):
             try:
                 self._vars.database["playlists"].audio.pop(g)
                 msg = (
-                    "```css\n🎵 Successfully disconnected from "
-                    + uniStr(vc.guild.name) + ". 🎵```"
+                    "```css\n🎵 Successfully disconnected from ["
+                    + noHighlight(vc.guild.name) + "]. 🎵```"
                 )
                 self.loop.create_task(self._vars.sendReact(
                     self.channel,
@@ -317,9 +317,9 @@ class customAudio(discord.AudioSource):
                     if not self.stats["quiet"]:
                         if time.time() - self.lastsent > 1:
                             msg = (
-                                "```css\n🎵 Now playing "
-                                + uniStr(noHighlight(name))
-                                + ", added by " + uniStr(added_by) + "! 🎵```"
+                                "```ini\n🎵 Now playing ["
+                                + noHighlight(name)
+                                + "], added by [" + added_by + "]! 🎵```"
                             )
                             self.loop.create_task(self._vars.sendReact(
                                 self.channel,
@@ -1106,11 +1106,11 @@ class Queue:
                     if auds.queue and "download" in auds.queue[0]:
                         auds.queue[0].pop("download")
                 auds.update()
-                return "```css\nSuccessfully resumed audio playback in " + uniStr(guild.name) + ".```", 1
+                return "```css\nSuccessfully resumed audio playback in [" + noHighlight(guild.name) + "].```", 1
             if not len(q):
                 auds.preparing = False
                 auds.update()
-                return "```css\nQueue for " + uniStr(guild.name) + " is currently empty. ```", 1
+                return "```ini\nQueue for [" + noHighlight(guild.name) + "] is currently empty. ```", 1
             if auds.stats["loop"]:
                 totalTime = inf
             else:
@@ -1126,8 +1126,8 @@ class Queue:
                     i += 1
             cnt = len(q)
             info = (
-                uniStr(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
-                + uniStr(sec2Time(totalTime / auds.speed)) + "\n"
+                str(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
+                + sec2Time(totalTime / auds.speed) + "\n"
             )
             duration = float(q[0]["duration"])
             sym = "⬜⬛"
@@ -1145,7 +1145,7 @@ class Queue:
                 description=info + countstr,
                 colour=_vars.randColour(),
             )
-            embed.set_author(name="Queue for " + uniStr(guild.name) + ":")
+            embed.set_author(name="Queue for " + guild.name.replace("`", "") + ":")
             embstr = ""
             embcnt = 0
             currTime = 0
@@ -1155,32 +1155,34 @@ class Queue:
                 e = q[i]
                 curr = "`"
                 curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
-                curr += "【" + uniStr(i) + "】` "
-                curr += "[" + limStr(noHighlight(e["name"]), 64 + 192 * v) + "](" + e["url"] + ")```css\n"
+                curr += "【" + str(i) + "】` ["
+                curr += discord.utils.escape_markdown(limStr(noHighlight(e["name"]), 64 + 192 * v))
+                curr += "](" + e["url"] + ")```css\n"
                 if v:
                     curr += (
-                        "Duration: " + uniStr(sec2Time(float(e["duration"])))
-                        + ", Added by: " + uniStr(e["added by"]) + "\n"
+                        "Duration: [" + sec2Time(float(e["duration"]))
+                        + "], Added by: [" + noHighlight(e["added by"]) + "]\n"
                     )
                 if auds.reverse and len(auds.queue):
                     estim = currTime + elapsed - float(auds.queue[0]["duration"])
                 else:
                     estim = currTime - elapsed
                 if estim > 0:
-                    curr += "Time until playing: "
-                    estimate = uniStr(sec2Time(estim / auds.speed))
+                    curr += "Time until playing: ["
+                    estimate = sec2Time(estim / auds.speed)
                     if i <= 1 or not auds.stats["shuffle"]:
                         curr += estimate
                     else:
                         curr += "(" + discord.utils.escape_markdown(estimate, as_needed=True) + ")"
+                    curr += "]"
                 else:
-                    curr += "Remaining time: " + uniStr(sec2Time((estim + float(e["duration"])) / auds.speed))
+                    curr += "Remaining time: [" + sec2Time((estim + float(e["duration"])) / auds.speed) + "]"
                 curr += "```\n"
                 if len(embstr) + len(curr) < 1024:
                     embstr += curr
                 elif embcnt < v * 4:
                     embed.add_field(
-                        name="Page " + uniStr(1 + embcnt),
+                        name="Page " + str(1 + embcnt),
                         value=embstr,
                         inline=False,
                     )
@@ -1188,7 +1190,7 @@ class Queue:
                     embstr = curr
                 else:
                     embed.set_footer(
-                        text=uniStr("And " + str(len(q) - i) + " more...", 1),
+                        text=uniStr("And ", 1) + str(len(q) - i) + uniStr(" more...", 1),
                     )
                     break
                 if i <= 1 or not auds.stats["shuffle"]:
@@ -1196,7 +1198,7 @@ class Queue:
                 if not 1 + i & 4095:
                     await asyncio.sleep(0.3)
             embed.add_field(
-                name="Page " + uniStr(1 + embcnt),
+                name="Page " + str(1 + embcnt),
                 value=embstr,
                 inline=False,
             )
@@ -1243,7 +1245,7 @@ class Queue:
                 added.append(temp)
                 if not dur:
                     dur = float(duration)
-                names.append(name)
+                names.append(noHighlight(name))
             total_duration = 0
             for e in q:
                 total_duration += float(e["duration"])
@@ -1269,16 +1271,18 @@ class Queue:
             if not names:
                 raise LookupError("No results for " + str(argv) + ".")
             if "v" in flags:
-                names = uniStr(hlist(subDict(i, "id") for i in added))
+                names = noHighlight(hlist(subDict(i, "id") for i in added))
             elif len(names) == 1:
-                names = uniStr(names[0])
+                names = names[0]
             elif len(names) >= 4:
-                names = uniStr(len(names)) + " items"
+                names = str(len(names)) + " items"
+            else:
+                names = ", ".join(names)
             if "h" not in flags:
                 return (
-                    "```css\n🎶 Added " + noHighlight(names)
-                    + " to the queue! Estimated time until playing: "
-                    + uniStr(sec2Time(total_duration)) + ". 🎶```", 1
+                    "```css\n🎶 Added [" + names
+                    + "] to the queue! Estimated time until playing: ["
+                    + sec2Time(total_duration) + "]. 🎶```", 1
                 )
 
 
@@ -1303,7 +1307,7 @@ class Playlist:
             if perm < req:
                 reason = (
                     "to modify default playlist for "
-                    + uniStr(guild.name)
+                    + guild.name
                 )
                 self.permError(perm, req, reason)
         pl = pl.setdefault(guild.id, [])
@@ -1312,22 +1316,22 @@ class Playlist:
                 pl[guild.id] = []
                 update()
                 return (
-                    "```css\nRemoved all entries from the default playlist for "
-                    + uniStr(guild.name) + ".```"
+                    "```css\nRemoved all entries from the default playlist for ["
+                    + noHighlight(guild.name) + "].```"
                 )
             if not pl:
                 return (
-                    "```css\nDefault playlist for " + uniStr(guild.name)
-                    + " is currently empty.```"
+                    "```ini\nDefault playlist for [" + noHighlight(guild.name)
+                    + "] is currently empty.```"
                 )
             if "v" in flags:
                 key = lambda x: noHighlight(x)
                 s = strIter(pl, key=key).replace("'", '"')
             else:
-                key = lambda x: limStr(noHighlight(x["name"]), 40)
+                key = lambda x: limStr(noHighlight(x["name"]), 1900 / len(pl) - 10)
                 s = strIter(pl, key=key)
             return (
-                "Current default playlist for **" + guild.name 
+                "Current default playlist for **" + discord.utils.escape_markdown(guild.name)
                 + "**: ```ini\n" + s + "```"
             )
         if "d" in flags:
@@ -1336,13 +1340,13 @@ class Playlist:
             pl.pop(i)
             update()
             return (
-                "```css\nRemoved " + uniStr(noHighlight(temp["name"]))
-                + " from the default playlist for "
-                + uniStr(guild.name) + ".```"
+                "```css\nRemoved [" + noHighlight(temp["name"])
+                + "] from the default playlist for "
+                + guild.name + "```"
             )
         if len(pl) >= 64:
             raise OverflowError(
-                "Playlist size for " + uniStr(guild.name)
+                "Playlist size for " + guild.name
                 + " has reached the maximum of 64 items. "
                 + "Please remove an item to add another."
             )
@@ -1369,13 +1373,13 @@ class Playlist:
                 "id": e["id"],
             })
         if not names:
-            raise LookupError("No results for " + str(argv) + ".")
+            raise LookupError("No results for " + argv + ".")
         pl.sort(key=lambda x: x["name"].lower())
         update()
         return (
-            "```css\nAdded " + uniStr(names)
-            + " to the default playlist for "
-            + uniStr(guild.name) + ".```"
+            "```css\nAdded [" + noHighlight(", ".join(names))
+            + "] to the default playlist for ["
+            + noHighlight(guild.name) + "].```"
         )
         
 
@@ -1430,8 +1434,8 @@ class Join:
         if joined:
             await _vars.database["playlists"](guild=guild)
             return (
-                "```css\n🎵 Successfully connected to " + uniStr(vc_.name)
-                + " in " + uniStr(guild.name) + ". 🎵```", 1
+                "```css\n🎵 Successfully connected to [" + noHighlight(vc_.name)
+                + "] in [" + noHighlight(guild.name) + "]. 🎵```", 1
             )
 
 
@@ -1542,7 +1546,7 @@ class Skip:
                     raise LookupError
                 curr = auds.queue[pos]
             except LookupError:
-                response += "\n" + repr(IndexError("Entry " + uniStr(pos) + " is out of range."))
+                response += "\n" + repr(IndexError("Entry " + str(pos) + " is out of range."))
                 continue
             if type(curr["skips"]) is list:
                 if "f" in flags or user.id == curr["u_id"] and not "v" in flags:
@@ -1558,10 +1562,10 @@ class Skip:
                     response = limStr(response, 1200)
                 else:
                     response += (
-                        "Voted to remove " + uniStr(noHighlight(curr["name"]))
-                        + " from the queue.\nCurrent vote count: "
-                        + uniStr(len(curr["skips"])) + ", required vote count: "
-                        + uniStr(required) + ".\n"
+                        "Voted to remove [" + noHighlight(curr["name"])
+                        + "] from the queue.\nCurrent vote count: ["
+                        + str(len(curr["skips"])) + "], required vote count: ["
+                        + str(required) + "].\n"
                     )
             if not i & 2047:
                 await asyncio.sleep(0.2)
@@ -1580,8 +1584,8 @@ class Skip:
                     i += 1
                 if count < 4:
                     response += (
-                        uniStr(noHighlight(song["name"]))
-                        + " has been removed from the queue.\n"
+                        "[" + noHighlight(song["name"])
+                        + "] has been removed from the queue.\n"
                     )
                 count += 1
             else:
@@ -1599,15 +1603,15 @@ class Skip:
                 auds.update()
                 if count < 4:
                     response += (
-                        uniStr(noHighlight(song["name"]))
-                        + " has been removed from the queue.\n"
+                        "[" + noHighlight(song["name"])
+                        + "] has been removed from the queue.\n"
                     )
                 count += 1
         if "h" not in flags:
             if count >= 4:
                 return (
-                    "```css\n" + uniStr(count)
-                    + " items have been removed from the queue.```"
+                    "```css\n[" + str(count)
+                    + "] items have been removed from the queue.```"
                 )
             return response + "```", 1
 
@@ -1645,8 +1649,8 @@ class Pause:
         if "h" not in flags:
             past = name + "pe" * (name == "stop") + "d"
             return (
-                "```css\nSuccessfully " + past + " audio playback in "
-                + uniStr(guild.name) + ".```", 1
+                "```css\nSuccessfully " + past + " audio playback in ["
+                + noHighlight(guild.name) + "].```", 1
             )
 
 
@@ -1681,8 +1685,8 @@ class Seek:
             auds.player["time"] = 1 + time.time()
         if "h" not in flags:
             return (
-                "```css\nSuccessfully moved audio position to "
-                + uniStr(sec2Time(pos)) + ".```", 1
+                "```css\nSuccessfully moved audio position to ["
+                + noHighlight(sec2Time(pos)) + "].```", 1
             )
 
 
@@ -1691,8 +1695,8 @@ def getDump(auds):
         lim = 32768
         if len(auds.queue) > lim:
             raise OverflowError(
-                "Too many items in queue (" + uniStr(len(auds.queue))
-                + " > " + uniStr(lim) + ")."
+                "Too many items in queue (" + str(len(auds.queue))
+                + " > " + str(lim) + ")."
             )
         q = [dict(e) for e in auds.queue if random.random() < 0.99 or not time.sleep(0.01)]
         s = copy.deepcopy(auds.stats)
@@ -1784,8 +1788,8 @@ class Dump:
             auds.update()
             if not "h" in flags:
                 return (
-                    "```css\nSuccessfully loaded audio queue data for " 
-                    + uniStr(guild.name) + ".```", 1
+                    "```css\nSuccessfully loaded audio queue data for [" 
+                    + noHighlight(guild.name) + "].```", 1
                 )
         if len(auds.queue) > 8192:
             doParallel(auds.queue.extend, [q])
@@ -1794,8 +1798,8 @@ class Dump:
         auds.stats.update(d["stats"])
         if "h" not in flags:
             return (
-                "```css\nSuccessfully appended loaded data to queue for " 
-                + uniStr(guild.name) + ".```", 1
+                "```css\nSuccessfully appended loaded data to queue for [" 
+                + noHighlight(guild.name) + "].```", 1
             )
             
 
@@ -1885,7 +1889,7 @@ class AudioSettings:
                 except KeyError:
                     pass
                 return (
-                    "Current audio settings for **" + guild.name + "**:\n```ini\n"
+                    "Current audio settings for **" + discord.utils.escape_markdown(guild.name) + "**:\n```ini\n"
                     + strIter(d, key=key) + "```"
                 )
             if op == "nightcore":
@@ -1896,8 +1900,8 @@ class AudioSettings:
             return (
                 "```css\nCurrent audio " + op
                 + " state" * (type(orig) is bool)
-                + " in " + uniStr(guild.name)
-                + ": " + uniStr(num) + ".```"
+                + " in [" + noHighlight(guild.name)
+                + "]: [" + str(num) + "].```"
             )
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to modify audio settings while other users are in voice")
@@ -1907,8 +1911,8 @@ class AudioSettings:
                 auds.stats = dict(auds.defaults)
                 auds.new(auds.file, pos)
                 return (
-                    "```css\nSuccessfully reset all audio settings for "
-                    + uniStr(guild.name) + ".```"
+                    "```css\nSuccessfully reset all audio settings for ["
+                    + noHighlight(guild.name) + "].```"
                 )
             else:
                 ops.append("volume")
@@ -1949,8 +1953,8 @@ class AudioSettings:
             s += (
                 "\nChanged audio " + str(op)
                 + " state" * (type(orig) is bool)
-                + " from " + uniStr(orig)
-                + " to " + uniStr(new) + "."
+                + " from [" + str(orig)
+                + "] to [" + str(new) + "]."
             )
         if "h" not in flags:
             return "```css" + s + "```", 1
@@ -1983,8 +1987,8 @@ class Rotate:
             auds.seek(inf)
         if "h" not in flags:
             return (
-                "```css\nSuccessfully rotated the queue "
-                + uniStr(amount) + " step"
+                "```css\nSuccessfully rotated queue ["
+                + str(amount) + "] step"
                 + "s" * (amount != 1) + ".```", 1
             )
 
@@ -2015,8 +2019,8 @@ class Shuffle:
             auds.seek(inf)
         if "h" not in flags:
             return (
-                "```css\nSuccessfully shuffled audio queue for "
-                + uniStr(guild.name) + ".```", 1
+                "```css\nSuccessfully shuffled queue for ["
+                + noHighlight(guild.name) + "].```", 1
             )
 
 
@@ -2046,8 +2050,8 @@ class Reverse:
             auds.queue.rotate(-1)
         if "h" not in flags:
             return (
-                "```css\nSuccessfully reversed audio queue for "
-                + uniStr(guild.name) + ".```", 1
+                "```css\nSuccessfully reversed queue for ["
+                + noHighlight(guild.name) + "].```", 1
             )
 
 
@@ -2071,8 +2075,8 @@ class Unmute:
                         create_task(user.edit(mute=False, deafen=False))
         if "h" not in flags:
             return (
-                "```css\nSuccessfully unmuted all users in voice channels in "
-                + uniStr(guild.name) + ".```", 1
+                "```css\nSuccessfully unmuted all users in voice channels in ["
+                + noHighlight(guild.name) + "].```", 1
             )
 
 
@@ -2116,8 +2120,8 @@ class Player:
                 skips = len(s)
             else:
                 skips = 0
-            output = "Playing " + uniStr(q[0]["name"]) + ", "
-            output += uniStr(len(q)) + " item" + "s" * (len(q) != 1) + " total "
+            output = "Playing " + noHighlight(q[0]["name"]) + ", "
+            output += str(len(q)) + " item" + "s" * (len(q) != 1) + " total "
             output += skips * "🚫"
         else:
             output = "Queue is currently empty. "
@@ -2336,12 +2340,12 @@ class Player:
                         reason = "override"
                 else:
                     reason = "create controllable"
-                self.permError(perm, req, "to " + reason + " virtual audio player for " + uniStr(guild.name))
+                self.permError(perm, req, "to " + reason + " virtual audio player for " + noHighlight(guild.name))
         if "d" in flags:
             auds.player = None
             return (
-                "```css\nSuccessfully disabled virtual audio players in "
-                + uniStr(channel.guild.name) + ".```"
+                "```css\nDisabled virtual audio players in ["
+                + noHighlight(channel.guild.name) + "].```"
             )
         await createPlayer(auds, p_type="c" in flags, verbose="z" in flags)
 
@@ -2350,6 +2354,11 @@ class Download:
     is_command = True
     time_consuming = True
     _timeout_ = 360
+
+    def ensure_url(self, url):
+        if url.startswith("ytsearch:"):
+            url = "https://www.youtube.com/results?search_query=" + url[9:]
+        return url
 
     def __init__(self):
         self.name = ["Search", "YTDL", "Youtube_DL", "Convert"]
@@ -2368,7 +2377,7 @@ class Download:
                     raise EOFError
                 res = [{"name": e["name"], "url": e["url"]} for e in auds.queue[:10]]
                 fmt = "ogg"
-                end = "Current items in queue for " + uniStr(channel.guild.name) + ":```"
+                end = "Current items in queue for " + channel.guild.name + ":```"
             except:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
         else:
@@ -2444,9 +2453,9 @@ class Download:
                         print(r[0])
                         print(traceback.format_exc())
             if not res:
-                raise LookupError("No results for " + uniStr(argv) + ".")
+                raise LookupError("No results for " + argv + ".")
             res = res[:10]
-            end = "Search results for " + uniStr(argv) + ":```"
+            end = "Search results for " + argv + ":```"
         url_list = bytes2Hex(bytes(str([e["url"] for e in res]), "utf-8")).replace(" ", "")
         msg = (
             "```" + "\n" * ("z" in flags) + "callback-voice-download-" + str(user.id) 
@@ -2459,7 +2468,7 @@ class Download:
                 url = url[:-len(size)] + "?size=4096"
         emb.set_author(name=str(user), url=url, icon_url=url)
         emb.description = "\n".join(
-            ["`【" + str(i) + "】` [" + discord.utils.escape_markdown(e["name"] + "](" + e["url"] + ")") for i in range(len(res)) for e in [res[i]]]
+            ["`【" + str(i) + "】` [" + discord.utils.escape_markdown(e["name"] + "](" + self.ensure_url(e["url"]) + ")") for i in range(len(res)) for e in [res[i]]]
         )
         sent = await message.channel.send(
             msg,

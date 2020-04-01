@@ -270,7 +270,7 @@ async def searchRandomNSFW(argv, delay=10):
         await asyncio.sleep(0.6)
     data = [i for i in data if i]
     if not data:
-        raise EOFError("No results for " + uniStr(argv) + ".")
+        raise EOFError("No results for " + argv + ".")
     item = random.choice(data)
     return item
 
@@ -390,7 +390,7 @@ class Neko:
                 url = nekos.img("neko")
             else:
                 raise EOFError(
-                    "Search tag " + uniStr(argv) + " not found. Use ?l for list.")
+                    "Search tag " + argv + " not found. Use ?l for list.")
         else:
             v = xrand(len(selected))
             get = selected[v]

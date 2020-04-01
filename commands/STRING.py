@@ -215,6 +215,31 @@ class OwOify:
         return "```fix\n" + argv.translate(self.otrans) + "```"
 
 
+class Time:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["UTC", "GMT"]
+        self.min_level = 0
+        self.description = "Shows the current time in a certain timezone."
+        self.usage = "<offset_hours[0]>"
+
+    async def __call__(self, argv, guild, **void):
+        if argv:
+            h = await self._vars.evalMath(argv, guild)
+        else:
+            h = 0
+        hrs = datetime.timedelta(hours=h)
+        t = datetime.datetime.utcnow() + hrs
+        s = str(h)
+        if not s.startswith("-"):
+            s = "+" + s
+        return (
+            "```fix\nCurrent time at UTC/GMT" + s 
+            + ": " + str(t) + ".```"
+        )
+
+
 class UrbanDictionary:
     is_command = True
     time_consuming = True
@@ -255,16 +280,16 @@ class UrbanDictionary:
             d = eval(s, {}, {})
         l = d["list"]
         if not l:
-            raise LookupError("No results for " + uniStr(argv) + ".")
+            raise LookupError("No results for " + argv + ".")
         l.sort(
             key=lambda e: e.get("thumbs_up", 0) - e.get("thumbs_down", 0),
             reverse=True,
         )
         if "v" in flags:
             output = (
-                "```ini\n" + uniStr(argv) + "\n"
+                "```ini\n[" + noHighlight(argv) + "]\n"
                 + "\n".join(
-                    "[" + uniStr(i + 1) + "] " + l[i].get(
+                    "[" + str(i + 1) + "] " + l[i].get(
                         "definition",
                         "",
                     ).replace("\n", " ").replace("\r", "") for i in range(
@@ -275,7 +300,7 @@ class UrbanDictionary:
             )
         else:
             output = (
-                "```ini\n" + uniStr(argv) + "\n"
+                "```ini\n[" + noHighlight(argv) + "]\n"
                 + l[0].get("definition", "") + "```"
             )
         return output

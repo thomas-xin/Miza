@@ -512,7 +512,7 @@ class CS_npc:
             else:
                 return "Search results for **" + argv + "**:\n```\n" + output + "```"
         else:
-            raise EOFError("No results found for " + uniStr(argv) + ".")
+            raise EOFError("No results found for " + argv + ".")
 
 
 class CS_tsc:
@@ -554,7 +554,7 @@ class CS_tsc:
             else:
                 return "Search results for **" + argv + "**:\n```\n" + output + "```"
         else:
-            raise EOFError("No results found for " + uniStr(argv) + ".")
+            raise EOFError("No results found for " + argv + ".")
 
 
 class CS_mod:
@@ -583,9 +583,9 @@ class CS_mod:
             for l in data:
                 line = (
                     "\n<" + str(l["url"]) + ">\n"
-                    + "```css\nName: " + uniStr(l["name"])
-                    + "\nAuthor: " + uniStr(l["author"])
-                    + "\n" + limStr(l["description"].replace("\n", " "), 128)
+                    + "```css\nName: [" + noHighlight(l["name"])
+                    + "]\nAuthor: [" + noHighlight(l["author"])
+                    + "]\n" + limStr(l["description"].replace("\n", " "), 128)
                     + "```\r"
                 )
                 response += line
@@ -601,4 +601,4 @@ class CS_mod:
                         curr += line
             return response
         else:
-            raise EOFError("No results found for " + uniStr(argv) + ".")
+            raise EOFError("No results found for " + argv + ".")

@@ -24,17 +24,17 @@ class Execute:
         if "e" in flags:
             _vars.database["exec"].channel = channel
             return (
-                "```css\nSuccessfully changed code channel to "
-                + uniStr(channel.id) + ".```"
+                "```css\nSuccessfully changed code execution channel to ["
+                + noHighlight(channel.name) + "].```"
             )
         elif "d" in flags:
             _vars.database["exec"].channel = freeClass(id=None)
             return (
-                "```css\nSuccessfully removed code channel.```"
+                "```fix\nSuccessfully removed code execution channel.```"
             )
         return (
-            "```css\ncode channel is currently set to "
-            + uniStr(_vars.database["exec"].channel.id) + ".```"
+            "```css\ncode channel is currently set to ["
+            + noHighlight(_vars.database["exec"].channel.name) + "].```"
         )
         
 
@@ -118,8 +118,8 @@ class Suspend:
                 user = await _vars.fetch_user(_vars.verifyID(args[0]))
             susp = _vars.data["blacklist"].get(user.id, None)
             return (
-                "```css\nCurrent suspension status of " + uniStr(user.name) + ": "
-                + uniStr(susp) + ".```"
+                "```css\nCurrent suspension status of [" + noHighlight(user.name) + "]: ["
+                + noHighlight(susp) + "].```"
             )
         else:
             user = await _vars.fetch_user(_vars.verifyID(args[0]))
@@ -127,8 +127,8 @@ class Suspend:
             _vars.data["blacklist"][user.id] = change
             update()
             return (
-                "```css\nChanged suspension status of " + uniStr(user.name) + " to "
-                + uniStr(change) + ".```"
+                "```css\nChanged suspension status of [" + noHighlight(user.name) + "] to ["
+                + noHighlight(change) + "].```"
             )
 
 
@@ -171,7 +171,6 @@ class updateBlacklist:
             f = open(self.suspected, "w")
             f.write(str(user.id))
             f.close()
-            self.update()
 
     async def __call__(self, **void):
         if time.time() - self.suspclear:
