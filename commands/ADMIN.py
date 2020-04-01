@@ -862,10 +862,47 @@ class updateUserLogs:
             emb = discord.Embed(colour=1)
             url = self._vars.strURL(user.avatar_url)
             emb.set_author(name=str(user), icon_url=url, url=url)
-            emb.description = (
-                "<@" + str(user.id)
-                + "> has left the server."
-            )
+            kick = None
+            ban = None
+            try:
+                ts = datetime.datetime.utcnow().timestamp()
+                bans = await guild.audit_logs(limit=4, action=discord.AuditLogAction.ban).flatten()
+                kicks += await guild.audit_logs(limit=4, action=discord.AuditLogAction.kick).flatten()
+                for log in bans:
+                    if ts - log.created_at.timestamp() < 3:
+                        if log.target.id == user.id:
+                            ban = freeClass(id=log.user.id, reason=log.reason)
+                            raise StopIteration
+                for log in kicks:
+                    if ts - log.created_at.timestamp() < 3:
+                        if log.target.id == user.id:
+                            kick = freeClass(id=log.user.id, reason=log.reason)
+                            raise StopIteration
+            except StopIteration:
+                pass
+            except:
+                print(traceback.format_exc())
+            if ban is not None:
+                emb.description = (
+                    "<@" + str(user.id)
+                    + "> has been banned by <@"
+                    + str(ban.id) + ">."
+                )
+                if ban.reason:
+                    emb.description += "\nReason: `" + noHighlight(ban.reason) + "`"
+            elif kick is not None:
+                emb.description = (
+                    "<@" + str(user.id)
+                    + "> has been kicked by <@"
+                    + str(kick.id) + ">."
+                )
+                if kick.reason:
+                    emb.description += "\nReason: `" + noHighlight(kick.reason) + "`"
+            else:
+                emb.description = (
+                    "<@" + str(user.id)
+                    + "> has left the server."
+                )
             await channel.send(embed=emb)
 
 
