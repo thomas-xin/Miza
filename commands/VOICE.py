@@ -1679,7 +1679,7 @@ class Seek:
                 _op = operator[0]
         num = await _vars.evalTime(expr, guild)
         if _op is not None:
-            num = eval(str(orig) + _op + str(num), {}, {})
+            num = eval(str(orig) + _op + str(num), {}, infinum)
         pos = auds.seek(num)
         if auds.player is not None:
             auds.player["time"] = 1 + time.time()
@@ -1937,7 +1937,7 @@ class AudioSettings:
             else:
                 orig = round(origVol[op] * 100, 9)
             if _op is not None:
-                num = eval(str(orig) + _op + str(num), {}, {})
+                num = eval(str(orig) + _op + str(num), {}, infinum)
             val = roundMin(float(num / 100))
             new = round(val * 100, 9)
             if op in "loop shuffle quiet":

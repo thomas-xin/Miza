@@ -1217,7 +1217,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                 check = comm[:length].lower()
                 argv = comm[length:]
                 match = check == alias and (
-                    len(comm) == length or comm[length] == " " or comm[length] in "?-"
+                    len(comm) == length or comm[length] == " " or comm[length] in "?-+"
                 )
                 if match:
                     run = True

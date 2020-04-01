@@ -277,7 +277,7 @@ class UrbanDictionary:
         try:
             d = json.loads(s)
         except:
-            d = eval(s, {}, {})
+            d = eval(s, {}, infinum)
         l = d["list"]
         if not l:
             raise LookupError("No results for " + argv + ".")

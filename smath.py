@@ -40,6 +40,10 @@ Mat = mat = matrix = mpmath.matrix
 
 inf = math.inf
 nan = math.nan
+infinum = {
+    "inf": inf,
+    "nan": nan,
+}
 i = I = j = J = 1j
 pi = mp.pi
 E = e = mp.e

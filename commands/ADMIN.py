@@ -162,7 +162,7 @@ class Ban:
                     _op = operator[0]
             num = await _vars.evalTime(expr, guild)
             if _op is not None:
-                num = eval(str(orig) + _op + str(num), {}, {})
+                num = eval(str(orig) + _op + str(num), {}, infinum)
             tm = num
         await channel.trigger_typing()
         if len(args) >= 3:
@@ -170,7 +170,7 @@ class Ban:
         else:
             msg = None
         if t_user is None:
-            if not "f" in flags:
+            if "f" not in flags:
                 response = uniStr(
                     "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
                     + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
@@ -391,6 +391,51 @@ class RainbowRole:
             "Changed dynamic role colours for **" + guild.name
             + "** to:\n```ini\n" + strIter(guild_special) + "```"
         )
+
+
+class Lockdown:
+    is_command = True
+    server_only = True
+
+    def __init__(self):
+        self.name = []
+        self.min_level = inf
+        self.description = "Completely locks down the server by removing send message permissions for all users and revoking all invites."
+        self.usage = ""
+        self.flags = "f"
+
+    async def roleLock(self, role, channel):
+        perm = role.permissions
+        perm.administrator = False
+        perm.send_messages = False
+        try:
+            await role.edit(permissions=perm, reason="Server Lockdown.")
+        except Exception as ex:
+            await channel.send(limStr("```py\n" + noHighlight(repr(ex)) + "```", 2000))
+    
+    async def invLock(self, inv, channel):
+        try:
+            await inv.delete(reason="Server Lockdown.")
+        except Exception as ex:
+            await channel.send(limStr("```py\n" + noHighlight(repr(ex)) + "```", 2000))
+    
+    async def __call__(self, guild, channel, flags, **void):
+        if "f" not in flags:
+            response = uniStr(
+                "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
+                + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
+            )
+            return ("```asciidoc\n[" + response + "]```")
+        u_id = self._vars.client.user.id
+        for role in guild.roles:
+            if len(role.members) != 1 or role.members[-1].id != u_id:
+                create_task(self.roleLock(role, channel))
+        for inv in guild.invites:
+            create_task(self.invLock(inv, channel))
+        response = uniStr(
+            "LOCKDOWN REQUESTED."
+        )
+        return ("```asciidoc\n[" + response + "]```")
         
 
 follow_default = {

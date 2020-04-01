@@ -262,7 +262,7 @@ class Cat:
                 try:
                     d = json.loads(resp.content)
                 except:
-                    d = eval(resp.content, {}, {})
+                    d = eval(resp.content, {}, infinum)
                 try:
                     if type(d) is list:
                         d = random.choice(d)
@@ -306,7 +306,7 @@ class Dog:
             try:
                 d = json.loads(s)
             except:
-                d = eval(s, {}, {})
+                d = eval(s, {}, infinum)
             try:
                 if type(d) is list:
                     d = random.choice(d)

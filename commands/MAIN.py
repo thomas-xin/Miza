@@ -188,7 +188,7 @@ class Perms:
                 m_perm = max(t_perm, c_perm, 1) + 1
             if not perm <= m_perm and m_perm is not nan:
                 if t_user is None:
-                    if not "f" in flags:
+                    if "f" not in flags:
                         response = uniStr(
                             "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
                             + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
