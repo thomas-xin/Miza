@@ -453,7 +453,7 @@ class main_data:
             reason = "for command " + self.name[-1]
         raise PermissionError(
             "Insufficient priviliges " + str(reason)
-            + ".\nRequired level: " + str(req)
+            + ". Required level: " + str(req)
             + ", Current level: " + str(perm) + "."
         )
 
