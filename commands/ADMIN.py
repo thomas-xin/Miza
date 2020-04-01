@@ -93,7 +93,7 @@ class Ban:
         self.min_display = "3+"
         self.description = "Bans a user for a certain amount of time, with an optional reason."
         self.usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
-        self.flags = "hv"
+        self.flags = "hvf"
 
     async def __call__(self, _vars, args, user, channel, guild, flags, perm, name, **void):
         update = self.data["bans"].update
@@ -153,7 +153,10 @@ class Ban:
                 )
             tm = 0
         else:
-            orig = g_bans.get(t_user.id, 0)
+            if t_user is None:
+                orig = 0
+            else:
+                orig = g_bans.get(t_user.id, 0)
             expr = " ".join(args[1:-1])
             _op = None
             for operator in ("+=", "-=", "*=", "/=", "%="):

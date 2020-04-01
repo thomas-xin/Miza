@@ -1460,6 +1460,9 @@ def uniStr(s, fmt=0):
 def reconstitute(s):
     return str(s).translate(__trans)
 
+def sbHighlight(s):
+    return "[" + noHighlight(s) + "]"
+
 
 __hlist_maxoff__ = (1 << 31) - 1
 

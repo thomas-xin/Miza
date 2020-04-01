@@ -843,26 +843,26 @@ class Status:
         stats = _vars.currState
         return (
             "```css"
-            + "\nActive users: " + uniStr(len(client.users))
-            + ", Active servers: " + uniStr(_vars.guilds)
-            + ", Active shards: " + uniStr(shards)
+            + "\nActive users: " + sbHighlight(len(client.users))
+            + ", Active servers: " + sbHighlight(_vars.guilds)
+            + ", Active shards: " + sbHighlight(shards)
             
-            + ".\nActive processes: " + uniStr(active[0])
-            + ", Active threads: " + uniStr(active[1])
-            + ", Active coroutines: " + uniStr(active[2])
+            + ".\nActive processes: " + sbHighlight(active[0])
+            + ", Active threads: " + sbHighlight(active[1])
+            + ", Active coroutines: " + sbHighlight(active[2])
             
-            + ".\nConnected voice channels: " + uniStr(len(client.voice_clients))
+            + ".\nConnected voice channels: " + sbHighlight(len(client.voice_clients))
             
-            + ".\nCached files: " + uniStr(len(os.listdir("cache/")))
+            + ".\nCached files: " + sbHighlight(len(os.listdir("cache/")))
             
-            + ".\nCode size: " + uniStr(size[0]) + " bytes"
-            + ", " + uniStr(size[1]) + " lines"
+            + ".\nCode size: " + sbHighlight(size[0]) + " bytes"
+            + ", " + sbHighlight(size[1]) + " lines"
 
-            + ".\nSystem time: " + uniStr(datetime.datetime.now())
-            + ".\nPing latency: " + uniStr(latency)
+            + ".\nSystem time: " + sbHighlight(datetime.datetime.now())
+            + ".\nPing latency: " + sbHighlight(latency)
             
-            + ".\nCPU usage: " + uniStr(round(stats[0], 3)) + "%"
-            + ", RAM usage: " + uniStr(round(stats[1] / 1048576, 3)) + " MB"
+            + ".\nCPU usage: " + sbHighlight(round(stats[0], 3)) + "%"
+            + ", RAM usage: " + sbHighlight(round(stats[1] / 1048576, 3)) + " MB"
             + ".```"
         )
 
