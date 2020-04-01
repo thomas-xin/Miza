@@ -638,7 +638,7 @@ class serverProtector:
                 + "and were unable to be automatically removed from the server; please watch them carefully to prevent any potential further attacks."
             ))
 
-    async def _channel_delete(self, channel, guild, **void):
+    async def _channel_delete_(self, channel, guild, **void):
         audits = await guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
         ts = datetime.datetime.utcnow().timestamp()
         dels = {}

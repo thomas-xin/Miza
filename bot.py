@@ -1666,6 +1666,7 @@ async def on_raw_bulk_message_delete(payload):
 
 @client.event
 async def on_guild_channel_delete(channel):
+    print(channel, "was deleted.")
     guild = channel.guild
     if guild:
         for u in _vars.database.values():
