@@ -1002,7 +1002,7 @@ class updateMessageLogs:
                                 init = "<@" + str(t.id) + ">"
                                 #print(t, e.target)
                 if t.bot or u.id == t.id == cu_id:
-                    print(self._vars.strMessage(message, True))
+                    print(self._vars.strMessage(message, username=True))
                     return
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
