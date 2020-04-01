@@ -867,7 +867,7 @@ class updateUserLogs:
             try:
                 ts = datetime.datetime.utcnow().timestamp()
                 bans = await guild.audit_logs(limit=4, action=discord.AuditLogAction.ban).flatten()
-                kicks += await guild.audit_logs(limit=4, action=discord.AuditLogAction.kick).flatten()
+                kicks = await guild.audit_logs(limit=4, action=discord.AuditLogAction.kick).flatten()
                 for log in bans:
                     if ts - log.created_at.timestamp() < 3:
                         if log.target.id == user.id:
