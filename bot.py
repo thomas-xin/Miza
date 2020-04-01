@@ -956,11 +956,13 @@ class main_data:
     def strURL(self, url):
         return str(url).replace(".webp", ".png")
 
-    def strMessage(self, message, limit=1024):
+    def strMessage(self, message, limit=1024, username=False):
         c = message.content
         s = getattr(message, "system_content", "")
         if s and len(s) > len(c):
             c = s
+        if username:
+            c = "<@" + str(message.author.id) + ">:\n" + c
         data = limStr(c, limit)
         if message.reactions:
             data += "\n{" + ", ".join(str(i) for i in message.reactions) + "}"
@@ -1159,8 +1161,11 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         try:
             enabled = _vars.data["enabled"][c_id]
         except KeyError:
-            enabled = _vars.data["enabled"][c_id] = ["main", "string", "admin"]
-            _vars.update()
+            try:
+                enabled = _vars.data["enabled"][c_id] = ["main", "string", "admin"]
+                _vars.update()
+            except KeyError:
+                enabled = ["main", "admin"]
     else:
         enabled = list(_vars.categories)
     u_perm = _vars.getPerms(u_id, guild)
@@ -1235,7 +1240,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             argv = argv.strip(" ")
                             if hasattr(command, "flags"):
                                 flaglist = command.flags
-                                for q in "?-":
+                                for q in "?-+":
                                     if q in argv:
                                         for char in flaglist:
                                             flag = q + char

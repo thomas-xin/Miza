@@ -310,7 +310,7 @@ class MimicConfig:
         m_id = "&" + str(_vars.verifyID(args.pop(0)))
         if m_id not in mimicdb:
             raise LookupError("Target mimic ID not found.")
-        if perm is not nan:
+        if not isnan(perm):
             mimics = mimicdb.setdefault(user.id, {})
             found = 0
             for prefix in mimics:
@@ -421,7 +421,7 @@ class Mimic:
                     mimics.pop(prefix)
             except KeyError:
                 mimic = _vars.get_mimic(prefix)
-                if perm is not nan and mimic.u_id != user.id:
+                if not isnan(perm) and mimic.u_id != user.id:
                     raise PermissionError("Target mimic does not belong to you.")
                 mimics = mimicdb[mimic.u_id]
                 m_id = mimic.id

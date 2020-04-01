@@ -115,7 +115,7 @@ class Ban:
                 except LookupError:
                     t_user = await _vars.fetch_whuser(u_id, guild)
             t_perm = _vars.getPerms(t_user, guild)
-        if t_perm + 1 > perm or t_perm is nan:
+        if t_perm + 1 > perm or isnan(t_perm):
             if len(args) > 1:
                 reason = (
                     "to ban " + t_user.name
@@ -168,7 +168,7 @@ class Ban:
         if len(args) >= 3:
             msg = args[-1]
         else:
-            msg = None ()
+            msg = None
         if t_user is None:
             if "f" not in flags:
                 response = uniStr(
@@ -289,7 +289,7 @@ class RoleGiver:
             raise OverflowError("Search substring too long.")
         try:
             role = float(args[1])
-            if perm < role + 1 or role is nan:
+            if perm < role + 1 or isnan(role):
                 reason = (
                     "to assign permission giver to " + guild.name
                     + " with value " + str(role) + "."
@@ -329,7 +329,7 @@ class DefaultPerms:
                 + "]: [" + str(currPerm) + "].```"
             )
         c_perm = await _vars.evalMath(argv, guild.id)
-        if perm < c_perm + 1 or c_perm is nan:
+        if perm < c_perm + 1 or isnan(c_perm):
             reason = (
                 "to change default permission level for " + guild.name
                 + " to " + str(c_perm) + "."
@@ -1002,6 +1002,7 @@ class updateMessageLogs:
                                 init = "<@" + str(t.id) + ">"
                                 #print(t, e.target)
                 if t.bot or u.id == t.id == cu_id:
+                    print(self._vars.strMessage(message, True))
                     return
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
@@ -1214,31 +1215,39 @@ class updateColours:
         self.counter = 0
         self.count = 0
         self.delay = 0
+        self.busy_guilds = {}
 
     async def changeColour(self, g_id, roles):
-        guild = await self._vars.fetch_guild(g_id)
-        l = list(roles)
-        for r in l:
-            try:
-                role = guild.get_role(r)
-                delay = roles[r]
-                if not random.randint(0, ceil(delay)):
-                    col = self._vars.randColour()
-                    try:
-                        await role.edit(colour=discord.Colour(col))
-                    except KeyError:
-                        self.count += 15
-                        self._vars.blocked += 1
-                        break
-                    self.count += 1
-                    #print("Edited role " + role.name)
-                await asyncio.sleep(frand(2))
-            except discord.Forbidden:
-                print(traceback.format_exc())
-            except discord.HTTPException as ex:
-                print(traceback.format_exc())
-                self._vars.blocked += 60
-                break
+        if self.busy_guilds.get(g_id, 0) > 1:
+            return
+        addDict(self.busy_guilds, {g_id: 1})
+        try:
+            guild = await self._vars.fetch_guild(g_id)
+            l = list(roles)
+            for r in l:
+                try:
+                    role = guild.get_role(r)
+                    delay = roles[r]
+                    if not random.randint(0, ceil(delay)):
+                        col = self._vars.randColour()
+                        try:
+                            await role.edit(colour=discord.Colour(col))
+                        except KeyError:
+                            self.count += 15
+                            self._vars.blocked += 1
+                            break
+                        self.count += 1
+                        #print("Edited role " + role.name)
+                    await asyncio.sleep(frand(2))
+                except discord.Forbidden:
+                    print(traceback.format_exc())
+                except discord.HTTPException:
+                    print(traceback.format_exc())
+                    self._vars.blocked += 60
+                    break
+        except:
+            print(traceback.format_exc())
+        addDict(self.busy_guilds, {g_id: -1})
 
     async def __call__(self):
         self.counter = self.counter + 1 & 65535

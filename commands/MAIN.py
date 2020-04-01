@@ -28,7 +28,7 @@ class Help:
         prefix = _vars.getPrefix(g_id)
         enabled = enabled.get(channel.id, list(default_commands))
         c_name = getattr(channel, "name", "DM")
-        admin = (not inf > perm, perm is nan)[c_name == "DM"]
+        admin = (not inf > perm, isnan(perm))[c_name == "DM"]
         categories = _vars.categories
         verb = "v" in flags
         show = []
@@ -45,7 +45,7 @@ class Help:
                     min_level = com.min_level
                     description = com.description
                     usage = com.usage
-                    if min_level > perm or (perm is not nan and min_level is nan):
+                    if min_level > perm or (not isnan(perm) and isnan(min_level)):
                         continue
                     if c_name == "DM" and getattr(com, "server_only", False):
                         continue
@@ -70,7 +70,7 @@ class Help:
                     min_level = com.min_level
                     description = com.description
                     usage = com.usage
-                    if min_level > perm or (perm is not nan and min_level is nan):
+                    if min_level > perm or (not isnan(perm) and isnan(min_level)):
                         continue
                     if c_name == "DM" and getattr(com, "server_only", False):
                         continue
@@ -103,7 +103,7 @@ class Help:
                 min_level = com.min_level
                 description = com.description
                 usage = com.usage
-                if min_level > perm or (perm is not nan and min_level is nan):
+                if min_level > perm or (not isnan(perm) and isnan(min_level)):
                     continue
                 if c_name == "DM" and getattr(com, "server_only", False):
                     continue
@@ -180,13 +180,13 @@ class Perms:
                     _op = operator[0]
             num = await _vars.evalMath(expr, guild)
             if _op is not None:
-                num = eval(str(orig) + _op + str(num), {}, {})
+                num = eval(str(orig) + _op + str(num), {}, infinum)
             c_perm = num
-            if t_perm is nan or c_perm is nan:
+            if t_perm is nan or isnan(c_perm):
                 m_perm = nan
             else:
                 m_perm = max(t_perm, c_perm, 1) + 1
-            if not perm <= m_perm and m_perm is not nan:
+            if not perm <= m_perm and not isnan(m_perm):
                 if t_user is None:
                     if "f" not in flags:
                         response = uniStr(
@@ -420,13 +420,13 @@ class Loop:
                 + " iterations"
             )
             self.permError(perm, ceil(iters / scale), reason)
-        elif perm is not nan and iters > 256:
+        elif not isnan(perm) and iters > 256:
             raise PermissionError("Must be owner to execute loop of more than 256 iterations.")
         func = func2 = " ".join(args[1:])
         if func:
             while func[0] == " ":
                 func = func[1:]
-        if perm is not nan:
+        if not isnan(perm):
             for n in self.name:
                 if (
                     (_vars.getPrefix(guild) + n).upper() in func.replace(" ", "").upper()

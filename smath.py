@@ -629,6 +629,9 @@ def pulse(x, y=0.5):
     return x
 
 
+isnan = cmath.isnan
+
+
 def isValid(x):
     if type(x) is complex:
         return not (cmath.isinf(x) or cmath.isnan(x))
