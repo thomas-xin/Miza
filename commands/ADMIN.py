@@ -948,6 +948,7 @@ class updateMessageLogs:
 
     async def _delete_(self, message, bulk=False, **void):
         if bulk:
+            print(self._vars.strMessage(message, username=True))
             return
         guild = message.guild
         if guild.id in self.data:
