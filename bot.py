@@ -1666,7 +1666,7 @@ async def on_raw_bulk_message_delete(payload):
 
 @client.event
 async def on_guild_channel_delete(channel):
-    print(channel, "was deleted.")
+    print(channel, "was deleted from", channel.guild)
     guild = channel.guild
     if guild:
         for u in _vars.database.values():
@@ -1674,6 +1674,19 @@ async def on_guild_channel_delete(channel):
             if f is not None:
                 try:
                     await f(channel=channel, guild=guild)
+                except:
+                    print(traceback.format_exc())
+
+
+@client.event
+async def on_member_ban(guild, user):
+    print(user, "was banned from", guild)
+    if guild:
+        for u in _vars.database.values():
+            f = getattr(u, "_ban_", None)
+            if f is not None:
+                try:
+                    await f(user=user, guild=guild)
                 except:
                     print(traceback.format_exc())
 

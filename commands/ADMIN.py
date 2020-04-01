@@ -168,17 +168,22 @@ class Ban:
         if len(args) >= 3:
             msg = args[-1]
         else:
-            msg = None
+            msg = None ()
         if t_user is None:
             if "f" not in flags:
                 response = uniStr(
                     "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
                     + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
                 )
+                
                 return ("```asciidoc\n[" + response + "]```")
             if tm >= 0:
-                it = guild.fetch_members(limit=None)
-                users = await it.flatten()
+                raise PermissionError(
+                    "Banning every user in a server is no longer allowed "
+                    + "in order to prevent misuse and/or security issues."
+                )
+                # it = guild.fetch_members(limit=None)
+                # users = await it.flatten()
             else:
                 users = []
                 create_task(channel.send(
@@ -667,54 +672,68 @@ class serverProtector:
     async def __call__(self):
         pass
 
-    async def kickWarn(self, u_id, guild, owner):
+    async def kickWarn(self, u_id, guild, owner, msg):
         user = await self._vars.fetch_user(u_id)
         try:
-            await guild.kick(user, reason="Triggered automated server protection response for channel deletion.")
-            create_task(owner.send(
+            await guild.kick(user, reason="Triggered automated server protection response for excessive " + msg + ".")
+            await owner.send(
                 "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
-                + "automated warning due to multiple channel deletions in `" + noHighlight(guild) + " (" + str(guild.id) + ")`, "
+                + "automated warning due to exessive " + msg + " in `" + noHighlight(guild) + " (" + str(guild.id) + ")`, "
                 + "and has been removed from the server to prevent any potential further attacks."
-            ))
+            )
         except discord.Forbidden:
-            create_task(owner.send(
+            await owner.send(
                 "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
-                + "automated warning due to multiple channel deletions in `" + noHighlight(guild) + " (" + str(guild.id) + ")`, "
+                + "automated warning due to exessive " + msg + " in `" + noHighlight(guild) + " (" + str(guild.id) + ")`, "
                 + "and were unable to be automatically removed from the server; please watch them carefully to prevent any potential further attacks."
-            ))
+            )
+
+    async def targetWarn(self, u_id, guild, msg):
+        user = self._vars.client.user
+        owner = guild.owner
+        if owner.id == user.id:
+            owner = await self._vars.fetch_user(self._vars.owner_id)
+        if u_id == guild.owner.id:
+            if u_id == user.id:
+                print("Channel Deletion warning by <@" + str(user.id) + "> in " + str(guild) + ".")
+                return
+            user = guild.owner
+            await owner.send(
+                "Apologies for the inconvenience, but your account <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
+                + "automated warning due to exessive " + msg + " in `" + noHighlight(guild) + "** (" + str(guild.id) + ")`. "
+                + "If this was intentional, please ignore this message."
+            )
+        elif u_id == user.id:
+            create_task(guild.leave())
+            await owner.send(
+                "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id)+ ")` has triggered an "
+                + "automated warning due to exessive " + msg + " in `" + noHighlight(guild) + " (" + str(guild.id) + ")`, "
+                + "and will promptly leave the server to prevent any potential further attacks."
+            )
+        else:
+            await self.kickWarn(u_id, guild, owner, msg)
 
     async def _channel_delete_(self, channel, guild, **void):
         audits = await guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete).flatten()
         ts = datetime.datetime.utcnow().timestamp()
-        dels = {}
+        cnt = {}
         for log in audits:
             if ts - log.created_at.timestamp() < 120:
-                addDict(dels, {log.user.id: 1})
-        user = self._vars.client.user
-        for u_id in dels:
-            if dels[u_id] > 2:
-                owner = guild.owner
-                if owner.id == user.id:
-                    owner = await self._vars.fetch_user(self._vars.owner_id)
-                if u_id == guild.owner.id:
-                    if u_id == user.id:
-                        print("Channel Deletion warning by <@" + str(user.id) + "> in " + str(guild) + ".")
-                        continue
-                    user = guild.owner
-                    create_task(owner.send(
-                        "Apologies for the inconvenience, but your account <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
-                        + "automated warning due to multiple channel deletions in `" + noHighlight(guild) + "** (" + str(guild.id) + ")`. "
-                        + "If this was intentional, please ignore this message."
-                    ))
-                elif u_id == user.id:
-                    create_task(guild.leave())
-                    create_task(owner.send(
-                        "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id)+ ")` has triggered an "
-                        + "automated warning due to multiple channel deletions in `" + noHighlight(guild) + " (" + str(guild.id) + ")`, "
-                        + "and will promptly leave the server to prevent any potential further attacks."
-                    ))
-                else:
-                    create_task(self.kickWarn(u_id, guild, owner))
+                addDict(cnt, {log.user.id: 1})
+        for u_id in cnt:
+            if cnt[u_id] > 2:
+                create_task(self.targetWarn(u_id, guild, "channel deletions (" + str(cnt[u_id]) + ")"))
+
+    async def _ban_(self, user, guild, **void):
+        audits = await guild.audit_logs(limit=11, action=discord.AuditLogAction.ban).flatten()
+        ts = datetime.datetime.utcnow().timestamp()
+        cnt = {}
+        for log in audits:
+            if ts - log.created_at.timestamp() < 10:
+                addDict(cnt, {log.user.id: 1})
+        for u_id in cnt:
+            if cnt[u_id] > 5:
+                create_task(self.targetWarn(u_id, guild, "banning (" + str(cnt[u_id]) + ")"))
 
 
 class updateUserLogs:
