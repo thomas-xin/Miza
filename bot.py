@@ -168,14 +168,14 @@ class main_data:
                     pass
             if member is None:
                 check = str(u_id)
-                check2 = reconstitute(check).lower()
+                check2 = reconstitute(check).replace(" ", "").lower()
                 members = guild.members
                 if not members:
                     members = await guild.fetch_members(limit=None)
                 cache = [{}, {}]
                 x = 1
                 for m in shuffle(members):
-                    for name in (str(m), reconstitute(m.name), reconstitute(m.display_name)):
+                    for name in (str(m), reconstitute(m.name).replace(" ", ""), reconstitute(m.display_name).replace(" ", "")):
                         if check == name:
                             member = m
                             break

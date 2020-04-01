@@ -235,7 +235,7 @@ class Time:
         if not s.startswith("-"):
             s = "+" + s
         return (
-            "```css\nCurrent time at UTC/GMT" + s 
+            "```ini\nCurrent time at UTC/GMT" + s 
             + ": [" + str(t) + "].```"
         )
 
