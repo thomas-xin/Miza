@@ -678,13 +678,13 @@ class serverProtector:
             await guild.kick(user, reason="Triggered automated server protection response for excessive " + msg + ".")
             await owner.send(
                 "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
-                + "automated warning due to exessive " + msg + " in `" + noHighlight(guild) + " (" + str(guild.id) + ")`, "
+                + "automated server protection response due to exessive " + msg + " in `" + noHighlight(guild) + "` `(" + str(guild.id) + ")`, "
                 + "and has been removed from the server to prevent any potential further attacks."
             )
         except discord.Forbidden:
             await owner.send(
                 "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
-                + "automated warning due to exessive " + msg + " in `" + noHighlight(guild) + " (" + str(guild.id) + ")`, "
+                + "automated server protection response due to exessive " + msg + " in `" + noHighlight(guild) + "` `(" + str(guild.id) + ")`, "
                 + "and were unable to be automatically removed from the server; please watch them carefully to prevent any potential further attacks."
             )
 
@@ -700,14 +700,14 @@ class serverProtector:
             user = guild.owner
             await owner.send(
                 "Apologies for the inconvenience, but your account <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
-                + "automated warning due to exessive " + msg + " in `" + noHighlight(guild) + "** (" + str(guild.id) + ")`. "
+                + "automated server protection response due to exessive " + msg + " in `" + noHighlight(guild) + "` `(" + str(guild.id) + ")`. "
                 + "If this was intentional, please ignore this message."
             )
         elif u_id == user.id:
             create_task(guild.leave())
             await owner.send(
                 "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id)+ ")` has triggered an "
-                + "automated warning due to exessive " + msg + " in `" + noHighlight(guild) + " (" + str(guild.id) + ")`, "
+                + "automated server protection response due to exessive " + msg + " in `" + noHighlight(guild) + "` `(" + str(guild.id) + ")`, "
                 + "and will promptly leave the server to prevent any potential further attacks."
             )
         else:
@@ -722,7 +722,7 @@ class serverProtector:
                 addDict(cnt, {log.user.id: 1})
         for u_id in cnt:
             if cnt[u_id] > 2:
-                create_task(self.targetWarn(u_id, guild, "channel deletions (" + str(cnt[u_id]) + ")"))
+                create_task(self.targetWarn(u_id, guild, "channel deletions `(" + str(cnt[u_id]) + ")`"))
 
     async def _ban_(self, user, guild, **void):
         audits = await guild.audit_logs(limit=11, action=discord.AuditLogAction.ban).flatten()
@@ -733,7 +733,7 @@ class serverProtector:
                 addDict(cnt, {log.user.id: 1})
         for u_id in cnt:
             if cnt[u_id] > 5:
-                create_task(self.targetWarn(u_id, guild, "banning (" + str(cnt[u_id]) + ")"))
+                create_task(self.targetWarn(u_id, guild, "banning `(" + str(cnt[u_id]) + ")`"))
 
 
 class updateUserLogs:
