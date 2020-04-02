@@ -904,8 +904,8 @@ class Reminder:
                     "```ini\nNo reminders currently set for ["
                     + noHighlight(user) + "].```"
                 )
-            d = datetime.datetime.utcnow()
-            s = strIter(rems, key=lambda x: limStr(x.msg, 64) + " ➡️ " + sec2Time((x.t - d).total_seconds()))
+            d = datetime.datetime.utcnow().timestamp()
+            s = strIter(rems, key=lambda x: limStr(x.msg, 64) + " ➡️ " + sec2Time(x.t - d))
             return (
                 "Current reminders set for **" + discord.utils.escape_markdown(str(user))
                 + "**:```ini" + s + "```"
