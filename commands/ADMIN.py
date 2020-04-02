@@ -449,11 +449,11 @@ class Lockdown:
         return ("```asciidoc\n[" + response + "]```")
 
 
-class saveChannel:
+class SaveChannel:
     is_command = True
 
     def __init__(self):
-        self.name = ["backupChannel"]
+        self.name = ["BackupChannel", "DownloadChannel"]
         self.min_level = 3
         self.description = "Saves a number of messages in a channel, as well as their contents, to a .txt file."
         self.usage = "<0:channel{current}> <1:message_limit[32768]>"
@@ -470,12 +470,13 @@ class saveChannel:
                 if num <= 0:
                     raise ValueError("Please input a valid message limit.")
             ch = await self._vars.fetch_channel(self._vars.verifyID(args[0]))
-        h = await ch.history(limit=num).flatten()[::-1]
+        h = await ch.history(limit=num).flatten()
+        h = h[::-1]
         s = ""
         while h:
             if s:
                 s += "\n\n"
-            s += "\n\n".join([self._vars.strMessage(m, username=True) for m in h[:4096]])
+            s += "\n\n".join([self._vars.strMessage(m, limit=2048, username=True) for m in h[:4096]])
             h = h[4096:]
             await asyncio.sleep(0.32)
         return bytes(s[2:], "utf-8")
@@ -699,7 +700,7 @@ class FileLog:
         )
 
 
-class serverProtector:
+class ServerProtector:
     is_database = True
     name = "prot"
     no_file = True
