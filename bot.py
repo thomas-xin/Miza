@@ -1512,7 +1512,7 @@ async def on_voice_state_update(member, before, after):
                 print("Unmuted self in " + member.guild.name)
                 await member.edit(mute=False, deafen=False)
             await _vars.handleUpdate()
-    await seen(after)
+    await seen(member)
 
 
 async def handleMessage(message, edit=True):
