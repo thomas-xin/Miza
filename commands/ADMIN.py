@@ -447,6 +447,36 @@ class Lockdown:
             "LOCKDOWN REQUESTED."
         )
         return ("```asciidoc\n[" + response + "]```")
+
+
+class saveChannel:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["backupChannel"]
+        self.min_level = 3
+        self.description = "Saves a number of messages in the current channel, as well as their contents, to a .txt file."
+        self.usage = "<0:channel{current}> <1:message_limit[32768]>"
+
+    async def __call__(self, guild, channel, args, **void):
+        if not args:
+            num = 32768
+            ch = channel
+        else:
+            if len(args) >= 2:
+                num = await self._vars.evalMath(" ".join(args[1:]), guild)
+                if not num <= 65536:
+                    raise OverflowError("Maximum number of messages allowed is 65536.")
+                if num <= 0:
+                    raise ValueError("Please input a valid message limit.")
+            ch = await self._vars.fetch_channel(self._vars.verifyID(args[0]))
+        h = await ch.history(limit=num).flatten()
+        s = ""
+        while h:
+            s += "\n\n" + "\n\n".join([self._vars.strMessage(m, username=True) for m in h[:4096]])
+            h = h[4096:]
+            await asyncio.sleep(0.32)
+        return bytes(s, "utf-8")
         
 
 follow_default = {

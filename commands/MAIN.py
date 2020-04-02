@@ -737,11 +737,15 @@ class Info:
         created = u.created_at
         activity = "\n".join(_vars.strActivity(i) for i in getattr(u, "activities", []))
         role = ", ".join(str(i) for i in getattr(u, "roles", []) if not i.is_default())
-        coms = msgs = avgs = 0
+        coms = seen = msgs = avgs = 0
         pos = None
         if "v" in flags:
             try:
                 coms = _vars.data["users"][u.id]["commands"]
+            except LookupError:
+                pass
+            try:
+                seen = sec2Time(time.time() - _vars.data["users"][u.id]["last_seen"]) + " ago"
             except LookupError:
                 pass
             try:
@@ -791,6 +795,8 @@ class Info:
         emb.add_field(name="Creation time", value=str(created), inline=1)
         if joined is not None:
             emb.add_field(name="Join time", value=str(joined), inline=1)
+        if seen:
+            emb.add_field(name="Last seen", value=str(seen), inline=1)
         if coms:
             emb.add_field(name="Commands used", value=str(coms), inline=1)
         if dname:
@@ -1249,9 +1255,13 @@ class updateUsers:
     def __init__(self):
         pass
 
+    async def _seen_(self, user):
+        addDict(self.data, {user.id: {"last_seen": 0}})
+        self.data[user.id]["last_seen"] = time.time()
+        self.update()
+
     async def _command_(self, user, command, **void):
-        udata = self.data.setdefault(user.id, {"commands": 0})
-        udata["commands"] += 1
+        addDict(self.data, {user.id: {"commands": 1}})
         self.update()
 
     async def __call__(self, **void):

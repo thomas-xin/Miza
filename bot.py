@@ -1437,6 +1437,16 @@ async def on_ready():
         create_task(updateLoop())
         create_task(heartbeatLoop())
 
+    
+async def seen(user):
+    for u in _vars.database.values():
+        f = getattr(u, "_seen_", None)
+        if f is not None:
+            try:
+                await f(user=user)
+            except:
+                print(traceback.format_exc())
+
 
 async def checkDelete(message, reaction, user):
     if message.author.id == client.user.id:
@@ -1473,6 +1483,7 @@ async def on_raw_reaction_add(payload):
         return
     if user.id != client.user.id:
         reaction = str(payload.emoji)
+        await seen(user)
         await _vars.reactCallback(message, reaction, user)
         create_task(checkDelete(message, reaction, user))
 
@@ -1487,6 +1498,7 @@ async def on_raw_reaction_remove(payload):
         return
     if user.id != client.user.id:
         reaction = str(payload.emoji)
+        await seen(user)
         await _vars.reactCallback(message, reaction, user)
         create_task(checkDelete(message, reaction, user))
 
@@ -1500,6 +1512,7 @@ async def on_voice_state_update(member, before, after):
                 print("Unmuted self in " + member.guild.name)
                 await member.edit(mute=False, deafen=False)
             await _vars.handleUpdate()
+    await seen(after)
 
 
 async def handleMessage(message, edit=True):
@@ -1538,6 +1551,7 @@ async def on_typing(channel, user, when):
                     await f(channel=channel, user=user)
                 except:
                     print(traceback.format_exc())
+    await seen(user)
 
 
 @client.event
@@ -1552,6 +1566,7 @@ async def on_message(message):
                     await f(message=message)
                 except:
                     print(traceback.format_exc())
+    await seen(message.author)
     await _vars.reactCallback(message, None, message.author)
     await handleMessage(message, False)
     await _vars.handleUpdate(True)
@@ -1566,6 +1581,7 @@ async def on_user_update(before, after):
                 await f(before=before, after=after)
             except:
                 print(traceback.format_exc())
+    await seen(after)
 
 
 @client.event
@@ -1588,6 +1604,7 @@ async def on_member_join(member):
                 await f(user=member)
             except:
                 print(traceback.format_exc())
+    await seen(member)
 
             
 @client.event
@@ -1712,6 +1729,7 @@ async def updateEdit(before, after):
                     await f(before=before, after=after)
                 except:
                     print(traceback.format_exc())
+    await seen(after.author)
 
 
 @client.event
