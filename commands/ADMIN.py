@@ -451,18 +451,18 @@ class Lockdown:
 
 class SaveChannel:
     is_command = True
+    time_consuming = 1
 
     def __init__(self):
         self.name = ["BackupChannel", "DownloadChannel"]
         self.min_level = 3
         self.description = "Saves a number of messages in a channel, as well as their contents, to a .txt file."
-        self.usage = "<0:channel{current}> <1:message_limit[32768]>"
+        self.usage = "<0:channel{current}> <1:message_limit[4096]>"
 
     async def __call__(self, guild, channel, args, **void):
-        if not args:
-            num = 32768
-            ch = channel
-        else:
+        num = 4096
+        ch = channel
+        if args:
             if len(args) >= 2:
                 num = await self._vars.evalMath(" ".join(args[1:]), guild)
                 if not num <= 65536:
