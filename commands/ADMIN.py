@@ -455,7 +455,7 @@ class saveChannel:
     def __init__(self):
         self.name = ["backupChannel"]
         self.min_level = 3
-        self.description = "Saves a number of messages in the current channel, as well as their contents, to a .txt file."
+        self.description = "Saves a number of messages in a channel, as well as their contents, to a .txt file."
         self.usage = "<0:channel{current}> <1:message_limit[32768]>"
 
     async def __call__(self, guild, channel, args, **void):
@@ -470,13 +470,15 @@ class saveChannel:
                 if num <= 0:
                     raise ValueError("Please input a valid message limit.")
             ch = await self._vars.fetch_channel(self._vars.verifyID(args[0]))
-        h = await ch.history(limit=num).flatten()
+        h = await ch.history(limit=num).flatten()[::-1]
         s = ""
         while h:
-            s += "\n\n" + "\n\n".join([self._vars.strMessage(m, username=True) for m in h[:4096]])
+            if s:
+                s += "\n\n"
+            s += "\n\n".join([self._vars.strMessage(m, username=True) for m in h[:4096]])
             h = h[4096:]
             await asyncio.sleep(0.32)
-        return bytes(s, "utf-8")
+        return bytes(s[2:], "utf-8")
         
 
 follow_default = {
