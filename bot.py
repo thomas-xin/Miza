@@ -1443,7 +1443,7 @@ async def seen(user, delay=0):
         f = getattr(u, "_seen_", None)
         if f is not None:
             try:
-                await f(user=user, delay=future)
+                await f(user=user, delay=delay)
             except:
                 print(traceback.format_exc())
 
