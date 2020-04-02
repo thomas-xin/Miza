@@ -944,7 +944,7 @@ class Reminder:
             raise OverflowError("Reminder message too long (" + str(len(msg)) + "> 256).")
         rems.append(freeClass(
             msg=msg,
-            t=datetime.timedelta(seconds=t) + datetime.datetime.utcnow(),
+            t=t + datetime.datetime.utcnow().timestamp(),
         ))
         _vars.data["reminders"][user.id] = sort(rems, key=lambda x: x.t)
         update()
@@ -966,7 +966,7 @@ class updateReminders:
     async def __call__(self):
         if self.busy:
             return
-        t = datetime.datetime.utcnow()
+        t = datetime.datetime.utcnow().timestamp()
         i = 1
         changed = False
         for u_id in tuple(self.data):
