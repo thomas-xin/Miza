@@ -692,13 +692,13 @@ class serverProtector:
             )
 
     async def targetWarn(self, u_id, guild, msg):
+        print("Channel Deletion warning by <@" + str(u_id) + "> in " + str(guild) + ".")
         user = self._vars.client.user
         owner = guild.owner
         if owner.id == user.id:
             owner = await self._vars.fetch_user(self._vars.owner_id)
         if u_id == guild.owner.id:
             if u_id == user.id:
-                print("Channel Deletion warning by <@" + str(user.id) + "> in " + str(guild) + ".")
                 return
             user = guild.owner
             await owner.send(
