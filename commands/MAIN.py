@@ -1259,7 +1259,6 @@ class updateUsers:
     async def _seen_(self, user, delay, **void):
         addDict(self.data, {user.id: {"last_seen": 0}})
         self.data[user.id]["last_seen"] = datetime.datetime.utcnow().timestamp() + delay
-        self.update()
 
     async def _command_(self, user, command, **void):
         addDict(self.data, {user.id: {"commands": 1}})
