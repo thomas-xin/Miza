@@ -899,7 +899,7 @@ class Reminder:
                     + noHighlight(user) + "].```"
                 )
             d = datetime.datetime.utcnow()
-            s = strIter(rems, key=lambda x: limStr(x.msg, 64) + "➡️" + sec2Time((x.t - d).total_seconds()))
+            s = strIter(rems, key=lambda x: limStr(x.msg, 64) + " ➡️ " + sec2Time((x.t - d).total_seconds()))
             return (
                 "Current reminders set for **" + discord.utils.escape_markdown(str(user))
                 + "**:```ini" + s + "```"
@@ -943,7 +943,7 @@ class Reminder:
         _vars.data["reminders"][user.id] = sort(rems, key=lambda x: x.t)
         update()
         return (
-            "```asciidoc\nSuccessfully set reminder for ["
+            "```css\nSuccessfully set reminder for ["
             + noHighlight(user) + "] in [" + noHighlight(sec2Time(t)) + "]:\n"
             + msg + "```"
         )
@@ -974,7 +974,7 @@ class updateReminders:
                 temp.popleft()
                 changed = True
                 ch = await self._vars.getDM(u_id)
-                await ch.send("```asciidoc\n" + x.msg + "```")
+                await ch.send("```css\n" + x.msg + "```")
             if not i & 16383:
                 await asyncio.sleep(0.4)
             i += 1

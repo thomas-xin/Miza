@@ -584,7 +584,7 @@ class CS_mod:
                 line = (
                     "\n<" + str(l["url"]) + ">\n"
                     + "```css\nName: [" + noHighlight(l["name"])
-                    + "]\nAuthor: [" + noHighlight(l["author"])
+                    + "]\nAuthor: [" + noHighlight(l["author"].strip(" "))
                     + "]\n" + limStr(l["description"].replace("\n", " "), 128)
                     + "```\r"
                 )

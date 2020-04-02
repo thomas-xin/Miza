@@ -157,7 +157,10 @@ class Ban:
                 orig = 0
             else:
                 orig = g_bans.get(t_user.id, 0)
-            expr = " ".join(args[1:-1])
+            if len(args) >= 3:
+                expr = " ".join(args[1:])
+            else:
+                expr = " ".join(args[1:])
             _op = None
             for operator in ("+=", "-=", "*=", "/=", "%="):
                 if expr.startswith(operator):
