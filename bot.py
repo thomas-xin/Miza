@@ -1438,12 +1438,12 @@ async def on_ready():
         create_task(heartbeatLoop())
 
     
-async def seen(user):
+async def seen(user, delay=0):
     for u in _vars.database.values():
         f = getattr(u, "_seen_", None)
         if f is not None:
             try:
-                await f(user=user)
+                await f(user=user, delay=future)
             except:
                 print(traceback.format_exc())
 
@@ -1512,7 +1512,8 @@ async def on_voice_state_update(member, before, after):
                 print("Unmuted self in " + member.guild.name)
                 await member.edit(mute=False, deafen=False)
             await _vars.handleUpdate()
-    await seen(member)
+    if member.voice is not None:
+        await seen(member)
 
 
 async def handleMessage(message, edit=True):
@@ -1551,7 +1552,7 @@ async def on_typing(channel, user, when):
                     await f(channel=channel, user=user)
                 except:
                     print(traceback.format_exc())
-    await seen(user)
+    await seen(user, delay=10)
 
 
 @client.event

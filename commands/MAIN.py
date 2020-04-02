@@ -745,7 +745,8 @@ class Info:
             except LookupError:
                 pass
             try:
-                seen = sec2Time(time.time() - _vars.data["users"][u.id]["last_seen"]) + " ago"
+                ts = datetime.datetime.utcnow().timestamp()
+                seen = sec2Time(max(0, ts - _vars.data["users"][u.id]["last_seen"])) + " ago"
             except LookupError:
                 pass
             try:
@@ -1255,9 +1256,9 @@ class updateUsers:
     def __init__(self):
         pass
 
-    async def _seen_(self, user):
+    async def _seen_(self, user, delay, **void):
         addDict(self.data, {user.id: {"last_seen": 0}})
-        self.data[user.id]["last_seen"] = time.time()
+        self.data[user.id]["last_seen"] = datetime.datetime.utcnow().timestamp() + delay
         self.update()
 
     async def _command_(self, user, command, **void):
