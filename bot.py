@@ -826,7 +826,7 @@ class main_data:
             c = await self.fetch_channel(spl[1])
             m = await self.fetch_message(spl[2], c)
             if m.attachments:
-                url = m.attachments[0]
+                url = m.attachments[0].url
             else:
                 url = await self.followURL(verifyURL(m.content))
         return url
