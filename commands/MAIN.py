@@ -472,7 +472,7 @@ class Avatar:
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
-        print(emb.to_dict())
+        # print(emb.to_dict())
         return {
             "embed": emb,
         }
@@ -486,7 +486,7 @@ class Avatar:
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
-        print(emb.to_dict())
+        # print(emb.to_dict())
         return {
             "embed": emb,
         }
@@ -549,7 +549,7 @@ class Avatar:
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
-        print(emb.to_dict())
+        # print(emb.to_dict())
         return {
             "embed": emb,
         }
@@ -626,7 +626,7 @@ class Info:
                 emb.add_field(name="Average post length", value=str(round(pavg, 9)), inline=1)
         if top is not None:
             emb.add_field(name="Top users", value=top, inline=0)
-        print(emb.to_dict())
+        # print(emb.to_dict())
         return {
             "embed": emb,
         }
@@ -664,7 +664,7 @@ class Info:
             emb.add_field(name="Post count", value=str(pcnt), inline=1)
             if "v" in flags:
                 emb.add_field(name="Average post length", value=str(round(pavg, 9)), inline=1)
-        print(emb.to_dict())
+        # print(emb.to_dict())
         return {
             "embed": emb,
         }
@@ -810,7 +810,7 @@ class Info:
             emb.add_field(name="Server rank", value=str(pos), inline=1)
         if role:
             emb.add_field(name="Roles", value=role, inline=0)
-        print(emb.to_dict())
+        # print(emb.to_dict())
         return {
             "embed": emb,
         }

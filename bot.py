@@ -828,7 +828,13 @@ class main_data:
             if m.attachments:
                 url = m.attachments[0].url
             else:
-                url = await self.followURL(verifyURL(m.content))
+                url = verifyURL(m.content)
+                if not isURL(url):
+                    for m in m.content.replace("\n", " ").split(" "):
+                        url = verifyURL(m)
+                        if isURL(url):
+                            break
+                url = await self.followURL(url)
         return url
 
     async def sendReact(self, channel, *args, reacts=(), **kwargs):
@@ -1524,7 +1530,7 @@ async def on_voice_state_update(member, before, after):
                 print("Unmuted self in " + member.guild.name)
                 await member.edit(mute=False, deafen=False)
             await _vars.handleUpdate()
-    if member.voice is not None:
+    if member.voice is not None and not member.voice.afk:
         await seen(member)
 
 

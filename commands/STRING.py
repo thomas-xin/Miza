@@ -1,4 +1,4 @@
-import discord, urllib, requests, json
+import discord, json
 from googletrans import Translator
 try:
     from smath import *

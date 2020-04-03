@@ -227,7 +227,7 @@ class Ban:
                         create_task(coro)
                     else:
                         await coro
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.3)
                 except Exception as ex:
                     response += "\nError: " + repr(ex)
                     continue

@@ -6,7 +6,7 @@ import os, sys, asyncio, threading, subprocess, psutil, traceback, time, datetim
 import ctypes, collections, ast, copy, pickle, io
 import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys, re
 
-import urllib.request, urllib.parse
+import urllib.request, urllib.parse, requests
 
 from scipy import interpolate, special, signal
 from dateutil import parser as tparser
