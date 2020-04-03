@@ -828,13 +828,13 @@ class main_data:
             if m.attachments:
                 url = m.attachments[0].url
             else:
-                url = verifyURL(m.content)
+                url = m.content
                 if not isURL(url):
                     for m in m.content.replace("\n", " ").split(" "):
                         url = verifyURL(m)
                         if isURL(url):
                             break
-                url = await self.followURL(url)
+                url = await self.followURL(verifyURL(url))
         return url
 
     async def sendReact(self, channel, *args, reacts=(), **kwargs):
