@@ -1054,7 +1054,7 @@ async def downloadTextFile(url, _vars):
             print(traceback.format_exc())
             return repr(ex)
 
-    await _vars.followURL(url)
+    url = await _vars.followURL(url)
     resp = urlOpen(url)
     returns = [None]
     doParallel(dreader, [resp], returns)
@@ -1211,6 +1211,7 @@ class Queue:
                     self.permError(perm, 1, "to force play while other users are in voice")
             auds.preparing = True
             output = [None]
+            argv = await _vars.followURL(argv)
             doParallel(ytdl.search, [argv], output)
             if not "h" in flags:
                 await channel.trigger_typing()
@@ -1351,6 +1352,7 @@ class Playlist:
                 + "Please remove an item to add another."
             )
         output = [None]
+        argv = await _vars.followURL(argv)
         doParallel(ytdl.search, [argv, True], output)
         await channel.trigger_typing()
         while output[0] is None:

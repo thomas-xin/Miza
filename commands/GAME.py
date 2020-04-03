@@ -445,7 +445,7 @@ class Mimic:
         mimic = None
         if len(args):
             if len(args) > 1:
-                url = verifyURL(args[-1])
+                url = url = await _vars.followURL(verifyURL(args[-1]))
                 name = " ".join(args[:-1])
             else:
                 mim = 0

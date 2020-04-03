@@ -38,7 +38,7 @@ class IMG:
                 key = args[0].lower()
                 if len(key) > 64:
                     raise OverflowError("Image tag too long.")
-                url = verifyURL(args[1])
+                url = await _vars.followURL(verifyURL(args[1]))
                 images[key] = url
                 sort(images)
                 imglists[guild.id] = images

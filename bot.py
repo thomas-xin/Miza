@@ -829,6 +829,7 @@ class main_data:
                 url = m.attachments[0]
             else:
                 url = await self.followURL(verifyURL(m.content))
+        return url
 
     async def sendReact(self, channel, *args, reacts=(), **kwargs):
         try:
