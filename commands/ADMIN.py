@@ -452,6 +452,7 @@ class Lockdown:
 class SaveChannel:
     is_command = True
     time_consuming = 1
+    _timeout_ = 60
 
     def __init__(self):
         self.name = ["BackupChannel", "DownloadChannel"]
@@ -470,6 +471,11 @@ class SaveChannel:
                 if num <= 0:
                     raise ValueError("Please input a valid message limit.")
             ch = await self._vars.fetch_channel(self._vars.verifyID(args[0]))
+            if guild is None or hasattr(guild, "ghost"):
+                if guild.id != ch.id:
+                    raise PermissionError("Target channel is not in this server.")
+            elif ch.id not in (c.id for c in guild.channels):
+                raise PermissionError("Target channel is not in this server.")
         h = await ch.history(limit=num).flatten()
         h = h[::-1]
         s = ""
@@ -479,7 +485,7 @@ class SaveChannel:
             s += "\n\n".join([self._vars.strMessage(m, limit=2048, username=True) for m in h[:4096]])
             h = h[4096:]
             await asyncio.sleep(0.32)
-        return bytes(s[2:], "utf-8")
+        return bytes(s, "utf-8")
         
 
 follow_default = {
@@ -984,7 +990,8 @@ class updateMessageLogs:
 
     async def _delete_(self, message, bulk=False, **void):
         if bulk:
-            print(self._vars.strMessage(message, username=True))
+            if self._vars.isDeleted(message) < 2:
+                print(self._vars.strMessage(message, username=True))
             return
         guild = message.guild
         if guild.id in self.data:
@@ -1042,8 +1049,9 @@ class updateMessageLogs:
                                 init = "<@" + str(t.id) + ">"
                                 #print(t, e.target)
                 if t.bot or u.id == t.id == cu_id:
-                    print(self._vars.strMessage(message, username=True))
-                    return
+                    if self._vars.isDeleted(message) < 2:
+                        print(self._vars.strMessage(message, username=True))
+                        return
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
             emb = discord.Embed(colour=colour2Raw([255, 0, 0]))

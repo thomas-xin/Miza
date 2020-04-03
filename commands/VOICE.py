@@ -1043,7 +1043,7 @@ class videoDownloader:
         return getDuration(filename)
 
 
-async def downloadTextFile(url):
+async def downloadTextFile(url, _vars):
     
     def dreader(file):
         try:
@@ -1054,6 +1054,7 @@ async def downloadTextFile(url):
             print(traceback.format_exc())
             return repr(ex)
 
+    await _vars.followURL(url)
     resp = urlOpen(url)
     returns = [None]
     doParallel(dreader, [resp], returns)
@@ -1755,7 +1756,7 @@ class Dump:
                 url = message.attachments[0].url
             else:
                 url = verifyURL(argv)
-            s = await downloadTextFile(url)
+            s = await downloadTextFile(url, _vars)
             s = s[s.index("{"):]
             if s[-4:] == "\n```":
                 s = s[:-4]
@@ -2315,7 +2316,7 @@ class Player:
                 content=text,
             )
             auds.player["message"] = message
-            await _vars.silentDelete(temp)
+            await _vars.silentDelete(temp, no_log=True)
         if auds.queue and not auds.paused & 1:
             maxdel = float(auds.queue[0]["duration"]) - auds.stats["position"] + 2
             delay = min(maxdel, float(auds.queue[0]["duration"]) / self.barsize / abs(auds.stats["speed"]))

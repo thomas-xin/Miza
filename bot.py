@@ -404,17 +404,17 @@ class main_data:
             m_id = int(message)
         return self.cache["deleted"].get(m_id, False)
 
-    def logDelete(self, message):
+    def logDelete(self, message, no_log=False):
         try:
             m_id = int(message.id)
         except AttributeError:
             m_id = int(message)
-        self.cache["deleted"][m_id] = True
+        self.cache["deleted"][m_id] = no_log + 1
         self.limitCache("deleted", limit=4096)
     
-    async def silentDelete(self, message, exc=False):
+    async def silentDelete(self, message, exc=False, no_log=False):
         try:
-            self.logDelete(message)
+            self.logDelete(message, no_log)
             await message.delete()
         except:
             try:
@@ -820,6 +820,16 @@ class main_data:
         self.currState = stats
         return stats
 
+    async def followURL(self, url):
+        if url.startswith("https://discordapp.com/channels/"):
+            spl = url[32:].split("/")
+            c = await self.fetch_channel(spl[1])
+            m = await self.fetch_message(spl[2], c)
+            if m.attachments:
+                url = m.attachments[0]
+            else:
+                url = await self.followURL(verifyURL(m.content))
+
     async def sendReact(self, channel, *args, reacts=(), **kwargs):
         try:
             sent = await channel.send(*args, **kwargs)
@@ -869,7 +879,7 @@ class main_data:
                 for f in catg:
                     if f.__name__.lower() == func.lower():
                         try:
-                            timeout = getattr(f, "_timeout_", self.timeout)
+                            timeout = getattr(f, "_timeout_", 1) * self.timeout
                             await asyncio.wait_for(
                                 f._callback_(
                                     client=client,
@@ -1299,7 +1309,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             f = getattr(u, "_command_", None)
                             if f is not None:
                                 await f(user, command)
-                        response = await command(
+                        timeout = getattr(f, "_timeout_", 1) * _vars.timeout
+                        response = await asyncio.wait_for(command(
                             client=client,          # for interfacing with discord
                             _vars=_vars,            # for interfacing with bot's database
                             argv=argv,              # raw text argument
@@ -1312,7 +1323,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             guild=guild,            # guild data
                             name=alias,             # alias the command was called as
                             callback=processMessage,# function that called the command
-                        )
+                        ), timeout=timeout)
                         if response is not None and len(response):
                             if type(response) is tuple:
                                 response, react = response
@@ -1523,13 +1534,7 @@ async def handleMessage(message, edit=True):
             cpy = msg[1:]
         else:
             cpy = reconstitute(msg)
-        if message.author.id == client.user.id:
-            timeout = _vars.timeout << 4
-        else:
-            timeout = _vars.timeout
-        await asyncio.wait_for(
-            processMessage(message, cpy, edit, msg), timeout=timeout
-        )
+        await processMessage(message, cpy, edit, msg)
     except Exception as ex:
         errmsg = limStr("```py\nError: " + discord.utils.escape_markdown(repr(ex)) + "\n```", 2000)
         print(traceback.format_exc())
