@@ -829,7 +829,7 @@ class main_data:
                 url = m.attachments[0].url
             else:
                 url = m.content
-                if not isURL(url):
+                if " " in url or "\n" in url or not isURL(url):
                     for m in m.content.replace("\n", " ").split(" "):
                         url = verifyURL(m)
                         if isURL(url):
