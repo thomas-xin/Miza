@@ -135,7 +135,10 @@ class updateExec:
                     await asyncio.sleep(0.2)
                 data = returns[0]
                 if type(data) is str:
-                    raise eval(data)
+                    try:
+                        raise eval(data)
+                    except RuntimeError:
+                        data[0] = procFunc(proc, _vars)
                 output = data[0]
                 if type(output) is tuple:
                     output = await _vars.recursiveCoro(output)

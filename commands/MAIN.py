@@ -186,7 +186,7 @@ class Perms:
                 m_perm = nan
             else:
                 m_perm = max(t_perm, c_perm, 1) + 1
-            if not perm <= m_perm and not isnan(m_perm):
+            if not perm < m_perm and not isnan(m_perm):
                 if t_user is None:
                     if "f" not in flags:
                         response = uniStr(
