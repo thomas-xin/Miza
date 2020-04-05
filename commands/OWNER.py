@@ -100,11 +100,8 @@ class updateExec:
         try:
             output = eval(proc, _vars._globals)
         except:
-            try:
-                exec(proc, _vars._globals)
-                output = str(proc) + " Successfully executed!"
-            except:
-                output = traceback.format_exc()
+            exec(proc, _vars._globals)
+            output = str(proc) + " Successfully executed!"
         try:
             if type(output) in (str, bytes, dict) or isinstance(output, freeClass):
                 raise TypeError
@@ -138,7 +135,7 @@ class updateExec:
                     try:
                         raise eval(data)
                     except RuntimeError:
-                        data[0] = procFunc(proc, _vars)
+                        data[0] = self.procFunc(proc, _vars)
                 output = data[0]
                 if type(output) is tuple:
                     output = await _vars.recursiveCoro(output)
@@ -146,6 +143,7 @@ class updateExec:
                     output = await output
                 await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
             except:
+                print(traceback.format_exc())
                 await self.channel.send(limStr(
                     "```py\n" + traceback.format_exc().replace("```", "") + "```",
                     2000,

@@ -331,7 +331,7 @@ class customAudio(discord.AudioSource):
                     self.preparing = False
                 except FileNotFoundError:
                     pass
-            elif not playing and self.source is None:
+            elif not playing and self.source is None and not self.is_loading and not self.preparing:
                 self.advance()
         if not (q or self.preparing):
             t = self._vars.data["playlists"].get(guild.id, ())
