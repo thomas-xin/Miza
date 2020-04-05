@@ -135,8 +135,9 @@ class updateExec:
                     try:
                         raise eval(data)
                     except RuntimeError:
-                        data[0] = self.procFunc(proc, _vars)
-                output = data[0]
+                        output = self.procFunc(proc, _vars)
+                else:
+                    output = data[0]
                 if type(output) is tuple:
                     output = await _vars.recursiveCoro(output)
                 elif asyncio.iscoroutine(output):
