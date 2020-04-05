@@ -413,7 +413,7 @@ class CS_hex2xml:
         self.description = "Converts a given Cave Story hex patch to an xml file readable by Booster's Lab."
         self.usage = "<hex_data>"
 
-    async def __call__(self, argv, channel, **void):
+    async def __call__(self, client, argv, channel, **void):
         hacks = {}
         hack = argv.replace(" ", "").replace("`", "").strip("\n")
         while len(hack):
