@@ -270,7 +270,7 @@ async def searchRandomNSFW(argv, delay=10):
         await asyncio.sleep(0.6)
     data = [i for i in data if i]
     if not data:
-        raise EOFError("No results for " + argv + ".")
+        raise LookupError("No results for " + argv + ".")
     item = random.choice(data)
     return item
 
@@ -414,7 +414,9 @@ class Neko:
         )
         emb.set_image(url=url)
         print(url)
-        create_task(channel.send(embed=emb))
+        return {
+            "embed": emb
+        }
 
 
 class Lewd:
@@ -447,4 +449,6 @@ class Lewd:
         )
         emb.set_image(url=url)
         print(url)
-        create_task(channel.send(embed=emb))
+        return {
+            "embed": emb
+        }

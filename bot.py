@@ -684,7 +684,7 @@ class main_data:
         return output
 
     async def evalMath(self, f, guild):
-        f = f.strip(" ")
+        f = f.strip()
         try:
             if not f:
                 r = [0]
@@ -713,7 +713,7 @@ class main_data:
         return roundMin(float(x))
 
     async def solveMath(self, f, guild, prec, r):
-        f = f.strip(" ")
+        f = f.strip()
         try:
             if hasattr(guild, "ghost"):
                 g_id = self.deleted_user
@@ -788,7 +788,7 @@ class main_data:
                                     s = s[0]
                                 t += s * n
                                 f = f[i + len(check):]
-                    if f.strip(" "):
+                    if f.strip():
                         t += await self.evalMath(f, guild.id)
             except:
                 t = tparser.parse(f).timestamp() - tparser.parse("0s").timestamp()
@@ -906,7 +906,7 @@ class main_data:
                             print(traceback.format_exc())
                             create_task(self.sendReact(
                                 message.channel,
-                                "```py\nError: " + repr(ex) + "\n```",
+                                "```py\nError: " + repr(ex).replace("`", "") + "\n```",
                                 reacts=["❎"],
                             ))
 
@@ -981,12 +981,12 @@ class main_data:
         if username:
             c = "<@" + str(message.author.id) + ">:\n" + c
         data = limStr(c, limit)
-        if message.reactions:
-            data += "\n{" + ", ".join(str(i) for i in message.reactions) + "}"
-        if message.embeds:
-            data += "\n⟨" + ", ".join(str(i.to_dict()) for i in message.embeds) + "⟩"
         if message.attachments:
             data += "\n[" + ", ".join(i.url for i in message.attachments) + "]"
+        if message.embeds:
+            data += "\n⟨" + ", ".join(str(i.to_dict()) for i in message.embeds) + "⟩"
+        if message.reactions:
+            data += "\n{" + ", ".join(str(i) for i in message.reactions) + "}"
         try:
             t = message.created_at
             if message.edited_at:
@@ -1254,7 +1254,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             if loop:
                                 addDict(flags, {"h": 1})
                         if argv:
-                            argv = argv.strip(" ")
+                            argv = argv.strip()
                             if hasattr(command, "flags"):
                                 flaglist = command.flags
                                 for q in "?-+":
@@ -1293,7 +1293,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                                     if not found:
                                                         break
                         if argv:
-                            argv = argv.strip(" ")
+                            argv = argv.strip()
                         if not argv:
                             args = []
                         else:
@@ -1372,7 +1372,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                     except TimeoutError:
                         raise TimeoutError("Request timed out.")
                     except Exception as ex:
-                        errmsg = limStr("```py\nError: " + discord.utils.escape_markdown(repr(ex)) + "\n```", 2000)
+                        errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
                         print(traceback.format_exc())
                         create_task(_vars.sendReact(
                             channel,
@@ -1543,7 +1543,7 @@ async def handleMessage(message, edit=True):
             cpy = reconstitute(msg)
         await processMessage(message, cpy, edit, msg)
     except Exception as ex:
-        errmsg = limStr("```py\nError: " + discord.utils.escape_markdown(repr(ex)) + "\n```", 2000)
+        errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
         print(traceback.format_exc())
         create_task(_vars.sendReact(
             message.channel,

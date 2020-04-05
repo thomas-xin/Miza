@@ -279,7 +279,9 @@ class Cat:
         )
         emb.set_image(url=url)
         print(url)
-        create_task(channel.send(embed=emb))
+        return {
+            "embed": emb
+        }
 
 
 class Dog:
@@ -326,7 +328,9 @@ class Dog:
         )
         emb.set_image(url=url)
         print(url)
-        create_task(channel.send(embed=emb))
+        return {
+            "embed": emb
+        }
 
 
 class updateImages:

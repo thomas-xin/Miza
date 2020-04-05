@@ -1,4 +1,5 @@
-import discord, urllib, json, youtube_dl, ffmpy
+import discord, json, youtube_dl, ffmpy
+from bs4 import BeautifulSoup
 try:
     from smath import *
 except ModuleNotFoundError:
@@ -417,7 +418,7 @@ class customAudio(discord.AudioSource):
             )
             self.is_playing = True
         except EOFError:
-            if empty or (not self.paused and not self.is_loading):
+            if (empty or not self.paused) and not self.is_loading:
                 queueable = (self.queue or self._vars.data["playlists"].get(self.vc.guild.id, None))
                 if empty and queueable:
                     if time.time() - self.lastEnd > 0.5:
@@ -434,9 +435,9 @@ class customAudio(discord.AudioSource):
             pitch = self.stats["pitch"]
             bassboost = self.stats["bassboost"]
             chorus = self.stats["chorus"]
-            #detune = self.stats["detune"]
+            # detune = self.stats["detune"]
             delay = 16
-            if volume == 1 and reverb == pitch == bassboost == chorus == 0:#detune == 0:
+            if volume == 1 and reverb == pitch == bassboost == chorus == 0: # detune == 0:
                 self.buffer = []
                 self.feedback = None
                 self.bassadj = None
@@ -454,8 +455,8 @@ class customAudio(discord.AudioSource):
                 bassboost = nan
             if abs(pitch) > 1 << 31:
                 pitch = nan
-            #if abs(detune) > 1 << 31:
-                #detune = nan
+            # if abs(detune) > 1 << 31:
+            #    detune = nan
             if not isValid(volume * reverb * bassboost * pitch):# * detune):
                 array = self.static()
             else:
@@ -1296,7 +1297,7 @@ class Playlist:
         self.min_level = 0
         self.min_display = "0~2"
         self.description = "Shows, appends, or removes from the default playlist."
-        self.usage = "<link[]> <remove(?d)> <verbose(?v)>"
+        self.usage = "<search_link[]> <remove(?d)> <verbose(?v)>"
         self.flags = "edv"
 
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
@@ -2352,10 +2353,99 @@ class Player:
         await createPlayer(auds, p_type="c" in flags, verbose="z" in flags)
 
 
+f = open("auth.json")
+auth = ast.literal_eval(f.read())
+f.close()
+try:
+    genius_key = auth["genius_key"]
+except:
+    genius_key = None
+    print("WARNING: genius_key not found. Unable to use API to search song lyrics.")
+
+
+def get_lyrics(item):
+    item = verifySearch(item)
+    url = "https://api.genius.com/search"
+    header = {"user-agent": "Mozilla/6." + str(xrand(10)), "Authorization": "Bearer " + genius_key}
+    data = {"q": item}
+    resp = requests.get(url, data=data, headers=header)
+    rdata = json.loads(resp.content)
+    hits = rdata["response"]["hits"]
+    name = None
+    path = None
+    for i in hits:
+        try:
+            name = i["result"]["title"]
+            path = i["result"]["api_path"]
+            break
+        except KeyError:
+            pass
+    if not (path and name):
+        raise LookupError("No results for " + item + ".")
+    page = requests.get("https://genius.com" + path, headers=header)
+    html = BeautifulSoup(page.text, 'html.parser')
+    lyrics = html.find('div', class_='lyrics').get_text()
+    return name, lyrics
+
+
+class Lyrics:
+    is_command = True
+    time_consuming = True
+
+    def __init__(self):
+        self.name = ["SongLyrics"]
+        self.min_level = 0
+        self.description = "Searches genius.com for lyrics of a song."
+        self.usage = "<0:search_link{queue}> <verbose(?v)>"
+        self.flags = "v"
+
+    async def __call__(self, _vars, channel, message, argv, flags, user, **void):
+        for a in message.attachments:
+            argv = a.url + " " + argv
+        if not argv:
+            try:
+                auds = await forceJoin(channel.guild, channel, user, _vars.client, _vars)
+                if not auds.queue:
+                    raise EOFError
+                argv = auds.queue[0]["name"]
+            except:
+                raise IndexError("Queue not found. Please input a search term, URL, or file.")
+        returns = [None]
+        doParallel(funcSafe, [get_lyrics, argv], returns)
+        while returns[0] is None:
+            await asyncio.sleep(0.73)
+        resp = returns[0]
+        if type(resp) is str:
+            raise eval(resp)
+        name, lyrics = resp[0]
+        text = lyrics.strip()
+        msg = "Lyrics for **" + discord.utils.escape_markdown(name) + "**:"
+        if "v" not in flags:
+            return limStr(msg + "```ini\n" + text + "```", 2000)
+        emb = discord.Embed(colour=_vars.randColour())
+        emb.set_author(name=name)
+        curr = ""
+        i = 1
+        for para in text.split("\n\n"):
+            if len(curr) + len(para) > 1000:
+                emb.add_field(name="Page " + str(i), value="```ini\n" + curr + "```", inline=False)
+                curr = para
+                i += 1
+            else:
+                if curr:
+                    curr += "\n\n"
+                curr += para
+        if curr:
+            emb.add_field(name="Page " + str(i), value="```ini\n" + curr + "```", inline=False)
+        return {
+            "embed": emb
+        }
+
+
 class Download:
     is_command = True
     time_consuming = True
-    _timeout_ = 360
+    _timeout_ = 8
 
     def ensure_url(self, url):
         if url.startswith("ytsearch:"):
@@ -2366,7 +2456,7 @@ class Download:
         self.name = ["Search", "YTDL", "Youtube_DL", "Convert"]
         self.min_level = 0
         self.description = "Searches and/or downloads a song from a YouTube/SoundCloud query or link."
-        self.usage = "<0:search_link> <-1:out_format[ogg]> <verbose(?v)> <show_debug(?z)>"
+        self.usage = "<0:search_link{queue}> <-1:out_format[ogg]> <verbose(?v)> <show_debug(?z)>"
         self.flags = "vz"
 
     async def __call__(self, _vars, channel, message, argv, flags, user, **void):
@@ -2525,6 +2615,7 @@ class Download:
                         filename=fn
                     )
                     create_task(_vars.silentDelete(message))
+
 
 class updateQueues:
     is_database = True

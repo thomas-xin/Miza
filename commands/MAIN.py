@@ -316,50 +316,6 @@ class EnableCommand:
                 )
 
 
-class Restart:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["Shutdown"]
-        self.min_level = nan
-        self.description = "Restarts or shuts down the bot."
-        self.usage = ""
-
-    async def __call__(self, client, channel, user, guild, name, _vars, **void):
-        if name.lower() == "shutdown":
-            await channel.send("Shutting down... :wave:")
-        else:
-            await channel.send("Restarting... :wave:")
-        _vars.update()
-        for vc in client.voice_clients:
-            await vc.disconnect(force=True)
-        for _ in loop(5):
-            try:
-                f = open(_vars.restart, "wb")
-                f.close()
-                break
-            except:
-                print(traceback.format_exc())
-                time.sleep(0.1)
-        for _ in loop(8):
-            try:
-                if "log.txt" in os.listdir():
-                    os.remove("log.txt")
-                break
-            except:
-                print(traceback.format_exc())
-                time.sleep(0.1)
-        if name.lower() == "shutdown":
-            f = open(_vars.shutdown, "wb")
-            f.close()
-        try:
-            await client.close()
-        except:
-            del client
-        del _vars
-        sys.exit()
-
-
 class Prefix:
     is_command = True
 
@@ -849,7 +805,7 @@ class Status:
         size = _vars.codeSize
         stats = _vars.currState
         return (
-            "```css"
+            "```ini"
             + "\nActive users: " + sbHighlight(len(client.users))
             + ", Active servers: " + sbHighlight(_vars.guilds)
             + ", Active shards: " + sbHighlight(shards)

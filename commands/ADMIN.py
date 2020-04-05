@@ -452,7 +452,7 @@ class Lockdown:
 class SaveChannel:
     is_command = True
     time_consuming = 1
-    _timeout_ = 60
+    _timeout_ = 10
 
     def __init__(self):
         self.name = ["BackupChannel", "DownloadChannel"]
@@ -1023,7 +1023,7 @@ class updateMessageLogs:
                         action=action,
                     ).flatten()
                     for e in reversed(al):
-                        #print(e, e.target, now - e.created_at)
+                        # print(e, e.target, now - e.created_at)
                         try:
                             cnt = e.extra.count - 1
                         except AttributeError:
@@ -1047,11 +1047,11 @@ class updateMessageLogs:
                             if targ == u.id and cid == message.channel.id:
                                 t = e.user
                                 init = "<@" + str(t.id) + ">"
-                                #print(t, e.target)
+                                # print(t, e.target)
                 if t.bot or u.id == t.id == cu_id:
                     if self._vars.isDeleted(message) < 2:
                         print(self._vars.strMessage(message, username=True))
-                        return
+                    return
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
             emb = discord.Embed(colour=colour2Raw([255, 0, 0]))
@@ -1075,6 +1075,7 @@ class updateFileLogs:
         pass
 
     async def _user_update_(self, before, after, **void):
+        return
         sending = {}
         for guild in self._vars.client.guilds:
             if guild.get_member(after.id) is None:

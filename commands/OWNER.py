@@ -7,6 +7,52 @@ except ModuleNotFoundError:
     from smath import *
 
 
+class Restart:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["Shutdown"]
+        self.min_level = nan
+        self.description = "Restarts or shuts down the bot."
+        self.usage = ""
+
+    async def __call__(self, channel, name, **void):
+        _vars = self._vars
+        client = _vars.client
+        if name.lower() == "shutdown":
+            await channel.send("Shutting down... :wave:")
+        else:
+            await channel.send("Restarting... :wave:")
+        _vars.update()
+        for vc in client.voice_clients:
+            await vc.disconnect(force=True)
+        for _ in loop(5):
+            try:
+                f = open(_vars.restart, "wb")
+                f.close()
+                break
+            except:
+                print(traceback.format_exc())
+                time.sleep(0.1)
+        for _ in loop(8):
+            try:
+                if "log.txt" in os.listdir():
+                    os.remove("log.txt")
+                break
+            except:
+                print(traceback.format_exc())
+                time.sleep(0.1)
+        if name.lower() == "shutdown":
+            f = open(_vars.shutdown, "wb")
+            f.close()
+        try:
+            await client.close()
+        except:
+            del client
+        del _vars
+        sys.exit()
+
+
 class Execute:
     is_command = True
 
@@ -49,6 +95,24 @@ class updateExec:
     async def __call__(self):
         pass
 
+    def procFunc(self, proc, _vars):
+        print(proc)
+        try:
+            output = eval(proc, _vars._globals)
+        except:
+            try:
+                exec(proc, _vars._globals)
+                output = str(proc) + " Successfully executed!"
+            except:
+                output = traceback.format_exc()
+        try:
+            if type(output) in (str, bytes, dict) or isinstance(output, freeClass):
+                raise TypeError
+            output = tuple(output)
+        except TypeError:
+            pass
+        return output
+
     async def _nocommand_(self, message, **void):
         _vars = self._vars
         if message.author.id == _vars.client.user.id:
@@ -65,21 +129,14 @@ class updateExec:
                 return
             output = None
             try:
-                print(proc)
-                try:
-                    output = eval(proc, _vars._globals)
-                except:
-                    try:
-                        exec(proc, _vars._globals)
-                        output = str(proc) + " Successfully executed!"
-                    except:
-                        output = traceback.format_exc()
-                try:
-                    if type(output) in (str, bytes, dict) or isinstance(output, freeClass):
-                        raise TypeError
-                    output = tuple(output)
-                except TypeError:
-                    pass
+                returns = [None]
+                doParallel(funcSafe, [self.procFunc, proc, _vars], returns)
+                while returns[0] is None:
+                    await asyncio.sleep(0.2)
+                data = returns[0]
+                if type(data) is str:
+                    raise eval(data)
+                output = data[0]
                 if type(output) is tuple:
                     output = await _vars.recursiveCoro(output)
                 elif asyncio.iscoroutine(output):

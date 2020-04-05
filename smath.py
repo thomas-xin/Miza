@@ -653,6 +653,13 @@ def approach(x, y, z, threshold=0.125):
     return x
 
 
+def scaleRatio(x, y):
+        try:
+            return x * (x - y) / (x + y)
+        except ZeroDivisionError:
+            return 0
+
+
 def xrange(a, b=None, c=None):
     if b == None:
         b = ceil(a.real)
@@ -2678,7 +2685,7 @@ __utrans = "".maketrans(__umap)
 def verifyURL(f):
     if "file:" in f:
         raise PermissionError("Unable to open local file " + f + ".")
-    return f.strip(" ").translate(__utrans)
+    return f.strip().translate(__utrans)
 
 __smap = {
     "<": "",
@@ -2689,7 +2696,7 @@ __smap = {
 __strans = "".maketrans(__smap)
 
 def verifySearch(f):
-    return f.strip(" ").translate(__strans)
+    return f.strip().translate(__strans)
 
 DOMAIN_FORMAT = re.compile(
     r"(?:^(\w{1,255}):(.{1,255})@|^)"

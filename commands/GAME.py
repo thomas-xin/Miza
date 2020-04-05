@@ -356,7 +356,7 @@ class MimicConfig:
             if len(new) > 256:
                 raise OverflowError("Must be 256 or fewer in length.")
         elif setting == "url":
-            new = verifyURL(new)
+            new = await _vars.followURL(verifyURL(new))
         name = mimic.name
         mimic[setting] = new
         update()
@@ -445,7 +445,7 @@ class Mimic:
         mimic = None
         if len(args):
             if len(args) > 1:
-                url = url = await _vars.followURL(verifyURL(args[-1]))
+                url = await _vars.followURL(verifyURL(args[-1]))
                 name = " ".join(args[:-1])
             else:
                 mim = 0
