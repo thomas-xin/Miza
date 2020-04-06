@@ -207,7 +207,7 @@ class updateBlacklist:
             os.remove(self.suspected)
             if susp:
                 u_id = int(susp)
-                udata = self.data[u_id]
+                udata = self.data.get(u_id, 0)
                 days = max(0, (udata - time.time()) / 86400)
                 try:
                     days **= 4
@@ -215,6 +215,7 @@ class updateBlacklist:
                     days = inf
                 days += 1.125
                 udata = time.time() + days * 86400
+                self.data[u_id] = udata
                 if days >= self._vars.min_suspend - 1:
                     self.lastsusp = u_id
                 self.update()

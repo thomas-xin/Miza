@@ -820,8 +820,13 @@ class main_data:
         self.currState = stats
         return stats
 
-    async def followURL(self, url):
+    async def followURL(self, url, it=None):
+        if url.startswith("<") and url[-1] == ">":
+            url = url[1:-1]
         if url.startswith("https://discordapp.com/channels/"):
+            if it is None:
+                it = {}
+            orig = url
             spl = url[32:].split("/")
             c = await self.fetch_channel(spl[1])
             m = await self.fetch_message(spl[2], c)
@@ -834,7 +839,11 @@ class main_data:
                         url = verifyURL(m)
                         if isURL(url):
                             break
-                url = await self.followURL(verifyURL(url))
+                url = verifyURL(url)
+                if url in it:
+                    return url
+                it[url] = True
+                url = await self.followURL(url, it)
         return url
 
     async def sendReact(self, channel, *args, reacts=(), **kwargs):
