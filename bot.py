@@ -844,9 +844,9 @@ class main_data:
                 url = verifyURL(url)
                 if url in it:
                     return url
-                elif not 1 + len(it) & 255:
-                    await asyncio.sleep(0.2)
                 it[url] = True
+                if not len(it) & 255:
+                    await asyncio.sleep(0.2)
                 url = await self.followURL(url, it)
         return url
 
