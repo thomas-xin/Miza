@@ -821,11 +821,12 @@ class main_data:
         return stats
 
     async def followURL(self, url, it=None):
-        if url.startswith("<") and url[-1] == ">":
-            url = url[1:-1]
+        if it is None:
+            url = url.strip(" ").strip("\n").strip("`")
+            if url.startswith("<") and url[-1] == ">":
+                url = url[1:-1]
+            it = {}
         if url.startswith("https://discordapp.com/channels/"):
-            if it is None:
-                it = {}
             orig = url
             spl = url[32:].split("/")
             c = await self.fetch_channel(spl[1])
@@ -836,12 +837,15 @@ class main_data:
                 url = m.content
                 if " " in url or "\n" in url or not isURL(url):
                     for m in m.content.replace("\n", " ").split(" "):
-                        url = verifyURL(m)
-                        if isURL(url):
+                        u = verifyURL(m)
+                        if isURL(u):
+                            url = u
                             break
                 url = verifyURL(url)
                 if url in it:
                     return url
+                elif not 1 + len(it) & 255:
+                    await asyncio.sleep(0.2)
                 it[url] = True
                 url = await self.followURL(url, it)
         return url
