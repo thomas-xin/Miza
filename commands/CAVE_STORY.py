@@ -512,7 +512,7 @@ class CS_npc:
             else:
                 return "Search results for **" + argv + "**:\n```\n" + output + "```"
         else:
-            raise EOFError("No results found for " + argv + ".")
+            raise LookupError("No results found for " + argv + ".")
 
 
 class CS_tsc:
@@ -554,7 +554,7 @@ class CS_tsc:
             else:
                 return "Search results for **" + argv + "**:\n```\n" + output + "```"
         else:
-            raise EOFError("No results found for " + argv + ".")
+            raise LookupError("No results found for " + argv + ".")
 
 
 class CS_mod:
@@ -601,4 +601,4 @@ class CS_mod:
                         curr += line
             return response
         else:
-            raise EOFError("No results found for " + argv + ".")
+            raise LookupError("No results found for " + argv + ".")

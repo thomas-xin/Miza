@@ -8,7 +8,7 @@ except ModuleNotFoundError:
 
 
 default_commands = ["main", "string", "admin"]
-standard_commands = default_commands + ["voice", "nsfw", "image", "game"]
+standard_commands = default_commands + ["voice", "image", "game"]
 
 
 class Help:
@@ -96,7 +96,7 @@ class Help:
         if not show:
             commands = hlist()
             for catg in categories:
-                if catg in enabled or admin:
+                if catg in enabled or admin and catg in standard_commands:
                     commands.extend(categories[catg])
             for com in commands:
                 name = com.__name__
@@ -134,43 +134,29 @@ class Perms:
         self.flags = "fh"
 
     async def __call__(self, _vars, args, user, perm, guild, flags, **void):
-        if len(args) < 2:
-            if len(args) < 1:
-                t_user = user
-            else:
-                if "@e" in args[0] or "everyone" in args[0] or "here" in args[0]:
-                    return (
-                        "Current user permissions for **" + guild.name + "**:\n```ini\n"
-                        + strIter(_vars.data["perms"].get(guild.id, {})) + "```"
-                    )
-                else:
-                    u_id = _vars.verifyID(args[0])
-                    try:
-                        t_user = await _vars.fetch_user(u_id)
-                    except (TypeError, discord.NotFound):
-                        try:
-                            t_user = await _vars.fetch_member(u_id, guild)
-                        except LookupError:
-                            t_user = await _vars.fetch_whuser(u_id, guild)
-            print(t_user)
-            t_perm = _vars.getPerms(t_user.id, guild)
+        if len(args) < 1:
+            t_user = user
         else:
             check = args[0].lower()
-            if "everyone" in check or "here" in check:
-                t_user = None
-                t_perm = inf
-                name = "everyone"
-            else:
-                u_id = _vars.verifyID(args[0])
+            if "@" in args[0] and ("everyone" in check or "here" in check):
+                args[0] = guild.id
+            u_id = _vars.verifyID(args[0])
+            try:
+                t_user = await _vars.fetch_user(u_id)
+            except (TypeError, discord.NotFound):
                 try:
-                    t_user = await _vars.fetch_user(u_id)
-                except (TypeError, discord.NotFound):
+                    t_user = await _vars.fetch_member(u_id, guild)
+                except LookupError:
                     try:
-                        t_user = await _vars.fetch_member(u_id, guild)
+                        t_user = guild.get_role(u_id)
+                        if t_user is None:
+                            raise LookupError
                     except LookupError:
                         t_user = await _vars.fetch_whuser(u_id, guild)
-                t_perm = _vars.getPerms(t_user.id, guild)
-                name = t_user.name
+        print(t_user)
+        t_perm = _vars.getPerms(t_user.id, guild)
+        if len(args) > 1:
+            name = str(t_user)
             orig = t_perm
             expr = " ".join(args[1:])
             _op = None
@@ -185,15 +171,11 @@ class Perms:
             if t_perm is nan or isnan(c_perm):
                 m_perm = nan
             else:
-                m_perm = max(t_perm, c_perm, 1) + 1
+                m_perm = max(t_perm, abs(c_perm), 1) + 1
             if not perm < m_perm and not isnan(m_perm):
+                if not m_perm < inf and guild.owner_id != user.id:
+                    raise PermissionError("Must be server owner to assign non-finite permission level.")
                 if t_user is None:
-                    if "f" not in flags:
-                        response = uniStr(
-                            "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
-                            + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
-                        )
-                        return ("```asciidoc\n[" + response + "]```")
                     for u in guild.members:
                         _vars.setPerms(u.id, guild, c_perm)
                 else:
@@ -221,7 +203,7 @@ class Perms:
         )
 
 
-class EnableCommand:
+class EnabledCommands:
     is_command = True
     server_only = True
 
@@ -259,7 +241,7 @@ class EnableCommand:
                 if "h" in flags:
                     return
                 return (
-                    "```css\nEnabled standard command categories in ["
+                    "```css\nEnabled all standard command categories in ["
                     + noHighlight(channel.name) + "].```"
                 )
             if "d" in flags:

@@ -368,24 +368,38 @@ class main_data:
             return nan
         if u_id == client.user.id:
             return inf
-        if guild is None:
+        if guild is None or hasattr(guild, "ghost"):
             return inf
         try:
-            perms = self.data["perms"]
+            return self.data["perms"][guild.id][u_id]
         except KeyError:
+            pass
+        m = guild.get_member(u_id)
+        if m is None:
+            r = guild.get_role(u_id)
+            if r is None:
+                return -inf
+            return self.getRolePerms(r, guild)
+        print(m.guild_permissions)
+        if m.guild_permissions.administrator:
+            return inf
+        perm = -inf
+        for role in m.roles: 
+            rp = self.getRolePerms(role, guild)
+            if rp > perm:
+                perm = rp
+        return perm
+    
+    def getRolePerms(self, role, guild):
+        if role.permissions.administrator:
+            return inf
+        try:
+            return self.data["perms"][guild.id][role.id]
+        except KeyError:
+            pass
+        if guild.id == role.id:
             return 0
-        if guild:
-            try:
-                g_id = guild.id
-            except AttributeError:
-                g_id = int(guild)
-            g_perm = perms.setdefault(g_id, {})
-            u_perm = g_perm.get(u_id, perms.setdefault("defaults", {}).get(g_id, 0))
-        else:
-            u_perm = inf
-        if u_perm is not nan and u_id == getattr(guild, "owner_id", 0):
-            u_perm = inf
-        return u_perm
+        return -inf
 
     def setPerms(self, user, guild, value):
         perms = self.data["perms"]

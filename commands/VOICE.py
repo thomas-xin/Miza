@@ -256,7 +256,7 @@ class customAudio(discord.AudioSource):
                 if self.att > 5:
                     self.dead = True
                     return
-        cnt = sum(1 for m in channel.members if m.id != self._vars.client.user.id)
+        cnt = sum(1 for m in channel.members if not m.bot)
         if not cnt and self.timeout < time.time() - 20:
             self.dead = True
             return
@@ -1071,9 +1071,8 @@ ytdl = videoDownloader()
 
 
 def isAlone(auds, user):
-    i = (auds._vars.client.user.id, user.id)
     for m in auds.vc.channel.members:
-        if m.id not in i:
+        if m.id != user.id and not m.bot:
             return False
     return True
 
@@ -1223,7 +1222,7 @@ class Queue:
                 try:
                     ex = eval(res)
                 except NameError:
-                    ex = ConnectionError(res[res.index("(") + 1:res.index(")")].strip("'"))
+                    ex = LookupError(res[res.index("(") + 1:res.index(")")].strip("'"))
                 raise ex
             dur = 0
             added = deque()

@@ -267,24 +267,33 @@ class RoleGiver:
         self.min_level = 3
         self.min_display = "3+"
         self.description = "Adds an automated role giver to the current channel."
-        self.usage = "<0:react_to[]> <1:role[]> <1:perm[]> <disable(?d)> <remover(?r)>"
-        self.flags = "edr"
+        self.usage = "<0:react_to[]> <1:role[]> <delete_messages(?x)> <disable(?d)>"
+        self.flags = "edx"
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
         update = self.data["rolegivers"].update
         _vars = self._vars
-        scheduled = _vars.data["rolegivers"]
+        data = _vars.data["rolegivers"]
         if "d" in flags:
-            scheduled[channel.id] = {}
-            update()
-            return "```css\nRemoved all automated role givers from channel [" + noHighlight(channel.name) + "].```"
-        currentSchedule = scheduled.setdefault(channel.id, {})
+            if argv:
+                react = args[0].lower()
+                assigned = data.get(channel.id, {})
+                if react not in assigned:
+                    raise LookupError("Rolegiver " + react + " not currently assigned for " + channel.name + ".")
+                assigned.pop(react)
+                return "```css\nRemoved [" + react + "] from the rolegiver list for [#" + noHighlight(channel.name) + "].```"
+            if channel.id in data:
+                data.pop(channel.id)
+                update()
+            return "```css\nRemoved all automated role givers from [#" + noHighlight(channel.name) + "].```"
+        assigned = data.setdefault(channel.id, {})
         if not argv:
+            key = lambda alist: "⟨" + ", ".join([str(r) for r in alist[0]]) + "⟩, delete: " + str(alist[1])
             return (
-                "Currently active permission givers in channel <#" + str(channel.id)
-                + ">:\n```ini\n" + strIter(currentSchedule) + "```"
+                "Currently active permission givers in <#" + str(channel.id)
+                + ">:\n```ini\n" + strIter(assigned, key=key) + "```"
             )
-        if len(currentSchedule) >= 16:
+        if sum(len(alist[0]) for alist in assigned) >= 16:
             raise OverflowError(
                 "Rolegiver list for " + channel.name
                 + " has reached the maximum of 16 items. "
@@ -293,59 +302,31 @@ class RoleGiver:
         react = args[0].lower()
         if len(react) > 64:
             raise OverflowError("Search substring too long.")
-        try:
-            role = float(args[1])
-            if perm < role + 1 or isnan(role):
-                reason = (
-                    "to assign permission giver to " + guild.name
-                    + " with value " + str(role) + "."
-                )
-                self.permError(perm, role + 1, reason)
-            r_type = "perm"
-        except ValueError:
-            role = args[1].lower()
-            r_type = "role"
-        currentSchedule[react] = {"role": role, "deleter": "r" in flags}
+        roles = hlist()
+        r = _vars.verifyID(" ".join(args[1:]))
+        if len(guild.roles) <= 1:
+            rolelist = await guild.fetch_roles()
+        else:
+            rolelist = guild.roles
+        if type(r) is int:
+            for i in rolelist:
+                if i.id == r:
+                    role = i
+                    roles.append(role)
+        else:
+            r = r.replace(" ", "").lower()
+            for i in rolelist:
+                if reconstitute(i).replace(" ", "").lower() == r:
+                    role = i
+                    roles.append(role)
+        alist = assigned.setdefault(react, [hlist(), False])
+        alist[1] |= "x" in flags
+        alist[0].append(role.id) 
         update()
         return (
             "```css\nAdded [" + noHighlight(react)
-            + "] ➡️ " + r_type + " [" + noHighlight(role)
+            + "] ➡️ [" + noHighlight(role)
             + "] to channel [" + noHighlight(channel.name) + "].```"
-        )
-
-        
-class DefaultPerms:
-    is_command = True
-    server_only = True
-
-    def __init__(self):
-        self.name = ["DefaultPerm"]
-        self.min_level = 3
-        self.min_display = "3+"
-        self.description = "Sets the default bot permission levels for all users in current server."
-        self.usage = "<level[]>"
-
-    async def __call__(self, _vars, argv, user, guild, perm, **void):
-        update = self.data["perms"].update
-        perms = _vars.data["perms"]
-        currPerm = perms.setdefault("defaults", {}).get(guild.id, 0)
-        if not argv:
-            return (
-                "```css\nCurrent default permission level for [" + noHighlight(guild.name)
-                + "]: [" + str(currPerm) + "].```"
-            )
-        c_perm = await _vars.evalMath(argv, guild.id)
-        if perm < c_perm + 1 or isnan(c_perm):
-            reason = (
-                "to change default permission level for " + guild.name
-                + " to " + str(c_perm) + "."
-            )
-            self.permError(perm, c_perm + 1, reason)
-        perms["defaults"][guild.id] = c_perm
-        update()
-        return (
-            "```css\nChanged default permission level for [" + noHighlight(guild.name)
-            + "] to [" + str(c_perm) + "].```"
         )
 
 
@@ -1214,32 +1195,29 @@ class updateRolegiver:
         user = message.author
         guild = message.guild
         _vars = self._vars
-        currentSchedule = self.data.get(message.channel.id, {})
-        for k in currentSchedule:
+        assigned = self.data.get(message.channel.id, {})
+        for k in assigned:
             if ((k in text) if self._vars.hasSymbol(k) else (k in message.content)):
-                curr = currentSchedule[k]
-                role = curr["role"]
-                deleter = curr["deleter"]
-                try:
-                    perm = float(role)
-                    currPerm = _vars.getPerms(user, guild)
-                    if perm > currPerm:
-                        _vars.setPerms(user, guild, perm)
-                    print("Granted perm " + str(perm) + " to " + user.name + ".")
-                except ValueError:
-                    for r in guild.roles:
-                        if r.name.lower() == role:
-                            await user.add_roles(
-                                r,
-                                reason="Keyword found in message.",
-                                atomic=True,
-                            )
-                            print("Granted role " + r.name + " to " + user.name + ".")
-                if deleter:
-                    try:
-                        await _vars.silentDelete(message, exc=True)
-                    except discord.NotFound:
-                        pass
+                alist = assigned[k]
+                d = alist[1]
+                for r in alist[0]:
+                    role = guild.get_role(r)
+                    if role is None:
+                        roles = await guild.fetch_roles()
+                        for i in roles:
+                            if i.id == r:
+                                role = i
+                    if role is None:
+                        alist[0].remove(curr)
+                        continue
+                    await user.add_roles(
+                        role,
+                        reason="Keyword found in message.",
+                        atomic=True,
+                    )
+                    print("Granted role " + str(role) + " to " + str(user) + ".")
+                if alist[1]:
+                    await _vars.silentDelete(message)
 
     async def __call__(self):
         pass

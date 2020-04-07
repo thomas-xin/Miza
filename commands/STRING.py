@@ -74,16 +74,16 @@ class Translate:
         self.name = ["TR"]
         self.min_level = 0
         self.description = "Translates a string into another language."
-        self.usage = "<0:language> <1:string> <verbose(?v)> <google(?g)>"
-        self.flags = "gv"
+        self.usage = "<0:language> <1:string> <verbose(?v)> <papago(?p)>"
+        self.flags = "pv"
 
     async def __call__(self, args, flags, user, **void):
         dest = args[0]
         string = " ".join(args[1:])
         detected = translators["Google Translate"].detect(string)
         source = detected.lang
-        trans = ["Papago", "Google Translate"]
-        if "g" in flags:
+        trans = ["Google Translate", "Papago"]
+        if "p" in flags:
             trans = trans[::-1]
         if "v" in flags:
             count = 2
@@ -124,7 +124,7 @@ class Math:
     time_consuming = True
 
     def __init__(self):
-        self.name = ["Python", "PY", "Sympy", "M"]
+        self.name = ["Python", "PY", "Sympy", "M", "Calc"]
         self.min_level = 0
         self.description = "Evaluates a math formula."
         self.usage = "<function> <verbose(?v)> <rationalize(?r)>"
