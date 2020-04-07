@@ -399,7 +399,7 @@ class main_data:
             pass
         if guild.id == role.id:
             return 0
-        return -inf
+        return -1
 
     def setPerms(self, user, guild, value):
         perms = self.data["perms"]
