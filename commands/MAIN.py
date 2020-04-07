@@ -876,7 +876,7 @@ class Reminder:
             msg = " ".join(args[:-1])
             t = await _vars.evalTime(args[-1], guild)
             break
-        msg = msg.strip("< >")
+        msg = msg.strip(" ")
         if not msg:
             msg = "[SAMPLE REMINDER]"
         elif len(msg) > 256:
