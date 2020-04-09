@@ -35,7 +35,7 @@ class customAudio(discord.AudioSource):
         try:
             self.paused = False
             self.stats = dict(self.defaults)
-            self.new()
+            self.new(update=False)
             self.queue = hlist()
             self.channel = channel
             self.vc = vc
@@ -70,7 +70,7 @@ class customAudio(discord.AudioSource):
             + "}"
         )
 
-    def new(self, source=None, pos=0):
+    def new(self, source=None, pos=0, update=True):
         self.reverse = self.stats["speed"] < 0
         self.speed = abs(self.stats["speed"])
         if self.speed < 0.005:
@@ -180,7 +180,8 @@ class customAudio(discord.AudioSource):
                 self.stats["position"] = float(self.queue[0]["duration"])
         if self.source is not None and self.player:
             self.player["time"] = 1 + time.time()
-        self.update()
+        if update:
+            self.update()
 
     def seek(self, pos):
         duration = float(self.queue[0]["duration"])
