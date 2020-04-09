@@ -64,10 +64,10 @@ class Execute:
             + " WARNING: DO NOT ALLOW UNTRUSTED USERS TO POST IN CHANNEL."
         )
         self.usage = "<enable(?e)> <disable(?d)>"
-        self.flags = "ed"
+        self.flags = "aed"
 
     async def __call__(self, _vars, flags, channel, **void):
-        if "e" in flags:
+        if "e" in flags or "a" in flags:
             _vars.database["exec"].channel = channel
             return (
                 "```css\nSuccessfully changed code execution channel to ["
@@ -109,6 +109,18 @@ class updateExec:
         except TypeError:
             pass
         return output
+
+    async def _typing_(self, user, channel, **void):
+        _vars = self._vars
+        if user.id == _vars.client.user.id:
+            return
+        if channel.guild is None:
+            emb = discord.Embed()
+            emb.add_field(
+                name=str(user) + " (" + str(user.id) + ")",
+                value="```ini\n[typing...]```",
+            )
+            await self.channel.send(embed=emb, delete_after=20)
 
     async def _nocommand_(self, message, **void):
         _vars = self._vars

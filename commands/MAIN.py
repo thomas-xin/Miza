@@ -173,7 +173,7 @@ class Perms:
             else:
                 m_perm = max(t_perm, abs(c_perm), 1) + 1
             if not perm < m_perm and not isnan(m_perm):
-                if not m_perm < inf and guild.owner_id != user.id:
+                if not m_perm < inf and guild.owner_id != user.id and not isnan(perm):
                     raise PermissionError("Must be server owner to assign non-finite permission level.")
                 if t_user is None:
                     for u in guild.members:
@@ -212,14 +212,14 @@ class EnabledCommands:
         self.min_level = 0
         self.min_display = "0~3"
         self.description = "Shows, enables, or disables a command category in the current channel."
-        self.usage = "<command{all}> <enable(?e)> <disable(?d)> <list(?l)> <hide(?h)>"
-        self.flags = "edlh"
+        self.usage = "<command{all}> <add(?e)> <remove(?d)> <list(?l)> <hide(?h)>"
+        self.flags = "aedlh"
 
     async def __call__(self, argv, flags, user, channel, perm, **void):
         update = self.data["enabled"].update
         _vars = self._vars
         enabled = _vars.data["enabled"]
-        if "e" in flags or "d" in flags:
+        if "a" in flags or "e" in flags or "d" in flags:
             req = 3
             if perm < req:
                 reason = (
@@ -234,7 +234,7 @@ class EnabledCommands:
                     "```css\nStandard command categories:\n"
                     + str(standard_commands) + "```"
                 )
-            if "e" in flags:
+            if "e" in flags or "a" in flags:
                 categories = list(standard_commands) #list(_vars.categories)
                 enabled[channel.id] = categories
                 update()
@@ -263,7 +263,7 @@ class EnabledCommands:
                 raise LookupError("Unknown command category " + argv + ".")
             else:
                 enabled = enabled.setdefault(channel.id, {})
-                if "e" in flags:
+                if "e" in flags or "a" in flags:
                     if catg in enabled:
                         raise ValueError(
                             "Command category " + catg
@@ -306,12 +306,20 @@ class Prefix:
         self.min_level = 0
         self.min_display = "0~3"
         self.description = "Shows or changes the prefix for commands for this server."
-        self.usage = "<prefix[]>"
-        self.flags = "h"
+        self.usage = "<prefix[]> <default(?d)>"
+        self.flags = "hd"
 
     async def __call__(self, argv, guild, perm, _vars, flags, **void):
         pref = _vars.data["prefixes"]
         update = self.data["prefixes"].update
+        if "d" in flags:
+            if guild.id in pref:
+                pref.pop(guild.id)
+                update()
+            return (
+                "```css\nSuccessfully reset command prefix for ["
+                + noHighlight(guild.name) + "].```"
+            )
         if not argv:
             return (
                 "```css\nCurrent command prefix for [" + noHighlight(guild.name)
@@ -820,7 +828,7 @@ class Reminder:
         self.min_level = 0
         self.description = "Sets a reminder for a certain date and time."
         self.usage = "<1:message> <0:time> <disable(?d)>"
-        self.flags = "ed"
+        self.flags = "aed"
 
     async def __call__(self, argv, args, flags, _vars, user, guild, **void):
         rems = _vars.data["reminders"].get(user.id, hlist())

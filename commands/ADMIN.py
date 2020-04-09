@@ -268,7 +268,7 @@ class RoleGiver:
         self.min_display = "3+"
         self.description = "Adds an automated role giver to the current channel."
         self.usage = "<0:react_to[]> <1:role[]> <delete_messages(?x)> <disable(?d)>"
-        self.flags = "edx"
+        self.flags = "aedx"
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
         update = self.data["rolegivers"].update
@@ -339,7 +339,7 @@ class RainbowRole:
         self.min_level = 3
         self.description = "Causes target role to randomly change colour."
         self.usage = "<0:role[]> <mim_delay[16]> <disable(?d)>"
-        self.flags = "ed"
+        self.flags = "aed"
 
     async def __call__(self, _vars, flags, args, argv, guild, **void):
         update = self.data["rolecolours"].update
@@ -484,7 +484,7 @@ class Dogpile:
         self.min_level = 2
         self.description = "Causes Miza to automatically imitate users when 3+ of the same messages are posted in a row."
         self.usage = "<enable(?e)> <disable(?d)>"
-        self.flags = "ed"
+        self.flags = "aed"
 
     async def __call__(self, flags, guild, **void):
         update = self.data["follows"].update
@@ -497,7 +497,7 @@ class Dogpile:
             curr["follow"] = False
             update()
             return "```css\nDisabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
-        elif "e" in flags:
+        elif "e" in flags or "a" in flags:
             curr["follow"] = True
             update()
             return "```css\nEnabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
@@ -517,7 +517,7 @@ class React:
         self.min_level = 2
         self.description = "Causes Miza to automatically assign a reaction to messages containing the substring."
         self.usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
-        self.flags = "ed"
+        self.flags = "aed"
 
     async def __call__(self, _vars, flags, guild, argv, args, **void):
         update = self.data["follows"].update
@@ -570,12 +570,12 @@ class UserLog:
         self.min_level = 3
         self.description = "Causes Miza to log user events from the server, in the current channel."
         self.usage = "<enable(?e)> <disable(?d)>"
-        self.flags = "ed"
+        self.flags = "aed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
         data = _vars.data["logU"]
         update = _vars.database["logU"].update
-        if "e" in flags:
+        if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
             return (
@@ -612,12 +612,12 @@ class MessageLog:
         self.min_level = 3
         self.description = "Causes Miza to log message events from the server, in the current channel."
         self.usage = "<enable(?e)> <disable(?d)>"
-        self.flags = "ed"
+        self.flags = "aed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
         data = _vars.data["logM"]
         update = _vars.database["logM"].update
-        if "e" in flags:
+        if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
             return (
@@ -654,12 +654,12 @@ class FileLog:
         self.min_level = 3
         self.description = "Causes Miza to log deleted files from the server, in the current channel."
         self.usage = "<enable(?e)> <disable(?d)>"
-        self.flags = "ed"
+        self.flags = "aed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
         data = _vars.data["logF"]
         update = _vars.database["logF"].update
-        if "e" in flags:
+        if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
             return (

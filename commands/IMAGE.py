@@ -15,20 +15,20 @@ class IMG:
         self.min_level = 0
         self.min_display = "0~2"
         self.description = "Sends an image in the current chat from a list."
-        self.usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <enable(?e)> <disable(?d)> <hide(?h)>"
-        self.flags = "vredh"
+        self.usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <add(?a)> <delete(?d)> <hide(?h)>"
+        self.flags = "vraedh"
 
     async def __call__(self, flags, args, argv, guild, perm, **void):
         update = self.data["images"].update
         _vars = self._vars
         imglists = _vars.data["images"]
         images = imglists.get(guild.id, {})
-        if "e" in flags or "d" in flags:
+        if "a" in flags or "e" in flags or "d" in flags:
             req = 2
             if perm < req:
                 reason = "to change image list for " + guild.name
                 self.permError(perm, req, reason)
-            if "e" in flags:
+            if "a" in flags or "e" in flags:
                 if len(images) > 64:
                     raise OverflowError(
                         "Image list for " + guild.name

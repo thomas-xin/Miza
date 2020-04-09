@@ -374,7 +374,7 @@ class Mimic:
         self.min_level = 0
         self.description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes."
         self.usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)>"
-        self.flags = "ed"
+        self.flags = "aed"
     
     async def __call__(self, _vars, message, user, perm, flags, args, argv, **void):
         mimicdb = _vars.data["mimics"]

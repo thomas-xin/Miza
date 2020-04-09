@@ -398,9 +398,6 @@ replacers = {
     "NaN": "nan",
     "TRUE": "True",
     "FALSE": "False",
-    "0x": "h2d ",
-    "0o": "o2d ",
-    "0b": "b2d ",
     "coo": "zoo",
     "cinf": "zoo",
 }

@@ -270,7 +270,7 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
             except FileNotFoundError:
                 pass
             dur = getDuration(fi)
-            br = max(32, min(256, floor(((fl - 1024) / dur / 128) / 4) * 4))
+            br = max(32, min(256, floor(((fl - 262144) / dur / 128) / 4) * 4))
             ff = ffmpy.FFmpeg(
                 global_options=["-y", "-hide_banner", "-loglevel panic"],
                 inputs={fi: None},

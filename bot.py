@@ -370,6 +370,8 @@ class main_data:
             return inf
         if guild is None or hasattr(guild, "ghost"):
             return inf
+        if u_id == guild.owner_id:
+            return inf
         try:
             return self.data["perms"][guild.id][u_id]
         except KeyError:
@@ -729,7 +731,7 @@ class main_data:
     async def solveMath(self, f, guild, prec, r):
         f = f.strip()
         try:
-            if hasattr(guild, "ghost"):
+            if guild is None or hasattr(guild, "ghost"):
                 g_id = self.deleted_user
             else:
                 g_id = guild.id
@@ -1582,15 +1584,13 @@ async def handleMessage(message, edit=True):
 
 @client.event
 async def on_typing(channel, user, when):
-    guild = getattr(channel, "guild", None)
-    if guild:
-        for u in _vars.database.values():
-            f = getattr(u, "_typing_", None)
-            if f is not None:
-                try:
-                    await f(channel=channel, user=user)
-                except:
-                    print(traceback.format_exc())
+    for u in _vars.database.values():
+        f = getattr(u, "_typing_", None)
+        if f is not None:
+            try:
+                await f(channel=channel, user=user)
+            except:
+                print(traceback.format_exc())
     await seen(user, delay=10)
 
 

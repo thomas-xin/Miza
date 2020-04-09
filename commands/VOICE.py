@@ -72,15 +72,16 @@ class customAudio(discord.AudioSource):
 
     def new(self, source=None, pos=0):
         self.reverse = self.stats["speed"] < 0
-        self.speed = max(0.005, abs(self.stats["speed"]))
-        if self.speed == 0.005:
+        self.speed = abs(self.stats["speed"])
+        if self.speed < 0.005:
             self.speed = 1
             self.paused |= 2
         else:
             self.paused &= -3
         self.stats["position"] = pos
         self.is_playing = source is not None
-        if getattr(self, "source", None) is not None:
+        orig_source = getattr(self, "source", None)
+        if orig_source is not None and type(orig_source) is not str:
             try:
                 self.source.cleanup()
             except:
@@ -92,7 +93,7 @@ class customAudio(discord.AudioSource):
                 return
             d = {"source": source}
             pitchscale = 2 ** (self.stats["pitch"] / 12)
-            chorus = min(32, abs(self.stats["chorus"]))
+            chorus = min(16, abs(self.stats["chorus"]))
             if pitchscale != 1 or self.stats["speed"] != 1:
                 speed = round(self.speed / pitchscale, 9)
                 if speed != 1:
@@ -139,7 +140,7 @@ class customAudio(discord.AudioSource):
                 for i in range(ceil(chorus)):
                     neg = ((i & 1) << 1) - 1
                     i = 1 + i >> 1
-                    i *= chorus / ceil(chorus)
+                    i *= self.stats["chorus"] / ceil(chorus)
                     if i:
                         A += "|"
                         B += "|"
@@ -167,6 +168,7 @@ class customAudio(discord.AudioSource):
             print(d)
             self.is_loading = True
             self.source = discord.FFmpegPCMAudio(**d)
+            self.is_playing = True
             self.file = source
         else:
             self.source = None
@@ -178,12 +180,14 @@ class customAudio(discord.AudioSource):
                 self.stats["position"] = float(self.queue[0]["duration"])
         if self.source is not None and self.player:
             self.player["time"] = 1 + time.time()
+        self.update()
 
     def seek(self, pos):
         duration = float(self.queue[0]["duration"])
         pos = max(0, pos)
         if pos >= duration:
             self.new()
+            self.update()
             return duration
         self.new(self.file, pos)
         self.stats["position"] = pos
@@ -195,7 +199,7 @@ class customAudio(discord.AudioSource):
             if self.stats["loop"]:
                 temp = q[0]
             self.prev = q[0]["id"]
-            q.pop(0)
+            q.popleft()
             if shuffled and self.stats["shuffle"]:
                 if len(q) > 1:
                     temp = q.popleft()
@@ -262,9 +266,10 @@ class customAudio(discord.AudioSource):
             return
         if cnt:
             self.timeout = time.time()
+        self.att = 0
         if q:
             if len(q) > 65536 + 2048:
-                self.queue = q = q[:65536]
+                self.queue = q = q[-65536:]
             while len(q) > 65536:
                 q.pop()
             dels = deque()
@@ -331,7 +336,7 @@ class customAudio(discord.AudioSource):
                     self.preparing = False
                 except FileNotFoundError:
                     pass
-            elif not playing and self.source is None and not self.is_loading and not self.preparing:
+            elif not playing and self.source is None and not self.is_loading:
                 self.advance()
         if not (q or self.preparing):
             t = self._vars.data["playlists"].get(guild.id, ())
@@ -418,13 +423,12 @@ class customAudio(discord.AudioSource):
             )
             self.is_playing = True
         except EOFError:
-            if (empty or not self.paused) and not self.is_loading:
+            if (empty or not self.paused) and not self.is_loading and self.source is not None:
                 queueable = (self.queue or self._vars.data["playlists"].get(self.vc.guild.id, None))
                 if empty and queueable:
                     if time.time() - self.lastEnd > 0.5:
                         self.lastEnd = time.time()
                         self.new()
-                        self.update()
                 elif not queueable:
                     self.vc.stop()
             temp = numpy.zeros(self.length, numpy.uint16).tobytes()
@@ -988,7 +992,8 @@ class videoDownloader:
                     content="```ini\nConverting [" + name + "]...```",
                     embed=None,
                 ))
-            br = max(32, min(256, floor(((fl - 1024) / dur / 128) / 4) * 4))
+            br = max(32, min(256, floor(((fl - 262144) / dur / 128) / 4) * 4))
+            print(br)
             out = fn + "." + fmt
             ff = ffmpy.FFmpeg(
                 global_options=["-y", "-hide_banner", "-loglevel panic"],
@@ -1297,7 +1302,7 @@ class Playlist:
         self.min_display = "0~2"
         self.description = "Shows, appends, or removes from the default playlist."
         self.usage = "<search_link[]> <remove(?d)> <verbose(?v)>"
-        self.flags = "edv"
+        self.flags = "aedv"
 
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
         update = self.data["playlists"].update
@@ -1541,7 +1546,6 @@ class Skip:
                     if "f" in flags:
                         auds.queue.clear()
                         auds.new()
-                        auds.update()
                         if "h" not in flags:
                             return "```fix\nRemoved all items from the queue.```", 1
                         return
@@ -1602,7 +1606,6 @@ class Skip:
                 else:
                     auds.advance(False, not count)
                 auds.new()
-                auds.update()
                 if count < 4:
                     response += (
                         "[" + noHighlight(song["name"])
@@ -1710,7 +1713,7 @@ def getDump(auds):
             e.pop("u_id")
             e.pop("skips")
             if not i & 2047:
-                time.sleep(0.1)
+                time.sleep(0.2)
             i += 1
         d = {
             "stats": s,
@@ -1822,6 +1825,7 @@ class AudioSettings:
         "Reset": "reset",
     }
     aliasExt = {
+        "AudioSettings": None,
         "Audio": None,
         "A": None,
         "Vol": "volume",
@@ -2675,6 +2679,8 @@ class updateQueues:
                     print(traceback.format_exc())
 
     async def _typing_(self, channel, user, **void):
+        if channel.guild is None:
+            return
         if channel.guild.id in self.audio and user.id != self._vars.client.user.id:
             auds = self.audio[channel.guild.id]
             if auds.player is not None and channel.id == auds.channel.id:
