@@ -445,7 +445,10 @@ class Mimic:
                 mimics = mimicdb[mimic.u_id]
                 m_id = mimic.id
                 for prefix in mimics:
-                    mimics[prefix].remove(m_id)
+                    try:
+                        mimics[prefix].remove(m_id)
+                    except IndexError:
+                        pass
                 mimicdb.pop(mimic.id)
             update()
             return (
