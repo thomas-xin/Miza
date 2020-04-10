@@ -424,9 +424,9 @@ class customAudio(discord.AudioSource):
             )
             self.is_playing = True
         except EOFError:
-            if (empty or not self.paused) and not self.is_loading and self.source is not None:
+            if (empty or not self.paused) and not self.is_loading:
                 queueable = (self.queue or self._vars.data["playlists"].get(self.vc.guild.id, None))
-                if empty and queueable:
+                if empty and queueable and self.source is not None:
                     if time.time() - self.lastEnd > 0.5:
                         self.lastEnd = time.time()
                         self.new()
@@ -676,6 +676,7 @@ class videoDownloader:
 
     def __init__(self):
         self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
+        self.downloading = {}
         self.searched = {}
         self.requests = 0
         self.lastclear = 0
@@ -927,16 +928,18 @@ class videoDownloader:
         while self.requests > 4:
             time.sleep(0.1)
         if item in self.searched:
-            return self.searched[item]
-        if time.time() - self.lastclear > 3600 << 3:
-            self.searched.clear()
-            self.lastclear = time.time()
+            if time.time() - self.searched[item].t < 7200:
+                self.searched[item].t = time.time()
+                return self.searched[item].data
+            else:
+                self.searched.pop(item)
         while len(self.searched) > 262144:
             self.searched.pop(next(iter(self.searched)))
         try:
             self.requests += 1
             print(item)
-            self.searched[item] = output = self.extract(item, force)
+            self.searched[item] = freeClass(t=time.time())
+            self.searched[item].data = output = self.extract(item, force)
             self.requests = max(self.requests - 1, 0)
             return output
         except Exception as ex:
@@ -945,15 +948,19 @@ class videoDownloader:
             return repr(ex)
         
     def downloadSingle(self, i, durc=None, auds=None):
+        if i["url"] in self.downloading:
+            raise FileExistsError("File already downloading.")
         new_opts = dict(self.ydl_opts)
         fn = "cache/" + i["id"] + ".mp3"
         new_opts["outtmpl"] = fn
         exl = RuntimeError
         exc = None
+        self.downloading[i["url"]] = True
         for _ in loop(5):
             downloader = youtube_dl.YoutubeDL(new_opts)
             try:
                 downloader.download([i["url"]])
+                self.downloading.pop(i["url"])
                 if durc is not None:
                     durc[0] = getDuration(fn)
                 auds.update()
@@ -962,6 +969,7 @@ class videoDownloader:
                 exl = ex
                 exc = traceback.format_exc()
                 time.sleep(1)
+        self.downloading.pop(i["url"])
         i["id"] = ""
         print(exc)
         raise exl
@@ -1017,11 +1025,15 @@ class videoDownloader:
         while self.requests > 4:
             time.sleep(0.1)
         if item in self.searched:
-            it = self.searched[item][-1]
-            i["name"] = it["name"]
-            i["duration"] = it["duration"]
-            i["url"] = it["url"]
-            return True
+            if time.time() - self.searched[item].t < 7200:
+                self.searched[item].t = time.time()
+                it = self.searched[item].data[0]
+                i["name"] = it["name"]
+                i["duration"] = it["duration"]
+                i["url"] = it["url"]
+                return True
+            else:
+                self.searched.pop(item)
         while len(self.searched) > 262144:
             self.searched.pop(next(iter(self.searched)))
         try:
@@ -1029,7 +1041,8 @@ class videoDownloader:
             data = self.downloader.extract_info(item, download=False, process=True)
             if "entries" in data:
                 data = data["entries"][-1]
-            self.searched[item] = data = [{
+            self.searched[item] = freeClass(t=time.time())
+            self.searched[item].data = data = [{
                 "id": data["id"],
                 "name": data["title"],
                 "duration": data["duration"],
@@ -1141,7 +1154,7 @@ class Queue:
             barsize = 24
             r = round(min(1, elapsed / duration) * barsize)
             bar = sym[0] * r + sym[1] * (barsize - r)
-            countstr = "Currently playing [" + q[0]["name"] + "](" + q[0]["url"] + ")\n"
+            countstr = "Currently playing [" + discord.utils.escape_markdown(q[0]["name"]) + "](" + q[0]["url"] + ")\n"
             countstr += (
                 "`(" + uniStr(dhms(elapsed))
                 + "/" + uniStr(dhms(duration)) + ") "
@@ -2387,7 +2400,7 @@ def get_lyrics(item):
     if not (path and name):
         raise LookupError("No results for " + item + ".")
     page = requests.get("https://genius.com" + path, headers=header)
-    html = BeautifulSoup(page.text, 'html.parser')
+    html = BeautifulSoup(page.text, "html.parser")
     lyrics = html.find('div', class_='lyrics').get_text()
     return name, lyrics
 
@@ -2680,7 +2693,7 @@ class updateQueues:
                     print(traceback.format_exc())
 
     async def _typing_(self, channel, user, **void):
-        if channel.guild is None:
+        if not hasattr(channel, "guild") or channel.guild is None:
             return
         if channel.guild.id in self.audio and user.id != self._vars.client.user.id:
             auds = self.audio[channel.guild.id]
@@ -2712,7 +2725,7 @@ class updateQueues:
         _vars = self._vars
         pl = self.data
         client = _vars.client
-        should_cache = {}
+        self.cached_items = self.__dict__.setdefault("cached_items", {})
         try:
             if guild is not None:
                 g = guild
@@ -2729,7 +2742,7 @@ class updateQueues:
             else:
                 for g in tuple(pl):
                     for i in pl[g]:
-                        should_cache[i["id"]] = True
+                        self.cached_items[i["id"]] = time.time()
                 for vc in client.voice_clients:
                     if vc.guild.id not in self.connecting and vc.guild.id not in self.audio:
                         create_task(vc.disconnect(force=True))
@@ -2761,19 +2774,25 @@ class updateQueues:
                     if q:
                         for i in range(256):
                             if i < len(q):
-                                should_cache[q[i]["id"]] = True
+                                self.cached_items[q[i]["id"]] = time.time()
                 except:
                     print(traceback.format_exc())
                 if not a & 7:
                     await asyncio.sleep(0.2)
                 a += 1
+            dt = datetime.datetime.utcnow()
+            i = 1
             for path in os.listdir("cache/"):
                 if path.startswith("&"):
-                    continue
-                if ".mp3" in path or ".part" in path:
+                    if "." in path:
+                        snow = int(path[1:path.index(".")])
+                        if (dt - discord.utils.snowflake_time(snow)).total_seconds() < 3600:
+                            continue
+                elif ".mp3" in path or ".part" in path:
                     key = path.replace(".mp3", "").replace(".part", "")
-                    if key in should_cache:
-                        continue
+                    if key in self.cached_items:
+                        if time.time() - self.cached_items[key] < 3600:
+                            continue
                     try:
                         os.remove("cache/" + path)
                         self.audiocache.pop(key)
@@ -2781,5 +2800,10 @@ class updateQueues:
                         pass
                     except:
                         print(traceback.format_exc())
+                    if key in self.cached_items:
+                        self.cached_items.pop(key)
+                if not i & 1023:
+                    await asyncio.sleep(0.2)
+                i += 1
             await asyncio.sleep(0.5)
         self.busy = max(0, self.busy - 1)

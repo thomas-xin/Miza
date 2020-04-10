@@ -593,7 +593,10 @@ class Info:
             if "v" in flags:
                 ptot = p.total
                 pcnt = p.count
-                pavg = ptot / pcnt
+                if not pcnt:
+                    pavg = 0
+                else:
+                    pavg = ptot / pcnt
         except (AttributeError, KeyError):
             pass
         emb.add_field(name="Mimic ID", value=str(p.id), inline=0)
@@ -683,7 +686,7 @@ class Info:
         created = u.created_at
         activity = "\n".join(_vars.strActivity(i) for i in getattr(u, "activities", []))
         role = ", ".join(str(i) for i in getattr(u, "roles", []) if not i.is_default())
-        coms = seen = msgs = avgs = 0
+        coms = seen = msgs = avgs = gmsg = 0
         pos = None
         if "v" in flags:
             try:
@@ -696,6 +699,7 @@ class Info:
             except LookupError:
                 pass
             try:
+                gmsg = _vars.database["counts"].getUserGlobalMessageCount(u)
                 msgs = await _vars.database["counts"].getUserMessages(u, guild)
                 avgs = await _vars.database["counts"].getUserAverage(u, guild)
                 if guild.owner.id != client.user.id:
@@ -748,6 +752,8 @@ class Info:
             emb.add_field(name="Commands used", value=str(coms), inline=1)
         if dname:
             emb.add_field(name="Nickname", value=dname, inline=1)
+        if gmsg:
+            emb.add_field(name="Global post count", value=str(gmsg), inline=1)
         if msgs:
             emb.add_field(name="Post count", value=str(msgs), inline=1)
         if avgs:
@@ -939,7 +945,7 @@ class updateReminders:
 class updateMessageCount:
     is_database = True
     name = "counts"
-    no_file = True
+    store_json = True
 
     def getMessageLength(self, message):
         return len(message.system_content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
@@ -970,6 +976,17 @@ class updateMessageCount:
                 return c.get(user.id, 0)
             self.startCalculate(guild)
         return "Calculating..."
+    
+    def getUserGlobalMessageCount(self, user):
+        count = 0
+        for g_id in self.data:
+            try:
+                c = self.data[g_id]["counts"]
+                if user.id in c:
+                    count += c[user.id]
+            except TypeError:
+                pass
+        return count
 
     async def getUserAverage(self, user, guild):
         if self.scanned == -1:
@@ -1004,14 +1021,9 @@ class updateMessageCount:
         return "Calculating..."            
 
     async def getGuildMessages(self, guild):
+        if guild is None or hasattr(guild, "ghost"):
+            return "Invalid server."
         if self.scanned == -1:
-            c_id = self._vars.client.user.id
-            if guild is None or hasattr(guild, "isDM"):
-                channel = guild.channel
-                if channel is None:
-                    return 0
-                messages = await channel.history(limit=None).flatten()
-                return len(messages)
             if guild.id in self.data:
                 try:
                     return self.data[guild.id]["counts"]
@@ -1049,7 +1061,7 @@ class updateMessageCount:
         year = datetime.timedelta(seconds=31556925.216)
         oneyear = datetime.datetime.utcnow() - guild.created_at < year
         if guild.member_count > 512 and not oneyear:
-            self.data["guild.id"] = "ERROR: Server is too large to estimate post counts."
+            self.data["guild.id"] = {"counts": {}, "totals": {}, 0: True}
             return
         print(guild)
         data = {}
@@ -1070,11 +1082,8 @@ class updateMessageCount:
             await asyncio.sleep(2)
         print("Counting...")
         while [] in histories:
-            histories.remove([])
-        mmax = 65536 / len(histories)
-        caches = hlist()
+            histories = histories.remove([])
         for messages in histories:
-            temp = hlist()
             i = 1
             for message in messages[0]:
                 u = message.author.id
@@ -1087,18 +1096,9 @@ class updateMessageCount:
                     avgs[u] = length
                 if not i & 8191:
                     await asyncio.sleep(0.5)
-                if len(temp) < mmax:
-                    temp.append(message)
                 i += 1
-            caches.append(temp)
         addDict(self.data[guild.id], {"counts": data, "totals": avgs, 0: True})
-        for temp in caches:
-            print("[" + str(len(temp)) + "]")
-            for message in temp:
-                self._vars.cacheMessage(message)
-                if not i & 8191:
-                    await asyncio.sleep(0.5)
-                i += 1
+        self.update()
         print(guild)
         print(self.data[guild.id])
 
@@ -1113,12 +1113,13 @@ class updateMessageCount:
         guilds = self._vars.client.guilds
         i = 1
         for guild in sorted(guilds, key=lambda g: g.member_count, reverse=True):
-            oneyear = datetime.datetime.utcnow() - guild.created_at < year
-            if guild.member_count < 512 or oneyear:
-                self.startCalculate(guild)
-            if not i & 63:
-                await asyncio.sleep(20)
-            i += 1
+            if guild.id not in self.data:
+                oneyear = datetime.datetime.utcnow() - guild.created_at < year
+                if guild.member_count < 512 or oneyear:
+                    self.startCalculate(guild)
+                if not i & 63:
+                    await asyncio.sleep(20)
+                i += 1
         self.scanned = -1
 
     async def _send_(self, message, **void):
@@ -1133,40 +1134,7 @@ class updateMessageCount:
                 total = d["totals"].get(user.id, 0) + self.getMessageLength(message)
                 d["totals"][user.id] = total
                 d["counts"][user.id] = count
-            else:
-                self.startCalculate(guild)
-
-    async def _edit_(self, before, after, **void):
-        if hasattr(before, "ghost"):
-            return
-        if self.scanned == -1:
-            user = after.author
-            guild = after.guild
-            if guild.id in self.data:
-                d = self.data[guild.id]
-                if type(d) is str:
-                    return
-                total = (
-                    d["totals"].get(user.id, 0)
-                    - self.getMessageLength(before)
-                    + self.getMessageLength(after)
-                )
-                d["totals"][user.id] = total
-            else:
-                self.startCalculate(guild)
-
-    async def _delete_(self, message, **void):
-        if self.scanned == -1:
-            user = message.author
-            guild = message.guild
-            if guild.id in self.data:
-                d = self.data[guild.id]
-                if type(d) is str:
-                    return
-                count = d["counts"].get(user.id, 0) - 1
-                total = d["totals"].get(user.id, 0) - self.getMessageLength(message)
-                d["totals"][user.id] = total
-                d["counts"][user.id] = count
+                self.update()
             else:
                 self.startCalculate(guild)
 

@@ -334,6 +334,8 @@ class MimicConfig:
             setting = "description"
         elif opt in ("gender", "birthday", "prefix"):
             setting = opt
+        elif opt in ("doppelganger", "copy", "user", "auto"):
+            setting = "doppelganger"
         else:
             raise TypeError("Invalid target attribute.")
         if new is None:
@@ -352,11 +354,28 @@ class MimicConfig:
                 mimics[new].append(m_id)
             else:
                 mimics[new] = hlist([m_id])
+        elif setting == "url":
+            new = await _vars.followURL(verifyURL(new))
+        elif setting == "doppelganger":
+            if new.lower() in ("none", "null", "0", "false", "f"):
+                new = None
+            else:
+                mim = None
+                try:
+                    mim = _vars.verifyID(new)
+                    user = await _vars.fetch_user(mim)
+                    if user is None:
+                        raise EOFError
+                    new = user.id
+                except:
+                    try:
+                        mimi = _vars.get_mimic(mim)
+                        new = mimi.id
+                    except:
+                        raise LookupError("Target user or mimic ID not found.")
         elif setting != "description":
             if len(new) > 256:
                 raise OverflowError("Must be 256 or fewer in length.")
-        elif setting == "url":
-            new = await _vars.followURL(verifyURL(new))
         name = mimic.name
         mimic[setting] = new
         update()
@@ -397,7 +416,7 @@ class Mimic:
                     "```ini\nNo webhook mimics currently enabled for ["
                     + noHighlight(user) + "].```"
                 )
-            key = lambda x: limStr("⟨" + ", ".join(i + ": " + str(_vars.data["mimics"][i].name) for i in iter(x)) + "⟩", 1900 / len(mimics))
+            key = lambda x: limStr("⟨" + ", ".join(i + ": " + (str(noHighlight(_vars.data["mimics"][i].name)), "[<@" + str(getattr(_vars.data["mimics"][i], "doppelganger", "None")) + ">]")[bool(getattr(_vars.data["mimics"][i], "doppelganger", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
             return (
                 "Currently enabled webhook mimics for **"
                 + discord.utils.escape_markdown(str(user)) + "**: ```ini\n"
@@ -439,6 +458,7 @@ class Mimic:
                 + " has reached the maximum of 256 items. "
                 + "Please remove an item to add another."
             )
+        dop = None
         ctime = datetime.datetime.utcnow()
         mid = discord.utils.time_snowflake(ctime)
         m_id = "&" + str(mid)
@@ -454,11 +474,13 @@ class Mimic:
                     user = await _vars.fetch_user(mim)
                     if user is None:
                         raise EOFError
+                    dop = user.id
                     name = user.name
                     url = str(user.avatar_url)
                 except:
                     try:
                         mimi = _vars.get_mimic(mim)
+                        dop = mimi.id
                         mimic = copy.deepcopy(mimi)
                         mimic.id = m_id
                         mimic.u_id = u_id
@@ -479,6 +501,7 @@ class Mimic:
                 id=m_id,
                 u_id=u_id,
                 prefix=prefix,
+                doppelganger=dop,
                 name=name,
                 url=url,
                 description="",
@@ -496,11 +519,36 @@ class Mimic:
         update()
         return (
             "```css\nSuccessfully added webhook mimic [" + mimic.name
-            + "] with prefix [" + mimic.prefix + "] and ID [" + mimic.id + "].```"
+            + "] with prefix [" + mimic.prefix + "] and ID [" + mimic.id + "]"
+            + (", bound to user [<@" + str(dop) + ">]") * (dop is not None) + ".```"
         )
 
 
-class updateMimics:
+class MathQuiz:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["MathTest"]
+        self.min_level = 1
+        self.description = "Starts a math quiz in the current channel."
+        self.usage = "<mode(easy)(hard)> <disable(?d)>"
+        self.flags = "aed"
+
+    async def __call__(self, channel, flags, argv, **void):
+        mathdb = self._vars.database["mathtest"]
+        if "d" in flags:
+            if channel.id in mathdb.data:
+                mathdb.pop(channel.id)
+            return "```css\nDisabled math quizzes for " + sbHighlight(channel.name) + ".```"
+        if not argv:
+            argv = "easy"
+        elif argv not in ("easy", "hard"):
+            raise TypeError("Invalid quiz mode.")
+        mathdb.data[channel.id] = freeClass(mode=argv, answer=None)
+        return "```css\nEnabled " + argv + " math quiz for " + sbHighlight(channel.name) + ".```"
+
+
+class UpdateMimics:
     is_database = True
     name = "mimics"
     user = True
@@ -509,6 +557,8 @@ class updateMimics:
         pass
 
     async def _nocommand_(self, message, **void):
+        if not message.content:
+            return
         user = message.author
         if user.id in self.data:
             _vars = self._vars
@@ -548,11 +598,45 @@ class updateMimics:
                         w = await _vars.ensureWebhook(channel)
                         for k in sending:
                             mimic = self.data[k.m_id]
-                            await w.send(k.msg, username=mimic.name, avatar_url=mimic.url)
+                            await self.updateMimic(mimic, guild=message.guild)
+                            name = mimic.name
+                            url = mimic.url
+                            await w.send(k.msg, username=name, avatar_url=url)
                             mimic.count += 1
                             mimic.total += len(k.msg)
                 except Exception as ex:
                     await channel.send(repr(ex))
+
+    async def updateMimic(self, mimic, guild=None, it=None):
+        if mimic.setdefault("doppelganger", None):
+            _vars = self._vars
+            mim = 0
+            try:
+                mim = _vars.verifyID(mimic.doppelganger)
+                if guild is not None:
+                    user = guild.get_member(mim)
+                if user is None:
+                    user = await _vars.fetch_user(mim)
+                if user is None:
+                    raise EOFError
+                mimic.name = user.display_name
+                mimic.url = str(user.avatar_url)
+            except LookupError:
+                try:
+                    mimi = _vars.get_mimic(mim)
+                    if it is None:
+                        it = {}
+                    elif mim in it:
+                        raise RecursionError("Infinite recursive loop detected.")
+                    it[mim] = True
+                    if not len(it) & 255:
+                        await asyncio.sleep(0.2)
+                    await self.updateMimic(mimi, guild=guild, it=it)
+                    mimic.name = mimi.name
+                    mimic.url = mimi.url
+                except LookupError:
+                    mimic.name = str(mimic.doppelganger)
+                    mimic.url = "https://cdn.discordapp.com/embed/avatars/0.png"
 
     async def __call__(self):
         if self.busy:
@@ -577,3 +661,262 @@ class updateMimics:
             print(traceback.format_exc())
         await asyncio.sleep(2)
         self.busy = False
+
+
+class UpdateMathTest:
+    is_database = True
+    name = "mathtest"
+    no_file = True
+
+    def __init__(self):
+        s = "⁰¹²³⁴⁵⁶⁷⁸⁹"
+        ss = {str(i): s[i] for i in range(len(s))}
+        ss["-"] = "⁻"
+        self.sst = "".maketrans(ss)
+
+    def format(self, x, y, op):
+        length = 6
+        xs = str(x)
+        xs = " " * (length - len(xs)) + xs
+        ys = str(y)
+        ys = " " * (length - len(ys)) + ys
+        return " " + xs + "\n" + op + ys
+
+    def eqtrans(self, eq):
+        return str(eq).replace("**", "^").replace("exp", "e^").replace("*", "∙")
+    
+    def addition(self):
+        x = xrand(100, 10000)
+        y = xrand(100, 10000)
+        s = self.format(x, y, "+")
+        return s, x + y
+    
+    def subtraction(self):
+        x = xrand(100, 12000)
+        y = xrand(100, 8000)
+        if x < y:
+            x, y = y, x
+        s = self.format(x, y, "-")
+        return s, x - y
+
+    def multiplication(self):
+        x = xrand(2, 20)
+        y = xrand(2, 20)
+        s = self.format(x, y, "×")
+        return s, x * y
+
+    def multiplication2(self):
+        x = xrand(13, 100)
+        y = xrand(13, 100)
+        s = self.format(x, y, "×")
+        return s, x * y
+
+    def division(self):
+        y = xrand(2, 20)
+        x = xrand(2, 14) * y
+        s = self.format(x, y, "÷")
+        return s, x // y
+
+    def exponentiation(self):
+        x = xrand(2, 20)
+        y = xrand(2, max(3, 14 / x))
+        s = str(x) + str(y).translate(self.sst)
+        return s, x ** y
+
+    def exponentiation2(self):
+        x = xrand(2, 4)
+        if x == 2:
+            y = xrand(7, 35)
+        else:
+            y = xrand(5, 11)
+        s = str(x) + str(y).translate(self.sst)
+        return s, x ** y
+        
+    def square_root(self):
+        x = xrand(2, 20)
+        y = x ** 2
+        s = "√" + str(y)
+        return s, x
+
+    def square_root2(self):
+        x = xrand(21, 1000)
+        y = x ** 2
+        s = "√" + str(y)
+        return s, x
+        
+    def scientific(self):
+        x = xrand(100, 10000)
+        x /= 10 ** int(math.log10(x))
+        y = xrand(-3, 6)
+        s = str(x) + "×10" + str(y).translate(self.sst)
+        return s, round(x * 10 ** y, 9)
+        
+    def fraction(self):
+        y = random.choice([2, 4, 5, 10])
+        x = xrand(3, 20)
+        mult = xrand(4) + 1
+        y *= mult
+        x *= mult
+        s = self.format(x, y, "÷")
+        return s, round(x / y, 9)
+        
+    def equation(self):
+        a = xrand(1, 10)
+        b = xrand(1, 10)
+        if xrand(2):
+            a = -a
+        if xrand(2):
+            b = -b
+        bx = -a - b
+        cx = a * b
+        s = "x² "
+        if bx:
+            s += ("+", "-")[bx < 0] + " " + (str(abs(bx))) * (abs(bx) != 1) +  "x "
+        s += ("+", "-")[cx < 0] + " " + str(abs(cx)) + " = 0"
+        return s, [a, b]
+
+    async def equation2(self):
+        a = xrand(1, 14)
+        b = xrand(1, 14)
+        c = xrand(1, 14)
+        d = xrand(1, 14)
+        if xrand(2):
+            a = -a
+        if xrand(2):
+            b = -b
+        if xrand(2):
+            c = -c
+        if xrand(2):
+            d = -d
+        st = "(" + str(a) + "*x+" + str(b) + ")*(" + str(c) + "*x+" + str(d) + ")"
+        a = [-b / a, -d / c]
+        returns = [None]
+        doParallel(sympy.expand, [st], returns)
+        while returns[0] is None:
+            await asyncio.sleep(0.2)
+        q = self.eqtrans(returns[0]).replace("^2", "²").replace("∙", "") + " = 0"
+        return q, a
+
+    async def calculus(self):
+        amount = xrand(2, 5)
+        s = []
+        for i in range(amount):
+            t = xrand(3)
+            if t == 0:
+                a = xrand(1, 7)
+                e = xrand(-3, 8)
+                if xrand(2):
+                    a = -a
+                s.append(str(a) + "x^(" + str(e) + ")")
+            elif t == 1:
+                a = xrand(5)
+                if a <= 1:
+                    a = "e"
+                s.append("+-"[xrand(2)] + str(a) + "^x")
+            elif t == 2:
+                a = xrand(6)
+                if a < 1:
+                    a = 1
+                if xrand(2):
+                    a = -a
+                op = ["sin", "cos", "tan", "sec", "csc", "cot", "log"]
+                s.append(str(a) + "*" + random.choice(op) + "(x)")
+        st = ""
+        for i in s:
+            if st and i[0] not in "+-":
+                st += "+"
+            st += i
+        ans = await self._vars.solveMath(st, -1, 2, 1)
+        a = ans[0]
+        q = self.eqtrans(a)
+        if xrand(2):
+            q = "Dₓ " + q
+            op = sympy.diff
+        else:
+            q = "∫ " + q
+            op = sympy.integrate
+        returns = [None]
+        doParallel(op, [a], returns)
+        while returns[0] is None:
+            await asyncio.sleep(0.2)
+        a = returns[0]
+        return q, a
+
+    async def generateMathQuestion(self, mode):
+        easy = (
+            self.addition,
+            self.subtraction,
+            self.multiplication,
+            self.division,
+            self.exponentiation,
+            self.square_root,
+            self.scientific,
+            self.fraction,
+            self.equation,
+        )
+        hard = (
+            self.multiplication2,
+            self.exponentiation2,
+            self.square_root2,
+            self.equation2,
+            self.calculus,
+        )
+        modes = {"easy": easy, "hard": hard}
+        qa = random.choice(modes[mode])()
+        if asyncio.iscoroutine(qa):
+            return await qa
+        return qa
+
+    async def newQuestion(self, channel):
+        q, a = await self.generateMathQuestion(self.data[channel.id].mode)
+        msg = "```\n" + q + "```"
+        self.data[channel.id].answer = a
+        await channel.send(msg)
+
+    async def __call__(self):
+        _vars = self._vars
+        for c_id in self.data:
+            if self.data[c_id].answer is None:
+                self.data[c_id].answer = nan
+                channel = await _vars.fetch_channel(c_id)
+                await self.newQuestion(channel)
+
+    async def _nocommand_(self, message, **void):
+        _vars = self._vars
+        channel = message.channel
+        if channel.id in self.data:
+            if message.author.id != _vars.client.user.id:
+                msg = message.content.strip("|").strip("`")
+                if msg.lower() != msg:
+                    return
+                try:
+                    x = await _vars.solveMath(msg, getattr(channel, "guild", None), 2, 1)
+                    returns = [None]
+                    doParallel(sympy.sympify, [x[0]], returns)
+                    while returns[0] is None:
+                        await asyncio.sleep(0.2)
+                    x = returns[0]
+                except:
+                    return
+                correct = False
+                a = self.data[channel.id].answer
+                if type(a) is list:
+                    if x in a:
+                        correct = True
+                else:
+                    returns = [None]
+                    doParallel(sympy.sympify, [a], returns)
+                    while returns[0] is None:
+                        await asyncio.sleep(0.2)
+                    a = returns[0]
+                    returns = [None]
+                    doParallel(sympy.simplify, [x - a], returns)
+                    while returns[0] is None:
+                        await asyncio.sleep(0.2)
+                    if returns[0] == 0:
+                        correct = True
+                if correct:
+                    create_task(self.newQuestion(channel))
+                    await channel.send("Great work!")
+                else:
+                    await channel.send("Oops! Not quite, try again!")

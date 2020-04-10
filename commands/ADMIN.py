@@ -937,12 +937,69 @@ class updateMessageLogs:
     name = "logM"
 
     def __init__(self):
+        self.searched = False
         self.dc = {}
+
+    async def cacheGuild(self, guild, lim=65536):
+
+        async def getChannelHistory(channel, returns, lim=2048):
+            try:
+                messages = []
+                for i in range(16):
+                    history = channel.history(limit=lim)
+                    try:
+                        messages = await history.flatten()
+                        break
+                    except discord.Forbidden:
+                        raise
+                    except:
+                        print(traceback.format_exc())
+                    await asyncio.sleep(20 * (i ** 2 + 1))
+                returns[0] = messages
+            except:
+                print(channel.name)
+                print(traceback.format_exc())
+                returns[0] = []
+
+        print(guild, "loading...")
+        limit = ceil(lim / len(guild.text_channels))
+        histories = deque()
+        i = 1
+        for channel in reversed(guild.text_channels):
+            returns = [None]
+            histories.append(returns)
+            if not i % 5:
+                await asyncio.sleep(5 + random.random() * 10)
+            create_task(getChannelHistory(
+                channel,
+                histories[-1],
+                lim=limit,
+            ))
+            i += 1
+        while [None] in histories:
+            await asyncio.sleep(2)
+        while [] in histories:
+            histories = histories.remove([])
+        i = 1
+        for h in histories:
+            temp = h[0]
+            print("[" + str(len(temp)) + "]")
+            for message in temp:
+                self._vars.cacheMessage(message)
+                if not i & 8191:
+                    await asyncio.sleep(0.5)
+                i += 1
+        print(guild, "finished.")
 
     async def __call__(self):
         for h in tuple(self.dc):
             if datetime.datetime.utcnow() - h > datetime.timedelta(seconds=3600):
                 self.dc.pop(h)
+        if not self.searched:
+            self.searched = True
+            lim = floor(1048576 / len(self._vars.client.guilds))
+            for g in self._vars.client.guilds:
+                create_task(self.cacheGuild(g, lim=lim))
 
     async def _edit_(self, before, after, **void):
         if not after.author.bot:
@@ -1144,7 +1201,7 @@ class updateFollows:
         self.msgFollow = {}
 
     async def _nocommand_(self, text, edit, orig, message, **void):
-        if message.guild is None:
+        if message.guild is None or not orig:
             return
         g_id = message.guild.id
         u_id = message.author.id
@@ -1189,8 +1246,8 @@ class updateRolegiver:
     def __init__(self):
         pass
 
-    async def _nocommand_(self, text, message, **void):
-        if message.guild is None:
+    async def _nocommand_(self, text, message, orig, **void):
+        if message.guild is None or not orig:
             return
         user = message.author
         guild = message.guild

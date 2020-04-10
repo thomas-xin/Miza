@@ -114,7 +114,7 @@ class updateExec:
         _vars = self._vars
         if user.id == _vars.client.user.id:
             return
-        if channel.guild is None:
+        if not hasattr(channel, "guild") or channel.guild is None:
             emb = discord.Embed()
             emb.add_field(
                 name=str(user) + " (" + str(user.id) + ")",
