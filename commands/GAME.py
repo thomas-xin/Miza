@@ -334,8 +334,8 @@ class MimicConfig:
             setting = "description"
         elif opt in ("gender", "birthday", "prefix"):
             setting = opt
-        elif opt in ("doppelganger", "copy", "user", "auto"):
-            setting = "doppelganger"
+        elif opt in ("auto", "copy", "user", "auto"):
+            setting = "auto"
         else:
             raise TypeError("Invalid target attribute.")
         if new is None:
@@ -356,7 +356,7 @@ class MimicConfig:
                 mimics[new] = hlist([m_id])
         elif setting == "url":
             new = await _vars.followURL(verifyURL(new))
-        elif setting == "doppelganger":
+        elif setting == "auto":
             if new.lower() in ("none", "null", "0", "false", "f"):
                 new = None
             else:
@@ -397,9 +397,11 @@ class Mimic:
     
     async def __call__(self, _vars, message, user, perm, flags, args, argv, **void):
         mimicdb = _vars.data["mimics"]
-        mimics = mimicdb.setdefault(user.id, {})
         update = _vars.database["mimics"].update
-        if not argv:
+        if len(args) == 1 and "d" not in flags:
+            user = await _vars.fetch_user(_vars.verifyID(argv))
+        mimics = mimicdb.setdefault(user.id, {})
+        if not argv or (len(args) == 1 and "d" not in flags):
             if "d" in flags:
                 _vars.data["mimics"].pop(user.id)
                 update()
@@ -416,7 +418,7 @@ class Mimic:
                     "```ini\nNo webhook mimics currently enabled for ["
                     + noHighlight(user) + "].```"
                 )
-            key = lambda x: limStr("⟨" + ", ".join(i + ": " + (str(noHighlight(_vars.data["mimics"][i].name)), "[<@" + str(getattr(_vars.data["mimics"][i], "doppelganger", "None")) + ">]")[bool(getattr(_vars.data["mimics"][i], "doppelganger", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
+            key = lambda x: limStr("⟨" + ", ".join(i + ": " + (str(noHighlight(_vars.data["mimics"][i].name)), "[<@" + str(getattr(_vars.data["mimics"][i], "auto", "None")) + ">]")[bool(getattr(_vars.data["mimics"][i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
             return (
                 "Currently enabled webhook mimics for **"
                 + discord.utils.escape_markdown(str(user)) + "**: ```ini\n"
@@ -443,6 +445,7 @@ class Mimic:
                 if not isnan(perm) and mimic.u_id != user.id:
                     raise PermissionError("Target mimic does not belong to you.")
                 mimics = mimicdb[mimic.u_id]
+                user = await _vars.fetch_user(mimic.u_id)
                 m_id = mimic.id
                 for prefix in mimics:
                     try:
@@ -490,6 +493,7 @@ class Mimic:
                         mimic.prefix = prefix
                         mimic.count = mimic.total = 0
                         mimic.created_at = ctime
+                        mimic.auto = dop
                     except:
                         name = args[0]
                         url = "https://cdn.discordapp.com/embed/avatars/0.png"
@@ -504,7 +508,7 @@ class Mimic:
                 id=m_id,
                 u_id=u_id,
                 prefix=prefix,
-                doppelganger=dop,
+                auto=dop,
                 name=name,
                 url=url,
                 description="",
@@ -523,7 +527,7 @@ class Mimic:
         return (
             "```css\nSuccessfully added webhook mimic [" + mimic.name
             + "] with prefix [" + mimic.prefix + "] and ID [" + mimic.id + "]"
-            + (", bound to user [<@" + str(dop) + ">]") * (dop is not None) + ".```"
+            + (", bound to user [<" + "@" * (type(dop) is int) + str(dop) + ">]") * (dop is not None) + ".```"
         )
 
 
@@ -541,7 +545,7 @@ class MathQuiz:
         mathdb = self._vars.database["mathtest"]
         if "d" in flags:
             if channel.id in mathdb.data:
-                mathdb.pop(channel.id)
+                mathdb.data.pop(channel.id)
             return "```css\nDisabled math quizzes for " + sbHighlight(channel.name) + ".```"
         if not argv:
             argv = "easy"
@@ -611,20 +615,20 @@ class UpdateMimics:
                     await channel.send(repr(ex))
 
     async def updateMimic(self, mimic, guild=None, it=None):
-        if mimic.setdefault("doppelganger", None):
+        if mimic.setdefault("auto", None):
             _vars = self._vars
             mim = 0
             try:
-                mim = _vars.verifyID(mimic.doppelganger)
+                mim = _vars.verifyID(mimic.auto)
                 if guild is not None:
                     user = guild.get_member(mim)
                 if user is None:
                     user = await _vars.fetch_user(mim)
                 if user is None:
-                    raise EOFError
+                    raise LookupError
                 mimic.name = user.display_name
                 mimic.url = str(user.avatar_url)
-            except LookupError:
+            except (discord.NotFound, LookupError):
                 try:
                     mimi = _vars.get_mimic(mim)
                     if it is None:
@@ -638,7 +642,7 @@ class UpdateMimics:
                     mimic.name = mimi.name
                     mimic.url = mimi.url
                 except LookupError:
-                    mimic.name = str(mimic.doppelganger)
+                    mimic.name = str(mimic.auto)
                     mimic.url = "https://cdn.discordapp.com/embed/avatars/0.png"
 
     async def __call__(self):
@@ -890,7 +894,9 @@ class UpdateMathTest:
         if channel.id in self.data:
             if message.author.id != _vars.client.user.id:
                 msg = message.content.strip("|").strip("`")
-                if msg.lower() != msg:
+                if not msg or msg.lower() != msg:
+                    return
+                if msg.startswith("#") or msg.startswith("//") or msg.startswith("\\"):
                     return
                 try:
                     x = await _vars.solveMath(msg, getattr(channel, "guild", None), 2, 1)

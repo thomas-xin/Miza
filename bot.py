@@ -1678,6 +1678,7 @@ async def on_raw_message_delete(payload):
             except AttributeError:
                 message.guild = None
             message.id = payload.message_id
+            message.created_at = discord.utils.snowflake_time(message.id)
     guild = message.guild
     if guild:
         for u in _vars.database.values():
@@ -1712,6 +1713,7 @@ async def on_raw_bulk_message_delete(payload):
                 except AttributeError:
                     message.guild = None
                 message.id = m_id
+                message.created_at = discord.utils.snowflake_time(message.id)
             messages.append(message)
     for message in messages:
         guild = message.guild
@@ -1760,6 +1762,7 @@ async def updateEdit(before, after):
         before.guild = after.guild
         before.author = after.author
         before.id = after.id
+        before.created_at = discord.utils.snowflake_time(before.id)
     guild = after.guild
     if guild:
         for u in _vars.database.values():
@@ -1796,6 +1799,7 @@ async def on_raw_message_edit(payload):
         before.channel = await _vars.fetch_channel(c_id)
         before.guild = channel.guild
         before.id = payload.message_id
+        before.created_at = discord.utils.snowflake_time(before.id)
     if before:
         after = await before.channel.fetch_message(payload.message_id)
         _vars.cacheMessage(after)
