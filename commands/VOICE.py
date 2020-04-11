@@ -1444,13 +1444,15 @@ class Connect:
         if vc_ is None:
             try:
                 auds = _vars.database["playlists"].audio[guild.id]
-                auds.dead = True
-                if guild.id in connecting:
-                    connecting.pop(guild.id)
-                await _vars.database["playlists"](guild=guild)
-                return
             except KeyError:
                 raise LookupError("Unable to find connected channel.")
+            if not isAlone(auds, user) and perm < 1:
+                self.permError(perm, 1, "to force play while other users are in voice")
+            auds.dead = True
+            if guild.id in connecting:
+                connecting.pop(guild.id)
+            await _vars.database["playlists"](guild=guild)
+            return
         joined = False
         for vc in client.voice_clients:
             if vc.guild.id == guild.id:
@@ -1668,7 +1670,7 @@ class Pause:
         auds.preparing = False
         if name in ("pause", "stop"):
             if not isAlone(auds, user) and perm < 1:
-                self.PermError(perm, 1, "to " + name + " while other users are in voice")
+                self.permError(perm, 1, "to " + name + " while other users are in voice")
         elif auds.stats["position"] <= 0:
             if auds.queue and "download" in auds.queue[0]:
                 auds.queue[0].pop("download")
