@@ -48,7 +48,7 @@ class customAudio(discord.AudioSource):
             self.searching = False
             self.preparing = True
             self.player = None
-            self.timeout = 0
+            self.timeout = time.time()
             self.lastEnd = 0
             self.pausec = False
             self.curr_timeout = 0
@@ -294,8 +294,8 @@ class customAudio(discord.AudioSource):
                 if i < len(q):
                     e_id = q[i]["id"]
                     dtime = q[i].get("download", 0)
-                    if not dtime:
-                        q[i]["download"] = 1
+                    if dtime >= 0 and time.time() - dtime > 4:
+                        q[i]["download"] = time.time()
                         search = e_id + ".mp3"
                         if search not in os.listdir("cache/"):
                             durc = [q[i]["duration"]]
@@ -955,7 +955,8 @@ class videoDownloader:
         
     def downloadSingle(self, i, durc=None, auds=None):
         if i["url"] in self.downloading:
-            raise FileExistsError("File already downloading.")
+            return
+            # raise FileExistsError("File already downloading.")
         new_opts = dict(self.ydl_opts)
         fn = "cache/" + i["id"] + ".mp3"
         new_opts["outtmpl"] = fn

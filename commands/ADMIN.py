@@ -1243,10 +1243,10 @@ class updateFollows:
                     curr[2] = u_id
                     #print(curr)
             try:
-                for k in following[g_id]["reacts"]:
-                    k = str(k)
+                for i in following[g_id]["reacts"]:
+                    k = str(i)
                     if ((k in words) if self._vars.hasSymbol(k) else (k in message.content)):
-                        await message.add_reaction(following[g_id]["reacts"][k])
+                        await message.add_reaction(following[g_id]["reacts"][i])
             except discord.Forbidden:
                 print(traceback.format_exc())
 
