@@ -53,7 +53,7 @@ class customAudio(discord.AudioSource):
             self.pausec = False
             self.curr_timeout = 0
             self._vars = _vars
-            _vars.database["playlists"].audio[channel.guild.id] = self
+            _vars.database["playlists"].audio[vc.guild.id] = self
         except:
             print(traceback.format_exc())
 
@@ -223,12 +223,12 @@ class customAudio(discord.AudioSource):
         guild = vc.guild
         g = guild.id
         if hasattr(self, "dead"):
-            self.loop.create_task(vc.disconnect(force=True))
+            self._vars.database["playlists"].audio.pop(g)
+            self.loop.create_task(vc.disconnect())
             try:
-                self._vars.database["playlists"].audio.pop(g)
                 msg = (
                     "```css\n🎵 Successfully disconnected from ["
-                    + noHighlight(vc.guild.name) + "]. 🎵```"
+                    + noHighlight(guild.name) + "]. 🎵```"
                 )
                 self.loop.create_task(self._vars.sendReact(
                     self.channel,
@@ -239,11 +239,6 @@ class customAudio(discord.AudioSource):
                 pass
             return
         if not hasattr(vc, "channel"):
-            self.dead = True
-            return
-        channel = vc.channel
-        guild = channel.guild
-        if guild.id != g:
             self.dead = True
             return
         if vc.is_connected() or vc.guild.id in self._vars.database["playlists"].connecting:
@@ -262,7 +257,7 @@ class customAudio(discord.AudioSource):
                 if self.att > 5:
                     self.dead = True
                     return
-        cnt = sum(1 for m in channel.members if not m.bot)
+        cnt = sum(1 for m in vc.channel.members if not m.bot)
         if not cnt and self.timeout < time.time() - 20:
             self.dead = True
             return
@@ -1430,7 +1425,7 @@ class Connect:
             vc_ = None
         elif argv or name == "move":
             c_id = _vars.verifyID(argv)
-            if not c_id:
+            if not c_id > 0:
                 vc_ = None
             else:
                 vc_ = await _vars.fetch_channel(c_id)
@@ -1485,6 +1480,9 @@ class Connect:
                         await asyncio.sleep(0.5)
                 except discord.ClientException:
                     await asyncio.sleep(1)
+            if not hasattr(vc, "guild"):
+                connecting[guild.id] = False
+                raise ConnectionError("Unable to connect to voice channel.")
         if guild.id not in _vars.database["playlists"].audio:
             await channel.trigger_typing()
             _vars.database["playlists"].audio[guild.id] = auds = customAudio(channel, vc, _vars)
