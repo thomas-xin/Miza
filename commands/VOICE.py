@@ -1437,7 +1437,10 @@ class Connect:
                 raise LookupError("Unable to find voice channel.")
             vc_ = voice.channel
         connecting = _vars.database["playlists"].connecting
-        guild = vc_.guild
+        if vc_ is None:
+            guild = channel.guild
+        else:
+            guild = vc_.guild
         if vc_ is None:
             try:
                 auds = _vars.database["playlists"].audio[guild.id]

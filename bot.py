@@ -527,7 +527,7 @@ class main_data:
                                     try:
                                         data = json.loads(s)
                                     except:
-                                        pass
+                                        print(traceback.format_exc())
                                 if data is None:
                                     data = eval(s)
                                 self.data[name] = var.data = data
