@@ -836,7 +836,13 @@ class Reminder:
         self.usage = "<1:message> <0:time> <disable(?d)>"
         self.flags = "aed"
 
-    async def __call__(self, argv, args, flags, _vars, user, guild, **void):
+    async def __call__(self, name, message, flags, _vars, user, guild, **void):
+        msg = message.content
+        argv = msg[msg.lower().index(name) + len(name):].strip(" ").strip("\n")
+        try:
+            args = shlex.split(argv)
+        except ValueError:
+            args = argv.split(" ")
         rems = _vars.data["reminders"].get(user.id, [])
         update = _vars.database["reminders"].update
         if "d" in flags:
@@ -907,7 +913,7 @@ class Reminder:
         _vars.data["reminders"][user.id] = sort(rems, key=lambda x: x["t"])
         update()
         emb = discord.Embed(description=msg)
-        emb.set_author(name=name, url=url)
+        emb.set_author(name=name, url=url, icon_url=url)
         return {
             "content": ("```css\nSuccessfully set reminder for ["
                 + noHighlight(user) + "] in [" + noHighlight(sec2Time(t)) + "]:```"
@@ -926,7 +932,13 @@ class Announcement:
         self.usage = "<1:message> <0:time> <disable(?d)>"
         self.flags = "aed"
 
-    async def __call__(self, argv, args, flags, _vars, user, channel, guild, **void):
+    async def __call__(self, name, message, flags, _vars, user, channel, guild, **void):
+        msg = message.content
+        argv = msg[msg.lower().index(name) + len(name):].strip(" ").strip("\n")
+        try:
+            args = shlex.split(argv)
+        except ValueError:
+            args = argv.split(" ")
         rems = _vars.data["reminders"].get(channel.id, [])
         update = _vars.database["reminders"].update
         if "d" in flags:
@@ -997,7 +1009,7 @@ class Announcement:
         _vars.data["reminders"][channel.id] = sort(rems, key=lambda x: x["t"])
         update()
         emb = discord.Embed(description=msg)
-        emb.set_author(name=name, url=url)
+        emb.set_author(name=name, url=url, icon_url=url)
         return {
             "content": ("```css\nSuccessfully set announcement for [#"
                 + noHighlight(channel) + "] in [" + noHighlight(sec2Time(t)) + "]:```"
@@ -1030,8 +1042,8 @@ class updateReminders:
                     continue
                 x = temp[0]
                 if t >= x["t"]:
-                    x = freeClass(x)
-                    temp.popleft()
+                    x = freeClass(**x)
+                    temp.pop(0)
                     changed = True
                     if x.u:
                         ch = await self._vars.getDM(u_id)

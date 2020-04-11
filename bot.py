@@ -857,7 +857,6 @@ class main_data:
                 url = url[1:-1]
             it = {}
         if url.startswith("https://discordapp.com/channels/"):
-            orig = url
             spl = url[32:].split("/")
             c = await self.fetch_channel(spl[1])
             m = await self.fetch_message(spl[2], c)
