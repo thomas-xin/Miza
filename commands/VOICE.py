@@ -1441,13 +1441,16 @@ class Connect:
             guild = channel.guild
         else:
             guild = vc_.guild
+        perm = _vars.getPerms(user, guild)
+        if perm < 0:
+            self.permError(perm, 0, "for command " + self.name + " in " + str(guild))
         if vc_ is None:
             try:
                 auds = _vars.database["playlists"].audio[guild.id]
             except KeyError:
                 raise LookupError("Unable to find connected channel.")
             if not isAlone(auds, user) and perm < 1:
-                self.permError(perm, 1, "to force play while other users are in voice")
+                self.permError(perm, 1, "to disconnect while other users are in voice")
             auds.dead = True
             if guild.id in connecting:
                 connecting.pop(guild.id)
