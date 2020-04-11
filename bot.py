@@ -98,6 +98,8 @@ class main_data:
         started = hasattr(self, "started")
         if obj.checking:
             return
+        if hasattr(obj, "no_delete"):
+            return
         obj.checking = True
         data = obj.data
         for key in tuple(data):
@@ -454,8 +456,12 @@ class main_data:
             if name:
                 if self.updated:
                     self.updated = False
+                    if hasattr(self, "store_json"):
+                        data = json.dumps(self.data)
+                    else:
+                        data = repr(self.data)
                     f = open(self.file, "wb")
-                    f.write(bytes(repr(self.data), "utf-8"))
+                    f.write(data.encode("utf-8"))
                     f.close()
                     return True
         else:
@@ -516,7 +522,15 @@ class main_data:
                                 s = f.read()
                                 if not s:
                                     raise FileNotFoundError
-                                self.data[name] = var.data = eval(s)
+                                data = None
+                                if hasattr(var, "store_json"):
+                                    try:
+                                        data = json.loads(s)
+                                    except:
+                                        pass
+                                if data is None:
+                                    data = eval(s)
+                                self.data[name] = var.data = data
                                 f.close()
                             except FileNotFoundError:
                                 self.data[name] = var.data = {}

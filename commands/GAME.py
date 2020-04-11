@@ -353,7 +353,7 @@ class MimicConfig:
             if new in mimics:
                 mimics[new].append(m_id)
             else:
-                mimics[new] = hlist([m_id])
+                mimics[new] = [m_id]
         elif setting == "url":
             new = await _vars.followURL(verifyURL(new))
         elif setting == "auto":
@@ -522,7 +522,7 @@ class Mimic:
         if prefix in mimics:
             mimics[prefix].append(m_id)
         else:
-            mimics[prefix] = hlist([m_id])
+            mimics[prefix] = [m_id]
         update()
         return (
             "```css\nSuccessfully added webhook mimic [" + mimic.name
@@ -559,9 +559,18 @@ class UpdateMimics:
     is_database = True
     name = "mimics"
     user = True
+    store_json = True
 
     def __init__(self):
-        pass
+        i = 1
+        for k in self.data:
+            if type(k) is str:
+                self.data[k] = freeClass(**self.data[k])
+            else:
+                self.data[k] = list(self.data[k])
+            if not i & 4095:
+                time.sleep(0.01)
+            i += 1
 
     async def _nocommand_(self, message, **void):
         if not message.content:

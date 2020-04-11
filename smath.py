@@ -2338,34 +2338,19 @@ def hzero(size, maxoff=__hlist_maxoff__):
     return hlist((0 for i in range(size)), maxoff)
 
 
-class freeClass(collections.abc.Mapping):
-    
-    def __init__(self, *args, **kwargs):
-        for i in range(len(args)):
-            self.__dict__[i] = args[i]
-        for i in kwargs:
-            self.__setattr__(i, kwargs[i])
-        for i in dir(self.__dict__):
-            if not hasattr(self, i):
-                setattr(self, i, getattr(self.__dict__, i))
+class freeClass(dict):
 
-    def __repr__(self, nofunc=True):
-        d = self.to_dict(nofunc)
-        return "freeClass(**" + repr(d) + ")"
+    __init__ = lambda self, *args, **kwargs: super().__init__(self, *args, **kwargs)
+    __repr__ = lambda self: "freeClass(**" + super().__repr__() + ")"
+    __iter__ = lambda self: iter(super())
+    __len__ = lambda self: len(super())
+    __setitem__ = lambda self, key, value: super().__setitem__(key, value)
+    __setattr__ = lambda self, key, value: super().__setitem__(key, value)
+    __getitem__ = lambda self, key: super().get(key)
+    __getattr__ = lambda self, key: super().get(key)
+    __str__ = lambda self: self.__repr__()
 
-    def to_dict(self, nofunc=True):
-        d = dict(self.__dict__)
-        if nofunc:
-            for k in tuple(d):
-                if callable(d[k]):
-                    d.pop(k)
-        return d
-    
-    __iter__ = lambda self: iter(self.__dict__)
-    __len__ = lambda self: len(self.__dict__)
-    __setitem__ = lambda self, key, value: self.__dict__.__setitem__(key, value)
-    __getitem__ = lambda self, key: self.__dict__.__getitem__(key)
-    __str__ = lambda self: self.__repr__(nofunc=False)
+    to_dict = lambda self: dict(self)
 
 
 class pickled:

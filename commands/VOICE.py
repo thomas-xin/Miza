@@ -51,6 +51,7 @@ class customAudio(discord.AudioSource):
             self.timeout = 0
             self.lastEnd = 0
             self.pausec = False
+            self.curr_timeout = 0
             self._vars = _vars
             _vars.database["playlists"].audio[channel.guild.id] = self
         except:
@@ -423,14 +424,19 @@ class customAudio(discord.AudioSource):
                 4,
             )
             self.is_playing = True
+            self.curr_timeout = 0
         except EOFError:
             if (empty or not self.paused) and not self.is_loading:
                 queueable = (self.queue or self._vars.data["playlists"].get(self.vc.guild.id, None))
                 if empty and queueable and self.source is not None:
                     if time.time() - self.lastEnd > 0.5:
-                        self.lastEnd = time.time()
-                        self.new()
+                        if self.curr_timeout - time.time() > 1 or self.stats["position"] >= self.queue[0]["duration"] - 1:
+                            self.lastEnd = time.time()
+                            self.new()
+                        elif self.curr_timeout == 0:
+                            self.curr_timeout = time.time()
                 elif not queueable:
+                    self.curr_timeout = 0
                     self.vc.stop()
             temp = numpy.zeros(self.length, numpy.uint16).tobytes()
             # print(traceback.format_exc())
@@ -646,7 +652,7 @@ async def forceJoin(guild, channel, user, client, _vars):
         for func in _vars.categories["voice"]:
             if "join" in (name.lower() for name in func.name):
                 try:
-                    await func(client=client, user=user, _vars=_vars, channel=channel, guild=guild)
+                    await func(user=user, channel=channel)
                 except discord.ClientException:
                     pass
                 except AttributeError:
@@ -1404,27 +1410,57 @@ class Playlist:
         )
         
 
-class Join:
+class Connect:
     is_command = True
     server_only = True
 
     def __init__(self):
-        self.name = ["Summon", "Connect"]
+        self.name = ["Summon", "Join", "DC", "Disconnect", "Move", "Reconnect"]
         self.min_level = 0
         self.description = "Summons the bot into a voice channel."
-        self.usage = ""
+        self.usage = "<channel{curr}(0)>"
 
-    async def __call__(self, client, user, _vars, channel, guild, **void):
-        voice = user.voice
-        if voice is None:
-            raise LookupError("Unable to find voice channel.")
-        vc_ = voice.channel
+    async def __call__(self, user, channel, name="join", argv="", **void):
+        _vars = self._vars
+        client = _vars.client
+        if name in ("dc", "disconnect"):
+            vc_ = None
+        elif argv or name == "move":
+            c_id = _vars.verifyID(argv)
+            if not c_id:
+                vc_ = None
+            else:
+                vc_ = await _vars.fetch_channel(c_id)
+        else:
+            voice = user.voice
+            if voice is None:
+                raise LookupError("Unable to find voice channel.")
+            vc_ = voice.channel
+        connecting = _vars.database["playlists"].connecting
+        guild = vc_.guild
+        if vc_ is None:
+            try:
+                auds = _vars.database["playlists"].audio[guild.id]
+                auds.dead = True
+                if guild.id in connecting:
+                    connecting.pop(guild.id)
+                await _vars.database["playlists"](guild=guild)
+                return
+            except KeyError:
+                raise LookupError("Unable to find connected channel.")
         joined = False
         for vc in client.voice_clients:
             if vc.guild.id == guild.id:
                 joined = True
+                if vc.channel.id != vc_.id:
+                    connecting[guild.id] = True
+                    try:
+                        await vc.move_to(vc_)
+                        connecting[guild.id] = False
+                    except:
+                        connecting[guild.id] = False
+                        raise
                 break
-        connecting = _vars.database["playlists"].connecting
         if not joined:
             connecting[guild.id] = True
             vc = freeClass(is_connected = lambda: False)
@@ -1458,30 +1494,6 @@ class Join:
                 "```css\n🎵 Successfully connected to [" + noHighlight(vc_.name)
                 + "] in [" + noHighlight(guild.name) + "]. 🎵```", 1
             )
-
-
-class Leave:
-    is_command = True
-    server_only = True
-
-    def __init__(self):
-        self.name = ["Quit", "DC", "Disconnect"]
-        self.min_level = 0
-        self.min_display = "0~1"
-        self.description = "Leaves a voice channel."
-        self.usage = ""
-
-    async def __call__(self, user, _vars, guild, perm, **void):
-        try:
-            auds = _vars.database["playlists"].audio[guild.id]
-        except KeyError:
-            raise LookupError("Unable to find connected channel.")
-        if not isAlone(auds, user) and perm < 1:
-            self.permError(perm, 1, "to disconnect while other users are in voice")
-        auds.dead = True
-        if guild.id in _vars.database["playlists"].connecting:
-            _vars.database["playlists"].connecting.pop(guild.id)
-        await _vars.database["playlists"](guild=guild)
 
 
 class Skip:
@@ -2637,6 +2649,7 @@ class Download:
 class updateQueues:
     is_database = True
     name = "playlists"
+    store_json = True
 
     def __init__(self):
         self.audio = {}

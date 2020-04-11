@@ -51,7 +51,7 @@ class Help:
                         continue
                     newstr = (
                         ("```xml\n", "```ini\n")["v" in flags] + prefix + name
-                        + "\nAliases: " + str(com.name)
+                        + "\nAliases: " + ", ".join(com.name[:-1])
                         + "\nEffect: " + description
                         + (
                             "\nUsage: " + prefix + name + " " + usage
@@ -83,7 +83,7 @@ class Help:
                         newstr = (
                             "```xml\n" + prefix + name
                             + "\nCategory: " + c
-                            + "\nAliases: " + str(com.name)
+                            + "\nAliases: " + ", ".join(com.name[:-1])
                             + "\nEffect: " + description
                             + (
                                 "\nUsage: " + prefix + name + " " + usage
@@ -837,7 +837,7 @@ class Reminder:
         self.flags = "aed"
 
     async def __call__(self, argv, args, flags, _vars, user, guild, **void):
-        rems = _vars.data["reminders"].get(user.id, hlist())
+        rems = _vars.data["reminders"].get(user.id, [])
         update = _vars.database["reminders"].update
         if "d" in flags:
             if not argv:
@@ -847,8 +847,8 @@ class Reminder:
             x = rems.pop(i)
             update()
             return (
-                "```css\nSuccessfully removed ["
-                + noHighlight(x.msg) + "] from reminders list for ["
+                "```ini\nSuccessfully removed ["
+                + limStr(noHighlight(x["msg"]), 64) + "] from announcements list for ["
                 + noHighlight(user) + "].```"
             )
         if not argv:
@@ -858,7 +858,7 @@ class Reminder:
                     + noHighlight(user) + "].```"
                 )
             d = datetime.datetime.utcnow().timestamp()
-            s = strIter(rems, key=lambda x: limStr(x.msg, 64) + " ➡️ " + sec2Time(x.t - d))
+            s = strIter(rems, key=lambda x: limStr(noHighlight(x["msg"]), 64) + " ➡️ " + sec2Time(x["t"] - d))
             return (
                 "Current reminders set for **" + discord.utils.escape_markdown(str(user))
                 + "**:```ini" + s + "```"
@@ -893,25 +893,124 @@ class Reminder:
         msg = msg.strip(" ")
         if not msg:
             msg = "[SAMPLE REMINDER]"
-        elif len(msg) > 256:
-            raise OverflowError("Reminder message too long (" + str(len(msg)) + "> 256).")
+        elif len(msg) > 512:
+            raise OverflowError("Reminder message too long (" + str(len(msg)) + "> 512).")
+        name = str(user)
+        url = _vars.strURL(user.avatar_url)
         rems.append(freeClass(
+            name=name,
+            url=url,
             msg=msg,
             t=t + datetime.datetime.utcnow().timestamp(),
+            u=1
         ))
-        _vars.data["reminders"][user.id] = sort(rems, key=lambda x: x.t)
+        _vars.data["reminders"][user.id] = sort(rems, key=lambda x: x["t"])
         update()
-        return (
-            "```css\nSuccessfully set reminder for ["
-            + noHighlight(user) + "] in [" + noHighlight(sec2Time(t)) + "]:\n"
-            + msg + "```"
-        )
+        emb = discord.Embed(description=msg)
+        emb.set_author(name=name, url=url)
+        return {
+            "content": ("```css\nSuccessfully set reminder for ["
+                + noHighlight(user) + "] in [" + noHighlight(sec2Time(t)) + "]:```"
+            ),
+            "embed": emb,
+        }
+
+
+class Announcement:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["Announce", "Announcements"]
+        self.min_level = 2
+        self.description = "Sets an announcement in the current channel for a certain date and time."
+        self.usage = "<1:message> <0:time> <disable(?d)>"
+        self.flags = "aed"
+
+    async def __call__(self, argv, args, flags, _vars, user, channel, guild, **void):
+        rems = _vars.data["reminders"].get(channel.id, [])
+        update = _vars.database["reminders"].update
+        if "d" in flags:
+            if not argv:
+                i = 0
+            else:
+                i = await _vars.evalMath(argv, guild)
+            x = rems.pop(i)
+            update()
+            return (
+                "```ini\nSuccessfully removed ["
+                + limStr(noHighlight(x["name"] + ": " + x["msg"]), 128) + "] from announcements list for [#"
+                + noHighlight(channel) + "].```"
+            )
+        if not argv:
+            if not len(rems):
+                return (
+                    "```ini\nNo announcements currently set for [#"
+                    + noHighlight(channel) + "].```"
+                )
+            d = datetime.datetime.utcnow().timestamp()
+            s = strIter(rems, key=lambda x: limStr(noHighlight(x["name"] + ": " + x["msg"]), 128) + " ➡️ " + sec2Time(x["t"] - d))
+            return (
+                "Current announcements set for <#" + str(channel.id)
+                + ">:```ini" + s + "```"
+            )
+        if len(rems) >= 8:
+            raise OverflowError("Channel has reached the maximum of 8 announcements. Please remove one to add another.")
+        while True:
+            spl = None
+            if "in" in argv:
+                if " in " in argv:
+                    spl = argv.split(" in ")
+                elif argv.startswith("in "):
+                    spl = [argv[3:]]
+                    msg = ""
+                if spl is not None:
+                    msg = " in ".join(spl[:-1])
+                    t = await _vars.evalTime(spl[-1], guild)
+                    break
+            if "at" in argv:
+                if " at " in argv:
+                    spl = argv.split(" at ")
+                elif argv.startswith("at "):
+                    spl = [argv[3:]]
+                    msg = ""
+                if spl is not None:
+                    msg = " at ".join(spl[:-1])
+                    t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
+                    break
+            msg = " ".join(args[:-1])
+            t = await _vars.evalTime(args[-1], guild)
+            break
+        msg = msg.strip(" ")
+        if not msg:
+            msg = "[SAMPLE ANNOUNCEMENT]"
+        elif len(msg) > 512:
+            raise OverflowError("Announcement message too long (" + str(len(msg)) + "> 512).")
+        name = str(user)
+        url = _vars.strURL(user.avatar_url)
+        rems.append(freeClass(
+            name=name,
+            url=url,
+            msg=msg,
+            t=t + datetime.datetime.utcnow().timestamp(),
+            u=0
+        ))
+        _vars.data["reminders"][channel.id] = sort(rems, key=lambda x: x["t"])
+        update()
+        emb = discord.Embed(description=msg)
+        emb.set_author(name=name, url=url)
+        return {
+            "content": ("```css\nSuccessfully set announcement for [#"
+                + noHighlight(channel) + "] in [" + noHighlight(sec2Time(t)) + "]:```"
+            ),
+            "embed": emb,
+        }
 
 
 class updateReminders:
     is_database = True
     name = "reminders"
-    user = True
+    no_delete = True
+    store_json = True
 
     def __init__(self):
         pass
@@ -923,20 +1022,29 @@ class updateReminders:
         i = 1
         changed = False
         for u_id in tuple(self.data):
-            temp = self.data[u_id]
-            if not len(temp):
-                self.data.pop(u_id)
-                changed = True
-                continue
-            x = temp[0]
-            if t >= x.t:
-                temp.popleft()
-                changed = True
-                ch = await self._vars.getDM(u_id)
-                await ch.send("```css\n" + x.msg + "```")
-            if not i & 16383:
-                await asyncio.sleep(0.4)
-            i += 1
+            try:
+                temp = self.data[u_id]
+                if not len(temp):
+                    self.data.pop(u_id)
+                    changed = True
+                    continue
+                x = temp[0]
+                if t >= x["t"]:
+                    x = freeClass(x)
+                    temp.popleft()
+                    changed = True
+                    if x.u:
+                        ch = await self._vars.getDM(u_id)
+                    else:
+                        ch = await self._vars.client.fetch_channel(u_id)
+                    emb = discord.Embed(description=x.msg)
+                    emb.set_author(name=x.name, url=x.url, icon_url=x.url)
+                    await ch.send(embed=emb)
+                if not i & 16383:
+                    await asyncio.sleep(0.3)
+                i += 1
+            except:
+                print(traceback.format_exc())
         if changed:
             self.update()
         self.busy = False
@@ -1142,6 +1250,7 @@ class updateMessageCount:
 class updatePrefix:
     is_database = True
     name = "prefixes"
+    store_json = True
 
     def __init__(self):
         pass
@@ -1153,6 +1262,7 @@ class updatePrefix:
 class updateEnabled:
     is_database = True
     name = "enabled"
+    store_json = True
 
     def __init__(self):
         pass
@@ -1165,6 +1275,7 @@ class updateUsers:
     is_database = True
     name = "users"
     suspected = "users.json"
+    store_json = True
     user = True
 
     def __init__(self):

@@ -336,6 +336,7 @@ class Dog:
 class updateImages:
     is_database = True
     name = "images"
+    store_json = True
 
     def __init__(self):
         pass
