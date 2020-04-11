@@ -1475,7 +1475,8 @@ class Connect:
         if not joined:
             connecting[guild.id] = True
             vc = freeClass(is_connected = lambda: False)
-            while not vc.is_connected():
+            t = time.time()
+            while not vc.is_connected() and time.time() - t < 12:
                 try:
                     vc = await vc_.connect(timeout=30, reconnect=False)
                     for _ in loop(5):
