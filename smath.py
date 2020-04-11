@@ -1316,7 +1316,7 @@ def strIter(it, key=None, limit=1728):
             it = hlist(i for i in it)
     except:
         it = hlist(it)
-    if type(it) is dict:
+    if type(it) in (dict, freeClass):
         keys = it.keys()
     else:
         keys = range(len(it))
@@ -1333,6 +1333,23 @@ def strIter(it, key=None, limit=1728):
             s += str(key(it[k]))
         i += 1
     return limStr(s, limit)
+
+
+def intKey(d):
+    c = {}
+    for k in tuple(d):
+        try:
+            t = d[k]
+        except KeyError:
+            continue
+        try:
+            k = int(k)
+        except (TypeError, ValueError):
+            pass
+        if type(t) is dict:
+            t = intKey(t)
+        c[k] = t
+    return c
 
 
 TIMEUNITS = {
@@ -2342,8 +2359,8 @@ class freeClass(dict):
 
     __init__ = lambda self, *args, **kwargs: super().__init__(self, *args, **kwargs)
     __repr__ = lambda self: "freeClass(**" + super().__repr__() + ")"
-    __iter__ = lambda self: iter(super())
-    __len__ = lambda self: len(super())
+    __iter__ = lambda self: super().__iter__()
+    __len__ = lambda self: super().__len__()
     __setitem__ = lambda self, key, value: super().__setitem__(key, value)
     __setattr__ = lambda self, key, value: super().__setitem__(key, value)
     __getitem__ = lambda self, key: super().get(key)

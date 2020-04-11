@@ -344,7 +344,7 @@ class MimicConfig:
                 + noHighlight(mimic.name) + "]: [" + noHighlight(mimic[setting]) + "].```"
             )
         if setting == "birthday":
-            new = tparser.parse(new)
+            new = tparser.parse(new).timestamp()
         elif setting == "prefix":
             if len(new) > 16:
                 raise OverflowError("Must be 16 or fewer in length.")
@@ -465,8 +465,9 @@ class Mimic:
                 + "Please remove an item to add another."
             )
         dop = None
-        ctime = datetime.datetime.utcnow()
-        mid = discord.utils.time_snowflake(ctime)
+        utcn = datetime.datetime.utcnow()
+        mid = discord.utils.time_snowflake(utcn)
+        ctime = utcn.timestamp()
         m_id = "&" + str(mid)
         mimic = None
         if len(args):
@@ -564,9 +565,9 @@ class UpdateMimics:
     def __init__(self):
         i = 1
         for k in self.data:
-            if type(k) is str:
+            try:
                 self.data[k] = freeClass(**self.data[k])
-            else:
+            except:
                 self.data[k] = list(self.data[k])
             if not i & 4095:
                 time.sleep(0.01)

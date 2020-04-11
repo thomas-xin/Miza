@@ -602,10 +602,10 @@ class Info:
         emb.add_field(name="Mimic ID", value=str(p.id), inline=0)
         emb.add_field(name="Name", value=str(p.name), inline=0)
         emb.add_field(name="Prefix", value=str(p.prefix), inline=1)
-        emb.add_field(name="Creation time", value=str(p.created_at), inline=1)
+        emb.add_field(name="Creation time", value=str(datetime.datetime.fromtimestamp(p.created_at)), inline=1)
         if "v" in flags:
             emb.add_field(name="Gender", value=str(p.gender), inline=1)
-            ctime = p.birthday
+            ctime = datetime.datetime.fromtimestamp(p.birthday)
             age = (datetime.datetime.utcnow() - ctime).total_seconds() / TIMEUNITS["year"]
             emb.add_field(name="Birthday", value=str(ctime), inline=1)
             emb.add_field(name="Age", value=str(roundMin(round(age, 1))), inline=1)

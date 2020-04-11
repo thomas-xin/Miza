@@ -530,6 +530,8 @@ class main_data:
                                         print(traceback.format_exc())
                                 if data is None:
                                     data = eval(s)
+                                if not hasattr(var, "force_str"):
+                                    data = intKey(data)
                                 self.data[name] = var.data = data
                                 f.close()
                             except FileNotFoundError:

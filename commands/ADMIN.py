@@ -324,7 +324,7 @@ class RoleGiver:
                 if reconstitute(i).replace(" ", "").lower() == r:
                     role = i
                     roles.append(role)
-        alist = assigned.setdefault(react, [hlist(), False])
+        alist = assigned.setdefault(react, [[], False])
         alist[1] |= "x" in flags
         alist[0].append(role.id) 
         update()
@@ -363,7 +363,7 @@ class RainbowRole:
                 "Currently active dynamic role colours in **" + guild.name
                 + "**:\n```ini\n" + strIter(guild_special) + "```"
             )
-        if len(curr["guild_special"]) >= 7:
+        if len(guild_special) >= 7:
             raise OverflowError(
                 "Rainbow role list for " + guild.name
                 + " has reached the maximum of 7 items. "
@@ -537,6 +537,11 @@ class React:
                 update()
                 return "```css\nRemoved all auto reacts for [" + noHighlight(guild.name) + "].```"
             else:
+                if not curr["reacts"]:
+                    return (
+                        "```ini\nNo currently active auto reacts for ["
+                        + noHighlight(guild.name) + "].```"
+                    )
                 return (
                     "Currently active auto reacts for **" + discord.utils.escape_markdown(guild.name)
                     + "**:\n```ini\n" + strIter(curr.get("reacts", {})) + "```"
@@ -1239,6 +1244,7 @@ class updateFollows:
                     #print(curr)
             try:
                 for k in following[g_id]["reacts"]:
+                    k = str(k)
                     if ((k in words) if self._vars.hasSymbol(k) else (k in message.content)):
                         await message.add_reaction(following[g_id]["reacts"][k])
             except discord.Forbidden:
@@ -1266,7 +1272,6 @@ class updateRolegiver:
         for k in assigned:
             if ((k in text) if self._vars.hasSymbol(k) else (k in message.content)):
                 alist = assigned[k]
-                d = alist[1]
                 for r in alist[0]:
                     role = guild.get_role(r)
                     if role is None:
@@ -1275,7 +1280,7 @@ class updateRolegiver:
                             if i.id == r:
                                 role = i
                     if role is None:
-                        alist[0].remove(curr)
+                        alist[0].remove(r)
                         continue
                     await user.add_roles(
                         role,
