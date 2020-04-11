@@ -263,7 +263,7 @@ class RoleGiver:
     server_only = True
 
     def __init__(self):
-        self.name = ["Verifier"]
+        self.name = ["Verifier", "AutoRole"]
         self.min_level = 3
         self.min_display = "3+"
         self.description = "Adds an automated role giver to the current channel."
@@ -285,17 +285,17 @@ class RoleGiver:
             if channel.id in data:
                 data.pop(channel.id)
                 update()
-            return "```css\nRemoved all automated role givers from [#" + noHighlight(channel.name) + "].```"
+            return "```css\nRemoved all automated rolegivers from [#" + noHighlight(channel.name) + "].```"
         assigned = data.setdefault(channel.id, {})
         if not argv:
             key = lambda alist: "⟨" + ", ".join([str(r) for r in alist[0]]) + "⟩, delete: " + str(alist[1])
             if not assigned:
                 return (
-                    "```ini\nNo currently active permission givers for [#"
+                    "```ini\nNo currently active rolegivers for [#"
                     + noHighlight(channel) + "].```"
                 )
             return (
-                "Currently active permission givers in <#" + str(channel.id)
+                "Currently active rolegivers in <#" + str(channel.id)
                 + ">:\n```ini\n" + strIter(assigned, key=key) + "```"
             )
         if sum(len(alist[0]) for alist in assigned) >= 16:
@@ -335,59 +335,59 @@ class RoleGiver:
         )
 
 
-class RainbowRole:
-    is_command = True
-    server_only = True
+# class RainbowRole:
+#     is_command = True
+#     server_only = True
 
-    def __init__(self):
-        self.name = ["DynamicRole"]
-        self.min_level = 3
-        self.description = "Causes target role to randomly change colour."
-        self.usage = "<0:role[]> <mim_delay[16]> <disable(?d)>"
-        self.flags = "aed"
+#     def __init__(self):
+#         self.name = ["DynamicRole"]
+#         self.min_level = 3
+#         self.description = "Causes target role to randomly change colour."
+#         self.usage = "<0:role[]> <mim_delay[16]> <disable(?d)>"
+#         self.flags = "aed"
 
-    async def __call__(self, _vars, flags, args, argv, guild, **void):
-        update = self.data["rolecolours"].update
-        _vars = self._vars
-        colours = _vars.data["rolecolours"]
-        guild_special = colours.setdefault(guild.id, {})
-        if not argv:
-            if "d" in flags:
-                colours.pop(guild.id)
-                update()
-                return (
-                    "```css\nRemoved all active dynamic role colours in ["
-                    + noHighlight(guild.name) + "].```"
-                )
-            return (
-                "Currently active dynamic role colours in **" + guild.name
-                + "**:\n```ini\n" + strIter(guild_special) + "```"
-            )
-        if len(guild_special) >= 7:
-            raise OverflowError(
-                "Rainbow role list for " + guild.name
-                + " has reached the maximum of 7 items. "
-                + "Please remove an item to add another."
-            )
-        role = args[0].lower()
-        if len(args) < 2:
-            delay = 16
-        else:
-            delay = await _vars.evalMath(" ".join(args[1:]), guild.id)
-        for r in guild.roles:
-            if role in r.name.lower():
-                if "d" in flags:
-                    try:
-                        guild_special.pop(r.id)
-                    except KeyError:
-                        pass
-                else:
-                    guild_special[r.id] = delay
-        update()
-        return (
-            "Changed dynamic role colours for **" + guild.name
-            + "** to:\n```ini\n" + strIter(guild_special) + "```"
-        )
+#     async def __call__(self, _vars, flags, args, argv, guild, **void):
+#         update = self.data["rolecolours"].update
+#         _vars = self._vars
+#         colours = _vars.data["rolecolours"]
+#         guild_special = colours.setdefault(guild.id, {})
+#         if not argv:
+#             if "d" in flags:
+#                 colours.pop(guild.id)
+#                 update()
+#                 return (
+#                     "```css\nRemoved all active dynamic role colours in ["
+#                     + noHighlight(guild.name) + "].```"
+#                 )
+#             return (
+#                 "Currently active dynamic role colours in **" + guild.name
+#                 + "**:\n```ini\n" + strIter(guild_special) + "```"
+#             )
+#         if len(guild_special) >= 7:
+#             raise OverflowError(
+#                 "Rainbow role list for " + guild.name
+#                 + " has reached the maximum of 7 items. "
+#                 + "Please remove an item to add another."
+#             )
+#         role = args[0].lower()
+#         if len(args) < 2:
+#             delay = 16
+#         else:
+#             delay = await _vars.evalMath(" ".join(args[1:]), guild.id)
+#         for r in guild.roles:
+#             if role in r.name.lower():
+#                 if "d" in flags:
+#                     try:
+#                         guild_special.pop(r.id)
+#                     except KeyError:
+#                         pass
+#                 else:
+#                     guild_special[r.id] = delay
+#         update()
+#         return (
+#             "Changed dynamic role colours for **" + guild.name
+#             + "** to:\n```ini\n" + strIter(guild_special) + "```"
+#         )
 
 
 class Lockdown:
@@ -1307,59 +1307,59 @@ class updatePerms:
         pass
 
 
-class updateColours:
-    is_database = True
-    name = "rolecolours"
-    store_json = True
+# class updateColours:
+#     is_database = True
+#     name = "rolecolours"
+#     store_json = True
 
-    def __init__(self):
-        self.counter = 0
-        self.count = 0
-        self.delay = 0
-        self.busy_guilds = {}
+#     def __init__(self):
+#         self.counter = 0
+#         self.count = 0
+#         self.delay = 0
+#         self.busy_guilds = {}
 
-    async def changeColour(self, g_id, roles):
-        if self.busy_guilds.get(g_id, 0) > 1:
-            return
-        addDict(self.busy_guilds, {g_id: 1})
-        try:
-            guild = await self._vars.fetch_guild(g_id)
-            l = list(roles)
-            for r in l:
-                try:
-                    role = guild.get_role(r)
-                    delay = roles[r]
-                    if not random.randint(0, ceil(delay)):
-                        col = self._vars.randColour()
-                        try:
-                            await role.edit(colour=discord.Colour(col))
-                        except KeyError:
-                            self.count += 15
-                            self._vars.blocked += 1
-                            break
-                        self.count += 1
-                        #print("Edited role " + role.name)
-                    await asyncio.sleep(frand(2))
-                except discord.Forbidden:
-                    print(traceback.format_exc())
-                except discord.HTTPException:
-                    print(traceback.format_exc())
-                    self._vars.blocked += 60
-                    break
-        except:
-            print(traceback.format_exc())
-        addDict(self.busy_guilds, {g_id: -1})
+#     async def changeColour(self, g_id, roles):
+#         if self.busy_guilds.get(g_id, 0) > 1:
+#             return
+#         addDict(self.busy_guilds, {g_id: 1})
+#         try:
+#             guild = await self._vars.fetch_guild(g_id)
+#             l = list(roles)
+#             for r in l:
+#                 try:
+#                     role = guild.get_role(r)
+#                     delay = roles[r]
+#                     if not random.randint(0, ceil(delay)):
+#                         col = self._vars.randColour()
+#                         try:
+#                             await role.edit(colour=discord.Colour(col))
+#                         except KeyError:
+#                             self.count += 15
+#                             self._vars.blocked += 1
+#                             break
+#                         self.count += 1
+#                         #print("Edited role " + role.name)
+#                     await asyncio.sleep(frand(2))
+#                 except discord.Forbidden:
+#                     print(traceback.format_exc())
+#                 except discord.HTTPException:
+#                     print(traceback.format_exc())
+#                     self._vars.blocked += 60
+#                     break
+#         except:
+#             print(traceback.format_exc())
+#         addDict(self.busy_guilds, {g_id: -1})
 
-    async def __call__(self):
-        self.counter = self.counter + 1 & 65535
-        if time.time() > self.delay:
-            self.delay = time.time() + 60
-            self.count = 0
-        for g in self.data:
-            if self.count < 48 and self._vars.blocked <= 0:
-                create_task(self.changeColour(g, self.data[g]))
-            else:
-                break
+#     async def __call__(self):
+#         self.counter = self.counter + 1 & 65535
+#         if time.time() > self.delay:
+#             self.delay = time.time() + 60
+#             self.count = 0
+#         for g in self.data:
+#             if self.count < 48 and self._vars.blocked <= 0:
+#                 create_task(self.changeColour(g, self.data[g]))
+#             else:
+#                 break
 
 
 async def getBans(_vars, guild):

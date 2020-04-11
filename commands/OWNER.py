@@ -130,7 +130,7 @@ class updateExec:
             proc = message.content
             while proc[0] == " ":
                 proc = proc[1:]
-            if proc.startswith("//") or proc.startswith("||") or proc.startswith("\\\\") or proc.startswith("#"):
+            if proc.startswith("//") or proc.startswith("||") or proc.startswith("\\") or proc.startswith("#"):
                 return
             if proc.startswith("`") and proc.endswith("`"):
                 proc = proc.strip("`")

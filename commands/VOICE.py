@@ -294,7 +294,7 @@ class customAudio(discord.AudioSource):
                 if i < len(q):
                     e_id = q[i]["id"]
                     dtime = q[i].get("download", 0)
-                    if dtime >= 0 and time.time() - dtime > 4:
+                    if dtime >= 0 and time.time() - dtime > 2:
                         q[i]["download"] = time.time()
                         search = e_id + ".mp3"
                         if search not in os.listdir("cache/"):
@@ -967,7 +967,8 @@ class videoDownloader:
             downloader = youtube_dl.YoutubeDL(new_opts)
             try:
                 downloader.download([i["url"]])
-                self.downloading.pop(i["url"])
+                if i["url"] in self.downloading:
+                    self.downloading.pop(i["url"])
                 if durc is not None:
                     durc[0] = getDuration(fn)
                 auds.update()
@@ -976,7 +977,8 @@ class videoDownloader:
                 exl = ex
                 exc = traceback.format_exc()
                 time.sleep(1)
-        self.downloading.pop(i["url"])
+        if i["url"] in self.downloading:
+            self.downloading.pop(i["url"])
         i["id"] = ""
         print(exc)
         raise exl
