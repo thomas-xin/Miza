@@ -472,12 +472,6 @@ class SaveChannel:
             h = h[4096:]
             await asyncio.sleep(0.32)
         return bytes(s, "utf-8")
-        
-
-follow_default = {
-    "follow": False,
-    "reacts": {},
-}
 
                   
 class Dogpile:
@@ -492,23 +486,22 @@ class Dogpile:
         self.flags = "aed"
 
     async def __call__(self, flags, guild, **void):
-        update = self.data["follows"].update
+        update = self.data["dogpiles"].update
         _vars = self._vars
-        following = _vars.data["follows"]
-        curr = following.setdefault(guild.id, copy.deepcopy(follow_default))
-        if type(curr) is not dict:
-            curr = copy.deepcopy(follow_default)
+        following = _vars.data["dogpiles"]
+        curr = following.get(guild.id, False)
         if "d" in flags:
-            curr["follow"] = False
-            update()
+            if guild.id in following:
+                following.pop(guild.id)
+                update()
             return "```css\nDisabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
         elif "e" in flags or "a" in flags:
-            curr["follow"] = True
+            following[guild.id] = True
             update()
             return "```css\nEnabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
         else:
             return (
-                "```css\nCurrently " + "not " * (not curr["follow"])
+                "```css\nCurrently " + "not " * (not curr)
                 + "dogpile imitating in [" + noHighlight(guild.name) + "].```"
             )
 
@@ -525,31 +518,30 @@ class React:
         self.flags = "aed"
 
     async def __call__(self, _vars, flags, guild, argv, args, **void):
-        update = self.data["follows"].update
+        update = self.data["reacts"].update
         _vars = self._vars
-        following = _vars.data["follows"]
-        curr = following.setdefault(guild.id, copy.deepcopy(follow_default))
-        if type(curr) is not dict:
-            curr = copy.deepcopy(follow_default)
+        following = _vars.data["reacts"]
+        curr = following.setdefault(guild.id, {})
         if not argv:
             if "d" in flags:
-                curr["reacts"] = {}
-                update()
+                if guild.id in following:
+                    following.pop(guild.id)
+                    update()
                 return "```css\nRemoved all auto reacts for [" + noHighlight(guild.name) + "].```"
             else:
-                if not curr["reacts"]:
+                if not curr:
                     return (
                         "```ini\nNo currently active auto reacts for ["
                         + noHighlight(guild.name) + "].```"
                     )
                 return (
                     "Currently active auto reacts for **" + discord.utils.escape_markdown(guild.name)
-                    + "**:\n```ini\n" + strIter(curr.get("reacts", {})) + "```"
+                    + "**:\n```ini\n" + strIter(curr) + "```"
                 )
         a = args[0].lower()[:64]
         if "d" in flags:
-            if a in curr["reacts"]:
-                curr["reacts"].pop(a)
+            if a in curr:
+                curr.pop(a)
                 update()
                 return (
                     "```css\nRemoved [" + noHighlight(a) + "] from the auto react list for ["
@@ -557,13 +549,13 @@ class React:
                 )
             else:
                 raise LookupError(str(a) + " is not in the auto react list.")
-        if len(curr["reacts"]) >= 256:
+        if len(curr) >= 256:
             raise OverflowError(
                 "React list for " + guild.name
                 + " has reached the maximum of 256 items. "
                 + "Please remove an item to add another."
             )
-        curr["reacts"][a] = args[1]
+        curr[a] = args[1]
         update()
         return (
             "```css\nAdded [" + noHighlight(a) + "] ➡️ [" + noHighlight(args[1]) + "] to the auto react list for ["
@@ -772,7 +764,7 @@ class ServerProtector:
                 create_task(self.targetWarn(u_id, guild, "banning `(" + str(cnt[u_id]) + ")`"))
 
 
-class updateUserLogs:
+class UpdateUserLogs:
     is_database = True
     name = "logU"
 
@@ -942,7 +934,7 @@ class updateUserLogs:
             await channel.send(embed=emb)
 
 
-class updateMessageLogs:
+class UpdateMessageLogs:
     is_database = True
     name = "logM"
 
@@ -1112,7 +1104,7 @@ class updateMessageLogs:
             await channel.send(embed=emb)
 
 
-class updateFileLogs:
+class UpdateFileLogs:
     is_database = True
     name = "logF"
 
@@ -1203,9 +1195,45 @@ class updateFileLogs:
                 await channel.send(msg, embed=emb, files=fils)
 
 
-class updateFollows:
+class UpdateReacts:
     is_database = True
-    name = "follows"
+    name = "reacts"
+
+    def __init__(self):
+        pass
+
+    async def _nocommand_(self, text, edit, orig, message, **void):
+        if message.guild is None or not orig:
+            return
+        g_id = message.guild.id
+        following = self.data
+        if g_id in following:
+            words = text.split(" ")
+            try:
+                reacting = {}
+                for k in following[g_id]:
+                    if self._vars.hasSymbol(k):
+                        if k in words:
+                            emoji = following[g_id][k]
+                            reacting[words.index(k) / len(words)] = emoji
+                    else:
+                        if k in message.content:
+                            emoji = following[g_id][k]
+                            reacting[message.content.index(k) / len(message.content)] = emoji
+                for r in sorted(list(reacting)):
+                    await message.add_reaction(reacting[r])
+            except ZeroDivisionError:
+                pass
+            except:
+                print(traceback.format_exc())
+
+    async def __call__(self):
+        pass
+
+
+class UpdateDogpiles:
+    is_database = True
+    name = "dogpiles"
 
     def __init__(self):
         self.msgFollow = {}
@@ -1214,17 +1242,17 @@ class updateFollows:
         if message.guild is None or not orig:
             return
         g_id = message.guild.id
-        u_id = message.author.id
         following = self.data
-        words = text.split(" ")
         if g_id in following:
+            u_id = message.author.id
+            c_id = message.channel.id
             if not edit:
-                if following[g_id]["follow"]:
+                if following[g_id]:
                     checker = orig
-                    curr = self.msgFollow.get(g_id)
+                    curr = self.msgFollow.get(c_id)
                     if curr is None:
                         curr = [checker, 1, 0]
-                        self.msgFollow[g_id] = curr
+                        self.msgFollow[c_id] = curr
                     elif checker == curr[0] and u_id != curr[2]:
                         curr[1] += 1
                         if curr[1] >= 3:
@@ -1238,27 +1266,12 @@ class updateFollows:
                         curr[1] = xrand(-1, 2)
                     curr[2] = u_id
                     #print(curr)
-            try:
-                reacting = {}
-                for i in following[g_id]["reacts"]:
-                    k = str(i)
-                    emoji = following[g_id]["reacts"][i]
-                    if self._vars.hasSymbol(k):
-                        if k in words:
-                            reacting[words.index(k) / len(words)] = emoji
-                    else:
-                        if k in message.content:
-                            reacting[message.content.index(k) / len(message.content)] = emoji
-                for r in sorted(list(reacting)):
-                    await message.add_reaction(reacting[r])
-            except discord.Forbidden:
-                print(traceback.format_exc())
 
     async def __call__(self):
         pass
 
 
-class updateRolegivers:
+class UpdateRolegivers:
     is_database = True
     name = "rolegivers"
 
@@ -1298,7 +1311,7 @@ class updateRolegivers:
         pass
 
 
-class updatePerms:
+class UpdatePerms:
     is_database = True
     name = "perms"
 
@@ -1309,7 +1322,7 @@ class updatePerms:
         pass
 
 
-# class updateColours:
+# class UpdateColours:
 #     is_database = True
 #     name = "rolecolours"
 
@@ -1381,7 +1394,7 @@ async def getBans(_vars, guild):
     return bans
 
 
-class updateBans:
+class UpdateBans:
     is_database = True
     name = "bans"
 

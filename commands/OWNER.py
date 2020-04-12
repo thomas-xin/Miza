@@ -124,7 +124,7 @@ class updateExec:
 
     async def _nocommand_(self, message, **void):
         _vars = self._vars
-        if message.author.id == _vars.client.user.id:
+        if message.author.bot:
             return
         if message.channel.id == self.channel.id:
             proc = message.content

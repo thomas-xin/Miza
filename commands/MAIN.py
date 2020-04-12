@@ -836,11 +836,12 @@ class Reminder:
         self.usage = "<1:message> <0:time> <disable(?d)>"
         self.flags = "aed"
 
-    async def __call__(self, name, message, flags, _vars, user, guild, **void):
+    async def __call__(self, argv, name, message, flags, _vars, user, guild, **void):
         msg = message.content
+        argv2 = argv
         argv = msg[msg.lower().index(name) + len(name):].strip(" ").strip("\n")
         try:
-            args = shlex.split(argv)
+            args = shlex.split(argv2)
         except ValueError:
             args = argv.split(" ")
         rems = _vars.data["reminders"].get(user.id, [])
@@ -849,12 +850,13 @@ class Reminder:
             if not argv:
                 i = 0
             else:
+                print(argv)
                 i = await _vars.evalMath(argv, guild)
             x = rems.pop(i)
             update()
             return (
                 "```ini\nSuccessfully removed ["
-                + limStr(noHighlight(x["msg"]), 64) + "] from announcements list for ["
+                + limStr(noHighlight(x["msg"]), 64) + "] from reminders list for ["
                 + noHighlight(user) + "].```"
             )
         if not argv:

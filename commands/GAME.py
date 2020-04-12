@@ -295,6 +295,30 @@ class Text2048:
         return text
 
 
+class MathQuiz:
+    is_command = True
+
+    def __init__(self):
+        self.name = ["MathTest"]
+        self.min_level = 1
+        self.description = "Starts a math quiz in the current channel."
+        self.usage = "<mode(easy)(hard)> <disable(?d)>"
+        self.flags = "aed"
+
+    async def __call__(self, channel, flags, argv, **void):
+        mathdb = self._vars.database["mathtest"]
+        if "d" in flags:
+            if channel.id in mathdb.data:
+                mathdb.data.pop(channel.id)
+            return "```css\nDisabled math quizzes for " + sbHighlight(channel.name) + ".```"
+        if not argv:
+            argv = "easy"
+        elif argv not in ("easy", "hard"):
+            raise TypeError("Invalid quiz mode.")
+        mathdb.data[channel.id] = freeClass(mode=argv, answer=None)
+        return "```css\nEnabled " + argv + " math quiz for " + sbHighlight(channel.name) + ".```"
+
+
 class MimicConfig:
     is_command = True
 
@@ -349,7 +373,10 @@ class MimicConfig:
             if len(new) > 16:
                 raise OverflowError("Must be 16 or fewer in length.")
             for prefix in mimics:
-                mimics[prefix].remove(m_id)
+                try:
+                    mimics[prefix].remove(m_id)
+                except (ValueError, IndexError):
+                    pass
             if new in mimics:
                 mimics[new].append(m_id)
             else:
@@ -431,6 +458,8 @@ class Mimic:
         if "d" in flags:
             try:
                 mlist = mimics[prefix]
+                if mlist is None:
+                    raise KeyError
                 if len(mlist):
                     m_id = mlist.pop(0)
                     mimic = _vars.data["mimics"].pop(m_id)
@@ -450,7 +479,7 @@ class Mimic:
                 for prefix in mimics:
                     try:
                         mimics[prefix].remove(m_id)
-                    except IndexError:
+                    except (ValueError, IndexError):
                         pass
                 mimicdb.pop(mimic.id)
             update()
@@ -532,28 +561,52 @@ class Mimic:
         )
 
 
-class MathQuiz:
+class RPSend:
     is_command = True
 
     def __init__(self):
-        self.name = ["MathTest"]
-        self.min_level = 1
-        self.description = "Starts a math quiz in the current channel."
-        self.usage = "<mode(easy)(hard)> <disable(?d)>"
-        self.flags = "aed"
+        self.name = ["MimicSend", "PluralSend"]
+        self.min_level = 0
+        self.description = "Sends a message using a webhook mimic, to the target channel."
+        self.usage = "<0:mimic> <1:channel> <2:string>"
 
-    async def __call__(self, channel, flags, argv, **void):
-        mathdb = self._vars.database["mathtest"]
-        if "d" in flags:
-            if channel.id in mathdb.data:
-                mathdb.data.pop(channel.id)
-            return "```css\nDisabled math quizzes for " + sbHighlight(channel.name) + ".```"
-        if not argv:
-            argv = "easy"
-        elif argv not in ("easy", "hard"):
-            raise TypeError("Invalid quiz mode.")
-        mathdb.data[channel.id] = freeClass(mode=argv, answer=None)
-        return "```css\nEnabled " + argv + " math quiz for " + sbHighlight(channel.name) + ".```"
+    async def __call__(self, _vars, user, perm, args, **void):
+        mimicdb = _vars.data["mimics"]
+        update = _vars.database["mimics"].update
+        mimics = mimicdb.setdefault(user.id, {})
+        prefix = args.pop(0)
+        c_id = _vars.verifyID(args.pop(0))
+        channel = await _vars.client.fetch_channel(c_id)
+        guild = channel.guild
+        w = await _vars.ensureWebhook(channel)
+        msg = " ".join(args)
+        if not msg:
+            raise IndexError("Message is empty.")
+        perm = _vars.getPerms(user.id, guild)
+        try:
+            mlist = mimics[prefix]
+            if mlist is None:
+                raise KeyError
+            m = [_vars.get_mimic(_vars.verifyID(p)) for p in mlist]
+        except KeyError:
+            mimic = _vars.get_mimic(_vars.verifyID(prefix))
+            if not isnan(perm) and mimic.u_id != user.id:
+                raise PermissionError("Target mimic does not belong to you.")
+            m = [mimic]
+        admin = not inf > perm
+        try:
+            enabled = _vars.data["enabled"][channel.id]
+        except KeyError:
+            enabled = ()
+        if not admin and "game" not in enabled:
+            raise PermissionError("Not permitted to send into target channel.")
+        for mimic in m:
+            await _vars.database["mimics"].updateMimic(mimic, guild)
+            name = mimic.name
+            url = mimic.url
+            await w.send(msg, username=name, avatar_url=url)
+            mimic.count += 1
+            mimic.total += len(msg)
 
 
 class UpdateMimics:
@@ -562,15 +615,7 @@ class UpdateMimics:
     user = True
 
     def __init__(self):
-        i = 1
-        for k in self.data:
-            try:
-                self.data[k] = freeClass(**self.data[k])
-            except:
-                self.data[k] = list(self.data[k])
-            if not i & 4095:
-                time.sleep(0.01)
-            i += 1
+        pass
 
     async def _nocommand_(self, message, **void):
         if not message.content:
@@ -598,10 +643,10 @@ class UpdateMimics:
                         if len(line) > 2 and " " in line:
                             i = line.index(" ")
                             prefix = line[:i]
-                            line = line[i + 1:].strip(" ")
                             if prefix in database:
                                 mimics = database[prefix]
                                 if mimics:
+                                    line = line[i + 1:].strip(" ")
                                     for m in mimics:
                                         sending.append(freeClass(m_id=m, msg=line))
                                     found = True
