@@ -412,7 +412,7 @@ class customAudio(discord.AudioSource):
                 raise EOFError
             try:
                 temp = self.source.read()
-                if not len(temp):
+                if not temp:
                     raise EOFError
             except:
                 empty = True
@@ -428,7 +428,11 @@ class customAudio(discord.AudioSource):
                 queueable = (self.queue or self._vars.data["playlists"].get(self.vc.guild.id, None))
                 if empty and queueable and self.source is not None:
                     if time.time() - self.lastEnd > 0.5:
-                        if self.curr_timeout - time.time() > 1 or self.stats["position"] >= self.queue[0]["duration"] - 1:
+                        if self.reverse:
+                            ended = self.stats["position"] <= 0
+                        else:
+                            ended = self.stats["position"] >= self.queue[0]["duration"] - 1
+                        if time.time() - self.curr_timeout > 1 or ended:
                             self.lastEnd = time.time()
                             self.new()
                         elif self.curr_timeout == 0:
