@@ -165,7 +165,10 @@ class customAudio(discord.AudioSource):
                 )
             d["options"] = d["options"].strip(" ")
             if pos != 0:
-                d["before_options"] = "-ss " + str(pos)
+                if self.reverse:
+                    d["before_options"] = "-to " + str(pos)
+                else:
+                    d["before_options"] = "-ss " + str(pos)
             print(d)
             self.is_loading = True
             self.source = discord.FFmpegPCMAudio(**d)
