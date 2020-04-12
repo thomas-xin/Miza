@@ -458,6 +458,7 @@ class main_data:
                     self.updated = False
                     data = repr(self.data)
                     if len(data) > 262144:
+                        print("Pickling " + name + "...")
                         data = pickle.dumps(data)
                     else:
                         data = data.encode("utf-8")

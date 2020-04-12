@@ -1239,10 +1239,18 @@ class updateFollows:
                     curr[2] = u_id
                     #print(curr)
             try:
+                reacting = {}
                 for i in following[g_id]["reacts"]:
                     k = str(i)
-                    if ((k in words) if self._vars.hasSymbol(k) else (k in message.content)):
-                        await message.add_reaction(following[g_id]["reacts"][i])
+                    emoji = following[g_id]["reacts"][i]
+                    if self._vars.hasSymbol(k):
+                        if k in words:
+                            reacting[words.index(k) / len(words)] = emoji
+                    else:
+                        if k in message.content:
+                            reacting[message.content.index(k) / len(message.content)] = emoji
+                for r in sorted(list(reacting)):
+                    await message.add_reaction(reacting[r])
             except discord.Forbidden:
                 print(traceback.format_exc())
 
@@ -1250,7 +1258,7 @@ class updateFollows:
         pass
 
 
-class updateRolegiver:
+class updateRolegivers:
     is_database = True
     name = "rolegivers"
 
