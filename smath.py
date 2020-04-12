@@ -38,12 +38,14 @@ mpf = mpmath.mpf
 mpc = mpmath.mpc
 Mat = mat = matrix = mpmath.matrix
 
-inf = math.inf
+inf = Infinity = math.inf
 nan = math.nan
 infinum = {
     "inf": inf,
     "nan": nan,
+    "Infinity": inf,
 }
+null = None
 i = I = j = J = 1j
 pi = mp.pi
 E = e = mp.e

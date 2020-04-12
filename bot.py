@@ -456,12 +456,13 @@ class main_data:
             if name:
                 if self.updated:
                     self.updated = False
-                    if hasattr(self, "store_json"):
-                        data = json.dumps(self.data)
+                    data = repr(self.data)
+                    if len(data) > 262144:
+                        data = pickle.dumps(data)
                     else:
-                        data = repr(self.data)
+                        data = data.encode("utf-8")
                     f = open(self.file, "wb")
-                    f.write(data.encode("utf-8"))
+                    f.write(data)
                     f.close()
                     return True
         else:
@@ -523,15 +524,12 @@ class main_data:
                                 if not s:
                                     raise FileNotFoundError
                                 data = None
-                                if hasattr(var, "store_json"):
-                                    try:
-                                        data = json.loads(s)
-                                    except:
-                                        print(traceback.format_exc())
+                                try:
+                                    data = pickle.loads(s)
+                                except pickle.UnpicklingError:
+                                    pass
                                 if data is None:
                                     data = eval(s)
-                                if not hasattr(var, "force_str"):
-                                    data = intKey(data)
                                 self.data[name] = var.data = data
                                 f.close()
                             except FileNotFoundError:

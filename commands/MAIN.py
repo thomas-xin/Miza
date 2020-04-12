@@ -1022,7 +1022,6 @@ class updateReminders:
     is_database = True
     name = "reminders"
     no_delete = True
-    store_json = True
 
     def __init__(self):
         pass
@@ -1065,7 +1064,6 @@ class updateReminders:
 class updateMessageCount:
     is_database = True
     name = "counts"
-    store_json = True
 
     def getMessageLength(self, message):
         return len(message.system_content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
@@ -1262,19 +1260,19 @@ class updateMessageCount:
 class updatePrefix:
     is_database = True
     name = "prefixes"
-    store_json = True
 
     def __init__(self):
         pass
 
     async def __call__(self):
-        pass
+        for g in tuple(self.data):
+            if self.data[g] == "~":
+                self.data.pop(g)
 
 
 class updateEnabled:
     is_database = True
     name = "enabled"
-    store_json = True
 
     def __init__(self):
         pass
@@ -1287,7 +1285,6 @@ class updateUsers:
     is_database = True
     name = "users"
     suspected = "users.json"
-    store_json = True
     user = True
 
     def __init__(self):

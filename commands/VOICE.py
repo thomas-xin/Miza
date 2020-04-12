@@ -2659,7 +2659,6 @@ class Download:
 class updateQueues:
     is_database = True
     name = "playlists"
-    store_json = True
 
     def __init__(self):
         self.audio = {}

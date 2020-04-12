@@ -207,7 +207,6 @@ class updateBlacklist:
     is_database = True
     name = "blacklist"
     suspected = "blacklist.json"
-    store_json = True
     user = True
 
     def __init__(self):

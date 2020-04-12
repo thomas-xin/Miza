@@ -775,7 +775,6 @@ class ServerProtector:
 class updateUserLogs:
     is_database = True
     name = "logU"
-    store_json = True
 
     def __init__(self):
         pass
@@ -946,7 +945,6 @@ class updateUserLogs:
 class updateMessageLogs:
     is_database = True
     name = "logM"
-    store_json = True
 
     def __init__(self):
         self.searched = False
@@ -1117,7 +1115,6 @@ class updateMessageLogs:
 class updateFileLogs:
     is_database = True
     name = "logF"
-    store_json = True
 
     def __init__(self):
         pass
@@ -1209,7 +1206,6 @@ class updateFileLogs:
 class updateFollows:
     is_database = True
     name = "follows"
-    store_json = True
 
     def __init__(self):
         self.msgFollow = {}
@@ -1257,7 +1253,6 @@ class updateFollows:
 class updateRolegiver:
     is_database = True
     name = "rolegivers"
-    store_json = True
 
     def __init__(self):
         pass
@@ -1298,7 +1293,6 @@ class updateRolegiver:
 class updatePerms:
     is_database = True
     name = "perms"
-    store_json = True
 
     def __init__(self):
         pass
@@ -1310,7 +1304,6 @@ class updatePerms:
 # class updateColours:
 #     is_database = True
 #     name = "rolecolours"
-#     store_json = True
 
 #     def __init__(self):
 #         self.counter = 0
@@ -1383,7 +1376,6 @@ async def getBans(_vars, guild):
 class updateBans:
     is_database = True
     name = "bans"
-    store_json = True
 
     def __init__(self):
         self.synced = False

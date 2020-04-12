@@ -432,7 +432,7 @@ class Mimic:
             try:
                 mlist = mimics[prefix]
                 if len(mlist):
-                    m_id = mlist.popleft()
+                    m_id = mlist.pop(0)
                     mimic = _vars.data["mimics"].pop(m_id)
                 else:
                     mimics.pop(prefix)
@@ -560,7 +560,6 @@ class UpdateMimics:
     is_database = True
     name = "mimics"
     user = True
-    store_json = True
 
     def __init__(self):
         i = 1
