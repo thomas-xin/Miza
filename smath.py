@@ -2479,8 +2479,12 @@ def subFunc(key, com, data_in, timeout):
             if time.time() - t > timeout:
                 raise TimeoutError("Request timed out.")
             time.sleep(0.001)
-        resp = eval(returns[0])
-        print(resp)
+        resp = returns[0]
+        try:
+            ex = eval(resp)
+        except NameError:
+            ex = RuntimeError(resp[resp.index("(") + 1:resp.index(")")].strip("'"))
+        raise ex
         if issubclass(resp.__class__, Exception):
             raise resp
         time.sleep(0.001)

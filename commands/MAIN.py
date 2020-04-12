@@ -841,7 +841,7 @@ class Reminder:
         argv2 = argv
         argv = msg[msg.lower().index(name) + len(name):].strip(" ").strip("\n")
         try:
-            args = shlex.split(argv2)
+            args = shlex.split(argv)
         except ValueError:
             args = argv.split(" ")
         rems = _vars.data["reminders"].get(user.id, [])
@@ -851,7 +851,7 @@ class Reminder:
                 i = 0
             else:
                 print(argv)
-                i = await _vars.evalMath(argv, guild)
+                i = await _vars.evalMath(argv2, guild)
             x = rems.pop(i)
             update()
             return (
