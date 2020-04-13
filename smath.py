@@ -1450,7 +1450,6 @@ custom list-like data structure that incorporates the functionality of dicts in 
 order to have average O(1) constant time insertion on both sides as well as O(1) \
 lookup time for all elements. Includes many array and numeric operations."""
 
-    @staticmethod
     def waiting(func):
         def call(self, *args, force=False, **kwargs):
             if not force:
@@ -1459,7 +1458,6 @@ lookup time for all elements. Includes many array and numeric operations."""
             return func(self, *args, **kwargs)
         return call
 
-    @staticmethod
     def blocking(func):
         def call(self, *args, force=False, **kwargs):
             if not force:
@@ -2312,11 +2310,7 @@ def hzero(size, maxoff=__hlist_maxoff__):
 
 class freeClass(dict):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
-        self.self = self
-
-    __call__ = lambda self: self
+    __init__ = lambda self, *args, **kwargs: super().__init__(self, *args, **kwargs)
     __repr__ = lambda self: "freeClass(**" + super().__repr__() + ")"
     __iter__ = lambda self: super().__iter__()
     __len__ = lambda self: super().__len__()

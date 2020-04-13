@@ -499,12 +499,11 @@ class main_data:
                 if hasattr(var, "is_command"):
                     obj = var(self)
                     commands.append(obj)
-                    # print("Successfully loaded command " + obj.__name__ + ".")
+                    print("Successfully loaded command " + obj.__name__ + ".")
                 elif hasattr(var, "is_database"):
-                    var.is_database
                     obj = var(self)
                     dataitems.append(obj)
-                    # print("Successfully loaded database " + obj.__name__ + ".")
+                    print("Successfully loaded database " + obj.__name__ + ".")
             for u in dataitems:
                 for c in commands:
                     c.data[u.name] = u
