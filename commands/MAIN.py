@@ -1,25 +1,20 @@
-import discord
 try:
-    from smath import *
+    from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
-    from smath import *
+    from common import *
 
 
 default_commands = ["main", "string", "admin"]
 standard_commands = default_commands + ["voice", "image", "game"]
 
 
-class Help:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["?"]
-        self.min_level = -inf
-        self.description = "Shows a list of usable commands, or gives a detailed description of a command."
-        self.usage = "<command{all}> <category{all}> <verbose(?v)>"
-        self.flags = "v"
+class Help(Command):
+    name = ["?"]
+    description = "Shows a list of usable commands, or gives a detailed description of a command."
+    usage = "<command{all}> <category{all}> <verbose(?v)>"
+    flags = "v"
 
     async def __call__(self, args, user, channel, guild, flags, perm, **void):
         _vars = self._vars
@@ -122,16 +117,12 @@ class Help:
         return "\n".join(show), 1
 
 
-class Perms:
-    is_command = True
+class Perms(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = ["ChangePerms", "Perm", "ChangePerm", "Permissions"]
-        self.min_level = -inf
-        self.description = "Shows or changes a user's permission level."
-        self.usage = "<0:user{self}> <1:level[]> <hide(?h)>"
-        self.flags = "fh"
+    name = ["ChangePerms", "Perm", "ChangePerm", "Permissions"]
+    description = "Shows or changes a user's permission level."
+    usage = "<0:user{self}> <1:level[]> <hide(?h)>"
+    flags = "fh"
 
     async def __call__(self, _vars, args, user, perm, guild, flags, **void):
         if len(args) < 1:
@@ -140,7 +131,7 @@ class Perms:
             check = args[0].lower()
             if "@" in args[0] and ("everyone" in check or "here" in check):
                 args[0] = guild.id
-            u_id = _vars.verifyID(args[0])
+            u_id = verifyID(args[0])
             try:
                 t_user = await _vars.fetch_user(u_id)
             except (TypeError, discord.NotFound):
@@ -203,17 +194,14 @@ class Perms:
         )
 
 
-class EnabledCommands:
-    is_command = True
+class EnabledCommands(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = ["EC", "Enable"]
-        self.min_level = 0
-        self.min_display = "0~3"
-        self.description = "Shows, enables, or disables a command category in the current channel."
-        self.usage = "<command{all}> <add(?e)> <remove(?d)> <list(?l)> <hide(?h)>"
-        self.flags = "aedlh"
+    name = ["EC", "Enable"]
+    min_level = 0
+    min_display = "0~3"
+    description = "Shows, enables, or disables a command category in the current channel."
+    usage = "<command{all}> <add(?e)> <remove(?d)> <list(?l)> <hide(?h)>"
+    flags = "aedlh"
 
     async def __call__(self, argv, flags, user, channel, perm, **void):
         update = self.data["enabled"].update
@@ -298,16 +286,13 @@ class EnabledCommands:
                 )
 
 
-class Prefix:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["ChangePrefix"]
-        self.min_level = 0
-        self.min_display = "0~3"
-        self.description = "Shows or changes the prefix for commands for this server."
-        self.usage = "<prefix[]> <default(?d)>"
-        self.flags = "hd"
+class Prefix(Command):
+    name = ["ChangePrefix"]
+    min_level = 0
+    min_display = "0~3"
+    description = "Shows or changes the prefix for commands for this server."
+    usage = "<prefix[]> <default(?d)>"
+    flags = "hd"
 
     async def __call__(self, argv, guild, perm, _vars, flags, **void):
         pref = _vars.data["prefixes"]
@@ -344,16 +329,13 @@ class Prefix:
             )
 
 
-class Loop:
-    is_command = True
+class Loop(Command):
     time_consuming = 3
-
-    def __init__(self):
-        self.name = ["For", "Rep", "Repeat", "While"]
-        self.min_level = 1
-        self.min_display = "1+"
-        self.description = "Loops a command."
-        self.usage = "<0:iterations> <1:command>"
+    name = ["For", "Rep", "Repeat", "While"]
+    min_level = 1
+    min_display = "1+"
+    description = "Loops a command."
+    usage = "<0:iterations> <1:command>"
 
     async def __call__(self, args, argv, message, channel, callback, _vars, perm, guild, **void):
         num = await _vars.evalMath(args[0], guild.id)
@@ -381,7 +363,7 @@ class Loop:
                 ):
                     raise PermissionError("Must be owner to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
-        create_task(_vars.sendReact(
+        create_task(sendReact(
             channel,
             (
                 "```css\nLooping [" + func + "] " + str(iters)
@@ -397,23 +379,19 @@ class Loop:
             await asyncio.sleep(0.5)
 
 
-class Avatar:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["PFP", "Icon"]
-        self.min_level = 0
-        self.description = "Sends a link to the avatar of a user or server."
-        self.usage = "<user>"
+class Avatar(Command):
+    name = ["PFP", "Icon"]
+    min_level = 0
+    description = "Sends a link to the avatar of a user or server."
+    usage = "<user>"
 
     async def getGuildData(self, g):
-        _vars = self._vars
-        url = _vars.strURL(g.icon_url)
+        url = strURL(g.icon_url)
         for size in ("?size=1024", "?size=2048"):
             if url.endswith(size):
                 url = url[:-len(size)] + "?size=4096"
         name = g.name
-        emb = discord.Embed(colour=_vars.randColour())
+        emb = discord.Embed(colour=randColour())
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
@@ -424,10 +402,9 @@ class Avatar:
         }
 
     def getMimicData(self, p):
-        _vars = self._vars
-        url = _vars.strURL(p.url)
+        url = strURL(p.url)
         name = p.name
-        emb = discord.Embed(colour=_vars.randColour())
+        emb = discord.Embed(colour=randColour())
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
@@ -441,7 +418,7 @@ class Avatar:
         g, guild = guild, None
         if argv:
             try:
-                u_id = _vars.verifyID(argv)
+                u_id = verifyID(argv)
             except:
                 u_id = argv
             try:
@@ -486,11 +463,11 @@ class Avatar:
             u = user
         guild = g
         name = str(u)
-        url = _vars.strURL(u.avatar_url)
+        url = strURL(u.avatar_url)
         for size in ("?size=1024", "?size=2048"):
             if url.endswith(size):
                 url = url[:-len(size)] + "?size=4096"
-        emb = discord.Embed(colour=_vars.randColour())
+        emb = discord.Embed(colour=randColour())
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
@@ -501,25 +478,22 @@ class Avatar:
         }
 
 
-class Info:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["UserInfo", "ServerInfo"]
-        self.min_level = 0
-        self.description = "Shows information about the target user or server."
-        self.usage = "<user> <verbose(?v)>"
-        self.flags = "v"
+class Info(Command):
+    name = ["UserInfo", "ServerInfo"]
+    min_level = 0
+    description = "Shows information about the target user or server."
+    usage = "<user> <verbose(?v)>"
+    flags = "v"
 
     async def getGuildData(self, g, flags={}):
         _vars = self._vars
-        url = _vars.strURL(g.icon_url)
+        url = strURL(g.icon_url)
         name = g.name
         try:
             u = g.owner
         except AttributeError:
             u = None
-        emb = discord.Embed(colour=_vars.randColour())
+        emb = discord.Embed(colour=randColour())
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         if u is not None:
@@ -579,9 +553,9 @@ class Info:
 
     def getMimicData(self, p, flags={}):
         _vars = self._vars
-        url = _vars.strURL(p.url)
+        url = strURL(p.url)
         name = p.name
-        emb = discord.Embed(colour=_vars.randColour())
+        emb = discord.Embed(colour=randColour())
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         d = "<@" + str(p.u_id) + ">```fix\n" + p.id + "```"
@@ -623,7 +597,7 @@ class Info:
         g, guild = guild, None
         if argv:
             try:
-                u_id = _vars.verifyID(argv)
+                u_id = verifyID(argv)
             except:
                 u_id = argv
             try:
@@ -670,7 +644,7 @@ class Info:
         guild = g
         name = str(u)
         dname = u.display_name * (u.display_name != u.name)
-        url = _vars.strURL(u.avatar_url)
+        url = strURL(u.avatar_url)
         try:
             is_sys = u.system
         except AttributeError:
@@ -684,7 +658,7 @@ class Info:
         else:
             joined = None
         created = u.created_at
-        activity = "\n".join(_vars.strActivity(i) for i in getattr(u, "activities", []))
+        activity = "\n".join(strActivity(i) for i in getattr(u, "activities", []))
         role = ", ".join(str(i) for i in getattr(u, "roles", []) if not i.is_default())
         coms = seen = msgs = avgs = gmsg = 0
         pos = None
@@ -726,7 +700,7 @@ class Info:
             url2 = _vars.website
         else:
             url2 = url
-        emb = discord.Embed(colour=_vars.randColour())
+        emb = discord.Embed(colour=randColour())
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url2)
         d = "<@" + str(u.id) + ">"
@@ -768,28 +742,20 @@ class Info:
         }
         
 
-class Hello:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["Hi", "Ping", "👋", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
-        self.min_level = 0
-        self.description = "Sends a waving emoji. Useful for checking whether the bot is online."
-        self.usage = ""
+class Hello(Command):
+    name = ["Hi", "Ping", "👋", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
+    min_level = 0
+    description = "Sends a waving emoji. Useful for checking whether the bot is online."
     
     async def __call__(self, channel, _vars, **void):
         return "👋"
 
 
 
-class Status:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["State"]
-        self.min_level = 0
-        self.description = "Shows the bot's current internal program state."
-        self.usage = ""
+class Status(Command):
+    name = ["State"]
+    min_level = 0
+    description = "Shows the bot's current internal program state."
 
     async def __call__(self, flags, client, _vars, **void):
         active = _vars.getActive()
@@ -826,15 +792,12 @@ class Status:
         )
 
 
-class Reminder:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["RemindMe", "Reminders"]
-        self.min_level = 0
-        self.description = "Sets a reminder for a certain date and time."
-        self.usage = "<1:message> <0:time> <disable(?d)>"
-        self.flags = "aed"
+class Reminder(Command):
+    name = ["RemindMe", "Reminders"]
+    min_level = 0
+    description = "Sets a reminder for a certain date and time."
+    usage = "<1:message> <0:time> <disable(?d)>"
+    flags = "aed"
 
     async def __call__(self, argv, name, message, flags, _vars, user, guild, **void):
         msg = message.content
@@ -904,7 +867,7 @@ class Reminder:
         elif len(msg) > 512:
             raise OverflowError("Reminder message too long (" + str(len(msg)) + "> 512).")
         name = str(user)
-        url = _vars.strURL(user.avatar_url)
+        url = strURL(user.avatar_url)
         rems.append(freeClass(
             name=name,
             url=url,
@@ -924,15 +887,12 @@ class Reminder:
         }
 
 
-class Announcement:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["Announce", "Announcements"]
-        self.min_level = 2
-        self.description = "Sets an announcement in the current channel for a certain date and time."
-        self.usage = "<1:message> <0:time> <disable(?d)>"
-        self.flags = "aed"
+class Announcement(Command):
+    name = ["Announce", "Announcements"]
+    min_level = 2
+    description = "Sets an announcement in the current channel for a certain date and time."
+    usage = "<1:message> <0:time> <disable(?d)>"
+    flags = "aed"
 
     async def __call__(self, name, message, flags, _vars, user, channel, guild, **void):
         msg = message.content
@@ -1000,7 +960,7 @@ class Announcement:
         elif len(msg) > 512:
             raise OverflowError("Announcement message too long (" + str(len(msg)) + "> 512).")
         name = str(user)
-        url = _vars.strURL(user.avatar_url)
+        url = strURL(user.avatar_url)
         rems.append(freeClass(
             name=name,
             url=url,
@@ -1020,13 +980,9 @@ class Announcement:
         }
 
 
-class updateReminders:
-    is_database = True
+class UpdateReminders(Database):
     name = "reminders"
     no_delete = True
-
-    def __init__(self):
-        pass
 
     async def __call__(self):
         if self.busy:
@@ -1049,7 +1005,7 @@ class updateReminders:
                     if x.u:
                         ch = await self._vars.getDM(u_id)
                     else:
-                        ch = await self._vars.client.fetch_channel(u_id)
+                        ch = await self._vars.fetch_channel(u_id)
                     emb = discord.Embed(description=x.msg)
                     emb.set_author(name=x.name, url=x.url, icon_url=x.url)
                     await ch.send(embed=emb)
@@ -1063,8 +1019,7 @@ class updateReminders:
         self.busy = False
 
 
-class updateMessageCount:
-    is_database = True
+class UpdateMessageCount(Database):
     name = "counts"
 
     def getMessageLength(self, message):
@@ -1222,8 +1177,9 @@ class updateMessageCount:
         print(guild)
         print(self.data[guild.id])
 
-    def __init__(self):
+    def __init__(self, _vars):
         self.scanned = False
+        super().__init__(_vars)
 
     async def __call__(self):
         if self.scanned:
@@ -1259,12 +1215,8 @@ class updateMessageCount:
                 self.startCalculate(guild)
 
 
-class updatePrefix:
-    is_database = True
+class UpdatePrefix(Database):
     name = "prefixes"
-
-    def __init__(self):
-        pass
 
     async def __call__(self):
         for g in tuple(self.data):
@@ -1272,25 +1224,14 @@ class updatePrefix:
                 self.data.pop(g)
 
 
-class updateEnabled:
-    is_database = True
+class UpdateEnabled(Database):
     name = "enabled"
 
-    def __init__(self):
-        pass
 
-    async def __call__(self):
-        pass
-
-
-class updateUsers:
-    is_database = True
+class updateUsers(Database):
     name = "users"
     suspected = "users.json"
     user = True
-
-    def __init__(self):
-        pass
 
     async def _seen_(self, user, delay, **void):
         addDict(self.data, {user.id: {"last_seen": 0}})
@@ -1299,6 +1240,3 @@ class updateUsers:
     async def _command_(self, user, command, **void):
         addDict(self.data, {user.id: {"commands": 1}})
         self.update()
-
-    async def __call__(self, **void):
-        pass

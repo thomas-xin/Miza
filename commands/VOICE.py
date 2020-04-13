@@ -1,11 +1,11 @@
-import discord, json, youtube_dl, ffmpy
+import youtube_dl, ffmpy
 from bs4 import BeautifulSoup
 try:
-    from smath import *
+    from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
-    from smath import *
+    from common import *
 
 youtube_dl.__builtins__["print"] = print
 
@@ -233,7 +233,7 @@ class customAudio(discord.AudioSource):
                     "```css\n🎵 Successfully disconnected from ["
                     + noHighlight(guild.name) + "]. 🎵```"
                 )
-                self.loop.create_task(self._vars.sendReact(
+                self.loop.create_task(sendReact(
                     self.channel,
                     msg,
                     reacts=["❎"],
@@ -327,7 +327,7 @@ class customAudio(discord.AudioSource):
                                 + noHighlight(name)
                                 + "], added by [" + added_by + "]! 🎵```"
                             )
-                            self.loop.create_task(self._vars.sendReact(
+                            self.loop.create_task(sendReact(
                                 self.channel,
                                 msg,
                                 reacts=["❎"],
@@ -1107,16 +1107,13 @@ def isAlone(auds, user):
     return True
 
 
-class Queue:
-    is_command = True
+class Queue(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = ["Q", "Play", "P"]
-        self.min_level = 0
-        self.description = "Shows the music queue, or plays a song in voice."
-        self.usage = "<search_link[]> <verbose(?v)> <hide(?h)> <force(?f)>"
-        self.flags = "hvf"
+    name = ["Q", "Play", "P"]
+    min_level = 0
+    description = "Shows the music queue, or plays a song in voice."
+    usage = "<search_link[]> <verbose(?v)> <hide(?h)> <force(?f)>"
+    flags = "hvf"
 
     async def __call__(self, _vars, client, user, perm, message, channel, guild, flags, name, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1174,7 +1171,7 @@ class Queue:
             embed=discord.Embed(
                 title=" ",
                 description=info + countstr,
-                colour=_vars.randColour(),
+                colour=randColour(),
             )
             embed.set_author(name="Queue for " + guild.name.replace("`", "") + ":")
             embstr = ""
@@ -1317,17 +1314,14 @@ class Queue:
                 )
 
 
-class Playlist:
-    is_command = True
+class Playlist(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = ["DefaultPlaylist", "PL"]
-        self.min_level = 0
-        self.min_display = "0~2"
-        self.description = "Shows, appends, or removes from the default playlist."
-        self.usage = "<search_link[]> <remove(?d)> <verbose(?v)>"
-        self.flags = "aedv"
+    name = ["DefaultPlaylist", "PL"]
+    min_level = 0
+    min_display = "0~2"
+    description = "Shows, appends, or removes from the default playlist."
+    usage = "<search_link[]> <remove(?d)> <verbose(?v)>"
+    flags = "aedv"
 
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
         update = self.data["playlists"].update
@@ -1415,15 +1409,12 @@ class Playlist:
         )
         
 
-class Connect:
-    is_command = True
+class Connect(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = ["Summon", "Join", "DC", "Disconnect", "Move", "Reconnect"]
-        self.min_level = 0
-        self.description = "Summons the bot into a voice channel."
-        self.usage = "<channel{curr}(0)>"
+    name = ["Summon", "Join", "DC", "Disconnect", "Move", "Reconnect"]
+    min_level = 0
+    description = "Summons the bot into a voice channel."
+    usage = "<channel{curr}(0)>"
 
     async def __call__(self, user, channel, name="join", argv="", **void):
         _vars = self._vars
@@ -1431,7 +1422,7 @@ class Connect:
         if name in ("dc", "disconnect"):
             vc_ = None
         elif argv or name == "move":
-            c_id = _vars.verifyID(argv)
+            c_id = verifyID(argv)
             if not c_id > 0:
                 vc_ = None
             else:
@@ -1513,17 +1504,14 @@ class Connect:
             )
 
 
-class Skip:
-    is_command = True
+class Skip(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = ["Remove", "Rem", "S", "SK", "ClearQueue", "Clear", "CQ"]
-        self.min_level = 0
-        self.min_display = "0~1"
-        self.description = "Removes an entry or range of entries from the voice channel queue."
-        self.usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
-        self.flags = "fhv"
+    name = ["Remove", "Rem", "S", "SK", "ClearQueue", "Clear", "CQ"]
+    min_level = 0
+    min_display = "0~1"
+    description = "Removes an entry or range of entries from the voice channel queue."
+    usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
+    flags = "fhv"
 
     async def __call__(self, client, user, perm, _vars, name, args, argv, guild, flags, message, **void):
         if guild.id not in _vars.database["playlists"].audio:
@@ -1664,17 +1652,14 @@ class Skip:
             return response + "```", 1
 
 
-class Pause:
-    is_command = True
+class Pause(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = ["Resume", "Unpause", "Stop"]
-        self.min_level = 0
-        self.min_display = "0~1"
-        self.description = "Pauses, stops, or resumes audio playing."
-        self.usage = "<hide(?h)>"
-        self.flags = "h"
+    name = ["Resume", "Unpause", "Stop"]
+    min_level = 0
+    min_display = "0~1"
+    description = "Pauses, stops, or resumes audio playing."
+    usage = "<hide(?h)>"
+    flags = "h"
 
     async def __call__(self, _vars, name, guild, client, user, perm, channel, message, flags, **void):
         name = name.lower()
@@ -1702,17 +1687,13 @@ class Pause:
             )
 
 
-class Seek:
-    is_command = True
+class Seek(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 0
-        self.min_display = "0~1"
-        self.description = "Seeks to a position in the current audio file."
-        self.usage = "<position[0]> <hide(?h)>"
-        self.flags = "h"
+    min_level = 0
+    min_display = "0~1"
+    description = "Seeks to a position in the current audio file."
+    usage = "<position[0]> <hide(?h)>"
+    flags = "h"
 
     async def __call__(self, argv, _vars, guild, client, user, perm, channel, message, flags, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1769,18 +1750,15 @@ def getDump(auds):
         return repr(ex)
 
 
-class Dump:
-    is_command = True
+class Dump(Command):
     server_only = True
     time_consuming = True
-
-    def __init__(self):
-        self.name = ["Save", "Load"]
-        self.min_level = 0
-        self.min_display = "0~1"
-        self.description = "Saves or loads the currently playing audio queue state."
-        self.usage = "<data{attached_file}> <append(?a)> <hide(?h)>"
-        self.flags = "ah"
+    name = ["Save", "Load"]
+    min_level = 0
+    min_display = "0~1"
+    description = "Saves or loads the currently playing audio queue state."
+    usage = "<data{attached_file}> <append(?a)> <hide(?h)>"
+    flags = "ah"
 
     async def __call__(self, guild, channel, user, client, _vars, perm, name, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1795,7 +1773,7 @@ class Dump:
             if type(resp) is str:
                 raise eval(resp)
             f = discord.File(io.BytesIO(bytes(resp[0], "utf-8")), filename="dump.json")
-            create_task(_vars.sendFile(channel, "Queue data for **" + guild.name + "**:", f))
+            create_task(sendFile(channel, "Queue data for **" + guild.name + "**:", f))
             return
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to load new queue while other users are in voice")
@@ -1851,8 +1829,7 @@ class Dump:
             )
             
 
-class AudioSettings:
-    is_command = True
+class AudioSettings(Command):
     server_only = True
     aliasMap = {
         "Volume": "volume",
@@ -1883,7 +1860,8 @@ class AudioSettings:
         "SQ": "shuffle",
     }
 
-    def __init__(self):
+    def __init__(self, _vars):
+        super().__init__(_vars)
         self.alias = list(self.aliasMap) + list(self.aliasExt)
         self.name = list(self.aliasMap)
         self.min_level = 0
@@ -2009,17 +1987,14 @@ class AudioSettings:
             return "```css" + s + "```", 1
 
 
-class Rotate:
-    is_command = True
+class Rotate(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = ["Jump"]
-        self.min_level = 0
-        self.min_display = "0~1"
-        self.description = "Rotates the queue to the left by a certain amount of steps."
-        self.usage = "<position> <hide(?h)>"
-        self.flags = "h"
+    name = ["Jump"]
+    min_level = 0
+    min_display = "0~1"
+    description = "Rotates the queue to the left by a certain amount of steps."
+    usage = "<position> <hide(?h)>"
+    flags = "h"
 
     async def __call__(self, perm, argv, flags, guild, channel, user, client, _vars, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -2042,17 +2017,13 @@ class Rotate:
             )
 
 
-class Shuffle:
-    is_command = True
+class Shuffle(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 0
-        self.min_display = "0~1"
-        self.description = "Shuffles the audio queue."
-        self.usage = "<hide(?h)>"
-        self.flags = "h"
+    min_level = 0
+    min_display = "0~1"
+    description = "Shuffles the audio queue."
+    usage = "<hide(?h)>"
+    flags = "h"
 
     async def __call__(self, perm, flags, guild, channel, user, client, _vars, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -2073,17 +2044,13 @@ class Shuffle:
             )
 
 
-class Reverse:
-    is_command = True
+class Reverse(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 0
-        self.min_display = "0~1"
-        self.description = "Reverses the audio queue direction."
-        self.usage = "<hide(?h)>"
-        self.flags = "h"
+    min_level = 0
+    min_display = "0~1"
+    description = "Reverses the audio queue direction."
+    usage = "<hide(?h)>"
+    flags = "h"
 
     async def __call__(self, perm, flags, guild, channel, user, client, _vars, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -2104,17 +2071,14 @@ class Reverse:
             )
 
 
-class Unmute:
-    is_command = True
+class Unmute(Command):
     server_only = True
     time_consuming = True
-
-    def __init__(self):
-        self.name = ["Unmuteall"]
-        self.min_level = 3
-        self.description = "Disables server mute for all members."
-        self.usage = "<hide(?h)>"
-        self.flags = "h"
+    name = ["Unmuteall"]
+    min_level = 3
+    description = "Disables server mute for all members."
+    usage = "<hide(?h)>"
+    flags = "h"
 
     async def __call__(self, guild, flags, **void):
         for vc in guild.voice_channels:
@@ -2129,8 +2093,7 @@ class Unmute:
             )
 
 
-class Player:
-    is_command = True
+class Player(Command):
     server_only = True
     time_consuming = True
     buttons = {
@@ -2152,14 +2115,12 @@ class Player:
         b'\xe2\x9b\x94': 15,
         }
     barsize = 24
-
-    def __init__(self):
-        self.name = ["NP", "NowPlaying", "Playing"]
-        self.min_level = 0
-        self.min_display = "0~3"
-        self.description = "Creates an auto-updating virtual audio player for the current server."
-        self.usage = "<controllable(?c)> <disable(?d)> <show_debug(?z)>"
-        self.flags = "cdez"
+    name = ["NP", "NowPlaying", "Playing"]
+    min_level = 0
+    min_display = "0~3"
+    description = "Creates an auto-updating virtual audio player for the current server."
+    usage = "<controllable(?c)> <disable(?d)> <show_debug(?z)>"
+    flags = "cdez"
 
     def showCurr(self, auds):
         q = auds.queue
@@ -2434,16 +2395,13 @@ def get_lyrics(item):
     return name, lyrics
 
 
-class Lyrics:
-    is_command = True
+class Lyrics(Command):
     time_consuming = True
-
-    def __init__(self):
-        self.name = ["SongLyrics"]
-        self.min_level = 0
-        self.description = "Searches genius.com for lyrics of a song."
-        self.usage = "<0:search_link{queue}> <verbose(?v)>"
-        self.flags = "v"
+    name = ["SongLyrics"]
+    min_level = 0
+    description = "Searches genius.com for lyrics of a song."
+    usage = "<0:search_link{queue}> <verbose(?v)>"
+    flags = "v"
 
     async def __call__(self, _vars, channel, message, argv, flags, user, **void):
         for a in message.attachments:
@@ -2468,7 +2426,7 @@ class Lyrics:
         msg = "Lyrics for **" + discord.utils.escape_markdown(name) + "**:"
         if "v" not in flags:
             return limStr(msg + "```ini\n" + text + "```", 2000)
-        emb = discord.Embed(colour=_vars.randColour())
+        emb = discord.Embed(colour=randColour())
         emb.set_author(name=name)
         curr = ""
         i = 1
@@ -2488,22 +2446,19 @@ class Lyrics:
         }
 
 
-class Download:
-    is_command = True
+class Download(Command):
     time_consuming = True
     _timeout_ = 8
+    name = ["Search", "YTDL", "Youtube_DL", "Convert"]
+    min_level = 0
+    description = "Searches and/or downloads a song from a YouTube/SoundCloud query or link."
+    usage = "<0:search_link{queue}> <-1:out_format[ogg]> <verbose(?v)> <show_debug(?z)>"
+    flags = "vz"
 
     def ensure_url(self, url):
         if url.startswith("ytsearch:"):
-            url = "https://www.youtube.com/results?search_query=" + url[9:]
+            url = "https://www.youtube.com/results?search_query=" + verifyURL(url[9:])
         return url
-
-    def __init__(self):
-        self.name = ["Search", "YTDL", "Youtube_DL", "Convert"]
-        self.min_level = 0
-        self.description = "Searches and/or downloads a song from a YouTube/SoundCloud query or link."
-        self.usage = "<0:search_link{queue}> <-1:out_format[ogg]> <verbose(?v)> <show_debug(?z)>"
-        self.flags = "vz"
 
     async def __call__(self, _vars, channel, message, argv, flags, user, **void):
         for a in message.attachments:
@@ -2599,7 +2554,7 @@ class Download:
             "```" + "\n" * ("z" in flags) + "callback-voice-download-" + str(user.id) 
             + "_" + str(len(res)) + "_" + url_list + "_" + fmt + "\n" + end
         )
-        emb = discord.Embed(colour=_vars.randColour())
+        emb = discord.Embed(colour=randColour())
         url = _vars.strURL(user.avatar_url)
         for size in ("?size=1024", "?size=2048"):
             if url.endswith(size):
@@ -2654,7 +2609,7 @@ class Download:
                         content="```ini\nUploading [" + noHighlight(out) + "]...```",
                         embed=None,
                     ))
-                    await _vars.sendFile(
+                    await sendFile(
                         channel=channel,
                         msg="",
                         file=f,
@@ -2663,14 +2618,14 @@ class Download:
                     create_task(_vars.silentDelete(message))
 
 
-class updateQueues:
-    is_database = True
+class UpdateQueues(Database):
     name = "playlists"
 
-    def __init__(self):
+    def __init__(self, _vars):
         self.audio = {}
         self.audiocache = {}
         self.connecting = {}
+        super().__init__(_vars)
         self.clearAudioCache()
 
     async def research(self, auds):
@@ -2806,7 +2761,7 @@ class updateQueues:
                                 self.cached_items[q[i]["id"]] = time.time()
                 except:
                     print(traceback.format_exc())
-                if not a & 7:
+                if not a & 15:
                     await asyncio.sleep(0.2)
                 a += 1
             dt = datetime.datetime.utcnow()

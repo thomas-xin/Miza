@@ -1,20 +1,15 @@
-import discord
 try:
-    from smath import *
+    from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
-    from smath import *
+    from common import *
 
 
-class Restart:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["Shutdown"]
-        self.min_level = nan
-        self.description = "Restarts or shuts down the bot."
-        self.usage = ""
+class Restart(Command):
+    name = ["Shutdown"]
+    min_level = nan
+    description = "Restarts or shuts down the bot."
 
     async def __call__(self, channel, name, **void):
         _vars = self._vars
@@ -53,18 +48,15 @@ class Restart:
         sys.exit()
 
 
-class Execute:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["Exec", "Eval"]
-        self.min_level = nan
-        self.description = (
-            "Causes all messages in the current channel to be executed as python code on the bot."
-            + " WARNING: DO NOT ALLOW UNTRUSTED USERS TO POST IN CHANNEL."
-        )
-        self.usage = "<enable(?e)> <disable(?d)>"
-        self.flags = "aed"
+class Execute(Command):
+    name = ["Exec", "Eval"]
+    min_level = nan
+    description = (
+        "Causes all messages in the current channel to be executed as python code on the bot."
+        + " WARNING: DO NOT ALLOW UNTRUSTED USERS TO POST IN CHANNEL."
+    )
+    usage = "<enable(?e)> <disable(?d)>"
+    flags = "aed"
 
     async def __call__(self, _vars, flags, channel, **void):
         if "e" in flags or "a" in flags:
@@ -82,18 +74,42 @@ class Execute:
             "```css\ncode channel is currently set to ["
             + noHighlight(_vars.database["exec"].channel.name) + "].```"
         )
-        
 
-class updateExec:
-    is_database = True
+
+class Suspend(Command):
+    name = ["Block", "Blacklist"]
+    min_level = nan
+    description = "Prevents a user from accessing the bot's commands. Overrides <perms>."
+    usage = "<0:user> <1:value[]>"
+
+    async def __call__(self, _vars, user, guild, args, **void):
+        update = self.data["blacklist"].update
+        if len(args) < 2:
+            if len(args) >= 1:
+                user = await _vars.fetch_user(verifyID(args[0]))
+            susp = _vars.data["blacklist"].get(user.id, None)
+            return (
+                "```css\nCurrent suspension status of [" + noHighlight(user.name) + "]: ["
+                + noHighlight(susp) + "].```"
+            )
+        else:
+            user = await _vars.fetch_user(verifyID(args[0]))
+            change = await _vars.evalMath(args[1], guild.id)
+            _vars.data["blacklist"][user.id] = change
+            update()
+            return (
+                "```css\nChanged suspension status of [" + noHighlight(user.name) + "] to ["
+                + noHighlight(change) + "].```"
+            )
+
+
+class UpdateExec(Database):
     name = "exec"
     no_file = True
 
-    def __init__(self):
+    def __init__(self, _vars):
         self.channel = freeClass(id=None)
-
-    async def __call__(self):
-        pass
+        super().__init__(_vars)
 
     def procFunc(self, proc, _vars):
         print(proc)
@@ -151,7 +167,7 @@ class updateExec:
                 else:
                     output = data[0]
                 if type(output) is tuple:
-                    output = await _vars.recursiveCoro(output)
+                    output = await recursiveCoro(output)
                 elif asyncio.iscoroutine(output):
                     output = await output
                 await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
@@ -168,48 +184,17 @@ class updateExec:
             emb = discord.Embed()
             emb.add_field(
                 name=str(message.author) + " (" + str(message.author.id) + ")",
-                value=_vars.strMessage(message),
+                value=strMessage(message),
             )
             await self.channel.send(embed=emb)
 
 
-class Suspend:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["Block", "Blacklist"]
-        self.min_level = nan
-        self.description = "Prevents a user from accessing the bot's commands. Overrides <perms>."
-        self.usage = "<0:user> <1:value[]>"
-
-    async def __call__(self, _vars, user, guild, args, **void):
-        update = self.data["blacklist"].update
-        if len(args) < 2:
-            if len(args) >= 1:
-                user = await _vars.fetch_user(_vars.verifyID(args[0]))
-            susp = _vars.data["blacklist"].get(user.id, None)
-            return (
-                "```css\nCurrent suspension status of [" + noHighlight(user.name) + "]: ["
-                + noHighlight(susp) + "].```"
-            )
-        else:
-            user = await _vars.fetch_user(_vars.verifyID(args[0]))
-            change = await _vars.evalMath(args[1], guild.id)
-            _vars.data["blacklist"][user.id] = change
-            update()
-            return (
-                "```css\nChanged suspension status of [" + noHighlight(user.name) + "] to ["
-                + noHighlight(change) + "].```"
-            )
-
-
-class updateBlacklist:
-    is_database = True
+class UpdateBlacklist(Database):
     name = "blacklist"
     suspected = "blacklist.json"
     user = True
 
-    def __init__(self):
+    def __init__(self, _vars):
         self.suspclear = inf
         try:
             self.lastsusp = None
@@ -235,6 +220,7 @@ class updateBlacklist:
             print(self.lastsusp)
         except FileNotFoundError:
             pass
+        super().__init__(_vars)
 
     async def _command_(self, user, command, **void):
         if user.id not in (self._vars.client.user.id, self._vars.owner_id):

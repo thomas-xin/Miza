@@ -1,11 +1,11 @@
-import requests, csv, knackpy, discord, urllib, ffmpy
+import csv, knackpy, ffmpy
 from prettytable import PrettyTable as ptable
 try:
-    from smath import *
+    from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
-    from smath import *
+    from common import *
 
 FFRuntimeError = ffmpy.FFRuntimeError
 
@@ -293,8 +293,7 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
         return repr(ex)
 
 
-class CS_org2xm:
-    is_command = True
+class CS_org2xm(Command):
     time_consuming = True
     fmts = [
         "mp3",
@@ -302,12 +301,10 @@ class CS_org2xm:
         "xm",
         "webm"
     ]
-
-    def __init__(self):
-        self.name = ["CS_o2x", "Org2xm", "Convert_org"]
-        self.min_level = 0
-        self.description = "Converts a .org file to another file format."
-        self.usage = "<0:org_url{attached_file}> <2:wave_url[]> <1:out_format[xm]>"
+    name = ["CS_o2x", "Org2xm", "Convert_org"]
+    min_level = 0
+    description = "Converts a .org file to another file format."
+    usage = "<0:org_url{attached_file}> <2:wave_url[]> <1:out_format[xm]>"
 
     async def __call__(self, args, _vars, message, channel, guild, **void):
         if len(message.attachments):
@@ -344,7 +341,7 @@ class CS_org2xm:
             f = discord.File(fn[0], filename=name)
         except TypeError:
             raise eval(fn)
-        create_task(_vars.sendFile(channel, "Org successfully converted!", f, fn[0]))
+        create_task(sendFile(channel, "Org successfully converted!", f, fn[0]))
 
 
 def _n2f(n):
@@ -387,14 +384,11 @@ def _m2f(mem, val):
     return result
 
 
-class CS_mem2flag:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["CS_m2f"]
-        self.min_level = 0
-        self.description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
-        self.usage = "<0:address> <1:value[1]>"
+class CS_mem2flag(Command):
+    name = ["CS_m2f"]
+    min_level = 0
+    description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
+    usage = "<0:address> <1:value[1]>"
 
     async def __call__(self, _vars, args, guild, **void):
         if len(args) < 2:
@@ -403,15 +397,12 @@ class CS_mem2flag:
         return "```css\n" + _m2f(args[0], num) + "```"
 
 
-class CS_hex2xml:
-    is_command = True
+class CS_hex2xml(Command):
     time_consuming = True
-
-    def __init__(self):
-        self.name = ["CS_h2x"]
-        self.min_level = 0
-        self.description = "Converts a given Cave Story hex patch to an xml file readable by Booster's Lab."
-        self.usage = "<hex_data>"
+    name = ["CS_h2x"]
+    min_level = 0
+    description = "Converts a given Cave Story hex patch to an xml file readable by Booster's Lab."
+    usage = "<hex_data>"
 
     async def __call__(self, client, argv, channel, **void):
         hacks = {}
@@ -470,19 +461,15 @@ class CS_hex2xml:
         data = bytes(output, "utf-8")
         b = io.BytesIO(data)
         f = discord.File(b, filename="patch.xml")
-        create_task(self._vars.sendFile(channel, "Patch successfully converted!", f))
+        create_task(sendFile(channel, "Patch successfully converted!", f))
 
 
-class CS_npc:
-    is_command = True
+class CS_npc(Command):
     time_consuming = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 0
-        self.description = "Searches the Cave Story NPC list for an NPC by name or ID."
-        self.usage = "<query> <condensed(?c)>"
-        self.flags = "c"
+    min_level = 0
+    description = "Searches the Cave Story NPC list for an NPC by name or ID."
+    usage = "<query> <condensed(?c)>"
+    flags = "c"
 
     async def __call__(self, _vars, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
@@ -515,16 +502,11 @@ class CS_npc:
             raise LookupError("No results found for " + argv + ".")
 
 
-class CS_tsc:
-    is_command = True
-    time_consuming = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 0
-        self.description = "Searches the Cave Story OOB flags list for a memory variable."
-        self.usage = "<query> <condensed(?c)>"
-        self.flags = "c"
+class CS_tsc(Command):
+    min_level = 0
+    description = "Searches the Cave Story OOB flags list for a memory variable."
+    usage = "<query> <condensed(?c)>"
+    flags = "c"
 
     async def __call__(self, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
@@ -557,15 +539,12 @@ class CS_tsc:
             raise LookupError("No results found for " + argv + ".")
 
 
-class CS_mod:
-    is_command = True
+class CS_mod(Command):
     time_consuming = True
-
-    def __init__(self):
-        self.name = ["CS_search"]
-        self.min_level = 0
-        self.description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
-        self.usage = "<query>"
+    name = ["CS_search"]
+    min_level = 0
+    description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
+    usage = "<query>"
 
     async def __call__(self, args, **void):
         argv = " ".join(args)

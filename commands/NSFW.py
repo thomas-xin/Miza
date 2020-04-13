@@ -1,10 +1,10 @@
-import nekos, rule34, pybooru, discord
+import nekos, rule34, pybooru
 try:
-    from smath import *
+    from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
-    from smath import *
+    from common import *
 
 image_forms = [
     ".gif",
@@ -350,15 +350,11 @@ def is_nsfw(channel):
         return True
 
 
-class Neko:
-    is_command = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 0
-        self.description = "Pulls a random image from nekos.life and embeds it."
-        self.usage = "<tags[neko]> <random(?r)> <verbose(?v)> <list(?l)>"
-        self.flags = "lrv"
+class Neko(Command):
+    min_level = 0
+    description = "Pulls a random image from nekos.life and embeds it."
+    usage = "<tags[neko]> <random(?r)> <verbose(?v)> <list(?l)>"
+    flags = "lrv"
 
     async def __call__(self, args, argv, flags, channel, **void):
         isNSFW = is_nsfw(channel)
@@ -410,7 +406,7 @@ class Neko:
             return text
         emb = discord.Embed(
             url=url,
-            colour=self._vars.randColour(),
+            colour=randColour(),
         )
         emb.set_image(url=url)
         print(url)
@@ -419,16 +415,13 @@ class Neko:
         }
 
 
-class Lewd:
-    is_command = True
+class Lewd(Command):
     time_consuming = True
-
-    def __init__(self):
-        self.name = ["nsfw"]
-        self.min_level = 1
-        self.description = "Pulls a random image from a search on Rule34 and e621, and embeds it."
-        self.usage = "<query> <verbose(?v)>"
-        self.flags = "v"
+    name = ["nsfw"]
+    min_level = 1
+    description = "Pulls a random image from a search on Rule34 and e621, and embeds it."
+    usage = "<query> <verbose(?v)>"
+    flags = "v"
 
     async def __call__(self, _vars, args, flags, channel, **void):
         if not is_nsfw(channel):
@@ -445,7 +438,7 @@ class Lewd:
             return text
         emb = discord.Embed(
             url=url,
-            colour=_vars.randColour(),
+            colour=randColour(),
         )
         emb.set_image(url=url)
         print(url)

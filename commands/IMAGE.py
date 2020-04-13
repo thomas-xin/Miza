@@ -1,22 +1,18 @@
-import discord, nekos, requests
+import nekos
 try:
-    from smath import *
+    from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
-    from smath import *
+    from common import *
 
 
-class IMG:
-    is_command = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 0
-        self.min_display = "0~2"
-        self.description = "Sends an image in the current chat from a list."
-        self.usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <add(?a)> <delete(?d)> <hide(?h)>"
-        self.flags = "vraedh"
+class IMG(Command):
+    min_level = 0
+    min_display = "0~2"
+    description = "Sends an image in the current chat from a list."
+    usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <add(?a)> <delete(?d)> <hide(?h)>"
+    flags = "vraedh"
 
     async def __call__(self, flags, args, argv, guild, perm, **void):
         update = self.data["images"].update
@@ -93,7 +89,7 @@ class IMG:
             return url
         emb = discord.Embed(
             url=url,
-            colour=_vars.randColour(),
+            colour=randColour(),
         )
         emb.set_image(url=url)
         return {
@@ -193,14 +189,11 @@ def _c2e(string, em1, em2):
     return "```fix\n" + output + "```"
 
 
-class Char2Emoj:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["C2E"]
-        self.min_level = 0
-        self.description = "Makes emoji blocks using a string."
-        self.usage = "<0:string> <1:emoji_1> <2:emoji_2>"
+class Char2Emoj(Command):
+    name = ["C2E"]
+    min_level = 0
+    description = "Makes emoji blocks using a string."
+    usage = "<0:string> <1:emoji_1> <2:emoji_2>"
 
     async def __call__(self, args, **extra):
         try:
@@ -227,19 +220,16 @@ except:
     print("WARNING: cat_api_key not found. Unable to use API to pull cat images.")
 
 
-class Cat:
+class Cat(Command):
     is_command = True
     if cat_key:
         header = {"x-api-key": cat_key}
     else:
         header = None
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 0
-        self.description = "Pulls a random image from thecatapi.com or cdn.nekos.life/meow, and embeds it."
-        self.usage = "<verbose(?v)>"
-        self.flags = "v"
+    min_level = 0
+    description = "Pulls a random image from thecatapi.com or cdn.nekos.life/meow, and embeds it."
+    usage = "<verbose(?v)>"
+    flags = "v"
 
     async def __call__(self, channel, flags, **void):
         if not self.header or random.random() > 0.9375:
@@ -275,7 +265,7 @@ class Cat:
             return text
         emb = discord.Embed(
             url=url,
-            colour=self._vars.randColour(),
+            colour=randColour(),
         )
         emb.set_image(url=url)
         print(url)
@@ -284,15 +274,11 @@ class Cat:
         }
 
 
-class Dog:
-    is_command = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 0
-        self.description = "Pulls a random image from images.dog.ceo and embeds it."
-        self.usage = "<verbose(?v)>"
-        self.flags = "v"
+class Dog(Command):
+    min_level = 0
+    description = "Pulls a random image from images.dog.ceo and embeds it."
+    usage = "<verbose(?v)>"
+    flags = "v"
 
     async def __call__(self, channel, flags, **void):
         for _ in loop(8):
@@ -324,7 +310,7 @@ class Dog:
             return text
         emb = discord.Embed(
             url=url,
-            colour=self._vars.randColour(),
+            colour=randColour(),
         )
         emb.set_image(url=url)
         print(url)
@@ -333,12 +319,5 @@ class Dog:
         }
 
 
-class updateImages:
-    is_database = True
+class UpdateImages(Database):
     name = "images"
-
-    def __init__(self):
-        pass
-
-    async def __call__(self):
-        pass

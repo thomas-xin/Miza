@@ -1,14 +1,12 @@
-import discord
 try:
-    from smath import *
+    from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
-    from smath import *
+    from common import *
 
 
-class Text2048:
-    is_command = True
+class Text2048(Command):
     time_consuming = True
     directions = {
         b'\xe2\xac\x85': [0, 0],
@@ -38,16 +36,14 @@ class Text2048:
         13: [i for i in range(100)],
     }
     numScore = lambda y, x: x * 2 ** (x + 1)
-
-    def __init__(self):
-        self.name = ["2048", "Text_2048"]
-        self.min_level = 0
-        self.description = "Plays a game of 2048 using reactions."
-        self.usage = (
-            "<board_size[4]>  <show_debug(?z)> <special_tiles(?s)> <public(?p)> "
-            + "<insanity_mode(?i)> <special_controls(?c)> <easy_mode(?e)>"
-        )
-        self.flags = "vzpice"
+    name = ["2048", "Text_2048"]
+    min_level = 0
+    description = "Plays a game of 2048 using reactions."
+    usage = (
+        "<board_size[4]>  <show_debug(?z)> <special_tiles(?s)> <public(?p)> "
+        + "<insanity_mode(?i)> <special_controls(?c)> <easy_mode(?e)>"
+    )
+    flags = "vzpice"
 
     def shiftTile(self, tiles, p1, p2):
         # print(p1, p2)
@@ -295,15 +291,12 @@ class Text2048:
         return text
 
 
-class MathQuiz:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["MathTest"]
-        self.min_level = 1
-        self.description = "Starts a math quiz in the current channel."
-        self.usage = "<mode(easy)(hard)> <disable(?d)>"
-        self.flags = "aed"
+class MathQuiz(Command):
+    name = ["MathTest"]
+    min_level = 1
+    description = "Starts a math quiz in the current channel."
+    usage = "<mode(easy)(hard)> <disable(?d)>"
+    flags = "aed"
 
     async def __call__(self, channel, flags, argv, **void):
         mathdb = self._vars.database["mathtest"]
@@ -319,19 +312,19 @@ class MathQuiz:
         return "```css\nEnabled " + argv + " math quiz for " + sbHighlight(channel.name) + ".```"
 
 
-class MimicConfig:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["PluralConfig", "RPConfig"]
-        self.min_level = 0
-        self.description = "Modifies an existing webhook mimic's attributes."
-        self.usage = "<0:mimic_id> <1:option(prefix)([name][username][nickname])([avatar][icon][url])([status][description])(gender)(birthday)> <2:new>"
+class MimicConfig(Command):
+    name = ["PluralConfig", "RPConfig"]
+    min_level = 0
+    description = "Modifies an existing webhook mimic's attributes."
+    usage = (
+        "<0:mimic_id> <1:option(prefix)([name][username][nickname])([avatar][icon][url])"
+        + "([status][description])(gender)(birthday)> <2:new>"
+    )
     
     async def __call__(self, _vars, user, perm, flags, args, **void):
         mimicdb = _vars.data["mimics"]
         update = _vars.database["mimics"].update
-        m_id = "&" + str(_vars.verifyID(args.pop(0)))
+        m_id = "&" + str(verifyID(args.pop(0)))
         if m_id not in mimicdb:
             raise LookupError("Target mimic ID not found.")
         if not isnan(perm):
@@ -389,7 +382,7 @@ class MimicConfig:
             else:
                 mim = None
                 try:
-                    mim = _vars.verifyID(new)
+                    mim = verifyID(new)
                     user = await _vars.fetch_user(mim)
                     if user is None:
                         raise EOFError
@@ -412,21 +405,18 @@ class MimicConfig:
         )
 
 
-class Mimic:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["RolePlay", "Plural", "RP", "RPCreate"]
-        self.min_level = 0
-        self.description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes."
-        self.usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)>"
-        self.flags = "aed"
+class Mimic(Command):
+    name = ["RolePlay", "Plural", "RP", "RPCreate"]
+    min_level = 0
+    description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes."
+    usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)>"
+    flags = "aed"
     
     async def __call__(self, _vars, message, user, perm, flags, args, argv, **void):
         mimicdb = _vars.data["mimics"]
         update = _vars.database["mimics"].update
         if len(args) == 1 and "d" not in flags:
-            user = await _vars.fetch_user(_vars.verifyID(argv))
+            user = await _vars.fetch_user(verifyID(argv))
         mimics = mimicdb.setdefault(user.id, {})
         if not argv or (len(args) == 1 and "d" not in flags):
             if "d" in flags:
@@ -506,7 +496,7 @@ class Mimic:
             else:
                 mim = 0
                 try:
-                    mim = _vars.verifyID(args[-1])
+                    mim = verifyID(args[-1])
                     user = await _vars.fetch_user(mim)
                     if user is None:
                         raise EOFError
@@ -561,22 +551,19 @@ class Mimic:
         )
 
 
-class RPSend:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["MimicSend", "PluralSend"]
-        self.min_level = 0
-        self.description = "Sends a message using a webhook mimic, to the target channel."
-        self.usage = "<0:mimic> <1:channel> <2:string>"
+class RPSend(Command):
+    name = ["MimicSend", "PluralSend"]
+    min_level = 0
+    description = "Sends a message using a webhook mimic, to the target channel."
+    usage = "<0:mimic> <1:channel> <2:string>"
 
     async def __call__(self, _vars, user, perm, args, **void):
         mimicdb = _vars.data["mimics"]
         update = _vars.database["mimics"].update
         mimics = mimicdb.setdefault(user.id, {})
         prefix = args.pop(0)
-        c_id = _vars.verifyID(args.pop(0))
-        channel = await _vars.client.fetch_channel(c_id)
+        c_id = verifyID(args.pop(0))
+        channel = await _vars.fetch_channel(c_id)
         guild = channel.guild
         w = await _vars.ensureWebhook(channel)
         msg = " ".join(args)
@@ -587,9 +574,9 @@ class RPSend:
             mlist = mimics[prefix]
             if mlist is None:
                 raise KeyError
-            m = [_vars.get_mimic(_vars.verifyID(p)) for p in mlist]
+            m = [_vars.get_mimic(verifyID(p)) for p in mlist]
         except KeyError:
-            mimic = _vars.get_mimic(_vars.verifyID(prefix))
+            mimic = _vars.get_mimic(verifyID(prefix))
             if not isnan(perm) and mimic.u_id != user.id:
                 raise PermissionError("Target mimic does not belong to you.")
             m = [mimic]
@@ -609,13 +596,9 @@ class RPSend:
             mimic.total += len(msg)
 
 
-class UpdateMimics:
-    is_database = True
+class UpdateMimics(Database):
     name = "mimics"
     user = True
-
-    def __init__(self):
-        pass
 
     async def _nocommand_(self, message, **void):
         if not message.content:
@@ -673,7 +656,7 @@ class UpdateMimics:
             _vars = self._vars
             mim = 0
             try:
-                mim = _vars.verifyID(mimic.auto)
+                mim = verifyID(mimic.auto)
                 if guild is not None:
                     user = guild.get_member(mim)
                 if user is None:
@@ -724,16 +707,16 @@ class UpdateMimics:
         self.busy = False
 
 
-class UpdateMathTest:
-    is_database = True
+class UpdateMathTest(Database):
     name = "mathtest"
     no_file = True
 
-    def __init__(self):
+    def __init__(self, _vars):
         s = "⁰¹²³⁴⁵⁶⁷⁸⁹"
         ss = {str(i): s[i] for i in range(len(s))}
         ss["-"] = "⁻"
         self.sst = "".maketrans(ss)
+        super().__init__(_vars)
 
     def format(self, x, y, op):
         length = 6

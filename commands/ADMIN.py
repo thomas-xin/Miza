@@ -1,22 +1,18 @@
-import discord
 try:
-    from smath import *
+    from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
-    from smath import *
+    from common import *
 
 
-class Purge:
-    is_command = True
+class Purge(Command):
     time_consuming = True
-
-    def __init__(self):
-        self.name = ["Del", "Delete"]
-        self.min_level = 3
-        self.description = "Deletes a number of messages from a certain user in current channel."
-        self.usage = "<1:user{bot}(?a)> <0:count[1]> <hide(?h)>"
-        self.flags = "ah"
+    name = ["Del", "Delete"]
+    min_level = 3
+    description = "Deletes a number of messages from a certain user in current channel."
+    usage = "<1:user{bot}(?a)> <0:count[1]> <hide(?h)>"
+    flags = "ah"
 
     async def __call__(self, client, _vars, argv, args, channel, name, flags, perm, guild, **void):
         t_user = -1
@@ -36,7 +32,7 @@ class Purge:
             num = await _vars.evalMath(a2, guild.id)
             count = round(num)
             if t_user == -1:
-                u_id = _vars.verifyID(a1)
+                u_id = verifyID(a1)
                 try:
                     t_user = await _vars.fetch_user(u_id)
                 except (TypeError, discord.NotFound):
@@ -83,17 +79,14 @@ class Purge:
             )
 
 
-class Ban:
-    is_command = True
+class Ban(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = ["Bans", "Unban"]
-        self.min_level = 3
-        self.min_display = "3+"
-        self.description = "Bans a user for a certain amount of time, with an optional reason."
-        self.usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
-        self.flags = "hvf"
+    name = ["Bans", "Unban"]
+    min_level = 3
+    min_display = "3+"
+    description = "Bans a user for a certain amount of time, with an optional reason."
+    usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
+    flags = "hvf"
 
     async def __call__(self, _vars, args, user, channel, guild, flags, perm, name, **void):
         update = self.data["bans"].update
@@ -106,7 +99,7 @@ class Ban:
             t_user = None
             t_perm = inf
         else:
-            u_id = _vars.verifyID(args[0])
+            u_id = verifyID(args[0])
             try:
                 t_user = await _vars.fetch_user(u_id)
             except (TypeError, discord.NotFound):
@@ -258,17 +251,14 @@ class Ban:
             return response + "```"
 
 
-class RoleGiver:
-    is_command = True
+class RoleGiver(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = ["Verifier", "AutoRole"]
-        self.min_level = 3
-        self.min_display = "3+"
-        self.description = "Adds an automated role giver to the current channel."
-        self.usage = "<0:react_to[]> <1:role[]> <delete_messages(?x)> <disable(?d)>"
-        self.flags = "aedx"
+    name = ["Verifier", "AutoRole"]
+    min_level = 3
+    min_display = "3+"
+    description = "Adds an automated role giver to the current channel."
+    usage = "<0:react_to[]> <1:role[]> <delete_messages(?x)> <disable(?d)>"
+    flags = "aedx"
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
         update = self.data["rolegivers"].update
@@ -308,7 +298,7 @@ class RoleGiver:
         if len(react) > 64:
             raise OverflowError("Search substring too long.")
         roles = hlist()
-        r = _vars.verifyID(" ".join(args[1:]))
+        r = verifyID(" ".join(args[1:]))
         if len(guild.roles) <= 1:
             rolelist = await guild.fetch_roles()
         else:
@@ -390,16 +380,11 @@ class RoleGiver:
 #         )
 
 
-class Lockdown:
-    is_command = True
+class Lockdown(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = inf
-        self.description = "Completely locks down the server by removing send message permissions for all users and revoking all invites."
-        self.usage = ""
-        self.flags = "f"
+    min_level = inf
+    description = "Completely locks down the server by removing send message permissions for all users and revoking all invites."
+    flags = "f"
 
     async def roleLock(self, role, channel):
         perm = role.permissions
@@ -435,16 +420,13 @@ class Lockdown:
         return ("```asciidoc\n[" + response + "]```")
 
 
-class SaveChannel:
-    is_command = True
+class SaveChannel(Command):
     time_consuming = 1
     _timeout_ = 10
-
-    def __init__(self):
-        self.name = ["BackupChannel", "DownloadChannel"]
-        self.min_level = 3
-        self.description = "Saves a number of messages in a channel, as well as their contents, to a .txt file."
-        self.usage = "<0:channel{current}> <1:message_limit[4096]>"
+    name = ["BackupChannel", "DownloadChannel"]
+    min_level = 3
+    description = "Saves a number of messages in a channel, as well as their contents, to a .txt file."
+    usage = "<0:channel{current}> <1:message_limit[4096]>"
 
     async def __call__(self, guild, channel, args, **void):
         num = 4096
@@ -456,7 +438,7 @@ class SaveChannel:
                     raise OverflowError("Maximum number of messages allowed is 65536.")
                 if num <= 0:
                     raise ValueError("Please input a valid message limit.")
-            ch = await self._vars.fetch_channel(self._vars.verifyID(args[0]))
+            ch = await self._vars.fetch_channel(verifyID(args[0]))
             if guild is None or hasattr(guild, "ghost"):
                 if guild.id != ch.id:
                     raise PermissionError("Target channel is not in this server.")
@@ -468,22 +450,18 @@ class SaveChannel:
         while h:
             if s:
                 s += "\n\n"
-            s += "\n\n".join([self._vars.strMessage(m, limit=2048, username=True) for m in h[:4096]])
+            s += "\n\n".join([strMessage(m, limit=2048, username=True) for m in h[:4096]])
             h = h[4096:]
             await asyncio.sleep(0.32)
         return bytes(s, "utf-8")
 
                   
-class Dogpile:
-    is_command = True
+class Dogpile(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 2
-        self.description = "Causes Miza to automatically imitate users when 3+ of the same messages are posted in a row."
-        self.usage = "<enable(?e)> <disable(?d)>"
-        self.flags = "aed"
+    min_level = 2
+    description = "Causes Miza to automatically imitate users when 3+ of the same messages are posted in a row."
+    usage = "<enable(?e)> <disable(?d)>"
+    flags = "aed"
 
     async def __call__(self, flags, guild, **void):
         update = self.data["dogpiles"].update
@@ -506,16 +484,13 @@ class Dogpile:
             )
 
 
-class React:
-    is_command = True
+class React(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = ["AutoReact"]
-        self.min_level = 2
-        self.description = "Causes Miza to automatically assign a reaction to messages containing the substring."
-        self.usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
-        self.flags = "aed"
+    name = ["AutoReact"]
+    min_level = 2
+    description = "Causes Miza to automatically assign a reaction to messages containing the substring."
+    usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
+    flags = "aed"
 
     async def __call__(self, _vars, flags, guild, argv, args, **void):
         update = self.data["reacts"].update
@@ -563,16 +538,12 @@ class React:
         )
 
 
-class UserLog:
-    is_command = True
+class UserLog(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 3
-        self.description = "Causes Miza to log user events from the server, in the current channel."
-        self.usage = "<enable(?e)> <disable(?d)>"
-        self.flags = "aed"
+    min_level = 3
+    description = "Causes Miza to log user events from the server, in the current channel."
+    usage = "<enable(?e)> <disable(?d)>"
+    flags = "aed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
         data = _vars.data["logU"]
@@ -605,16 +576,12 @@ class UserLog:
         )
 
 
-class MessageLog:
-    is_command = True
+class MessageLog(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 3
-        self.description = "Causes Miza to log message events from the server, in the current channel."
-        self.usage = "<enable(?e)> <disable(?d)>"
-        self.flags = "aed"
+    min_level = 3
+    description = "Causes Miza to log message events from the server, in the current channel."
+    usage = "<enable(?e)> <disable(?d)>"
+    flags = "aed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
         data = _vars.data["logM"]
@@ -647,16 +614,12 @@ class MessageLog:
         )
 
 
-class FileLog:
-    is_command = True
+class FileLog(Command):
     server_only = True
-
-    def __init__(self):
-        self.name = []
-        self.min_level = 3
-        self.description = "Causes Miza to log deleted files from the server, in the current channel."
-        self.usage = "<enable(?e)> <disable(?d)>"
-        self.flags = "aed"
+    min_level = 3
+    description = "Causes Miza to log deleted files from the server, in the current channel."
+    usage = "<enable(?e)> <disable(?d)>"
+    flags = "aed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
         data = _vars.data["logF"]
@@ -689,16 +652,9 @@ class FileLog:
         )
 
 
-class ServerProtector:
-    is_database = True
+class ServerProtector(Database):
     name = "prot"
     no_file = True
-
-    def __init__(self):
-        pass
-
-    async def __call__(self):
-        pass
 
     async def kickWarn(self, u_id, guild, owner, msg):
         user = await self._vars.fetch_user(u_id)
@@ -764,15 +720,8 @@ class ServerProtector:
                 create_task(self.targetWarn(u_id, guild, "banning `(" + str(cnt[u_id]) + ")`"))
 
 
-class UpdateUserLogs:
-    is_database = True
+class UpdateUserLogs(Database):
     name = "logU"
-
-    def __init__(self):
-        pass
-
-    async def __call__(self):
-        pass
 
     async def _user_update_(self, before, after, **void):
         for guild in self._vars.client.guilds:
@@ -797,8 +746,8 @@ class UpdateUserLogs:
                 self.update()
                 return
             emb = discord.Embed()
-            b_url = self._vars.strURL(before.avatar_url)
-            a_url = self._vars.strURL(after.avatar_url)
+            b_url = strURL(before.avatar_url)
+            a_url = strURL(after.avatar_url)
             emb.set_author(name=str(after), icon_url=a_url, url=a_url)
             emb.description = (
                 "<@" + str(after.id)
@@ -869,7 +818,7 @@ class UpdateUserLogs:
                 self.update()
                 return
             emb = discord.Embed(colour=16777214)
-            url = self._vars.strURL(user.avatar_url)
+            url = strURL(user.avatar_url)
             emb.set_author(name=str(user), icon_url=url, url=url)
             emb.description = (
                 "<@" + str(user.id)
@@ -888,7 +837,7 @@ class UpdateUserLogs:
                 self.update()
                 return
             emb = discord.Embed(colour=1)
-            url = self._vars.strURL(user.avatar_url)
+            url = strURL(user.avatar_url)
             emb.set_author(name=str(user), icon_url=url, url=url)
             kick = None
             ban = None
@@ -934,13 +883,13 @@ class UpdateUserLogs:
             await channel.send(embed=emb)
 
 
-class UpdateMessageLogs:
-    is_database = True
+class UpdateMessageLogs(Database):
     name = "logM"
 
-    def __init__(self):
+    def __init__(self, _vars):
         self.searched = False
         self.dc = {}
+        super().__init__(_vars)
 
     async def cacheGuild(self, guild, lim=65536):
 
@@ -985,7 +934,7 @@ class UpdateMessageLogs:
         i = 1
         for h in histories:
             temp = h[0]
-            print("[" + str(len(temp)) + "]")
+            # print("[" + str(len(temp)) + "]")
             for message in temp:
                 self._vars.cacheMessage(message)
                 if not i & 8191:
@@ -1017,21 +966,21 @@ class UpdateMessageLogs:
                 u = before.author
                 name = u.name
                 name_id = name + bool(u.display_name) * ("#" + u.discriminator)
-                url = self._vars.strURL(u.avatar_url)
+                url = strURL(u.avatar_url)
                 emb = discord.Embed(colour=colour2Raw([0, 0, 255]))
                 emb.set_author(name=name_id, icon_url=url, url=url)
                 emb.description = (
                     "**Message edited in** <#"
                     + str(before.channel.id) + ">:"
                 )
-                emb.add_field(name="Before", value=self._vars.strMessage(before))
-                emb.add_field(name="After", value=self._vars.strMessage(after))
+                emb.add_field(name="Before", value=strMessage(before))
+                emb.add_field(name="After", value=strMessage(after))
                 await channel.send(embed=emb)
 
     async def _delete_(self, message, bulk=False, **void):
         if bulk:
             if self._vars.isDeleted(message) < 2:
-                print(self._vars.strMessage(message, username=True))
+                print(strMessage(message, username=True))
             return
         guild = message.guild
         if guild.id in self.data:
@@ -1046,7 +995,7 @@ class UpdateMessageLogs:
             u = message.author
             name = u.name
             name_id = name + bool(u.display_name) * ("#" + u.discriminator)
-            url = self._vars.strURL(u.avatar_url)
+            url = strURL(u.avatar_url)
             action = (
                 discord.AuditLogAction.message_delete,
                 discord.AuditLogAction.message_bulk_delete,
@@ -1090,7 +1039,7 @@ class UpdateMessageLogs:
                                 # print(t, e.target)
                 if t.bot or u.id == t.id == cu_id:
                     if self._vars.isDeleted(message) < 2:
-                        print(self._vars.strMessage(message, username=True))
+                        print(strMessage(message, username=True))
                     return
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
@@ -1100,19 +1049,12 @@ class UpdateMessageLogs:
                 init + " **deleted message from** <#"
                 + str(message.channel.id) + ">:\n"
             )
-            emb.description += self._vars.strMessage(message, limit=2048 - len(emb.description))
+            emb.description += strMessage(message, limit=2048 - len(emb.description))
             await channel.send(embed=emb)
 
 
-class UpdateFileLogs:
-    is_database = True
+class UpdateFileLogs(Database):
     name = "logF"
-
-    def __init__(self):
-        pass
-
-    async def __call__(self):
-        pass
 
     async def _user_update_(self, before, after, **void):
         return
@@ -1128,8 +1070,8 @@ class UpdateFileLogs:
             sending[guild.id] = True
         if not sending:
             return
-        b_url = self._vars.strURL(before.avatar_url)
-        a_url = self._vars.strURL(after.avatar_url)
+        b_url = strURL(before.avatar_url)
+        a_url = strURL(after.avatar_url)
         if b_url != a_url:
             try:
                 obj = before.avatar_url_as(format="gif", static_format="png", size=4096)
@@ -1146,7 +1088,7 @@ class UpdateFileLogs:
             except:
                 msg = str(obj)
                 fil=None
-            emb = discord.Embed(colour=self._vars.randColour())
+            emb = discord.Embed(colour=randColour())
             emb.description = "File deleted from <@" + str(before.id) + ">"
             for g_id in sending:
                 guild = self._vars.cache["guilds"].get(g_id, None)
@@ -1188,19 +1130,15 @@ class UpdateFileLogs:
                         fils.append(fil)
                     except:
                         msg += a.url + "\n"
-                emb = discord.Embed(colour=self._vars.randColour())
+                emb = discord.Embed(colour=randColour())
                 emb.description = "File" + "s" * (len(fils) + len(msg) != 1) + " deleted from <@" + str(message.author.id) + ">"
                 if not msg:
                     msg = None
                 await channel.send(msg, embed=emb, files=fils)
 
 
-class UpdateReacts:
-    is_database = True
+class UpdateReacts(Database):
     name = "reacts"
-
-    def __init__(self):
-        pass
 
     async def _nocommand_(self, text, edit, orig, message, **void):
         if message.guild is None or not orig:
@@ -1212,7 +1150,7 @@ class UpdateReacts:
             try:
                 reacting = {}
                 for k in following[g_id]:
-                    if self._vars.hasSymbol(k):
+                    if hasSymbol(k):
                         if k in words:
                             emoji = following[g_id][k]
                             reacting[words.index(k) / len(words)] = emoji
@@ -1227,16 +1165,13 @@ class UpdateReacts:
             except:
                 print(traceback.format_exc())
 
-    async def __call__(self):
-        pass
 
-
-class UpdateDogpiles:
-    is_database = True
+class UpdateDogpiles(Database):
     name = "dogpiles"
 
-    def __init__(self):
+    def __init__(self, _vars):
         self.msgFollow = {}
+        super().__init__(_vars)
 
     async def _nocommand_(self, text, edit, orig, message, **void):
         if message.guild is None or not orig:
@@ -1267,16 +1202,9 @@ class UpdateDogpiles:
                     curr[2] = u_id
                     #print(curr)
 
-    async def __call__(self):
-        pass
 
-
-class UpdateRolegivers:
-    is_database = True
+class UpdateRolegivers(Database):
     name = "rolegivers"
-
-    def __init__(self):
-        pass
 
     async def _nocommand_(self, text, message, orig, **void):
         if message.guild is None or not orig:
@@ -1286,7 +1214,7 @@ class UpdateRolegivers:
         _vars = self._vars
         assigned = self.data.get(message.channel.id, {})
         for k in assigned:
-            if ((k in text) if self._vars.hasSymbol(k) else (k in message.content)):
+            if ((k in text) if hasSymbol(k) else (k in message.content)):
                 alist = assigned[k]
                 for r in alist[0]:
                     role = guild.get_role(r)
@@ -1307,19 +1235,9 @@ class UpdateRolegivers:
                 if alist[1]:
                     await _vars.silentDelete(message)
 
-    async def __call__(self):
-        pass
 
-
-class UpdatePerms:
-    is_database = True
+class UpdatePerms(Database):
     name = "perms"
-
-    def __init__(self):
-        pass
-
-    async def __call__(self):
-        pass
 
 
 # class UpdateColours:
@@ -1344,7 +1262,7 @@ class UpdatePerms:
 #                     role = guild.get_role(r)
 #                     delay = roles[r]
 #                     if not random.randint(0, ceil(delay)):
-#                         col = self._vars.randColour()
+#                         col = randColour()
 #                         try:
 #                             await role.edit(colour=discord.Colour(col))
 #                         except KeyError:
@@ -1394,12 +1312,12 @@ async def getBans(_vars, guild):
     return bans
 
 
-class UpdateBans:
-    is_database = True
+class UpdateBans(Database):
     name = "bans"
 
-    def __init__(self):
+    def __init__(self, _vars):
         self.synced = False
+        super().__init__(_vars)
 
     async def __call__(self, **void):
         while self.busy:

@@ -2,27 +2,19 @@
 Adds many useful math-related functions.
 """
 
-import os, sys, asyncio, threading, subprocess, psutil, traceback, time, datetime
+import os, sys, threading, subprocess, psutil, traceback, time, datetime
 import ctypes, collections, ast, copy, pickle, io
 import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys, re
-
-import urllib.request, urllib.parse, requests
 
 from scipy import interpolate, special, signal
 from dateutil import parser as tparser
 from sympy.parsing.sympy_parser import parse_expr
 from itertools import repeat
 
-if hasattr(asyncio, "create_task"):
-    create_task = asyncio.create_task
-else:
-    create_task = asyncio.ensure_future
-
 loop = lambda x: repeat(None, x)
 
 CalledProcessError = subprocess.CalledProcessError
 Process = psutil.Process()
-urlParse = urllib.parse.quote
 
 np = numpy
 array = numpy.array
@@ -1283,33 +1275,6 @@ def strGetRem(s, arg):
         return s, False
 
 
-def htmlDecode(s):
-    while len(s) > 7:
-        try:
-            i = s.index("&#")
-        except ValueError:
-            break
-        try:
-            if s[i + 2] == "x":
-                h = "0x"
-                p = i + 3
-            else:
-                h = ""
-                p = i + 2
-            for a in range(4):
-                if s[p + a] == ";":
-                    v = int(h + s[p:p + a])
-                    break
-            c = chr(v)
-            s = s[:i] + c + s[p + a + 1:]
-        except ValueError:
-            continue
-        except IndexError:
-            continue
-    s = s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-    return s.replace("&quot;", '"').replace("&apos;", "'")
-
-
 def strIter(it, key=None, limit=1728):
     try:
         try:
@@ -1439,17 +1404,6 @@ def rdhms(ts):
     return t
 
 
-ESCAPE_T = {
-    "[": "⦍",
-    "]": "⦎",
-    "@": "＠",
-    "`": "",
-}
-__emap = "".maketrans(ESCAPE_T)
-
-def noHighlight(s):
-    return str(s).translate(__emap)
-
 UNIFMTS = [
     "𝟎𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙",
     "𝟢𝟣𝟤𝟥𝟦𝟧𝟨𝟩𝟪𝟫𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩",
@@ -1485,9 +1439,6 @@ def uniStr(s, fmt=0):
 
 def reconstitute(s):
     return str(s).translate(__trans)
-
-def sbHighlight(s):
-    return "[" + noHighlight(s) + "]"
 
 
 __hlist_maxoff__ = (1 << 31) - 1
@@ -2481,14 +2432,13 @@ def subFunc(key, com, data_in, timeout):
             time.sleep(0.001)
         resp = returns[0]
         try:
-            ex = eval(resp)
+            resp = eval(resp)
         except NameError:
-            ex = RuntimeError(resp[resp.index("(") + 1:resp.index(")")].strip("'"))
-        raise ex
+            raise RuntimeError(resp[resp.index("(") + 1:resp.index(")")].strip("'"))
         if issubclass(resp.__class__, Exception):
             raise resp
         time.sleep(0.001)
-        resp = eval(resp.decode("utf-8"))
+        resp = eval(resp)
         if issubclass(resp.__class__, Exception):
             raise resp
         resp = str(resp)
@@ -2659,141 +2609,3 @@ def waitParallel(delay):
                 time.sleep(0.001)
 
 threads = _parallel()
-
-
-def getLineCount(fn):
-    f = open(fn, "rb")
-    count = 1
-    size = 0
-    while True:
-        try:
-            i = f.read(1024)
-            if not i:
-                raise EOFError
-            size += len(i)
-            count += i.count(b"\n")
-        except EOFError:
-            f.close()
-            return hlist((size, count))
-
-
-def iscode(fn):
-    fn = str(fn)
-    return fn.endswith(".py") or fn.endswith(".pyw")# or fn.endswith(".c") or fn.endswith(".cpp")
-
-__umap = {
-    "<": "",
-    ">": "",
-    "|": "",
-    "*": "",
-    " ": "%20",
-}
-__utrans = "".maketrans(__umap)
-
-def verifyURL(f):
-    if "file:" in f:
-        raise PermissionError("Unable to open local file " + f + ".")
-    return f.strip().translate(__utrans)
-
-__smap = {
-    "<": "",
-    ">": "",
-    "|": "",
-    "*": "",
-}
-__strans = "".maketrans(__smap)
-
-def verifySearch(f):
-    return f.strip().translate(__strans)
-
-DOMAIN_FORMAT = re.compile(
-    r"(?:^(\w{1,255}):(.{1,255})@|^)"
-    r"(?:(?:(?=\S{0,253}(?:$|:))"
-    r"((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
-    r"(?:[a-z0-9]{1,63})))"
-    r"|localhost)"
-    r"(:\d{1,5})?",
-    re.IGNORECASE
-)
-SCHEME_FORMAT = re.compile(
-    r"^(http|hxxp|ftp|fxp)s?$",
-    re.IGNORECASE
-)
-
-def isURL(url):
-    url = url.strip()
-    if not url:
-        return None
-    result = urllib.parse.urlparse(url)
-    scheme = result.scheme
-    domain = result.netloc
-    if not scheme:
-        return False
-    if not re.fullmatch(SCHEME_FORMAT, scheme):
-        return False
-    if not domain:
-        return False
-    if not re.fullmatch(DOMAIN_FORMAT, domain):
-        return False
-    return True
-
-class urlBypass(urllib.request.FancyURLopener):
-    version = "Mozilla/5." + str(xrand(1, 10))
-
-def urlOpen(url):
-    opener = urlBypass()
-    resp = opener.open(verifyURL(url))
-    if resp.getcode() != 200:
-        raise ConnectionError("Error " + str(resp.code))
-    return resp
-
-
-def funcSafe(func, *args, print_exc=False, **kwargs):
-    try:
-        return [func(*args, **kwargs)]
-    except Exception as ex:
-        if print_exc:
-            print(traceback.format_exc())
-        return repr(ex)
-
-
-def logClear():
-    if os.name == 'nt':
-        os.system('cls')
-    else:
-        os.system('clear')
-
-class __logPrinter():
-
-    print_temp = ""
-    
-    def updatePrint(self, file):
-        if file is None:
-            outfunc = sys.stdout.write
-            enc = lambda x: str(x)
-        else:
-            def filePrint(b):
-                f = open(file, "ab+")
-                f.write(b)
-                f.close()
-            outfunc = filePrint
-            enc = lambda x: bytes(str(x), "utf-8")
-        outfunc(enc("Logging started...\n"))
-        while True:
-            if self.print_temp:
-                self.print_temp = limStr(self.print_temp, 4096)
-                data = enc(self.print_temp)
-                #sys.stdout.write(repr(data))
-                outfunc(data)
-                self.print_temp = ""
-            time.sleep(1)
-            #sys.stdout.write(str(f))
-
-    def logPrint(self, *args, sep=" ", end="\n", prefix="", **void):
-        self.print_temp += str(sep).join((str(i) for i in args)) + str(end) + str(prefix)
-
-    def __init__(self, file=None):
-        doParallel(self.updatePrint, [file], name="printer", killable=False)
-
-__printer = __logPrinter("log.txt")
-print = __printer.logPrint

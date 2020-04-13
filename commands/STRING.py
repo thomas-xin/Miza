@@ -1,11 +1,10 @@
-import discord, json
 from googletrans import Translator
 try:
-    from smath import *
+    from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
-    from smath import *
+    from common import *
 
 
 class PapagoTrans:
@@ -66,16 +65,13 @@ def getTranslate(translator, string, dest, source):
         return ex
 
 
-class Translate:
-    is_command = True
+class Translate(Command):
     time_consuming = True
-
-    def __init__(self):
-        self.name = ["TR"]
-        self.min_level = 0
-        self.description = "Translates a string into another language."
-        self.usage = "<0:language> <1:string> <verbose(?v)> <papago(?p)>"
-        self.flags = "pv"
+    name = ["TR"]
+    min_level = 0
+    description = "Translates a string into another language."
+    usage = "<0:language> <1:string> <verbose(?v)> <papago(?p)>"
+    flags = "pv"
 
     async def __call__(self, args, flags, user, **void):
         dest = args[0]
@@ -119,16 +115,13 @@ class Translate:
         return response + end    
 
 
-class Math:
-    is_command = True
+class Math(Command):
     time_consuming = True
-
-    def __init__(self):
-        self.name = ["Python", "PY", "Sympy", "M", "Calc"]
-        self.min_level = 0
-        self.description = "Evaluates a math formula."
-        self.usage = "<function> <verbose(?v)> <rationalize(?r)>"
-        self.flags = "rv"
+    name = ["Python", "PY", "Sympy", "M", "Calc"]
+    min_level = 0
+    description = "Evaluates a math formula."
+    usage = "<function> <verbose(?v)> <rationalize(?r)>"
+    flags = "rv"
 
     async def __call__(self, _vars, argv, channel, flags, guild, **void):
         f = argv
@@ -143,14 +136,11 @@ class Math:
         return "```py\n" + str(f) + " = " + "\n".join(str(i) for i in resp) + "```"
 
 
-class Uni2Hex:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["U2H"]
-        self.min_level = 0
-        self.description = "Converts unicode text to hexadecimal numbers."
-        self.usage = "<string>"
+class Uni2Hex(Command):
+    name = ["U2H"]
+    min_level = 0
+    description = "Converts unicode text to hexadecimal numbers."
+    usage = "<string>"
 
     async def __call__(self, argv, **void):
         if not argv:
@@ -159,14 +149,11 @@ class Uni2Hex:
         return "```fix\n" + bytes2Hex(b) + "```"
 
 
-class Hex2Uni:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["H2U"]
-        self.min_level = 0
-        self.description = "Converts hexadecimal numbers to unicode text."
-        self.usage = "<string>"
+class Hex2Uni(Command):
+    name = ["H2U"]
+    min_level = 0
+    description = "Converts hexadecimal numbers to unicode text."
+    usage = "<string>"
 
     async def __call__(self, argv, **void):
         if not argv:
@@ -175,14 +162,37 @@ class Hex2Uni:
         return "```fix\n" + b.decode("utf-8") + "```"
 
 
-class UniFmt:
-    is_command = True
+class ID2Time(Command):
+    name = ["I2T"]
+    min_level = 0
+    description = "Converts a discord ID to its corresponding UTC time."
+    usage = "<string>"
 
-    def __init__(self):
-        self.name = ["Fancy", "FancyText"]
-        self.min_level = 0
-        self.description = "Creates a representation of a text string using unicode fonts."
-        self.usage = "<0:font_id> <1:string>"
+    async def __call__(self, argv, **void):
+        if not argv:
+            raise IndexError("Input string is empty.")
+        argv = verifyID(argv)
+        return "```fix\n" + str(snowflake_time(argv)) + "```"
+
+
+class Time2ID(Command):
+    name = ["T2I"]
+    min_level = 0
+    description = "Converts a UTC time to its corresponding discord ID."
+    usage = "<string>"
+
+    async def __call__(self, argv, **void):
+        if not argv:
+            raise IndexError("Input string is empty.")
+        argv = tparser.parse(argv)
+        return "```fix\n" + str(time_snowflake(argv)) + "```"
+
+
+class UniFmt(Command):
+    name = ["Fancy", "FancyText"]
+    min_level = 0
+    description = "Creates a representation of a text string using unicode fonts."
+    usage = "<0:font_id> <1:string>"
 
     async def __call__(self, args, guild, **void):
         if len(args) < 2:
@@ -191,8 +201,7 @@ class UniFmt:
         return "```fix\n" + uniStr(" ".join(args[1:]), i) + "```"
 
 
-class OwOify:
-    is_command = True
+class OwOify(Command):
     omap = {
         "n": "ny",
         "N": "NY",
@@ -202,12 +211,10 @@ class OwOify:
         "L": "W",
     }
     otrans = "".maketrans(omap)
-
-    def __init__(self):
-        self.name = ["OwO"]
-        self.min_level = 0
-        self.description = "owo-ifies text."
-        self.usage = "<string>"
+    name = ["OwO"]
+    min_level = 0
+    description = "owo-ifies text."
+    usage = "<string>"
 
     async def __call__(self, argv, **void):
         if not argv:
@@ -215,14 +222,11 @@ class OwOify:
         return "```fix\n" + argv.translate(self.otrans) + "```"
 
 
-class Time:
-    is_command = True
-
-    def __init__(self):
-        self.name = ["UTC", "GMT"]
-        self.min_level = 0
-        self.description = "Shows the current time in a certain timezone."
-        self.usage = "<offset_hours[0]>"
+class Time(Command):
+    name = ["UTC", "GMT"]
+    min_level = 0
+    description = "Shows the current time in a certain timezone."
+    usage = "<offset_hours[0]>"
 
     async def __call__(self, argv, guild, **void):
         if argv:
@@ -240,20 +244,17 @@ class Time:
         )
 
 
-class UrbanDictionary:
-    is_command = True
+class UrbanDictionary(Command):
     time_consuming = True
     header = {
 	"x-rapidapi-host": "mashape-community-urban-dictionary.p.rapidapi.com",
 	"x-rapidapi-key": rapidapi_key,
     }
-
-    def __init__(self):
-        self.name = ["Urban"]
-        self.min_level = 0
-        self.description = "Searches Urban Dictionary for an item."
-        self.usage = "<string> <verbose(?v)>"
-        self.flags = "v"
+    name = ["Urban"]
+    min_level = 0
+    description = "Searches Urban Dictionary for an item."
+    usage = "<string> <verbose(?v)>"
+    flags = "v"
 
     async def __call__(self, argv, flags, **void):
         url = (

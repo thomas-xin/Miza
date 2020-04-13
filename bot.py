@@ -1,10 +1,9 @@
-import discord, json
 try:
-    from smath import *
+    from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
-    from smath import *
+    from common import *
 
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
@@ -70,7 +69,6 @@ class main_data:
         except KeyError:
             self.owner_id = 0
             print("WARNING: owner_id not found. Unable to locate owner.")
-        self.data = {}
         self.proc = psutil.Process()
         doParallel(self.getModules, state=2)
         self.guilds = 0
@@ -140,7 +138,7 @@ class main_data:
             user.name = "Deleted User"
             user.id = u_id
             user.avatar_url = "https://cdn.discordapp.com/embed/avatars/0.png"
-            user.created_at = discord.utils.snowflake_time(u_id)
+            user.created_at = snowflake_time(u_id)
         else:
             try:
                 user = client.get_user(u_id)
@@ -246,7 +244,7 @@ class main_data:
                     guild = freeClass(member_count=invite.approximate_member_count)
                     for at in g.__slots__:
                         setattr(guild, at, getattr(g, at))
-                    guild.created_at = discord.utils.snowflake_time(guild.id)
+                    guild.created_at = snowflake_time(guild.id)
                     icon = str(guild.icon)
                     guild.icon_url = (
                         "https://cdn.discordapp.com/icons/"
@@ -332,6 +330,35 @@ class main_data:
             channel = await user.create_dm()
         return channel
 
+    async def followURL(self, url, it=None):
+        if it is None:
+            url = url.strip(" ").strip("\n").strip("`")
+            if url.startswith("<") and url[-1] == ">":
+                url = url[1:-1]
+            it = {}
+        if url.startswith("https://discordapp.com/channels/"):
+            spl = url[32:].split("/")
+            c = await self.fetch_channel(spl[1])
+            m = await self.fetch_message(spl[2], c)
+            if m.attachments:
+                url = m.attachments[0].url
+            else:
+                url = m.content
+                if " " in url or "\n" in url or not isURL(url):
+                    for m in m.content.replace("\n", " ").split(" "):
+                        u = verifyURL(m)
+                        if isURL(u):
+                            url = u
+                            break
+                url = verifyURL(url)
+                if url in it:
+                    return url
+                it[url] = True
+                if not len(it) & 255:
+                    await asyncio.sleep(0.2)
+                url = await self.followURL(url, it)
+        return url
+
     def cacheMessage(self, message):
         self.cache["messages"][message.id] = message
         self.limitCache("messages")
@@ -359,7 +386,10 @@ class main_data:
                 g_id = int(guild)
             except TypeError:
                 g_id = 0
-        return self.data["prefixes"].get(g_id, "~")
+        try:
+            return self.data["prefixes"][g_id]
+        except KeyError:
+            return "~"
 
     def getPerms(self, user, guild=None):
         try:
@@ -450,37 +480,6 @@ class main_data:
             u_id, 0
         ) >= time.time() + self.min_suspend * 86400
 
-    def updatePart(self, force=False):
-        if force:
-            name = getattr(self, "name", None)
-            if name:
-                if self.updated:
-                    self.updated = False
-                    data = repr(self.data)
-                    if len(data) > 262144:
-                        print("Pickling " + name + "...")
-                        data = pickle.dumps(data)
-                    else:
-                        data = data.encode("utf-8")
-                    f = open(self.file, "wb")
-                    f.write(data)
-                    f.close()
-                    return True
-        else:
-            self.updated = True
-        return False
-
-    def permError(self, perm, req=None, reason=None):
-        if req is None:
-            req = self.min_level
-        if reason is None:
-            reason = "for command " + self.name[-1]
-        raise PermissionError(
-            "Insufficient priviliges " + str(reason)
-            + ". Required level: " + str(req)
-            + ", Current level: " + str(perm) + "."
-        )
-
     def getModule(self, module):
         try:
             f = module
@@ -495,58 +494,15 @@ class main_data:
             vd = mod.__dict__
             for k in vd:
                 var = vd[k]
-                try:
-                    var.is_command
-                    var._vars = self
-                    obj = var()
-                    obj.data = {}
-                    obj.__name__ = var.__name__
-                    if not hasattr(obj, "alias"):
-                        obj.alias = obj.name
-                    else:
-                        obj.alias.append(obj.__name__)
-                    obj.name.append(obj.__name__)
-                    if not hasattr(obj, "min_display"):
-                        obj.min_display = obj.min_level
-                    var.permError = main_data.permError
+                if hasattr(var, "is_command"):
+                    obj = var(self)
                     commands.append(obj)
-                    #print("Successfully loaded command " + obj.__name__ + ".")
-                except AttributeError:
-                    try:
-                        var.is_database
-                        name = var.name
-                        if not getattr(var, "no_file", False):
-                            var.file = "saves/" + name + ".json"
-                            var.update = main_data.updatePart
-                            var.updated = False
-                            try:
-                                f = open(var.file, "rb")
-                                s = f.read()
-                                if not s:
-                                    raise FileNotFoundError
-                                data = None
-                                try:
-                                    data = pickle.loads(s)
-                                except pickle.UnpicklingError:
-                                    pass
-                                if data is None:
-                                    data = eval(s)
-                                self.data[name] = var.data = data
-                                f.close()
-                            except FileNotFoundError:
-                                self.data[name] = var.data = {}
-                        else:
-                            self.data[name] = var.data = {}
-                        var._vars = self
-                        obj = var()
-                        obj.busy = False
-                        obj.checking = False
-                        obj._globals = vd
-                        self.database[obj.name] = obj
-                        dataitems.append(obj)
-                        #print("Successfully loaded database " + obj.__name__ + ".")
-                    except AttributeError:
-                        pass
+                    # print("Successfully loaded command " + obj.__name__ + ".")
+                elif hasattr(var, "is_database"):
+                    var.is_database
+                    obj = var(self)
+                    dataitems.append(obj)
+                    # print("Successfully loaded database " + obj.__name__ + ".")
             for u in dataitems:
                 for c in commands:
                     c.data[u.name] = u
@@ -557,16 +513,15 @@ class main_data:
 
     def getModules(self, reload=False):
         files = (i for i in os.listdir("commands") if iscode(i))
-        self.categories = {}
-        self.database = {}
+        self.categories = freeClass()
+        self.database = freeClass()
+        self.data = freeClass()
         totalsize = [0,0]
         totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
         totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p))
         self.codeSize = totalsize
         for f in files:
             doParallel(self.getModule, [f], state=2)
-        __import__("smath", globals())
-        subKill()
 
     def update(self):
         saved = hlist()
@@ -580,22 +535,6 @@ class main_data:
             print(traceback.format_exc())
         if saved:
             print("Autosaved " + str(saved) + ".")
-
-    imap = {
-        "#": "",
-        "<": "",
-        ">": "",
-        "@": "",
-        "!": "",
-        "&": "",
-    }
-    itrans = "".maketrans(imap)
-    
-    def verifyID(self, value):
-        try:
-            return int(str(value).translate(self.itrans))
-        except ValueError:
-            return value
     
     mmap = {
         "“": '"',
@@ -667,53 +606,6 @@ class main_data:
     }
     ctrans = "".maketrans(cmap)
 
-    class returns:
-
-        def __init__(self, data=None):
-            self.data = data
-
-        def __bool__(self):
-            return self.data is not None
-
-    async def parasync(self, coro, returns):
-        try:
-            resp = await coro
-            returns.data = self.returns(resp)
-        except Exception as ex:
-            returns.data = repr(ex)
-        return returns.data
-
-    async def recursiveCoro(self, item):
-        returns = hlist()
-        for i in range(len(item)):
-            try:
-                if type(item[i]) in (str, bytes, dict) or isinstance(item[i], freeClass):
-                    raise TypeError
-                item[i] = tuple(item[i])
-            except TypeError:
-                pass
-            if type(item[i]) is tuple:
-                returns.append(self.returns())
-                create_task(self.parasync(self.recursiveCoro(item[i]), returns[-1]))
-            elif asyncio.iscoroutine(item[i]):
-                returns.append(self.returns())
-                create_task(self.parasync(item[i], returns[-1]))
-            else:
-                returns.append(self.returns(item[i]))
-        full = False
-        while not full:
-            full = True
-            for i in returns:
-                if not i:
-                    full = False
-            await asyncio.sleep(0.2)
-        output = hlist()
-        for i in returns:
-            while isinstance(i, self.returns):
-                i = i.data
-            output.append(i)
-        return output
-
     async def evalMath(self, f, guild):
         f = f.strip()
         try:
@@ -761,7 +653,6 @@ class main_data:
         print(args)
         returns = [None]
         doParallel(subFunc, args, returns, state=2)
-        t = time.time()
         while returns[0] is None:
             await asyncio.sleep(0.25)
         resp = returns[0]
@@ -859,55 +750,6 @@ class main_data:
         self.currState = stats
         return stats
 
-    async def followURL(self, url, it=None):
-        if it is None:
-            url = url.strip(" ").strip("\n").strip("`")
-            if url.startswith("<") and url[-1] == ">":
-                url = url[1:-1]
-            it = {}
-        if url.startswith("https://discordapp.com/channels/"):
-            spl = url[32:].split("/")
-            c = await self.fetch_channel(spl[1])
-            m = await self.fetch_message(spl[2], c)
-            if m.attachments:
-                url = m.attachments[0].url
-            else:
-                url = m.content
-                if " " in url or "\n" in url or not isURL(url):
-                    for m in m.content.replace("\n", " ").split(" "):
-                        u = verifyURL(m)
-                        if isURL(u):
-                            url = u
-                            break
-                url = verifyURL(url)
-                if url in it:
-                    return url
-                it[url] = True
-                if not len(it) & 255:
-                    await asyncio.sleep(0.2)
-                url = await self.followURL(url, it)
-        return url
-
-    async def sendReact(self, channel, *args, reacts=(), **kwargs):
-        try:
-            sent = await channel.send(*args, **kwargs)
-            for react in reacts:
-                await sent.add_reaction(react)
-        except:
-            print(traceback.format_exc())
-
-    async def sendFile(self, channel, msg, file, filename=None):
-        message = await channel.send(msg, file=file)
-        if filename is not None:
-            try:
-                os.remove(filename)
-            except FileNotFoundError:
-                pass
-            except:
-                print(traceback.format_exc())
-        if message.attachments:
-            await message.edit(content=message.content + "\n" + "\n".join(tuple("<" + a.url + ">" for a in message.attachments)))
-
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:
             suspended = _vars.isSuspended(user.id)
@@ -955,7 +797,7 @@ class main_data:
                             return
                         except Exception as ex:
                             print(traceback.format_exc())
-                            create_task(self.sendReact(
+                            create_task(sendReact(
                                 message.channel,
                                 "```py\nError: " + repr(ex).replace("`", "") + "\n```",
                                 reacts=["❎"],
@@ -1017,50 +859,6 @@ class main_data:
             except:
                 print(traceback.format_exc())
             self.busy = False
-
-    def randColour(self):
-        return colour2Raw(colourCalculation(xrand(12) * 128))
-
-    def strURL(self, url):
-        return str(url).replace(".webp", ".png")
-
-    def strMessage(self, message, limit=1024, username=False):
-        c = message.content
-        s = getattr(message, "system_content", "")
-        if s and len(s) > len(c):
-            c = s
-        if username:
-            c = "<@" + str(message.author.id) + ">:\n" + c
-        data = limStr(c, limit)
-        if message.attachments:
-            data += "\n[" + ", ".join(i.url for i in message.attachments) + "]"
-        if message.embeds:
-            data += "\n⟨" + ", ".join(str(i.to_dict()) for i in message.embeds) + "⟩"
-        if message.reactions:
-            data += "\n{" + ", ".join(str(i) for i in message.reactions) + "}"
-        try:
-            t = message.created_at
-            if message.edited_at:
-                t = message.edited_at
-            data += "\n`(" + str(t) + ")`"
-        except AttributeError:
-            pass
-        if not data:
-            data = "```css\n" + uniStr("[EMPTY MESSAGE]") + "```"
-        return limStr(data, limit)
-
-    def strActivity(self, activity):
-        if hasattr(activity, "type") and activity.type != discord.ActivityType.custom:
-            t = activity.type.name
-            return t[0].upper() + t[1:] + " " + activity.name
-        return str(activity)
-
-    def hasSymbol(self, string):
-        for c in string.lower():
-            x = ord(c)
-            if x > 122 or (x < 97 and x > 57) or x < 48:
-                return False
-        return True
 
     async def ensureWebhook(self, channel):
         if not hasattr(self, "cw_cache"):
@@ -1257,7 +1055,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
     suspended = _vars.isSuspended(u_id)
     if (suspended and op) or msg.replace(" ", "") in mention:
         if not u_perm < 0 and not suspended:
-            create_task(_vars.sendReact(
+            create_task(sendReact(
                 channel,
                 (
                     "Hi, did you require my services for anything? Use `"
@@ -1271,7 +1069,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                 + user.name + " (" + str(u_id) + "): "
                 + limStr(message.content, 256)
             )
-            create_task(_vars.sendReact(
+            create_task(sendReact(
                 channel,
                 "Sorry, you are currently not permitted to request my services.",
                 reacts=["❎"],
@@ -1414,7 +1212,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                         b = io.BytesIO(response)
                                         f = discord.File(b, filename="message.txt")
                                         create_task(
-                                            _vars.sendFile(channel, filemsg, f),
+                                            sendFile(channel, filemsg, f),
                                         )
                                     else:
                                         raise OverflowError("Response too long for file upload.")
@@ -1425,7 +1223,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                     except Exception as ex:
                         errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
                         print(traceback.format_exc())
-                        create_task(_vars.sendReact(
+                        create_task(sendReact(
                             channel,
                             errmsg,
                             reacts=["❎"],
@@ -1596,7 +1394,7 @@ async def handleMessage(message, edit=True):
     except Exception as ex:
         errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
         print(traceback.format_exc())
-        create_task(_vars.sendReact(
+        create_task(sendReact(
             message.channel,
             errmsg,
             reacts=["❎"],
@@ -1700,7 +1498,7 @@ async def on_raw_message_delete(payload):
             except AttributeError:
                 message.guild = None
             message.id = payload.message_id
-            message.created_at = discord.utils.snowflake_time(message.id)
+            message.created_at = snowflake_time(message.id)
     guild = message.guild
     if guild:
         for u in _vars.database.values():
@@ -1735,7 +1533,7 @@ async def on_raw_bulk_message_delete(payload):
                 except AttributeError:
                     message.guild = None
                 message.id = m_id
-                message.created_at = discord.utils.snowflake_time(message.id)
+                message.created_at = snowflake_time(message.id)
             messages.append(message)
     for message in messages:
         guild = message.guild
@@ -1784,7 +1582,7 @@ async def updateEdit(before, after):
         before.guild = after.guild
         before.author = after.author
         before.id = after.id
-        before.created_at = discord.utils.snowflake_time(before.id)
+        before.created_at = snowflake_time(before.id)
     guild = after.guild
     if guild:
         for u in _vars.database.values():
@@ -1821,7 +1619,7 @@ async def on_raw_message_edit(payload):
         before.channel = await _vars.fetch_channel(c_id)
         before.guild = channel.guild
         before.id = payload.message_id
-        before.created_at = discord.utils.snowflake_time(before.id)
+        before.created_at = snowflake_time(before.id)
     if before:
         after = await before.channel.fetch_message(payload.message_id)
         _vars.cacheMessage(after)
