@@ -76,6 +76,8 @@ class main_data:
         self.updated = False
         print("Initialized.")
 
+    __call__ = lambda self: self
+
     def setshutdown(self):
         time.sleep(2)
         f = open(self.shutdown, "wb")

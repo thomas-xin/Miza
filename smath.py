@@ -1044,7 +1044,7 @@ def toRect(pos, rect, edge=0):
         return p, True, True
     dest_rect = convertRect(rect, 0)
     lr, ud = False, False
-    for i in range(4):
+    for _ in loop(4):
         diff = p[0] - dest_rect[0] - edge
         if diff <= 0:
             p[0] = dest_rect[0] - diff + edge
@@ -1450,6 +1450,7 @@ custom list-like data structure that incorporates the functionality of dicts in 
 order to have average O(1) constant time insertion on both sides as well as O(1) \
 lookup time for all elements. Includes many array and numeric operations."""
 
+    @staticmethod
     def waiting(func):
         def call(self, *args, force=False, **kwargs):
             if not force:
@@ -1458,6 +1459,7 @@ lookup time for all elements. Includes many array and numeric operations."""
             return func(self, *args, **kwargs)
         return call
 
+    @staticmethod
     def blocking(func):
         def call(self, *args, force=False, **kwargs):
             if not force:
@@ -2310,7 +2312,11 @@ def hzero(size, maxoff=__hlist_maxoff__):
 
 class freeClass(dict):
 
-    __init__ = lambda self, *args, **kwargs: super().__init__(self, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(self, *args, **kwargs)
+        self.self = self
+
+    __call__ = lambda self: self
     __repr__ = lambda self: "freeClass(**" + super().__repr__() + ")"
     __iter__ = lambda self: super().__iter__()
     __len__ = lambda self: super().__len__()
@@ -2330,6 +2336,9 @@ class pickled:
         self.ignores = {}
         self.__str__ = obj.__str__
         self.__dict__.update(getattr(obj, "__dict__", {}))
+
+    def __call__(self):
+        return self
 
     def ignore(self, item):
         self.ignores[item] = True
@@ -2522,7 +2531,7 @@ class _parallel:
 
         def get_id(self):
             if hasattr(self, "_thread_id"):
-                return self._thread_id
+                return getattr(self, "_thread_id")
             for t_id, thread in threading._active.items():
                 if thread is self:
                     self._thread_id = t_id

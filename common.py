@@ -81,8 +81,8 @@ class returns:
     def __init__(self, data=None):
         self.data = data
 
-    def __bool__(self):
-        return self.data is not None
+    __call__ = lambda self: self.data
+    __bool__ = lambda self: self.data is not None
 
 async def parasync(coro, returns):
     try:
@@ -90,7 +90,7 @@ async def parasync(coro, returns):
         returns.data = returns(resp)
     except Exception as ex:
         returns.data = repr(ex)
-    return returns.data
+    return returns()
 
 async def recursiveCoro(item):
     returns = hlist()
@@ -119,7 +119,7 @@ async def recursiveCoro(item):
     output = hlist()
     for i in returns:
         while isinstance(i, returns):
-            i = i.data
+            i = i()
         output.append(i)
     return output
 
@@ -265,9 +265,11 @@ def isURL(url):
 class urlBypass(urllib.request.FancyURLopener):
     version = "Mozilla/5." + str(xrand(1, 10))
 
+    __call__ = lambda self, url: self.open(url)
+
 def urlOpen(url):
     opener = urlBypass()
-    resp = opener.open(verifyURL(url))
+    resp = opener(verifyURL(url))
     if resp.getcode() != 200:
         raise ConnectionError("Error " + str(resp.code))
     return resp

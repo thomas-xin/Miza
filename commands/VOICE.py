@@ -431,7 +431,7 @@ class customAudio(discord.AudioSource):
                         if self.reverse:
                             ended = self.stats["position"] <= 0
                         else:
-                            ended = self.stats["position"] >= self.queue[0]["duration"] - 1
+                            ended = self.stats["position"] >= float(self.queue[0]["duration"]) - 1
                         if self.curr_timeout and time.time() - self.curr_timeout > 1 or ended:
                             self.lastEnd = time.time()
                             self.new()
