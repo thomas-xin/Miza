@@ -496,14 +496,18 @@ class main_data:
             vd = mod.__dict__
             for k in vd:
                 var = vd[k]
-                if hasattr(var, "is_command"):
-                    obj = var(self)
-                    commands.append(obj)
-                    print("Successfully loaded command " + obj.__name__ + ".")
-                elif hasattr(var, "is_database"):
-                    obj = var(self)
-                    dataitems.append(obj)
-                    print("Successfully loaded database " + obj.__name__ + ".")
+                if var not in (Command, Database):
+                    try:
+                        if issubclass(var, Command):
+                            obj = var(self)
+                            commands.append(obj)
+                            print("Successfully loaded command " + obj.__name__ + ".")
+                        elif issubclass(var, Database):
+                            obj = var(self)
+                            dataitems.append(obj)
+                            print("Successfully loaded database " + obj.__name__ + ".")
+                    except TypeError:
+                        pass
             for u in dataitems:
                 for c in commands:
                     c.data[u.name] = u
@@ -1026,10 +1030,12 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
     c_id = channel.id
     if g_id:
         try:
-            enabled = _vars.data["enabled"][c_id]
+            enabled = _vars.data.enabled[c_id]
+            if enabled is None:
+                raise KeyError
         except KeyError:
             try:
-                enabled = _vars.data["enabled"][c_id] = ["main", "string", "admin"]
+                enabled = _vars.data.enabled[c_id] = ["main", "string", "admin"]
                 _vars.update()
             except KeyError:
                 enabled = ["main", "admin"]

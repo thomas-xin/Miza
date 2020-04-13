@@ -502,7 +502,7 @@ class Mimic(Command):
                         raise EOFError
                     dop = user.id
                     name = user.name
-                    url = str(user.avatar_url)
+                    url = strURL(user.avatar_url)
                 except:
                     try:
                         mimi = _vars.get_mimic(mim)
@@ -519,7 +519,7 @@ class Mimic(Command):
                         url = "https://cdn.discordapp.com/embed/avatars/0.png"
         else:
             name = user.name
-            url = str(user.avatar_url)
+            url = strURL(user.avatar_url)
         while m_id in mimics:
             mid += 1
             m_id = "&" + str(mid)

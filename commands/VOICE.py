@@ -2555,7 +2555,7 @@ class Download(Command):
             + "_" + str(len(res)) + "_" + url_list + "_" + fmt + "\n" + end
         )
         emb = discord.Embed(colour=randColour())
-        url = _vars.strURL(user.avatar_url)
+        url = strURL(user.avatar_url)
         for size in ("?size=1024", "?size=2048"):
             if url.endswith(size):
                 url = url[:-len(size)] + "?size=4096"

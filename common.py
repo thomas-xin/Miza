@@ -327,7 +327,6 @@ print = __printer.logPrint
 
 
 class Command:
-    is_command = True
     min_level = -inf
     description = ""
     usage = ""
@@ -359,13 +358,12 @@ class Command:
         self._vars = _vars
         self._globals = _vars._globals
     
-    async def __call__(self):
+    async def __call__(self, **void):
         pass
 
 
 class Database:
     _vars = None
-    is_database = True
     name = "data"
 
     def __init__(self, _vars):
@@ -398,7 +396,7 @@ class Database:
         self._globals = globals()
         # print(name, self.__name__)
 
-    async def __call__(self):
+    async def __call__(self, **void):
         pass
 
     def update(self, force=False):
