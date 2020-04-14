@@ -1863,7 +1863,6 @@ class AudioSettings(Command):
     }
 
     def __init__(self, *args):
-        super().__init__(*args)
         self.alias = list(self.aliasMap) + list(self.aliasExt)
         self.name = list(self.aliasMap)
         self.min_level = 0
@@ -1876,6 +1875,7 @@ class AudioSettings(Command):
         self.flags = "vspbrcnlxqdh"
         self.map = {k.lower():self.aliasMap[k] for k in self.aliasMap}
         addDict(self.map, {k.lower():self.aliasExt[k] for k in self.aliasExt})
+        super().__init__(*args)
 
     async def __call__(self, client, channel, user, guild, _vars, flags, name, argv, perm, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)

@@ -1097,6 +1097,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                     for a in command.alias:
                         if a.lower() == check:
                             alias = a
+                    alias = alias.lower()
                     argv = comm[i:]
                     run = True
                     print(str(user) + " (" + str(u_id) + ") issued command " + msg)
