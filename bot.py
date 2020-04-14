@@ -188,7 +188,7 @@ class main_data:
                             i = len(name)
                             if i not in cache[0]:
                                 cache[0][i] = m
-                        elif check.lower() in name.lower():
+                        elif check2 in name.lower():
                             i = len(name)
                             if i not in cache[1]:
                                 cache[1][i] = m
