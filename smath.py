@@ -2434,18 +2434,9 @@ def subFunc(key, com, data_in, timeout):
             if time.time() - t > timeout:
                 raise TimeoutError("Request timed out.")
             time.sleep(0.001)
-        resp = returns[0]
-        try:
-            resp = eval(resp)
-        except NameError:
-            raise RuntimeError(resp[resp.index("(") + 1:resp.index(")")].strip("'"))
-        if issubclass(resp.__class__, Exception):
-            raise resp
+        resp = evalEX(returns[0])
         time.sleep(0.001)
-        resp = eval(resp)
-        if issubclass(resp.__class__, Exception):
-            raise resp
-        resp = str(resp)
+        resp = str(evalEX(resp))
         output = [resp]
     except TimeoutError as ex:
         print(traceback.format_exc())
@@ -2462,6 +2453,32 @@ def subFunc(key, com, data_in, timeout):
     thread.kill()
     return output
 
+
+def evalEX(exc):
+    is_ex = False
+    try:
+        ex = eval(exc)
+    except NameError:
+        if type(exc) is bytes:
+            exc = exc.decode("utf-8")
+        ex = RuntimeError(exc[exc.index("(") + 1:exc.index(")")].strip("'"))
+    try:
+        if issubclass(ex.__class__, Exception):
+            is_ex = True
+    except AttributeError:
+        pass
+    if is_ex:
+        raise ex
+    return ex
+
+
+def funcSafe(func, *args, print_exc=False, **kwargs):
+    try:
+        return [func(*args, **kwargs)]
+    except Exception as ex:
+        if print_exc:
+            print(traceback.format_exc())
+        return repr(ex)
 
 class dynamicFunc:
     

@@ -275,15 +275,6 @@ def urlOpen(url):
     return resp
 
 
-def funcSafe(func, *args, print_exc=False, **kwargs):
-    try:
-        return [func(*args, **kwargs)]
-    except Exception as ex:
-        if print_exc:
-            print(traceback.format_exc())
-        return repr(ex)
-
-
 def logClear():
     if os.name == 'nt':
         os.system('cls')

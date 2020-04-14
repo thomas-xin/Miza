@@ -663,18 +663,11 @@ class main_data:
         resp = returns[0]
         print(resp)
         if type(resp) is str:
-            try:
-                ex = eval(resp)
-            except NameError:
-                ex = RuntimeError(resp[resp.index("(") + 1:resp.index(")")].strip("'"))
-            raise ex
-        resp = eval(resp[0].replace("\n", "").replace("\r", ""))
+            resp = evalEX(resp)
+        else:
+            resp = eval(resp[0].replace("\n", "").replace("\r", ""))
         if type(resp) is str:
-            try:
-                ex = eval(resp)
-            except NameError:
-                ex = RuntimeError(resp[resp.index("(") + 1:resp.index(")")].strip("'"))
-            raise ex
+            resp = evalEX(resp)
         return resp
 
     timeChecks = {

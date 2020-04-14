@@ -271,8 +271,9 @@ class UrbanDictionary(Command):
         while returns[0] is None:
             await asyncio.sleep(0.4)
         if type(returns[0]) is str:
-            raise eval(returns[0])
-        resp = returns[0][-1]
+            resp = evalEX(returns[0])
+        else:
+            resp = returns[0][-1]
         s = resp.content
         resp.close()
         try:

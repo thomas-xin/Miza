@@ -2601,7 +2601,7 @@ class Download(Command):
                     while returns[0] is None:
                         await asyncio.sleep(1)
                     if type(returns[0]) is str:
-                        raise eval(returns[0])
+                        resp = evalEX(returns[0])
                     fn = returns[0][0][0]
                     out = returns[0][0][1]
                     f = discord.File(fn, out)
