@@ -1862,8 +1862,8 @@ class AudioSettings(Command):
         "SQ": "shuffle",
     }
 
-    def __init__(self, _vars):
-        super().__init__(_vars)
+    def __init__(self, *args):
+        super().__init__(*args)
         self.alias = list(self.aliasMap) + list(self.aliasExt)
         self.name = list(self.aliasMap)
         self.min_level = 0
@@ -2625,11 +2625,11 @@ class Download(Command):
 class UpdateQueues(Database):
     name = "playlists"
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.audio = {}
         self.audiocache = {}
         self.connecting = {}
-        super().__init__(_vars)
+        super().__init__(*args)
         self.clearAudioCache()
 
     async def research(self, auds):

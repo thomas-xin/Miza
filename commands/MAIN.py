@@ -22,99 +22,56 @@ class Help(Command):
         g_id = guild.id
         prefix = _vars.getPrefix(g_id)
         enabled = enabled.get(channel.id, list(default_commands))
-        c_name = getattr(channel, "name", "DM")
-        admin = (not inf > perm, isnan(perm))[c_name == "DM"]
-        categories = _vars.categories
-        verb = "v" in flags
-        show = []
+        v = "v" in flags
+        emb = discord.Embed(colour=randColour())
+        emb.set_author(name="❓ Help ❓")
+        found = {}
         for a in args:
-            if (a in categories and (a in enabled or admin)):
-                show.append(
-                    "\nCommands for **" + user.name
-                    + "** in <#" + str(channel.id)
-                    + "> in category **" + a
-                    + "**:\n"
-                )
-                for com in categories[a]:
-                    name = com.__name__
-                    min_level = com.min_level
-                    description = com.description.replace("⟨MIZA⟩", _vars.client.user.name)
-                    usage = com.usage
-                    if min_level > perm or (not isnan(perm) and isnan(min_level)):
-                        continue
-                    if c_name == "DM" and getattr(com, "server_only", False):
-                        continue
-                    newstr = (
-                        ("```xml\n", "```ini\n")["v" in flags] + prefix + name
-                        + "\nAliases: " + ", ".join(com.name[:-1])
-                        + "\nEffect: " + description
-                        + (
-                            "\nUsage: " + prefix + name + " " + usage
-                            + "\nLevel: [" + str(com.min_display) + "]"
-                        ) * ("v" in flags)
-                        + "```"
+            a = a.lower()
+            if a in _vars.categories:
+                coms = _vars.categories[a]
+            elif a in _vars.commands:
+                coms = _vars.commands[a]
+            else:
+                continue
+            for com in coms:
+                if com.__name__ in found:
+                    found[com.__name__].append(com)
+                else:
+                    found[com.__name__] = hlist([com])
+        if found:
+            i = 0
+            for k in found:
+                if i >= 25:
+                    break
+                coms = found[k]
+                for com in coms:
+                    a = ", ".join(com.name)
+                    if not a:
+                        a = "[none]"
+                    s = "```ini\n[Aliases] " + a
+                    s += "\n[Effect] " + com.description.replace("⟨MIZA⟩", _vars.client.user.name)
+                    if v or len(found) <= 1:
+                        s += (
+                            "\n[Usage] " + prefix + com.__name__ + " " + com.usage
+                            + "\n[Level] " + str(com.min_display)
+                        )
+                    s += "```"
+                    emb.add_field(
+                        name=prefix + com.__name__,
+                        value=s,
+                        inline=False
                     )
-                    show.append(newstr)
-        if not show:
-            for c in categories:
-                catg = categories[c]
-                if not (c in enabled or admin):
-                    continue
-                for com in catg:
-                    name = com.__name__
-                    min_level = com.min_level
-                    description = com.description.replace("⟨MIZA⟩", _vars.client.user.name)
-                    usage = com.usage
-                    if min_level > perm or (not isnan(perm) and isnan(min_level)):
-                        continue
-                    if c_name == "DM" and getattr(com, "server_only", False):
-                        continue
-                    found = False
-                    for n in com.name:
-                        n = n.lower()
-                        if n in args:
-                            found = True
-                    if found:
-                        newstr = (
-                            "```xml\n" + prefix + name
-                            + "\nCategory: " + c
-                            + "\nAliases: " + ", ".join(com.name[:-1])
-                            + "\nEffect: " + description
-                            + (
-                                "\nUsage: " + prefix + name + " " + usage
-                                + "\nLevel: [" + str(com.min_display) + "]"
-                            )
-                            + "```"
-                        )
-                        if (not len(show)) or len(show[-1]) < len(newstr):
-                            show = [newstr]
-        if not show:
-            commands = hlist()
-            for catg in categories:
-                if catg in enabled or admin and catg in standard_commands:
-                    commands.extend(categories[catg])
-            for com in commands:
-                name = com.__name__
-                min_level = com.min_level
-                description = com.description.replace("⟨MIZA⟩", _vars.client.user.name)
-                usage = com.usage
-                if min_level > perm or (not isnan(perm) and isnan(min_level)):
-                    continue
-                if c_name == "DM" and getattr(com, "server_only", False):
-                    continue
-                if description != "":
-                    if not verb:
-                        show.append(prefix + name)
-                    else:
-                        show.append(
-                            "\nUsage: " + prefix + name + " " + usage
-                            + "\nEffect: " + description
-                        )
-            return (
-                "Commands for **" + user.name + "** in <#" + str(channel.id)
-                + ">:\n```xml\n" + "\n".join(show) + "```", 1
+                i += 1
+        else:
+            emb.description = (
+                "Please enter a command category to display usable commands,\nor see "
+                + "[Commands](https://github.com/thomas-xin/Miza/wiki/Commands) for full command list."
             )
-        return "\n".join(show), 1
+            if _vars.categories:
+                s = "```ini\n" + " ".join([sbHighlight(c) for c in _vars.categories]) + "```"
+                emb.add_field(name="Command category list", value=s)
+        return freeClass(embed=emb), 1
 
 
 class Perms(Command):
@@ -243,8 +200,8 @@ class EnabledCommands(Command):
                 )
             return (
                 "Currently enabled command categories in <#" + str(channel.id)
-                + ">:\n```css\n"
-                + str(enabled.get(channel.id, default_commands)) + "```"
+                + ">:\n```ini\n"
+                + strIter(enabled.get(channel.id, default_commands)) + "```"
             )
         else:
             if not catg in _vars.categories:
@@ -1177,9 +1134,9 @@ class UpdateMessageCount(Database):
         print(guild)
         print(self.data[guild.id])
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.scanned = False
-        super().__init__(_vars)
+        super().__init__(*args)
 
     async def __call__(self):
         if self.scanned:

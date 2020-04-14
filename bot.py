@@ -478,9 +478,12 @@ class main_data:
         u_id = int(u_id)
         if u_id in (self.owner_id, client.user.id):
             return False
-        return self.data.blacklist.get(
-            u_id, 0
-        ) >= time.time() + self.min_suspend * 86400
+        try:
+            return self.data.blacklist.get(
+                u_id, 0
+            ) >= time.time() + self.min_suspend * 86400
+        except KeyError:
+            return True
 
     def getModule(self, module):
         try:
@@ -497,17 +500,22 @@ class main_data:
             for k in vd:
                 var = vd[k]
                 if var not in (Command, Database):
+                    load_type = 0
                     try:
                         if issubclass(var, Command):
-                            obj = var(self)
-                            commands.append(obj)
-                            # print("Successfully loaded command " + obj.__name__ + ".")
+                            load_type = 1
                         elif issubclass(var, Database):
-                            obj = var(self)
-                            dataitems.append(obj)
-                            # print("Successfully loaded database " + obj.__name__ + ".")
+                            load_type = 2
                     except TypeError:
                         pass
+                    if load_type:
+                        obj = var(self, rename)
+                        if load_type == 1:
+                            commands.append(obj)
+                            print("Successfully loaded command " + obj.__name__ + ".")
+                        elif load_type == 2:
+                            dataitems.append(obj)
+                            print("Successfully loaded database " + obj.__name__ + ".")
             for u in dataitems:
                 for c in commands:
                     c.data[u.name] = u
@@ -519,9 +527,10 @@ class main_data:
     def getModules(self, reload=False):
         files = (i for i in os.listdir("commands") if iscode(i))
         self.categories = freeClass()
+        self.commands = freeClass()
         self.database = freeClass()
         self.data = freeClass()
-        totalsize = [0,0]
+        totalsize = [0, 0]
         totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
         totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p))
         self.codeSize = totalsize
@@ -1001,7 +1010,6 @@ class main_data:
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=False):
     cpy = msg
-    categories = _vars.categories
     if msg[:2] == "> ":
         msg = msg[2:]
     elif msg[:2] == "||" and msg[-2:] == "||":
@@ -1075,20 +1083,21 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         return
     run = False
     if op:
-        commands = hlist()
-        for catg in categories:
-            if catg in enabled or admin:
-                commands.extend(categories[catg])
-        for command in commands:
-            for alias in command.alias:
-                alias = alias.lower()
-                length = len(alias)
-                check = comm[:length].lower()
-                argv = comm[length:]
-                match = check == alias and (
-                    len(comm) == length or comm[length] == " " or comm[length] in "?-+"
-                )
-                if match:
+        i = len(comm)
+        for end in " ?-+":
+            if end in comm:
+                i2 = comm.index(end)
+                if i2 < i:
+                    i = i2
+        check = comm[:i].lower()
+        if check in _vars.commands:
+            for command in _vars.commands[check]:
+                if command.catg in enabled or admin:
+                    alias = command.__name__
+                    for a in command.alias:
+                        if a.lower() == check:
+                            alias = a
+                    argv = comm[i:]
                     run = True
                     print(str(user) + " (" + str(u_id) + ") issued command " + msg)
                     req = command.min_level
@@ -1189,7 +1198,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             if type(response) is list:
                                 for r in response:
                                     create_task(channel.send(r))
-                            elif type(response) is dict:
+                            elif type(response) is dict or isinstance(response, freeClass):
                                 if react:
                                     sent = await channel.send(**response)
                                 else:

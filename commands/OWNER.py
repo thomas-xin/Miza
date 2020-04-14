@@ -9,7 +9,7 @@ except ModuleNotFoundError:
 class Restart(Command):
     name = ["Shutdown"]
     min_level = nan
-    description = "Restarts or shuts down ⟨MIZA⟩"
+    description = "Restarts or shuts down ⟨MIZA⟩."
 
     async def __call__(self, channel, name, **void):
         _vars = self._vars
@@ -52,7 +52,7 @@ class Execute(Command):
     name = ["Exec", "Eval"]
     min_level = nan
     description = (
-        "Causes all messages in the current channel to be executed as python code on ⟨MIZA⟩"
+        "Causes all messages in the current channel to be executed as python code on ⟨MIZA⟩."
         + " WARNING: DO NOT ALLOW UNTRUSTED USERS TO POST IN CHANNEL."
     )
     usage = "<enable(?e)> <disable(?d)>"
@@ -107,9 +107,9 @@ class UpdateExec(Database):
     name = "exec"
     no_file = True
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.channel = freeClass(id=None)
-        super().__init__(_vars)
+        super().__init__(*args)
 
     def procFunc(self, proc, _vars):
         print(proc)
@@ -194,7 +194,7 @@ class UpdateBlacklist(Database):
     suspected = "blacklist.json"
     user = True
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.suspclear = inf
         try:
             self.lastsusp = None
@@ -220,7 +220,7 @@ class UpdateBlacklist(Database):
             print(self.lastsusp)
         except FileNotFoundError:
             pass
-        super().__init__(_vars)
+        super().__init__(*args)
 
     async def _command_(self, user, command, **void):
         if user.id not in (self._vars.client.user.id, self._vars.owner_id):

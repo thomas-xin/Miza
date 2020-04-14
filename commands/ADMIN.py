@@ -886,10 +886,10 @@ class UpdateUserLogs(Database):
 class UpdateMessageLogs(Database):
     name = "logM"
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.searched = False
         self.dc = {}
-        super().__init__(_vars)
+        super().__init__(*args)
 
     async def cacheGuild(self, guild, lim=65536):
 
@@ -1169,9 +1169,9 @@ class UpdateReacts(Database):
 class UpdateDogpiles(Database):
     name = "dogpiles"
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.msgFollow = {}
-        super().__init__(_vars)
+        super().__init__(*args)
 
     async def _nocommand_(self, text, edit, orig, message, **void):
         if message.guild is None or not orig:
@@ -1315,9 +1315,9 @@ async def getBans(_vars, guild):
 class UpdateBans(Database):
     name = "bans"
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.synced = False
-        super().__init__(_vars)
+        super().__init__(*args)
 
     async def __call__(self, **void):
         while self.busy:

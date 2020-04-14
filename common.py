@@ -333,7 +333,7 @@ class Command:
             + ", Current level: " + str(perm) + "."
         )
 
-    def __init__(self, _vars):
+    def __init__(self, _vars, catg):
         if not hasattr(self, "data"):
             self.data = freeClass()
         if not hasattr(self, "name"):
@@ -346,6 +346,13 @@ class Command:
         self.name.append(self.__name__)
         if not hasattr(self, "min_display"):
             self.min_display = self.min_level
+        for a in self.alias:
+            a = a.lower()
+            if a in _vars.commands:
+                _vars.commands[a].append(self)
+            else:
+                _vars.commands[a] = hlist([self])
+        self.catg = catg
         self._vars = _vars
         self._globals = _vars._globals
     
@@ -357,7 +364,7 @@ class Database:
     _vars = None
     name = "data"
 
-    def __init__(self, _vars):
+    def __init__(self, _vars, catg):
         name = self.name
         self.__name__ = self.__class__.__name__
         if not getattr(self, "no_file", False):
@@ -382,6 +389,7 @@ class Database:
         else:
             _vars.data[name] = self.data = freeClass()
         _vars.database[name] = self
+        self.catg = catg
         self._vars = _vars
         self.busy = self.checking = False
         self._globals = globals()

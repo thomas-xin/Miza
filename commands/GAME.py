@@ -711,12 +711,12 @@ class UpdateMathTest(Database):
     name = "mathtest"
     no_file = True
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         s = "⁰¹²³⁴⁵⁶⁷⁸⁹"
         ss = {str(i): s[i] for i in range(len(s))}
         ss["-"] = "⁻"
         self.sst = "".maketrans(ss)
-        super().__init__(_vars)
+        super().__init__(*args)
 
     def format(self, x, y, op):
         length = 6

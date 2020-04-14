@@ -8,6 +8,7 @@ except ModuleNotFoundError:
 
 
 class PapagoTrans:
+
     class PapagoOutput:
         def __init__(self, text):
             self.text = text
