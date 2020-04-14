@@ -299,7 +299,7 @@ class MathQuiz(Command):
     flags = "aed"
 
     async def __call__(self, channel, flags, argv, **void):
-        mathdb = self._vars.database["mathtest"]
+        mathdb = self._vars.database.mathtest
         if "d" in flags:
             if channel.id in mathdb.data:
                 mathdb.data.pop(channel.id)
@@ -322,8 +322,8 @@ class MimicConfig(Command):
     )
     
     async def __call__(self, _vars, user, perm, flags, args, **void):
-        mimicdb = _vars.data["mimics"]
-        update = _vars.database["mimics"].update
+        update = self.data.mimics.update
+        mimicdb = _vars.data.mimics
         m_id = "&" + str(verifyID(args.pop(0)))
         if m_id not in mimicdb:
             raise LookupError("Target mimic ID not found.")
@@ -413,14 +413,14 @@ class Mimic(Command):
     flags = "aed"
     
     async def __call__(self, _vars, message, user, perm, flags, args, argv, **void):
-        mimicdb = _vars.data["mimics"]
-        update = _vars.database["mimics"].update
+        update = self.data.mimics.update
+        mimicdb = _vars.data.mimics
         if len(args) == 1 and "d" not in flags:
             user = await _vars.fetch_user(verifyID(argv))
         mimics = mimicdb.setdefault(user.id, {})
         if not argv or (len(args) == 1 and "d" not in flags):
             if "d" in flags:
-                _vars.data["mimics"].pop(user.id)
+                mimicdb.pop(user.id)
                 update()
                 return (
                     "```css\nSuccessfully removed all webhook mimics for ["
@@ -435,7 +435,7 @@ class Mimic(Command):
                     "```ini\nNo webhook mimics currently enabled for ["
                     + noHighlight(user) + "].```"
                 )
-            key = lambda x: limStr("⟨" + ", ".join(i + ": " + (str(noHighlight(_vars.data["mimics"][i].name)), "[<@" + str(getattr(_vars.data["mimics"][i], "auto", "None")) + ">]")[bool(getattr(_vars.data["mimics"][i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
+            key = lambda x: limStr("⟨" + ", ".join(i + ": " + (str(noHighlight(mimicdb[i].name)), "[<@" + str(getattr(mimicdb[i], "auto", "None")) + ">]")[bool(getattr(mimicdb[i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
             return (
                 "Currently enabled webhook mimics for **"
                 + discord.utils.escape_markdown(str(user)) + "**: ```ini\n"
@@ -452,7 +452,7 @@ class Mimic(Command):
                     raise KeyError
                 if len(mlist):
                     m_id = mlist.pop(0)
-                    mimic = _vars.data["mimics"].pop(m_id)
+                    mimic = mimicdb.pop(m_id)
                 else:
                     mimics.pop(prefix)
                     update()
@@ -558,8 +558,8 @@ class RPSend(Command):
     usage = "<0:mimic> <1:channel> <2:string>"
 
     async def __call__(self, _vars, user, perm, args, **void):
-        mimicdb = _vars.data["mimics"]
-        update = _vars.database["mimics"].update
+        update = self.data.mimics.update
+        mimicdb = _vars.data.mimics
         mimics = mimicdb.setdefault(user.id, {})
         prefix = args.pop(0)
         c_id = verifyID(args.pop(0))
@@ -582,13 +582,13 @@ class RPSend(Command):
             m = [mimic]
         admin = not inf > perm
         try:
-            enabled = _vars.data["enabled"][channel.id]
+            enabled = _vars.data.enabled[channel.id]
         except KeyError:
             enabled = ()
         if not admin and "game" not in enabled:
             raise PermissionError("Not permitted to send into target channel.")
         for mimic in m:
-            await _vars.database["mimics"].updateMimic(mimic, guild)
+            await _vars.database.mimics.updateMimic(mimic, guild)
             name = mimic.name
             url = mimic.url
             await w.send(msg, username=name, avatar_url=url)
@@ -610,7 +610,7 @@ class UpdateMimics(Database):
             admin = not inf > perm
             if message.guild is not None:
                 try:
-                    enabled = _vars.data["enabled"][message.channel.id]
+                    enabled = _vars.data.enabled[message.channel.id]
                 except KeyError:
                     enabled = ()
             else:

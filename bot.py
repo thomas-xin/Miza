@@ -26,13 +26,13 @@ class main_data:
     savedata = "data.json"
     authdata = "auth.json"
     client = client
-    cache = {
-        "guilds": {},
-        "channels": {},
-        "users": {},
-        "messages": {},
-        "deleted": {},
-    }
+    cache = freeClass(
+        guilds={},
+        channels={},
+        users={},
+        messages={},
+        deleted={},
+    )
     deleted_user = 456226577798135808
     _globals = globals()
     python = ("python3", "python")[os.name == "nt"]
@@ -147,10 +147,10 @@ class main_data:
                 if user is None:
                     raise EOFError
             except:
-                if u_id in self.cache["users"]:
-                    return self.cache["users"][u_id]
+                if u_id in self.cache.users:
+                    return self.cache.users[u_id]
                 user = await client.fetch_user(u_id)
-        self.cache["users"][u_id] = user
+        self.cache.users[u_id] = user
         self.limitCache("users")
         return user
 
@@ -229,7 +229,7 @@ class main_data:
                     raise StopIteration
             raise EOFError
         except StopIteration:
-            self.cache["users"][u_id] = user
+            self.cache.users[u_id] = user
             self.limitCache("users")
             return user
         except EOFError:
@@ -265,10 +265,10 @@ class main_data:
             if guild is None:
                 raise EOFError
         except:
-            if g_id in self.cache["guilds"]:
-                return self.cache["guilds"][g_id]
+            if g_id in self.cache.guilds:
+                return self.cache.guilds[g_id]
             guild = await client.fetch_guild(g_id)
-        self.cache["guilds"][g_id] = guild
+        self.cache.guilds[g_id] = guild
         self.limitCache("guilds", limit=65536)
         return guild
 
@@ -282,10 +282,10 @@ class main_data:
             if channel is None:
                 raise EOFError
         except:
-            if c_id in self.cache["channels"]:
-                return self.cache["channels"][c_id]
+            if c_id in self.cache.channels:
+                return self.cache.channels[c_id]
             channel = await client.fetch_channel(c_id)
-        self.cache["channels"][c_id] = channel
+        self.cache.channels[c_id] = channel
         self.limitCache("channels")
         return channel
 
@@ -294,8 +294,8 @@ class main_data:
             m_id = int(m_id)
         except (ValueError, TypeError):
             raise TypeError("Invalid message identifier: " + str(m_id))
-        if m_id in self.cache["messages"]:
-            return self.cache["messages"][m_id]
+        if m_id in self.cache.messages:
+            return self.cache.messages[m_id]
         if channel is None:
             raise LookupError("Message data not found.")
         try:
@@ -305,7 +305,7 @@ class main_data:
             pass
         message = await channel.fetch_message(m_id)
         if message is not None:
-            self.cache["messages"][m_id] = message
+            self.cache.messages[m_id] = message
             self.limitCache("messages")
         return message
     
@@ -316,7 +316,7 @@ class main_data:
             except (ValueError, TypeError):
                 pass
             m_id = "&" + str(m_id)
-            mimic = self.data["mimics"][m_id]
+            mimic = self.data.mimics[m_id]
             return mimic
         except KeyError:
             raise LookupError("Unable to find target mimic.")
@@ -362,12 +362,12 @@ class main_data:
         return url
 
     def cacheMessage(self, message):
-        self.cache["messages"][message.id] = message
+        self.cache.messages[message.id] = message
         self.limitCache("messages")
 
     def deleteMessage(self, message):
         try:
-            self.cache["messages"].pop(message.id)
+            self.cache.messages.pop(message.id)
         except KeyError:
             pass
 
@@ -389,7 +389,7 @@ class main_data:
             except TypeError:
                 g_id = 0
         try:
-            return self.data["prefixes"][g_id]
+            return self.data.prefixes[g_id]
         except KeyError:
             return "~"
 
@@ -407,8 +407,8 @@ class main_data:
         if u_id == guild.owner_id:
             return inf
         try:
-            return self.data["perms"][guild.id][u_id]
-        except KeyError:
+            return self.data.perms[guild.id][u_id]
+        except (KeyError, TypeError):
             pass
         m = guild.get_member(u_id)
         if m is None:
@@ -430,36 +430,36 @@ class main_data:
         if role.permissions.administrator:
             return inf
         try:
-            return self.data["perms"][guild.id][role.id]
-        except KeyError:
+            return self.data.perms[guild.id][role.id]
+        except (KeyError, TypeError):
             pass
         if guild.id == role.id:
             return 0
         return -1
 
     def setPerms(self, user, guild, value):
-        perms = self.data["perms"]
+        perms = self.data.perms
         try:
             u_id = user.id
         except AttributeError:
             u_id = user
         g_perm = perms.setdefault(guild.id, {})
         g_perm.update({u_id: value})
-        self.database["perms"].update()
+        self.database.perms.update()
 
     def isDeleted(self, message):
         try:
             m_id = int(message.id)
         except AttributeError:
             m_id = int(message)
-        return self.cache["deleted"].get(m_id, False)
+        return self.cache.deleted.get(m_id, False)
 
     def logDelete(self, message, no_log=False):
         try:
             m_id = int(message.id)
         except AttributeError:
             m_id = int(message)
-        self.cache["deleted"][m_id] = no_log + 1
+        self.cache.deleted[m_id] = no_log + 1
         self.limitCache("deleted", limit=4096)
     
     async def silentDelete(self, message, exc=False, no_log=False):
@@ -468,7 +468,7 @@ class main_data:
             await message.delete()
         except:
             try:
-                self.cache["deleted"].pop(message.id)
+                self.cache.deleted.pop(message.id)
             except KeyError:
                 pass
             if exc:
@@ -478,7 +478,7 @@ class main_data:
         u_id = int(u_id)
         if u_id in (self.owner_id, client.user.id):
             return False
-        return self.data["blacklist"].get(
+        return self.data.blacklist.get(
             u_id, 0
         ) >= time.time() + self.min_suspend * 86400
 
@@ -501,11 +501,11 @@ class main_data:
                         if issubclass(var, Command):
                             obj = var(self)
                             commands.append(obj)
-                            print("Successfully loaded command " + obj.__name__ + ".")
+                            # print("Successfully loaded command " + obj.__name__ + ".")
                         elif issubclass(var, Database):
                             obj = var(self)
                             dataitems.append(obj)
-                            print("Successfully loaded database " + obj.__name__ + ".")
+                            # print("Successfully loaded database " + obj.__name__ + ".")
                     except TypeError:
                         pass
             for u in dataitems:
@@ -867,7 +867,7 @@ class main_data:
 
     async def ensureWebhook(self, channel):
         if not hasattr(self, "cw_cache"):
-            self.cw_cache = {}
+            self.cw_cache = freeClass()
         wlist = None
         if channel.id in self.cw_cache:
             if time.time() - self.cw_cache[channel.id].time > 300:
@@ -1031,8 +1031,6 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
     if g_id:
         try:
             enabled = _vars.data.enabled[c_id]
-            if enabled is None:
-                raise KeyError
         except KeyError:
             try:
                 enabled = _vars.data.enabled[c_id] = ["main", "string", "admin"]

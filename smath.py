@@ -2316,11 +2316,12 @@ class freeClass(dict):
     __len__ = lambda self: super().__len__()
     __setitem__ = lambda self, key, value: super().__setitem__(key, value)
     __setattr__ = lambda self, key, value: super().__setitem__(key, value)
-    __getitem__ = lambda self, key: super().get(key)
-    __getattr__ = lambda self, key: super().get(key)
+    __getitem__ = lambda self, key: super().__getitem__(key)
+    __getattr__ = lambda self, key: super().__getitem__(key)
     __str__ = lambda self: self.__repr__()
 
     to_dict = lambda self: dict(self)
+    to_list = lambda self: list(super().values())
 
 
 class pickled:
@@ -2384,15 +2385,15 @@ def subKill():
 
 def subFunc(key, com, data_in, timeout):
     while len(__subs__) > 256:
-        i = iter(__subs__)
+        i = iter(tuple(__subs__))
         try:
             while i:
                 k = next(i)
                 if __subs__[k].kill is not None:
                     __subs__[k].kill()
-                    __subs__.pop(next(iter(__subs__)))
+                    __subs__.pop(k)
                     break
-        except (StopIteration, KeyError):
+        except StopIteration:
             pass
     if key in __subs__:
         try:

@@ -344,7 +344,7 @@ class Command:
 
     def __init__(self, _vars):
         if not hasattr(self, "data"):
-            self.data = {}
+            self.data = freeClass()
         if not hasattr(self, "name"):
             self.name = []
         self.__name__ = self.__class__.__name__

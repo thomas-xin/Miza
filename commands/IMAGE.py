@@ -15,9 +15,9 @@ class IMG(Command):
     flags = "vraedh"
 
     async def __call__(self, flags, args, argv, guild, perm, **void):
-        update = self.data["images"].update
+        update = self.data.images.update
         _vars = self._vars
-        imglists = _vars.data["images"]
+        imglists = _vars.data.images
         images = imglists.get(guild.id, {})
         if "a" in flags or "e" in flags or "d" in flags:
             req = 2

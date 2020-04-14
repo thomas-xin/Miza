@@ -261,9 +261,9 @@ class RoleGiver(Command):
     flags = "aedx"
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
-        update = self.data["rolegivers"].update
+        update = self.data.rolegivers.update
         _vars = self._vars
-        data = _vars.data["rolegivers"]
+        data = _vars.data.rolegivers
         if "d" in flags:
             if argv:
                 react = args[0].lower()
@@ -459,14 +459,14 @@ class SaveChannel(Command):
 class Dogpile(Command):
     server_only = True
     min_level = 2
-    description = "Causes Miza to automatically imitate users when 3+ of the same messages are posted in a row."
+    description = "Causes ⟨MIZA⟩ to automatically imitate users when 3+ of the same messages are posted in a row."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
     async def __call__(self, flags, guild, **void):
-        update = self.data["dogpiles"].update
+        update = self.data.dogpiles.update
         _vars = self._vars
-        following = _vars.data["dogpiles"]
+        following = _vars.data.dogpiles
         curr = following.get(guild.id, False)
         if "d" in flags:
             if guild.id in following:
@@ -488,14 +488,14 @@ class React(Command):
     server_only = True
     name = ["AutoReact"]
     min_level = 2
-    description = "Causes Miza to automatically assign a reaction to messages containing the substring."
+    description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
     usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
     flags = "aed"
 
     async def __call__(self, _vars, flags, guild, argv, args, **void):
-        update = self.data["reacts"].update
+        update = self.data.reacts.update
         _vars = self._vars
-        following = _vars.data["reacts"]
+        following = _vars.data.reacts
         curr = following.setdefault(guild.id, {})
         if not argv:
             if "d" in flags:
@@ -541,13 +541,13 @@ class React(Command):
 class UserLog(Command):
     server_only = True
     min_level = 3
-    description = "Causes Miza to log user events from the server, in the current channel."
+    description = "Causes ⟨MIZA⟩ to log user events from the server, in the current channel."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
-        data = _vars.data["logU"]
-        update = _vars.database["logU"].update
+        data = _vars.data.logU
+        update = _vars.database.logU.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
@@ -579,13 +579,13 @@ class UserLog(Command):
 class MessageLog(Command):
     server_only = True
     min_level = 3
-    description = "Causes Miza to log message events from the server, in the current channel."
+    description = "Causes ⟨MIZA⟩ to log message events from the server, in the current channel."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
-        data = _vars.data["logM"]
-        update = _vars.database["logM"].update
+        data = _vars.data.logM
+        update = _vars.database.logM.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
@@ -617,13 +617,13 @@ class MessageLog(Command):
 class FileLog(Command):
     server_only = True
     min_level = 3
-    description = "Causes Miza to log deleted files from the server, in the current channel."
+    description = "Causes ⟨MIZA⟩ to log deleted files from the server, in the current channel."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
-        data = _vars.data["logF"]
-        update = _vars.database["logF"].update
+        data = _vars.data.logF
+        update = _vars.database.logF.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()

@@ -53,7 +53,7 @@ class customAudio(discord.AudioSource):
             self.pausec = False
             self.curr_timeout = 0
             self._vars = _vars
-            _vars.database["playlists"].audio[vc.guild.id] = self
+            _vars.database.playlists.audio[vc.guild.id] = self
         except:
             print(traceback.format_exc())
 
@@ -226,7 +226,7 @@ class customAudio(discord.AudioSource):
         guild = vc.guild
         g = guild.id
         if hasattr(self, "dead"):
-            self._vars.database["playlists"].audio.pop(g)
+            self._vars.database.playlists.audio.pop(g)
             self.loop.create_task(vc.disconnect())
             try:
                 msg = (
@@ -244,7 +244,7 @@ class customAudio(discord.AudioSource):
         if not hasattr(vc, "channel"):
             self.dead = True
             return
-        if vc.is_connected() or vc.guild.id in self._vars.database["playlists"].connecting:
+        if vc.is_connected() or vc.guild.id in self._vars.database.playlists.connecting:
             playing = self.is_playing or self.is_loading
         else:
             self.loop.create_task(self.reconnect())
@@ -281,8 +281,8 @@ class customAudio(discord.AudioSource):
                 if not e_id:
                     dels.append(i)
                     continue
-                if e_id in self._vars.database["playlists"].audiocache:
-                    e["duration"] = self._vars.database["playlists"].audiocache[e_id][-1]
+                if e_id in self._vars.database.playlists.audiocache:
+                    e["duration"] = self._vars.database.playlists.audiocache[e_id][-1]
             if len(dels) > 2:
                 q.pops(dels)
             elif dels:
@@ -297,7 +297,7 @@ class customAudio(discord.AudioSource):
                         search = e_id + ".mp3"
                         if search not in os.listdir("cache/"):
                             durc = [q[i]["duration"]]
-                            self._vars.database["playlists"].audiocache[e_id] = durc
+                            self._vars.database.playlists.audiocache[e_id] = durc
                             doParallel(
                                 ytdl.downloadSingle,
                                 [q[i], durc, self],
@@ -339,7 +339,7 @@ class customAudio(discord.AudioSource):
             elif not playing and self.source is None and not self.is_loading:
                 self.advance()
         if not (q or self.preparing):
-            t = self._vars.data["playlists"].get(guild.id, ())
+            t = self._vars.data.playlists.get(guild.id, ())
             if t:
                 d = None
                 while d is None or d["id"] == self.prev:
@@ -425,7 +425,7 @@ class customAudio(discord.AudioSource):
             self.curr_timeout = 0
         except EOFError:
             if (empty or not self.paused) and not self.is_loading:
-                queueable = (self.queue or self._vars.data["playlists"].get(self.vc.guild.id, None))
+                queueable = (self.queue or self._vars.data.playlists.get(self.vc.guild.id, None))
                 if empty and queueable and self.source is not None:
                     if time.time() - self.lastEnd > 0.5:
                         if self.reverse:
@@ -650,8 +650,8 @@ def getBitrate(filename):
 
 
 async def forceJoin(guild, channel, user, client, _vars):
-    if guild.id not in _vars.database["playlists"].audio:
-        for func in _vars.categories["voice"]:
+    if guild.id not in _vars.database.playlists.audio:
+        for func in _vars.categories.voice:
             if "join" in (name.lower() for name in func.name):
                 try:
                     await func(user=user, channel=channel)
@@ -660,7 +660,7 @@ async def forceJoin(guild, channel, user, client, _vars):
                 except AttributeError:
                     pass
     try:
-        auds = _vars.database["playlists"].audio[guild.id]
+        auds = _vars.database.playlists.audio[guild.id]
         auds.channel = channel
     except KeyError:
         raise LookupError("Voice channel not found.")
@@ -1324,9 +1324,9 @@ class Playlist(Command):
     flags = "aedv"
 
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
-        update = self.data["playlists"].update
+        update = self.data.playlists.update
         _vars = self._vars
-        pl = _vars.data["playlists"]
+        pl = _vars.data.playlists
         if argv or "d" in flags:
             req = 2
             if perm < req:
@@ -1432,7 +1432,7 @@ class Connect(Command):
             if voice is None:
                 raise LookupError("Unable to find voice channel.")
             vc_ = voice.channel
-        connecting = _vars.database["playlists"].connecting
+        connecting = _vars.database.playlists.connecting
         if vc_ is None:
             guild = channel.guild
         else:
@@ -1442,7 +1442,7 @@ class Connect(Command):
             self.permError(perm, 0, "for command " + self.name + " in " + str(guild))
         if vc_ is None:
             try:
-                auds = _vars.database["playlists"].audio[guild.id]
+                auds = _vars.database.playlists.audio[guild.id]
             except KeyError:
                 raise LookupError("Unable to find connected channel.")
             if not isAlone(auds, user) and perm < 1:
@@ -1450,7 +1450,7 @@ class Connect(Command):
             auds.dead = True
             if guild.id in connecting:
                 connecting.pop(guild.id)
-            await _vars.database["playlists"](guild=guild)
+            await _vars.database.playlists(guild=guild)
             return
         joined = False
         for vc in client.voice_clients:
@@ -1481,9 +1481,9 @@ class Connect(Command):
             if not hasattr(vc, "guild"):
                 connecting[guild.id] = False
                 raise ConnectionError("Unable to connect to voice channel.")
-        if guild.id not in _vars.database["playlists"].audio:
+        if guild.id not in _vars.database.playlists.audio:
             await channel.trigger_typing()
-            _vars.database["playlists"].audio[guild.id] = auds = customAudio(channel, vc, _vars)
+            _vars.database.playlists.audio[guild.id] = auds = customAudio(channel, vc, _vars)
             await auds._init_()
         try:
             joined = connecting.pop(guild.id)
@@ -1497,7 +1497,7 @@ class Connect(Command):
                 create_task(user.edit(mute=False, deafen=False))
                 break
         if joined:
-            await _vars.database["playlists"](guild=guild)
+            await _vars.database.playlists(guild=guild)
             return (
                 "```css\n🎵 Successfully connected to [" + noHighlight(vc_.name)
                 + "] in [" + noHighlight(guild.name) + "]. 🎵```", 1
@@ -1514,9 +1514,9 @@ class Skip(Command):
     flags = "fhv"
 
     async def __call__(self, client, user, perm, _vars, name, args, argv, guild, flags, message, **void):
-        if guild.id not in _vars.database["playlists"].audio:
+        if guild.id not in _vars.database.playlists.audio:
             raise LookupError("Currently not playing in a voice channel.")
-        auds = _vars.database["playlists"].audio[guild.id]
+        auds = _vars.database.playlists.audio[guild.id]
         if name.lower().startswith("c"):
             argv = "inf"
             args = [argv]
@@ -1678,7 +1678,7 @@ class Pause(Command):
             auds.pausec = False
         if auds.player is not None:
             auds.player["time"] = 1 + time.time()
-        await _vars.database["playlists"](guild=guild)
+        await _vars.database.playlists(guild=guild)
         if "h" not in flags:
             past = name + "pe" * (name == "stop") + "d"
             return (
@@ -1920,9 +1920,9 @@ class AudioSettings(Command):
                     + strIter(d, key=key) + "```"
                 )
             if op == "nightcore":
-                orig = _vars.database["playlists"].audio[guild.id].stats["pitch"]
+                orig = _vars.database.playlists.audio[guild.id].stats["pitch"]
             else:
-                orig = _vars.database["playlists"].audio[guild.id].stats[op]
+                orig = _vars.database.playlists.audio[guild.id].stats[op]
             num = round(100 * orig, 9)
             return (
                 "```css\nCurrent audio " + op
@@ -1946,13 +1946,13 @@ class AudioSettings(Command):
         s = ""
         for op in ops:
             if type(op) is str and op in "loop shuffle quiet" and not argv:
-                argv = str(not _vars.database["playlists"].audio[guild.id].stats[op])
+                argv = str(not _vars.database.playlists.audio[guild.id].stats[op])
             if disable:
                 val = auds.defaults[op]
                 if type(val) is not bool:
                     val *= 100
                 argv = str(val)
-            origVol = _vars.database["playlists"].audio[guild.id].stats
+            origVol = _vars.database.playlists.audio[guild.id].stats
             _op = None
             for operator in ("+=", "-=", "*=", "/=", "%="):
                 if argv.startswith(operator):
@@ -2205,10 +2205,10 @@ class Player(Command):
     async def _callback_(self, message, guild, channel, reaction, _vars, perm, vals, **void):
         if message is None:
             return
-        if not guild.id in _vars.database["playlists"].audio:
+        if not guild.id in _vars.database.playlists.audio:
             await message.clear_reactions()
             return
-        auds = _vars.database["playlists"].audio[guild.id]
+        auds = _vars.database.playlists.audio[guild.id]
         if reaction is None:
             auds.player = {
                 "time": inf,
