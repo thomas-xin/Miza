@@ -946,8 +946,9 @@ class videoDownloader:
         try:
             self.requests += 1
             print(item)
-            self.searched[item] = freeClass(t=time.time())
-            self.searched[item].data = output = self.extract(item, force)
+            obj = freeClass(t=time.time())
+            obj.data = output = self.extract(item, force)
+            self.searched[item] = obj
             self.requests = max(self.requests - 1, 0)
             return output
         except Exception as ex:
@@ -1052,13 +1053,14 @@ class videoDownloader:
             data = self.downloader.extract_info(item, download=False, process=True)
             if "entries" in data:
                 data = data["entries"][-1]
-            self.searched[item] = freeClass(t=time.time())
-            self.searched[item].data = data = [{
+            obj = freeClass(t=time.time())
+            obj.data = data = [{
                 "id": data["id"],
                 "name": data["title"],
                 "duration": data["duration"],
                 "url": data["webpage_url"],
             }]
+            self.searched[item] = obj
             it = data[-1]
             i["name"] = it["name"]
             i["duration"] = it["duration"]
@@ -2495,14 +2497,16 @@ class Download(Command):
             argv = verifySearch(argv)
             res = []
             if isURL(argv):
+                argv = await _vars.followURL(argv)
                 returns = [None]
                 doParallel(funcSafe, [ytdl.extract, argv], returns, kwargs={"print_exc": True})
                 while returns[0] is None:
                     await asyncio.sleep(0.4)
                 if returns[0]:
                     if type(returns[0]) is str:
-                        raise eval(returns[0])
-                    data = returns[0][0]
+                        data = evalEX(returns[0])
+                    else:
+                        data = returns[0][0]
                     res += data
             if not res:
                 sc = min(4, flags.get("v", 0) + 1)
