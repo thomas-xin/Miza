@@ -680,13 +680,13 @@ class videoDownloader:
     opener = urlBypass()
     
     ydl_opts = {
+        # "verbose": 1,
         "quiet": 1,
         "format": "bestaudio/best",
-        "call_home": 1,
+        "no_call_home": 1,
         "nooverwrites": 1,
         "noplaylist": 1,
         "ignoreerrors": 0,
-        "source_address": "0.0.0.0",
         "default_search": "auto",
     }
 
@@ -2794,12 +2794,22 @@ class UpdateQueues(Database):
                         if (dt - discord.utils.snowflake_time(snow)).total_seconds() < 3600:
                             continue
                 elif ".mp3" in path or ".part" in path:
-                    key = path.replace(".mp3", "").replace(".part", "")
+                    try:
+                        i1 = path.index(".mp3")
+                    except ValueError:
+                        i1 = len(path)
+                    try:
+                        i2 = path.index(".part")
+                    except ValueError:
+                        i2 = len(path)
+                    key = path[:min(i1, i2)]
                     if key in self.cached_items:
                         if time.time() - self.cached_items[key] < 3600:
                             continue
                     try:
-                        os.remove("cache/" + path)
+                        fn = "cache/" + path
+                        print("Deleting " + fn + "...")
+                        os.remove(fn)
                         self.audiocache.pop(key)
                     except (KeyError, PermissionError, FileNotFoundError):
                         pass

@@ -435,7 +435,7 @@ class AutoRole(Command):
             for member in guild.members:
                 role = random.choice(roles)
                 if role not in member.roles:
-                    create_task(member.add_roles(role, reason="InstaRole"))
+                    create_task(member.add_roles(role, reason="InstaRole", atomic=True))
                     if not i % 5:
                         await asyncio.sleep(5)
                     i += 1
@@ -1163,7 +1163,7 @@ class UpdateRolegivers(Database):
         user = message.author
         guild = message.guild
         _vars = self._vars
-        assigned = self.data.get(message.channel.id, {})
+        assigned = self.data.get(message.channel.id, ())
         for k in assigned:
             if ((k in text) if hasSymbol(k) else (k in message.content.lower())):
                 alist = assigned[k]
@@ -1201,7 +1201,7 @@ class UpdateAutoRoles(Database):
                 except:
                     print(traceback.format_exc())
             print(roles)
-            await user.add_roles(*roles, reason="AutoRole")
+            await user.add_roles(*roles, reason="AutoRole", atomic=False)
 
 
 class UpdateRolePreservers(Database):

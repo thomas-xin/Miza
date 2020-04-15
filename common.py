@@ -73,7 +73,7 @@ def getLineCount(fn):
 
 def iscode(fn):
     fn = str(fn)
-    return fn.endswith(".py") or fn.endswith(".pyw")# or fn.endswith(".c") or fn.endswith(".cpp")
+    return fn.endswith(".py") or fn.endswith(".pyw") # or fn.endswith(".c") or fn.endswith(".cpp")
 
 
 class returns:
@@ -84,16 +84,16 @@ class returns:
     __call__ = lambda self: self.data
     __bool__ = lambda self: self.data is not None
 
-async def parasync(coro, returns):
+async def parasync(coro, rets):
     try:
         resp = await coro
-        returns.data = returns(resp)
+        rets.data = returns(resp)
     except Exception as ex:
-        returns.data = repr(ex)
+        rets.data = repr(ex)
     return returns()
 
 async def recursiveCoro(item):
-    returns = hlist()
+    rets = hlist()
     for i in range(len(item)):
         try:
             if type(item[i]) in (str, bytes, dict) or isinstance(item[i], freeClass):
@@ -102,22 +102,22 @@ async def recursiveCoro(item):
         except TypeError:
             pass
         if type(item[i]) is tuple:
-            returns.append(returns())
-            create_task(parasync(recursiveCoro(item[i]), returns[-1]))
+            rets.append(returns())
+            create_task(parasync(recursiveCoro(item[i]), rets[-1]))
         elif asyncio.iscoroutine(item[i]):
-            returns.append(returns())
-            create_task(parasync(item[i], returns[-1]))
+            rets.append(returns())
+            create_task(parasync(item[i], rets[-1]))
         else:
-            returns.append(returns(item[i]))
+            rets.append(returns(item[i]))
     full = False
     while not full:
         full = True
-        for i in returns:
+        for i in rets:
             if not i:
                 full = False
         await asyncio.sleep(0.2)
     output = hlist()
-    for i in returns:
+    for i in rets:
         while isinstance(i, returns):
             i = i()
         output.append(i)
