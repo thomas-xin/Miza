@@ -73,14 +73,14 @@ class customAudio(discord.AudioSource):
         )
 
     def new(self, source=None, pos=0, update=True):
-        self.reverse = self.stats["speed"] < 0
-        self.speed = abs(self.stats["speed"])
+        self.reverse = self.stats.speed < 0
+        self.speed = abs(self.stats.speed)
         if self.speed < 0.005:
             self.speed = 1
             self.paused |= 2
         else:
             self.paused &= -3
-        self.stats["position"] = pos
+        self.stats.position = pos
         self.is_playing = source is not None
         orig_source = getattr(self, "source", None)
         if orig_source is not None and type(orig_source) is not str:
@@ -89,14 +89,14 @@ class customAudio(discord.AudioSource):
             except:
                 print(traceback.format_exc())
         if source is not None:
-            if not isValid(self.stats["pitch"] * self.stats["speed"] * self.stats["chorus"]):
+            if not isValid(self.stats.pitch * self.stats.speed * self.stats.chorus):
                 self.source = None
                 self.file = None
                 return
-            d = {"source": source}
-            pitchscale = 2 ** (self.stats["pitch"] / 12)
-            chorus = min(16, abs(self.stats["chorus"]))
-            if pitchscale != 1 or self.stats["speed"] != 1:
+            d = freeClass(source=source)
+            pitchscale = 2 ** (self.stats.pitch / 12)
+            chorus = min(16, abs(self.stats.chorus))
+            if pitchscale != 1 or self.stats.speed != 1:
                 speed = round(self.speed / pitchscale, 9)
                 if speed != 1:
                     speed = max(0.005, speed)
@@ -112,29 +112,29 @@ class customAudio(discord.AudioSource):
                         opts += "atempo=0.5,"
                         speed /= 0.5
                     opts += "atempo=" + str(speed)
-                    d["options"] = "-af " + opts
+                    d.options = "-af " + opts
                 else:
-                    d["options"] = "-af "
+                    d.options = "-af "
             else:
-                d["options"] = ""
+                d.options = ""
             if pitchscale != 1:
                 if abs(pitchscale) > 2147483647:
                     self.source = None
                     self.file = None
                     return
                 #br = getBitrate(source)
-                if d["options"] and d["options"][-1] != " ":
-                    d["options"] += ","
-                d["options"] += "asetrate=r=" + str(48000 * pitchscale)
+                if d.options and d.options[-1] != " ":
+                    d.options += ","
+                d.options += "asetrate=r=" + str(48000 * pitchscale)
             if self.reverse:
-                if d["options"] and d["options"][-1] != " ":
-                    d["options"] += ","
-                d["options"] += "areverse"
+                if d.options and d.options[-1] != " ":
+                    d.options += ","
+                d.options += "areverse"
             if chorus:
-                if not d["options"]:
-                    d["options"] = "-af "
+                if not d.options:
+                    d.options = "-af "
                 else:
-                    d["options"] += ","
+                    d.options += ","
                 A = ""
                 B = ""
                 C = ""
@@ -142,7 +142,7 @@ class customAudio(discord.AudioSource):
                 for i in range(ceil(chorus)):
                     neg = ((i & 1) << 1) - 1
                     i = 1 + i >> 1
-                    i *= self.stats["chorus"] / ceil(chorus)
+                    i *= self.stats.chorus / ceil(chorus)
                     if i:
                         A += "|"
                         B += "|"
@@ -157,19 +157,19 @@ class customAudio(discord.AudioSource):
                     depth = (i * 0.43 * neg) % 4 + 0.5
                     D += str(round(depth, 3))
                 b = 0.5 / sqrt(ceil(chorus + 1))
-                d["options"] += (
+                d.options += (
                     "\"chorus=0.5:" + str(round(b, 3)) + ":"
                     + A + ":"
                     + B + ":"
                     + C + ":"
                     + D + "\""
                 )
-            d["options"] = d["options"].strip(" ")
+            d.options = d.options.strip(" ")
             if pos != 0:
                 if self.reverse:
-                    d["before_options"] = "-to " + str(pos)
+                    d.before_options = "-to " + str(pos)
                 else:
-                    d["before_options"] = "-ss " + str(pos)
+                    d.before_options = "-ss " + str(pos)
             print(d)
             self.is_loading = True
             self.source = discord.FFmpegPCMAudio(**d)
@@ -179,12 +179,12 @@ class customAudio(discord.AudioSource):
             self.source = None
             self.file = None
         self.is_loading = False
-        self.stats["position"] = pos
+        self.stats.position = pos
         if pos == 0:
             if self.reverse and len(self.queue):
-                self.stats["position"] = float(self.queue[0]["duration"])
+                self.stats.position = float(self.queue[0]["duration"])
         if self.source is not None and self.player:
-            self.player["time"] = 1 + time.time()
+            self.player.time = 1 + time.time()
         if update:
             self.update()
 
@@ -196,29 +196,29 @@ class customAudio(discord.AudioSource):
             self.update()
             return duration
         self.new(self.file, pos)
-        self.stats["position"] = pos
-        return self.stats["position"]
+        self.stats.position = pos
+        return self.stats.position
 
     def advance(self, looped=True, shuffled=True):
         q = self.queue
         if q:
-            if self.stats["loop"]:
+            if self.stats.loop:
                 temp = q[0]
             self.prev = q[0]["id"]
             q.popleft()
-            if shuffled and self.stats["shuffle"]:
+            if shuffled and self.stats.shuffle:
                 if len(q) > 1:
                     temp = q.popleft()
                     shuffle(q)
                     q.appendleft(temp)
-            if self.stats["loop"] and looped:
+            if self.stats.loop and looped:
                 temp["id"] = temp["id"]
                 if "download" in temp:
                     temp.pop("download")
                 q.append(temp)
             self.queue = q
         if self.player:
-            self.player["time"] = 1 + time.time()
+            self.player.time = 1 + time.time()
 
     def update(self, *void1, **void2):
         if not hasattr(self, "lastsent"):
@@ -330,7 +330,7 @@ class customAudio(discord.AudioSource):
                     name = q[0]["name"]
                     added_by = q[0]["added by"]
                     self.new(path)
-                    if not self.stats["quiet"]:
+                    if not self.stats.quiet:
                         if time.time() - self.lastsent > 1:
                             msg = (
                                 "```ini\n🎵 Now playing ["
@@ -372,26 +372,26 @@ class customAudio(discord.AudioSource):
 
     async def updatePlayer(self):
         curr = self.player
-        self.stats["quiet"] &= -3
+        self.stats.quiet &= -3
         if curr is not None:
-            if curr["type"]:
-                self.stats["quiet"] |= 2
+            if curr.type:
+                self.stats.quiet |= 2
             try:
-                if not curr["message"].content:
+                if not curr.message.content:
                     raise EOFError
             except:
                 self.player = None
                 print(traceback.format_exc())
-            if time.time() > curr["time"]:
-                curr["time"] = inf
+            if time.time() > curr.time:
+                curr.time = inf
                 try:
-                    await self._vars.reactCallback(curr["message"], "❎", self._vars.client.user)
+                    await self._vars.reactCallback(curr.message, "❎", self._vars.client.user)
                 except discord.NotFound:
                     self.player = None
                     print(traceback.format_exc())
-        q = self.stats["quiet"]
+        q = self.stats.quiet
         if q == bool(q):
-            self.stats["quiet"] = bool(q)
+            self.stats.quiet = bool(q)
 
     async def reconnect(self):
         try:
@@ -427,8 +427,8 @@ class customAudio(discord.AudioSource):
             except:
                 empty = True
                 raise EOFError
-            self.stats["position"] = round(
-                self.stats["position"] + self.speed / 50 * (self.reverse * -2 + 1),
+            self.stats.position = round(
+                self.stats.position + self.speed / 50 * (self.reverse * -2 + 1),
                 4,
             )
             self.is_playing = True
@@ -439,9 +439,9 @@ class customAudio(discord.AudioSource):
                 if empty and queueable and self.source is not None:
                     if time.time() - self.lastEnd > 0.5:
                         if self.reverse:
-                            ended = self.stats["position"] <= 0
+                            ended = self.stats.position <= 0
                         else:
-                            ended = self.stats["position"] >= float(self.queue[0]["duration"]) - 1
+                            ended = self.stats.position >= float(self.queue[0]["duration"]) - 1
                         if self.curr_timeout and time.time() - self.curr_timeout > 1 or ended:
                             self.lastEnd = time.time()
                             self.new()
@@ -453,11 +453,11 @@ class customAudio(discord.AudioSource):
             temp = numpy.zeros(self.length, numpy.uint16).tobytes()
             # print(traceback.format_exc())
         try:
-            volume = self.stats["volume"]
-            reverb = self.stats["reverb"]
-            pitch = self.stats["pitch"]
-            bassboost = self.stats["bassboost"]
-            chorus = self.stats["chorus"]
+            volume = self.stats.volume
+            reverb = self.stats.reverb
+            pitch = self.stats.pitch
+            bassboost = self.stats.bassboost
+            chorus = self.stats.chorus
             # detune = self.stats["detune"]
             delay = 16
             if volume == 1 and reverb == pitch == bassboost == chorus == 0: # detune == 0:
@@ -591,7 +591,7 @@ class customAudio(discord.AudioSource):
 
 
 async def createPlayer(auds, p_type=0, verbose=False):
-    auds.stats["quiet"] |= 2 * p_type
+    auds.stats.quiet |= 2 * p_type
     text = (
         "```" + "\n" * verbose + "callback-voice-player-" + str(int(bool(p_type)))
         + "\nInitializing virtual audio player...```"
@@ -1127,9 +1127,9 @@ class Queue(Command):
 
     async def __call__(self, _vars, client, user, perm, message, channel, guild, flags, name, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        if auds.stats["quiet"] & 2:
+        if auds.stats.quiet & 2:
             flags.setdefault("h", 1)
-        elapsed = auds.stats["position"]
+        elapsed = auds.stats.position
         q = auds.queue
         if not argv:
             if message.attachments:
@@ -1140,7 +1140,7 @@ class Queue(Command):
                 auds.paused &= -2
                 auds.pausec = False
                 auds.preparing = False
-                if auds.stats["position"] <= 0:
+                if auds.stats.position <= 0:
                     if auds.queue and "download" in auds.queue[0]:
                         auds.queue[0].pop("download")
                 auds.update()
@@ -1149,7 +1149,7 @@ class Queue(Command):
                 auds.preparing = False
                 auds.update()
                 return "```ini\nQueue for [" + noHighlight(guild.name) + "] is currently empty. ```", 1
-            if auds.stats["loop"]:
+            if auds.stats.loop:
                 totalTime = inf
             else:
                 if auds.reverse and len(auds.queue):
@@ -1208,7 +1208,7 @@ class Queue(Command):
                 if estim > 0:
                     curr += "Time until playing: "
                     estimate = sec2Time(estim / auds.speed)
-                    if i <= 1 or not auds.stats["shuffle"]:
+                    if i <= 1 or not auds.stats.shuffle:
                         curr += "[" + estimate + "]"
                     else:
                         curr += "{" + estimate + "}"
@@ -1230,7 +1230,7 @@ class Queue(Command):
                         text=uniStr("And ", 1) + str(len(q) - i) + uniStr(" more...", 1),
                     )
                     break
-                if i <= 1 or not auds.stats["shuffle"]:
+                if i <= 1 or not auds.stats.shuffle:
                     currTime += float(e["duration"])
                 if not 1 + i & 4095:
                     await asyncio.sleep(0.3)
@@ -1291,7 +1291,7 @@ class Queue(Command):
                 total_duration += elapsed - float(q[0]["duration"])
             else:
                 total_duration -= elapsed
-            if auds.stats["shuffle"]:
+            if auds.stats.shuffle:
                 added = shuffle(added)
             auds.queue.extend(added)
             tdur = float(dur / 128 + frand(0.5) + 2)
@@ -1680,7 +1680,7 @@ class Pause(Command):
         if name in ("pause", "stop"):
             if not isAlone(auds, user) and perm < 1:
                 self.permError(perm, 1, "to " + name + " while other users are in voice")
-        elif auds.stats["position"] <= 0:
+        elif auds.stats.position <= 0:
             if auds.queue and "download" in auds.queue[0]:
                 auds.queue[0].pop("download")
         if name == "stop":
@@ -1689,7 +1689,7 @@ class Pause(Command):
             auds.paused = name in ("pause", "stop")
             auds.pausec = False
         if auds.player is not None:
-            auds.player["time"] = 1 + time.time()
+            auds.player.time = 1 + time.time()
         await _vars.database.playlists(guild=guild)
         if "h" not in flags:
             past = name + "pe" * (name == "stop") + "d"
@@ -1711,7 +1711,7 @@ class Seek(Command):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to seek while other users are in voice")
-        orig = auds.stats["position"]
+        orig = auds.stats.position
         expr = argv
         _op = None
         for operator in ("+=", "-=", "*=", "/=", "%="):
@@ -1723,7 +1723,7 @@ class Seek(Command):
             num = eval(str(orig) + _op + str(num), {}, infinum)
         pos = auds.seek(num)
         if auds.player is not None:
-            auds.player["time"] = 1 + time.time()
+            auds.player.time = 1 + time.time()
         if "h" not in flags:
             return (
                 "```css\nSuccessfully moved audio position to ["
@@ -1740,7 +1740,7 @@ def getDump(auds):
                 + " > " + str(lim) + ")."
             )
         q = [dict(e) for e in auds.queue if random.random() < 0.99 or not time.sleep(0.01)]
-        s = copy.deepcopy(auds.stats)
+        s = dict(**auds.stats)
         i = 1
         for e in q:
             if "download" in e:
@@ -1808,20 +1808,20 @@ class Dump(Command):
             e["u_id"] = user.id
             e["skips"] = []
         if auds.player is not None:
-            auds.player["time"] = 1 + time.time()
-        if auds.stats["shuffle"]:
+            auds.player.time = 1 + time.time()
+        if auds.stats.shuffle:
             shuffle(q)
+        for k in d["stats"]:
+            if k not in auds.stats:
+                d["stats"].pop(k)
+            if k in "loop shuffle quiet":
+                d["stats"][k] = bool(d["stats"][k])
+            else:
+                d["stats"][k] = float(d["stats"][k])
         if "a" not in flags:
             auds.new()
             auds.preparing = True
             auds.queue = hlist(q)
-            for k in d["stats"]:
-                if k not in auds.stats:
-                    d["stats"].pop(k)
-                if k in "loop shuffle quiet":
-                    d["stats"][k] = bool(d["stats"][k])
-                else:
-                    d["stats"][k] = float(d["stats"][k])
             auds.stats.update(d["stats"])
             auds.update()
             if not "h" in flags:
@@ -1883,8 +1883,8 @@ class AudioSettings(Command):
             + " <nightcore(?n)> <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)> <hide(?h)>"
         )
         self.flags = "vspbrcnlxqdh"
-        self.map = {k.lower():self.aliasMap[k] for k in self.aliasMap}
-        addDict(self.map, {k.lower():self.aliasExt[k] for k in self.aliasExt})
+        self.map = {k.lower(): self.aliasMap[k] for k in self.aliasMap}
+        addDict(self.map, {k.lower(): self.aliasExt[k] for k in self.aliasExt})
         super().__init__(*args)
 
     async def __call__(self, client, channel, user, guild, _vars, flags, name, argv, perm, **void):
@@ -1932,7 +1932,7 @@ class AudioSettings(Command):
                     + strIter(d, key=key) + "```"
                 )
             if op == "nightcore":
-                orig = _vars.database.playlists.audio[guild.id].stats["pitch"]
+                orig = _vars.database.playlists.audio[guild.id].stats.pitch
             else:
                 orig = _vars.database.playlists.audio[guild.id].stats[op]
             num = round(100 * orig, 9)
@@ -1946,7 +1946,7 @@ class AudioSettings(Command):
             self.permError(perm, 1, "to modify audio settings while other users are in voice")
         if not ops:
             if disable:
-                pos = auds.stats["position"]
+                pos = auds.stats.position
                 auds.stats = dict(auds.defaults)
                 auds.new(auds.file, pos)
                 return (
@@ -1972,7 +1972,7 @@ class AudioSettings(Command):
                     _op = operator[0]
             num = await _vars.evalMath(argv, guild.id)
             if op == "nightcore":
-                orig = round(origVol["pitch"] * 100, 9)
+                orig = round(origVol.pitch * 100, 9)
             else:
                 orig = round(origVol[op] * 100, 9)
             if _op is not None:
@@ -1983,12 +1983,12 @@ class AudioSettings(Command):
                 origVol[op] = new = bool(val)
                 orig = bool(orig)
             elif op == "nightcore":
-                origVol["speed"] = 2 ** (val / 12)
-                origVol["pitch"] = val
+                origVol.speed = 2 ** (val / 12)
+                origVol.pitch = val
             else:
                 origVol[op] = val
             if op in "speed pitch chorus nightcore":
-                auds.new(auds.file, auds.stats["position"])
+                auds.new(auds.file, auds.stats.position)
             s += (
                 "\nChanged audio " + str(op)
                 + " state" * (type(orig) is bool)
@@ -2147,14 +2147,14 @@ class Player(Command):
             output += skips * "🚫"
         else:
             output = "Queue is currently empty. "
-        if auds.stats["loop"]:
+        if auds.stats.loop:
             output += "🔄"
-        if auds.stats["shuffle"]:
+        if auds.stats.shuffle:
             output += "🔀"
-        if auds.stats["quiet"]:
+        if auds.stats.quiet:
             output += "🔕"
         output += "\n"
-        v = abs(auds.stats["volume"])
+        v = abs(auds.stats.volume)
         if v == 0:
             output += "🔇"
         if v <= 0.5:
@@ -2165,7 +2165,7 @@ class Player(Command):
             output += "📢"
         else:
             output += "🌪️"
-        b = auds.stats["bassboost"]
+        b = auds.stats.bassboost
         if abs(b) > 1 / 3:
             if abs(b) > 5:
                 output += "💥"
@@ -2173,36 +2173,36 @@ class Player(Command):
                 output += "🥁"
             else:
                 output += "🎻"
-        r = auds.stats["reverb"]
+        r = auds.stats.reverb
         if r:
             if abs(r) >= 1:
                 output += "📈"
             else:
                 output += "📉"
-        c = auds.stats["chorus"]
+        c = auds.stats.chorus
         if c:
             output += "📊"
-        s = auds.stats["speed"]
+        s = auds.stats.speed
         if s < 0:
             output += "⏪"
         elif s > 1:
             output += "⏩"
         elif s > 0 and s < 1:
             output += "🐌"
-        p = auds.stats["pitch"]
+        p = auds.stats.pitch
         if p > 0:
             output += "⏫"
         elif p < 0:
             output += "⏬"
         output += "\n"
-        if auds.paused or not auds.stats["speed"]:
+        if auds.paused or not auds.stats.speed:
             output += "⏸️"
-        elif auds.stats["speed"] > 0:
+        elif auds.stats.speed > 0:
             output += "▶️"
         else:
             output += "◀️"
         if q:
-            p = [auds.stats["position"], float(q[0]["duration"])]
+            p = [auds.stats.position, float(q[0]["duration"])]
         else:
             p = [0, 0.25]
         output += (
@@ -2222,25 +2222,25 @@ class Player(Command):
             return
         auds = _vars.database.playlists.audio[guild.id]
         if reaction is None:
-            auds.player = {
-                "time": inf,
-                "message": message,
-                "type": int(vals),
-                "events": 0,
-            }
-            if auds.player["type"]:
-                auds.stats["quiet"] |= 2
-        elif auds.player is None or auds.player["message"].id != message.id:
+            auds.player = freeClass(
+                time=inf,
+                message=message,
+                type=int(vals),
+                events=0,
+            )
+            if auds.player.type:
+                auds.stats.quiet |= 2
+        elif auds.player is None or auds.player.message.id != message.id:
             await message.clear_reactions()
             return
         if perm < 1:
             return
         orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]) + "\n"
-        if reaction is None and auds.player["type"]:
+        if reaction is None and auds.player.type:
             for b in self.buttons:
                 await message.add_reaction(b.decode("utf-8"))
         else:
-            if not auds.player["type"]:
+            if not auds.player.type:
                 emoji = bytes()
             elif type(reaction) is bytes:
                 emoji = reaction
@@ -2256,9 +2256,9 @@ class Player(Command):
                 if i == 0:
                     auds.paused ^= 1
                 elif i == 1:
-                    auds.stats["loop"] = bool(auds.stats["loop"] ^ 1)
+                    auds.stats.loop = bool(auds.stats.loop ^ 1)
                 elif i == 2:
-                    auds.stats["shuffle"] = bool(auds.stats["shuffle"] ^ 1)
+                    auds.stats.shuffle = bool(auds.stats.shuffle ^ 1)
                 elif i == 3 or i == 4:
                     if i == 3:
                         pos = 0
@@ -2269,48 +2269,48 @@ class Player(Command):
                     if pos:
                         return
                 elif i == 5:
-                    v = abs(auds.stats["volume"])
+                    v = abs(auds.stats.volume)
                     if v < 0.25 or v >= 2:
                         v = 1 / 3
                     elif v < 1:
                         v = 1
                     else:
                         v = 2
-                    auds.stats["volume"] = v
+                    auds.stats.volume = v
                 elif i == 6:
-                    b = auds.stats["bassboost"]
+                    b = auds.stats.bassboost
                     if abs(b) < 1 / 3:
                         b = 1
                     elif b < 0:
                         b = 0
                     else:
                         b = -1
-                    auds.stats["bassboost"] = b
+                    auds.stats.bassboost = b
                 elif i == 7:
-                    r = auds.stats["reverb"]
+                    r = auds.stats.reverb
                     if r:
                         r = 0
                     else:
                         r = 0.5
-                    auds.stats["reverb"] = r
+                    auds.stats.reverb = r
                 elif i == 8:
-                    c = abs(auds.stats["chorus"])
+                    c = abs(auds.stats.chorus)
                     if c:
                         c = 0
                     else:
                         c = 1 / 3
-                    auds.stats["chorus"] = c
-                    auds.new(auds.file, auds.stats["position"])
+                    auds.stats.chorus = c
+                    auds.new(auds.file, auds.stats.position)
                 elif i == 9 or i == 10:
                     s = (i * 2 - 19) * 2 / 11
-                    auds.stats["speed"] = round(auds.stats["speed"] + s, 5)
-                    auds.new(auds.file, auds.stats["position"])
+                    auds.stats.speed = round(auds.stats.speed + s, 5)
+                    auds.new(auds.file, auds.stats.position)
                 elif i == 11 or i == 12:
                     p = i * 2 - 23
-                    auds.stats["pitch"] -= p
-                    auds.new(auds.file, auds.stats["position"])
+                    auds.stats.pitch -= p
+                    auds.new(auds.file, auds.stats.position)
                 elif i == 13:
-                    pos = auds.stats["position"]
+                    pos = auds.stats.position
                     auds.stats = dict(auds.defaults)
                     auds.new(auds.file, pos)
                 elif i == 14:
@@ -2324,38 +2324,38 @@ class Player(Command):
                     return
         text = limStr(orig + self.showCurr(auds) + "```", 2000)
         last = message.channel.last_message
-        if last is not None and (auds.player["type"] or message.id == last.id):
-            auds.player["events"] += 1
+        if last is not None and (auds.player.type or message.id == last.id):
+            auds.player.events += 1
             await message.edit(
                 content=text,
             )
         else:
-            auds.player["time"] = inf
-            auds.player["events"] += 2
+            auds.player.time = inf
+            auds.player.events += 2
             channel = message.channel
             temp = message
             message = await channel.send(
                 content=text,
             )
-            auds.player["message"] = message
+            auds.player.message = message
             await _vars.silentDelete(temp, no_log=True)
         if auds.queue and not auds.paused & 1:
-            maxdel = float(auds.queue[0]["duration"]) - auds.stats["position"] + 2
-            delay = min(maxdel, float(auds.queue[0]["duration"]) / self.barsize / abs(auds.stats["speed"]))
+            maxdel = float(auds.queue[0]["duration"]) - auds.stats.position + 2
+            delay = min(maxdel, float(auds.queue[0]["duration"]) / self.barsize / abs(auds.stats.speed))
             if delay > 20:
                 delay = 20
             elif delay < 6:
                 delay = 6
         else:
             delay = inf
-        auds.player["time"] = time.time() + delay
+        auds.player.time = time.time() + delay
 
     async def __call__(self, guild, channel, user, client, _vars, flags, perm, **void):
         auds = await forceJoin(channel.guild, channel, user, client, _vars)
-        if "c" in flags or auds.stats["quiet"] & 2:
+        if "c" in flags or auds.stats.quiet & 2:
             req = 3
             if perm < req:
-                if auds.stats["quiet"] & 2:
+                if auds.stats.quiet & 2:
                     if "d" in flags:
                         reason = "delete"
                     else:
@@ -2704,16 +2704,16 @@ class UpdateQueues(Database):
             auds = self.audio[channel.guild.id]
             if auds.player is not None and channel.id == auds.channel.id:
                 t = time.time() + 10
-                if auds.player["time"] < t:
-                    auds.player["time"] = t
+                if auds.player.time < t:
+                    auds.player.time = t
 
     async def _send_(self, message, **void):
         if message.guild.id in self.audio and message.author.id != self._vars.client.user.id:
             auds = self.audio[message.guild.id]
             if auds.player is not None and message.channel.id == auds.channel.id:
                 t = time.time() + 10
-                if auds.player["time"] < t:
-                    auds.player["time"] = t
+                if auds.player.time < t:
+                    auds.player.time = t
 
     async def _dc(self, member):
         try:
