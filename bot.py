@@ -30,6 +30,7 @@ class main_data:
         guilds={},
         channels={},
         users={},
+        roles={},
         messages={},
         deleted={},
     )
@@ -169,40 +170,18 @@ class main_data:
                 except discord.NotFound:
                     pass
             if member is None:
-                check = str(u_id)
-                check2 = reconstitute(check).replace(" ", "").lower()
                 members = guild.members
                 if not members:
-                    members = await guild.fetch_members(limit=None)
-                cache = [{}, {}]
-                x = 1
-                for m in shuffle(members):
-                    for name in (str(m), reconstitute(m.name).replace(" ", ""), reconstitute(m.display_name).replace(" ", "")):
-                        if check == name:
-                            member = m
-                            break
-                        if check2 == name.lower():
-                            member = m
-                            break
-                        if name.lower().startswith(check2):
-                            i = len(name)
-                            if i not in cache[0]:
-                                cache[0][i] = m
-                        elif check2 in name.lower():
-                            i = len(name)
-                            if i not in cache[1]:
-                                cache[1][i] = m
-                    if member is not None:
-                        break
-                    if not x & 1023:
-                        await asyncio.sleep(0.5)
-                if member is None:
-                    for c in cache:
-                        if c:
-                            member = c[min(c)]
-                            break
-                    if member is None:
-                        raise LookupError("Unable to find member data.")
+                    members = guild.members = await guild.fetch_members(limit=None)
+                try:
+                    member = await strLookup(
+                        members,
+                        u_id,
+                        qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
+                        ikey=lambda x: [str(x), reconstitute(x.name), reconstitute(x.display_name)],
+                    )
+                except LookupError:
+                    raise LookupError("Unable to find member data.")
         return member
 
     async def fetch_whuser(self, u_id, guild=None):
@@ -308,18 +287,47 @@ class main_data:
             self.cache.messages[m_id] = message
             self.limitCache("messages")
         return message
+
+    async def fetch_role(self, r_id, guild):
+        try:
+            r_id = int(r_id)
+        except (ValueError, TypeError):
+            raise TypeError("Invalid role identifier: " + str(r_id))
+        try:
+            role = guild.get_role(r_id)
+            if role is None:
+                raise EOFError
+        except:
+            if r_id in self.cache.roles:
+                return self.cache.roles[r_id]
+            if len(guild.roles) <= 1:
+                roles = await guild.fetch_roles()
+                guild.roles = sorted(roles)
+                role = discord.utils.get(roles, id=r_id)
+            if role is None:
+                raise discord.NotFound("Role not found.")
+        self.cache.roles[r_id] = role
+        self.limitCache("roles")
+        return role
     
-    def get_mimic(self, m_id):
+    def get_mimic(self, m_id, user=None):
         try:
             try:
-                m_id = int(m_id)
+                m_id = "&" + str(int(m_id))
             except (ValueError, TypeError):
                 pass
-            m_id = "&" + str(m_id)
             mimic = self.data.mimics[m_id]
             return mimic
         except KeyError:
-            raise LookupError("Unable to find target mimic.")
+            pass
+        if user is not None:
+            try:
+                mimics = self.data.mimics[user.id]
+                mlist = mimics[m_id]
+                return self.get_mimic(random.choice(mlist))
+            except KeyError:
+                pass
+        raise LookupError("Unable to find target mimic.")
 
     async def getDM(self, user):
         try:
@@ -407,8 +415,10 @@ class main_data:
         if u_id == guild.owner_id:
             return inf
         try:
-            return self.data.perms[guild.id][u_id]
-        except (KeyError, TypeError):
+            perm = self.data.perms[guild.id][u_id]
+            if isnan(perm):
+                return -inf
+        except KeyError:
             pass
         m = guild.get_member(u_id)
         if m is None:
@@ -416,25 +426,38 @@ class main_data:
             if r is None:
                 return -inf
             return self.getRolePerms(r, guild)
-        print(m.guild_permissions)
-        if m.guild_permissions.administrator:
+        p = m.guild_permissions
+        if p.administrator:
             return inf
         perm = -inf
         for role in m.roles: 
             rp = self.getRolePerms(role, guild)
             if rp > perm:
                 perm = rp
+        if isnan(perm):
+            perm = -inf
         return perm
     
     def getRolePerms(self, role, guild):
         if role.permissions.administrator:
             return inf
         try:
-            return self.data.perms[guild.id][role.id]
-        except (KeyError, TypeError):
+            perm = self.data.perms[guild.id][role.id]
+            if isnan(perm):
+                return -inf
+        except KeyError:
             pass
         if guild.id == role.id:
             return 0
+        p = role.permissions
+        if all((p.ban_members, p.manage_channels, p.manage_guild, p.manage_roles, p.manage_messages)):
+            return 4
+        elif any((p.ban_members, p.manage_channels, p.manage_guild)):
+            return 3
+        elif any([p.kick_members, p.manage_messages, p.manage_nicknames, p.manage_roles, p.manage_webhooks, p.manage_emojis]):
+            return 2
+        elif any([p.view_audit_log, p.priority_speaker, p.mention_everyone, p.move_members]):
+            return 1
         return -1
 
     def setPerms(self, user, guild, value):
@@ -497,7 +520,7 @@ class main_data:
             commands = hlist()
             dataitems = hlist()
             vd = mod.__dict__
-            for k in vd:
+            for k in tuple(vd):
                 var = vd[k]
                 if var not in (Command, Database):
                     load_type = 0
@@ -1469,7 +1492,7 @@ async def on_member_join(member):
         f = getattr(u, "_join_", None)
         if f is not None:
             try:
-                await f(user=member)
+                await f(user=member, guild=member.guild)
             except:
                 print(traceback.format_exc())
     await seen(member)
@@ -1481,7 +1504,7 @@ async def on_member_remove(member):
         f = getattr(u, "_leave_", None)
         if f is not None:
             try:
-                await f(user=member)
+                await f(user=member, guild=member.guild)
             except:
                 print(traceback.format_exc())
 

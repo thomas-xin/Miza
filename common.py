@@ -183,6 +183,28 @@ def hasSymbol(string):
     return True
 
 
+async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]):
+    qlist = qkey(query)
+    cache = [[inf, None] for _ in qlist]
+    x = 1
+    for i in shuffle(it):
+        for c in ikey(i):
+            for a, b in enumerate(qkey(c)):
+                if b == qlist[a]:
+                    return i
+                elif b.startswith(qlist[a]):
+                    if len(b) < cache[a][0]:
+                        cache[a][0] = len(b)
+                        cache[a][1] = i
+        if not x & 1023:
+            await asyncio.sleep(0.1)
+        x += 1
+    for c in cache:
+        if c[1] is not None:
+            return c[1]
+    raise LookupError("No results for " + str(query) + ".")
+
+
 def randColour():
     return colour2Raw(colourCalculation(xrand(12) * 128))
 
@@ -373,6 +395,7 @@ class Database:
             try:
                 f = open(self.file, "rb")
                 s = f.read()
+                f.close()
                 if not s:
                     raise FileNotFoundError
                 data = None
@@ -381,13 +404,17 @@ class Database:
                 except pickle.UnpicklingError:
                     pass
                 if data is None:
-                    data = eval(s)
+                    try:
+                        data = eval(s)
+                    except:
+                        print(self.file)
+                        print(traceback.format_exc())
+                        raise FileNotFoundError
                 _vars.data[name] = self.data = data
-                f.close()
             except FileNotFoundError:
-                _vars.data[name] = self.data = freeClass()
+                _vars.data[name] = self.data = {}
         else:
-            _vars.data[name] = self.data = freeClass()
+            _vars.data[name] = self.data = {}
         _vars.database[name] = self
         self.catg = catg
         self._vars = _vars

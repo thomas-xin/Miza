@@ -290,6 +290,34 @@ class Text2048(Command):
         )
         return text
 
+    
+class Dogpile(Command):
+    server_only = True
+    min_level = 2
+    description = "Causes ⟨MIZA⟩ to automatically imitate users when 3+ of the same messages are posted in a row."
+    usage = "<enable(?e)> <disable(?d)>"
+    flags = "aed"
+
+    async def __call__(self, flags, guild, **void):
+        update = self.data.dogpiles.update
+        _vars = self._vars
+        following = _vars.data.dogpiles
+        curr = following.get(guild.id, False)
+        if "d" in flags:
+            if guild.id in following:
+                following.pop(guild.id)
+                update()
+            return "```css\nDisabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
+        elif "e" in flags or "a" in flags:
+            following[guild.id] = True
+            update()
+            return "```css\nEnabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
+        else:
+            return (
+                "```ini\nDogpile imitating is currently " + "not " * (not curr)
+                + "enabled in [" + noHighlight(guild.name) + "].```"
+            )
+
 
 class MathQuiz(Command):
     name = ["MathTest"]
@@ -337,12 +365,12 @@ class MimicConfig(Command):
         else:
             mimics = mimicdb[mimicdb[m_id].u_id]
             found = True
+        mimic = mimicdb[m_id]
         opt = args.pop(0).lower()
         if args:
             new = " ".join(args)
         else:
             new = None
-        mimic = mimicdb[m_id]
         if opt in ("name", "username", "nickname"):
             setting = "name"
         elif opt in ("avatar", "icon", "url"):
@@ -389,7 +417,7 @@ class MimicConfig(Command):
                     new = user.id
                 except:
                     try:
-                        mimi = _vars.get_mimic(mim)
+                        mimi = _vars.get_mimic(mim, user)
                         new = mimi.id
                     except:
                         raise LookupError("Target user or mimic ID not found.")
@@ -445,6 +473,8 @@ class Mimic(Command):
         prefix = args.pop(0)
         if not prefix:
             raise IndexError("Prefix must not be empty.")
+        if len(prefix) > 16:
+            raise OverflowError("Must be 16 or fewer in length.")
         if "d" in flags:
             try:
                 mlist = mimics[prefix]
@@ -460,7 +490,7 @@ class Mimic(Command):
                 if not mlist:
                     mimics.pop(prefix)
             except KeyError:
-                mimic = _vars.get_mimic(prefix)
+                mimic = _vars.get_mimic(prefix, user)
                 if not isnan(perm) and mimic.u_id != user.id:
                     raise PermissionError("Target mimic does not belong to you.")
                 mimics = mimicdb[mimic.u_id]
@@ -505,7 +535,7 @@ class Mimic(Command):
                     url = strURL(user.avatar_url)
                 except:
                     try:
-                        mimi = _vars.get_mimic(mim)
+                        mimi = _vars.get_mimic(mim, user)
                         dop = mimi.id
                         mimic = copy.deepcopy(mimi)
                         mimic.id = m_id
@@ -705,6 +735,43 @@ class UpdateMimics(Database):
             print(traceback.format_exc())
         await asyncio.sleep(2)
         self.busy = False
+
+
+class UpdateDogpiles(Database):
+    name = "dogpiles"
+
+    def __init__(self, *args):
+        self.msgFollow = {}
+        super().__init__(*args)
+
+    async def _nocommand_(self, text, edit, orig, message, **void):
+        if message.guild is None or not orig:
+            return
+        g_id = message.guild.id
+        following = self.data
+        if g_id in following:
+            u_id = message.author.id
+            c_id = message.channel.id
+            if not edit:
+                if following[g_id]:
+                    checker = orig
+                    curr = self.msgFollow.get(c_id)
+                    if curr is None:
+                        curr = [checker, 1, 0]
+                        self.msgFollow[c_id] = curr
+                    elif checker == curr[0] and u_id != curr[2]:
+                        curr[1] += 1
+                        if curr[1] >= 3:
+                            curr[1] = xrand(-3) + 1
+                            if len(checker):
+                                create_task(message.channel.send(checker))
+                    else:
+                        if len(checker) > 100:
+                            checker = ""
+                        curr[0] = checker
+                        curr[1] = xrand(-1, 2)
+                    curr[2] = u_id
+                    #print(curr)
 
 
 class UpdateMathTest(Database):

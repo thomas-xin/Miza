@@ -65,9 +65,10 @@ class customAudio(discord.AudioSource):
         classname = classname[classname.index("'") + 1:]
         return (
             "<" + classname + " object at " + hex(id(self)).upper() + ">: {"
-            + "\"queue\": " + str(self.queue)
+            + "\"vc\": " + str(self.vc)
+            + ", \"queue\": " + str(self.queue)
             + ", \"stats\": " + str(self.stats)
-            + ", \"player\": " + str(self.player)
+            + ", \"source\": " + str(self.source)
             + "}"
         )
 
@@ -226,7 +227,16 @@ class customAudio(discord.AudioSource):
         guild = vc.guild
         g = guild.id
         if hasattr(self, "dead"):
-            self._vars.database.playlists.audio.pop(g)
+            if getattr(self, "source", None) is not None:
+                self.source.cleanup()
+            try:
+                self._vars.database.playlists.audio.pop(g)
+            except KeyError:
+                pass
+            try:
+                self._vars.database.playlists.connecting.pop(g)
+            except KeyError:
+                pass
             self.loop.create_task(vc.disconnect())
             try:
                 msg = (
@@ -244,7 +254,7 @@ class customAudio(discord.AudioSource):
         if not hasattr(vc, "channel"):
             self.dead = True
             return
-        if vc.is_connected() or vc.guild.id in self._vars.database.playlists.connecting:
+        if vc.is_connected() or self._vars.database.playlists.is_connecting(vc.guild.id):
             playing = self.is_playing or self.is_loading
         else:
             self.loop.create_task(self.reconnect())
@@ -578,8 +588,6 @@ class customAudio(discord.AudioSource):
 
     def cleanup(self):
         return
-        # if getattr(self, "source", None) is not None:
-        #     return self.source.cleanup()
 
 
 async def createPlayer(auds, p_type=0, verbose=False):
@@ -1326,7 +1334,7 @@ class Playlist(Command):
     flags = "aedv"
 
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
-        update = self.data.playlists.update
+        update = self._vars.database.playlists.update
         _vars = self._vars
         pl = _vars.data.playlists
         if argv or "d" in flags:
@@ -1450,8 +1458,10 @@ class Connect(Command):
             if not isAlone(auds, user) and perm < 1:
                 self.permError(perm, 1, "to disconnect while other users are in voice")
             auds.dead = True
-            if guild.id in connecting:
+            try:
                 connecting.pop(guild.id)
+            except KeyError:
+                pass
             await _vars.database.playlists(guild=guild)
             return
         joined = False
@@ -1459,16 +1469,16 @@ class Connect(Command):
             if vc.guild.id == guild.id:
                 joined = True
                 if vc.channel.id != vc_.id:
-                    connecting[guild.id] = True
+                    connecting[guild.id] = time.time()
                     try:
                         await vc.move_to(vc_)
-                        connecting[guild.id] = False
+                        connecting[guild.id] = 0
                     except:
-                        connecting[guild.id] = False
+                        connecting[guild.id] = 0
                         raise
                 break
         if not joined:
-            connecting[guild.id] = True
+            connecting[guild.id] = time.time()
             vc = freeClass(is_connected = lambda: False)
             t = time.time()
             while not vc.is_connected() and time.time() - t < 12:
@@ -1481,7 +1491,7 @@ class Connect(Command):
                 except discord.ClientException:
                     await asyncio.sleep(1)
             if not hasattr(vc, "guild"):
-                connecting[guild.id] = False
+                connecting[guild.id] = 0
                 raise ConnectionError("Unable to connect to voice channel.")
         if guild.id not in _vars.database.playlists.audio:
             await channel.trigger_typing()
@@ -2632,6 +2642,13 @@ class UpdateQueues(Database):
         super().__init__(*args)
         self.clearAudioCache()
 
+    def is_connecting(self, g):
+        if g in self.connecting:
+            if time.time() - self.connecting[g] < 12:
+                return True
+            self.connecting.pop(g)
+        return False
+
     async def research(self, auds):
         if auds.searching >= 1:
             return
@@ -2717,7 +2734,7 @@ class UpdateQueues(Database):
         try:
             if guild is not None:
                 g = guild
-                if g.id not in self.connecting and g.id not in self.audio:
+                if not self.is_connecting(g.id) and g.id not in self.audio:
                     for c in g.voice_channels:
                         for m in c.members:
                             if m.id == client.user.id:
@@ -2732,10 +2749,10 @@ class UpdateQueues(Database):
                     for i in pl[g]:
                         self.cached_items[i["id"]] = time.time()
                 for vc in client.voice_clients:
-                    if vc.guild.id not in self.connecting and vc.guild.id not in self.audio:
+                    if not self.is_connecting(vc.guild.id) and vc.guild.id not in self.audio:
                         create_task(vc.disconnect(force=True))
                 for g in client.guilds:
-                    if g.id not in self.connecting and g.id not in self.audio:
+                    if not self.is_connecting(g.id) and g.id not in self.audio:
                         for c in g.voice_channels:
                             for m in c.members:
                                 if m.id == client.user.id:

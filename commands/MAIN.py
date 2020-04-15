@@ -379,7 +379,7 @@ class Avatar(Command):
             except:
                 u_id = argv
             try:
-                p = _vars.get_mimic(u_id)
+                p = _vars.get_mimic(u_id, user)
                 return self.getMimicData(p)
             except:
                 try:
@@ -558,7 +558,7 @@ class Info(Command):
             except:
                 u_id = argv
             try:
-                p = _vars.get_mimic(u_id)
+                p = _vars.get_mimic(u_id, user)
                 return self.getMimicData(p, flags)
             except:
                 try:
