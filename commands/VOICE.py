@@ -238,18 +238,20 @@ class customAudio(discord.AudioSource):
             except KeyError:
                 pass
             self.loop.create_task(vc.disconnect())
-            try:
-                msg = (
-                    "```css\n🎵 Successfully disconnected from ["
-                    + noHighlight(guild.name) + "]. 🎵```"
-                )
-                self.loop.create_task(sendReact(
-                    self.channel,
-                    msg,
-                    reacts=["❎"],
-                ))
-            except KeyError:
-                pass
+            if self.dead is not None:
+                self.dead = None
+                try:
+                    msg = (
+                        "```css\n🎵 Successfully disconnected from ["
+                        + noHighlight(guild.name) + "]. 🎵```"
+                    )
+                    self.loop.create_task(sendReact(
+                        self.channel,
+                        msg,
+                        reacts=["❎"],
+                    ))
+                except KeyError:
+                    pass
             return
         if not hasattr(vc, "channel"):
             self.dead = True
@@ -395,6 +397,8 @@ class customAudio(discord.AudioSource):
 
     async def reconnect(self):
         try:
+            if hasattr(self, "dead"):
+                return
             self.att = getattr(self, "att", 0) + 1
             self.vc = await self.vc.channel.connect(timeout=30, reconnect=False)
             for user in guild.members:
@@ -408,6 +412,7 @@ class customAudio(discord.AudioSource):
         except (discord.Forbidden, discord.HTTPException):
             self.dead = True
         except:
+            print(traceback.format_exc())
             if self.att > 5:
                 self.dead = True
         
@@ -1947,7 +1952,7 @@ class AudioSettings(Command):
         if not ops:
             if disable:
                 pos = auds.stats.position
-                auds.stats = dict(auds.defaults)
+                auds.stats = freeClass(**auds.defaults)
                 auds.new(auds.file, pos)
                 return (
                     "```css\nSuccessfully reset all audio settings for ["
