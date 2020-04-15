@@ -229,20 +229,20 @@ def getDuration(filename):
 def orgConv(org, wave, fmt, key="temp", fl=8388608):
     try:
         try:
-            os.remove("cache/" + key + ".org")
+            os.remove("cache/&" + key + ".org")
         except FileNotFoundError:
             pass
         try:
-            os.remove("cache/" + key + ".xm")
+            os.remove("cache/&" + key + ".xm")
         except FileNotFoundError:
             pass
         opener = urlBypass()
-        opener.retrieve(org, "cache/" + key + ".org")
+        opener.retrieve(org, "cache/&" + key + ".org")
         if wave is not None:
-            opener.retrieve(wave, "cache/" + key + ".dat")
-            com = "org2xm ../cache/" + key + ".org ../cache/" + key + ".dat"
+            opener.retrieve(wave, "cache/&" + key + ".dat")
+            com = "org2xm ../cache/&" + key + ".org ../cache/" + key + ".dat"
         else:
-            com = "org2xm ../cache/" + key + ".org ORG210EN.DAT"
+            com = "org2xm ../cache/&" + key + ".org ORG210EN.DAT"
         os.chdir("misc")
         try:
             os.system(com)
@@ -250,11 +250,11 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
         except:
             os.chdir("..")
             raise
-        fi = "cache/" + key + ".xm"
+        fi = "cache/&" + key + ".xm"
         t = time.time()
         while time.time() - t < 12:
             time.sleep(0.2)
-            if key + ".xm" in os.listdir("cache"):
+            if "&" + key + ".xm" in os.listdir("cache"):
                 try:
                     f = open(fi, "rb")
                     f.read(32)
@@ -264,7 +264,7 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
                     print(repr(ex))                
                     pass
         if fmt != "xm":
-            fn = "cache/" + key + "." + fmt
+            fn = "cache/&" + key + "." + fmt
             try:
                 os.remove(fn)
             except FileNotFoundError:
@@ -278,11 +278,11 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
             )
             ff.run()
             try:
-                os.remove("cache/" + key + ".org")
+                os.remove("cache/&" + key + ".org")
             except FileNotFoundError:
                 pass
             try:
-                os.remove("cache/" + key + ".xm")
+                os.remove("cache/&" + key + ".xm")
             except FileNotFoundError:
                 pass
         else:

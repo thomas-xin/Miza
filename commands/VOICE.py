@@ -34,7 +34,7 @@ class customAudio(discord.AudioSource):
     def __init__(self, channel, vc, _vars):
         try:
             self.paused = False
-            self.stats = dict(self.defaults)
+            self.stats = freeClass(self.defaults)
             self.new(update=False)
             self.queue = hlist()
             self.channel = channel
@@ -1377,7 +1377,7 @@ class Playlist(Command):
             return (
                 "```css\nRemoved [" + noHighlight(temp["name"])
                 + "] from the default playlist for "
-                + guild.name + "```"
+                + sbHighlight(guild.name) + "```"
             )
         if len(pl) >= 64:
             raise OverflowError(
