@@ -418,6 +418,7 @@ class main_data:
             perm = self.data.perms[guild.id][u_id]
             if isnan(perm):
                 return -inf
+            return perm
         except KeyError:
             pass
         m = guild.get_member(u_id)
@@ -445,6 +446,7 @@ class main_data:
             perm = self.data.perms[guild.id][role.id]
             if isnan(perm):
                 return -inf
+            return perm
         except KeyError:
             pass
         if guild.id == role.id:

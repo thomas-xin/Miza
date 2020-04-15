@@ -1161,7 +1161,7 @@ class UpdateRolegivers(Database):
         _vars = self._vars
         assigned = self.data.get(message.channel.id, {})
         for k in assigned:
-            if ((k in text) if hasSymbol(k) else (k in message.content)):
+            if ((k in text) if hasSymbol(k) else (k in message.content.lower())):
                 alist = assigned[k]
                 for r in alist[0]:
                     role = guild.get_role(r)
@@ -1175,7 +1175,7 @@ class UpdateRolegivers(Database):
                         continue
                     await user.add_roles(
                         role,
-                        reason="Keyword found in message.",
+                        reason="Keyword \"" + k + "\" found in message \"" + message.content + "\".",
                         atomic=True,
                     )
                     print("Granted role " + str(role) + " to " + str(user) + ".")
@@ -1214,13 +1214,16 @@ class UpdateRolePreservers(Database):
                         roles.append(role)
                     except:
                         print(traceback.format_exc())
+                print(user, roles)
                 await user.add_roles(*roles, reason="RolePreserver")
                 self.data[guild.id].pop(user.id)
 
     async def _leave_(self, user, guild, **void):
         if guild.id in self.data:
-            roles = [role.id for role in user.roles[1:]]
-            self.data[guild.id][user.id] = roles
+            roles = user.roles[1:]
+            assigned = [role.id for role in roles]
+            print(user, assigned)
+            self.data[guild.id][user.id] = assigned
             self.update()
 
 
