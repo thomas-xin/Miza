@@ -991,7 +991,10 @@ class UpdateMessageLogs(Database):
                 await channel.send(embed=emb)
 
     async def _delete_(self, message, bulk=False, **void):
+        cu_id = self._vars.client.user.id
         if bulk:
+            if message.author.bot and message.author.id != cu_id:
+                return
             if self._vars.isDeleted(message) < 2:
                 print(strMessage(message, username=True))
             return
@@ -1014,7 +1017,6 @@ class UpdateMessageLogs(Database):
                 discord.AuditLogAction.message_bulk_delete,
             )[bulk]
             try:
-                cu_id = self._vars.client.user.id
                 t = u
                 init = "<@" + str(t.id) + ">"
                 if self._vars.isDeleted(message):
@@ -1051,6 +1053,8 @@ class UpdateMessageLogs(Database):
                                 init = "<@" + str(t.id) + ">"
                                 # print(t, e.target)
                 if t.bot or u.id == t.id == cu_id:
+                    if message.author.bot and message.author.id != cu_id:
+                        return
                     if self._vars.isDeleted(message) < 2:
                         print(strMessage(message, username=True))
                     return
@@ -1215,7 +1219,7 @@ class UpdateRolePreservers(Database):
                     except:
                         print(traceback.format_exc())
                 print(user, roles)
-                await user.add_roles(*roles, reason="RolePreserver")
+                await user.edit(roles=roles, reason="RolePreserver")
                 self.data[guild.id].pop(user.id)
 
     async def _leave_(self, user, guild, **void):

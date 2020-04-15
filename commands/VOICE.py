@@ -542,23 +542,23 @@ class customAudio(discord.AudioSource):
                             self.buffer = [[self.empty] * 2] * delay
                         r = 18
                         p1 = round(size * (0.5 - 2 / r))
-                        p2 = round(size * (0.5 - 1 / r))
+                        # p2 = round(size * (0.5 - 1 / r))
                         p3 = round(size * 0.5)
-                        p4 = round(size * (0.5 + 1 / r))
+                        # p4 = round(size * (0.5 + 1 / r))
                         p5 = round(size * (0.5 + 2 / r))
                         lfeed = (
-                            + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 24
-                            + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
+                            + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 8
+                            # + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
                             + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
-                            + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
-                            + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 24
+                            # + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
+                            + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 8
                         ) * reverb
                         rfeed = (
-                            + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 24
-                            + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
+                            + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 8
+                            # + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
                             + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
-                            + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
-                            + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 24
+                            # + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
+                            + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 8
                         ) * reverb
                         if self.feedback is not None:
                             left -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size-16:-16]
@@ -974,7 +974,7 @@ class videoDownloader:
         exl = RuntimeError
         exc = None
         self.downloading[i["url"]] = True
-        for _ in loop(5):
+        for _ in loop(3):
             downloader = youtube_dl.YoutubeDL(new_opts)
             try:
                 downloader.download([i["url"]])
@@ -987,7 +987,7 @@ class videoDownloader:
             except Exception as ex:
                 exl = ex
                 exc = traceback.format_exc()
-                time.sleep(1)
+                time.sleep(3)
         if i["url"] in self.downloading:
             self.downloading.pop(i["url"])
         i["id"] = ""
