@@ -1,4 +1,4 @@
-import os, sys, subprocess, psutil, asyncio, discord, json, requests
+import os, sys, subprocess, psutil, asyncio, discord, json, requests, socketio
 import urllib.request, urllib.parse, concurrent.futures
 from smath import *
 
@@ -410,6 +410,7 @@ def logClear():
     else:
         os.system('clear')
 
+
 class __logPrinter():
 
     print_temp = ""
@@ -438,11 +439,82 @@ class __logPrinter():
 
     def logPrint(self, *args, sep=" ", end="\n", prefix="", **void):
         self.print_temp += str(sep).join((str(i) for i in args)) + str(end) + str(prefix)
-
+        if _io.hasAuth:
+            global emit
+            emit('log', str(sep).join((str(i) for i in args)) + str(end) + str(prefix))   
     def __init__(self, file=None):
         self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.future = athreads.submit(self.updatePrint, file)
 
+sio = False
+
+class __ioStuff():
+    def __init__(self):
+        global sio 
+        sio = socketio.Client()
+
+        # yes i'm really copy/pasting this from bot.py, sue me
+        try:
+            f = open('auth.json')
+        except FileNotFoundError:
+            print("ERROR: Please create auth.json to continue.")
+            time.sleep(2)
+            f = open("shutdown.json", "wb")
+            f.close()
+            sys.exit(1)
+            return
+        self.auth = ast.literal_eval(f.read())
+        f.close()
+        self.web_token = None
+        self.web_address = None
+        self.hasAuth = False
+        try:
+            self.web_token = self.auth["web_token"]
+        except KeyError:
+            print("ERROR: web_token not found. Unable to authenticate with webserver.")
+            self.web_token = None
+        try:
+            self.web_address = self.auth["web_address"]
+        except KeyError:
+            print("ERROR: web_address not found. Unable to connect to controller.")
+            self.web_address = None
+
+        @sio.event
+        def connect():
+            print('Connected to controller, authenticating...')
+            if self.web_address and self.web_token:
+                sio.emit('authMeBB', self.web_token)
+            elif self.web_address:
+                    print("Can't authenticate: web_token hasn't been defined.")
+            elif self.web_token:
+                    print("Can't authenticate: web_address hasn't been defined.")
+
+        @sio.event
+        def authAccepted():
+            print("Successfully authenticated with controller.")
+            self.hasAuth = True
+
+        @sio.event
+        def authDenied(data):
+            print("Failed to authenticate with controller. Server reports: " + data)
+            self.hasAuth = False # just in case
+        
+        if self.web_address:
+            print("Attempting to connect to controller at "+self.web_address)
+            try:
+                sio.connect(self.web_address)
+            except:
+                print("Failed to connect to controller.")
+        else:
+            print("ERROR: web_address not found. Unable to connect to webserver.")
+    
+    def emit(self, *args):
+        if self.hasAuth:
+            sio.emit(*args)
+
+    
+_io = __ioStuff()
+emit = _io.emit
 __printer = __logPrinter("log.txt")
 print = __printer.logPrint
 
