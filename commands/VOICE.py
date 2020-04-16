@@ -2668,7 +2668,7 @@ class UpdateQueues(Database):
             print(traceback.format_exc())
 
     async def __call__(self, guild=None, **void):
-        print(self, "call")
+        # print(self, "call")
         if self.busy > 1:
             return
         self.busy += 1
