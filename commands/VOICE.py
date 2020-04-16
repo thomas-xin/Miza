@@ -2465,7 +2465,7 @@ class Download(Command):
             res = []
             if isURL(argv):
                 argv = await _vars.followURL(argv)
-                data = await create_future(ytdl.extract, argv, print_exc=True)
+                data = await create_future(ytdl.extract, argv)
                 res += data
             if not res:
                 sc = min(4, flags.get("v", 0) + 1)
@@ -2478,7 +2478,6 @@ class Download(Command):
                         searches[r] + ":" + argv.replace(":", "~"),
                         download=False,
                         process=r,
-                        print_exc=True,
                     ))
                 returns = await recursiveCoro(returns)
                 for r in returns:
@@ -2562,7 +2561,6 @@ class Download(Command):
                         spl[3],
                         message,
                         asyncio.get_event_loop(),
-                        print_exc=True,
                     )
                     f = discord.File(fn, out)
                     create_task(message.edit(
