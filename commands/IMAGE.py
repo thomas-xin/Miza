@@ -290,19 +290,11 @@ class Cat(Command):
             url = nekos.cat()
         else:
             for _ in loop(8):
-                returns = [None]
-                doParallel(
-                    funcSafe,
-                    [requests.get, "https://api.thecatapi.com/v1/images/search"],
-                    returns,
-                    {"headers": self.header},
+                resp = await create_future(
+                    requests.get,
+                    "https://api.thecatapi.com/v1/images/search",
+                    headers=self.header,
                 )
-                while returns[0] is None:
-                    await asyncio.sleep(0.5)
-                if type(returns[0]) is str:
-                    print(eval, returns[0])
-                    raise eval(returns[0])
-                resp = returns[0][-1]
                 try:
                     d = json.loads(resp.content)
                 except:
@@ -336,19 +328,14 @@ class Dog(Command):
 
     async def __call__(self, channel, flags, **void):
         for _ in loop(8):
-            returns = [None]
-            doParallel(funcSafe, [urlOpen, "https://dog.ceo/api/breeds/image/random"], returns)
-            while returns[0] is None:
-                await asyncio.sleep(0.5)
-            if type(returns[0]) is str:
-                raise eval(returns[0])
-            resp = returns[0][-1]
-            s = resp.read()
-            resp.close()
+            resp = await create_future(
+                requests.get,
+                "https://dog.ceo/api/breeds/image/random",
+            )
             try:
-                d = json.loads(s)
+                d = json.loads(resp.content)
             except:
-                d = eval(s, {}, infinum)
+                d = eval(resp.content, {}, infinum)
             try:
                 if type(d) is list:
                     d = random.choice(d)

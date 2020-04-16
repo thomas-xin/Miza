@@ -154,18 +154,7 @@ class UpdateExec(Database):
                 return
             output = None
             try:
-                returns = [None]
-                doParallel(funcSafe, [self.procFunc, proc, _vars], returns)
-                while returns[0] is None:
-                    await asyncio.sleep(0.2)
-                data = returns[0]
-                if type(data) is str:
-                    try:
-                        raise eval(data)
-                    except RuntimeError:
-                        output = self.procFunc(proc, _vars)
-                else:
-                    output = data[0]
+                output = await create_future(self.procFunc, proc, _vars)
                 if type(output) is tuple:
                     output = await recursiveCoro(output)
                 elif asyncio.iscoroutine(output):

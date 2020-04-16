@@ -2,9 +2,9 @@
 Adds many useful math-related functions.
 """
 
-import os, sys, threading, subprocess, psutil, traceback, time, datetime
-import ctypes, collections, ast, copy, pickle, io
-import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys, re
+import traceback, time, datetime
+import collections, ast, copy, pickle, io
+import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys, re, hashlib
 
 from scipy import interpolate, special, signal
 from dateutil import parser as tparser
@@ -12,9 +12,6 @@ from sympy.parsing.sympy_parser import parse_expr
 from itertools import repeat
 
 loop = lambda x: repeat(None, x)
-
-CalledProcessError = subprocess.CalledProcessError
-Process = psutil.Process()
 
 np = numpy
 array = numpy.array
@@ -789,13 +786,15 @@ def verifyString(string):
         return str(string)
 
 
-def bytes2Hex(b):
+def bytes2Hex(b, space=True):
     o = ""
     for a in b:
         c = hex(a).upper()[2:]
         if len(c) < 2:
             c = "0" + c
-        o += c + " "
+        o += c
+        if space:
+            o += " "
     return o[:-1]
 
 def hex2Bytes(h):
@@ -2347,283 +2346,3 @@ class pickled:
             + bytes2Hex(d).replace(" ", "")
             + "''')))"
         )
-
-
-def readline(stream, timeout=10):
-    output = bytes()
-    t = time.time()
-    while b"\n" not in output and time.time() - t < timeout:
-        c = stream.read(1)
-        if c:
-            output += c
-            if not len(output) & 4095:
-                time.sleep(0.01)
-        else:
-            time.sleep(0.002)
-    print(output)
-    return output
-    
-
-__subs__ = {}
-
-def subCount():
-    count = 0
-    for i in list(__subs__):
-        if __subs__[i].is_running():
-            count += 1
-        else:
-            __subs__.pop(i)
-    return count
-
-def subKill():
-    for sub in __subs__.values():
-        sub.kill()
-    __subs__.clear()
-
-def subFunc(key, com, data_in, timeout):
-    while len(__subs__) > 256:
-        i = iter(tuple(__subs__))
-        try:
-            while i:
-                k = next(i)
-                if __subs__[k].kill is not None:
-                    __subs__[k].kill()
-                    __subs__.pop(k)
-                    break
-        except StopIteration:
-            pass
-    if key in __subs__:
-        try:
-            while __subs__[key].busy:
-                time.sleep(0.01)
-        except KeyError:
-            return subFunc(key, com, data_in, timeout)
-    else:
-        __subs__[key] = freeClass(
-            busy=True,
-            is_running=lambda: True,
-            kill=None,
-        )
-    if isinstance(__subs__[key], psutil.Popen):
-        proc = __subs__[key]
-        if not proc.is_running():
-            __subs__.pop(key)
-            del proc
-            return subFunc(key, com, data_in, timeout)
-    else:
-        proc = __subs__[key] = psutil.Popen(
-            com,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    thread = freeClass(kill=lambda: None)
-    try:
-        t = time.time()
-        proc.busy = True
-        d = repr(bytes(str(data_in), "utf-8")).encode("utf-8") + b"\n"
-        print(d)
-        proc.stdin.write(d)
-        proc.stdin.flush()
-        returns = [None]
-        thread = doParallel(readline, [proc.stdout, timeout], returns, state=2)
-        while returns[0] is None:
-            if time.time() - t > timeout:
-                raise TimeoutError("Request timed out.")
-            time.sleep(0.001)
-        resp = evalEX(returns[0])
-        time.sleep(0.001)
-        resp = str(evalEX(resp))
-        output = [resp]
-    except TimeoutError as ex:
-        print(traceback.format_exc())
-        try:
-            proc.kill()
-        except psutil.NoSuchProcess:
-            pass
-        __subs__.pop(key)
-        output = repr(ex)
-    except Exception as ex:
-        print(traceback.format_exc())
-        output = repr(ex)
-    proc.busy = False
-    thread.kill()
-    return output
-
-
-def evalEX(exc):
-    is_ex = False
-    try:
-        ex = eval(exc)
-    except NameError:
-        if type(exc) is bytes:
-            exc = exc.decode("utf-8")
-        ex = RuntimeError(exc[exc.index("(") + 1:exc.index(")")].strip("'"))
-    try:
-        if issubclass(ex.__class__, Exception):
-            is_ex = True
-    except AttributeError:
-        pass
-    if is_ex:
-        raise ex
-    return ex
-
-
-def funcSafe(func, *args, print_exc=False, **kwargs):
-    try:
-        return [func(*args, **kwargs)]
-    except Exception as ex:
-        if print_exc:
-            print(traceback.format_exc())
-        return repr(ex)
-
-class dynamicFunc:
-    
-    def __init__(self, func):
-        self.text = func
-        self.func = eval(func)
-
-    def __call__(self, *args, **kwargs):
-        return self.func(*args, **kwargs)
-
-    def __repr__(self):
-        return self.text
-
-def performAction(action):
-    if "delay" in action:
-        time.sleep(action["delay"])
-    action.get("retn", [0])[0] = action["func"](*action.get("args", ()), **action.get("kwargs", {}))
-
-class _parallel:
-    
-    def __init__(self):
-        self.max = 64
-        self.running = {i: self.new(i) for i in range(self.max)}
-        for i in self.running:
-            self.running[i].start()
-
-    class new(threading.Thread):
-        
-        def __init__(self, p_id, killable=True):
-            threading.Thread.__init__(self)
-            self.killable = killable
-            self.id = p_id
-            self.actions = hlist()
-            self.state = 0
-            self.action = None
-            self.daemon = True
-
-        def __call__(self, action):
-            self.actions.append(action)
-            self.state = inf
-
-        def run(self):
-            while True:
-                try:
-                    if self.actions:
-                        self.state = max(i.get("state", 1) for i in self.actions)
-                    time.sleep(0.01 * (random.random() + 1))
-                    if self.actions is None:
-                        print("EXIT")
-                        return
-                    while self.actions:
-                        self.action = self.actions.popleft()
-                        performAction(self.action)
-                except TimeoutError:
-                    pass
-                except:
-                    print(traceback.format_exc())
-                if type(self.id) is str:
-                    print("EXIT")
-                    break
-                self.state = -1
-
-        def get_id(self):
-            if hasattr(self, "_thread_id"):
-                return getattr(self, "_thread_id")
-            for t_id, thread in threading._active.items():
-                if thread is self:
-                    self._thread_id = t_id
-                    return t_id
-
-        def kill(self, destroy=False):
-            thread_id = self.get_id()
-            if destroy or type(self.id) is str:
-                self.actions = None
-                res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                    thread_id,
-                    ctypes.py_object(KeyboardInterrupt),
-                )
-            else:
-                res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                    thread_id,
-                    ctypes.py_object(TimeoutError),
-                )
-            if res != 1:
-                ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                    thread_id,
-                    ctypes.py_object(BaseException),
-                )
-                self.actions = None
-                try:
-                    del threading._active[thread_id]
-                except KeyError:
-                    pass
-                if not destroy and type(self.id) is not str:
-                    threads.running[self.id] = threads.new(self.id)
-            elif type(self.id) is str:
-                self.actions = None
-                try:
-                    del threading._active[thread_id]
-                except KeyError:
-                    pass
-
-def doParallel(func, args=None, data_out=[0], kwargs=None, name=None, **kws):
-    """
-Performs an action using parallel threads."""
-    ps = threads.running
-    if name is not None:
-        d = str(name)
-        ps[d] = threads.new(d, kws.get("killable", True))
-        p = ps[d]
-        p.start()
-    else:
-        t = d = 0
-        p = ps[0]
-        while p.state > 0:
-            d = xrand(threads.max)
-            p = ps[d]
-            if t > threads.max:
-                break
-            t += 1
-        while p.state > 1 or len(p.actions) >= 64:
-            time.sleep(0.01)
-            d = xrand(threads.max)
-            p = ps[d]
-    action = kws
-    if args is not None:
-        action["args"] = args
-    if kwargs is not None:
-        action["kwargs"] = kwargs
-    action["func"] = func
-    action["retn"] = data_out
-    p(action)
-    return p
-
-def killThreads():
-    running = tuple(threads.running)
-    for i in running:
-        if threads.running[i].killable:
-            p = threads.running[i]
-            p.kill()
-
-def waitParallel(delay):
-    t = time.time()
-    running = tuple(threads.running)
-    for i in running:
-        if type(i) is int and i in threads.running:
-            p = threads.running[i]
-            while p.state > 0 and time.time() - t < delay:
-                time.sleep(0.001)
-
-threads = _parallel()

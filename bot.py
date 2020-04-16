@@ -71,7 +71,7 @@ class main_data:
             self.owner_id = 0
             print("WARNING: owner_id not found. Unable to locate owner.")
         self.proc = psutil.Process()
-        doParallel(self.getModules, state=2)
+        self.getModules()
         self.guilds = 0
         self.blocked = 0
         self.updated = False
@@ -550,7 +550,7 @@ class main_data:
             print(traceback.format_exc())
 
     def getModules(self, reload=False):
-        files = (i for i in os.listdir("commands") if iscode(i))
+        files = [i for i in os.listdir("commands") if iscode(i)]
         self.categories = freeClass()
         self.commands = freeClass()
         self.database = freeClass()
@@ -559,8 +559,9 @@ class main_data:
         totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
         totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p))
         self.codeSize = totalsize
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(files))
         for f in files:
-            doParallel(self.getModule, [f], state=2)
+            executor.submit(self.getModule, f)
 
     def update(self):
         saved = hlist()
@@ -690,19 +691,7 @@ class main_data:
             self.timeout / 2,
         ]
         print(args)
-        returns = [None]
-        doParallel(subFunc, args, returns, state=2)
-        while returns[0] is None:
-            await asyncio.sleep(0.25)
-        resp = returns[0]
-        print(resp)
-        if type(resp) is str:
-            resp = evalEX(resp)
-        else:
-            resp = eval(resp[0].replace("\n", "").replace("\r", ""))
-        if type(resp) is str:
-            resp = evalEX(resp)
-        return resp
+        return await subFunc(*args)
 
     timeChecks = {
         "galactic year": ("gy", "galactic year", "galactic years"),

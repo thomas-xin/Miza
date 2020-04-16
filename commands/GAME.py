@@ -141,14 +141,7 @@ class Text2048(Command):
                 self.spawn(gamestate[0], mode, 1)
             else:
                 pool = list(self.multis[i])
-                returns = [None]
-                t = time.time()
-                doParallel(self.randomSpam, [gamestate, mode, pool, returns])
-                while returns[0] is None and time.time() - t < self._vars.timeout / 3:
-                    await asyncio.sleep(0.2)
-                if returns[0] is None:
-                    return
-                self.gamestate, a = returns[0]
+                self.gamestate, a = await create_future(self.randomSpam, gamestate, mode, pool)
         if not a:
             gsr = str(gamestate).replace("[", "A").replace("]", "B").replace(",", "C").replace("-", "D").replace(" ", "")
             orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]).split("-")
@@ -901,11 +894,8 @@ class UpdateMathTest(Database):
             d = -d
         st = "(" + str(a) + "*x+" + str(b) + ")*(" + str(c) + "*x+" + str(d) + ")"
         a = [-b / a, -d / c]
-        returns = [None]
-        doParallel(sympy.expand, [st], returns)
-        while returns[0] is None:
-            await asyncio.sleep(0.2)
-        q = self.eqtrans(returns[0]).replace("^2", "²").replace("∙", "") + " = 0"
+        q = await create_future(sympy.expand, st)
+        q = self.eqtrans(q).replace("^2", "²").replace("∙", "") + " = 0"
         return q, a
 
     async def calculus(self):
@@ -946,11 +936,7 @@ class UpdateMathTest(Database):
         else:
             q = "∫ " + q
             op = sympy.integrate
-        returns = [None]
-        doParallel(op, [a], returns)
-        while returns[0] is None:
-            await asyncio.sleep(0.2)
-        a = returns[0]
+        a = await create_future(op, a)
         return q, a
 
     async def generateMathQuestion(self, mode):
@@ -1004,11 +990,7 @@ class UpdateMathTest(Database):
                     return
                 try:
                     x = await _vars.solveMath(msg, getattr(channel, "guild", None), 2, 1)
-                    returns = [None]
-                    doParallel(sympy.sympify, [x[0]], returns)
-                    while returns[0] is None:
-                        await asyncio.sleep(0.2)
-                    x = returns[0]
+                    x = await create_future(sympy.sympify, x[0])
                 except:
                     return
                 correct = False
@@ -1017,17 +999,9 @@ class UpdateMathTest(Database):
                     if x in a:
                         correct = True
                 else:
-                    returns = [None]
-                    doParallel(sympy.sympify, [a], returns)
-                    while returns[0] is None:
-                        await asyncio.sleep(0.2)
-                    a = returns[0]
-                    returns = [None]
-                    doParallel(sympy.simplify, [x - a], returns)
-                    while returns[0] is None:
-                        await asyncio.sleep(0.2)
-                    if returns[0] == 0:
-                        correct = True
+                    a = await create_future(sympy.sympify, a)
+                    z = await create_future(sympy.simplify, x - a)
+                    correct = z == 0
                 if correct:
                     create_task(self.newQuestion(channel))
                     await channel.send("Great work!")

@@ -26,7 +26,7 @@ class DouClub:
 
     def search(self, query):
         if time.time() - self.data[1] > 720:
-            doParallel(self.pull, state=2)
+            create_future(self.pull)
         output = []
         query = query.lower()
         for l in self.data[0]:
@@ -139,7 +139,7 @@ class SheetPull:
 
     def search(self, query, lim):
         if time.time() - self.data[1] > 60:
-            doParallel(self.pull, state=2)
+            create_future(self.pull)
         output = []
         query = query.lower()
         try:
@@ -229,20 +229,20 @@ def getDuration(filename):
 def orgConv(org, wave, fmt, key="temp", fl=8388608):
     try:
         try:
-            os.remove("cache/&" + key + ".org")
+            os.remove("cache/" + key + ".org")
         except FileNotFoundError:
             pass
         try:
-            os.remove("cache/&" + key + ".xm")
+            os.remove("cache/" + key + ".xm")
         except FileNotFoundError:
             pass
         opener = urlBypass()
-        opener.retrieve(org, "cache/&" + key + ".org")
+        opener.retrieve(org, "cache/" + key + ".org")
         if wave is not None:
-            opener.retrieve(wave, "cache/&" + key + ".dat")
-            com = "org2xm ../cache/&" + key + ".org ../cache/" + key + ".dat"
+            opener.retrieve(wave, "cache/" + key + ".dat")
+            com = "org2xm ../cache/" + key + ".org ../cache/" + key + ".dat"
         else:
-            com = "org2xm ../cache/&" + key + ".org ORG210EN.DAT"
+            com = "org2xm ../cache/" + key + ".org ORG210EN.DAT"
         os.chdir("misc")
         try:
             os.system(com)
@@ -250,7 +250,7 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
         except:
             os.chdir("..")
             raise
-        fi = "cache/&" + key + ".xm"
+        fi = "cache/" + key + ".xm"
         t = time.time()
         while time.time() - t < 12:
             time.sleep(0.2)
@@ -264,7 +264,7 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
                     print(repr(ex))                
                     pass
         if fmt != "xm":
-            fn = "cache/&" + key + "." + fmt
+            fn = "cache/" + key + "." + fmt
             try:
                 os.remove(fn)
             except FileNotFoundError:
@@ -278,11 +278,11 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
             )
             ff.run()
             try:
-                os.remove("cache/&" + key + ".org")
+                os.remove("cache/" + key + ".org")
             except FileNotFoundError:
                 pass
             try:
-                os.remove("cache/&" + key + ".xm")
+                os.remove("cache/" + key + ".xm")
             except FileNotFoundError:
                 pass
         else:
@@ -325,18 +325,14 @@ class CS_org2xm(Command):
         if fmt not in self.fmts:
             raise TypeError(fmt + " is not a supported output format.")
         name = org.split("/")[-1].replace(".org", "") + "." + fmt
-        returns = [None]
-        doParallel(orgConv, [org, wave, fmt, str(guild.id), guild.filesize_limit], returns, state=2)
-        t = time.time()
-        i = 0
-        while returns[0] is None and time.time() - t < _vars.timeout - 1:
-            if not i % 8:
-                await channel.trigger_typing()
-            await asyncio.sleep(0.5)
-            i += 0.5
-        fn = returns[0]
-        if fn is None:
-            raise TimeoutError("Request timed out.")
+        fn = await create_future(
+            orgConv,
+            org,
+            wave,
+            fmt,
+            "%" + str(guild.id),
+            guild.filesize_limit
+        )
         try:
             f = discord.File(fn[0], filename=name)
         except TypeError:
@@ -548,15 +544,8 @@ class CS_mod(Command):
 
     async def __call__(self, args, **void):
         argv = " ".join(args)
-        resp = [None]
-        doParallel(searchForums, [argv], resp, state=2)
-        data = douclub.search(argv)
-        t = time.time()
-        while resp[0] is None and time.time() - t < 5:
-            await asyncio.sleep(0.5)
-        if resp[0] is not None:
-            data += resp[0]
-        print(data)
+        data = await create_future(searchForums, argv)
+        data += douclub.search(argv)
         if len(data):
             response = "Search results for **" + argv + "**:\n"
             for l in data:

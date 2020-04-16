@@ -1,16 +1,14 @@
-import asyncio, discord, json
+import os, sys, subprocess, psutil, asyncio, discord, json, requests
+import urllib.request, urllib.parse, concurrent.futures
 from smath import *
-import urllib.request, urllib.parse, requests
 
 urlParse = urllib.parse.quote
+create_task = asyncio.ensure_future
+CalledProcessError = subprocess.CalledProcessError
+Process = psutil.Process()
 escape_markdown = discord.utils.escape_markdown
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
-
-if hasattr(asyncio, "create_task"):
-    create_task = asyncio.create_task
-else:
-    create_task = asyncio.ensure_future
 
 
 def htmlDecode(s):
@@ -216,6 +214,9 @@ def randColour():
 def strURL(url):
     return str(url).replace(".webp", ".png")
 
+def shash(s):
+    return bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
+
 __imap = {
     "#": "",
     "<": "",
@@ -300,6 +301,107 @@ def urlOpen(url):
     if resp.getcode() != 200:
         raise ConnectionError("Error " + str(resp.code))
     return resp
+    
+
+__subs__ = {}
+
+def subCount():
+    count = 0
+    for i in list(__subs__):
+        if __subs__[i].is_running():
+            count += 1
+        else:
+            __subs__.pop(i)
+    return count
+
+def subKill():
+    for sub in __subs__.values():
+        sub.kill()
+    __subs__.clear()
+
+async def subFunc(key, com, data_in, timeout=60):
+    while len(__subs__) > 256:
+        i = iter(tuple(__subs__))
+        try:
+            while i:
+                k = next(i)
+                if __subs__[k].kill is not None:
+                    __subs__[k].kill()
+                    __subs__.pop(k)
+                    break
+        except StopIteration:
+            pass
+    if key in __subs__:
+        try:
+            while __subs__[key].busy:
+                time.sleep(0.01)
+        except KeyError:
+            return subFunc(key, com, data_in, timeout)
+    else:
+        __subs__[key] = freeClass(
+            busy=True,
+            is_running=lambda: True,
+            kill=None,
+        )
+    if isinstance(__subs__[key], psutil.Popen):
+        proc = __subs__[key]
+        if not proc.is_running():
+            __subs__.pop(key)
+            del proc
+            return subFunc(key, com, data_in, timeout)
+    else:
+        proc = __subs__[key] = psutil.Popen(
+            com,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    proc.busy = True
+    d = repr(bytes(str(data_in), "utf-8")).encode("utf-8") + b"\n"
+    print(d)
+    proc.stdin.write(d)
+    proc.stdin.flush()
+    try:
+        resp = await asyncio.wait_for(wait_for(proc.stdout.readline), timeout=timeout)
+    except TimeoutError:
+        proc.kill()
+        raise
+    proc.busy = False
+    output = evalEX(resp)
+    return output
+
+
+def evalEX(exc):
+    is_ex = False
+    try:
+        ex = eval(exc)
+    except NameError:
+        if type(exc) is bytes:
+            exc = exc.decode("utf-8")
+        ex = RuntimeError(exc[exc.index("(") + 1:exc.index(")")].strip("'"))
+    try:
+        if issubclass(ex.__class__, Exception):
+            is_ex = True
+    except AttributeError:
+        pass
+    if is_ex:
+        raise ex
+    return ex
+
+
+def funcSafe(func, *args, print_exc=False, **kwargs):
+    try:
+        return [func(*args, **kwargs)]
+    except Exception as ex:
+        if print_exc:
+            print(traceback.format_exc())
+        return repr(ex)
+
+
+athreads = concurrent.futures.ThreadPoolExecutor(max_workers=64)
+
+def create_future(func, *args, **kwargs):
+    return athreads.submit(func, *args, **kwargs)
 
 
 def logClear():
@@ -338,7 +440,8 @@ class __logPrinter():
         self.print_temp += str(sep).join((str(i) for i in args)) + str(end) + str(prefix)
 
     def __init__(self, file=None):
-        doParallel(self.updatePrint, [file], name="printer", killable=False)
+        self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.future = athreads.submit(self.updatePrint, file)
 
 __printer = __logPrinter("log.txt")
 print = __printer.logPrint
