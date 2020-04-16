@@ -14,7 +14,7 @@ class customAudio(discord.AudioSource):
     
     length = 1920
     empty = numpy.zeros(length >> 1, float)
-    emptybuff = numpy.zeros(self.length, numpy.uint16).tobytes()
+    emptybuff = numpy.zeros(length, numpy.uint16).tobytes()
     filt = signal.butter(1, 0.125, btype="low", output="sos")
     #fff = numpy.abs(numpy.fft.fftfreq(960, 1/48000))[:481]
     static = lambda self, *args: numpy.random.rand(self.length) * 65536 - 32768
