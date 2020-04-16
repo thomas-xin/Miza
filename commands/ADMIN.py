@@ -921,8 +921,7 @@ class UpdateMessageLogs(Database):
                     await asyncio.sleep(20 * (i ** 2 + 1))
                 returns[0] = messages
             except:
-                print(channel.name)
-                print(traceback.format_exc())
+                print('Failed to get channel history for "',channel.name,'" in server "',guild,'".')
                 returns[0] = []
 
         print(guild, "loading...")
