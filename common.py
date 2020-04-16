@@ -362,12 +362,12 @@ async def subFunc(key, com, data_in, timeout=60):
     proc.stdin.write(d)
     proc.stdin.flush()
     try:
-        resp = await asyncio.wait_for(wait_for(proc.stdout.readline), timeout=timeout)
-    except TimeoutError:
+        resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
+    except (TimeoutError, asyncio.exceptions.TimeoutError):
         proc.kill()
         raise
     proc.busy = False
-    output = evalEX(resp)
+    output = evalEX(evalEX(resp))
     return output
 
 
@@ -401,7 +401,7 @@ def funcSafe(func, *args, print_exc=False, **kwargs):
 athreads = concurrent.futures.ThreadPoolExecutor(max_workers=64)
 
 def create_future(func, *args, **kwargs):
-    return athreads.submit(func, *args, **kwargs)
+    return asyncio.wrap_future(athreads.submit(func, *args, **kwargs))
 
 
 def logClear():

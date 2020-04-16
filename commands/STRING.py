@@ -106,6 +106,7 @@ class Translate(Command):
 
 class Math(Command):
     time_consuming = True
+    _timeout_ = 4
     name = ["Python", "PY", "Sympy", "M", "Calc"]
     min_level = 0
     description = "Evaluates a math formula."
