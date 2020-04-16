@@ -1240,7 +1240,7 @@ class Queue(Command):
             dur = 0
             added = deque()
             names = []
-            for e in res:
+            for e in resp:
                 name = e.name
                 url = e.url
                 duration = e.duration
