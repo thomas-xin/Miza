@@ -89,7 +89,7 @@ class Ban(Command):
     flags = "hvf"
 
     async def __call__(self, _vars, args, user, channel, guild, flags, perm, name, **void):
-        update = self.data["bans"].update
+        update = self._vars.database.bans.update
         dtime = datetime.datetime.utcnow().timestamp()
         if args:
             check = args[0].lower()
@@ -116,6 +116,7 @@ class Ban(Command):
                 )
                 self.permError(perm, t_perm + 1, reason)
         g_bans = await getBans(_vars, guild)
+        msg = None
         if name.lower() == "unban":
             tm = -1
             args = ["", ""]
@@ -141,7 +142,7 @@ class Ban(Command):
                         print(traceback.format_exc())
                 return (
                     "Currently banned users from **" 
-                    + discord.utils.escape_markdown(guild.name) + "**:\n```css\n"
+                    + escape_markdown(guild.name) + "**:\n```css\n"
                     + output.strip("\n") + "```"
                 )
             tm = 0
@@ -150,24 +151,23 @@ class Ban(Command):
                 orig = 0
             else:
                 orig = g_bans.get(t_user.id, 0)
-            if len(args) >= 3:
-                expr = " ".join(args[1:])
+            bantype = " ".join(args[1:])
+            if "for" in bantype:
+                i = bantype.index("for")
+                expr = bantype[:i].strip()
+                msg = bantype[i + 3:].strip()
             else:
-                expr = " ".join(args[1:])
+                expr = bantype
             _op = None
             for operator in ("+=", "-=", "*=", "/=", "%="):
                 if expr.startswith(operator):
-                    expr = expr[2:].strip(" ")
+                    expr = expr[2:].strip()
                     _op = operator[0]
             num = await _vars.evalTime(expr, guild)
             if _op is not None:
                 num = eval(str(orig) + _op + str(num), {}, infinum)
             tm = num
         await channel.trigger_typing()
-        if len(args) >= 3:
-            msg = args[-1]
-        else:
-            msg = None
         if t_user is None:
             if "f" not in flags:
                 response = uniStr(
@@ -253,7 +253,7 @@ class Ban(Command):
 
 class RoleGiver(Command):
     server_only = True
-    name = ["Verifier", "AutoRole"]
+    name = ["Verifier"]
     min_level = 3
     min_display = "3+"
     description = "Adds an automated role giver to the current channel."
@@ -261,9 +261,9 @@ class RoleGiver(Command):
     flags = "aedx"
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
-        update = self.data["rolegivers"].update
+        update = self._vars.database.rolegivers.update
         _vars = self._vars
-        data = _vars.data["rolegivers"]
+        data = _vars.data.rolegivers
         if "d" in flags:
             if argv:
                 react = args[0].lower()
@@ -297,23 +297,28 @@ class RoleGiver(Command):
         react = args[0].lower()
         if len(react) > 64:
             raise OverflowError("Search substring too long.")
-        roles = hlist()
         r = verifyID(" ".join(args[1:]))
         if len(guild.roles) <= 1:
-            rolelist = await guild.fetch_roles()
-        else:
-            rolelist = guild.roles
+            guild.roles = await guild.fetch_roles()
+            guild.roles.sort()
+        rolelist = guild.roles
         if type(r) is int:
             for i in rolelist:
                 if i.id == r:
                     role = i
-                    roles.append(role)
+                    break
         else:
-            r = r.replace(" ", "").lower()
-            for i in rolelist:
-                if reconstitute(i).replace(" ", "").lower() == r:
-                    role = i
-                    roles.append(role)
+            role = await strLookup(
+                rolelist,
+                r,
+                qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
+            )
+        if not inf > perm:
+            memb = guild.get_member(user.id)
+            if memb is None:
+                memb = await guild.fetch_member(user.id)
+            if memb.top_role <= role:
+                raise PermissionError("Target role is higher than your highest role.")
         alist = assigned.setdefault(react, [[], False])
         alist[1] |= "x" in flags
         alist[0].append(role.id) 
@@ -325,59 +330,149 @@ class RoleGiver(Command):
         )
 
 
-# class RainbowRole:
-#     is_command = True
-#     server_only = True
+class AutoRole(Command):
+    server_only = True
+    name = ["InstaRole"]
+    min_level = 3
+    min_display = "3+"
+    _timeout_ = 7
+    description = (
+        "Causes any new user joining the server to automatically gain the targeted role.\n"
+        + "Input multiple roles to create a randomized role giver."
+    )
+    usage = "<role[]> <disable(?d)> <update_all(?x)>"
+    flags = "aedx"
 
-#     def __init__(self):
-#         self.name = ["DynamicRole"]
-#         self.min_level = 3
-#         self.description = "Causes target role to randomly change colour."
-#         self.usage = "<0:role[]> <mim_delay[16]> <disable(?d)>"
-#         self.flags = "aed"
+    async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
+        update = self._vars.database.autoroles.update
+        _vars = self._vars
+        data = _vars.data.autoroles
+        if "d" in flags:
+            assigned = data.get(guild.id, None)
+            if argv and assigned:
+                i = await _vars.evalMath(argv, guild)
+                roles = assigned.pop(i)
+                removed = []
+                for r in roles:
+                    try:
+                        role = await _vars.fetch_role(r, guild)
+                    except:
+                        print(traceback.format_exc())
+                        continue
+                    removed.append(role)
+                if "x" in flags:
+                    i = 1
+                    for member in guild.members:
+                        for role in removed:
+                            if role in member.roles:
+                                new = {role: True for role in member.roles}
+                                for role in tuple(new):
+                                    if role in removed:
+                                        new.pop(role)
+                                create_task(member.edit(roles=list(new), reason="InstaRole"))
+                                break
+                        if not i % 5:
+                            await asyncio.sleep(5)
+                        i += 1
+                update()
+                return "```css\nRemoved " + sbHighlight(", ".join([str(role) for role in removed])) + " from the autorole list for " + sbHighlight(guild) + ".```"
+            if guild.id in data:
+                data.pop(channel.id)
+                update()
+            return "```css\nRemoved all items from the autorole list for " + sbHighlight(guild) + ".```"
+        assigned = data.setdefault(guild.id, hlist())
+        if not argv:
+            rlist = hlist()
+            for roles in assigned:
+                new = hlist()
+                for r in roles:
+                    role = await _vars.fetch_role(r, guild)
+                    new.append(role)
+                rlist.append(new)
+            if not assigned:
+                return (
+                    "```ini\nNo currently active autoroles for " + sbHighlight(guild) + ".```"
+                )
+            return (
+                "Currently active autoroles for **" + escape_markdown(guild.name)
+                + "**:\n```ini\n" + strIter(rlist) + "```"
+            )
+        if sum(len(alist) for alist in assigned) >= 8:
+            raise OverflowError(
+                "Autorole list for " + channel.name
+                + " has reached the maximum of 8 items. "
+                + "Please remove an item to add another."
+            )
+        roles = hlist()
+        rolenames = args
+        if len(guild.roles) <= 1:
+            guild.roles = await guild.fetch_roles()
+            guild.roles.sort()
+        rolelist = guild.roles
+        for r in rolenames:
+            if type(r) is int:
+                for i in rolelist:
+                    if i.id == r:
+                        role = i
+                        break
+            else:
+                role = await strLookup(
+                    rolelist,
+                    r,
+                    qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
+                )
+            if not inf > perm:
+                memb = guild.get_member(user.id)
+                if memb is None:
+                    memb = await guild.fetch_member(user.id)
+                if memb.top_role <= role:
+                    raise PermissionError("Target role is higher than your highest role.")
+            roles.append(role)
+        assigned.append(hlist(role.id for role in roles))
+        update()
+        if "x" in flags:
+            i = 1
+            for member in guild.members:
+                role = random.choice(roles)
+                if role not in member.roles:
+                    create_task(member.add_roles(role, reason="InstaRole", atomic=True))
+                    if not i % 5:
+                        await asyncio.sleep(5)
+                    i += 1
+        return (
+            "```css\nAdded [" + noHighlight(", ".join([str(role) for role in roles]))
+            + "] to the autorole list for [" + noHighlight(guild) + "].```"
+        )
 
-#     async def __call__(self, _vars, flags, args, argv, guild, **void):
-#         update = self.data["rolecolours"].update
-#         _vars = self._vars
-#         colours = _vars.data["rolecolours"]
-#         guild_special = colours.setdefault(guild.id, {})
-#         if not argv:
-#             if "d" in flags:
-#                 colours.pop(guild.id)
-#                 update()
-#                 return (
-#                     "```css\nRemoved all active dynamic role colours in ["
-#                     + noHighlight(guild.name) + "].```"
-#                 )
-#             return (
-#                 "Currently active dynamic role colours in **" + guild.name
-#                 + "**:\n```ini\n" + strIter(guild_special) + "```"
-#             )
-#         if len(guild_special) >= 7:
-#             raise OverflowError(
-#                 "Rainbow role list for " + guild.name
-#                 + " has reached the maximum of 7 items. "
-#                 + "Please remove an item to add another."
-#             )
-#         role = args[0].lower()
-#         if len(args) < 2:
-#             delay = 16
-#         else:
-#             delay = await _vars.evalMath(" ".join(args[1:]), guild.id)
-#         for r in guild.roles:
-#             if role in r.name.lower():
-#                 if "d" in flags:
-#                     try:
-#                         guild_special.pop(r.id)
-#                     except KeyError:
-#                         pass
-#                 else:
-#                     guild_special[r.id] = delay
-#         update()
-#         return (
-#             "Changed dynamic role colours for **" + guild.name
-#             + "** to:\n```ini\n" + strIter(guild_special) + "```"
-#         )
+
+class RolePreserver(Command):
+    server_only = True
+    name = ["StickyRoles"]
+    min_level = 3
+    min_display = "3+"
+    description = "Causes ⟨MIZA⟩ to save roles for all users, and re-add them when they leave and rejoin."
+    usage = "<enable(?e)> <disable(?d)>"
+    flags = "aed"
+
+    async def __call__(self, flags, guild, **void):
+        update = self._vars.database.rolepreservers.update
+        _vars = self._vars
+        following = _vars.data.rolepreservers
+        curr = following.get(guild.id)
+        if "d" in flags:
+            if guild.id in following:
+                following.pop(guild.id)
+                update()
+            return "```css\nDisabled role preservation for [" + noHighlight(guild) + "].```"
+        elif "e" in flags or "a" in flags:
+            following[guild.id] = {}
+            update()
+            return "```css\nEnabled role preservation for [" + noHighlight(guild) + "].```"
+        else:
+            return (
+                "```ini\nRole preservation is currently " + "not " * (curr is None)
+                + "enabled in [" + noHighlight(guild) + "].```"
+            )
 
 
 class Lockdown(Command):
@@ -455,99 +550,17 @@ class SaveChannel(Command):
             await asyncio.sleep(0.32)
         return bytes(s, "utf-8")
 
-                  
-class Dogpile(Command):
-    server_only = True
-    min_level = 2
-    description = "Causes Miza to automatically imitate users when 3+ of the same messages are posted in a row."
-    usage = "<enable(?e)> <disable(?d)>"
-    flags = "aed"
-
-    async def __call__(self, flags, guild, **void):
-        update = self.data["dogpiles"].update
-        _vars = self._vars
-        following = _vars.data["dogpiles"]
-        curr = following.get(guild.id, False)
-        if "d" in flags:
-            if guild.id in following:
-                following.pop(guild.id)
-                update()
-            return "```css\nDisabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
-        elif "e" in flags or "a" in flags:
-            following[guild.id] = True
-            update()
-            return "```css\nEnabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
-        else:
-            return (
-                "```css\nCurrently " + "not " * (not curr)
-                + "dogpile imitating in [" + noHighlight(guild.name) + "].```"
-            )
-
-
-class React(Command):
-    server_only = True
-    name = ["AutoReact"]
-    min_level = 2
-    description = "Causes Miza to automatically assign a reaction to messages containing the substring."
-    usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
-    flags = "aed"
-
-    async def __call__(self, _vars, flags, guild, argv, args, **void):
-        update = self.data["reacts"].update
-        _vars = self._vars
-        following = _vars.data["reacts"]
-        curr = following.setdefault(guild.id, {})
-        if not argv:
-            if "d" in flags:
-                if guild.id in following:
-                    following.pop(guild.id)
-                    update()
-                return "```css\nRemoved all auto reacts for [" + noHighlight(guild.name) + "].```"
-            else:
-                if not curr:
-                    return (
-                        "```ini\nNo currently active auto reacts for ["
-                        + noHighlight(guild.name) + "].```"
-                    )
-                return (
-                    "Currently active auto reacts for **" + discord.utils.escape_markdown(guild.name)
-                    + "**:\n```ini\n" + strIter(curr) + "```"
-                )
-        a = args[0].lower()[:64]
-        if "d" in flags:
-            if a in curr:
-                curr.pop(a)
-                update()
-                return (
-                    "```css\nRemoved [" + noHighlight(a) + "] from the auto react list for ["
-                    + noHighlight(guild.name) + "].```"
-                )
-            else:
-                raise LookupError(str(a) + " is not in the auto react list.")
-        if len(curr) >= 256:
-            raise OverflowError(
-                "React list for " + guild.name
-                + " has reached the maximum of 256 items. "
-                + "Please remove an item to add another."
-            )
-        curr[a] = args[1]
-        update()
-        return (
-            "```css\nAdded [" + noHighlight(a) + "] ➡️ [" + noHighlight(args[1]) + "] to the auto react list for ["
-            + noHighlight(guild.name) + "].```"
-        )
-
 
 class UserLog(Command):
     server_only = True
     min_level = 3
-    description = "Causes Miza to log user events from the server, in the current channel."
+    description = "Causes ⟨MIZA⟩ to log user events from the server, in the current channel."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
-        data = _vars.data["logU"]
-        update = _vars.database["logU"].update
+        data = _vars.data.logU
+        update = _vars.database.logU.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
@@ -579,13 +592,13 @@ class UserLog(Command):
 class MessageLog(Command):
     server_only = True
     min_level = 3
-    description = "Causes Miza to log message events from the server, in the current channel."
+    description = "Causes ⟨MIZA⟩ to log message events from the server, in the current channel."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
-        data = _vars.data["logM"]
-        update = _vars.database["logM"].update
+        data = _vars.data.logM
+        update = _vars.database.logM.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
@@ -617,13 +630,13 @@ class MessageLog(Command):
 class FileLog(Command):
     server_only = True
     min_level = 3
-    description = "Causes Miza to log deleted files from the server, in the current channel."
+    description = "Causes ⟨MIZA⟩ to log deleted files from the server, in the current channel."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
     async def __call__(self, _vars, flags, channel, guild, **void):
-        data = _vars.data["logF"]
-        update = _vars.database["logF"].update
+        data = _vars.data.logF
+        update = _vars.database.logF.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
@@ -758,7 +771,7 @@ class UpdateUserLogs(Database):
             if str(before) != str(after):
                 emb.add_field(
                     name="Username",
-                    value=discord.utils.escape_markdown(str(before)) + " <:arrow:688320024586223620> " + discord.utils.escape_markdown(str(after)),
+                    value=escape_markdown(str(before)) + " <:arrow:688320024586223620> " + escape_markdown(str(after)),
                 )
                 change = True
                 colour[0] += 255
@@ -766,7 +779,7 @@ class UpdateUserLogs(Database):
                 if before.display_name != after.display_name:
                     emb.add_field(
                         name="Nickname",
-                        value=discord.utils.escape_markdown(before.display_name) + " <:arrow:688320024586223620> " + discord.utils.escape_markdown(after.display_name),
+                        value=escape_markdown(before.display_name) + " <:arrow:688320024586223620> " + escape_markdown(after.display_name),
                     )
                     change = True
                     colour[0] += 255
@@ -781,11 +794,11 @@ class UpdateUserLogs(Database):
                             add.append(r)
                     rchange = ""
                     if sub:
-                        rchange = "<:minus:688316020359823364> " + discord.utils.escape_markdown(", ".join(str(r) for r in sub))
+                        rchange = "<:minus:688316020359823364> " + escape_markdown(", ".join(str(r) for r in sub))
                     if add:
                         rchange += (
                             "\n" * bool(rchange) + "<:plus:688316007093370910> " 
-                            + discord.utils.escape_markdown(", ".join(str(r) for r in add))
+                            + escape_markdown(", ".join(str(r) for r in add))
                         )
                     if rchange:
                         emb.add_field(name="Roles", value=rchange)
@@ -886,10 +899,10 @@ class UpdateUserLogs(Database):
 class UpdateMessageLogs(Database):
     name = "logM"
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.searched = False
         self.dc = {}
-        super().__init__(_vars)
+        super().__init__(*args)
 
     async def cacheGuild(self, guild, lim=65536):
 
@@ -978,7 +991,10 @@ class UpdateMessageLogs(Database):
                 await channel.send(embed=emb)
 
     async def _delete_(self, message, bulk=False, **void):
+        cu_id = self._vars.client.user.id
         if bulk:
+            if message.author.bot and message.author.id != cu_id:
+                return
             if self._vars.isDeleted(message) < 2:
                 print(strMessage(message, username=True))
             return
@@ -1001,7 +1017,6 @@ class UpdateMessageLogs(Database):
                 discord.AuditLogAction.message_bulk_delete,
             )[bulk]
             try:
-                cu_id = self._vars.client.user.id
                 t = u
                 init = "<@" + str(t.id) + ">"
                 if self._vars.isDeleted(message):
@@ -1038,6 +1053,8 @@ class UpdateMessageLogs(Database):
                                 init = "<@" + str(t.id) + ">"
                                 # print(t, e.target)
                 if t.bot or u.id == t.id == cu_id:
+                    if message.author.bot and message.author.id != cu_id:
+                        return
                     if self._vars.isDeleted(message) < 2:
                         print(strMessage(message, username=True))
                     return
@@ -1137,72 +1154,6 @@ class UpdateFileLogs(Database):
                 await channel.send(msg, embed=emb, files=fils)
 
 
-class UpdateReacts(Database):
-    name = "reacts"
-
-    async def _nocommand_(self, text, edit, orig, message, **void):
-        if message.guild is None or not orig:
-            return
-        g_id = message.guild.id
-        following = self.data
-        if g_id in following:
-            words = text.split(" ")
-            try:
-                reacting = {}
-                for k in following[g_id]:
-                    if hasSymbol(k):
-                        if k in words:
-                            emoji = following[g_id][k]
-                            reacting[words.index(k) / len(words)] = emoji
-                    else:
-                        if k in message.content:
-                            emoji = following[g_id][k]
-                            reacting[message.content.index(k) / len(message.content)] = emoji
-                for r in sorted(list(reacting)):
-                    await message.add_reaction(reacting[r])
-            except ZeroDivisionError:
-                pass
-            except:
-                print(traceback.format_exc())
-
-
-class UpdateDogpiles(Database):
-    name = "dogpiles"
-
-    def __init__(self, _vars):
-        self.msgFollow = {}
-        super().__init__(_vars)
-
-    async def _nocommand_(self, text, edit, orig, message, **void):
-        if message.guild is None or not orig:
-            return
-        g_id = message.guild.id
-        following = self.data
-        if g_id in following:
-            u_id = message.author.id
-            c_id = message.channel.id
-            if not edit:
-                if following[g_id]:
-                    checker = orig
-                    curr = self.msgFollow.get(c_id)
-                    if curr is None:
-                        curr = [checker, 1, 0]
-                        self.msgFollow[c_id] = curr
-                    elif checker == curr[0] and u_id != curr[2]:
-                        curr[1] += 1
-                        if curr[1] >= 3:
-                            curr[1] = xrand(-3) + 1
-                            if len(checker):
-                                create_task(message.channel.send(checker))
-                    else:
-                        if len(checker) > 100:
-                            checker = ""
-                        curr[0] = checker
-                        curr[1] = xrand(-1, 2)
-                    curr[2] = u_id
-                    #print(curr)
-
-
 class UpdateRolegivers(Database):
     name = "rolegivers"
 
@@ -1212,9 +1163,9 @@ class UpdateRolegivers(Database):
         user = message.author
         guild = message.guild
         _vars = self._vars
-        assigned = self.data.get(message.channel.id, {})
+        assigned = self.data.get(message.channel.id, ())
         for k in assigned:
-            if ((k in text) if hasSymbol(k) else (k in message.content)):
+            if ((k in text) if hasSymbol(k) else (k in message.content.lower())):
                 alist = assigned[k]
                 for r in alist[0]:
                     role = guild.get_role(r)
@@ -1228,7 +1179,7 @@ class UpdateRolegivers(Database):
                         continue
                     await user.add_roles(
                         role,
-                        reason="Keyword found in message.",
+                        reason="Keyword \"" + k + "\" found in message \"" + message.content + "\".",
                         atomic=True,
                     )
                     print("Granted role " + str(role) + " to " + str(user) + ".")
@@ -1236,62 +1187,52 @@ class UpdateRolegivers(Database):
                     await _vars.silentDelete(message)
 
 
+class UpdateAutoRoles(Database):
+    name = "autoroles"
+
+    async def _join_(self, user, guild, **void):
+        if guild.id in self.data:
+            roles = []
+            assigned = self.data[guild.id]
+            for rolelist in assigned:
+                try:
+                    role = await self._vars.fetch_role(random.choice(rolelist), guild)
+                    roles.append(role)
+                except:
+                    print(traceback.format_exc())
+            print(roles)
+            await user.add_roles(*roles, reason="AutoRole", atomic=False)
+
+
+class UpdateRolePreservers(Database):
+    name = "rolepreservers"
+
+    async def _join_(self, user, guild, **void):
+        if guild.id in self.data:
+            if user.id in self.data[guild.id]:
+                roles = []
+                assigned = self.data[guild.id][user.id]
+                for r_id in assigned:
+                    try:
+                        role = await self._vars.fetch_role(r_id, guild)
+                        roles.append(role)
+                    except:
+                        print(traceback.format_exc())
+                print(user, roles)
+                await user.edit(roles=roles, reason="RolePreserver")
+                self.data[guild.id].pop(user.id)
+
+    async def _leave_(self, user, guild, **void):
+        if guild.id in self.data:
+            roles = user.roles[1:]
+            assigned = [role.id for role in roles]
+            print(user, assigned)
+            self.data[guild.id][user.id] = assigned
+            self.update()
+
+
 class UpdatePerms(Database):
     name = "perms"
-
-
-# class UpdateColours:
-#     is_database = True
-#     name = "rolecolours"
-
-#     def __init__(self):
-#         self.counter = 0
-#         self.count = 0
-#         self.delay = 0
-#         self.busy_guilds = {}
-
-#     async def changeColour(self, g_id, roles):
-#         if self.busy_guilds.get(g_id, 0) > 1:
-#             return
-#         addDict(self.busy_guilds, {g_id: 1})
-#         try:
-#             guild = await self._vars.fetch_guild(g_id)
-#             l = list(roles)
-#             for r in l:
-#                 try:
-#                     role = guild.get_role(r)
-#                     delay = roles[r]
-#                     if not random.randint(0, ceil(delay)):
-#                         col = randColour()
-#                         try:
-#                             await role.edit(colour=discord.Colour(col))
-#                         except KeyError:
-#                             self.count += 15
-#                             self._vars.blocked += 1
-#                             break
-#                         self.count += 1
-#                         #print("Edited role " + role.name)
-#                     await asyncio.sleep(frand(2))
-#                 except discord.Forbidden:
-#                     print(traceback.format_exc())
-#                 except discord.HTTPException:
-#                     print(traceback.format_exc())
-#                     self._vars.blocked += 60
-#                     break
-#         except:
-#             print(traceback.format_exc())
-#         addDict(self.busy_guilds, {g_id: -1})
-
-#     async def __call__(self):
-#         self.counter = self.counter + 1 & 65535
-#         if time.time() > self.delay:
-#             self.delay = time.time() + 60
-#             self.count = 0
-#         for g in self.data:
-#             if self.count < 48 and self._vars.blocked <= 0:
-#                 create_task(self.changeColour(g, self.data[g]))
-#             else:
-#                 break
 
 
 async def getBans(_vars, guild):
@@ -1315,9 +1256,9 @@ async def getBans(_vars, guild):
 class UpdateBans(Database):
     name = "bans"
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.synced = False
-        super().__init__(_vars)
+        super().__init__(*args)
 
     async def __call__(self, **void):
         while self.busy:

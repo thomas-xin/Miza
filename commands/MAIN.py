@@ -18,103 +18,60 @@ class Help(Command):
 
     async def __call__(self, args, user, channel, guild, flags, perm, **void):
         _vars = self._vars
-        enabled = _vars.data["enabled"]
+        enabled = _vars.data.enabled
         g_id = guild.id
         prefix = _vars.getPrefix(g_id)
         enabled = enabled.get(channel.id, list(default_commands))
-        c_name = getattr(channel, "name", "DM")
-        admin = (not inf > perm, isnan(perm))[c_name == "DM"]
-        categories = _vars.categories
-        verb = "v" in flags
-        show = []
+        v = "v" in flags
+        emb = discord.Embed(colour=randColour())
+        emb.set_author(name="❓ Help ❓")
+        found = {}
         for a in args:
-            if (a in categories and (a in enabled or admin)):
-                show.append(
-                    "\nCommands for **" + user.name
-                    + "** in <#" + str(channel.id)
-                    + "> in category **" + a
-                    + "**:\n"
-                )
-                for com in categories[a]:
-                    name = com.__name__
-                    min_level = com.min_level
-                    description = com.description
-                    usage = com.usage
-                    if min_level > perm or (not isnan(perm) and isnan(min_level)):
-                        continue
-                    if c_name == "DM" and getattr(com, "server_only", False):
-                        continue
-                    newstr = (
-                        ("```xml\n", "```ini\n")["v" in flags] + prefix + name
-                        + "\nAliases: " + ", ".join(com.name[:-1])
-                        + "\nEffect: " + description
-                        + (
-                            "\nUsage: " + prefix + name + " " + usage
-                            + "\nLevel: [" + str(com.min_display) + "]"
-                        ) * ("v" in flags)
-                        + "```"
+            a = a.lower()
+            if a in _vars.categories:
+                coms = _vars.categories[a]
+            elif a in _vars.commands:
+                coms = _vars.commands[a]
+            else:
+                continue
+            for com in coms:
+                if com.__name__ in found:
+                    found[com.__name__].append(com)
+                else:
+                    found[com.__name__] = hlist([com])
+        if found:
+            i = 0
+            for k in found:
+                if i >= 25:
+                    break
+                coms = found[k]
+                for com in coms:
+                    a = ", ".join(com.name)
+                    if not a:
+                        a = "[none]"
+                    s = "```ini\n[Aliases] " + a
+                    s += "\n[Effect] " + com.description.replace("⟨MIZA⟩", _vars.client.user.name)
+                    if v or len(found) <= 1:
+                        s += (
+                            "\n[Usage] " + prefix + com.__name__ + " " + com.usage
+                            + "\n[Level] " + str(com.min_display)
+                        )
+                    s += "```"
+                    emb.add_field(
+                        name=prefix + com.__name__,
+                        value=s,
+                        inline=False
                     )
-                    show.append(newstr)
-        if not show:
-            for c in categories:
-                catg = categories[c]
-                if not (c in enabled or admin):
-                    continue
-                for com in catg:
-                    name = com.__name__
-                    min_level = com.min_level
-                    description = com.description
-                    usage = com.usage
-                    if min_level > perm or (not isnan(perm) and isnan(min_level)):
-                        continue
-                    if c_name == "DM" and getattr(com, "server_only", False):
-                        continue
-                    found = False
-                    for n in com.name:
-                        n = n.lower()
-                        if n in args:
-                            found = True
-                    if found:
-                        newstr = (
-                            "```xml\n" + prefix + name
-                            + "\nCategory: " + c
-                            + "\nAliases: " + ", ".join(com.name[:-1])
-                            + "\nEffect: " + description
-                            + (
-                                "\nUsage: " + prefix + name + " " + usage
-                                + "\nLevel: [" + str(com.min_display) + "]"
-                            )
-                            + "```"
-                        )
-                        if (not len(show)) or len(show[-1]) < len(newstr):
-                            show = [newstr]
-        if not show:
-            commands = hlist()
-            for catg in categories:
-                if catg in enabled or admin and catg in standard_commands:
-                    commands.extend(categories[catg])
-            for com in commands:
-                name = com.__name__
-                min_level = com.min_level
-                description = com.description
-                usage = com.usage
-                if min_level > perm or (not isnan(perm) and isnan(min_level)):
-                    continue
-                if c_name == "DM" and getattr(com, "server_only", False):
-                    continue
-                if description != "":
-                    if not verb:
-                        show.append(prefix + name)
-                    else:
-                        show.append(
-                            "\nUsage: " + prefix + name + " " + usage
-                            + "\nEffect: " + com.description
-                        )
-            return (
-                "Commands for **" + user.name + "** in <#" + str(channel.id)
-                + ">:\n```xml\n" + "\n".join(show) + "```", 1
+                i += 1
+        else:
+            emb.description = (
+                "Please enter a command category to display usable commands,\nor see "
+                + "[Commands](https://github.com/thomas-xin/Miza/wiki/Commands) for full command list."
             )
-        return "\n".join(show), 1
+            if _vars.categories:
+                s = "```ini\n" + " ".join([sbHighlight(c) for c in _vars.categories]) + "```"
+                emb.add_field(name="Command category list", value=s)
+        return freeClass(embed=emb), 1
 
 
 class Perms(Command):
@@ -204,9 +161,9 @@ class EnabledCommands(Command):
     flags = "aedlh"
 
     async def __call__(self, argv, flags, user, channel, perm, **void):
-        update = self.data["enabled"].update
+        update = self.data.enabled.update
         _vars = self._vars
-        enabled = _vars.data["enabled"]
+        enabled = _vars.data.enabled
         if "a" in flags or "e" in flags or "d" in flags:
             req = 3
             if perm < req:
@@ -243,8 +200,8 @@ class EnabledCommands(Command):
                 )
             return (
                 "Currently enabled command categories in <#" + str(channel.id)
-                + ">:\n```css\n"
-                + str(enabled.get(channel.id, default_commands)) + "```"
+                + ">:\n```ini\n"
+                + strIter(enabled.get(channel.id, default_commands)) + "```"
             )
         else:
             if not catg in _vars.categories:
@@ -290,13 +247,13 @@ class Prefix(Command):
     name = ["ChangePrefix"]
     min_level = 0
     min_display = "0~3"
-    description = "Shows or changes the prefix for commands for this server."
+    description = "Shows or changes the prefix for ⟨MIZA⟩'s commands for this server."
     usage = "<prefix[]> <default(?d)>"
     flags = "hd"
 
     async def __call__(self, argv, guild, perm, _vars, flags, **void):
-        pref = _vars.data["prefixes"]
-        update = self.data["prefixes"].update
+        pref = _vars.data.prefixes
+        update = self.data.prefixes.update
         if "d" in flags:
             if guild.id in pref:
                 pref.pop(guild.id)
@@ -422,7 +379,7 @@ class Avatar(Command):
             except:
                 u_id = argv
             try:
-                p = _vars.get_mimic(u_id)
+                p = _vars.get_mimic(u_id, user)
                 return self.getMimicData(p)
             except:
                 try:
@@ -444,8 +401,8 @@ class Avatar(Command):
                                         u = await _vars.fetch_whuser(u_id, g)
                                     except EOFError:
                                         u = None
-                                        if g.id in _vars.data["counts"]:
-                                            if u_id in _vars.data["counts"][g.id]["counts"]:
+                                        if g.id in _vars.data.counts:
+                                            if u_id in _vars.data.counts[g.id]["counts"]:
                                                 u = _vars.ghostUser()
                                                 u.id = u_id
                                         if u is None:
@@ -491,7 +448,7 @@ class Info(Command):
         name = g.name
         try:
             u = g.owner
-        except AttributeError:
+        except (AttributeError, KeyError):
             u = None
         emb = discord.Embed(colour=randColour())
         emb.set_thumbnail(url=url)
@@ -506,14 +463,14 @@ class Info(Command):
         top = None
         try:
             g.region
-            pcount = await _vars.database["counts"].getUserMessages(None, g)
+            pcount = await _vars.database.counts.getUserMessages(None, g)
         except AttributeError:
             pcount = 0
         try:
             if "v" in flags:
-                pavg = await _vars.database["counts"].getUserAverage(None, g)
+                pavg = await _vars.database.counts.getUserAverage(None, g)
                 users = deque()
-                us = await _vars.database["counts"].getGuildMessages(g)
+                us = await _vars.database.counts.getGuildMessages(g)
                 if type(us) is str:
                     top = us
                 else:
@@ -601,7 +558,7 @@ class Info(Command):
             except:
                 u_id = argv
             try:
-                p = _vars.get_mimic(u_id)
+                p = _vars.get_mimic(u_id, user)
                 return self.getMimicData(p, flags)
             except:
                 try:
@@ -624,8 +581,8 @@ class Info(Command):
                                         u = await _vars.fetch_whuser(u_id, g)
                                     except EOFError:
                                         u = None
-                                        if g.id in _vars.data["counts"]:
-                                            if u_id in _vars.data["counts"][g.id]["counts"]:
+                                        if g.id in _vars.data.counts:
+                                            if u_id in _vars.data.counts[g.id]["counts"]:
                                                 u = _vars.ghostUser()
                                                 u.id = u_id
                                         if u is None:
@@ -664,20 +621,20 @@ class Info(Command):
         pos = None
         if "v" in flags:
             try:
-                coms = _vars.data["users"][u.id]["commands"]
+                coms = _vars.data.users[u.id]["commands"]
             except LookupError:
                 pass
             try:
                 ts = datetime.datetime.utcnow().timestamp()
-                seen = sec2Time(max(0, ts - _vars.data["users"][u.id]["last_seen"])) + " ago"
+                seen = sec2Time(max(0, ts - _vars.data.users[u.id]["last_seen"])) + " ago"
             except LookupError:
                 pass
             try:
-                gmsg = _vars.database["counts"].getUserGlobalMessageCount(u)
-                msgs = await _vars.database["counts"].getUserMessages(u, guild)
-                avgs = await _vars.database["counts"].getUserAverage(u, guild)
+                gmsg = _vars.database.counts.getUserGlobalMessageCount(u)
+                msgs = await _vars.database.counts.getUserMessages(u, guild)
+                avgs = await _vars.database.counts.getUserAverage(u, guild)
                 if guild.owner.id != client.user.id:
-                    us = await _vars.database["counts"].getGuildMessages(guild)
+                    us = await _vars.database.counts.getGuildMessages(guild)
                     if type(us) is str:
                         pos = us
                     else:
@@ -807,8 +764,8 @@ class Reminder(Command):
             args = shlex.split(argv)
         except ValueError:
             args = argv.split(" ")
-        rems = _vars.data["reminders"].get(user.id, [])
-        update = _vars.database["reminders"].update
+        rems = _vars.data.reminders.get(user.id, [])
+        update = _vars.database.reminders.update
         if "d" in flags:
             if not argv:
                 i = 0
@@ -875,7 +832,7 @@ class Reminder(Command):
             t=t + datetime.datetime.utcnow().timestamp(),
             u=1
         ))
-        _vars.data["reminders"][user.id] = sort(rems, key=lambda x: x["t"])
+        _vars.data.reminders[user.id] = sort(rems, key=lambda x: x["t"])
         update()
         emb = discord.Embed(description=msg)
         emb.set_author(name=name, url=url, icon_url=url)
@@ -901,8 +858,8 @@ class Announcement(Command):
             args = shlex.split(argv)
         except ValueError:
             args = argv.split(" ")
-        rems = _vars.data["reminders"].get(channel.id, [])
-        update = _vars.database["reminders"].update
+        rems = _vars.data.reminders.get(channel.id, [])
+        update = _vars.database.reminders.update
         if "d" in flags:
             if not argv:
                 i = 0
@@ -968,7 +925,7 @@ class Announcement(Command):
             t=t + datetime.datetime.utcnow().timestamp(),
             u=0
         ))
-        _vars.data["reminders"][channel.id] = sort(rems, key=lambda x: x["t"])
+        _vars.data.reminders[channel.id] = sort(rems, key=lambda x: x["t"])
         update()
         emb = discord.Embed(description=msg)
         emb.set_author(name=name, url=url, icon_url=url)
@@ -1177,9 +1134,9 @@ class UpdateMessageCount(Database):
         print(guild)
         print(self.data[guild.id])
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.scanned = False
-        super().__init__(_vars)
+        super().__init__(*args)
 
     async def __call__(self):
         if self.scanned:

@@ -141,14 +141,7 @@ class Text2048(Command):
                 self.spawn(gamestate[0], mode, 1)
             else:
                 pool = list(self.multis[i])
-                returns = [None]
-                t = time.time()
-                doParallel(self.randomSpam, [gamestate, mode, pool, returns])
-                while returns[0] is None and time.time() - t < self._vars.timeout / 3:
-                    await asyncio.sleep(0.2)
-                if returns[0] is None:
-                    return
-                self.gamestate, a = returns[0]
+                self.gamestate, a = await create_future(self.randomSpam, gamestate, mode, pool)
         if not a:
             gsr = str(gamestate).replace("[", "A").replace("]", "B").replace(",", "C").replace("-", "D").replace(" ", "")
             orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]).split("-")
@@ -290,6 +283,34 @@ class Text2048(Command):
         )
         return text
 
+    
+class Dogpile(Command):
+    server_only = True
+    min_level = 2
+    description = "Causes ⟨MIZA⟩ to automatically imitate users when 3+ of the same messages are posted in a row."
+    usage = "<enable(?e)> <disable(?d)>"
+    flags = "aed"
+
+    async def __call__(self, flags, guild, **void):
+        update = self.data.dogpiles.update
+        _vars = self._vars
+        following = _vars.data.dogpiles
+        curr = following.get(guild.id, False)
+        if "d" in flags:
+            if guild.id in following:
+                following.pop(guild.id)
+                update()
+            return "```css\nDisabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
+        elif "e" in flags or "a" in flags:
+            following[guild.id] = True
+            update()
+            return "```css\nEnabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
+        else:
+            return (
+                "```ini\nDogpile imitating is currently " + "not " * (not curr)
+                + "enabled in [" + noHighlight(guild.name) + "].```"
+            )
+
 
 class MathQuiz(Command):
     name = ["MathTest"]
@@ -299,7 +320,7 @@ class MathQuiz(Command):
     flags = "aed"
 
     async def __call__(self, channel, flags, argv, **void):
-        mathdb = self._vars.database["mathtest"]
+        mathdb = self._vars.database.mathtest
         if "d" in flags:
             if channel.id in mathdb.data:
                 mathdb.data.pop(channel.id)
@@ -322,8 +343,8 @@ class MimicConfig(Command):
     )
     
     async def __call__(self, _vars, user, perm, flags, args, **void):
-        mimicdb = _vars.data["mimics"]
-        update = _vars.database["mimics"].update
+        update = self.data.mimics.update
+        mimicdb = _vars.data.mimics
         m_id = "&" + str(verifyID(args.pop(0)))
         if m_id not in mimicdb:
             raise LookupError("Target mimic ID not found.")
@@ -337,12 +358,12 @@ class MimicConfig(Command):
         else:
             mimics = mimicdb[mimicdb[m_id].u_id]
             found = True
+        mimic = mimicdb[m_id]
         opt = args.pop(0).lower()
         if args:
             new = " ".join(args)
         else:
             new = None
-        mimic = mimicdb[m_id]
         if opt in ("name", "username", "nickname"):
             setting = "name"
         elif opt in ("avatar", "icon", "url"):
@@ -389,7 +410,7 @@ class MimicConfig(Command):
                     new = user.id
                 except:
                     try:
-                        mimi = _vars.get_mimic(mim)
+                        mimi = _vars.get_mimic(mim, user)
                         new = mimi.id
                     except:
                         raise LookupError("Target user or mimic ID not found.")
@@ -413,14 +434,14 @@ class Mimic(Command):
     flags = "aed"
     
     async def __call__(self, _vars, message, user, perm, flags, args, argv, **void):
-        mimicdb = _vars.data["mimics"]
-        update = _vars.database["mimics"].update
+        update = self.data.mimics.update
+        mimicdb = _vars.data.mimics
         if len(args) == 1 and "d" not in flags:
             user = await _vars.fetch_user(verifyID(argv))
         mimics = mimicdb.setdefault(user.id, {})
         if not argv or (len(args) == 1 and "d" not in flags):
             if "d" in flags:
-                _vars.data["mimics"].pop(user.id)
+                mimicdb.pop(user.id)
                 update()
                 return (
                     "```css\nSuccessfully removed all webhook mimics for ["
@@ -435,7 +456,7 @@ class Mimic(Command):
                     "```ini\nNo webhook mimics currently enabled for ["
                     + noHighlight(user) + "].```"
                 )
-            key = lambda x: limStr("⟨" + ", ".join(i + ": " + (str(noHighlight(_vars.data["mimics"][i].name)), "[<@" + str(getattr(_vars.data["mimics"][i], "auto", "None")) + ">]")[bool(getattr(_vars.data["mimics"][i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
+            key = lambda x: limStr("⟨" + ", ".join(i + ": " + (str(noHighlight(mimicdb[i].name)), "[<@" + str(getattr(mimicdb[i], "auto", "None")) + ">]")[bool(getattr(mimicdb[i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
             return (
                 "Currently enabled webhook mimics for **"
                 + discord.utils.escape_markdown(str(user)) + "**: ```ini\n"
@@ -445,6 +466,8 @@ class Mimic(Command):
         prefix = args.pop(0)
         if not prefix:
             raise IndexError("Prefix must not be empty.")
+        if len(prefix) > 16:
+            raise OverflowError("Must be 16 or fewer in length.")
         if "d" in flags:
             try:
                 mlist = mimics[prefix]
@@ -452,7 +475,7 @@ class Mimic(Command):
                     raise KeyError
                 if len(mlist):
                     m_id = mlist.pop(0)
-                    mimic = _vars.data["mimics"].pop(m_id)
+                    mimic = mimicdb.pop(m_id)
                 else:
                     mimics.pop(prefix)
                     update()
@@ -460,7 +483,7 @@ class Mimic(Command):
                 if not mlist:
                     mimics.pop(prefix)
             except KeyError:
-                mimic = _vars.get_mimic(prefix)
+                mimic = _vars.get_mimic(prefix, user)
                 if not isnan(perm) and mimic.u_id != user.id:
                     raise PermissionError("Target mimic does not belong to you.")
                 mimics = mimicdb[mimic.u_id]
@@ -502,10 +525,10 @@ class Mimic(Command):
                         raise EOFError
                     dop = user.id
                     name = user.name
-                    url = str(user.avatar_url)
+                    url = strURL(user.avatar_url)
                 except:
                     try:
-                        mimi = _vars.get_mimic(mim)
+                        mimi = _vars.get_mimic(mim, user)
                         dop = mimi.id
                         mimic = copy.deepcopy(mimi)
                         mimic.id = m_id
@@ -519,7 +542,7 @@ class Mimic(Command):
                         url = "https://cdn.discordapp.com/embed/avatars/0.png"
         else:
             name = user.name
-            url = str(user.avatar_url)
+            url = strURL(user.avatar_url)
         while m_id in mimics:
             mid += 1
             m_id = "&" + str(mid)
@@ -558,8 +581,8 @@ class RPSend(Command):
     usage = "<0:mimic> <1:channel> <2:string>"
 
     async def __call__(self, _vars, user, perm, args, **void):
-        mimicdb = _vars.data["mimics"]
-        update = _vars.database["mimics"].update
+        update = self.data.mimics.update
+        mimicdb = _vars.data.mimics
         mimics = mimicdb.setdefault(user.id, {})
         prefix = args.pop(0)
         c_id = verifyID(args.pop(0))
@@ -582,13 +605,13 @@ class RPSend(Command):
             m = [mimic]
         admin = not inf > perm
         try:
-            enabled = _vars.data["enabled"][channel.id]
+            enabled = _vars.data.enabled[channel.id]
         except KeyError:
             enabled = ()
         if not admin and "game" not in enabled:
             raise PermissionError("Not permitted to send into target channel.")
         for mimic in m:
-            await _vars.database["mimics"].updateMimic(mimic, guild)
+            await _vars.database.mimics.updateMimic(mimic, guild)
             name = mimic.name
             url = mimic.url
             await w.send(msg, username=name, avatar_url=url)
@@ -610,7 +633,7 @@ class UpdateMimics(Database):
             admin = not inf > perm
             if message.guild is not None:
                 try:
-                    enabled = _vars.data["enabled"][message.channel.id]
+                    enabled = _vars.data.enabled[message.channel.id]
                 except KeyError:
                     enabled = ()
             else:
@@ -707,16 +730,53 @@ class UpdateMimics(Database):
         self.busy = False
 
 
+class UpdateDogpiles(Database):
+    name = "dogpiles"
+
+    def __init__(self, *args):
+        self.msgFollow = {}
+        super().__init__(*args)
+
+    async def _nocommand_(self, text, edit, orig, message, **void):
+        if message.guild is None or not orig:
+            return
+        g_id = message.guild.id
+        following = self.data
+        if g_id in following:
+            u_id = message.author.id
+            c_id = message.channel.id
+            if not edit:
+                if following[g_id]:
+                    checker = orig
+                    curr = self.msgFollow.get(c_id)
+                    if curr is None:
+                        curr = [checker, 1, 0]
+                        self.msgFollow[c_id] = curr
+                    elif checker == curr[0] and u_id != curr[2]:
+                        curr[1] += 1
+                        if curr[1] >= 3:
+                            curr[1] = xrand(-3) + 1
+                            if len(checker):
+                                create_task(message.channel.send(checker))
+                    else:
+                        if len(checker) > 100:
+                            checker = ""
+                        curr[0] = checker
+                        curr[1] = xrand(-1, 2)
+                    curr[2] = u_id
+                    #print(curr)
+
+
 class UpdateMathTest(Database):
     name = "mathtest"
     no_file = True
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         s = "⁰¹²³⁴⁵⁶⁷⁸⁹"
         ss = {str(i): s[i] for i in range(len(s))}
         ss["-"] = "⁻"
         self.sst = "".maketrans(ss)
-        super().__init__(_vars)
+        super().__init__(*args)
 
     def format(self, x, y, op):
         length = 6
@@ -834,11 +894,8 @@ class UpdateMathTest(Database):
             d = -d
         st = "(" + str(a) + "*x+" + str(b) + ")*(" + str(c) + "*x+" + str(d) + ")"
         a = [-b / a, -d / c]
-        returns = [None]
-        doParallel(sympy.expand, [st], returns)
-        while returns[0] is None:
-            await asyncio.sleep(0.2)
-        q = self.eqtrans(returns[0]).replace("^2", "²").replace("∙", "") + " = 0"
+        q = await create_future(sympy.expand, st)
+        q = self.eqtrans(q).replace("^2", "²").replace("∙", "") + " = 0"
         return q, a
 
     async def calculus(self):
@@ -879,11 +936,7 @@ class UpdateMathTest(Database):
         else:
             q = "∫ " + q
             op = sympy.integrate
-        returns = [None]
-        doParallel(op, [a], returns)
-        while returns[0] is None:
-            await asyncio.sleep(0.2)
-        a = returns[0]
+        a = await create_future(op, a)
         return q, a
 
     async def generateMathQuestion(self, mode):
@@ -937,11 +990,7 @@ class UpdateMathTest(Database):
                     return
                 try:
                     x = await _vars.solveMath(msg, getattr(channel, "guild", None), 2, 1)
-                    returns = [None]
-                    doParallel(sympy.sympify, [x[0]], returns)
-                    while returns[0] is None:
-                        await asyncio.sleep(0.2)
-                    x = returns[0]
+                    x = await create_future(sympy.sympify, x[0])
                 except:
                     return
                 correct = False
@@ -950,17 +999,9 @@ class UpdateMathTest(Database):
                     if x in a:
                         correct = True
                 else:
-                    returns = [None]
-                    doParallel(sympy.sympify, [a], returns)
-                    while returns[0] is None:
-                        await asyncio.sleep(0.2)
-                    a = returns[0]
-                    returns = [None]
-                    doParallel(sympy.simplify, [x - a], returns)
-                    while returns[0] is None:
-                        await asyncio.sleep(0.2)
-                    if returns[0] == 0:
-                        correct = True
+                    a = await create_future(sympy.sympify, a)
+                    z = await create_future(sympy.simplify, x - a)
+                    correct = z == 0
                 if correct:
                     create_task(self.newQuestion(channel))
                     await channel.send("Great work!")

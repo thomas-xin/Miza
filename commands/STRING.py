@@ -8,6 +8,7 @@ except ModuleNotFoundError:
 
 
 class PapagoTrans:
+
     class PapagoOutput:
         def __init__(self, text):
             self.text = text
@@ -87,25 +88,13 @@ class Translate(Command):
         else:
             count = 1
             end = ""
-        response = "**" + user.name + "**:"
+        response = "**" + str(user) + "**:"
         print(string, dest, source)
         for i in range(count):
             for t in trans:
                 try:
-                    dest = dest[:2] + dest[2:].upper()
-                    returns = [None]
-                    doParallel(getTranslate, [translators[t], string, dest, source], returns)
-                    while returns[0] is None:
-                        await asyncio.sleep(0.5)
-                    output = returns[0]
-                    ex = issubclass(output.__class__, Exception)
-                    try:
-                        ex = issubclass(output, Exception)
-                    except TypeError:
-                        pass
-                    if ex:
-                        raise output
-                    output = output.text
+                    resp = await create_future(getTranslate, translators[t], string, dest, source)
+                    output = resp.text
                     response += "\n" + output + "  `" + t + "`"
                     source, dest = dest, source
                     break
@@ -117,6 +106,7 @@ class Translate(Command):
 
 class Math(Command):
     time_consuming = True
+    _timeout_ = 4
     name = ["Python", "PY", "Sympy", "M", "Calc"]
     min_level = 0
     description = "Evaluates a math formula."
@@ -261,18 +251,7 @@ class UrbanDictionary(Command):
             "https://mashape-community-urban-dictionary.p.rapidapi.com/define?term="
             + argv.replace(" ", "%20")
         )
-        returns = [None]
-        doParallel(
-            funcSafe,
-            [requests.get, url],
-            returns,
-            {"headers": self.header}
-        )
-        while returns[0] is None:
-            await asyncio.sleep(0.4)
-        if type(returns[0]) is str:
-            raise eval(returns[0])
-        resp = returns[0][-1]
+        resp = await create_future(requests.get, url, returns, headers=self.header)
         s = resp.content
         resp.close()
         try:

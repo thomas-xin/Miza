@@ -265,9 +265,14 @@ async def searchRandomNSFW(argv, delay=10):
     ]
     data = [None for i in funcs]
     for i in range(len(funcs)):
-        doParallel(funcs[i], [argv, data, i, delay - 3])
-    while None in data and time.time() - t < delay:
-        await asyncio.sleep(0.6)
+        data.append(create_future(
+            funcs[i],
+            argv,
+            data,
+            i,
+            delay - 3,
+        ))
+    data = await recursiveCoro(data)
     data = [i for i in data if i]
     if not data:
         raise LookupError("No results for " + argv + ".")

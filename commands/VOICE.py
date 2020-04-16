@@ -14,6 +14,7 @@ class customAudio(discord.AudioSource):
     
     length = 1920
     empty = numpy.zeros(length >> 1, float)
+    emptybuff = numpy.zeros(length, numpy.uint16).tobytes()
     filt = signal.butter(1, 0.125, btype="low", output="sos")
     #fff = numpy.abs(numpy.fft.fftfreq(960, 1/48000))[:481]
     static = lambda self, *args: numpy.random.rand(self.length) * 65536 - 32768
@@ -34,7 +35,7 @@ class customAudio(discord.AudioSource):
     def __init__(self, channel, vc, _vars):
         try:
             self.paused = False
-            self.stats = dict(self.defaults)
+            self.stats = freeClass(**self.defaults)
             self.new(update=False)
             self.queue = hlist()
             self.channel = channel
@@ -53,7 +54,7 @@ class customAudio(discord.AudioSource):
             self.pausec = False
             self.curr_timeout = 0
             self._vars = _vars
-            _vars.database["playlists"].audio[vc.guild.id] = self
+            _vars.database.playlists.audio[vc.guild.id] = self
         except:
             print(traceback.format_exc())
 
@@ -65,21 +66,26 @@ class customAudio(discord.AudioSource):
         classname = classname[classname.index("'") + 1:]
         return (
             "<" + classname + " object at " + hex(id(self)).upper() + ">: {"
-            + "\"queue\": " + str(self.queue)
+            + "\"vc\": " + str(self.vc)
+            + ", \"queue\": " + str(self.queue)
             + ", \"stats\": " + str(self.stats)
-            + ", \"player\": " + str(self.player)
+            + ", \"source\": " + str(self.source)
             + "}"
         )
 
     def new(self, source=None, pos=0, update=True):
-        self.reverse = self.stats["speed"] < 0
-        self.speed = abs(self.stats["speed"])
+        # try:
+        #     print(self, "new")
+        # except:
+        #     pass
+        self.reverse = self.stats.speed < 0
+        self.speed = abs(self.stats.speed)
         if self.speed < 0.005:
             self.speed = 1
             self.paused |= 2
         else:
             self.paused &= -3
-        self.stats["position"] = pos
+        self.stats.position = pos
         self.is_playing = source is not None
         orig_source = getattr(self, "source", None)
         if orig_source is not None and type(orig_source) is not str:
@@ -88,14 +94,14 @@ class customAudio(discord.AudioSource):
             except:
                 print(traceback.format_exc())
         if source is not None:
-            if not isValid(self.stats["pitch"] * self.stats["speed"] * self.stats["chorus"]):
+            if not isValid(self.stats.pitch * self.stats.speed * self.stats.chorus):
                 self.source = None
                 self.file = None
                 return
-            d = {"source": source}
-            pitchscale = 2 ** (self.stats["pitch"] / 12)
-            chorus = min(16, abs(self.stats["chorus"]))
-            if pitchscale != 1 or self.stats["speed"] != 1:
+            d = freeClass(source=source)
+            pitchscale = 2 ** (self.stats.pitch / 12)
+            chorus = min(16, abs(self.stats.chorus))
+            if pitchscale != 1 or self.stats.speed != 1:
                 speed = round(self.speed / pitchscale, 9)
                 if speed != 1:
                     speed = max(0.005, speed)
@@ -111,29 +117,29 @@ class customAudio(discord.AudioSource):
                         opts += "atempo=0.5,"
                         speed /= 0.5
                     opts += "atempo=" + str(speed)
-                    d["options"] = "-af " + opts
+                    d.options = "-af " + opts
                 else:
-                    d["options"] = "-af "
+                    d.options = "-af "
             else:
-                d["options"] = ""
+                d.options = ""
             if pitchscale != 1:
                 if abs(pitchscale) > 2147483647:
                     self.source = None
                     self.file = None
                     return
                 #br = getBitrate(source)
-                if d["options"] and d["options"][-1] != " ":
-                    d["options"] += ","
-                d["options"] += "asetrate=r=" + str(48000 * pitchscale)
+                if d.options and d.options[-1] != " ":
+                    d.options += ","
+                d.options += "asetrate=r=" + str(48000 * pitchscale)
             if self.reverse:
-                if d["options"] and d["options"][-1] != " ":
-                    d["options"] += ","
-                d["options"] += "areverse"
+                if d.options and d.options[-1] != " ":
+                    d.options += ","
+                d.options += "areverse"
             if chorus:
-                if not d["options"]:
-                    d["options"] = "-af "
+                if not d.options:
+                    d.options = "-af "
                 else:
-                    d["options"] += ","
+                    d.options += ","
                 A = ""
                 B = ""
                 C = ""
@@ -141,7 +147,7 @@ class customAudio(discord.AudioSource):
                 for i in range(ceil(chorus)):
                     neg = ((i & 1) << 1) - 1
                     i = 1 + i >> 1
-                    i *= self.stats["chorus"] / ceil(chorus)
+                    i *= self.stats.chorus / ceil(chorus)
                     if i:
                         A += "|"
                         B += "|"
@@ -156,19 +162,19 @@ class customAudio(discord.AudioSource):
                     depth = (i * 0.43 * neg) % 4 + 0.5
                     D += str(round(depth, 3))
                 b = 0.5 / sqrt(ceil(chorus + 1))
-                d["options"] += (
+                d.options += (
                     "\"chorus=0.5:" + str(round(b, 3)) + ":"
                     + A + ":"
                     + B + ":"
                     + C + ":"
                     + D + "\""
                 )
-            d["options"] = d["options"].strip(" ")
+            d.options = d.options.strip(" ")
             if pos != 0:
                 if self.reverse:
-                    d["before_options"] = "-to " + str(pos)
+                    d.before_options = "-to " + str(pos)
                 else:
-                    d["before_options"] = "-ss " + str(pos)
+                    d.before_options = "-ss " + str(pos)
             print(d)
             self.is_loading = True
             self.source = discord.FFmpegPCMAudio(**d)
@@ -178,73 +184,84 @@ class customAudio(discord.AudioSource):
             self.source = None
             self.file = None
         self.is_loading = False
-        self.stats["position"] = pos
+        self.stats.position = pos
         if pos == 0:
             if self.reverse and len(self.queue):
-                self.stats["position"] = float(self.queue[0]["duration"])
+                self.stats.position = float(self.queue[0].duration)
         if self.source is not None and self.player:
-            self.player["time"] = 1 + time.time()
+            self.player.time = 1 + time.time()
         if update:
             self.update()
 
     def seek(self, pos):
-        duration = float(self.queue[0]["duration"])
+        duration = float(self.queue[0].duration)
         pos = max(0, pos)
         if pos >= duration:
             self.new()
             self.update()
             return duration
         self.new(self.file, pos)
-        self.stats["position"] = pos
-        return self.stats["position"]
+        self.stats.position = pos
+        return self.stats.position
 
     def advance(self, looped=True, shuffled=True):
         q = self.queue
         if q:
-            if self.stats["loop"]:
+            if self.stats.loop:
                 temp = q[0]
-            self.prev = q[0]["id"]
+            self.prev = gethash(q[0])
             q.popleft()
-            if shuffled and self.stats["shuffle"]:
+            if shuffled and self.stats.shuffle:
                 if len(q) > 1:
                     temp = q.popleft()
                     shuffle(q)
                     q.appendleft(temp)
-            if self.stats["loop"] and looped:
-                temp["id"] = temp["id"]
+            if self.stats.loop and looped:
                 if "download" in temp:
                     temp.pop("download")
                 q.append(temp)
             self.queue = q
         if self.player:
-            self.player["time"] = 1 + time.time()
+            self.player.time = 1 + time.time()
 
     def update(self, *void1, **void2):
+        # print(self, "update")
         if not hasattr(self, "lastsent"):
             self.lastsent = 0
         vc = self.vc
         guild = vc.guild
         g = guild.id
         if hasattr(self, "dead"):
-            self._vars.database["playlists"].audio.pop(g)
-            self.loop.create_task(vc.disconnect())
+            if getattr(self, "source", None) is not None:
+                self.source.cleanup()
             try:
-                msg = (
-                    "```css\n🎵 Successfully disconnected from ["
-                    + noHighlight(guild.name) + "]. 🎵```"
-                )
-                self.loop.create_task(sendReact(
-                    self.channel,
-                    msg,
-                    reacts=["❎"],
-                ))
+                self._vars.database.playlists.audio.pop(g)
             except KeyError:
                 pass
+            try:
+                self._vars.database.playlists.connecting.pop(g)
+            except KeyError:
+                pass
+            self.loop.create_task(vc.disconnect())
+            if self.dead is not None:
+                self.dead = None
+                try:
+                    msg = (
+                        "```css\n🎵 Successfully disconnected from ["
+                        + noHighlight(guild.name) + "]. 🎵```"
+                    )
+                    self.loop.create_task(sendReact(
+                        self.channel,
+                        msg,
+                        reacts=["❎"],
+                    ))
+                except KeyError:
+                    pass
             return
         if not hasattr(vc, "channel"):
             self.dead = True
             return
-        if vc.is_connected() or vc.guild.id in self._vars.database["playlists"].connecting:
+        if vc.is_connected() or self._vars.database.playlists.is_connecting(vc.guild.id):
             playing = self.is_playing or self.is_loading
         else:
             self.loop.create_task(self.reconnect())
@@ -277,12 +294,13 @@ class customAudio(discord.AudioSource):
                 if i >= len(q) or i > 8191:
                     break
                 e = q[i]
-                e_id = e["id"]
-                if not e_id:
+                check = e.url
+                if not check:
                     dels.append(i)
                     continue
-                if e_id in self._vars.database["playlists"].audiocache:
-                    e["duration"] = self._vars.database["playlists"].audiocache[e_id][-1]
+                h = gethash(e)
+                if h in self._vars.database.playlists.audiocache:
+                    e.duration = self._vars.database.playlists.audiocache[h][-1]
             if len(dels) > 2:
                 q.pops(dels)
             elif dels:
@@ -290,15 +308,15 @@ class customAudio(discord.AudioSource):
                     q.pop(dels.popleft())
             for i in range(2):
                 if i < len(q):
-                    e_id = q[i]["id"]
+                    e_id = gethash(q[i])
                     dtime = q[i].get("download", 0)
                     if dtime >= 0 and time.time() - dtime > 2:
-                        q[i]["download"] = time.time()
+                        q[i].download = time.time()
                         search = e_id + ".mp3"
                         if search not in os.listdir("cache/"):
-                            durc = [q[i]["duration"]]
-                            self._vars.database["playlists"].audiocache[e_id] = durc
-                            doParallel(
+                            durc = [q[i].duration]
+                            self._vars.database.playlists.audiocache[e_id] = durc
+                            create_future(
                                 ytdl.downloadSingle,
                                 [q[i], durc, self],
                                 state=2,
@@ -306,21 +324,21 @@ class customAudio(discord.AudioSource):
                         else:
                             dur = ytdl.getDuration("cache/" + search)
                             if i < len(q):
-                                q[i]["duration"] = dur
+                                q[i].duration = dur
             if q and q[0].get("download", 0) > 0 and not playing:
                 try:
-                    path = "cache/" + q[0]["id"] + ".mp3"
+                    path = "cache/" + gethash(q[0]) + ".mp3"
                     f = open(path, "rb")
                     minl = 32
                     b = f.read(minl)
                     f.close()
                     if len(b) < minl:
                         raise FileNotFoundError
-                    q[0]["download"] = -1
-                    name = q[0]["name"]
-                    added_by = q[0]["added by"]
+                    q[0].download = -1
+                    name = q[0].name
+                    added_by = q[0].added_by
                     self.new(path)
-                    if not self.stats["quiet"]:
+                    if not self.stats.quiet:
                         if time.time() - self.lastsent > 1:
                             msg = (
                                 "```ini\n🎵 Now playing ["
@@ -339,75 +357,74 @@ class customAudio(discord.AudioSource):
             elif not playing and self.source is None and not self.is_loading:
                 self.advance()
         if not (q or self.preparing):
-            t = self._vars.data["playlists"].get(guild.id, ())
+            t = self._vars.data.playlists.get(guild.id, ())
             if t:
-                d = None
-                while d is None or d["id"] == self.prev:
+                while True:
                     p = random.choice(t)
+                    h = shash(p.url)
                     d = {
-                        "name": p["name"],
-                        "url": p["url"],
-                        "duration": p["duration"],
-                        "added by": self._vars.client.user.name,
+                        "hash": h,
+                        "name": p.name,
+                        "url": p.url,
+                        "duration": p.duration,
+                        "added_by": self._vars.client.user.name,
                         "u_id": self._vars.client.user.id,
-                        "id": p["id"],
                         "skips": (),
                     }
                     if len(t) <= 1:
                         break
-                q.append(d)
+                    if h != self.prev:
+                        break
+                q.append(freeClass(d))
         if self.pausec and self.paused:
             vc.stop()
         self.loop.create_task(self.updatePlayer())
 
     async def updatePlayer(self):
         curr = self.player
-        self.stats["quiet"] &= -3
+        self.stats.quiet &= -3
         if curr is not None:
-            if curr["type"]:
-                self.stats["quiet"] |= 2
+            if curr.type:
+                self.stats.quiet |= 2
             try:
-                if not curr["message"].content:
+                if not curr.message.content:
                     raise EOFError
             except:
                 self.player = None
                 print(traceback.format_exc())
-            if time.time() > curr["time"]:
-                curr["time"] = inf
+            if time.time() > curr.time:
+                curr.time = inf
                 try:
-                    await self._vars.reactCallback(curr["message"], "❎", self._vars.client.user)
+                    await self._vars.reactCallback(curr.message, "❎", self._vars.client.user)
                 except discord.NotFound:
                     self.player = None
                     print(traceback.format_exc())
-        q = self.stats["quiet"]
+        q = self.stats.quiet
         if q == bool(q):
-            self.stats["quiet"] = bool(q)
+            self.stats.quiet = bool(q)
 
     async def reconnect(self):
         try:
+            if hasattr(self, "dead"):
+                return
             self.att = getattr(self, "att", 0) + 1
             self.vc = await self.vc.channel.connect(timeout=30, reconnect=False)
-            for user in guild.members:
-                if user.id == client.user.id:
-                    if getattr(user, "voice", None) is not None:
-                        if not (user.voice.deaf or user.voice.mute or user.voice.afk):
-                            break
+            user = guild.get_member(client.user.id)
+            if getattr(user, "voice", None) is not None:
+                if user.voice.deaf or user.voice.mute or user.voice.afk:
                     create_task(user.edit(mute=False, deafen=False))
-                    break
             self.att = 0
         except (discord.Forbidden, discord.HTTPException):
             self.dead = True
         except:
+            print(traceback.format_exc())
             if self.att > 5:
                 self.dead = True
         
     def read(self):
         empty = False
         try:
-            if self.is_loading:
-                self.is_playing = True
-                raise EOFError
-            if self.paused:
+            if self.is_loading or self.paused:
                 self.is_playing = True
                 raise EOFError
             try:
@@ -417,21 +434,21 @@ class customAudio(discord.AudioSource):
             except:
                 empty = True
                 raise EOFError
-            self.stats["position"] = round(
-                self.stats["position"] + self.speed / 50 * (self.reverse * -2 + 1),
+            self.stats.position = round(
+                self.stats.position + self.speed / 50 * (self.reverse * -2 + 1),
                 4,
             )
             self.is_playing = True
             self.curr_timeout = 0
         except EOFError:
             if (empty or not self.paused) and not self.is_loading:
-                queueable = (self.queue or self._vars.data["playlists"].get(self.vc.guild.id, None))
+                queueable = (self.queue or self._vars.data.playlists.get(self.vc.guild.id, None))
                 if empty and queueable and self.source is not None:
                     if time.time() - self.lastEnd > 0.5:
                         if self.reverse:
-                            ended = self.stats["position"] <= 0
+                            ended = self.stats.position <= 0
                         else:
-                            ended = self.stats["position"] >= float(self.queue[0]["duration"]) - 1
+                            ended = self.stats.position >= float(self.queue[0].duration) - 1
                         if self.curr_timeout and time.time() - self.curr_timeout > 1 or ended:
                             self.lastEnd = time.time()
                             self.new()
@@ -440,14 +457,14 @@ class customAudio(discord.AudioSource):
                 elif not queueable:
                     self.curr_timeout = 0
                     self.vc.stop()
-            temp = numpy.zeros(self.length, numpy.uint16).tobytes()
+            temp = self.emptybuff
             # print(traceback.format_exc())
         try:
-            volume = self.stats["volume"]
-            reverb = self.stats["reverb"]
-            pitch = self.stats["pitch"]
-            bassboost = self.stats["bassboost"]
-            chorus = self.stats["chorus"]
+            volume = self.stats.volume
+            reverb = self.stats.reverb
+            pitch = self.stats.pitch
+            bassboost = self.stats.bassboost
+            chorus = self.stats.chorus
             # detune = self.stats["detune"]
             delay = 16
             if volume == 1 and reverb == pitch == bassboost == chorus == 0: # detune == 0:
@@ -470,7 +487,7 @@ class customAudio(discord.AudioSource):
                 pitch = nan
             # if abs(detune) > 1 << 31:
             #    detune = nan
-            if not isValid(volume * reverb * bassboost * pitch):# * detune):
+            if not isValid(volume * reverb * bassboost * pitch): # * detune):
                 array = self.static()
             else:
                 if volume != 1 or chorus:
@@ -532,23 +549,23 @@ class customAudio(discord.AudioSource):
                             self.buffer = [[self.empty] * 2] * delay
                         r = 18
                         p1 = round(size * (0.5 - 2 / r))
-                        p2 = round(size * (0.5 - 1 / r))
+                        # p2 = round(size * (0.5 - 1 / r))
                         p3 = round(size * 0.5)
-                        p4 = round(size * (0.5 + 1 / r))
+                        # p4 = round(size * (0.5 + 1 / r))
                         p5 = round(size * (0.5 + 2 / r))
                         lfeed = (
-                            + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 24
-                            + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
+                            + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 8
+                            # + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
                             + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
-                            + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
-                            + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 24
+                            # + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
+                            + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 8
                         ) * reverb
                         rfeed = (
-                            + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 24
-                            + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
+                            + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 8
+                            # + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
                             + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
-                            + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
-                            + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 24
+                            # + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
+                            + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 8
                         ) * reverb
                         if self.feedback is not None:
                             left -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size-16:-16]
@@ -578,12 +595,10 @@ class customAudio(discord.AudioSource):
 
     def cleanup(self):
         return
-        # if getattr(self, "source", None) is not None:
-        #     return self.source.cleanup()
 
 
 async def createPlayer(auds, p_type=0, verbose=False):
-    auds.stats["quiet"] |= 2 * p_type
+    auds.stats.quiet |= 2 * p_type
     text = (
         "```" + "\n" * verbose + "callback-voice-player-" + str(int(bool(p_type)))
         + "\nInitializing virtual audio player...```"
@@ -620,6 +635,14 @@ def getDuration(filename):
     return max(1 / (1 << 24), n)
 
 
+def gethash(entry):
+    return entry.setdefault("hash", shash(entry.url))
+
+def sethash(entry):
+    entry.hash = shash(entry.url)
+    return entry.hash
+
+
 def getBitrate(filename):
     command = [
         "ffprobe",
@@ -650,8 +673,8 @@ def getBitrate(filename):
 
 
 async def forceJoin(guild, channel, user, client, _vars):
-    if guild.id not in _vars.database["playlists"].audio:
-        for func in _vars.categories["voice"]:
+    if guild.id not in _vars.database.playlists.audio:
+        for func in _vars.categories.voice:
             if "join" in (name.lower() for name in func.name):
                 try:
                     await func(user=user, channel=channel)
@@ -660,7 +683,7 @@ async def forceJoin(guild, channel, user, client, _vars):
                 except AttributeError:
                     pass
     try:
-        auds = _vars.database["playlists"].audio[guild.id]
+        auds = _vars.database.playlists.audio[guild.id]
         auds.channel = channel
     except KeyError:
         raise LookupError("Voice channel not found.")
@@ -672,13 +695,13 @@ class videoDownloader:
     opener = urlBypass()
     
     ydl_opts = {
+        # "verbose": 1,
         "quiet": 1,
         "format": "bestaudio/best",
-        "call_home": 1,
+        "no_call_home": 1,
         "nooverwrites": 1,
         "noplaylist": 1,
         "ignoreerrors": 0,
-        "source_address": "0.0.0.0",
         "default_search": "auto",
     }
 
@@ -718,15 +741,16 @@ class videoDownloader:
                         t = '<meta name="description" content="'
                         s = s[s.index(t) + len(t):]
                         item = htmlDecode(s[:s.index('" />')]).replace(", a song by ", " ~ ").replace(" on Spotify", "").strip(" ")
+                        search = "ytsearch:" + item.replace(":", "-")
                         temp = {
-                            "id": hex(abs(hash(item))).replace("0x", ""),
+                            "hash": shash(search),
                             "name": item,
-                            "url": "ytsearch:" + item.replace(":", "-"),
+                            "url": search,
                             "duration": float(duration),
                             "research": True,
                             }
                         sys.stdout.write(repr(temp) + "\n")
-                        output.append(temp)
+                        output.append(freeClass(temp))
                     else:
                         it = '<meta property="og:type" content="'
                         s = ""
@@ -750,13 +774,11 @@ class videoDownloader:
                                         continue
                                     x = s[:s.index('" />')]
                                     if len(x) > 12:
-                                        output.append([None])
-                                        doParallel(self.extract, [x, "spotify"], output[-1], state=2)
+                                        output.append(create_future(self.extract, x, "spotify"))
                                 except ValueError:
                                     break
-                            while [None] in output:
-                                time.sleep(0.1)
-                            outlist = [i[-1] for i in output if i[-1] != 0]
+                            resp = [f.result() for f in output]
+                            outlist = [i for i in resp if i != 0]
                             output = []
                             for i in outlist:
                                 output += i
@@ -773,7 +795,7 @@ class videoDownloader:
             if not len(output) and force != "spotify":
                 resp = self.extract_info(item, count)
                 if resp.get("_type", None) == "url":
-                    resp = self.extract_info(resp["url"], count)
+                    resp = self.extract_info(resp.url, count)
                 if resp is None or not len(resp):
                     raise EOFError("No search results found.")
                 if resp.get("_type", None) == "playlist":
@@ -781,12 +803,12 @@ class videoDownloader:
                     if force or len(entries) <= 1:
                         for entry in entries:
                             data = self.downloader.extract_info(entry["id"], download=False, process=True)
-                            output.append({
-                                "id": data["id"],
+                            output.append(freeClass({
+                                "hash": shash(data["webpage_url"]),
                                 "name": data["title"],
                                 "url": data["webpage_url"],
                                 "duration": float(data["duration"]),
-                            })
+                            }))
                     else:
                         for entry in entries:
                             try:
@@ -796,25 +818,20 @@ class videoDownloader:
                                 else:
                                     title = entry["url"].split("/")[-1]
                                     found = False
-                                if "id" in entry:
-                                    e_id = entry["id"]
-                                else:
-                                    e_id = str(hash(entry["url"]) & 4294967295)
-                                    found = False
                                 if "duration" in entry:
                                     dur = float(entry["duration"])
                                 else:
                                     dur = "300"
                                     found = False
                                 temp = {
-                                    "id": e_id,
+                                    "hash": shash(entry["url"]),
                                     "name": title,
                                     "url": entry["url"],
                                     "duration": dur,
                                 }
                                 if not found:
                                     temp["research"] = True
-                                output.append(temp)
+                                output.append(freeClass(temp))
                             except:
                                 print(traceback.format_exc())
                 else:
@@ -824,14 +841,14 @@ class videoDownloader:
                     else:
                         dur = "300"
                     temp = {
-                        "id": resp["id"],
+                        "hash": shash(resp["webpage_url"]),
                         "name": resp["title"],
                         "url": resp["webpage_url"],
                         "duration": dur,
                     }
                     if not found:
                         temp["research"] = True
-                    output.append(temp)
+                    output.append(freeClass(temp))
             return output
         except:
             if force != "spotify":
@@ -861,7 +878,6 @@ class videoDownloader:
                 href = s[:s.index('"')]
                 if not href.startswith("/watch?v="):
                     raise ValueError
-                v_id = href[9:]
                 url = "https://www.youtube.com" + href
                 sub = 'title="'
                 s = s[s.index(sub) + len(sub):]
@@ -874,26 +890,11 @@ class videoDownloader:
                 print(traceback.format_exc())
         resp.close()
         return {
-            "id": v_id,
+            "hash": shash(url),
             "title": title,
             "webpage_url": url,
             "duration": dur,
         }
-
-    def search_sc(self, item):
-        resp = urlOpen("https://soundcloud.com/search?q=" + urlParse(item))
-        sub = '<li><h2><a href="'
-        s = ""
-        while sub not in s:
-            s = resp.read(1024).decode("utf-8")
-            if not s:
-                raise EOFError
-        s = s[s.index(sub) + len(sub):]
-        s += resp.read(1024).decode("utf-8")
-        resp.close()
-        href = s[:s.index('"')]
-        url = "https://soundcloud.com" + href
-        return url
 
     def fast_search(self, item):
         return self.search_yt(item)
@@ -946,8 +947,9 @@ class videoDownloader:
         try:
             self.requests += 1
             print(item)
-            self.searched[item] = freeClass(t=time.time())
-            self.searched[item].data = output = self.extract(item, force)
+            obj = freeClass(t=time.time())
+            obj.data = output = self.extract(item, force)
+            self.searched[item] = obj
             self.requests = max(self.requests - 1, 0)
             return output
         except Exception as ex:
@@ -956,21 +958,21 @@ class videoDownloader:
             return repr(ex)
         
     def downloadSingle(self, i, durc=None, auds=None):
-        if i["url"] in self.downloading:
+        if i.url in self.downloading:
             return
             # raise FileExistsError("File already downloading.")
         new_opts = dict(self.ydl_opts)
-        fn = "cache/" + i["id"] + ".mp3"
+        fn = "cache/" + gethash(i) + ".mp3"
         new_opts["outtmpl"] = fn
         exl = RuntimeError
         exc = None
-        self.downloading[i["url"]] = True
-        for _ in loop(5):
+        self.downloading[i.url] = True
+        for _ in loop(3):
             downloader = youtube_dl.YoutubeDL(new_opts)
             try:
-                downloader.download([i["url"]])
-                if i["url"] in self.downloading:
-                    self.downloading.pop(i["url"])
+                downloader.download([i.url])
+                if i.url in self.downloading:
+                    self.downloading.pop(i.url)
                 if durc is not None:
                     durc[0] = getDuration(fn)
                 auds.update()
@@ -978,10 +980,10 @@ class videoDownloader:
             except Exception as ex:
                 exl = ex
                 exc = traceback.format_exc()
-                time.sleep(1)
-        if i["url"] in self.downloading:
-            self.downloading.pop(i["url"])
-        i["id"] = ""
+                time.sleep(3)
+        if i.url in self.downloading:
+            self.downloading.pop(i.url)
+        i.url = ""
         print(exc)
         raise exl
     
@@ -1032,16 +1034,17 @@ class videoDownloader:
             raise
 
     def extractSingle(self, i):
-        item = i["url"]
+        item = i.url
         while self.requests > 4:
             time.sleep(0.1)
         if item in self.searched:
             if time.time() - self.searched[item].t < 7200:
                 self.searched[item].t = time.time()
                 it = self.searched[item].data[0]
-                i["name"] = it["name"]
-                i["duration"] = it["duration"]
-                i["url"] = it["url"]
+                i.name = it.name
+                i.duration = it.duration
+                i.url = it.url
+                i.hash = gethash(it)
                 return True
             else:
                 self.searched.pop(item)
@@ -1051,22 +1054,23 @@ class videoDownloader:
             self.requests += 1
             data = self.downloader.extract_info(item, download=False, process=True)
             if "entries" in data:
-                data = data["entries"][-1]
-            self.searched[item] = freeClass(t=time.time())
-            self.searched[item].data = data = [{
-                "id": data["id"],
+                data = data["entries"][0]
+            obj = freeClass(t=time.time())
+            obj.data = data = [{
                 "name": data["title"],
-                "duration": data["duration"],
+                "duration": data.duration,
                 "url": data["webpage_url"],
             }]
-            it = data[-1]
-            i["name"] = it["name"]
-            i["duration"] = it["duration"]
-            i["url"] = it["url"]
+            self.searched[item] = obj
+            it = data[0]
+            i.name = it.name
+            i.duration = it.duration
+            i.url = it.url
+            sethash(i)
             self.requests = max(self.requests - 1, 0)
         except:
             self.requests = max(self.requests - 1, 0)
-            i["id"] = ""
+            i.url = ""
             print(traceback.format_exc())
         return True
 
@@ -1087,14 +1091,7 @@ async def downloadTextFile(url, _vars):
 
     url = await _vars.followURL(url)
     resp = urlOpen(url)
-    returns = [None]
-    doParallel(dreader, [resp], returns)
-    while returns[0] is None:
-        await asyncio.sleep(0.3)
-    resp = returns[0]
-    if type(resp) is str:
-        raise eval(resp)
-    return resp[0]
+    create_future(dreader, resp)
 
 
 ytdl = videoDownloader()
@@ -1117,9 +1114,9 @@ class Queue(Command):
 
     async def __call__(self, _vars, client, user, perm, message, channel, guild, flags, name, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
-        if auds.stats["quiet"] & 2:
+        if auds.stats.quiet & 2:
             flags.setdefault("h", 1)
-        elapsed = auds.stats["position"]
+        elapsed = auds.stats.position
         q = auds.queue
         if not argv:
             if message.attachments:
@@ -1130,7 +1127,7 @@ class Queue(Command):
                 auds.paused &= -2
                 auds.pausec = False
                 auds.preparing = False
-                if auds.stats["position"] <= 0:
+                if auds.stats.position <= 0:
                     if auds.queue and "download" in auds.queue[0]:
                         auds.queue[0].pop("download")
                 auds.update()
@@ -1139,16 +1136,16 @@ class Queue(Command):
                 auds.preparing = False
                 auds.update()
                 return "```ini\nQueue for [" + noHighlight(guild.name) + "] is currently empty. ```", 1
-            if auds.stats["loop"]:
+            if auds.stats.loop:
                 totalTime = inf
             else:
                 if auds.reverse and len(auds.queue):
-                    totalTime = elapsed - float(auds.queue[0]["duration"])
+                    totalTime = elapsed - float(auds.queue[0].duration)
                 else:
                     totalTime = -elapsed
                 i = 1
                 for e in q:
-                    totalTime += float(e["duration"])
+                    totalTime += float(e.duration)
                     if not i & 4095:
                         await asyncio.sleep(0.2)
                     i += 1
@@ -1157,12 +1154,12 @@ class Queue(Command):
                 str(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
                 + sec2Time(totalTime / auds.speed) + "\n"
             )
-            duration = float(q[0]["duration"])
+            duration = float(q[0].duration)
             sym = "⬜⬛"
             barsize = 24
             r = round(min(1, elapsed / duration) * barsize)
             bar = sym[0] * r + sym[1] * (barsize - r)
-            countstr = "Currently playing [" + discord.utils.escape_markdown(q[0]["name"]) + "](" + q[0]["url"] + ")\n"
+            countstr = "Currently playing [" + discord.utils.escape_markdown(q[0].name) + "](" + q[0].url + ")\n"
             countstr += (
                 "`(" + uniStr(dhms(elapsed))
                 + "/" + uniStr(dhms(duration)) + ") "
@@ -1184,26 +1181,26 @@ class Queue(Command):
                 curr = "`"
                 curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
                 curr += "【" + str(i) + "】` ["
-                curr += discord.utils.escape_markdown(limStr(noHighlight(e["name"]), 64 + 192 * v))
-                curr += "](" + e["url"] + ")```css\n"
+                curr += discord.utils.escape_markdown(limStr(noHighlight(e.name), 64 + 192 * v))
+                curr += "](" + e.url + ")```css\n"
                 if v:
                     curr += (
-                        "Duration: [" + sec2Time(float(e["duration"]))
-                        + "], Added by: [" + noHighlight(e["added by"]) + "]\n"
+                        "Duration: [" + sec2Time(float(e.duration))
+                        + "], Added by: [" + noHighlight(e.added_by) + "]\n"
                     )
                 if auds.reverse and len(auds.queue):
-                    estim = currTime + elapsed - float(auds.queue[0]["duration"])
+                    estim = currTime + elapsed - float(auds.queue[0].duration)
                 else:
                     estim = currTime - elapsed
                 if estim > 0:
                     curr += "Time until playing: "
                     estimate = sec2Time(estim / auds.speed)
-                    if i <= 1 or not auds.stats["shuffle"]:
+                    if i <= 1 or not auds.stats.shuffle:
                         curr += "[" + estimate + "]"
                     else:
                         curr += "{" + estimate + "}"
                 else:
-                    curr += "Remaining time: [" + sec2Time((estim + float(e["duration"])) / auds.speed) + "]"
+                    curr += "Remaining time: [" + sec2Time((estim + float(e.duration)) / auds.speed) + "]"
                 curr += "```\n"
                 if len(embstr) + len(curr) < 1024:
                     embstr += curr
@@ -1220,8 +1217,8 @@ class Queue(Command):
                         text=uniStr("And ", 1) + str(len(q) - i) + uniStr(" more...", 1),
                     )
                     break
-                if i <= 1 or not auds.stats["shuffle"]:
-                    currTime += float(e["duration"])
+                if i <= 1 or not auds.stats.shuffle:
+                    currTime += float(e.duration)
                 if not 1 + i & 4095:
                     await asyncio.sleep(0.3)
             embed.add_field(
@@ -1237,51 +1234,40 @@ class Queue(Command):
                 if not isAlone(auds, user) and perm < 1:
                     self.permError(perm, 1, "to force play while other users are in voice")
             auds.preparing = True
-            output = [None]
             argv = await _vars.followURL(argv)
-            doParallel(ytdl.search, [argv], output)
-            if not "h" in flags:
-                await channel.trigger_typing()
-            while output[0] is None:
-                await asyncio.sleep(0.3)
-            res = output[0]
-            if type(res) is str:
-                try:
-                    ex = eval(res)
-                except NameError:
-                    ex = LookupError(res[res.index("(") + 1:res.index(")")].strip("'"))
-                raise ex
+            resp = await create_future(ytdl.search, argv)
+            if type(resp) is str:
+                raise evalEX(resp)
             dur = 0
             added = deque()
             names = []
-            for e in res:
-                name = e["name"]
-                url = e["url"]
-                duration = e["duration"]
-                v_id = e["id"]
+            for e in resp:
+                name = e.name
+                url = e.url
+                duration = e.duration
                 temp = {
+                    "hash": e.hash,
                     "name": name,
                     "url": url,
                     "duration": duration,
-                    "added by": user.name,
+                    "added_by": user.name,
                     "u_id": user.id,
-                    "id": v_id,
                     "skips": [],
                 }
                 if "research" in e:
                     temp["research"] = True
-                added.append(temp)
+                added.append(freeClass(temp))
                 if not dur:
                     dur = float(duration)
                 names.append(noHighlight(name))
             total_duration = 0
             for e in q:
-                total_duration += float(e["duration"])
+                total_duration += float(e.duration)
             if auds.reverse and len(auds.queue):
-                total_duration += elapsed - float(q[0]["duration"])
+                total_duration += elapsed - float(q[0].duration)
             else:
                 total_duration -= elapsed
-            if auds.stats["shuffle"]:
+            if auds.stats.shuffle:
                 added = shuffle(added)
             auds.queue.extend(added)
             tdur = float(dur / 128 + frand(0.5) + 2)
@@ -1299,7 +1285,7 @@ class Queue(Command):
             if not names:
                 raise LookupError("No results for " + str(argv) + ".")
             if "v" in flags:
-                names = noHighlight(hlist(subDict(i, "id") for i in added))
+                names = noHighlight(hlist(subDict(i, ["skips", "added_by", "u_id"]) for i in added))
             elif len(names) == 1:
                 names = names[0]
             elif len(names) >= 4:
@@ -1324,9 +1310,9 @@ class Playlist(Command):
     flags = "aedv"
 
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
-        update = self.data["playlists"].update
+        update = self._vars.database.playlists.update
         _vars = self._vars
-        pl = _vars.data["playlists"]
+        pl = _vars.data.playlists
         if argv or "d" in flags:
             req = 2
             if perm < req:
@@ -1353,7 +1339,7 @@ class Playlist(Command):
                 key = lambda x: noHighlight(x)
                 s = strIter(pl, key=key).replace("'", '"')
             else:
-                key = lambda x: limStr(noHighlight(x["name"]), 1900 / len(pl) - 10)
+                key = lambda x: limStr(noHighlight(x.name), 1900 / len(pl) - 10)
                 s = strIter(pl, key=key)
             return (
                 "Current default playlist for **" + discord.utils.escape_markdown(guild.name)
@@ -1365,9 +1351,9 @@ class Playlist(Command):
             pl.pop(i)
             update()
             return (
-                "```css\nRemoved [" + noHighlight(temp["name"])
+                "```css\nRemoved [" + noHighlight(temp.name)
                 + "] from the default playlist for "
-                + guild.name + "```"
+                + sbHighlight(guild.name) + "```"
             )
         if len(pl) >= 64:
             raise OverflowError(
@@ -1375,32 +1361,22 @@ class Playlist(Command):
                 + " has reached the maximum of 64 items. "
                 + "Please remove an item to add another."
             )
-        output = [None]
         argv = await _vars.followURL(argv)
-        doParallel(ytdl.search, [argv, True], output)
-        await channel.trigger_typing()
-        while output[0] is None:
-            await asyncio.sleep(0.7)
-        res = output[0]
-        if type(res) is str:
-            try:
-                ex = eval(res)
-            except NameError:
-                ex = ConnectionError(res[res.index("(") + 1:res.index(")")])
-            raise ex
+        resp = await create_future(ytdl.search, argv)
+        if type(resp) is str:
+            raise evalEX(resp)
         names = []
-        for e in res:
-            name = e["name"]
+        for e in resp:
+            name = e.name
             names.append(noHighlight(name))
             pl.append({
                 "name": name,
-                "url": e["url"],
-                "duration": e["duration"],
-                "id": e["id"],
+                "url": e.url,
+                "duration": e.duration,
             })
         if not names:
             raise LookupError("No results for " + argv + ".")
-        pl.sort(key=lambda x: x["name"].lower())
+        pl.sort(key=lambda x: x.name.lower())
         update()
         return (
             "```css\nAdded [" + noHighlight(", ".join(names))
@@ -1432,7 +1408,7 @@ class Connect(Command):
             if voice is None:
                 raise LookupError("Unable to find voice channel.")
             vc_ = voice.channel
-        connecting = _vars.database["playlists"].connecting
+        connecting = _vars.database.playlists.connecting
         if vc_ is None:
             guild = channel.guild
         else:
@@ -1442,31 +1418,33 @@ class Connect(Command):
             self.permError(perm, 0, "for command " + self.name + " in " + str(guild))
         if vc_ is None:
             try:
-                auds = _vars.database["playlists"].audio[guild.id]
+                auds = _vars.database.playlists.audio[guild.id]
             except KeyError:
                 raise LookupError("Unable to find connected channel.")
             if not isAlone(auds, user) and perm < 1:
                 self.permError(perm, 1, "to disconnect while other users are in voice")
             auds.dead = True
-            if guild.id in connecting:
+            try:
                 connecting.pop(guild.id)
-            await _vars.database["playlists"](guild=guild)
+            except KeyError:
+                pass
+            await _vars.database.playlists(guild=guild)
             return
         joined = False
         for vc in client.voice_clients:
             if vc.guild.id == guild.id:
                 joined = True
                 if vc.channel.id != vc_.id:
-                    connecting[guild.id] = True
+                    connecting[guild.id] = time.time()
                     try:
                         await vc.move_to(vc_)
-                        connecting[guild.id] = False
+                        connecting[guild.id] = 0
                     except:
-                        connecting[guild.id] = False
+                        connecting[guild.id] = 0
                         raise
                 break
         if not joined:
-            connecting[guild.id] = True
+            connecting[guild.id] = time.time()
             vc = freeClass(is_connected = lambda: False)
             t = time.time()
             while not vc.is_connected() and time.time() - t < 12:
@@ -1479,11 +1457,11 @@ class Connect(Command):
                 except discord.ClientException:
                     await asyncio.sleep(1)
             if not hasattr(vc, "guild"):
-                connecting[guild.id] = False
+                connecting[guild.id] = 0
                 raise ConnectionError("Unable to connect to voice channel.")
-        if guild.id not in _vars.database["playlists"].audio:
+        if guild.id not in _vars.database.playlists.audio:
             await channel.trigger_typing()
-            _vars.database["playlists"].audio[guild.id] = auds = customAudio(channel, vc, _vars)
+            _vars.database.playlists.audio[guild.id] = auds = customAudio(channel, vc, _vars)
             await auds._init_()
         try:
             joined = connecting.pop(guild.id)
@@ -1497,7 +1475,7 @@ class Connect(Command):
                 create_task(user.edit(mute=False, deafen=False))
                 break
         if joined:
-            await _vars.database["playlists"](guild=guild)
+            await _vars.database.playlists(guild=guild)
             return (
                 "```css\n🎵 Successfully connected to [" + noHighlight(vc_.name)
                 + "] in [" + noHighlight(guild.name) + "]. 🎵```", 1
@@ -1514,9 +1492,9 @@ class Skip(Command):
     flags = "fhv"
 
     async def __call__(self, client, user, perm, _vars, name, args, argv, guild, flags, message, **void):
-        if guild.id not in _vars.database["playlists"].audio:
+        if guild.id not in _vars.database.playlists.audio:
             raise LookupError("Currently not playing in a voice channel.")
-        auds = _vars.database["playlists"].audio[guild.id]
+        auds = _vars.database.playlists.audio[guild.id]
         if name.lower().startswith("c"):
             argv = "inf"
             args = [argv]
@@ -1585,23 +1563,23 @@ class Skip(Command):
             except LookupError:
                 response += "\n" + repr(IndexError("Entry " + str(pos) + " is out of range."))
                 continue
-            if type(curr["skips"]) is list:
+            if type(curr.skips) is list:
                 if "f" in flags or user.id == curr["u_id"] and not "v" in flags:
-                    curr["skips"] = None
-                elif user.id not in curr["skips"]:
-                    curr["skips"].append(user.id)
+                    curr.skips = None
+                elif user.id not in curr.skips:
+                    curr.skips.append(user.id)
             elif "v" in flags:
-                curr["skips"] = [user.id]
+                curr.skips = [user.id]
             else:
-                curr["skips"] = None
-            if curr["skips"] is not None:
+                curr.skips = None
+            if curr.skips is not None:
                 if len(response) > 1200:
                     response = limStr(response, 1200)
                 else:
                     response += (
-                        "Voted to remove [" + noHighlight(curr["name"])
+                        "Voted to remove [" + noHighlight(curr.name)
                         + "] from the queue.\nCurrent vote count: ["
-                        + str(len(curr["skips"])) + "], required vote count: ["
+                        + str(len(curr.skips)) + "], required vote count: ["
                         + str(required) + "].\n"
                     )
             if not i & 2047:
@@ -1613,7 +1591,7 @@ class Skip(Command):
         while i < len(auds.queue):
             q = auds.queue
             song = q[i]
-            if song["skips"] is None or len(song["skips"]) >= required:
+            if song.skips is None or len(song.skips) >= required:
                 if count <= 3:
                     q.pop(i)
                 else:
@@ -1621,7 +1599,7 @@ class Skip(Command):
                     i += 1
                 if count < 4:
                     response += (
-                        "[" + noHighlight(song["name"])
+                        "[" + noHighlight(song.name)
                         + "] has been removed from the queue.\n"
                     )
                 count += 1
@@ -1631,15 +1609,15 @@ class Skip(Command):
             auds.queue.pops(pops)
         if auds.queue:
             song = auds.queue[0]
-            if song["skips"] is None or len(song["skips"]) >= required:
+            if song.skips is None or len(song.skips) >= required:
                 if len(auds.queue) > 256:
-                    doParallel(auds.advance, [False, not count])
+                    await create_future(auds.advance, False, not count)
                 else:
                     auds.advance(False, not count)
                 auds.new()
                 if count < 4:
                     response += (
-                        "[" + noHighlight(song["name"])
+                        "[" + noHighlight(song.name)
                         + "] has been removed from the queue.\n"
                     )
                 count += 1
@@ -1668,7 +1646,7 @@ class Pause(Command):
         if name in ("pause", "stop"):
             if not isAlone(auds, user) and perm < 1:
                 self.permError(perm, 1, "to " + name + " while other users are in voice")
-        elif auds.stats["position"] <= 0:
+        elif auds.stats.position <= 0:
             if auds.queue and "download" in auds.queue[0]:
                 auds.queue[0].pop("download")
         if name == "stop":
@@ -1677,8 +1655,8 @@ class Pause(Command):
             auds.paused = name in ("pause", "stop")
             auds.pausec = False
         if auds.player is not None:
-            auds.player["time"] = 1 + time.time()
-        await _vars.database["playlists"](guild=guild)
+            auds.player.time = 1 + time.time()
+        await _vars.database.playlists(guild=guild)
         if "h" not in flags:
             past = name + "pe" * (name == "stop") + "d"
             return (
@@ -1699,7 +1677,7 @@ class Seek(Command):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to seek while other users are in voice")
-        orig = auds.stats["position"]
+        orig = auds.stats.position
         expr = argv
         _op = None
         for operator in ("+=", "-=", "*=", "/=", "%="):
@@ -1711,7 +1689,7 @@ class Seek(Command):
             num = eval(str(orig) + _op + str(num), {}, infinum)
         pos = auds.seek(num)
         if auds.player is not None:
-            auds.player["time"] = 1 + time.time()
+            auds.player.time = 1 + time.time()
         if "h" not in flags:
             return (
                 "```css\nSuccessfully moved audio position to ["
@@ -1728,12 +1706,12 @@ def getDump(auds):
                 + " > " + str(lim) + ")."
             )
         q = [dict(e) for e in auds.queue if random.random() < 0.99 or not time.sleep(0.01)]
-        s = copy.deepcopy(auds.stats)
+        s = dict(**auds.stats)
         i = 1
         for e in q:
             if "download" in e:
                 e.pop("download")
-            e.pop("added by")
+            e.pop("added_by")
             e.pop("u_id")
             e.pop("skips")
             if not i & 2047:
@@ -1765,13 +1743,9 @@ class Dump(Command):
         if not argv and not len(message.attachments) or name.lower() == "save":
             if name.lower() == "load":
                 raise EOFError("Please input a file, URL or json data to load.")
-            returns = [None]
-            doParallel(getDump, [auds], returns)
-            while returns[0] is None:
-                await asyncio.sleep(0.3)
-            resp = returns[0]
+            resp = await getDump(auds)
             if type(resp) is str:
-                raise eval(resp)
+                raise evalEX(resp)
             f = discord.File(io.BytesIO(bytes(resp[0], "utf-8")), filename="dump.json")
             create_task(sendFile(channel, "Queue data for **" + guild.name + "**:", f))
             return
@@ -1791,25 +1765,28 @@ class Dump(Command):
             print(traceback.format_exc())
         d = json.loads(s.strip("\n"))
         q = d["queue"]
-        for e in q:
-            e["added by"] = user.name
-            e["u_id"] = user.id
-            e["skips"] = []
+        for i in range(len(q)):
+            e = q[i] = freeClass(q[i])
+            e.added_by = user.name
+            e.u_id = user.id
+            e.skips = []
+            if not 1 + i & 2047:
+                await asyncio.sleep(0.2)
         if auds.player is not None:
-            auds.player["time"] = 1 + time.time()
-        if auds.stats["shuffle"]:
+            auds.player.time = 1 + time.time()
+        if auds.stats.shuffle:
             shuffle(q)
+        for k in d["stats"]:
+            if k not in auds.stats:
+                d["stats"].pop(k)
+            if k in "loop shuffle quiet":
+                d["stats"][k] = bool(d["stats"][k])
+            else:
+                d["stats"][k] = float(d["stats"][k])
         if "a" not in flags:
             auds.new()
             auds.preparing = True
             auds.queue = hlist(q)
-            for k in d["stats"]:
-                if k not in auds.stats:
-                    d["stats"].pop(k)
-                if k in "loop shuffle quiet":
-                    d["stats"][k] = bool(d["stats"][k])
-                else:
-                    d["stats"][k] = float(d["stats"][k])
             auds.stats.update(d["stats"])
             auds.update()
             if not "h" in flags:
@@ -1818,7 +1795,7 @@ class Dump(Command):
                     + noHighlight(guild.name) + "].```", 1
                 )
         if len(auds.queue) > 8192:
-            doParallel(auds.queue.extend, [q])
+            await create_future(auds.queue.extend, q)
         else:
             auds.queue.extend(q)
         auds.stats.update(d["stats"])
@@ -1860,8 +1837,7 @@ class AudioSettings(Command):
         "SQ": "shuffle",
     }
 
-    def __init__(self, _vars):
-        super().__init__(_vars)
+    def __init__(self, *args):
         self.alias = list(self.aliasMap) + list(self.aliasExt)
         self.name = list(self.aliasMap)
         self.min_level = 0
@@ -1872,8 +1848,9 @@ class AudioSettings(Command):
             + " <nightcore(?n)> <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)> <hide(?h)>"
         )
         self.flags = "vspbrcnlxqdh"
-        self.map = {k.lower():self.aliasMap[k] for k in self.aliasMap}
-        addDict(self.map, {k.lower():self.aliasExt[k] for k in self.aliasExt})
+        self.map = {k.lower(): self.aliasMap[k] for k in self.aliasMap}
+        addDict(self.map, {k.lower(): self.aliasExt[k] for k in self.aliasExt})
+        super().__init__(*args)
 
     async def __call__(self, client, channel, user, guild, _vars, flags, name, argv, perm, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1920,9 +1897,9 @@ class AudioSettings(Command):
                     + strIter(d, key=key) + "```"
                 )
             if op == "nightcore":
-                orig = _vars.database["playlists"].audio[guild.id].stats["pitch"]
+                orig = _vars.database.playlists.audio[guild.id].stats.pitch
             else:
-                orig = _vars.database["playlists"].audio[guild.id].stats[op]
+                orig = _vars.database.playlists.audio[guild.id].stats[op]
             num = round(100 * orig, 9)
             return (
                 "```css\nCurrent audio " + op
@@ -1934,8 +1911,8 @@ class AudioSettings(Command):
             self.permError(perm, 1, "to modify audio settings while other users are in voice")
         if not ops:
             if disable:
-                pos = auds.stats["position"]
-                auds.stats = dict(auds.defaults)
+                pos = auds.stats.position
+                auds.stats = freeClass(**auds.defaults)
                 auds.new(auds.file, pos)
                 return (
                     "```css\nSuccessfully reset all audio settings for ["
@@ -1946,13 +1923,13 @@ class AudioSettings(Command):
         s = ""
         for op in ops:
             if type(op) is str and op in "loop shuffle quiet" and not argv:
-                argv = str(not _vars.database["playlists"].audio[guild.id].stats[op])
+                argv = str(not _vars.database.playlists.audio[guild.id].stats[op])
             if disable:
                 val = auds.defaults[op]
                 if type(val) is not bool:
                     val *= 100
                 argv = str(val)
-            origVol = _vars.database["playlists"].audio[guild.id].stats
+            origVol = _vars.database.playlists.audio[guild.id].stats
             _op = None
             for operator in ("+=", "-=", "*=", "/=", "%="):
                 if argv.startswith(operator):
@@ -1960,7 +1937,7 @@ class AudioSettings(Command):
                     _op = operator[0]
             num = await _vars.evalMath(argv, guild.id)
             if op == "nightcore":
-                orig = round(origVol["pitch"] * 100, 9)
+                orig = round(origVol.pitch * 100, 9)
             else:
                 orig = round(origVol[op] * 100, 9)
             if _op is not None:
@@ -1971,12 +1948,12 @@ class AudioSettings(Command):
                 origVol[op] = new = bool(val)
                 orig = bool(orig)
             elif op == "nightcore":
-                origVol["speed"] = 2 ** (val / 12)
-                origVol["pitch"] = val
+                origVol.speed = 2 ** (val / 12)
+                origVol.pitch = val
             else:
                 origVol[op] = val
             if op in "speed pitch chorus nightcore":
-                auds.new(auds.file, auds.stats["position"])
+                auds.new(auds.file, auds.stats.position)
             s += (
                 "\nChanged audio " + str(op)
                 + " state" * (type(orig) is bool)
@@ -2125,24 +2102,24 @@ class Player(Command):
     def showCurr(self, auds):
         q = auds.queue
         if q:
-            s = q[0]["skips"]
+            s = q[0].skips
             if s is not None:
                 skips = len(s)
             else:
                 skips = 0
-            output = "Playing " + noHighlight(q[0]["name"]) + ", "
+            output = "Playing " + noHighlight(q[0].name) + ", "
             output += str(len(q)) + " item" + "s" * (len(q) != 1) + " total "
             output += skips * "🚫"
         else:
             output = "Queue is currently empty. "
-        if auds.stats["loop"]:
+        if auds.stats.loop:
             output += "🔄"
-        if auds.stats["shuffle"]:
+        if auds.stats.shuffle:
             output += "🔀"
-        if auds.stats["quiet"]:
+        if auds.stats.quiet:
             output += "🔕"
         output += "\n"
-        v = abs(auds.stats["volume"])
+        v = abs(auds.stats.volume)
         if v == 0:
             output += "🔇"
         if v <= 0.5:
@@ -2153,7 +2130,7 @@ class Player(Command):
             output += "📢"
         else:
             output += "🌪️"
-        b = auds.stats["bassboost"]
+        b = auds.stats.bassboost
         if abs(b) > 1 / 3:
             if abs(b) > 5:
                 output += "💥"
@@ -2161,36 +2138,36 @@ class Player(Command):
                 output += "🥁"
             else:
                 output += "🎻"
-        r = auds.stats["reverb"]
+        r = auds.stats.reverb
         if r:
             if abs(r) >= 1:
                 output += "📈"
             else:
                 output += "📉"
-        c = auds.stats["chorus"]
+        c = auds.stats.chorus
         if c:
             output += "📊"
-        s = auds.stats["speed"]
+        s = auds.stats.speed
         if s < 0:
             output += "⏪"
         elif s > 1:
             output += "⏩"
         elif s > 0 and s < 1:
             output += "🐌"
-        p = auds.stats["pitch"]
+        p = auds.stats.pitch
         if p > 0:
             output += "⏫"
         elif p < 0:
             output += "⏬"
         output += "\n"
-        if auds.paused or not auds.stats["speed"]:
+        if auds.paused or not auds.stats.speed:
             output += "⏸️"
-        elif auds.stats["speed"] > 0:
+        elif auds.stats.speed > 0:
             output += "▶️"
         else:
             output += "◀️"
         if q:
-            p = [auds.stats["position"], float(q[0]["duration"])]
+            p = [auds.stats.position, float(q[0].duration)]
         else:
             p = [0, 0.25]
         output += (
@@ -2205,30 +2182,30 @@ class Player(Command):
     async def _callback_(self, message, guild, channel, reaction, _vars, perm, vals, **void):
         if message is None:
             return
-        if not guild.id in _vars.database["playlists"].audio:
+        if not guild.id in _vars.database.playlists.audio:
             await message.clear_reactions()
             return
-        auds = _vars.database["playlists"].audio[guild.id]
+        auds = _vars.database.playlists.audio[guild.id]
         if reaction is None:
-            auds.player = {
-                "time": inf,
-                "message": message,
-                "type": int(vals),
-                "events": 0,
-            }
-            if auds.player["type"]:
-                auds.stats["quiet"] |= 2
-        elif auds.player is None or auds.player["message"].id != message.id:
+            auds.player = freeClass(
+                time=inf,
+                message=message,
+                type=int(vals),
+                events=0,
+            )
+            if auds.player.type:
+                auds.stats.quiet |= 2
+        elif auds.player is None or auds.player.message.id != message.id:
             await message.clear_reactions()
             return
         if perm < 1:
             return
         orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]) + "\n"
-        if reaction is None and auds.player["type"]:
+        if reaction is None and auds.player.type:
             for b in self.buttons:
                 await message.add_reaction(b.decode("utf-8"))
         else:
-            if not auds.player["type"]:
+            if not auds.player.type:
                 emoji = bytes()
             elif type(reaction) is bytes:
                 emoji = reaction
@@ -2244,62 +2221,62 @@ class Player(Command):
                 if i == 0:
                     auds.paused ^= 1
                 elif i == 1:
-                    auds.stats["loop"] = bool(auds.stats["loop"] ^ 1)
+                    auds.stats.loop = bool(auds.stats.loop ^ 1)
                 elif i == 2:
-                    auds.stats["shuffle"] = bool(auds.stats["shuffle"] ^ 1)
+                    auds.stats.shuffle = bool(auds.stats.shuffle ^ 1)
                 elif i == 3 or i == 4:
                     if i == 3:
                         pos = 0
                     else:
                         pos = inf
-                    dur = float(auds.queue[0]["duration"])
+                    dur = float(auds.queue[0].duration)
                     auds.seek(pos)
                     if pos:
                         return
                 elif i == 5:
-                    v = abs(auds.stats["volume"])
+                    v = abs(auds.stats.volume)
                     if v < 0.25 or v >= 2:
                         v = 1 / 3
                     elif v < 1:
                         v = 1
                     else:
                         v = 2
-                    auds.stats["volume"] = v
+                    auds.stats.volume = v
                 elif i == 6:
-                    b = auds.stats["bassboost"]
+                    b = auds.stats.bassboost
                     if abs(b) < 1 / 3:
                         b = 1
                     elif b < 0:
                         b = 0
                     else:
                         b = -1
-                    auds.stats["bassboost"] = b
+                    auds.stats.bassboost = b
                 elif i == 7:
-                    r = auds.stats["reverb"]
+                    r = auds.stats.reverb
                     if r:
                         r = 0
                     else:
                         r = 0.5
-                    auds.stats["reverb"] = r
+                    auds.stats.reverb = r
                 elif i == 8:
-                    c = abs(auds.stats["chorus"])
+                    c = abs(auds.stats.chorus)
                     if c:
                         c = 0
                     else:
                         c = 1 / 3
-                    auds.stats["chorus"] = c
-                    auds.new(auds.file, auds.stats["position"])
+                    auds.stats.chorus = c
+                    auds.new(auds.file, auds.stats.position)
                 elif i == 9 or i == 10:
                     s = (i * 2 - 19) * 2 / 11
-                    auds.stats["speed"] = round(auds.stats["speed"] + s, 5)
-                    auds.new(auds.file, auds.stats["position"])
+                    auds.stats.speed = round(auds.stats.speed + s, 5)
+                    auds.new(auds.file, auds.stats.position)
                 elif i == 11 or i == 12:
                     p = i * 2 - 23
-                    auds.stats["pitch"] -= p
-                    auds.new(auds.file, auds.stats["position"])
+                    auds.stats.pitch -= p
+                    auds.new(auds.file, auds.stats.position)
                 elif i == 13:
-                    pos = auds.stats["position"]
-                    auds.stats = dict(auds.defaults)
+                    pos = auds.stats.position
+                    auds.stats = freeClass(auds.defaults)
                     auds.new(auds.file, pos)
                 elif i == 14:
                     auds.dead = True
@@ -2312,38 +2289,38 @@ class Player(Command):
                     return
         text = limStr(orig + self.showCurr(auds) + "```", 2000)
         last = message.channel.last_message
-        if last is not None and (auds.player["type"] or message.id == last.id):
-            auds.player["events"] += 1
+        if last is not None and (auds.player.type or message.id == last.id):
+            auds.player.events += 1
             await message.edit(
                 content=text,
             )
         else:
-            auds.player["time"] = inf
-            auds.player["events"] += 2
+            auds.player.time = inf
+            auds.player.events += 2
             channel = message.channel
             temp = message
             message = await channel.send(
                 content=text,
             )
-            auds.player["message"] = message
+            auds.player.message = message
             await _vars.silentDelete(temp, no_log=True)
         if auds.queue and not auds.paused & 1:
-            maxdel = float(auds.queue[0]["duration"]) - auds.stats["position"] + 2
-            delay = min(maxdel, float(auds.queue[0]["duration"]) / self.barsize / abs(auds.stats["speed"]))
+            maxdel = float(auds.queue[0].duration) - auds.stats.position + 2
+            delay = min(maxdel, float(auds.queue[0].duration) / self.barsize / abs(auds.stats.speed))
             if delay > 20:
                 delay = 20
             elif delay < 6:
                 delay = 6
         else:
             delay = inf
-        auds.player["time"] = time.time() + delay
+        auds.player.time = time.time() + delay
 
     async def __call__(self, guild, channel, user, client, _vars, flags, perm, **void):
         auds = await forceJoin(channel.guild, channel, user, client, _vars)
-        if "c" in flags or auds.stats["quiet"] & 2:
+        if "c" in flags or auds.stats.quiet & 2:
             req = 3
             if perm < req:
-                if auds.stats["quiet"] & 2:
+                if auds.stats.quiet & 2:
                     if "d" in flags:
                         reason = "delete"
                     else:
@@ -2411,17 +2388,10 @@ class Lyrics(Command):
                 auds = await forceJoin(channel.guild, channel, user, _vars.client, _vars)
                 if not auds.queue:
                     raise EOFError
-                argv = auds.queue[0]["name"]
+                argv = auds.queue[0].name
             except:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
-        returns = [None]
-        doParallel(funcSafe, [get_lyrics, argv], returns)
-        while returns[0] is None:
-            await asyncio.sleep(0.73)
-        resp = returns[0]
-        if type(resp) is str:
-            raise eval(resp)
-        name, lyrics = resp[0]
+        name, lyrics = await create_future(get_lyrics, argv)
         text = lyrics.strip()
         msg = "Lyrics for **" + discord.utils.escape_markdown(name) + "**:"
         if "v" not in flags:
@@ -2468,7 +2438,7 @@ class Download(Command):
                 auds = await forceJoin(channel.guild, channel, user, _vars.client, _vars)
                 if not auds.queue:
                     raise EOFError
-                res = [{"name": e["name"], "url": e["url"]} for e in auds.queue[:10]]
+                res = [{"name": e.name, "url": e.url} for e in auds.queue[:10]]
                 fmt = "ogg"
                 end = "Current items in queue for " + channel.guild.name + ":```"
             except:
@@ -2495,29 +2465,22 @@ class Download(Command):
             argv = verifySearch(argv)
             res = []
             if isURL(argv):
-                returns = [None]
-                doParallel(funcSafe, [ytdl.extract, argv], returns, kwargs={"print_exc": True})
-                while returns[0] is None:
-                    await asyncio.sleep(0.4)
-                if returns[0]:
-                    if type(returns[0]) is str:
-                        raise eval(returns[0])
-                    data = returns[0][0]
-                    res += data
+                argv = await _vars.followURL(argv)
+                data = await create_future(ytdl.extract, argv)
+                res += data
             if not res:
                 sc = min(4, flags.get("v", 0) + 1)
                 yt = min(6, sc << 1)
                 searches = ["ytsearch" + str(yt), "scsearch" + str(sc)]
-                returns = [[None], [None]]
-                for r in range(len(returns)):
-                    doParallel(
-                        funcSafe,
-                        [ytdl.downloader.extract_info, searches[r] + ":" + argv.replace(":", "~")],
-                        returns[r],
-                        kwargs=freeClass(download=False, process=r, print_exc=True).to_dict(),
-                    )
-                while [None] in returns:
-                    await asyncio.sleep(0.6)
+                returns = []
+                for r in range(2):
+                    returns.append(create_future(
+                        ytdl.downloader.extract_info,
+                        searches[r] + ":" + argv.replace(":", "~"),
+                        download=False,
+                        process=r,
+                    ))
+                returns = await recursiveCoro(returns)
                 for r in returns:
                     try:
                         if type(r[0]) is not str:
@@ -2538,7 +2501,7 @@ class Download(Command):
                                     if e["ie_key"].lower() == "youtube":
                                         res.append({
                                             "name": e["title"],
-                                            "url": "https://www.youtube.com/watch?v=" + e["url"],
+                                            "url": "https://www.youtube.com/watch?v=" + e.url,
                                         })
                         else:
                             print(r[0])
@@ -2555,7 +2518,7 @@ class Download(Command):
             + "_" + str(len(res)) + "_" + url_list + "_" + fmt + "\n" + end
         )
         emb = discord.Embed(colour=randColour())
-        url = _vars.strURL(user.avatar_url)
+        url = strURL(user.avatar_url)
         for size in ("?size=1024", "?size=2048"):
             if url.endswith(size):
                 url = url[:-len(size)] + "?size=4096"
@@ -2587,23 +2550,19 @@ class Download(Command):
                         fl = 8388608
                     else:
                         fl = guild.filesize_limit
-                    doParallel(
-                        funcSafe,
-                        [ytdl.downloadAs, url, fl, spl[3], message, asyncio.get_event_loop()],
-                        returns,
-                        kwargs={"print_exc": True},
-                    )
-                    await message.edit(
+                    create_task(message.edit(
                         content="```ini\nDownloading [" + noHighlight(url) + "]...```",
                         embed=None,
+                    ))
+                    create_task(channel.trigger_typing())
+                    fn, out = await create_future(
+                        ytdl.downloadAs,
+                        url,
+                        fl,
+                        spl[3],
+                        message,
+                        asyncio.get_event_loop(),
                     )
-                    await channel.trigger_typing()
-                    while returns[0] is None:
-                        await asyncio.sleep(1)
-                    if type(returns[0]) is str:
-                        raise eval(returns[0])
-                    fn = returns[0][0][0]
-                    out = returns[0][0][1]
                     f = discord.File(fn, out)
                     create_task(message.edit(
                         content="```ini\nUploading [" + noHighlight(out) + "]...```",
@@ -2621,12 +2580,19 @@ class Download(Command):
 class UpdateQueues(Database):
     name = "playlists"
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.audio = {}
         self.audiocache = {}
         self.connecting = {}
-        super().__init__(_vars)
+        super().__init__(*args)
         self.clearAudioCache()
+
+    def is_connecting(self, g):
+        if g in self.connecting:
+            if time.time() - self.connecting[g] < 12:
+                return True
+            self.connecting.pop(g)
+        return False
 
     async def research(self, auds):
         if auds.searching >= 1:
@@ -2640,12 +2606,8 @@ class UpdateQueues(Database):
             if "research" in i:
                 try:
                     i.pop("research")
-                    returns = [None]
-                    t = time.time()
-                    doParallel(ytdl.extractSingle, [i], returns)
-                    while returns[0] is None and time.time() - t < 10:
-                        await asyncio.sleep(0.6)
-                    print(i["name"])
+                    await create_future(ytdl.extractSingle, i)
+                    print(i.name)
                     searched += 1
                 except:
                     print(traceback.format_exc())
@@ -2660,8 +2622,11 @@ class UpdateQueues(Database):
         pl = self.data
         should_cache = {}
         for g in pl:
-            for i in pl[g]:
-                s = i["id"] + ".mp3"
+            for i in range(len(pl[g])):
+                e = pl[g][i]
+                if type(e) is dict:
+                    e = pl[g][i] = freeClass(e)
+                s = gethash(e) + ".mp3"
                 should_cache[s] = True
         for path in os.listdir("cache/"):
             found = False
@@ -2683,16 +2648,16 @@ class UpdateQueues(Database):
             auds = self.audio[channel.guild.id]
             if auds.player is not None and channel.id == auds.channel.id:
                 t = time.time() + 10
-                if auds.player["time"] < t:
-                    auds.player["time"] = t
+                if auds.player.time < t:
+                    auds.player.time = t
 
     async def _send_(self, message, **void):
         if message.guild.id in self.audio and message.author.id != self._vars.client.user.id:
             auds = self.audio[message.guild.id]
             if auds.player is not None and message.channel.id == auds.channel.id:
                 t = time.time() + 10
-                if auds.player["time"] < t:
-                    auds.player["time"] = t
+                if auds.player.time < t:
+                    auds.player.time = t
 
     async def _dc(self, member):
         try:
@@ -2703,6 +2668,7 @@ class UpdateQueues(Database):
             print(traceback.format_exc())
 
     async def __call__(self, guild=None, **void):
+        # print(self, "call")
         if self.busy > 1:
             return
         self.busy += 1
@@ -2713,7 +2679,7 @@ class UpdateQueues(Database):
         try:
             if guild is not None:
                 g = guild
-                if g.id not in self.connecting and g.id not in self.audio:
+                if not self.is_connecting(g.id) and g.id not in self.audio:
                     for c in g.voice_channels:
                         for m in c.members:
                             if m.id == client.user.id:
@@ -2726,12 +2692,12 @@ class UpdateQueues(Database):
             else:
                 for g in tuple(pl):
                     for i in pl[g]:
-                        self.cached_items[i["id"]] = time.time()
+                        self.cached_items[gethash(i)] = time.time()
                 for vc in client.voice_clients:
-                    if vc.guild.id not in self.connecting and vc.guild.id not in self.audio:
+                    if not self.is_connecting(vc.guild.id) and vc.guild.id not in self.audio:
                         create_task(vc.disconnect(force=True))
                 for g in client.guilds:
-                    if g.id not in self.connecting and g.id not in self.audio:
+                    if not self.is_connecting(g.id) and g.id not in self.audio:
                         for c in g.voice_channels:
                             for m in c.members:
                                 if m.id == client.user.id:
@@ -2752,13 +2718,15 @@ class UpdateQueues(Database):
             for g in tuple(self.audio):
                 try:
                     auds = self.audio[g]
-                    doParallel(auds.update)
+                    create_future(auds.update)
                     create_task(self.research(auds))
                     q = auds.queue
                     if q:
                         for i in range(256):
                             if i < len(q):
-                                self.cached_items[q[i]["id"]] = time.time()
+                                self.cached_items[gethash(q[i])] = time.time()
+                            else:
+                                break
                 except:
                     print(traceback.format_exc())
                 if not a & 15:
@@ -2767,18 +2735,30 @@ class UpdateQueues(Database):
             dt = datetime.datetime.utcnow()
             i = 1
             for path in os.listdir("cache/"):
+                if path.startswith("%"):
+                    continue
                 if path.startswith("&"):
                     if "." in path:
                         snow = int(path[1:path.index(".")])
                         if (dt - discord.utils.snowflake_time(snow)).total_seconds() < 3600:
                             continue
                 elif ".mp3" in path or ".part" in path:
-                    key = path.replace(".mp3", "").replace(".part", "")
+                    try:
+                        i1 = path.index(".mp3")
+                    except ValueError:
+                        i1 = len(path)
+                    try:
+                        i2 = path.index(".part")
+                    except ValueError:
+                        i2 = len(path)
+                    key = path[:min(i1, i2)]
                     if key in self.cached_items:
                         if time.time() - self.cached_items[key] < 3600:
                             continue
                     try:
-                        os.remove("cache/" + path)
+                        fn = "cache/" + path
+                        print("Deleting " + fn + "...")
+                        os.remove(fn)
                         self.audiocache.pop(key)
                     except (KeyError, PermissionError, FileNotFoundError):
                         pass

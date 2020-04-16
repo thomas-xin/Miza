@@ -15,9 +15,9 @@ class IMG(Command):
     flags = "vraedh"
 
     async def __call__(self, flags, args, argv, guild, perm, **void):
-        update = self.data["images"].update
+        update = self.data.images.update
         _vars = self._vars
-        imglists = _vars.data["images"]
+        imglists = _vars.data.images
         images = imglists.get(guild.id, {})
         if "a" in flags or "e" in flags or "d" in flags:
             req = 2
@@ -95,6 +95,60 @@ class IMG(Command):
         return {
             "embed": emb
         }
+
+
+class React(Command):
+    server_only = True
+    name = ["AutoReact"]
+    min_level = 2
+    description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
+    usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
+    flags = "aed"
+
+    async def __call__(self, _vars, flags, guild, argv, args, **void):
+        update = self.data.reacts.update
+        _vars = self._vars
+        following = _vars.data.reacts
+        curr = following.setdefault(guild.id, {})
+        if not argv:
+            if "d" in flags:
+                if guild.id in following:
+                    following.pop(guild.id)
+                    update()
+                return "```css\nRemoved all auto reacts for [" + noHighlight(guild.name) + "].```"
+            else:
+                if not curr:
+                    return (
+                        "```ini\nNo currently active auto reacts for ["
+                        + noHighlight(guild.name) + "].```"
+                    )
+                return (
+                    "Currently active auto reacts for **" + discord.utils.escape_markdown(guild.name)
+                    + "**:\n```ini\n" + strIter(curr) + "```"
+                )
+        a = args[0].lower()[:64]
+        if "d" in flags:
+            if a in curr:
+                curr.pop(a)
+                update()
+                return (
+                    "```css\nRemoved [" + noHighlight(a) + "] from the auto react list for ["
+                    + noHighlight(guild.name) + "].```"
+                )
+            else:
+                raise LookupError(str(a) + " is not in the auto react list.")
+        if len(curr) >= 256:
+            raise OverflowError(
+                "React list for " + guild.name
+                + " has reached the maximum of 256 items. "
+                + "Please remove an item to add another."
+            )
+        curr[a] = args[1]
+        update()
+        return (
+            "```css\nAdded [" + noHighlight(a) + "] ➡️ [" + noHighlight(args[1]) + "] to the auto react list for ["
+            + noHighlight(guild.name) + "].```"
+        )
 
 
 def _c2e(string, em1, em2):
@@ -236,19 +290,11 @@ class Cat(Command):
             url = nekos.cat()
         else:
             for _ in loop(8):
-                returns = [None]
-                doParallel(
-                    funcSafe,
-                    [requests.get, "https://api.thecatapi.com/v1/images/search"],
-                    returns,
-                    {"headers": self.header},
+                resp = await create_future(
+                    requests.get,
+                    "https://api.thecatapi.com/v1/images/search",
+                    headers=self.header,
                 )
-                while returns[0] is None:
-                    await asyncio.sleep(0.5)
-                if type(returns[0]) is str:
-                    print(eval, returns[0])
-                    raise eval(returns[0])
-                resp = returns[0][-1]
                 try:
                     d = json.loads(resp.content)
                 except:
@@ -282,19 +328,14 @@ class Dog(Command):
 
     async def __call__(self, channel, flags, **void):
         for _ in loop(8):
-            returns = [None]
-            doParallel(funcSafe, [urlOpen, "https://dog.ceo/api/breeds/image/random"], returns)
-            while returns[0] is None:
-                await asyncio.sleep(0.5)
-            if type(returns[0]) is str:
-                raise eval(returns[0])
-            resp = returns[0][-1]
-            s = resp.read()
-            resp.close()
+            resp = await create_future(
+                requests.get,
+                "https://dog.ceo/api/breeds/image/random",
+            )
             try:
-                d = json.loads(s)
+                d = json.loads(resp.content)
             except:
-                d = eval(s, {}, infinum)
+                d = eval(resp.content, {}, infinum)
             try:
                 if type(d) is list:
                     d = random.choice(d)
@@ -321,3 +362,32 @@ class Dog(Command):
 
 class UpdateImages(Database):
     name = "images"
+
+
+class UpdateReacts(Database):
+    name = "reacts"
+
+    async def _nocommand_(self, text, edit, orig, message, **void):
+        if message.guild is None or not orig:
+            return
+        g_id = message.guild.id
+        following = self.data
+        if g_id in following:
+            words = text.split(" ")
+            try:
+                reacting = {}
+                for k in following[g_id]:
+                    if hasSymbol(k):
+                        if k in words:
+                            emoji = following[g_id][k]
+                            reacting[words.index(k) / len(words)] = emoji
+                    else:
+                        if k in message.content:
+                            emoji = following[g_id][k]
+                            reacting[message.content.index(k) / len(message.content)] = emoji
+                for r in sorted(list(reacting)):
+                    await message.add_reaction(reacting[r])
+            except ZeroDivisionError:
+                pass
+            except:
+                print(traceback.format_exc())

@@ -1,16 +1,14 @@
-import asyncio, discord, json
+import os, sys, subprocess, psutil, asyncio, discord, json, requests
+import urllib.request, urllib.parse, concurrent.futures
 from smath import *
-import urllib.request, urllib.parse, requests
 
 urlParse = urllib.parse.quote
+create_task = asyncio.ensure_future
+CalledProcessError = subprocess.CalledProcessError
+Process = psutil.Process()
 escape_markdown = discord.utils.escape_markdown
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
-
-if hasattr(asyncio, "create_task"):
-    create_task = asyncio.create_task
-else:
-    create_task = asyncio.ensure_future
 
 
 def htmlDecode(s):
@@ -73,7 +71,7 @@ def getLineCount(fn):
 
 def iscode(fn):
     fn = str(fn)
-    return fn.endswith(".py") or fn.endswith(".pyw")# or fn.endswith(".c") or fn.endswith(".cpp")
+    return fn.endswith(".py") or fn.endswith(".pyw") # or fn.endswith(".c") or fn.endswith(".cpp")
 
 
 class returns:
@@ -84,16 +82,16 @@ class returns:
     __call__ = lambda self: self.data
     __bool__ = lambda self: self.data is not None
 
-async def parasync(coro, returns):
+async def parasync(coro, rets):
     try:
         resp = await coro
-        returns.data = returns(resp)
+        rets.data = returns(resp)
     except Exception as ex:
-        returns.data = repr(ex)
+        rets.data = repr(ex)
     return returns()
 
 async def recursiveCoro(item):
-    returns = hlist()
+    rets = hlist()
     for i in range(len(item)):
         try:
             if type(item[i]) in (str, bytes, dict) or isinstance(item[i], freeClass):
@@ -102,22 +100,22 @@ async def recursiveCoro(item):
         except TypeError:
             pass
         if type(item[i]) is tuple:
-            returns.append(returns())
-            create_task(parasync(recursiveCoro(item[i]), returns[-1]))
+            rets.append(returns())
+            create_task(parasync(recursiveCoro(item[i]), rets[-1]))
         elif asyncio.iscoroutine(item[i]):
-            returns.append(returns())
-            create_task(parasync(item[i], returns[-1]))
+            rets.append(returns())
+            create_task(parasync(item[i], rets[-1]))
         else:
-            returns.append(returns(item[i]))
+            rets.append(returns(item[i]))
     full = False
     while not full:
         full = True
-        for i in returns:
+        for i in rets:
             if not i:
                 full = False
         await asyncio.sleep(0.2)
     output = hlist()
-    for i in returns:
+    for i in rets:
         while isinstance(i, returns):
             i = i()
         output.append(i)
@@ -183,11 +181,41 @@ def hasSymbol(string):
     return True
 
 
+async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]):
+    qlist = qkey(query)
+    cache = [[[inf, None], [inf, None]] for _ in qlist]
+    x = 1
+    for i in shuffle(it):
+        for c in ikey(i):
+            for a, b in enumerate(qkey(c)):
+                if b == qlist[a]:
+                    return i
+                elif b.startswith(qlist[a]):
+                    if len(b) < cache[a][0][0]:
+                        cache[a][0] = [len(b), i]
+                elif qlist[a] in b:
+                    if len(b) < cache[a][1][0]:
+                        cache[a][1] = [len(b), i]
+        if not x & 1023:
+            await asyncio.sleep(0.1)
+        x += 1
+    for c in cache:
+        if c[0][0] < inf:
+            return c[0][1]
+    for c in cache:
+        if c[1][0] < inf:
+            return c[1][1]
+    raise LookupError("No results for " + str(query) + ".")
+
+
 def randColour():
     return colour2Raw(colourCalculation(xrand(12) * 128))
 
 def strURL(url):
     return str(url).replace(".webp", ".png")
+
+def shash(s):
+    return bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
 
 __imap = {
     "#": "",
@@ -273,6 +301,92 @@ def urlOpen(url):
     if resp.getcode() != 200:
         raise ConnectionError("Error " + str(resp.code))
     return resp
+    
+
+__subs__ = {}
+
+def subCount():
+    count = 0
+    for i in list(__subs__):
+        if __subs__[i].is_running():
+            count += 1
+        else:
+            __subs__.pop(i)
+    return count
+
+def subKill():
+    for sub in __subs__.values():
+        sub.kill()
+    __subs__.clear()
+
+async def subFunc(key, com, data_in, timeout=60):
+    while len(__subs__) > 256:
+        i = iter(tuple(__subs__))
+        try:
+            while i:
+                k = next(i)
+                if __subs__[k].kill is not None:
+                    __subs__[k].kill()
+                    __subs__.pop(k)
+                    break
+        except StopIteration:
+            pass
+    if key in __subs__:
+        try:
+            while __subs__[key].busy:
+                time.sleep(0.01)
+        except KeyError:
+            return subFunc(key, com, data_in, timeout)
+    else:
+        __subs__[key] = freeClass(
+            busy=True,
+            is_running=lambda: True,
+            kill=None,
+        )
+    if isinstance(__subs__[key], psutil.Popen):
+        proc = __subs__[key]
+        if not proc.is_running():
+            __subs__.pop(key)
+            del proc
+            return subFunc(key, com, data_in, timeout)
+    else:
+        proc = __subs__[key] = psutil.Popen(
+            com,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    proc.busy = True
+    d = repr(bytes(str(data_in), "utf-8")).encode("utf-8") + b"\n"
+    print(d)
+    proc.stdin.write(d)
+    proc.stdin.flush()
+    try:
+        resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
+    except (TimeoutError, asyncio.exceptions.TimeoutError):
+        proc.kill()
+        raise
+    proc.busy = False
+    output = evalEX(evalEX(resp))
+    return output
+
+
+def evalEX(exc):
+    is_ex = False
+    try:
+        ex = eval(exc)
+    except NameError:
+        if type(exc) is bytes:
+            exc = exc.decode("utf-8")
+        ex = RuntimeError(exc[exc.index("(") + 1:exc.index(")")].strip("'"))
+    try:
+        if issubclass(ex.__class__, Exception):
+            is_ex = True
+    except AttributeError:
+        pass
+    if is_ex:
+        raise ex
+    return ex
 
 
 def funcSafe(func, *args, print_exc=False, **kwargs):
@@ -282,6 +396,12 @@ def funcSafe(func, *args, print_exc=False, **kwargs):
         if print_exc:
             print(traceback.format_exc())
         return repr(ex)
+
+
+athreads = concurrent.futures.ThreadPoolExecutor(max_workers=64)
+
+def create_future(func, *args, **kwargs):
+    return asyncio.wrap_future(athreads.submit(func, *args, **kwargs))
 
 
 def logClear():
@@ -320,14 +440,14 @@ class __logPrinter():
         self.print_temp += str(sep).join((str(i) for i in args)) + str(end) + str(prefix)
 
     def __init__(self, file=None):
-        doParallel(self.updatePrint, [file], name="printer", killable=False)
+        self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.future = athreads.submit(self.updatePrint, file)
 
 __printer = __logPrinter("log.txt")
 print = __printer.logPrint
 
 
 class Command:
-    is_command = True
     min_level = -inf
     description = ""
     usage = ""
@@ -343,9 +463,9 @@ class Command:
             + ", Current level: " + str(perm) + "."
         )
 
-    def __init__(self, _vars):
+    def __init__(self, _vars, catg):
         if not hasattr(self, "data"):
-            self.data = {}
+            self.data = freeClass()
         if not hasattr(self, "name"):
             self.name = []
         self.__name__ = self.__class__.__name__
@@ -356,19 +476,25 @@ class Command:
         self.name.append(self.__name__)
         if not hasattr(self, "min_display"):
             self.min_display = self.min_level
+        for a in self.alias:
+            a = a.lower()
+            if a in _vars.commands:
+                _vars.commands[a].append(self)
+            else:
+                _vars.commands[a] = hlist([self])
+        self.catg = catg
         self._vars = _vars
         self._globals = _vars._globals
     
-    async def __call__(self):
+    async def __call__(self, **void):
         pass
 
 
 class Database:
     _vars = None
-    is_database = True
     name = "data"
 
-    def __init__(self, _vars):
+    def __init__(self, _vars, catg):
         name = self.name
         self.__name__ = self.__class__.__name__
         if not getattr(self, "no_file", False):
@@ -377,6 +503,7 @@ class Database:
             try:
                 f = open(self.file, "rb")
                 s = f.read()
+                f.close()
                 if not s:
                     raise FileNotFoundError
                 data = None
@@ -385,20 +512,25 @@ class Database:
                 except pickle.UnpicklingError:
                     pass
                 if data is None:
-                    data = eval(s)
+                    try:
+                        data = eval(s)
+                    except:
+                        print(self.file)
+                        print(traceback.format_exc())
+                        raise FileNotFoundError
                 _vars.data[name] = self.data = data
-                f.close()
             except FileNotFoundError:
-                _vars.data[name] = self.data = freeClass()
+                _vars.data[name] = self.data = {}
         else:
-            _vars.data[name] = self.data = freeClass()
+            _vars.data[name] = self.data = {}
         _vars.database[name] = self
+        self.catg = catg
         self._vars = _vars
         self.busy = self.checking = False
         self._globals = globals()
         # print(name, self.__name__)
 
-    async def __call__(self):
+    async def __call__(self, **void):
         pass
 
     def update(self, force=False):

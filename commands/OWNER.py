@@ -9,7 +9,7 @@ except ModuleNotFoundError:
 class Restart(Command):
     name = ["Shutdown"]
     min_level = nan
-    description = "Restarts or shuts down the bot."
+    description = "Restarts or shuts down ⟨MIZA⟩."
 
     async def __call__(self, channel, name, **void):
         _vars = self._vars
@@ -52,7 +52,7 @@ class Execute(Command):
     name = ["Exec", "Eval"]
     min_level = nan
     description = (
-        "Causes all messages in the current channel to be executed as python code on the bot."
+        "Causes all messages in the current channel to be executed as python code on ⟨MIZA⟩."
         + " WARNING: DO NOT ALLOW UNTRUSTED USERS TO POST IN CHANNEL."
     )
     usage = "<enable(?e)> <disable(?d)>"
@@ -60,34 +60,34 @@ class Execute(Command):
 
     async def __call__(self, _vars, flags, channel, **void):
         if "e" in flags or "a" in flags:
-            _vars.database["exec"].channel = channel
+            _vars.database.exec.channel = channel
             return (
                 "```css\nSuccessfully changed code execution channel to ["
                 + noHighlight(channel.name) + "].```"
             )
         elif "d" in flags:
-            _vars.database["exec"].channel = freeClass(id=None)
+            _vars.database.exec.channel = freeClass(id=None)
             return (
                 "```fix\nSuccessfully removed code execution channel.```"
             )
         return (
             "```css\ncode channel is currently set to ["
-            + noHighlight(_vars.database["exec"].channel.name) + "].```"
+            + noHighlight(_vars.database.exec.channel.name) + "].```"
         )
 
 
 class Suspend(Command):
     name = ["Block", "Blacklist"]
     min_level = nan
-    description = "Prevents a user from accessing the bot's commands. Overrides <perms>."
+    description = "Prevents a user from accessing ⟨MIZA⟩'s commands. Overrides <perms>."
     usage = "<0:user> <1:value[]>"
 
     async def __call__(self, _vars, user, guild, args, **void):
-        update = self.data["blacklist"].update
+        update = self.data.blacklist.update
         if len(args) < 2:
             if len(args) >= 1:
                 user = await _vars.fetch_user(verifyID(args[0]))
-            susp = _vars.data["blacklist"].get(user.id, None)
+            susp = _vars.data.blacklist.get(user.id, None)
             return (
                 "```css\nCurrent suspension status of [" + noHighlight(user.name) + "]: ["
                 + noHighlight(susp) + "].```"
@@ -95,7 +95,7 @@ class Suspend(Command):
         else:
             user = await _vars.fetch_user(verifyID(args[0]))
             change = await _vars.evalMath(args[1], guild.id)
-            _vars.data["blacklist"][user.id] = change
+            _vars.data.blacklist[user.id] = change
             update()
             return (
                 "```css\nChanged suspension status of [" + noHighlight(user.name) + "] to ["
@@ -107,9 +107,9 @@ class UpdateExec(Database):
     name = "exec"
     no_file = True
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.channel = freeClass(id=None)
-        super().__init__(_vars)
+        super().__init__(*args)
 
     def procFunc(self, proc, _vars):
         print(proc)
@@ -140,7 +140,7 @@ class UpdateExec(Database):
 
     async def _nocommand_(self, message, **void):
         _vars = self._vars
-        if message.author.bot:
+        if message.author.id != self._vars.owner_id:
             return
         if message.channel.id == self.channel.id:
             proc = message.content
@@ -154,18 +154,7 @@ class UpdateExec(Database):
                 return
             output = None
             try:
-                returns = [None]
-                doParallel(funcSafe, [self.procFunc, proc, _vars], returns)
-                while returns[0] is None:
-                    await asyncio.sleep(0.2)
-                data = returns[0]
-                if type(data) is str:
-                    try:
-                        raise eval(data)
-                    except RuntimeError:
-                        output = self.procFunc(proc, _vars)
-                else:
-                    output = data[0]
+                output = await create_future(self.procFunc, proc, _vars)
                 if type(output) is tuple:
                     output = await recursiveCoro(output)
                 elif asyncio.iscoroutine(output):
@@ -194,7 +183,7 @@ class UpdateBlacklist(Database):
     suspected = "blacklist.json"
     user = True
 
-    def __init__(self, _vars):
+    def __init__(self, *args):
         self.suspclear = inf
         try:
             self.lastsusp = None
@@ -220,7 +209,7 @@ class UpdateBlacklist(Database):
             print(self.lastsusp)
         except FileNotFoundError:
             pass
-        super().__init__(_vars)
+        super().__init__(*args)
 
     async def _command_(self, user, command, **void):
         if user.id not in (self._vars.client.user.id, self._vars.owner_id):

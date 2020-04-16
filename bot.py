@@ -26,13 +26,14 @@ class main_data:
     savedata = "data.json"
     authdata = "auth.json"
     client = client
-    cache = {
-        "guilds": {},
-        "channels": {},
-        "users": {},
-        "messages": {},
-        "deleted": {},
-    }
+    cache = freeClass(
+        guilds={},
+        channels={},
+        users={},
+        roles={},
+        messages={},
+        deleted={},
+    )
     deleted_user = 456226577798135808
     _globals = globals()
     python = ("python3", "python")[os.name == "nt"]
@@ -70,7 +71,7 @@ class main_data:
             self.owner_id = 0
             print("WARNING: owner_id not found. Unable to locate owner.")
         self.proc = psutil.Process()
-        doParallel(self.getModules, state=2)
+        self.getModules()
         self.guilds = 0
         self.blocked = 0
         self.updated = False
@@ -147,10 +148,10 @@ class main_data:
                 if user is None:
                     raise EOFError
             except:
-                if u_id in self.cache["users"]:
-                    return self.cache["users"][u_id]
+                if u_id in self.cache.users:
+                    return self.cache.users[u_id]
                 user = await client.fetch_user(u_id)
-        self.cache["users"][u_id] = user
+        self.cache.users[u_id] = user
         self.limitCache("users")
         return user
 
@@ -169,40 +170,18 @@ class main_data:
                 except discord.NotFound:
                     pass
             if member is None:
-                check = str(u_id)
-                check2 = reconstitute(check).replace(" ", "").lower()
                 members = guild.members
                 if not members:
-                    members = await guild.fetch_members(limit=None)
-                cache = [{}, {}]
-                x = 1
-                for m in shuffle(members):
-                    for name in (str(m), reconstitute(m.name).replace(" ", ""), reconstitute(m.display_name).replace(" ", "")):
-                        if check == name:
-                            member = m
-                            break
-                        if check2 == name.lower():
-                            member = m
-                            break
-                        if name.lower().startswith(check2):
-                            i = len(name)
-                            if i not in cache[0]:
-                                cache[0][i] = m
-                        elif check.lower() in name.lower():
-                            i = len(name)
-                            if i not in cache[1]:
-                                cache[1][i] = m
-                    if member is not None:
-                        break
-                    if not x & 1023:
-                        await asyncio.sleep(0.5)
-                if member is None:
-                    for c in cache:
-                        if c:
-                            member = c[min(c)]
-                            break
-                    if member is None:
-                        raise LookupError("Unable to find member data.")
+                    members = guild.members = await guild.fetch_members(limit=None)
+                try:
+                    member = await strLookup(
+                        members,
+                        u_id,
+                        qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
+                        ikey=lambda x: [str(x), reconstitute(x.name), reconstitute(x.display_name)],
+                    )
+                except LookupError:
+                    raise LookupError("Unable to find member data.")
         return member
 
     async def fetch_whuser(self, u_id, guild=None):
@@ -229,7 +208,7 @@ class main_data:
                     raise StopIteration
             raise EOFError
         except StopIteration:
-            self.cache["users"][u_id] = user
+            self.cache.users[u_id] = user
             self.limitCache("users")
             return user
         except EOFError:
@@ -265,10 +244,10 @@ class main_data:
             if guild is None:
                 raise EOFError
         except:
-            if g_id in self.cache["guilds"]:
-                return self.cache["guilds"][g_id]
+            if g_id in self.cache.guilds:
+                return self.cache.guilds[g_id]
             guild = await client.fetch_guild(g_id)
-        self.cache["guilds"][g_id] = guild
+        self.cache.guilds[g_id] = guild
         self.limitCache("guilds", limit=65536)
         return guild
 
@@ -282,10 +261,10 @@ class main_data:
             if channel is None:
                 raise EOFError
         except:
-            if c_id in self.cache["channels"]:
-                return self.cache["channels"][c_id]
+            if c_id in self.cache.channels:
+                return self.cache.channels[c_id]
             channel = await client.fetch_channel(c_id)
-        self.cache["channels"][c_id] = channel
+        self.cache.channels[c_id] = channel
         self.limitCache("channels")
         return channel
 
@@ -294,8 +273,8 @@ class main_data:
             m_id = int(m_id)
         except (ValueError, TypeError):
             raise TypeError("Invalid message identifier: " + str(m_id))
-        if m_id in self.cache["messages"]:
-            return self.cache["messages"][m_id]
+        if m_id in self.cache.messages:
+            return self.cache.messages[m_id]
         if channel is None:
             raise LookupError("Message data not found.")
         try:
@@ -305,21 +284,50 @@ class main_data:
             pass
         message = await channel.fetch_message(m_id)
         if message is not None:
-            self.cache["messages"][m_id] = message
+            self.cache.messages[m_id] = message
             self.limitCache("messages")
         return message
+
+    async def fetch_role(self, r_id, guild):
+        try:
+            r_id = int(r_id)
+        except (ValueError, TypeError):
+            raise TypeError("Invalid role identifier: " + str(r_id))
+        try:
+            role = guild.get_role(r_id)
+            if role is None:
+                raise EOFError
+        except:
+            if r_id in self.cache.roles:
+                return self.cache.roles[r_id]
+            if len(guild.roles) <= 1:
+                roles = await guild.fetch_roles()
+                guild.roles = sorted(roles)
+                role = discord.utils.get(roles, id=r_id)
+            if role is None:
+                raise discord.NotFound("Role not found.")
+        self.cache.roles[r_id] = role
+        self.limitCache("roles")
+        return role
     
-    def get_mimic(self, m_id):
+    def get_mimic(self, m_id, user=None):
         try:
             try:
-                m_id = int(m_id)
+                m_id = "&" + str(int(m_id))
             except (ValueError, TypeError):
                 pass
-            m_id = "&" + str(m_id)
-            mimic = self.data["mimics"][m_id]
+            mimic = self.data.mimics[m_id]
             return mimic
         except KeyError:
-            raise LookupError("Unable to find target mimic.")
+            pass
+        if user is not None:
+            try:
+                mimics = self.data.mimics[user.id]
+                mlist = mimics[m_id]
+                return self.get_mimic(random.choice(mlist))
+            except KeyError:
+                pass
+        raise LookupError("Unable to find target mimic.")
 
     async def getDM(self, user):
         try:
@@ -362,12 +370,12 @@ class main_data:
         return url
 
     def cacheMessage(self, message):
-        self.cache["messages"][message.id] = message
+        self.cache.messages[message.id] = message
         self.limitCache("messages")
 
     def deleteMessage(self, message):
         try:
-            self.cache["messages"].pop(message.id)
+            self.cache.messages.pop(message.id)
         except KeyError:
             pass
 
@@ -389,7 +397,7 @@ class main_data:
             except TypeError:
                 g_id = 0
         try:
-            return self.data["prefixes"][g_id]
+            return self.data.prefixes[g_id]
         except KeyError:
             return "~"
 
@@ -407,7 +415,10 @@ class main_data:
         if u_id == guild.owner_id:
             return inf
         try:
-            return self.data["perms"][guild.id][u_id]
+            perm = self.data.perms[guild.id][u_id]
+            if isnan(perm):
+                return -inf
+            return perm
         except KeyError:
             pass
         m = guild.get_member(u_id)
@@ -416,50 +427,64 @@ class main_data:
             if r is None:
                 return -inf
             return self.getRolePerms(r, guild)
-        print(m.guild_permissions)
-        if m.guild_permissions.administrator:
+        p = m.guild_permissions
+        if p.administrator:
             return inf
         perm = -inf
         for role in m.roles: 
             rp = self.getRolePerms(role, guild)
             if rp > perm:
                 perm = rp
+        if isnan(perm):
+            perm = -inf
         return perm
     
     def getRolePerms(self, role, guild):
         if role.permissions.administrator:
             return inf
         try:
-            return self.data["perms"][guild.id][role.id]
+            perm = self.data.perms[guild.id][role.id]
+            if isnan(perm):
+                return -inf
+            return perm
         except KeyError:
             pass
         if guild.id == role.id:
             return 0
+        p = role.permissions
+        if all((p.ban_members, p.manage_channels, p.manage_guild, p.manage_roles, p.manage_messages)):
+            return 4
+        elif any((p.ban_members, p.manage_channels, p.manage_guild)):
+            return 3
+        elif any([p.kick_members, p.manage_messages, p.manage_nicknames, p.manage_roles, p.manage_webhooks, p.manage_emojis]):
+            return 2
+        elif any([p.view_audit_log, p.priority_speaker, p.mention_everyone, p.move_members]):
+            return 1
         return -1
 
     def setPerms(self, user, guild, value):
-        perms = self.data["perms"]
+        perms = self.data.perms
         try:
             u_id = user.id
         except AttributeError:
             u_id = user
         g_perm = perms.setdefault(guild.id, {})
         g_perm.update({u_id: value})
-        self.database["perms"].update()
+        self.database.perms.update()
 
     def isDeleted(self, message):
         try:
             m_id = int(message.id)
         except AttributeError:
             m_id = int(message)
-        return self.cache["deleted"].get(m_id, False)
+        return self.cache.deleted.get(m_id, False)
 
     def logDelete(self, message, no_log=False):
         try:
             m_id = int(message.id)
         except AttributeError:
             m_id = int(message)
-        self.cache["deleted"][m_id] = no_log + 1
+        self.cache.deleted[m_id] = no_log + 1
         self.limitCache("deleted", limit=4096)
     
     async def silentDelete(self, message, exc=False, no_log=False):
@@ -468,7 +493,7 @@ class main_data:
             await message.delete()
         except:
             try:
-                self.cache["deleted"].pop(message.id)
+                self.cache.deleted.pop(message.id)
             except KeyError:
                 pass
             if exc:
@@ -478,9 +503,12 @@ class main_data:
         u_id = int(u_id)
         if u_id in (self.owner_id, client.user.id):
             return False
-        return self.data["blacklist"].get(
-            u_id, 0
-        ) >= time.time() + self.min_suspend * 86400
+        try:
+            return self.data.blacklist.get(
+                u_id, 0
+            ) >= time.time() + self.min_suspend * 86400
+        except KeyError:
+            return True
 
     def getModule(self, module):
         try:
@@ -494,16 +522,25 @@ class main_data:
             commands = hlist()
             dataitems = hlist()
             vd = mod.__dict__
-            for k in vd:
+            for k in tuple(vd):
                 var = vd[k]
-                if hasattr(var, "is_command"):
-                    obj = var(self)
-                    commands.append(obj)
-                    print("Successfully loaded command " + obj.__name__ + ".")
-                elif hasattr(var, "is_database"):
-                    obj = var(self)
-                    dataitems.append(obj)
-                    print("Successfully loaded database " + obj.__name__ + ".")
+                if var not in (Command, Database):
+                    load_type = 0
+                    try:
+                        if issubclass(var, Command):
+                            load_type = 1
+                        elif issubclass(var, Database):
+                            load_type = 2
+                    except TypeError:
+                        pass
+                    if load_type:
+                        obj = var(self, rename)
+                        if load_type == 1:
+                            commands.append(obj)
+                            print("Successfully loaded command " + obj.__name__ + ".")
+                        elif load_type == 2:
+                            dataitems.append(obj)
+                            print("Successfully loaded database " + obj.__name__ + ".")
             for u in dataitems:
                 for c in commands:
                     c.data[u.name] = u
@@ -513,16 +550,18 @@ class main_data:
             print(traceback.format_exc())
 
     def getModules(self, reload=False):
-        files = (i for i in os.listdir("commands") if iscode(i))
+        files = [i for i in os.listdir("commands") if iscode(i)]
         self.categories = freeClass()
+        self.commands = freeClass()
         self.database = freeClass()
         self.data = freeClass()
-        totalsize = [0,0]
+        totalsize = [0, 0]
         totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
         totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p))
         self.codeSize = totalsize
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(files))
         for f in files:
-            doParallel(self.getModule, [f], state=2)
+            executor.submit(self.getModule, f)
 
     def update(self):
         saved = hlist()
@@ -652,26 +691,7 @@ class main_data:
             self.timeout / 2,
         ]
         print(args)
-        returns = [None]
-        doParallel(subFunc, args, returns, state=2)
-        while returns[0] is None:
-            await asyncio.sleep(0.25)
-        resp = returns[0]
-        print(resp)
-        if type(resp) is str:
-            try:
-                ex = eval(resp)
-            except NameError:
-                ex = RuntimeError(resp[resp.index("(") + 1:resp.index(")")].strip("'"))
-            raise ex
-        resp = eval(resp[0].replace("\n", "").replace("\r", ""))
-        if type(resp) is str:
-            try:
-                ex = eval(resp)
-            except NameError:
-                ex = RuntimeError(resp[resp.index("(") + 1:resp.index(")")].strip("'"))
-            raise ex
-        return resp
+        return await subFunc(*args)
 
     timeChecks = {
         "galactic year": ("gy", "galactic year", "galactic years"),
@@ -863,7 +883,7 @@ class main_data:
 
     async def ensureWebhook(self, channel):
         if not hasattr(self, "cw_cache"):
-            self.cw_cache = {}
+            self.cw_cache = freeClass()
         wlist = None
         if channel.id in self.cw_cache:
             if time.time() - self.cw_cache[channel.id].time > 300:
@@ -1004,7 +1024,6 @@ class main_data:
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=False):
     cpy = msg
-    categories = _vars.categories
     if msg[:2] == "> ":
         msg = msg[2:]
     elif msg[:2] == "||" and msg[-2:] == "||":
@@ -1026,10 +1045,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
     c_id = channel.id
     if g_id:
         try:
-            enabled = _vars.data["enabled"][c_id]
+            enabled = _vars.data.enabled[c_id]
         except KeyError:
             try:
-                enabled = _vars.data["enabled"][c_id] = ["main", "string", "admin"]
+                enabled = _vars.data.enabled[c_id] = ["main", "string", "admin"]
                 _vars.update()
             except KeyError:
                 enabled = ["main", "admin"]
@@ -1078,20 +1097,22 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         return
     run = False
     if op:
-        commands = hlist()
-        for catg in categories:
-            if catg in enabled or admin:
-                commands.extend(categories[catg])
-        for command in commands:
-            for alias in command.alias:
-                alias = alias.lower()
-                length = len(alias)
-                check = comm[:length].lower()
-                argv = comm[length:]
-                match = check == alias and (
-                    len(comm) == length or comm[length] == " " or comm[length] in "?-+"
-                )
-                if match:
+        i = len(comm)
+        for end in " ?-+":
+            if end in comm:
+                i2 = comm.index(end)
+                if i2 < i:
+                    i = i2
+        check = comm[:i].lower()
+        if check in _vars.commands:
+            for command in _vars.commands[check]:
+                if command.catg in enabled or admin:
+                    alias = command.__name__
+                    for a in command.alias:
+                        if a.lower() == check:
+                            alias = a
+                    alias = alias.lower()
+                    argv = comm[i:]
                     run = True
                     print(str(user) + " (" + str(u_id) + ") issued command " + msg)
                     req = command.min_level
@@ -1192,7 +1213,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             if type(response) is list:
                                 for r in response:
                                     create_task(channel.send(r))
-                            elif type(response) is dict:
+                            elif type(response) is dict or isinstance(response, freeClass):
                                 if react:
                                     sent = await channel.send(**response)
                                 else:
@@ -1462,7 +1483,7 @@ async def on_member_join(member):
         f = getattr(u, "_join_", None)
         if f is not None:
             try:
-                await f(user=member)
+                await f(user=member, guild=member.guild)
             except:
                 print(traceback.format_exc())
     await seen(member)
@@ -1474,7 +1495,7 @@ async def on_member_remove(member):
         f = getattr(u, "_leave_", None)
         if f is not None:
             try:
-                await f(user=member)
+                await f(user=member, guild=member.guild)
             except:
                 print(traceback.format_exc())
 
