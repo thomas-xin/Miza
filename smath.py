@@ -2310,17 +2310,14 @@ def hzero(size, maxoff=__hlist_maxoff__):
 
 class freeClass(dict):
 
-    __init__ = lambda self, *args, **kwargs: super().__init__(self, *args, **kwargs)
+    __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
     __repr__ = lambda self: "freeClass(**" + super().__repr__() + ")"
-    __iter__ = lambda self: super().__iter__()
-    __len__ = lambda self: super().__len__()
-    __setitem__ = lambda self, key, value: super().__setitem__(key, value)
+    __iter__ = lambda self: iter(tuple(super().__iter__()))
     __setattr__ = lambda self, key, value: super().__setitem__(key, value)
-    __getitem__ = lambda self, key: super().__getitem__(key)
     __getattr__ = lambda self, key: super().__getitem__(key)
-    __str__ = lambda self: self.__repr__()
+    __str__ = lambda self: "【" + super().__str__()[1:-1] + "】"
 
-    to_dict = lambda self: dict(self)
+    to_dict = lambda self: dict(**self)
     to_list = lambda self: list(super().values())
 
 

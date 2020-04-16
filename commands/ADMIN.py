@@ -116,6 +116,7 @@ class Ban(Command):
                 )
                 self.permError(perm, t_perm + 1, reason)
         g_bans = await getBans(_vars, guild)
+        msg = None
         if name.lower() == "unban":
             tm = -1
             args = ["", ""]
@@ -150,24 +151,23 @@ class Ban(Command):
                 orig = 0
             else:
                 orig = g_bans.get(t_user.id, 0)
-            if len(args) >= 3:
-                expr = " ".join(args[1:])
+            bantype = " ".join(args[1:])
+            if "for" in bantype:
+                i = bantype.index("for")
+                expr = bantype[:i].strip()
+                msg = bantype[i + 3:].strip()
             else:
-                expr = " ".join(args[1:])
+                expr = bantype
             _op = None
             for operator in ("+=", "-=", "*=", "/=", "%="):
                 if expr.startswith(operator):
-                    expr = expr[2:].strip(" ")
+                    expr = expr[2:].strip()
                     _op = operator[0]
             num = await _vars.evalTime(expr, guild)
             if _op is not None:
                 num = eval(str(orig) + _op + str(num), {}, infinum)
             tm = num
         await channel.trigger_typing()
-        if len(args) >= 3:
-            msg = args[-1]
-        else:
-            msg = None
         if t_user is None:
             if "f" not in flags:
                 response = uniStr(
