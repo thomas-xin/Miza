@@ -997,9 +997,9 @@ class videoDownloader:
             ov = OverflowError("Maximum time limit is 16 minutes.")
             try:
                 if "entries" in info:
-                    dur = info["entries"][0].duration
+                    dur = info["entries"][0]["duration"]
                 else:
-                    dur = info.duration
+                    dur = info["duration"]
                 if dur > 960:
                     raise ov
             except KeyError:
