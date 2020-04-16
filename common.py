@@ -185,7 +185,7 @@ def hasSymbol(string):
 
 async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]):
     qlist = qkey(query)
-    cache = [[inf, inf] for _ in qlist]
+    cache = [[[inf, None], [inf, None]] for _ in qlist]
     x = 1
     for i in shuffle(it):
         for c in ikey(i):
@@ -193,20 +193,20 @@ async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)])
                 if b == qlist[a]:
                     return i
                 elif b.startswith(qlist[a]):
-                    if len(b) < cache[a][0]:
-                        cache[a][0] = len(b)
+                    if len(b) < cache[a][0][0]:
+                        cache[a][0] = [len(b), i]
                 elif qlist[a] in b:
-                    if len(b) < cache[a][1]:
-                        cache[a][1] = len(b)
+                    if len(b) < cache[a][1][0]:
+                        cache[a][1] = [len(b), i]
         if not x & 1023:
             await asyncio.sleep(0.1)
         x += 1
     for c in cache:
-        if c[0] < inf:
-            return c[0]
+        if c[0][0] < inf:
+            return c[0][1]
     for c in cache:
-        if c[1] < inf:
-            return c[1]
+        if c[1][0] < inf:
+            return c[1][1]
     raise LookupError("No results for " + str(query) + ".")
 
 

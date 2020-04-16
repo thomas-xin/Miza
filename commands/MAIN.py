@@ -448,7 +448,7 @@ class Info(Command):
         name = g.name
         try:
             u = g.owner
-        except AttributeError:
+        except (AttributeError, KeyError):
             u = None
         emb = discord.Embed(colour=randColour())
         emb.set_thumbnail(url=url)

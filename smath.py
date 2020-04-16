@@ -2315,7 +2315,7 @@ class freeClass(dict):
     __iter__ = lambda self: iter(tuple(super().__iter__()))
     __setattr__ = lambda self, key, value: super().__setitem__(key, value)
     __getattr__ = lambda self, key: super().__getitem__(key)
-    __str__ = lambda self: "【" + super().__str__()[1:-1] + "】"
+    __str__ = lambda self: "【" + self.__repr__()[13:-2] + "】"
 
     to_dict = lambda self: dict(**self)
     to_list = lambda self: list(super().values())

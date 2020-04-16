@@ -88,12 +88,11 @@ class Translate(Command):
         else:
             count = 1
             end = ""
-        response = "**" + user.name + "**:"
+        response = "**" + str(user) + "**:"
         print(string, dest, source)
         for i in range(count):
             for t in trans:
                 try:
-                    dest = dest[:2] + dest[2:].upper()
                     returns = [None]
                     doParallel(getTranslate, [translators[t], string, dest, source], returns)
                     while returns[0] is None:
