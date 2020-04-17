@@ -242,7 +242,7 @@ class customAudio(discord.AudioSource):
                 self._vars.database.playlists.connecting.pop(g)
             except KeyError:
                 pass
-            self.loop.create_task(vc.disconnect())
+            create_task(vc.disconnect(), loop=loop)
             if self.dead is not None:
                 self.dead = None
                 try:
@@ -250,11 +250,11 @@ class customAudio(discord.AudioSource):
                         "```css\n🎵 Successfully disconnected from ["
                         + noHighlight(guild.name) + "]. 🎵```"
                     )
-                    self.loop.create_task(sendReact(
+                    create_task(sendReact(
                         self.channel,
                         msg,
                         reacts=["❎"],
-                    ))
+                    ), loop=self.loop)
                 except KeyError:
                     pass
             return
@@ -264,7 +264,7 @@ class customAudio(discord.AudioSource):
         if vc.is_connected() or self._vars.database.playlists.is_connecting(vc.guild.id):
             playing = self.is_playing or self.is_loading
         else:
-            self.loop.create_task(self.reconnect())
+            create_task(self.reconnect(), loop=self.loop)
             return
         q = self.queue
         if not vc.is_playing():
@@ -286,16 +286,27 @@ class customAudio(discord.AudioSource):
         self.att = 0
         if q:
             if len(q) > 65536 + 2048:
-                self.queue = q = q[-65536:]
-            while len(q) > 65536:
-                q.pop()
+                self.queue = q = q[-65535:].extendleft(q[0])
+            elif len(q) > 65536:
+                q.rotate(-1)
+                while len(q) > 65536:
+                    q.pop()
+                q.rotate(1)
             dels = deque()
             for i in range(len(q)):
                 if i >= len(q) or i > 8191:
                     break
                 e = q[i]
-                check = e.url
-                if not check:
+                if not e.url:
+                    create_task(
+                        self._vars.sendReact(
+                            self.channel,
+                            "```ini\nA problem occured while loading " + sbHighlight(e.name)
+                            + ", and it has been removed from the queue as a result.```",
+                            reacts=["❎"],
+                        ),
+                        loop=self.loop,
+                    )
                     dels.append(i)
                     continue
                 h = gethash(e)
@@ -347,11 +358,11 @@ class customAudio(discord.AudioSource):
                                 + noHighlight(name)
                                 + "], added by [" + added_by + "]! 🎵```"
                             )
-                            self.loop.create_task(sendReact(
+                            create_task(sendReact(
                                 self.channel,
                                 msg,
                                 reacts=["❎"],
-                            ))
+                            ), loop=self.loop)
                         self.lastsent = time.time()
                     self.preparing = False
                 except FileNotFoundError:
@@ -380,7 +391,7 @@ class customAudio(discord.AudioSource):
                 q.append(freeClass(d))
         if self.pausec and self.paused:
             vc.stop()
-        self.loop.create_task(self.updatePlayer())
+        create_task(self.updatePlayer(), loop=self.loop)
 
     async def updatePlayer(self):
         curr = self.player
@@ -985,6 +996,7 @@ class videoDownloader:
                 time.sleep(3)
         if i["url"] in self.downloading:
             self.downloading.pop(i["url"])
+        print(i["url"])
         i["url"] = ""
         print(exc)
         raise exl
