@@ -86,7 +86,7 @@ class main_data:
         sys.exit(1)
 
     def run(self):
-        print("Attempting to authorize with token " + self.token + ":")
+        print("Attempting to authorize with token ending in " + self.token[-5:])
         try:
             self.client.run(self.token)
         except (KeyboardInterrupt, SystemExit):

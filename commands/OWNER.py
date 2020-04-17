@@ -16,8 +16,12 @@ class Restart(Command):
         client = _vars.client
         if name.lower() == "shutdown":
             await channel.send("Shutting down... :wave:")
+            print("Shutting down...")
+            emit('stopped')
         else:
             await channel.send("Restarting... :wave:")
+            print("Restarting...")
+            emit('restarting')
         _vars.update()
         for vc in client.voice_clients:
             await vc.disconnect(force=True)

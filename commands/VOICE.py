@@ -55,6 +55,8 @@ class customAudio(discord.AudioSource):
             self.curr_timeout = 0
             self._vars = _vars
             _vars.database.playlists.audio[vc.guild.id] = self
+            print("Initialized custom audio in channel ",channel)
+            print(self.__str__())
         except:
             print(traceback.format_exc())
 

@@ -952,7 +952,7 @@ class UpdateMessageLogs(Database):
                 if not i & 8191:
                     await asyncio.sleep(0.5)
                 i += 1
-        print(guild, "finished.")
+        print("Finished processing guild \"",guild,"\".")
 
     async def __call__(self):
         for h in tuple(self.dc):
@@ -1199,7 +1199,7 @@ class UpdateAutoRoles(Database):
                     roles.append(role)
                 except:
                     print(traceback.format_exc())
-            print(roles)
+            #print(roles)
             await user.add_roles(*roles, reason="AutoRole", atomic=False)
 
 
