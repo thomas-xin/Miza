@@ -2477,8 +2477,8 @@ class Download(Command):
                 returns = await recursiveCoro(returns)
                 for r in returns:
                     try:
-                        if type(r[0]) is not str:
-                            data = r[0][0]
+                        if type(r) is not str:
+                            data = r
                             for e in data["entries"]:
                                 if "webpage_url" in e:
                                     if "title" in e:
@@ -2495,12 +2495,12 @@ class Download(Command):
                                     if e["ie_key"].lower() == "youtube":
                                         res.append({
                                             "name": e["title"],
-                                            "url": "https://www.youtube.com/watch?v=" + e.url,
+                                            "url": "https://www.youtube.com/watch?v=" + e["url"],
                                         })
                         else:
-                            print(r[0])
+                            print(r)
                     except:
-                        print(r[0])
+                        print(r)
                         print(traceback.format_exc())
             if not res:
                 raise LookupError("No results for " + argv + ".")

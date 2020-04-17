@@ -94,7 +94,13 @@ async def recursiveCoro(item):
     rets = hlist()
     for i in range(len(item)):
         try:
-            if type(item[i]) in (str, bytes, dict) or isinstance(item[i], freeClass):
+            if type(item[i]) in (str, bytes, dict):
+                raise TypeError
+            if isinstance(item[i], freeClass):
+                raise TypeError
+            if asyncio.iscoroutine(item[i]):
+                raise TypeError
+            if isinstance(item[i], asyncio.Future):
                 raise TypeError
             item[i] = tuple(item[i])
         except TypeError:
@@ -102,7 +108,7 @@ async def recursiveCoro(item):
         if type(item[i]) is tuple:
             rets.append(returns())
             create_task(parasync(recursiveCoro(item[i]), rets[-1]))
-        elif asyncio.iscoroutine(item[i]):
+        elif asyncio.iscoroutine(item[i]) or isinstance(item[i], asyncio.Future):
             rets.append(returns())
             create_task(parasync(item[i], rets[-1]))
         else:
