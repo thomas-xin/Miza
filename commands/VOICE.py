@@ -319,7 +319,7 @@ class customAudio(discord.AudioSource):
                             create_future(
                                 ytdl.downloadSingle,
                                 [q[i], durc, self],
-                                state=2,
+                                loop=self.loop,
                             )
                         else:
                             dur = ytdl.getDuration("cache/" + search)
@@ -795,7 +795,7 @@ class videoDownloader:
             if not len(output) and force != "spotify":
                 resp = self.extract_info(item, count)
                 if resp.get("_type", None) == "url":
-                    resp = self.extract_info(resp.url, count)
+                    resp = self.extract_info(resp["url"], count)
                 if resp is None or not len(resp):
                     raise EOFError("No search results found.")
                 if resp.get("_type", None) == "playlist":

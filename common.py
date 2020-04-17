@@ -399,9 +399,35 @@ def funcSafe(func, *args, print_exc=False, **kwargs):
 
 
 athreads = concurrent.futures.ThreadPoolExecutor(max_workers=64)
+# aprocs = hlist()
 
-def create_future(func, *args, **kwargs):
-    return asyncio.wrap_future(athreads.submit(func, *args, **kwargs))
+def wrap_future(fut, loop=None):
+    if loop is None:
+        loop = asyncio.get_event_loop()
+    aio_future = loop.create_future()
+
+    def on_done(*void):
+        try:
+            result = fut.result()
+        except Exception as ex:
+            loop.call_soon_threadsafe(aio_future.set_exception, ex)
+        else:
+            loop.call_soon_threadsafe(aio_future.set_result, result)
+
+    fut.add_done_callback(on_done)
+    return aio_future
+
+def create_future(func, *args, loop=None, **kwargs):
+    return wrap_future(athreads.submit(func, *args, **kwargs), loop=loop)
+
+# def create_future_ex(func, *args, **kwargs):
+#     proc = None
+#     for p in aprocs:
+#         if not p.busy:
+#             proc = p
+#     if proc is None:
+#         proc = multiprocessing.pool.Pool(processes=1)
+#     return asyncio.wrap_future(athreads.submit(func, *args, **kwargs))
 
 
 def logClear():
