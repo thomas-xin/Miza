@@ -1058,11 +1058,11 @@ class videoDownloader:
             if "entries" in data:
                 data = data["entries"][0]
             obj = freeClass(t=time.time())
-            obj.data = data = [{
-                "name": data["title"],
-                "duration": data.duration,
-                "url": data["webpage_url"],
-            }]
+            obj.data = data = [freeClass(
+                name=data["title"],
+                duration=data["duration"],
+                url=data["webpage_url"],
+            )]
             self.searched[item] = obj
             it = data[0]
             i.name = it.name
