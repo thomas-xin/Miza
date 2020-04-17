@@ -1708,6 +1708,8 @@ def getDump(auds):
     for e in q:
         if "download" in e:
             e.pop("download")
+        if "hash" in e:
+            e.pop("hash")
         e.pop("added_by")
         e.pop("u_id")
         e.pop("skips")
