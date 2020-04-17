@@ -318,7 +318,9 @@ class customAudio(discord.AudioSource):
                             self._vars.database.playlists.audiocache[e_id] = durc
                             create_future(
                                 ytdl.downloadSingle,
-                                [q[i], durc, self],
+                                q[i],
+                                durc,
+                                self,
                                 loop=self.loop,
                             )
                         else:
@@ -958,7 +960,7 @@ class videoDownloader:
             return repr(ex)
         
     def downloadSingle(self, i, durc=None, auds=None):
-        if i.url in self.downloading:
+        if i["url"] in self.downloading:
             return
             # raise FileExistsError("File already downloading.")
         new_opts = dict(self.ydl_opts)
@@ -966,13 +968,13 @@ class videoDownloader:
         new_opts["outtmpl"] = fn
         exl = RuntimeError
         exc = None
-        self.downloading[i.url] = True
+        self.downloading[i["url"]] = True
         for _ in loop(3):
             downloader = youtube_dl.YoutubeDL(new_opts)
             try:
-                downloader.download([i.url])
+                downloader.download([i["url"]])
                 if i.url in self.downloading:
-                    self.downloading.pop(i.url)
+                    self.downloading.pop(i["url"])
                 if durc is not None:
                     durc[0] = getDuration(fn)
                 auds.update()
@@ -981,9 +983,9 @@ class videoDownloader:
                 exl = ex
                 exc = traceback.format_exc()
                 time.sleep(3)
-        if i.url in self.downloading:
-            self.downloading.pop(i.url)
-        i.url = ""
+        if i["url"] in self.downloading:
+            self.downloading.pop(i["url"])
+        i["url"] = ""
         print(exc)
         raise exl
     
@@ -1081,17 +1083,13 @@ class videoDownloader:
 async def downloadTextFile(url, _vars):
     
     def dreader(file):
-        try:
-            s = resp.read().decode("utf-8")
-            resp.close()
-            return [s]
-        except Exception as ex:
-            print(traceback.format_exc())
-            return repr(ex)
+        s = resp.read().decode("utf-8")
+        resp.close()
+        return s
 
     url = await _vars.followURL(url)
     resp = urlOpen(url)
-    create_future(dreader, resp)
+    return create_future(dreader, resp)
 
 
 ytdl = videoDownloader()
@@ -1756,7 +1754,8 @@ class Dump(Command):
                 url = message.attachments[0].url
             else:
                 url = verifyURL(argv)
-            s = await downloadTextFile(url, _vars)
+            f = await downloadTextFile(url, _vars)
+            s = await f
             s = s[s.index("{"):]
             if s[-4:] == "\n```":
                 s = s[:-4]
