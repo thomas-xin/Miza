@@ -1098,13 +1098,17 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         return
     run = False
     if op:
-        i = len(comm)
-        for end in " ?-+":
-            if end in comm:
-                i2 = comm.index(end)
-                if i2 < i:
-                    i = i2
-        check = comm[:i].lower()
+        if comm == "?":
+            check = comm
+            i = 1
+        else:
+            i = len(comm)
+            for end in " ?-+":
+                if end in comm:
+                    i2 = comm.index(end)
+                    if i2 < i:
+                        i = i2
+            check = comm[:i].lower()
         if check in _vars.commands:
             for command in _vars.commands[check]:
                 if command.catg in enabled or admin:
