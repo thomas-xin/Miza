@@ -794,6 +794,8 @@ class Reminder(Command):
         if len(rems) >= 32:
             raise OverflowError("You have reached the maximum of 32 reminders. Please remove one to add another.")
         while True:
+            if argv.startswith("to "):
+                argv = argv[3:]
             spl = None
             if "in" in argv:
                 if " in " in argv:

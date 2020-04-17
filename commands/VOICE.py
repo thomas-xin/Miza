@@ -1696,34 +1696,30 @@ class Seek(Command):
 
 
 def getDump(auds):
-    try:
-        lim = 32768
-        if len(auds.queue) > lim:
-            raise OverflowError(
-                "Too many items in queue (" + str(len(auds.queue))
-                + " > " + str(lim) + ")."
-            )
-        q = [dict(e) for e in auds.queue if random.random() < 0.99 or not time.sleep(0.01)]
-        s = dict(**auds.stats)
-        i = 1
-        for e in q:
-            if "download" in e:
-                e.pop("download")
-            e.pop("added_by")
-            e.pop("u_id")
-            e.pop("skips")
-            if not i & 2047:
-                time.sleep(0.2)
-            i += 1
-        d = {
-            "stats": s,
-            "queue": q,
-        }
-        d["stats"].pop("position")
-        return [json.dumps(d)]
-    except Exception as ex:
-        print(traceback.format_exc())
-        return repr(ex)
+    lim = 32768
+    if len(auds.queue) > lim:
+        raise OverflowError(
+            "Too many items in queue (" + str(len(auds.queue))
+            + " > " + str(lim) + ")."
+        )
+    q = [dict(e) for e in auds.queue if random.random() < 0.99 or not time.sleep(0.01)]
+    s = dict(**auds.stats)
+    i = 1
+    for e in q:
+        if "download" in e:
+            e.pop("download")
+        e.pop("added_by")
+        e.pop("u_id")
+        e.pop("skips")
+        if not i & 2047:
+            time.sleep(0.2)
+        i += 1
+    d = {
+        "stats": s,
+        "queue": q,
+    }
+    d["stats"].pop("position")
+    return json.dumps(d)
 
 
 class Dump(Command):
@@ -1741,10 +1737,8 @@ class Dump(Command):
         if not argv and not len(message.attachments) or name.lower() == "save":
             if name.lower() == "load":
                 raise EOFError("Please input a file, URL or json data to load.")
-            resp = await getDump(auds)
-            if type(resp) is str:
-                raise evalEX(resp)
-            f = discord.File(io.BytesIO(bytes(resp[0], "utf-8")), filename="dump.json")
+            resp = await create_future(getDump, auds)
+            f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
             create_task(sendFile(channel, "Queue data for **" + guild.name + "**:", f))
             return
         if not isAlone(auds, user) and perm < 1:
@@ -1785,7 +1779,8 @@ class Dump(Command):
         if "a" not in flags:
             auds.new()
             auds.preparing = True
-            auds.queue = hlist(q)
+            auds.queue.clear()
+            auds.queue.extend(q)
             auds.stats.update(d["stats"])
             auds.update()
             if not "h" in flags:
@@ -2756,8 +2751,8 @@ class UpdateQueues(Database):
                             continue
                     try:
                         fn = "cache/" + path
-                        print("Deleting " + fn + "...")
                         os.remove(fn)
+                        print("Deleted " + fn + "...")
                         self.audiocache.pop(key)
                     except (KeyError, PermissionError, FileNotFoundError):
                         pass
