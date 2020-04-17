@@ -559,9 +559,10 @@ class main_data:
         totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
         totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p))
         self.codeSize = totalsize
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(files)) as executor:
-            for f in files:
-                executor.submit(self.getModule, f)
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(files))
+        for f in files:
+            executor.submit(self.getModule, f)
+        executor.shutdown(wait=False)
 
     def update(self):
         saved = hlist()

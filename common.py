@@ -472,8 +472,8 @@ class __logPrinter():
         self.print_temp += str(sep).join((str(i) for i in args)) + str(end) + str(prefix)
 
     def __init__(self, file=None):
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            executor.submit(self.updatePrint, file)
+        self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.future = self.exec.submit(self.updatePrint, file)
 
 __printer = __logPrinter("log.txt")
 print = __printer.logPrint
