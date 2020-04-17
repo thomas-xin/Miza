@@ -242,7 +242,7 @@ class customAudio(discord.AudioSource):
                 self._vars.database.playlists.connecting.pop(g)
             except KeyError:
                 pass
-            create_task(vc.disconnect(), loop=loop)
+            create_task(vc.disconnect(), loop=self.loop)
             if self.dead is not None:
                 self.dead = None
                 try:
