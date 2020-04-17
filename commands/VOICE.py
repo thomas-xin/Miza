@@ -298,15 +298,12 @@ class customAudio(discord.AudioSource):
                     break
                 e = q[i]
                 if not e.url:
-                    create_task(
-                        self._vars.sendReact(
-                            self.channel,
-                            "```ini\nA problem occured while loading " + sbHighlight(e.name)
-                            + ", and it has been removed from the queue as a result.```",
-                            reacts=["❎"],
-                        ),
-                        loop=self.loop,
-                    )
+                    create_task(sendReact(
+                        self.channel,
+                        "```ini\nA problem occured while loading " + sbHighlight(e.name)
+                        + ", and it has been removed from the queue as a result.```",
+                        reacts=["❎"],
+                    ), loop=self.loop)
                     dels.append(i)
                     continue
                 h = gethash(e)
