@@ -60,8 +60,7 @@ TRUE, FALSE = True, False
 true, false = True, False
 
 
-def nop(*args):
-    pass
+nop = lambda *void1, **void2: None
 
 
 def shuffle(it):
@@ -289,21 +288,16 @@ def trunc(x):
         return x
 
 
-def sqr(x):
-    return ((sin(x) >= 0) << 1) - 1
+sqr = lambda x: ((sin(x) >= 0) << 1) - 1
 
-def saw(x):
-    return (x / pi + 1) % 2 - 1
+saw = lambda x: (x / pi + 1) % 2 - 1
 
-def tri(x):
-    return (abs((0.5 - x / pi) % 2 - 1)) * 2 - 1
+tri = lambda x: (abs((0.5 - x / pi) % 2 - 1)) * 2 - 1
 
-def sgn(x):
-    return (((x > 0) << 1) - 1) * (x != 0)
+sgn = lambda x: (((x > 0) << 1) - 1) * (x != 0)
 
 
-def frand(x=1, y=0):
-    return (random.random() * max(x, y) / mpf(random.random())) % x + y
+frand = lambda x=1, y=0: (random.random() * max(x, y) / mpf(random.random())) % x + y
 
 def xrand(x, y=None, z=0):
     if y == None:
@@ -312,8 +306,7 @@ def xrand(x, y=None, z=0):
         return x
     return random.randint(floor(min(x, y)), ceil(max(x, y)) - 1) + z
 
-def rrand(x=1, y=0):
-    return frand(x) ** (1 - y)
+rrand = lambda x=1, y=0: frand(x) ** (1 - y)
 
 
 def modularInv(a, b):
@@ -485,13 +478,6 @@ def generatePrimes(a=2, b=inf, c=1):
     return primes
 
 
-def getFactors(x):
-    f = factorize(x)
-    f.append(1)
-    s = {}
-    print(s)
-
-
 def addDict(a, b, replace=True):
     if replace:
         r = a
@@ -603,8 +589,7 @@ def lcmRange(x):
     return y
 
 
-def mean(*nums):
-    return roundMin(numpy.mean(numpy.array(nums)))
+mean = lambda *nums: roundMin(numpy.mean(numpy.array(nums)))
 
 
 def pwr(x, power=2):
@@ -645,10 +630,10 @@ def approach(x, y, z, threshold=0.125):
 
 
 def scaleRatio(x, y):
-        try:
-            return x * (x - y) / (x + y)
-        except ZeroDivisionError:
-            return 0
+    try:
+        return x * (x - y) / (x + y)
+    except ZeroDivisionError:
+        return 0
 
 
 def xrange(a, b=None, c=None):
@@ -805,8 +790,7 @@ def hex2Bytes(h):
     return bytes(o)
 
 
-def colourCalculation(a, offset=0):
-    return adjColour(colorsys.hsv_to_rgb((a / 1536) % 1, 1, 1), offset, 255)
+colourCalculation = lambda a, offset=0: adjColour(colorsys.hsv_to_rgb((a / 1536) % 1, 1, 1), offset, 255)
 
 def colour2Raw(c):
     if len(c) == 3:
@@ -820,11 +804,9 @@ def raw2Colour(x):
     else:
         return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255))
 
-def hex2Colour(h):
-    return verifyColour(hex2Bytes(h))
+hex2Colour = lambda h: verifyColour(hex2Bytes(h))
 
-def luma(c):
-    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+luma = lambda c: 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
 
 def verifyColour(c):
     c = list(c)
@@ -853,8 +835,7 @@ def negColour(c, t=127):
     else:
         return fillColour(255)
 
-def invColour(c):
-    return [255 - i for i in c]
+invColour = lambda c: [255 - i for i in c]
 
 def adjColour(colour, brightness=0, intensity=1, hue=0, bits=0, scale=False):
     if hue != 0:
@@ -996,8 +977,7 @@ def limitList(source, dest, direction=False):
     return source
 
 
-def randomPolarCoord(x=1):
-    return polarCoords(frand(x), frand(tau))
+randomPolarCoord = lambda x=1: polarCoords(frand(x), frand(tau))
 
 def polarCoords(dist, angle, pos=None):
     p = dist * array([math.cos(angle), math.sin(angle)])
@@ -1360,8 +1340,7 @@ def timeConv(s):
         return [str(roundMin(s)) + " seconds"]
     return taken
 
-def sec2Time(s):
-    return " ".join(timeConv(s))
+sec2Time = lambda s: " ".join(timeConv(s))
 
 def dhms(s):
     if not isValid(s):
@@ -1436,8 +1415,7 @@ def uniStr(s, fmt=0):
         s = s.replace(UNIFMTS[-1][i], UNIFMTS[fmt][i])
     return s
 
-def reconstitute(s):
-    return str(s).translate(__trans)
+reconstitute = lambda s: str(s).translate(__trans)
 
 
 __hlist_maxoff__ = (1 << 31) - 1
@@ -2300,11 +2278,9 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     __copy__ = lambda self: self.copy()
 
-def hrange(a, b=None, c=None, maxoff=__hlist_maxoff__):
-    return hlist(xrange(a, b, c), maxoff)
+hrange = lambda a, b=None, c=None, maxoff=__hlist_maxoff__: hlist(xrange(a, b, c), maxoff)
 
-def hzero(size, maxoff=__hlist_maxoff__):
-    return hlist((0 for i in range(size)), maxoff)
+hzero = lambda size, maxoff=__hlist_maxoff__: hlist((0 for i in range(size)), maxoff)
 
 
 class freeClass(dict):

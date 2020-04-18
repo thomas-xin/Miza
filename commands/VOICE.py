@@ -58,9 +58,6 @@ class customAudio(discord.AudioSource):
         except:
             print(traceback.format_exc())
 
-    async def _init_(self):
-        self.loop = asyncio.get_event_loop()
-
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
         classname = classname[classname.index("'") + 1:]
@@ -242,7 +239,7 @@ class customAudio(discord.AudioSource):
                 self._vars.database.playlists.connecting.pop(g)
             except KeyError:
                 pass
-            create_task(vc.disconnect(), loop=self.loop)
+            create_task(vc.disconnect())
             if self.dead is not None:
                 self.dead = None
                 try:
@@ -254,7 +251,7 @@ class customAudio(discord.AudioSource):
                         self.channel,
                         msg,
                         reacts=["❎"],
-                    ), loop=self.loop)
+                    ))
                 except KeyError:
                     pass
             return
@@ -264,7 +261,7 @@ class customAudio(discord.AudioSource):
         if vc.is_connected() or self._vars.database.playlists.is_connecting(vc.guild.id):
             playing = self.is_playing or self.is_loading
         else:
-            create_task(self.reconnect(), loop=self.loop)
+            create_task(self.reconnect())
             return
         q = self.queue
         if not vc.is_playing():
@@ -303,7 +300,7 @@ class customAudio(discord.AudioSource):
                         "```ini\nA problem occured while loading " + sbHighlight(e.name)
                         + ", and it has been removed from the queue as a result.```",
                         reacts=["❎"],
-                    ), loop=self.loop)
+                    ))
                     dels.append(i)
                     continue
                 h = gethash(e)
@@ -329,7 +326,6 @@ class customAudio(discord.AudioSource):
                                 q[i],
                                 durc,
                                 self,
-                                loop=self.loop,
                             )
                         else:
                             dur = ytdl.getDuration("cache/" + search)
@@ -359,7 +355,7 @@ class customAudio(discord.AudioSource):
                                 self.channel,
                                 msg,
                                 reacts=["❎"],
-                            ), loop=self.loop)
+                            ))
                         self.lastsent = time.time()
                     self.preparing = False
                 except FileNotFoundError:
@@ -388,7 +384,7 @@ class customAudio(discord.AudioSource):
                 q.append(freeClass(d))
         if self.pausec and self.paused:
             vc.stop()
-        create_task(self.updatePlayer(), loop=self.loop)
+        create_task(self.updatePlayer())
 
     async def updatePlayer(self):
         curr = self.player
@@ -419,7 +415,7 @@ class customAudio(discord.AudioSource):
                 return
             self.att = getattr(self, "att", 0) + 1
             self.vc = await self.vc.channel.connect(timeout=30, reconnect=False)
-            user = guild.get_member(client.user.id)
+            user = self.vc.guild.get_member(client.user.id)
             if getattr(user, "voice", None) is not None:
                 if user.voice.deaf or user.voice.mute or user.voice.afk:
                     create_task(user.edit(mute=False, deafen=False))
@@ -784,20 +780,20 @@ class videoDownloader:
                                         continue
                                     x = s[:s.index('" />')]
                                     if len(x) > 12:
-                                        output.append(create_future(self.extract, x, "spotify"))
+                                        output.append(self.extract(x, "spotify"))
                                 except ValueError:
                                     break
-                            resp = [f.result() for f in output]
-                            outlist = [i for i in resp if i != 0]
-                            output = []
-                            for i in outlist:
-                                output += i
-                            sys.stdout.write(repr(output) + "\n\n")
+                            outlist = []
+                            for i in output:
+                                if i:
+                                    outlist += i
+                            output = outlist
+                            # sys.stdout.write(repr(outlist) + "\n\n")
                         else:
                             t = '<meta name="description" content="'
                             s = s[s.index(t) + len(t):]
                             item = htmlDecode(s[:s.index('" />')]).replace(" on Spotify", "")
-                            sys.stdout.write(item + "\n")
+                            # sys.stdout.write(item + "\n")
                 except urllib.error.URLError:
                     pass
             if r is not None:
@@ -998,7 +994,7 @@ class videoDownloader:
         print(exc)
         raise exl
     
-    def downloadAs(self, url, fl=8388608, fmt="ogg", message=None, aloop=None):
+    def downloadAs(self, url, fl=8388608, fmt="ogg", message=None):
         try:
             name = "&" + str(discord.utils.time_snowflake(datetime.datetime.utcnow()))
             new_opts = dict(self.ydl_opts)
@@ -1021,7 +1017,7 @@ class videoDownloader:
             if dur > 960:
                 raise ov
             if message is not None:
-                aloop.create_task(message.edit(
+                create_task(message.edit(
                     content="```ini\nConverting [" + name + "]...```",
                     embed=None,
                 ))
@@ -1109,6 +1105,12 @@ def isAlone(auds, user):
         if m.id != user.id and not m.bot:
             return False
     return True
+
+
+def ensure_url(url):
+    if url.startswith("ytsearch:"):
+        url = "https://www.youtube.com/results?search_query=" + verifyURL(url[9:])
+    return url
 
 
 class Queue(Command):
@@ -1469,7 +1471,6 @@ class Connect(Command):
         if guild.id not in _vars.database.playlists.audio:
             await channel.trigger_typing()
             _vars.database.playlists.audio[guild.id] = auds = customAudio(channel, vc, _vars)
-            await auds._init_()
         try:
             joined = connecting.pop(guild.id)
         except KeyError:
@@ -2430,11 +2431,6 @@ class Download(Command):
     usage = "<0:search_link{queue}> <-1:out_format[ogg]> <verbose(?v)> <show_debug(?z)>"
     flags = "vz"
 
-    def ensure_url(self, url):
-        if url.startswith("ytsearch:"):
-            url = "https://www.youtube.com/results?search_query=" + verifyURL(url[9:])
-        return url
-
     async def __call__(self, _vars, channel, message, argv, flags, user, **void):
         for a in message.attachments:
             argv = a.url + " " + argv
@@ -2529,7 +2525,7 @@ class Download(Command):
                 url = url[:-len(size)] + "?size=4096"
         emb.set_author(name=str(user), url=url, icon_url=url)
         emb.description = "\n".join(
-            ["`【" + str(i) + "】` [" + discord.utils.escape_markdown(e["name"] + "](" + self.ensure_url(e["url"]) + ")") for i in range(len(res)) for e in [res[i]]]
+            ["`【" + str(i) + "】` [" + discord.utils.escape_markdown(e["name"] + "](" + ensure_url(e["url"]) + ")") for i in range(len(res)) for e in [res[i]]]
         )
         sent = await message.channel.send(
             msg,
@@ -2550,13 +2546,12 @@ class Download(Command):
                 if num <= int(spl[1]):
                     data = ast.literal_eval(hex2Bytes(spl[2]).decode("utf-8"))
                     url = data[num]
-                    returns = [None]
                     if guild is None:
                         fl = 8388608
                     else:
                         fl = guild.filesize_limit
                     create_task(message.edit(
-                        content="```ini\nDownloading [" + noHighlight(url) + "]...```",
+                        content="```ini\nDownloading [" + noHighlight(ensure_url(url)) + "]...```",
                         embed=None,
                     ))
                     create_task(channel.trigger_typing())
@@ -2566,7 +2561,6 @@ class Download(Command):
                         fl,
                         spl[3],
                         message,
-                        asyncio.get_event_loop(),
                     )
                     f = discord.File(fn, out)
                     create_task(message.edit(

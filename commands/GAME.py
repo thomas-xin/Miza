@@ -35,7 +35,7 @@ class Text2048(Command):
         12: [i for i in range(16)],
         13: [i for i in range(100)],
     }
-    numScore = lambda y, x: x * 2 ** (x + 1)
+    numScore = lambda y, x=0: x * 2 ** (x + 1)
     name = ["2048", "Text_2048"]
     min_level = 0
     description = "Plays a game of 2048 using reactions."

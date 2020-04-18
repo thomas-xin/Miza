@@ -25,16 +25,18 @@ class IMG(Command):
                 reason = "to change image list for " + guild.name
                 self.permError(perm, req, reason)
             if "a" in flags or "e" in flags:
-                if len(images) > 64:
+                if len(images) > 256:
                     raise OverflowError(
                         "Image list for " + guild.name
-                        + " has reached the maximum of 64 items. "
+                        + " has reached the maximum of 256 items. "
                         + "Please remove an item to add another."
                     )
                 key = args[0].lower()
                 if len(key) > 64:
                     raise OverflowError("Image tag too long.")
                 url = await _vars.followURL(verifyURL(args[1]))
+                if len(url) > 256:
+                    raise OverflowError("Image url too long.")
                 images[key] = url
                 sort(images)
                 imglists[guild.id] = images

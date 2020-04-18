@@ -88,8 +88,10 @@ class main_data:
     def run(self):
         print("Attempting to authorize with token " + self.token + ":")
         try:
-            self.client.run(self.token)
+            eloop.run_until_complete(client.start(self.token))
         except (KeyboardInterrupt, SystemExit):
+            eloop.run_until_complete(client.logout())
+            eloop.close()
             sys.exit()
 
     def print(self, *args, sep=" ", end="\n"):
@@ -1328,8 +1330,8 @@ async def on_ready():
     await _vars.handleUpdate()
     if not hasattr(_vars, "started"):
         _vars.started = True
-        create_task(updateLoop())
-        create_task(heartbeatLoop())
+        asyncio.create_task(updateLoop())
+        asyncio.create_task(heartbeatLoop())
 
     
 async def seen(user, delay=0):
@@ -1364,7 +1366,6 @@ async def checkDelete(message, reaction, user):
                         await _vars.silentDelete(message, exc=True)
                     except discord.NotFound:
                         pass
-            await _vars.handleUpdate()
 
 
 @client.event
@@ -1377,7 +1378,7 @@ async def on_raw_reaction_add(payload):
         return
     if user.id != client.user.id:
         reaction = str(payload.emoji)
-        await seen(user)
+        create_task(seen(user))
         await _vars.reactCallback(message, reaction, user)
         create_task(checkDelete(message, reaction, user))
 
@@ -1392,7 +1393,7 @@ async def on_raw_reaction_remove(payload):
         return
     if user.id != client.user.id:
         reaction = str(payload.emoji)
-        await seen(user)
+        create_task(seen(user))
         await _vars.reactCallback(message, reaction, user)
         create_task(checkDelete(message, reaction, user))
 
@@ -1407,7 +1408,7 @@ async def on_voice_state_update(member, before, after):
                 await member.edit(mute=False, deafen=False)
             await _vars.handleUpdate()
     if member.voice is not None and not member.voice.afk:
-        await seen(member)
+        create_task(seen(member))
 
 
 async def handleMessage(message, edit=True):
@@ -1438,7 +1439,7 @@ async def on_typing(channel, user, when):
                 await f(channel=channel, user=user)
             except:
                 print(traceback.format_exc())
-    await seen(user, delay=10)
+    create_task(seen(user, delay=10))
 
 
 @client.event
@@ -1453,10 +1454,9 @@ async def on_message(message):
                     await f(message=message)
                 except:
                     print(traceback.format_exc())
-    await seen(message.author)
+    create_task(seen(message.author))
     await _vars.reactCallback(message, None, message.author)
     await handleMessage(message, False)
-    await _vars.handleUpdate(True)
 
 
 @client.event
@@ -1468,7 +1468,7 @@ async def on_user_update(before, after):
                 await f(before=before, after=after)
             except:
                 print(traceback.format_exc())
-    await seen(after)
+    create_task(seen(after))
 
 
 @client.event
@@ -1491,7 +1491,7 @@ async def on_member_join(member):
                 await f(user=member, guild=member.guild)
             except:
                 print(traceback.format_exc())
-    await seen(member)
+    create_task(seen(member))
 
             
 @client.event
@@ -1619,7 +1619,7 @@ async def updateEdit(before, after):
                     await f(before=before, after=after)
                 except:
                     print(traceback.format_exc())
-    await seen(after.author)
+    create_task(seen(after.author))
 
 
 @client.event
@@ -1627,7 +1627,6 @@ async def on_message_edit(before, after):
     if before.content != after.content:
         _vars.cacheMessage(after)
         await handleMessage(after)
-        await _vars.handleUpdate(True)
         await updateEdit(before, after)
 
 
@@ -1651,7 +1650,6 @@ async def on_raw_message_edit(payload):
         after = await before.channel.fetch_message(payload.message_id)
         _vars.cacheMessage(after)
         await handleMessage(after)
-        await _vars.handleUpdate(True)
         await updateEdit(before, after)
 
 

@@ -411,7 +411,7 @@ class Avatar(Command):
                                     guild = channel.guild
                                 except NameError:
                                     pass
-                                except AttributeError:
+                                except (AttributeError, KeyError):
                                     guild = None
                                     u = channel.recipient
                         if guild is not None:
@@ -464,7 +464,7 @@ class Info(Command):
         try:
             g.region
             pcount = await _vars.database.counts.getUserMessages(None, g)
-        except AttributeError:
+        except (AttributeError, KeyError):
             pcount = 0
         try:
             if "v" in flags:
@@ -486,7 +486,7 @@ class Info(Command):
                             + str(us[u_id])
                         )
                     top = "\n".join(users)
-        except AttributeError:
+        except (AttributeError, KeyError):
             pass
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
         emb.add_field(name="Creation time", value=str(g.created_at), inline=1)
@@ -494,7 +494,7 @@ class Info(Command):
             try:
                 emb.add_field(name="Region", value=str(g.region), inline=1)
                 emb.add_field(name="Nitro boosts", value=str(g.premium_subscription_count), inline=1)
-            except AttributeError:
+            except (AttributeError, KeyError):
                 pass
         emb.add_field(name="User count", value=str(g.member_count), inline=1)
         if pcount:
@@ -591,7 +591,7 @@ class Info(Command):
                                     guild = channel.guild
                                 except NameError:
                                     pass
-                                except AttributeError:
+                                except (AttributeError, KeyError):
                                     guild = None
                                     u = channel.recipient
                         if guild is not None:
@@ -604,7 +604,7 @@ class Info(Command):
         url = strURL(u.avatar_url)
         try:
             is_sys = u.system
-        except AttributeError:
+        except (AttributeError, KeyError):
             is_sys = False
         is_bot = u.bot
         is_self = u.id == client.user.id

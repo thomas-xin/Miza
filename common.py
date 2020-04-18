@@ -3,7 +3,6 @@ import urllib.request, urllib.parse, concurrent.futures
 from smath import *
 
 urlParse = urllib.parse.quote
-create_task = asyncio.ensure_future
 CalledProcessError = subprocess.CalledProcessError
 Process = psutil.Process()
 escape_markdown = discord.utils.escape_markdown
@@ -46,11 +45,9 @@ ESCAPE_T = {
 }
 __emap = "".maketrans(ESCAPE_T)
 
-def noHighlight(s):
-    return str(s).translate(__emap)
+noHighlight = lambda s: str(s).translate(__emap)
 
-def sbHighlight(s):
-    return "[" + noHighlight(s) + "]"
+sbHighlight = lambda s: "[" + noHighlight(s) + "]"
 
 
 def getLineCount(fn):
@@ -69,9 +66,9 @@ def getLineCount(fn):
             return hlist((size, count))
 
 
-def iscode(fn):
-    fn = str(fn)
-    return fn.endswith(".py") or fn.endswith(".pyw") # or fn.endswith(".c") or fn.endswith(".cpp")
+iscode = lambda fn: str(fn).endswith(".py") or str(fn).endswith(".pyw")
+
+isasync = lambda obj: asyncio.iscoroutine(obj) or isinstance(obj, asyncio.Future)
 
 
 class returns:
@@ -98,9 +95,7 @@ async def recursiveCoro(item):
                 raise TypeError
             if isinstance(item[i], freeClass):
                 raise TypeError
-            if asyncio.iscoroutine(item[i]):
-                raise TypeError
-            if isinstance(item[i], asyncio.Future):
+            if isasync(item[i]):
                 raise TypeError
             item[i] = tuple(item[i])
         except TypeError:
@@ -108,7 +103,7 @@ async def recursiveCoro(item):
         if type(item[i]) is tuple:
             rets.append(returns())
             create_task(parasync(recursiveCoro(item[i]), rets[-1]))
-        elif asyncio.iscoroutine(item[i]) or isinstance(item[i], asyncio.Future):
+        elif isasync(item[i]):
             rets.append(returns())
             create_task(parasync(item[i], rets[-1]))
         else:
@@ -214,14 +209,11 @@ async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)])
     raise LookupError("No results for " + str(query) + ".")
 
 
-def randColour():
-    return colour2Raw(colourCalculation(xrand(12) * 128))
+randColour = lambda: colour2Raw(colourCalculation(xrand(12) * 128))
 
-def strURL(url):
-    return str(url).replace(".webp", ".png")
+strURL = lambda url: str(url).replace(".webp", ".png")
 
-def shash(s):
-    return bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
+shash = lambda s: bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
 
 __imap = {
     "#": "",
@@ -261,8 +253,7 @@ __smap = {
 }
 __strans = "".maketrans(__smap)
 
-def verifySearch(f):
-    return f.strip().translate(__strans)
+verifySearch = lambda f: f.strip().translate(__strans)
 
 DOMAIN_FORMAT = re.compile(
     r"(?:^(\w{1,255}):(.{1,255})@|^)"
@@ -405,42 +396,39 @@ def funcSafe(func, *args, print_exc=False, **kwargs):
 
 
 athreads = concurrent.futures.ThreadPoolExecutor(max_workers=64)
-# aprocs = hlist()
+eloop = asyncio.new_event_loop()
+asyncio.set_event_loop(eloop)
 
 def wrap_future(fut, loop=None):
     if loop is None:
-        loop = asyncio.get_event_loop()
-    aio_future = loop.create_future()
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = eloop
+    new_fut = loop.create_future()
 
     def on_done(*void):
         try:
             result = fut.result()
         except Exception as ex:
-            loop.call_soon_threadsafe(aio_future.set_exception, ex)
+            loop.call_soon_threadsafe(new_fut.set_exception, ex)
         else:
-            loop.call_soon_threadsafe(aio_future.set_result, result)
+            loop.call_soon_threadsafe(new_fut.set_result, result)
 
     fut.add_done_callback(on_done)
-    return aio_future
+    return new_fut
 
-def create_future(func, *args, loop=None, **kwargs):
-    return wrap_future(athreads.submit(func, *args, **kwargs), loop=loop)
-
-# def create_future_ex(func, *args, **kwargs):
-#     proc = None
-#     for p in aprocs:
-#         if not p.busy:
-#             proc = p
-#     if proc is None:
-#         proc = multiprocessing.pool.Pool(processes=1)
-#     return asyncio.wrap_future(athreads.submit(func, *args, **kwargs))
+create_future = lambda func, *args, loop=None, **kwargs: wrap_future(athreads.submit(func, *args, **kwargs), loop=loop)
+def create_task(fut, *args, loop=None, **kwargs):
+    if loop is None:
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = eloop
+    return asyncio.ensure_future(fut, *args, loop=loop, **kwargs)
 
 
-def logClear():
-    if os.name == 'nt':
-        os.system('cls')
-    else:
-        os.system('clear')
+logClear = lambda: os.system(("clear", "cls")[os.name == "nt"])
 
 class __logPrinter():
 
