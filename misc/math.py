@@ -3,7 +3,8 @@ import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
-latex.__builtins__["print"] = lambda *void1, **void2: None
+
+getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
 
 key = "0"
 BF_PREC = 256

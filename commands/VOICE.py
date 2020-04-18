@@ -1,5 +1,3 @@
-import youtube_dl, ffmpy
-from bs4 import BeautifulSoup
 try:
     from common import *
 except ModuleNotFoundError:
@@ -7,7 +5,105 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-youtube_dl.__builtins__["print"] = print
+import youtube_dl, ffmpy
+from bs4 import BeautifulSoup
+
+FFRuntimeError = ffmpy.FFRuntimeError
+getattr(youtube_dl, "__builtins__", {})["print"] = print
+getattr(ffmpy, "__builtins__", {})["print"] = print
+
+
+async def createPlayer(auds, p_type=0, verbose=False):
+    auds.stats.quiet |= 2 * p_type
+    text = (
+        "```" + "\n" * verbose + "callback-voice-player-" + str(int(bool(p_type)))
+        + "\nInitializing virtual audio player...```"
+    )
+    await auds.channel.send(text)
+    await auds.updatePlayer()
+
+
+def gethash(entry):
+    return entry.setdefault("hash", shash(entry.url))
+
+def sethash(entry):
+    entry.hash = shash(entry.url)
+    return entry.hash
+
+
+def getDuration(filename):
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        filename,
+    ]
+    try:
+        output = subprocess.check_output(command).decode()
+    except:
+        print(traceback.format_exc())
+        output = "N/A"
+    try:
+        i = output.index("\r")
+        output = output[:i]
+    except ValueError:
+        output = "N/A"
+    if output == "N/A":
+        n = 0
+    else:
+        n = roundMin(float(output))
+    return max(1 / (1 << 24), n)
+
+
+def getBitrate(filename):
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=bit_rate",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        filename,
+    ]
+    try:
+        output = subprocess.check_output(command).decode()
+    except:
+        print(traceback.format_exc())
+        output = "N/A"
+    print(output)
+    try:
+        i = output.index("\r")
+        output = output[:i]
+    except ValueError:
+        output = "N/A"
+    if output == "N/A":
+        n = 0
+    else:
+        n = roundMin(float(output))
+    return max(1 / (1 << 24), n)
+
+
+async def forceJoin(guild, channel, user, client, _vars):
+    if guild.id not in _vars.database.playlists.audio:
+        for func in _vars.categories.voice:
+            if "join" in (name.lower() for name in func.name):
+                try:
+                    await func(user=user, channel=channel)
+                except discord.ClientException:
+                    pass
+                except AttributeError:
+                    pass
+    try:
+        auds = _vars.database.playlists.audio[guild.id]
+        auds.channel = channel
+    except KeyError:
+        raise LookupError("Voice channel not found.")
+    return auds
 
 
 class customAudio(discord.AudioSource):
@@ -328,7 +424,7 @@ class customAudio(discord.AudioSource):
                                 self,
                             )
                         else:
-                            dur = ytdl.getDuration("cache/" + search)
+                            dur = getDuration("cache/" + search)
                             if i < len(q):
                                 q[i].duration = dur
             if q and q[0].get("download", 0) > 0 and not playing:
@@ -368,6 +464,8 @@ class customAudio(discord.AudioSource):
                 while True:
                     p = random.choice(t)
                     h = shash(p.url)
+                    if len(t) > 1 and h == self.prev:
+                        continue
                     d = {
                         "hash": h,
                         "name": p.name,
@@ -377,10 +475,7 @@ class customAudio(discord.AudioSource):
                         "u_id": self._vars.client.user.id,
                         "skips": (),
                     }
-                    if len(t) <= 1:
-                        break
-                    if h != self.prev:
-                        break
+                    break
                 q.append(freeClass(d))
         if self.pausec and self.paused:
             vc.stop()
@@ -596,104 +691,8 @@ class customAudio(discord.AudioSource):
             print(traceback.format_exc())
         return temp
 
-    def is_opus(self):
-        return False
-
-    def cleanup(self):
-        return
-
-
-async def createPlayer(auds, p_type=0, verbose=False):
-    auds.stats.quiet |= 2 * p_type
-    text = (
-        "```" + "\n" * verbose + "callback-voice-player-" + str(int(bool(p_type)))
-        + "\nInitializing virtual audio player...```"
-    )
-    await auds.channel.send(text)
-    await auds.updatePlayer()
-
-
-def getDuration(filename):
-    command = [
-        "ffprobe",
-        "-v",
-        "error",
-        "-show_entries",
-        "format=duration",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-        filename,
-    ]
-    try:
-        output = subprocess.check_output(command).decode()
-    except:
-        print(traceback.format_exc())
-        output = "N/A"
-    try:
-        i = output.index("\r")
-        output = output[:i]
-    except ValueError:
-        output = "N/A"
-    if output == "N/A":
-        n = 0
-    else:
-        n = roundMin(float(output))
-    return max(1 / (1 << 24), n)
-
-
-def gethash(entry):
-    return entry.setdefault("hash", shash(entry.url))
-
-def sethash(entry):
-    entry.hash = shash(entry.url)
-    return entry.hash
-
-
-def getBitrate(filename):
-    command = [
-        "ffprobe",
-        "-v",
-        "error",
-        "-show_entries",
-        "format=bit_rate",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-        filename,
-    ]
-    try:
-        output = subprocess.check_output(command).decode()
-    except:
-        print(traceback.format_exc())
-        output = "N/A"
-    print(output)
-    try:
-        i = output.index("\r")
-        output = output[:i]
-    except ValueError:
-        output = "N/A"
-    if output == "N/A":
-        n = 0
-    else:
-        n = roundMin(float(output))
-    return max(1 / (1 << 24), n)
-
-
-async def forceJoin(guild, channel, user, client, _vars):
-    if guild.id not in _vars.database.playlists.audio:
-        for func in _vars.categories.voice:
-            if "join" in (name.lower() for name in func.name):
-                try:
-                    await func(user=user, channel=channel)
-                except discord.ClientException:
-                    pass
-                except AttributeError:
-                    pass
-    try:
-        auds = _vars.database.playlists.audio[guild.id]
-        auds.channel = channel
-    except KeyError:
-        raise LookupError("Voice channel not found.")
-    return auds
+    is_opus = lambda self: False
+    cleanup = lambda self: None
 
     
 class videoDownloader:
@@ -1080,9 +1079,6 @@ class videoDownloader:
             i.url = ""
             print(traceback.format_exc())
         return True
-
-    def getDuration(self, filename):
-        return getDuration(filename)
 
 
 async def downloadTextFile(url, _vars):
@@ -2713,6 +2709,7 @@ class UpdateQueues(Database):
                 auds = self.audio[guild.id]
                 auds.update()
         else:
+            t = time.time()
             a = 1
             for g in tuple(self.audio):
                 try:
@@ -2723,7 +2720,7 @@ class UpdateQueues(Database):
                     if q:
                         for i in range(256):
                             if i < len(q):
-                                self.cached_items[gethash(q[i])] = time.time()
+                                self.cached_items[gethash(q[i])] = t
                             else:
                                 break
                 except:
@@ -2741,7 +2738,8 @@ class UpdateQueues(Database):
                         snow = int(path[1:path.index(".")])
                         if (dt - discord.utils.snowflake_time(snow)).total_seconds() < 3600:
                             continue
-                elif ".mp3" in path or ".part" in path:
+                    continue
+                if ".mp3" in path or ".part" in path:
                     try:
                         i1 = path.index(".mp3")
                     except ValueError:
@@ -2752,7 +2750,7 @@ class UpdateQueues(Database):
                         i2 = len(path)
                     key = path[:min(i1, i2)]
                     if key in self.cached_items:
-                        if time.time() - self.cached_items[key] < 3600:
+                        if t - self.cached_items[key] < 3600:
                             continue
                     try:
                         fn = "cache/" + path

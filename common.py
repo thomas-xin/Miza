@@ -8,6 +8,7 @@ Process = psutil.Process()
 escape_markdown = discord.utils.escape_markdown
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
+getattr(discord, "__builtins__", {})["print"] = print
 
 
 def htmlDecode(s):

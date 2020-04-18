@@ -1,10 +1,11 @@
-import nekos, rule34, pybooru
 try:
     from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
     from common import *
+
+import nekos, rule34, pybooru
 
 image_forms = [
     ".gif",

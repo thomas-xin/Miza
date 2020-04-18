@@ -1,5 +1,3 @@
-import csv, knackpy, ffmpy
-from prettytable import PrettyTable as ptable
 try:
     from common import *
 except ModuleNotFoundError:
@@ -7,10 +5,12 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-FFRuntimeError = ffmpy.FFRuntimeError
+import csv, knackpy, ffmpy
+from prettytable import PrettyTable as ptable
 
-knackpy.__builtins__["print"] = print
-ffmpy.__builtins__["print"] = print
+FFRuntimeError = ffmpy.FFRuntimeError
+getattr(knackpy, "__builtins__", {})["print"] = print
+getattr(ffmpy, "__builtins__", {})["print"] = print
 
 
 class DouClub:

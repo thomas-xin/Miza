@@ -1,10 +1,11 @@
-from googletrans import Translator
 try:
     from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
     from common import *
+
+from googletrans import Translator
 
 
 class PapagoTrans:
