@@ -1681,6 +1681,10 @@ lookup time for all elements. Includes many array and numeric operations."""
         data = (value,) * len(self.data)
         self.__init__(data)
 
+    keys = lambda self: range(len(self))
+    values = lambda self: iter(self)
+    items = lambda self: enumerate(self)
+
     @blocking
     def clip(self, a, b=None):
         if b is None:
@@ -2287,10 +2291,13 @@ class freeClass(dict):
 
     __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
     __repr__ = lambda self: "freeClass(**" + super().__repr__() + ")"
+    __str__ = lambda self: "【" + self.__repr__()[13:-2] + "】"
     __iter__ = lambda self: iter(tuple(super().__iter__()))
     __setattr__ = lambda self, key, value: super().__setitem__(key, value)
-    __getattr__ = lambda self, key: super().__getitem__(key)
-    __str__ = lambda self: "【" + self.__repr__()[13:-2] + "】"
+    def __getattr__(self, key):
+        if key.startswith("__") and key.endswith("__"):
+            return freeClass.__getattribute__(self, key)
+        return super().__getitem__(key)
 
     to_dict = lambda self: dict(**self)
     to_list = lambda self: list(super().values())

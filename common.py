@@ -2,9 +2,10 @@ import os, sys, subprocess, psutil, asyncio, discord, json, requests
 import urllib.request, urllib.parse, concurrent.futures
 from smath import *
 
-urlParse = urllib.parse.quote
+python = ("python3", "python")[os.name == "nt"]
 CalledProcessError = subprocess.CalledProcessError
 Process = psutil.Process()
+urlParse = urllib.parse.quote
 escape_markdown = discord.utils.escape_markdown
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
@@ -299,72 +300,93 @@ def urlOpen(url):
     if resp.getcode() != 200:
         raise ConnectionError("Error " + str(resp.code))
     return resp
-    
 
-__subs__ = {}
 
-def subCount():
-    count = 0
-    for i in list(__subs__):
-        if __subs__[i].is_running():
-            count += 1
-        else:
-            __subs__.pop(i)
-    return count
+SUBS = freeClass(procs=hlist(), busy=freeClass())
+
+subCount = lambda: sum(1 for proc in SUBS.procs if proc.is_running())
 
 def subKill():
-    for sub in __subs__.values():
+    for sub in SUBS.procs:
         sub.kill()
-    __subs__.clear()
+    SUBS.procs.clear()
+    SUBS.busy.clear()
 
-async def subFunc(key, com, data_in, timeout=60):
-    while len(__subs__) > 256:
-        i = iter(tuple(__subs__))
-        try:
-            while i:
-                k = next(i)
-                if __subs__[k].kill is not None:
-                    __subs__[k].kill()
-                    __subs__.pop(k)
-                    break
-        except StopIteration:
-            pass
-    if key in __subs__:
-        try:
-            while __subs__[key].busy:
-                time.sleep(0.01)
-        except KeyError:
-            return subFunc(key, com, data_in, timeout)
-    else:
-        __subs__[key] = freeClass(
-            busy=True,
-            is_running=lambda: True,
-            kill=None,
-        )
-    if isinstance(__subs__[key], psutil.Popen):
-        proc = __subs__[key]
-        if not proc.is_running():
-            __subs__.pop(key)
-            del proc
-            return subFunc(key, com, data_in, timeout)
-    else:
-        proc = __subs__[key] = psutil.Popen(
-            com,
+def procUpdate():
+    procs = SUBS.procs
+    b = len(SUBS.busy)
+    count = sum(1 for proc in procs if not proc.busy)
+    if count > 16:
+        return
+    if b + 1 > count:
+        proc = psutil.Popen(
+            python + " misc/math.py",
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-    proc.busy = True
-    d = repr(bytes(str(data_in), "utf-8")).encode("utf-8") + b"\n"
-    print(d)
-    proc.stdin.write(d)
-    proc.stdin.flush()
+        proc.busy = False
+        procs.append(proc)
+    att = 0
+    while count > b + 2:
+        for p in range(len(procs)):
+            if p < len(procs):
+                proc = procs[p]
+                if not proc.busy:
+                    proc.kill()
+                    procs.pop(p)
+                    break
+            else:
+                break
+        att += 1
+        if att >= 16:
+            break
+
+procUpdate()
+
+async def mathProc(data, key=-1, timeout=12):
+    procs, busy = SUBS.procs, SUBS.busy
+    while time.time() - busy.get(key, 0) < 60:
+        await asyncio.sleep(0.5)
     try:
+        while True:
+            for p in range(len(procs)):
+                if p < len(procs):
+                    proc = procs[p]
+                    if not proc.busy:
+                        raise StopIteration
+                else:
+                    break
+            procUpdate()
+            await asyncio.sleep(0.5)
+    except StopIteration:
+        pass
+    d = repr(bytes(data, "utf-8")).encode("utf-8") + b"\n"
+    print(d)
+    try:
+        proc.busy = True
+        busy[key] = time.time()
+        procUpdate()
+        proc.stdin.write(d)
+        proc.stdin.flush()
         resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
+        proc.busy = False
     except (TimeoutError, asyncio.exceptions.TimeoutError):
         proc.kill()
+        try:
+            procs.pop(p)
+        except LookupError:
+            pass
+        try:
+            busy.pop(key)
+        except KeyError:
+            pass
+        procUpdate()
         raise
-    proc.busy = False
+    try:
+        busy.pop(key)
+    except KeyError:
+        pass
     output = evalEX(evalEX(resp))
     return output
 
@@ -377,6 +399,9 @@ def evalEX(exc):
         if type(exc) is bytes:
             exc = exc.decode("utf-8")
         ex = RuntimeError(exc[exc.index("(") + 1:exc.index(")")].strip("'"))
+    except:
+        print(exc)
+        raise
     try:
         if issubclass(ex.__class__, Exception):
             is_ex = True

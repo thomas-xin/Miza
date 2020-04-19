@@ -36,7 +36,6 @@ class main_data:
     )
     deleted_user = 456226577798135808
     _globals = globals()
-    python = ("python3", "python")[os.name == "nt"]
             
     def __init__(self):
         print("Time: " + str(datetime.datetime.now()))
@@ -687,14 +686,11 @@ class main_data:
                 g_id = guild.id
         except AttributeError:
             g_id = int(guild)
-        args = [
-            g_id,
-            self.python + " misc/math.py",
+        return await mathProc(
             str(f) + "`" + str(int(prec)) + "`" + str(int(r)) + "`" + str(g_id),
+            g_id,
             self.timeout / 2,
-        ]
-        print(args)
-        return await subFunc(*args)
+        )
 
     timeChecks = {
         "galactic year": ("gy", "galactic year", "galactic years"),
@@ -1247,7 +1243,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                         raise OverflowError("Response too long for file upload.")
                             if sent is not None:
                                 await sent.add_reaction(react)
-                    except TimeoutError:
+                    except (TimeoutError, asyncio.exceptions.TimeoutError):
                         raise TimeoutError("Request timed out.")
                     except Exception as ex:
                         errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
