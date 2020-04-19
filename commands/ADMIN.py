@@ -1001,6 +1001,7 @@ class UpdateMessageLogs(Database):
         cu_id = self._vars.client.user.id
         if bulk:
             self.logDeleted(message)
+            return
         guild = message.guild
         if guild.id in self.data:
             c_id = self.data[guild.id]
@@ -1057,6 +1058,7 @@ class UpdateMessageLogs(Database):
                                 # print(t, e.target)
                 if t.bot or u.id == t.id == cu_id:
                     self.logDeleted(message)
+                    return
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
             emb = discord.Embed(colour=colour2Raw([255, 0, 0]))
