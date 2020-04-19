@@ -152,8 +152,8 @@ class Ban(Command):
             else:
                 orig = g_bans.get(t_user.id, 0)
             bantype = " ".join(args[1:])
-            if "for" in bantype:
-                i = bantype.index("for")
+            if "for " in bantype:
+                i = bantype.index("for ")
                 expr = bantype[:i].strip()
                 msg = bantype[i + 3:].strip()
             else:

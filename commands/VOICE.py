@@ -1112,10 +1112,11 @@ def ensure_url(url):
 class Queue(Command):
     server_only = True
     name = ["Q", "Play", "P"]
+    alias = name + ["LS"]
     min_level = 0
     description = "Shows the music queue, or plays a song in voice."
-    usage = "<search_link[]> <verbose(?v)> <hide(?h)> <force(?f)>"
-    flags = "hvf"
+    usage = "<search_link[]> <verbose(?v)> <hide(?h)> <force(?f)> <budge(?b)>"
+    flags = "hvfb"
 
     async def __call__(self, _vars, client, user, perm, message, channel, guild, flags, name, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1235,7 +1236,7 @@ class Queue(Command):
                 "embed": embed,
             }, 1)
         else:
-            if "f" in flags:
+            if "f" in flags or "b" in flags:
                 if not isAlone(auds, user) and perm < 1:
                     self.permError(perm, 1, "to force play while other users are in voice")
             auds.preparing = True
@@ -1265,16 +1266,16 @@ class Queue(Command):
                 if not dur:
                     dur = float(duration)
                 names.append(noHighlight(name))
-            total_duration = 0
-            for e in q:
-                total_duration += float(e.duration)
-            if auds.reverse and len(auds.queue):
-                total_duration += elapsed - float(q[0].duration)
-            else:
-                total_duration -= elapsed
+            if "b" not in flags:
+                total_duration = 0
+                for e in q:
+                    total_duration += float(e.duration)
+                if auds.reverse and len(auds.queue):
+                    total_duration += elapsed - float(q[0].duration)
+                else:
+                    total_duration -= elapsed
             if auds.stats.shuffle:
                 added = shuffle(added)
-            auds.queue.extend(added)
             tdur = float(dur / 128 + frand(0.5) + 2)
             if "f" in flags:
                 for i in range(3):
@@ -1282,10 +1283,17 @@ class Queue(Command):
                         auds.queue[i].pop("download")
                     except (KeyError, IndexError):
                         pass
+                auds.queue.extend(added)
                 auds.queue.rotate(len(added))
                 auds.seek(inf)
                 total_duration = tdur
+            elif "b" in flags:
+                auds.queue.rotate(-1)
+                auds.queue.extend(added)
+                auds.queue.rotate(len(added) + 1)
+                total_duration = q[0].duration
             else:
+                auds.queue.extend(added)
                 total_duration = max(total_duration / auds.speed, tdur)
             if not names:
                 raise LookupError("No results for " + str(argv) + ".")
