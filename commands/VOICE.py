@@ -2458,7 +2458,7 @@ class Download(Command):
                     fmt = spl[-1]
                     if fmt.startswith("."):
                         fmt = fmt[1:]
-                    if fmt not in ("mp3", "ogg", "webm"):
+                    if fmt not in ("mp3", "ogg", "webm", "wav"):
                         fmt = "ogg"
                     else:
                         argv = " ".join(spl[:-1])

@@ -300,6 +300,7 @@ class CS_org2xm(Command):
         "ogg",
         "xm",
         "webm"
+        "wav"
     ]
     name = ["CS_o2x", "Org2xm", "Convert_org"]
     min_level = 0

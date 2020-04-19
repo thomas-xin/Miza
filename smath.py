@@ -766,7 +766,7 @@ def roundX(num, prec):
 
 def verifyString(string):
     if type(string) is list or type(string) is tuple:
-        return "".join([str(c) for c in string])
+        return "".join(str(c) for c in string)
     else:
         return str(string)
 

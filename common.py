@@ -69,7 +69,7 @@ def getLineCount(fn):
 
 iscode = lambda fn: str(fn).endswith(".py") or str(fn).endswith(".pyw")
 
-isasync = lambda obj: asyncio.iscoroutine(obj) or isinstance(obj, asyncio.Future)
+awaitable = lambda obj: asyncio.iscoroutine(obj) or isinstance(obj, asyncio.Future)
 
 
 class returns:
@@ -96,7 +96,7 @@ async def recursiveCoro(item):
                 raise TypeError
             if isinstance(item[i], freeClass):
                 raise TypeError
-            if isasync(item[i]):
+            if awaitable(item[i]):
                 raise TypeError
             item[i] = tuple(item[i])
         except TypeError:
@@ -104,7 +104,7 @@ async def recursiveCoro(item):
         if type(item[i]) is tuple:
             rets.append(returns())
             create_task(parasync(recursiveCoro(item[i]), rets[-1]))
-        elif isasync(item[i]):
+        elif awaitable(item[i]):
             rets.append(returns())
             create_task(parasync(item[i], rets[-1]))
         else:
@@ -141,7 +141,7 @@ async def sendFile(channel, msg, file, filename=None):
         except:
             print(traceback.format_exc())
     if message.attachments:
-        await message.edit(content=message.content + "\n" + "\n".join(tuple("<" + a.url + ">" for a in message.attachments)))
+        await message.edit(content=message.content + "\n" + "\n".join("<" + a.url + ">" for a in message.attachments))
 
 
 def strMessage(message, limit=1024, username=False):
@@ -431,38 +431,48 @@ def create_task(fut, *args, loop=None, **kwargs):
 
 logClear = lambda: os.system(("clear", "cls")[os.name == "nt"])
 
-class __logPrinter():
-
-    print_temp = ""
+class __logPrinter:
     
-    def updatePrint(self, file):
-        if file is None:
+    def updatePrint(self):
+
+        def filePrint(fn, b):
+            f = open(fn, "ab")
+            f.write(b)
+            f.close()
+
+        if self.file is None:
             outfunc = sys.stdout.write
-            enc = lambda x: str(x)
+            enc = lambda x: x
         else:
-            def filePrint(b):
-                f = open(file, "ab+")
-                f.write(b)
-                f.close()
-            outfunc = filePrint
-            enc = lambda x: bytes(str(x), "utf-8")
+            outfunc = lambda s: filePrint(self.file, s)
+            enc = lambda x: bytes(x, "utf-8")
         outfunc(enc("Logging started...\n"))
         while True:
-            if self.print_temp:
-                self.print_temp = limStr(self.print_temp, 4096)
-                data = enc(self.print_temp)
-                #sys.stdout.write(repr(data))
-                outfunc(data)
-                self.print_temp = ""
+            for f in self.data:
+                if not self.data[f]:
+                    self.data.pop(f)
+                    continue
+                self.data[f] = limStr(self.data[f], 8192)
+                data = enc(self.data[f])
+                self.data[f] = ""
+                if f == self.file:
+                    outfunc(data)
+                else:
+                    filePrint(f, data)
             time.sleep(1)
-            #sys.stdout.write(str(f))
 
-    def logPrint(self, *args, sep=" ", end="\n", prefix="", **void):
-        self.print_temp += str(sep).join((str(i) for i in args)) + str(end) + str(prefix)
+    def logPrint(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
+        if file is None:
+            file = self.file
+        if file not in self.data:
+            self.data[file] = ""
+        self.data[file] += str(sep).join(str(i) for i in args) + str(end) + str(prefix)
 
     def __init__(self, file=None):
         self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.future = self.exec.submit(self.updatePrint, file)
+        self.data = freeClass()
+        self.file = file
+        self.future = self.exec.submit(self.updatePrint)
 
 __printer = __logPrinter("log.txt")
 print = __printer.logPrint

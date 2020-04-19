@@ -893,7 +893,7 @@ class UpdateMathTest(Database):
         if xrand(2):
             d = -d
         st = "(" + str(a) + "*x+" + str(b) + ")*(" + str(c) + "*x+" + str(d) + ")"
-        a = [-b / a, -d / c]
+        a = [-sympy.Number(b) / a, -sympy.Number(d) / c]
         q = await create_future(sympy.expand, st)
         q = self.eqtrans(q).replace("^2", "²").replace("∙", "") + " = 0"
         return q, a
@@ -960,7 +960,7 @@ class UpdateMathTest(Database):
         )
         modes = {"easy": easy, "hard": hard}
         qa = random.choice(modes[mode])()
-        if asyncio.iscoroutine(qa):
+        if awaitable(qa):
             return await qa
         return qa
 
@@ -1000,7 +1000,8 @@ class UpdateMathTest(Database):
                         correct = True
                 else:
                     a = await create_future(sympy.sympify, a)
-                    z = await create_future(sympy.simplify, x - a)
+                    d = await create_future(sympy.Add, x, -a)
+                    z = await create_future(sympy.simplify, d)
                     correct = z == 0
                 if correct:
                     create_task(self.newQuestion(channel))

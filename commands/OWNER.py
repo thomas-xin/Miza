@@ -119,7 +119,7 @@ class UpdateExec(Database):
             exec(proc, _vars._globals)
             output = str(proc) + " Successfully executed!"
         try:
-            if isasync(output):
+            if awaitable(output):
                 raise TypeError
             if type(output) in (str, bytes, dict):
                 raise TypeError
@@ -161,7 +161,7 @@ class UpdateExec(Database):
                 output = await create_future(self.procFunc, proc, _vars)
                 if type(output) is tuple:
                     output = await recursiveCoro(output)
-                elif isasync(output):
+                elif awaitable(output):
                     output = await output
                 await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
             except:

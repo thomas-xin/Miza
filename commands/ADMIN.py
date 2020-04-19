@@ -278,7 +278,7 @@ class RoleGiver(Command):
             return "```css\nRemoved all automated rolegivers from [#" + noHighlight(channel.name) + "].```"
         assigned = data.setdefault(channel.id, {})
         if not argv:
-            key = lambda alist: "⟨" + ", ".join([str(r) for r in alist[0]]) + "⟩, delete: " + str(alist[1])
+            key = lambda alist: "⟨" + ", ".join(str(r) for r in alist[0]) + "⟩, delete: " + str(alist[1])
             if not assigned:
                 return (
                     "```ini\nNo currently active rolegivers for [#"
@@ -375,7 +375,7 @@ class AutoRole(Command):
                             await asyncio.sleep(5)
                         i += 1
                 update()
-                return "```css\nRemoved " + sbHighlight(", ".join([str(role) for role in removed])) + " from the autorole list for " + sbHighlight(guild) + ".```"
+                return "```css\nRemoved " + sbHighlight(", ".join(str(role) for role in removed)) + " from the autorole list for " + sbHighlight(guild) + ".```"
             if guild.id in data:
                 data.pop(channel.id)
                 update()
@@ -440,7 +440,7 @@ class AutoRole(Command):
                         await asyncio.sleep(5)
                     i += 1
         return (
-            "```css\nAdded [" + noHighlight(", ".join([str(role) for role in roles]))
+            "```css\nAdded [" + noHighlight(", ".join(str(role) for role in roles))
             + "] to the autorole list for [" + noHighlight(guild) + "].```"
         )
 
@@ -545,7 +545,7 @@ class SaveChannel(Command):
         while h:
             if s:
                 s += "\n\n"
-            s += "\n\n".join([strMessage(m, limit=2048, username=True) for m in h[:4096]])
+            s += "\n\n".join(strMessage(m, limit=2048, username=True) for m in h[:4096])
             h = h[4096:]
             await asyncio.sleep(0.32)
         return bytes(s, "utf-8")
@@ -990,14 +990,17 @@ class UpdateMessageLogs(Database):
                 emb.add_field(name="After", value=strMessage(after))
                 await channel.send(embed=emb)
 
+    def logDeleted(self, message):
+        if message.author.bot and message.author.id != self._vars.client.user.id:
+            return
+        if self._vars.isDeleted(message) < 2:
+            s = strMessage(message, username=True)
+            print(s, file="deleted.txt")
+
     async def _delete_(self, message, bulk=False, **void):
         cu_id = self._vars.client.user.id
         if bulk:
-            if message.author.bot and message.author.id != cu_id:
-                return
-            if self._vars.isDeleted(message) < 2:
-                print(strMessage(message, username=True))
-            return
+            self.logDeleted(message)
         guild = message.guild
         if guild.id in self.data:
             c_id = self.data[guild.id]
@@ -1053,11 +1056,7 @@ class UpdateMessageLogs(Database):
                                 init = "<@" + str(t.id) + ">"
                                 # print(t, e.target)
                 if t.bot or u.id == t.id == cu_id:
-                    if message.author.bot and message.author.id != cu_id:
-                        return
-                    if self._vars.isDeleted(message) < 2:
-                        print(strMessage(message, username=True))
-                    return
+                    self.logDeleted(message)
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
             emb = discord.Embed(colour=colour2Raw([255, 0, 0]))
@@ -1073,56 +1072,55 @@ class UpdateMessageLogs(Database):
 class UpdateFileLogs(Database):
     name = "logF"
 
-    async def _user_update_(self, before, after, **void):
-        return
-        sending = {}
-        for guild in self._vars.client.guilds:
-            if guild.get_member(after.id) is None:
-                try:
-                    memb = await guild.fetch_member(after.id)
-                    if memb is None:
-                        raise EOFError
-                except:
-                    continue
-            sending[guild.id] = True
-        if not sending:
-            return
-        b_url = strURL(before.avatar_url)
-        a_url = strURL(after.avatar_url)
-        if b_url != a_url:
-            try:
-                obj = before.avatar_url_as(format="gif", static_format="png", size=4096)
-            except discord.InvalidArgument:
-                obj = before.avatar_url_as(format="png", static_format="png", size=4096)
-            if ".gif" in str(obj):
-                fmt = ".gif"
-            else:
-                fmt = ".png"
-            msg = None
-            try:
-                b = await obj.read()
-                fil = discord.File(io.BytesIO(b), filename=str(before.id) + fmt)
-            except:
-                msg = str(obj)
-                fil=None
-            emb = discord.Embed(colour=randColour())
-            emb.description = "File deleted from <@" + str(before.id) + ">"
-            for g_id in sending:
-                guild = self._vars.cache["guilds"].get(g_id, None)
-                create_task(self.send_avatars(msg, fil, emb, guild))
+    # async def _user_update_(self, before, after, **void):
+    #     sending = {}
+    #     for guild in self._vars.client.guilds:
+    #         if guild.get_member(after.id) is None:
+    #             try:
+    #                 memb = await guild.fetch_member(after.id)
+    #                 if memb is None:
+    #                     raise EOFError
+    #             except:
+    #                 continue
+    #         sending[guild.id] = True
+    #     if not sending:
+    #         return
+    #     b_url = strURL(before.avatar_url)
+    #     a_url = strURL(after.avatar_url)
+    #     if b_url != a_url:
+    #         try:
+    #             obj = before.avatar_url_as(format="gif", static_format="png", size=4096)
+    #         except discord.InvalidArgument:
+    #             obj = before.avatar_url_as(format="png", static_format="png", size=4096)
+    #         if ".gif" in str(obj):
+    #             fmt = ".gif"
+    #         else:
+    #             fmt = ".png"
+    #         msg = None
+    #         try:
+    #             b = await obj.read()
+    #             fil = discord.File(io.BytesIO(b), filename=str(before.id) + fmt)
+    #         except:
+    #             msg = str(obj)
+    #             fil=None
+    #         emb = discord.Embed(colour=randColour())
+    #         emb.description = "File deleted from <@" + str(before.id) + ">"
+    #         for g_id in sending:
+    #             guild = self._vars.cache["guilds"].get(g_id, None)
+    #             create_task(self.send_avatars(msg, fil, emb, guild))
 
-    async def send_avatars(self, msg, fil, emb, guild=None):
-        if guild is None:
-            return
-        if guild.id in self.data:
-            c_id = self.data[guild.id]
-            try:
-                channel = await self._vars.fetch_channel(c_id)
-            except (EOFError, discord.NotFound):
-                self.data.pop(guild.id)
-                self.update()
-                return
-            await channel.send(msg, embed=emb, file=fil)
+    # async def send_avatars(self, msg, fil, emb, guild=None):
+    #     if guild is None:
+    #         return
+    #     if guild.id in self.data:
+    #         c_id = self.data[guild.id]
+    #         try:
+    #             channel = await self._vars.fetch_channel(c_id)
+    #         except (EOFError, discord.NotFound):
+    #             self.data.pop(guild.id)
+    #             self.update()
+    #             return
+    #         await channel.send(msg, embed=emb, file=fil)
 
     async def _delete_(self, message, bulk=False, **void):
         guild = message.guild
