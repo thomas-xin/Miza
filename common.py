@@ -320,7 +320,7 @@ def procUpdate():
         return
     if b + 1 > count:
         proc = psutil.Popen(
-            python + " misc/math.py",
+            [python, "misc/math.py"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

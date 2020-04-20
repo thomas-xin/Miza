@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import sympy, time, sys, traceback, random, numpy
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex

@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 try:
     from common import *
 except ModuleNotFoundError:
@@ -689,7 +691,6 @@ class main_data:
         return await mathProc(
             str(f) + "`" + str(int(prec)) + "`" + str(int(r)) + "`" + str(g_id),
             g_id,
-            self.timeout / 2,
         )
 
     timeChecks = {
