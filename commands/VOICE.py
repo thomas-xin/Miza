@@ -121,7 +121,7 @@ class customAudio(discord.AudioSource):
         "speed": 1,
         "bassboost": 0,
         "chorus": 0,
-        "resample": 1,
+        "resample": 0,
         "loop": False,
         "shuffle": False,
         "quiet": False,
