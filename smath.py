@@ -254,6 +254,14 @@ def round(x, y=None):
     except:
         return x
 
+def round_random(x):
+    if x == round(x):
+        return round(x)
+    x, y = divmod(x, 1)
+    if random.random() <= y:
+        x += 1
+    return int(x)
+
 def ceil(x):
     try:
         return math.ceil(x)

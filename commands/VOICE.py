@@ -5,7 +5,7 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-import youtube_dl, ffmpy
+import youtube_dl, ffmpy, samplerate
 from bs4 import BeautifulSoup
 
 FFRuntimeError = ffmpy.FFRuntimeError
@@ -121,7 +121,7 @@ class customAudio(discord.AudioSource):
         "speed": 1,
         "bassboost": 0,
         "chorus": 0,
-        #"detune": 0,
+        "resample": 1,
         "loop": False,
         "shuffle": False,
         "quiet": False,
@@ -138,9 +138,11 @@ class customAudio(discord.AudioSource):
             self.vc = vc
             # self.fftrans = list(range(len(self.fff)))
             # self.cpitch = 0
+            self.temp_buffer = [numpy.zeros(0, dtype=float) for _ in loop(2)]
             self.buffer = []
             self.feedback = None
             self.bassadj = None
+            self.bufadj = None
             self.prev = None
             self.searching = False
             self.preparing = True
@@ -193,12 +195,16 @@ class customAudio(discord.AudioSource):
                 return
             d = freeClass(source=source)
             pitchscale = 2 ** (self.stats.pitch / 12)
+            if self.stats.resample >= 2400:
+                pitchscale *= 2 ** (self.stats.resample / 12)
             chorus = min(16, abs(self.stats.chorus))
             if pitchscale != 1 or self.stats.speed != 1:
-                speed = round(self.speed / pitchscale, 9)
-                if speed != 1:
+                speed = self.speed / pitchscale
+                if self.stats.resample >= 2400:
+                    speed *= 2 ** (self.stats.resample / 12)
+                if round(speed, 9) != 1:
                     speed = max(0.005, speed)
-                    if speed > 2147483647:
+                    if speed >= 64:
                         self.source = None
                         self.file = None
                         return
@@ -216,7 +222,7 @@ class customAudio(discord.AudioSource):
             else:
                 d.options = ""
             if pitchscale != 1:
-                if abs(pitchscale) > 2147483647:
+                if abs(pitchscale) >= 64:
                     self.source = None
                     self.file = None
                     return
@@ -524,164 +530,200 @@ class customAudio(discord.AudioSource):
         
     def read(self):
         empty = False
-        try:
-            if self.is_loading or self.paused:
-                self.is_playing = True
-                raise EOFError
+        size = self.length >> 1
+        volume = self.stats.volume
+        reverb = self.stats.reverb
+        pitch = self.stats.pitch
+        bassboost = self.stats.bassboost
+        chorus = self.stats.chorus
+        if self.stats.resample >= 2400:
+            resample = 1
+        else:
+            resample = 2 ** (self.stats.resample / 12)
+        delay = 16
+        if abs(volume) >= 1 << 31:
+            volume = nan
+        if abs(reverb) >= 1 << 31:
+            volume = nan
+        if abs(bassboost) >= 1 << 31:
+            volume = nan
+        if abs(pitch) >= 1 << 31:
+            volume = nan
+        if abs(resample) >= 1 << 31:
+            volume = nan
+        buflen = size
+        if resample != 1:
+            buflen = max(1, round_random(resample * buflen))
+        while len(self.temp_buffer[0]) < buflen:
             try:
-                temp = self.source.read()
-                if not temp:
+                if self.is_loading or self.paused:
+                    self.is_playing = True
                     raise EOFError
-            except:
-                empty = True
-                raise EOFError
-            self.stats.position = round(
-                self.stats.position + self.speed / 50 * (self.reverse * -2 + 1),
-                4,
-            )
-            self.is_playing = True
-            self.curr_timeout = 0
-        except EOFError:
-            if (empty or not self.paused) and not self.is_loading:
-                queueable = (self.queue or self._vars.data.playlists.get(self.vc.guild.id, None))
-                if empty and queueable and self.source is not None:
-                    if time.time() - self.lastEnd > 0.5:
-                        if self.reverse:
-                            ended = self.stats.position <= 0
-                        else:
-                            ended = self.stats.position >= float(self.queue[0].duration) - 1
-                        if self.curr_timeout and time.time() - self.curr_timeout > 1 or ended:
-                            self.lastEnd = time.time()
-                            self.new()
-                        elif self.curr_timeout == 0:
-                            self.curr_timeout = time.time()
-                elif not queueable:
-                    self.curr_timeout = 0
-                    self.vc.stop()
-            temp = self.emptybuff
-            # print(traceback.format_exc())
-        try:
-            volume = self.stats.volume
-            reverb = self.stats.reverb
-            pitch = self.stats.pitch
-            bassboost = self.stats.bassboost
-            chorus = self.stats.chorus
-            # detune = self.stats["detune"]
-            delay = 16
-            if volume == 1 and reverb == pitch == bassboost == chorus == 0: # detune == 0:
-                self.buffer = []
-                self.feedback = None
-                self.bassadj = None
-                self.pausec = self.paused and not (max(temp) or min(temp))
-                if self.pausec:
-                    self.vc.stop()
-                return temp
-            array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
-            size = self.length >> 1
-            if abs(volume) > 1 << 31:
-                volume = nan
-            if abs(reverb) > 1 << 31:
-                reverb = nan
-            if abs(bassboost) > 1 << 31:
-                bassboost = nan
-            if abs(pitch) > 1 << 31:
-                pitch = nan
-            # if abs(detune) > 1 << 31:
-            #    detune = nan
-            if not isValid(volume * reverb * bassboost * pitch): # * detune):
-                array = self.static()
-            else:
-                if volume != 1 or chorus:
-                    try:
-                        if chorus:
-                            volume *= 2
-                        array *= volume * (bool(chorus) + 1)
-                    except:
-                        array = self.static()
-                left, right = array[::2], array[1::2]
-                # if detune:
-                #     if self.cpitch != detune:
-                #         self.cpitch = detune
-                #         self.fftrans = numpy.clip(self.fff * 2 ** (detune / 12) / 50, 1, len(self.fff) - 1)
-                #         self.fftrans[0] = 0
-                #     lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
-                #     s = len(lft) + len(rft) >> 1
-                #     temp = numpy.zeros(s, dtype=complex)
-                #     lsh, rsh = temp, numpy.array(temp)
-                #     for i in range(s):
-                #         j = self.fftrans[i]
-                #         x = int(j)
-                #         y = min(x + 1, s - 1)
-                #         z = j % 1
-                #         lsh[x] += lft[i] * (1 - z)
-                #         lsh[y] += lft[i] * z
-                #         rsh[x] += rft[i] * (1 - z)
-                #         rsh[y] += rft[i] * z
-                #     left, right = numpy.fft.irfft(lsh), numpy.fft.irfft(rsh)
-                if bassboost:
-                    try:
-                        lbass = numpy.array(left)
-                        rbass = numpy.array(right)
-                        if self.bassadj is not None:
-                            x = float(sqrt(abs(bassboost)))
-                            f = min(8, 2 + round(x))
-                            if bassboost > 0:
-                                g = max(1 / 128, (1 - x / 64) / 9)
-                                filt = signal.butter(f, g, btype="low", output="sos")
+                try:
+                    temp = self.source.read()
+                    if not temp:
+                        raise EOFError
+                except:
+                    empty = True
+                    raise EOFError
+                self.stats.position = round(
+                    self.stats.position + self.speed / 50 * (self.reverse * -2 + 1),
+                    4,
+                )
+                self.is_playing = True
+                self.curr_timeout = 0
+            except EOFError:
+                if (empty or not self.paused) and not self.is_loading:
+                    queueable = (self.queue or self._vars.data.playlists.get(self.vc.guild.id, None))
+                    if empty and queueable and self.source is not None:
+                        if time.time() - self.lastEnd > 0.5:
+                            if self.reverse:
+                                ended = self.stats.position <= 0
                             else:
-                                g = min(127 / 128, (1 + x / 64) / 9)
-                                filt = signal.butter(f, g, btype="high", output="sos")
-                            left += signal.sosfilt(
-                                filt,
-                                numpy.concatenate((self.bassadj[0], left))
-                            )[size-16:-16] * bassboost
-                            right += signal.sosfilt(
-                                filt,
-                                numpy.concatenate((self.bassadj[1], right))
-                            )[size-16:-16] * bassboost
-                        self.bassadj = [lbass, rbass]
-                    except:
-                        print(traceback.format_exc())
-                else:
-                    self.bassadj = None
-                if reverb:
-                    try:
-                        if not len(self.buffer):
-                            self.buffer = [[self.empty] * 2] * delay
-                        r = 18
-                        p1 = round(size * (0.5 - 2 / r))
-                        # p2 = round(size * (0.5 - 1 / r))
-                        p3 = round(size * 0.5)
-                        # p4 = round(size * (0.5 + 1 / r))
-                        p5 = round(size * (0.5 + 2 / r))
-                        lfeed = (
-                            + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 8
-                            # + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
-                            + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
-                            # + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
-                            + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 8
-                        ) * reverb
-                        rfeed = (
-                            + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 8
-                            # + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
-                            + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
-                            # + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
-                            + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 8
-                        ) * reverb
-                        if self.feedback is not None:
-                            left -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size-16:-16]
-                            right -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size-16:-16]
-                        self.feedback = (lfeed, rfeed)
-                        a = 1 / 16
-                        b = 1 - a
-                        self.buffer.append((left * a + right * b, left * b + right * a))
-                    except:
-                        print(traceback.format_exc())
-                    self.buffer = self.buffer[-delay:]
-                else:
+                                ended = self.stats.position >= float(self.queue[0].duration) - 1
+                            if self.curr_timeout and time.time() - self.curr_timeout > 1 or ended:
+                                self.lastEnd = time.time()
+                                self.new()
+                            elif self.curr_timeout == 0:
+                                self.curr_timeout = time.time()
+                    elif not queueable:
+                        self.curr_timeout = 0
+                        self.vc.stop()
+                temp = self.emptybuff
+                # print(traceback.format_exc())
+            try:
+                if volume == resample == 1 and reverb == pitch == bassboost == chorus == 0:
                     self.buffer = []
                     self.feedback = None
-                array = numpy.stack((left, right), axis=-1).flatten()
+                    self.bassadj = None
+                    self.pausec = self.paused and not (max(temp) or min(temp))
+                    if self.pausec:
+                        self.vc.stop()
+                    return temp
+                if not isValid(volume):
+                    array = self.static()
+                else:
+                    array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
+                    if volume != 1 or chorus:
+                        try:
+                            if chorus:
+                                volume *= 2
+                            array *= volume * (bool(chorus) + 1)
+                        except:
+                            array = self.static()
+                for i in range(len(self.temp_buffer)):
+                    if resample != 1:
+                        self.temp_buffer[i] = numpy.concatenate([self.temp_buffer[i], array[i::2]])
+                    else:
+                        self.temp_buffer[i] = array[i::2]
+            except:
+                print(traceback.format_exc())
+        try:
+            if resample != 1:
+                if self.bufadj is not None:
+                    lbuf, self.temp_buffer[0] = numpy.hsplit(self.temp_buffer[0], [buflen])
+                    rbuf, self.temp_buffer[1] = numpy.hsplit(self.temp_buffer[1], [buflen])
+                    ltemp = numpy.concatenate((self.bufadj[0], lbuf))
+                    rtemp = numpy.concatenate((self.bufadj[1], rbuf))
+                    try:
+                        left = samplerate.resample(ltemp, 2 * size / len(ltemp), converter_type="sinc_fastest")[-size - 16:-16]
+                        right = samplerate.resample(rtemp, 2 * size / len(rtemp), converter_type="sinc_fastest")[-size - 16:-16]
+                    except samplerate.exceptions.ResamplingError:
+                        left, right = ltemp, rtemp
+                    if len(left) != size or len(right) != size:
+                        left = numpy.interp([i * len(left) / size for i in range(size)], list(range(len(left))), left)
+                        right = numpy.interp([i * len(right) / size for i in range(size)], list(range(len(right))), right)
+                else:
+                    left, self.temp_buffer[0] = self.temp_buffer[0], numpy.zeros(0, dtype=float)
+                    right, self.temp_buffer[1] = self.temp_buffer[1], numpy.zeros(0, dtype=float)
+                    lbuf, rbuf = left, right
+                self.bufadj = [lbuf, rbuf]
+            else:
+                left, self.temp_buffer[0] = self.temp_buffer[0], numpy.zeros(0, dtype=float)
+                right, self.temp_buffer[1] = self.temp_buffer[1], numpy.zeros(0, dtype=float)
+            # if detune:
+            #     if self.cpitch != detune:
+            #         self.cpitch = detune
+            #         self.fftrans = numpy.clip(self.fff * 2 ** (detune / 12) / 50, 1, len(self.fff) - 1)
+            #         self.fftrans[0] = 0
+            #     lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
+            #     s = len(lft) + len(rft) >> 1
+            #     temp = numpy.zeros(s, dtype=complex)
+            #     lsh, rsh = temp, numpy.array(temp)
+            #     for i in range(s):
+            #         j = self.fftrans[i]
+            #         x = int(j)
+            #         y = min(x + 1, s - 1)
+            #         z = j % 1
+            #         lsh[x] += lft[i] * (1 - z)
+            #         lsh[y] += lft[i] * z
+            #         rsh[x] += rft[i] * (1 - z)
+            #         rsh[y] += rft[i] * z
+            #     left, right = numpy.fft.irfft(lsh), numpy.fft.irfft(rsh)
+            if bassboost:
+                try:
+                    lbass = numpy.array(left)
+                    rbass = numpy.array(right)
+                    if self.bassadj is not None:
+                        x = float(sqrt(abs(bassboost)))
+                        f = min(8, 2 + round(x))
+                        if bassboost > 0:
+                            g = max(1 / 128, (1 - x / 64) / 9)
+                            filt = signal.butter(f, g, btype="low", output="sos")
+                        else:
+                            g = min(127 / 128, (1 + x / 64) / 9)
+                            filt = signal.butter(f, g, btype="high", output="sos")
+                        left += signal.sosfilt(
+                            filt,
+                            numpy.concatenate((self.bassadj[0], left))
+                        )[-size - 16:-16] * bassboost
+                        right += signal.sosfilt(
+                            filt,
+                            numpy.concatenate((self.bassadj[1], right))
+                        )[-size - 16:-16] * bassboost
+                    self.bassadj = [lbass, rbass]
+                except:
+                    print(traceback.format_exc())
+            else:
+                self.bassadj = None
+            if reverb:
+                try:
+                    if not len(self.buffer):
+                        self.buffer = [[self.empty] * 2] * delay
+                    r = 18
+                    p1 = round(size * (0.5 - 2 / r))
+                    # p2 = round(size * (0.5 - 1 / r))
+                    p3 = round(size * 0.5)
+                    # p4 = round(size * (0.5 + 1 / r))
+                    p5 = round(size * (0.5 + 2 / r))
+                    lfeed = (
+                        + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 8
+                        # + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
+                        + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
+                        # + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
+                        + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 8
+                    ) * reverb
+                    rfeed = (
+                        + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 8
+                        # + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
+                        + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
+                        # + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
+                        + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 8
+                    ) * reverb
+                    if self.feedback is not None:
+                        left -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size-16:-16]
+                        right -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size-16:-16]
+                    self.feedback = (lfeed, rfeed)
+                    a = 1 / 16
+                    b = 1 - a
+                    self.buffer.append((left * a + right * b, left * b + right * a))
+                except:
+                    print(traceback.format_exc())
+                self.buffer = self.buffer[-delay:]
+            else:
+                self.buffer = []
+                self.feedback = None
+            array = numpy.stack((left, right), axis=-1).flatten()
             numpy.clip(array, -32767, 32767, out=array)
             temp = array.astype(numpy.int16).tobytes()
             self.pausec = self.paused and not (max(temp) or min(temp))
@@ -1825,7 +1867,8 @@ class AudioSettings(Command):
         "BassBoost": "bassboost",
         "Reverb": "reverb",
         "Chorus": "chorus",
-        "NightCore": "nightcore",
+        "NightCore": "resample",
+        "Resample": "resample",
         "LoopQueue": "loop",
         "ShuffleQueue": "shuffle",
         "Quiet": "quiet",
@@ -1842,7 +1885,7 @@ class AudioSettings(Command):
         "BB": "bassboost",
         "RV": "reverb",
         "CH": "chorus",
-        "NC": "nightcore",
+        "NC": "resample",
         "LQ": "loop",
         "SQ": "shuffle",
     }
@@ -1885,7 +1928,7 @@ class AudioSettings(Command):
         if "c" in flags:
             ops.append("chorus")
         if "n" in flags:
-            ops.append("nightcore")
+            ops.append("resample")
         if "l" in flags:
             ops.append("loop")
         if "x" in flags:
@@ -1906,15 +1949,11 @@ class AudioSettings(Command):
                     "Current audio settings for **" + discord.utils.escape_markdown(guild.name) + "**:\n```ini\n"
                     + strIter(d, key=key) + "```"
                 )
-            if op == "nightcore":
-                orig = _vars.database.playlists.audio[guild.id].stats.pitch
-            else:
-                orig = _vars.database.playlists.audio[guild.id].stats[op]
+            orig = _vars.database.playlists.audio[guild.id].stats[op]
             num = round(100 * orig, 9)
             return (
                 "```css\nCurrent audio " + op
-                + " state" * (type(orig) is bool)
-                + " in [" + noHighlight(guild.name)
+                + " setting in [" + noHighlight(guild.name)
                 + "]: [" + str(num) + "].```"
             )
         if not isAlone(auds, user) and perm < 1:
@@ -1946,10 +1985,7 @@ class AudioSettings(Command):
                     argv = argv[2:].strip(" ")
                     _op = operator[0]
             num = await _vars.evalMath(argv, guild.id)
-            if op == "nightcore":
-                orig = round(origVol.pitch * 100, 9)
-            else:
-                orig = round(origVol[op] * 100, 9)
+            orig = round(origVol[op] * 100, 9)
             if _op is not None:
                 num = eval(str(orig) + _op + str(num), {}, infinum)
             val = roundMin(float(num / 100))
@@ -1957,17 +1993,13 @@ class AudioSettings(Command):
             if op in "loop shuffle quiet":
                 origVol[op] = new = bool(val)
                 orig = bool(orig)
-            elif op == "nightcore":
-                origVol.speed = 2 ** (val / 12)
-                origVol.pitch = val
             else:
                 origVol[op] = val
-            if op in "speed pitch chorus nightcore":
+            if op in "speed pitch chorus" or op == "resample" and max(orig, new) >= 240000:
                 auds.new(auds.file, auds.stats.position)
             s += (
                 "\nChanged audio " + str(op)
-                + " state" * (type(orig) is bool)
-                + " from [" + str(orig)
+                + " setting from [" + str(orig)
                 + "] to [" + str(new) + "]."
             )
         if "h" not in flags:
@@ -2239,7 +2271,6 @@ class Player(Command):
                         pos = 0
                     else:
                         pos = inf
-                    dur = float(auds.queue[0].duration)
                     auds.seek(pos)
                     if pos:
                         return
