@@ -563,12 +563,8 @@ class customAudio(discord.AudioSource):
         if resample != 1:
             buflen = max(1, round_random(resample * buflen))
         new_buf = [numpy.zeros(0, dtype=float) for _ in loop(2)]
-        limit = inf
-        if len(self.temp_buffer[0]) < buflen:
-            limit = 8
         found = False
-        n = 0
-        while len(self.temp_buffer[0]) + len(new_buf[0]) < buflen * 16:
+        while len(self.temp_buffer[0]) + len(new_buf[0]) < buflen:
             # print(len(self.temp_buffer[0]) + len(new_buf[0]))
             try:
                 if self.is_loading or self.paused:
@@ -634,18 +630,12 @@ class customAudio(discord.AudioSource):
                     new_buf[i] = numpy.concatenate([new_buf[i], array[i::2]])
             except:
                 print(traceback.format_exc())
-            n += size / buflen
-            if n >= limit:
-                break
         while self.reading or self.refilling > 1:
             time.sleep(0.03)
         self.refilling = 2
         for i in range(2):
             self.temp_buffer[i] = numpy.concatenate([self.temp_buffer[i], new_buf[i]])
-        self.refilling = 1
         # print("refilled.")
-        if limit < inf and random.random() > 0.5:
-            self.refill_buffer()
         self.refilling = 0
 
     def read(self):
@@ -660,10 +650,11 @@ class customAudio(discord.AudioSource):
         buflen = size
         if resample != 1:
             buflen = max(1, round_random(resample * buflen))
-        if len(self.temp_buffer[0]) < buflen * 8:
+        if len(self.temp_buffer[0]) < buflen:
             if not self.refilling:
                 self.refilling = 1
-                create_future(self.refill_buffer, priority=True)
+                self.refill_buffer()
+                # create_future(self.refill_buffer, priority=True)
                 # print("refilling...")
         if len(self.temp_buffer[0]) < buflen or self.refilling > 1:
             return self.emptybuff
