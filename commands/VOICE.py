@@ -658,8 +658,8 @@ class customAudio(discord.AudioSource):
                 self.refilling = 1
                 create_future(self.refill_buffer, priority=True)
                 # print("refilling...")
-        while len(self.temp_buffer[0]) < buflen or self.refilling > 1:
-            time.sleep(0.01)
+        if len(self.temp_buffer[0]) < buflen or self.refilling > 1:
+            return self.emptybuff
         # print("started.")
         try:
             self.reading = 1
