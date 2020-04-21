@@ -302,8 +302,14 @@ class customAudio(discord.AudioSource):
                     shuffle(q)
                     q.appendleft(temp)
             if self.stats.loop and looped:
-                if "download" in temp:
-                    temp.pop("download")
+                try:
+                    temp.pop("played")
+                except (KeyError, IndexError):
+                    pass
+                try:
+                    temp.pop("read")
+                except (KeyError, IndexError):
+                    pass
                 q.append(temp)
             self.queue = q
         if self.player:
@@ -588,11 +594,12 @@ class customAudio(discord.AudioSource):
             except EOFError:
                 if (empty or not self.paused) and not self.is_loading:
                     queueable = (self.queue or self._vars.data.playlists.get(self.vc.guild.id, None))
-                    if empty and queueable and self.source is not None:
-                        if self.queue and not self.queue[0].get("played", False):
-                            if not found:
-                                self.update()
-                        elif time.time() - self.lastEnd > 0.5:
+                    if self.queue and not self.queue[0].get("played", False):
+                        if not found:
+                            self.is_loading = True
+                            self.update()
+                    elif empty and queueable and self.source is not None:
+                        if time.time() - self.lastEnd > 0.5:
                             if self.reverse:
                                 ended = self.stats.position <= 0
                             else:
@@ -1204,8 +1211,15 @@ class Queue(Command):
                 auds.pausec = False
                 auds.preparing = False
                 if auds.stats.position <= 0:
-                    if auds.queue and "download" in auds.queue[0]:
-                        auds.queue[0].pop("download")
+                    if auds.queue:
+                        try:
+                            auds.queue[0].pop("played")
+                        except (KeyError, IndexError):
+                            pass
+                        try:
+                            auds.queue[0].pop("read")
+                        except (KeyError, IndexError):
+                            pass
                 auds.update()
                 return "```css\nSuccessfully resumed audio playback in [" + noHighlight(guild.name) + "].```", 1
             if not len(q):
@@ -1729,8 +1743,8 @@ class Pause(Command):
             if not isAlone(auds, user) and perm < 1:
                 self.permError(perm, 1, "to " + name + " while other users are in voice")
         elif auds.stats.position <= 0:
-            if auds.queue and "download" in auds.queue[0]:
-                auds.queue[0].pop("download")
+            if auds.queue and "played" in auds.queue[0]:
+                auds.queue[0].pop("played")
         if name == "stop":
             auds.seek(0)
         if not auds.paused > 1:
@@ -2042,7 +2056,11 @@ class Rotate(Command):
                 self.permError(perm, 1, "to rotate queue while other users are in voice")
             for i in range(3):
                 try:
-                    auds.queue[i].pop("download")
+                    auds.queue[i].pop("played")
+                except (KeyError, IndexError):
+                    pass
+                try:
+                    auds.queue[i].pop("read")
                 except (KeyError, IndexError):
                     pass
             auds.queue.rotate(-amount)
@@ -2070,7 +2088,11 @@ class Shuffle(Command):
                 self.permError(perm, 1, "to shuffle queue while other users are in voice")
             for i in range(3):
                 try:
-                    auds.queue[i].pop("download")
+                    auds.queue[i].pop("played")
+                except (KeyError, IndexError):
+                    pass
+                try:
+                    auds.queue[i].pop("read")
                 except (KeyError, IndexError):
                     pass
             shuffle(auds.queue)
@@ -2097,7 +2119,11 @@ class Reverse(Command):
                 self.permError(perm, 1, "to reverse queue while other users are in voice")
             for i in range(1, 3):
                 try:
-                    auds.queue[i].pop("download")
+                    auds.queue[i].pop("played")
+                except (KeyError, IndexError):
+                    pass
+                try:
+                    auds.queue[i].pop("read")
                 except (KeyError, IndexError):
                     pass
             reverse(auds.queue)
