@@ -274,7 +274,7 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
             ff = ffmpy.FFmpeg(
                 global_options=["-y", "-hide_banner", "-loglevel panic"],
                 inputs={fi: None},
-                outputs={str(br) + "k": "-b:a", fn: None},
+                outputs={str(br) + "k": "-vn -b:a", fn: None},
             )
             ff.run()
             try:

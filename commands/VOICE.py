@@ -5,7 +5,7 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-import youtube_dl, ffmpy, samplerate
+import youtube_dl, pafy, ffmpy, samplerate
 from bs4 import BeautifulSoup
 
 FFRuntimeError = ffmpy.FFRuntimeError
@@ -23,12 +23,12 @@ async def createPlayer(auds, p_type=0, verbose=False):
     await auds.updatePlayer()
 
 
-def gethash(entry):
-    return entry.setdefault("hash", shash(entry.url))
+# def gethash(entry):
+#     return entry.setdefault("hash", shash(entry.url))
 
-def sethash(entry):
-    entry.hash = shash(entry.url)
-    return entry.hash
+# def sethash(entry):
+#     entry.hash = shash(entry.url)
+#     return entry.hash
 
 
 def getDuration(filename):
@@ -38,54 +38,36 @@ def getDuration(filename):
         "error",
         "-show_entries",
         "format=duration",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
         filename,
     ]
-    try:
-        output = subprocess.check_output(command).decode()
-    except:
-        print(traceback.format_exc())
-        output = "N/A"
-    try:
-        i = output.index("\r")
-        output = output[:i]
-    except ValueError:
-        output = "N/A"
-    if output == "N/A":
-        n = 0
-    else:
-        n = roundMin(float(output))
-    return max(1 / (1 << 24), n)
+    resp = None
+    for _ in loop(3):
+        try:
+            resp = subprocess.check_output(command)
+            break
+        except:
+            print(traceback.format_exc())
+    if resp is None:
+        return "300"
+    s = resp.decode("utf-8")
+    i = s.index("duration=")
+    d = s[i + 9:]
+    i = d.index("\r")
+    dur = float(d[:i])
+    return dur
 
 
-def getBitrate(filename):
-    command = [
-        "ffprobe",
-        "-v",
-        "error",
-        "-show_entries",
-        "format=bit_rate",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-        filename,
-    ]
-    try:
-        output = subprocess.check_output(command).decode()
-    except:
-        print(traceback.format_exc())
-        output = "N/A"
-    print(output)
-    try:
-        i = output.index("\r")
-        output = output[:i]
-    except ValueError:
-        output = "N/A"
-    if output == "N/A":
-        n = 0
-    else:
-        n = roundMin(float(output))
-    return max(1 / (1 << 24), n)
+def getBestAudio(entry):
+    fmts = entry["formats"]
+    best = -1
+    for fmt in fmts:
+        q = fmt.get("abr", 0)
+        if fmt.get("vcodec", "none") != "none":
+            q -= 1
+        if q > best:
+            best = q
+            url = fmt["url"]
+    return url
 
 
 async def forceJoin(guild, channel, user, client, _vars):
@@ -144,6 +126,8 @@ class customAudio(discord.AudioSource):
             self.bassadj = None
             self.bufadj = None
             self.prev = None
+            self.refilling = 0
+            self.reading = 0
             self.searching = False
             self.preparing = True
             self.player = None
@@ -185,7 +169,7 @@ class customAudio(discord.AudioSource):
         orig_source = getattr(self, "source", None)
         if orig_source is not None and type(orig_source) is not str:
             try:
-                self.source.cleanup()
+                getattr(self, "source").cleanup()
             except:
                 print(traceback.format_exc())
         if source is not None:
@@ -274,6 +258,7 @@ class customAudio(discord.AudioSource):
                     d.before_options = "-to " + str(pos)
                 else:
                     d.before_options = "-ss " + str(pos)
+            d.before_options = "-vn " + d.get("before_options", "")
             print(d)
             self.is_loading = True
             self.source = discord.FFmpegPCMAudio(**d)
@@ -308,7 +293,7 @@ class customAudio(discord.AudioSource):
         if q:
             if self.stats.loop:
                 temp = q[0]
-            self.prev = gethash(q[0])
+            self.prev = q[0]
             q.popleft()
             if shuffled and self.stats.shuffle:
                 if len(q) > 1:
@@ -405,63 +390,80 @@ class customAudio(discord.AudioSource):
                     ))
                     dels.append(i)
                     continue
-                h = gethash(e)
-                if h in self._vars.database.playlists.audiocache:
-                    e.duration = self._vars.database.playlists.audiocache[h][-1]
+                # h = gethash(e)
+                # if h in self._vars.database.playlists.audiocache:
+                #     e.duration = self._vars.database.playlists.audiocache[h]
             if len(dels) > 2:
                 q.pops(dels)
             elif dels:
                 while dels:
                     q.pop(dels.popleft())
-            for i in range(2):
-                if i < len(q):
-                    e_id = gethash(q[i])
-                    dtime = q[i].get("download", 0)
-                    if dtime >= 0 and time.time() - dtime > 2:
-                        q[i].download = time.time()
-                        search = e_id + ".mp3"
-                        if search not in os.listdir("cache/"):
-                            durc = [q[i].duration]
-                            self._vars.database.playlists.audiocache[e_id] = durc
-                            create_future(
-                                ytdl.downloadSingle,
-                                q[i],
-                                durc,
-                                self,
-                            )
-                        else:
-                            dur = getDuration("cache/" + search)
-                            if i < len(q):
-                                q[i].duration = dur
-            if q and q[0].get("download", 0) > 0 and not playing:
-                try:
-                    path = "cache/" + gethash(q[0]) + ".mp3"
-                    f = open(path, "rb")
-                    minl = 32
-                    b = f.read(minl)
-                    f.close()
-                    if len(b) < minl:
-                        raise FileNotFoundError
-                    q[0].download = -1
-                    name = q[0].name
-                    added_by = q[0].added_by
-                    self.new(path)
-                    if not self.stats.quiet:
-                        if time.time() - self.lastsent > 1:
-                            msg = (
-                                "```ini\n🎵 Now playing ["
-                                + noHighlight(name)
-                                + "], added by [" + added_by + "]! 🎵```"
-                            )
-                            create_task(sendReact(
-                                self.channel,
-                                msg,
-                                reacts=["❎"],
-                            ))
-                        self.lastsent = time.time()
-                    self.preparing = False
-                except FileNotFoundError:
-                    pass
+            # for i in range(2):
+            #     if i < len(q):
+            #         e_id = gethash(q[i])
+            #         dtime = q[i].get("download", 0)
+            #         if dtime >= 0 and time.time() - dtime > 2:
+            #             q[i].download = time.time()
+            #             search = e_id + ".mp3"
+            #             if search not in os.listdir("cache/"):
+            #                 durc = [q[i].duration]
+            #                 self._vars.database.playlists.audiocache[e_id] = durc
+            #                 create_future(
+            #                     ytdl.downloadSingle,
+            #                     q[i],
+            #                     durc,
+            #                     self,
+            #                 )
+            #             else:
+            #                 dur = getDuration("cache/" + search)
+            #                 if i < len(q):
+            #                     q[i].duration = dur
+            if q and not playing and not q[0].get("played", False):
+                url = ytdl.getStream(q[0])
+                self.new(url)
+                q[0].played = True
+                self.preparing = False
+                if not self.stats.quiet:
+                    if time.time() - self.lastsent > 1:
+                        msg = (
+                            "```ini\n🎵 Now playing ["
+                            + noHighlight(q[0].name)
+                            + "], added by [" + q[0].added_by + "]! 🎵```"
+                        )
+                        create_task(sendReact(
+                            self.channel,
+                            msg,
+                            reacts=["❎"],
+                        ))
+                    self.lastsent = time.time()
+                # try:
+                #     path = "cache/" + gethash(q[0]) + ".mp3"
+                #     f = open(path, "rb")
+                #     minl = 32
+                #     b = f.read(minl)
+                #     f.close()
+                #     if len(b) < minl:
+                #         raise FileNotFoundError
+                #     q[0].download = -1
+                #     name = q[0].name
+                #     added_by = q[0].added_by
+                #     self.new(path)
+                #     if not self.stats.quiet:
+                #         if time.time() - self.lastsent > 1:
+                #             msg = (
+                #                 "```ini\n🎵 Now playing ["
+                #                 + noHighlight(name)
+                #                 + "], added by [" + added_by + "]! 🎵```"
+                #             )
+                #             create_task(sendReact(
+                #                 self.channel,
+                #                 msg,
+                #                 reacts=["❎"],
+                #             ))
+                #         self.lastsent = time.time()
+                #     self.preparing = False
+                # except FileNotFoundError:
+                #     pass
             elif not playing and self.source is None and not self.is_loading:
                 self.advance()
         if not (q or self.preparing):
@@ -469,13 +471,13 @@ class customAudio(discord.AudioSource):
             if t:
                 while True:
                     p = random.choice(t)
-                    h = shash(p.url)
-                    if len(t) > 1 and h == self.prev:
+                    if len(t) > 1 and p.url == self.prev:
                         continue
                     d = {
-                        "hash": h,
+                        # "hash": h,
                         "name": p.name,
                         "url": p.url,
+                        "stream": ytdl.getStream(p),
                         "duration": p.duration,
                         "added_by": self._vars.client.user.name,
                         "u_id": self._vars.client.user.id,
@@ -527,8 +529,8 @@ class customAudio(discord.AudioSource):
             print(traceback.format_exc())
             if self.att > 5:
                 self.dead = True
-        
-    def read(self):
+
+    def refill_buffer(self):
         empty = False
         size = self.length >> 1
         volume = self.stats.volume
@@ -540,7 +542,6 @@ class customAudio(discord.AudioSource):
             resample = 1
         else:
             resample = 2 ** (self.stats.resample / 12)
-        delay = 16
         if abs(volume) >= 1 << 31:
             volume = nan
         if abs(reverb) >= 1 << 31:
@@ -554,7 +555,14 @@ class customAudio(discord.AudioSource):
         buflen = size
         if resample != 1:
             buflen = max(1, round_random(resample * buflen))
-        while len(self.temp_buffer[0]) < buflen:
+        new_buf = [numpy.zeros(0, dtype=float) for _ in loop(2)]
+        limit = inf
+        if len(self.temp_buffer[0]) < buflen:
+            limit = 8
+        found = False
+        n = 0
+        while len(self.temp_buffer[0]) + len(new_buf[0]) < buflen * 16:
+            # print(len(self.temp_buffer[0]) + len(new_buf[0]))
             try:
                 if self.is_loading or self.paused:
                     self.is_playing = True
@@ -563,6 +571,10 @@ class customAudio(discord.AudioSource):
                     temp = self.source.read()
                     if not temp:
                         raise EOFError
+                    if not found:
+                        if self.queue:
+                            self.queue[0].read = True
+                    found = True
                 except:
                     empty = True
                     raise EOFError
@@ -576,14 +588,21 @@ class customAudio(discord.AudioSource):
                 if (empty or not self.paused) and not self.is_loading:
                     queueable = (self.queue or self._vars.data.playlists.get(self.vc.guild.id, None))
                     if empty and queueable and self.source is not None:
-                        if time.time() - self.lastEnd > 0.5:
+                        if self.queue and not self.queue[0].get("played", False):
+                            if not found:
+                                self.update()
+                        elif time.time() - self.lastEnd > 0.5:
                             if self.reverse:
                                 ended = self.stats.position <= 0
                             else:
                                 ended = self.stats.position >= float(self.queue[0].duration) - 1
                             if self.curr_timeout and time.time() - self.curr_timeout > 1 or ended:
-                                self.lastEnd = time.time()
-                                self.new()
+                                if not found:
+                                    if self.queue and not self.queue[0].get("read", False):
+                                        self.queue[0].url = ""
+                                    print("Advanced.")
+                                    self.lastEnd = time.time()
+                                    self.new()
                             elif self.curr_timeout == 0:
                                 self.curr_timeout = time.time()
                     elif not queueable:
@@ -592,14 +611,6 @@ class customAudio(discord.AudioSource):
                 temp = self.emptybuff
                 # print(traceback.format_exc())
             try:
-                if volume == resample == 1 and reverb == pitch == bassboost == chorus == 0:
-                    self.buffer = []
-                    self.feedback = None
-                    self.bassadj = None
-                    self.pausec = self.paused and not (max(temp) or min(temp))
-                    if self.pausec:
-                        self.vc.stop()
-                    return temp
                 if not isValid(volume):
                     array = self.static()
                 else:
@@ -611,18 +622,51 @@ class customAudio(discord.AudioSource):
                             array *= volume * (bool(chorus) + 1)
                         except:
                             array = self.static()
-                for i in range(len(self.temp_buffer)):
-                    if resample != 1:
-                        self.temp_buffer[i] = numpy.concatenate([self.temp_buffer[i], array[i::2]])
-                    else:
-                        self.temp_buffer[i] = array[i::2]
+                for i in range(2):
+                    new_buf[i] = numpy.concatenate([new_buf[i], array[i::2]])
             except:
                 print(traceback.format_exc())
+            n += size / buflen
+            if n >= limit:
+                break
+        while self.reading or self.refilling > 1:
+            time.sleep(0.03)
+        self.refilling = 2
+        for i in range(2):
+            self.temp_buffer[i] = numpy.concatenate([self.temp_buffer[i], new_buf[i]])
+        self.refilling = 1
+        # print("refilled.")
+        if limit < inf and random.random() > 0.5:
+            self.refill_buffer()
+        self.refilling = 0
+
+    def read(self):
+        size = self.length >> 1
+        reverb = self.stats.reverb
+        bassboost = self.stats.bassboost
+        if self.stats.resample >= 2400:
+            resample = 1
+        else:
+            resample = 2 ** (self.stats.resample / 12)
+        delay = 16
+        buflen = size
+        if resample != 1:
+            buflen = max(1, round_random(resample * buflen))
+        if len(self.temp_buffer[0]) < buflen * 8:
+            if not self.refilling:
+                self.refilling = 1
+                create_future(self.refill_buffer, priority=True)
+                # print("refilling...")
+        while len(self.temp_buffer[0]) < buflen or self.refilling > 1:
+            time.sleep(0.01)
+        # print("started.")
         try:
+            self.reading = 1
+            lbuf, self.temp_buffer[0] = numpy.hsplit(self.temp_buffer[0], [buflen])
+            rbuf, self.temp_buffer[1] = numpy.hsplit(self.temp_buffer[1], [buflen])
+            self.reading = 0
             if resample != 1:
                 if self.bufadj is not None:
-                    lbuf, self.temp_buffer[0] = numpy.hsplit(self.temp_buffer[0], [buflen])
-                    rbuf, self.temp_buffer[1] = numpy.hsplit(self.temp_buffer[1], [buflen])
                     ltemp = numpy.concatenate((self.bufadj[0], lbuf))
                     rtemp = numpy.concatenate((self.bufadj[1], rbuf))
                     try:
@@ -634,13 +678,10 @@ class customAudio(discord.AudioSource):
                         left = numpy.interp([i * len(left) / size for i in range(size)], list(range(len(left))), left)
                         right = numpy.interp([i * len(right) / size for i in range(size)], list(range(len(right))), right)
                 else:
-                    left, self.temp_buffer[0] = self.temp_buffer[0], numpy.zeros(0, dtype=float)
-                    right, self.temp_buffer[1] = self.temp_buffer[1], numpy.zeros(0, dtype=float)
-                    lbuf, rbuf = left, right
+                    left, right = lbuf, rbuf
                 self.bufadj = [lbuf, rbuf]
             else:
-                left, self.temp_buffer[0] = self.temp_buffer[0], numpy.zeros(0, dtype=float)
-                right, self.temp_buffer[1] = self.temp_buffer[1], numpy.zeros(0, dtype=float)
+                left, right = lbuf, rbuf
             # if detune:
             #     if self.cpitch != detune:
             #         self.cpitch = detune
@@ -711,8 +752,8 @@ class customAudio(discord.AudioSource):
                         + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 8
                     ) * reverb
                     if self.feedback is not None:
-                        left -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[size-16:-16]
-                        right -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[size-16:-16]
+                        left -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[-size - 16:-16]
+                        right -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[-size - 16:-16]
                     self.feedback = (lfeed, rfeed)
                     a = 1 / 16
                     b = 1 - a
@@ -730,6 +771,7 @@ class customAudio(discord.AudioSource):
             if self.pausec:
                 self.vc.stop()
         except:
+            self.reading = 0
             print(traceback.format_exc())
         return temp
 
@@ -745,11 +787,14 @@ class videoDownloader:
         # "verbose": 1,
         "quiet": 1,
         "format": "bestaudio/best",
+        "nocheckcertificate": 1,
         "no_call_home": 1,
         "nooverwrites": 1,
         "noplaylist": 1,
+        "logtostderr": 0,
         "ignoreerrors": 0,
         "default_search": "auto",
+        "source_address": "0.0.0.0",
     }
 
     def __init__(self):
@@ -790,7 +835,7 @@ class videoDownloader:
                         item = htmlDecode(s[:s.index('" />')]).replace(", a song by ", " ~ ").replace(" on Spotify", "").strip(" ")
                         search = "ytsearch:" + item.replace(":", "-")
                         temp = {
-                            "hash": shash(search),
+                            # "hash": shash(search),
                             "name": item,
                             "url": search,
                             "duration": float(duration),
@@ -842,20 +887,40 @@ class videoDownloader:
             if not len(output) and force != "spotify":
                 resp = self.extract_info(item, count)
                 if resp.get("_type", None) == "url":
-                    resp = self.extract_info(resp["url"], count)
+                    try:
+                        p_resp = pafy.new(resp["url"])
+                        print(p_resp)
+                        resp = {
+                            "title": p_resp.title,
+                            "duration": p_resp.length,
+                            "webpage_url": p_resp.watchv_url,
+                            "formats": [{"url": p_resp.getbestaudio()}],
+                        }
+                    except:
+                        resp = self.extract_info(resp["url"], count)
                 if resp is None or not len(resp):
                     raise EOFError("No search results found.")
                 if resp.get("_type", None) == "playlist":
                     entries = list(resp["entries"])
                     if force or len(entries) <= 1:
                         for entry in entries:
-                            data = self.downloader.extract_info(entry["id"], download=False, process=True)
-                            output.append(freeClass({
-                                "hash": shash(data["webpage_url"]),
+                            try:
+                                p_resp = pafy.new(entry["id"])
+                                print(p_resp)
+                                data = {
+                                    "title": p_resp.title,
+                                    "duration": p_resp.length,
+                                    "webpage_url": p_resp.watchv_url,
+                                    "formats": [{"url": p_resp.getbestaudio()}],
+                                }
+                            except:
+                                data = self.downloader.extract_info(entry["id"], download=False, process=True)
+                            temp = {
                                 "name": data["title"],
                                 "url": data["webpage_url"],
                                 "duration": float(data["duration"]),
-                            }))
+                            }
+                            output.append(freeClass(temp))
                     else:
                         for entry in entries:
                             try:
@@ -868,14 +933,16 @@ class videoDownloader:
                                 if "duration" in entry:
                                     dur = float(entry["duration"])
                                 else:
-                                    dur = "300"
-                                    found = False
+                                    dur = None
                                 temp = {
-                                    "hash": shash(entry["url"]),
+                                    # "hash": shash(entry["url"]),
                                     "name": title,
                                     "url": entry["url"],
                                     "duration": dur,
+                                    "stream": getBestAudio(entry),
                                 }
+                                if dur is None:
+                                    temp["duration"] = getDuration(temp["stream"])
                                 if not found:
                                     temp["research"] = True
                                 output.append(freeClass(temp))
@@ -886,15 +953,16 @@ class videoDownloader:
                     if found:
                         dur = resp["duration"]
                     else:
-                        dur = "300"
+                        dur = None
                     temp = {
-                        "hash": shash(resp["webpage_url"]),
+                        # "hash": shash(resp["webpage_url"]),
                         "name": resp["title"],
                         "url": resp["webpage_url"],
                         "duration": dur,
+                        "stream": getBestAudio(resp),
                     }
-                    if not found:
-                        temp["research"] = True
+                    if dur is None:
+                        temp["duration"] = getDuration(temp["stream"])
                     output.append(freeClass(temp))
             return output
         except:
@@ -902,49 +970,6 @@ class videoDownloader:
                 raise
             print(traceback.format_exc())
             return 0
-
-    def search_yt(self, item):
-        item = item[9:]
-        resp = urlOpen("https://www.youtube.com/results?search_query=" + urlParse(item))
-        while True:
-            try:
-                sub = bytes('<span class="video-time"', "utf-8")
-                s = bytes()
-                while sub not in s:
-                    s = resp.read(1024)
-                    if not s:
-                        raise EOFError("End of response.")
-                s = s[s.index(sub) + len(sub):]
-                s = s[s.index(b">") + 1:]
-                s += resp.read(2048) + b"\0\0\0\0"
-                s = s.decode("utf-8")
-                print(s[:1024])
-                dur = rdhms(s[:s.index("<")])
-                sub = '"><a href="'
-                s = s[s.index(sub) + len(sub):]
-                href = s[:s.index('"')]
-                if not href.startswith("/watch?v="):
-                    raise ValueError
-                url = "https://www.youtube.com" + href
-                sub = 'title="'
-                s = s[s.index(sub) + len(sub):]
-                title = htmlDecode(s[:s.index('" rel="')])
-                break
-            except Exception as ex:
-                if isinstance(ex, EOFError):
-                    resp.close()
-                    raise
-                print(traceback.format_exc())
-        resp.close()
-        return {
-            "hash": shash(url),
-            "title": title,
-            "webpage_url": url,
-            "duration": dur,
-        }
-
-    def fast_search(self, item):
-        return self.search_yt(item)
 
     def extract_info(self, item, count=1):
         if not item.startswith("ytsearch:") and not isURL(item):
@@ -963,21 +988,6 @@ class videoDownloader:
             except Exception as ex:
                 raise ConnectionError(exc + repr(ex))
         return self.downloader.extract_info(item, download=False, process=False)
-        # print(item)
-        # if not isURL(item) or item.startswith("ytsearch:"):
-        #     try:
-        #         return self.fast_search(item[9:])
-        #     except:
-        #         print(traceback.format_exc())
-        # try:
-        #     data = self.downloader.extract_info(item, download=False, process=False)
-        #     print("YTDL")
-        #     return data
-        # except Exception as ex:
-        #     try:
-        #         return self.fast_search(item)
-        #     except:
-        #         raise ex
 
     def search(self, item, force=False):
         item = verifySearch(item)
@@ -1004,36 +1014,42 @@ class videoDownloader:
             self.requests = max(self.requests - 1, 0)
             return repr(ex)
         
-    def downloadSingle(self, i, durc=None, auds=None):
-        if i["url"] in self.downloading:
-            return
-            # raise FileExistsError("File already downloading.")
-        new_opts = dict(self.ydl_opts)
-        fn = "cache/" + gethash(i) + ".mp3"
-        new_opts["outtmpl"] = fn
-        exl = RuntimeError
-        exc = None
-        self.downloading[i["url"]] = True
-        for _ in loop(3):
-            downloader = youtube_dl.YoutubeDL(new_opts)
-            try:
-                downloader.download([i["url"]])
-                if i.url in self.downloading:
-                    self.downloading.pop(i["url"])
-                if durc is not None:
-                    durc[0] = getDuration(fn)
-                auds.update()
-                return fn
-            except Exception as ex:
-                exl = ex
-                exc = traceback.format_exc()
-                time.sleep(3)
-        if i["url"] in self.downloading:
-            self.downloading.pop(i["url"])
-        print(i["url"])
-        i["url"] = ""
-        print(exc)
-        raise exl
+    def getStream(self, i):
+        stream = i.get("stream", None)
+        if stream is None:
+            data = self.extract(i.url)
+            stream = data[0].get("stream", data[0].url)
+        print(stream)
+        return stream
+        # if i["url"] in self.downloading:
+        #     return
+        #     # raise FileExistsError("File already downloading.")
+        # new_opts = dict(self.ydl_opts)
+        # fn = "cache/" + gethash(i) + ".mp3"
+        # new_opts["outtmpl"] = fn
+        # exl = RuntimeError
+        # exc = None
+        # self.downloading[i["url"]] = True
+        # for _ in loop(3):
+        #     downloader = youtube_dl.YoutubeDL(new_opts)
+        #     try:
+        #         downloader.download([i["url"]])
+        #         if i.url in self.downloading:
+        #             self.downloading.pop(i["url"])
+        #         if durc is not None:
+        #             durc[0] = getDuration(fn)
+        #         auds.update()
+        #         return fn
+        #     except Exception as ex:
+        #         exl = ex
+        #         exc = traceback.format_exc()
+        #         time.sleep(3)
+        # if i["url"] in self.downloading:
+        #     self.downloading.pop(i["url"])
+        # print(i["url"])
+        # i["url"] = ""
+        # print(exc)
+        # raise exl
     
     def downloadAs(self, url, fl=8388608, fmt="ogg", message=None):
         try:
@@ -1068,7 +1084,7 @@ class videoDownloader:
             ff = ffmpy.FFmpeg(
                 global_options=["-y", "-hide_banner", "-loglevel panic"],
                 inputs={fn: None},
-                outputs={str(br) + "k": "-b:a", out: None},
+                outputs={str(br) + "k": "-vn -b:a", out: None},
             )
             ff.run()
             os.remove(fn)
@@ -1092,7 +1108,7 @@ class videoDownloader:
                 i.name = it.name
                 i.duration = it.duration
                 i.url = it.url
-                i.hash = gethash(it)
+                # i.hash = gethash(it)
                 return True
             else:
                 self.searched.pop(item)
@@ -1100,21 +1116,32 @@ class videoDownloader:
             self.searched.pop(next(iter(self.searched)))
         try:
             self.requests += 1
-            data = self.downloader.extract_info(item, download=False, process=True)
-            if "entries" in data:
-                data = data["entries"][0]
+            try:
+                p_resp = pafy.new(item)
+                data = {
+                    "title": p_resp.title,
+                    "duration": p_resp.duration,
+                    "webpage_url": p_resp.watchv_url,
+                    "formats": [{"url": p_resp.getbestaudio()}],
+                }
+                print(p_resp)
+            except:
+                data = self.downloader.extract_info(item, download=False, process=True)
+                if "entries" in data:
+                    data = data["entries"][0]
             obj = freeClass(t=time.time())
             obj.data = data = [freeClass(
                 name=data["title"],
                 duration=data["duration"],
                 url=data["webpage_url"],
+                stream=getBestAudio(data),
             )]
             self.searched[item] = obj
             it = data[0]
             i.name = it.name
             i.duration = it.duration
             i.url = it.url
-            sethash(i)
+            # sethash(i)
             self.requests = max(self.requests - 1, 0)
         except:
             self.requests = max(self.requests - 1, 0)
@@ -1294,7 +1321,7 @@ class Queue(Command):
                 url = e.url
                 duration = e.duration
                 temp = {
-                    "hash": e.hash,
+                    # "hash": e.hash,
                     "name": name,
                     "url": url,
                     "duration": duration,
@@ -1752,26 +1779,17 @@ class Seek(Command):
 
 
 def getDump(auds):
+
+    copyDict = lambda item: {"name": item.title, "url": item.url, "duration": item.duration}
+
     lim = 32768
     if len(auds.queue) > lim:
         raise OverflowError(
             "Too many items in queue (" + str(len(auds.queue))
             + " > " + str(lim) + ")."
         )
-    q = [dict(e) for e in auds.queue if random.random() < 0.99 or not time.sleep(0.01)]
-    s = dict(**auds.stats)
-    i = 1
-    for e in q:
-        if "download" in e:
-            e.pop("download")
-        if "hash" in e:
-            e.pop("hash")
-        e.pop("added_by")
-        e.pop("u_id")
-        e.pop("skips")
-        if not i & 2047:
-            time.sleep(0.2)
-        i += 1
+    q = [copyDict(item) for item in auds.queue if random.random() < 0.99 or not time.sleep(0.01)]
+    s = dict(auds.stats)
     d = {
         "stats": s,
         "queue": q,
@@ -2654,22 +2672,14 @@ class UpdateQueues(Database):
     def clearAudioCache(self):
         _vars = self._vars
         pl = self.data
-        should_cache = {}
         for g in pl:
             for i in range(len(pl[g])):
                 e = pl[g][i]
                 if type(e) is dict:
-                    e = pl[g][i] = freeClass(e)
-                s = gethash(e) + ".mp3"
-                should_cache[s] = True
+                    pl[g][i] = freeClass(e)
         for path in os.listdir("cache/"):
             found = False
             if ".mp3" in path:
-                for i in should_cache:
-                    if i in path:
-                        found = True
-                        break
-            if not found:
                 try:
                     os.remove("cache/" + path)
                 except:
@@ -2709,7 +2719,7 @@ class UpdateQueues(Database):
         _vars = self._vars
         pl = self.data
         client = _vars.client
-        self.cached_items = self.__dict__.setdefault("cached_items", {})
+        # self.cached_items = self.__dict__.setdefault("cached_items", {})
         try:
             if guild is not None:
                 g = guild
@@ -2724,9 +2734,9 @@ class UpdateQueues(Database):
                         if m.voice.deaf or m.voice.mute or m.voice.afk:
                             create_task(m.edit(mute=False, deafen=False))
             else:
-                for g in tuple(pl):
-                    for i in pl[g]:
-                        self.cached_items[gethash(i)] = time.time()
+                # for g in tuple(pl):
+                #     for i in pl[g]:
+                #         self.cached_items[gethash(i)] = time.time()
                 for vc in client.voice_clients:
                     if not self.is_connecting(vc.guild.id) and vc.guild.id not in self.audio:
                         create_task(vc.disconnect(force=True))
@@ -2756,12 +2766,12 @@ class UpdateQueues(Database):
                     create_future(auds.update)
                     create_task(self.research(auds))
                     q = auds.queue
-                    if q:
-                        for i in range(256):
-                            if i < len(q):
-                                self.cached_items[gethash(q[i])] = t
-                            else:
-                                break
+                    # if q:
+                    #     for i in range(256):
+                    #         if i < len(q):
+                    #             self.cached_items[gethash(q[i])] = t
+                    #         else:
+                    #             break
                 except:
                     print(traceback.format_exc())
                 if not a & 15:
@@ -2778,30 +2788,30 @@ class UpdateQueues(Database):
                         if (dt - discord.utils.snowflake_time(snow)).total_seconds() < 3600:
                             continue
                     continue
-                if ".mp3" in path or ".part" in path:
-                    try:
-                        i1 = path.index(".mp3")
-                    except ValueError:
-                        i1 = len(path)
-                    try:
-                        i2 = path.index(".part")
-                    except ValueError:
-                        i2 = len(path)
-                    key = path[:min(i1, i2)]
-                    if key in self.cached_items:
-                        if t - self.cached_items[key] < 3600:
-                            continue
-                    try:
-                        fn = "cache/" + path
-                        os.remove(fn)
-                        print("Deleted " + fn + "...")
-                        self.audiocache.pop(key)
-                    except (KeyError, PermissionError, FileNotFoundError):
-                        pass
-                    except:
-                        print(traceback.format_exc())
-                    if key in self.cached_items:
-                        self.cached_items.pop(key)
+                # if ".mp3" in path or ".part" in path:
+                #     try:
+                #         i1 = path.index(".mp3")
+                #     except ValueError:
+                #         i1 = len(path)
+                #     try:
+                #         i2 = path.index(".part")
+                #     except ValueError:
+                #         i2 = len(path)
+                #     key = path[:min(i1, i2)]
+                #     if key in self.cached_items:
+                #         if t - self.cached_items[key] < 3600:
+                #             continue
+                #     try:
+                #         fn = "cache/" + path
+                #         os.remove(fn)
+                #         print("Deleted " + fn + "...")
+                #         self.audiocache.pop(key)
+                #     except (KeyError, PermissionError, FileNotFoundError):
+                #         pass
+                #     except:
+                #         print(traceback.format_exc())
+                #     if key in self.cached_items:
+                #         self.cached_items.pop(key)
                 if not i & 1023:
                     await asyncio.sleep(0.2)
                 i += 1

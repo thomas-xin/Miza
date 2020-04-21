@@ -158,7 +158,7 @@ class UpdateExec(Database):
                 return
             output = None
             try:
-                output = await create_future(self.procFunc, proc, _vars)
+                output = await create_future(self.procFunc, proc, _vars, priority=True)
                 if type(output) is tuple:
                     output = await recursiveCoro(output)
                 elif awaitable(output):

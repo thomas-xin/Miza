@@ -10,6 +10,9 @@ escape_markdown = discord.utils.escape_markdown
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
 getattr(discord, "__builtins__", {})["print"] = print
+getattr(concurrent.futures, "__builtins__", {})["print"] = print
+getattr(asyncio.futures, "__builtins__", {})["print"] = print
+getattr(asyncio, "__builtins__", {})["print"] = print
 
 
 def htmlDecode(s):
@@ -421,6 +424,7 @@ def funcSafe(func, *args, print_exc=False, **kwargs):
         return repr(ex)
 
 
+pthreads = concurrent.futures.ThreadPoolExecutor(max_workers=128)
 athreads = concurrent.futures.ThreadPoolExecutor(max_workers=64)
 eloop = asyncio.new_event_loop()
 asyncio.set_event_loop(eloop)
@@ -444,7 +448,8 @@ def wrap_future(fut, loop=None):
     fut.add_done_callback(on_done)
     return new_fut
 
-create_future = lambda func, *args, loop=None, **kwargs: wrap_future(athreads.submit(func, *args, **kwargs), loop=loop)
+create_future = lambda func, *args, loop=None, priority=False, **kwargs: wrap_future((athreads, pthreads)[priority].submit(func, *args, **kwargs), loop=loop)
+
 def create_task(fut, *args, loop=None, **kwargs):
     if loop is None:
         try:
@@ -473,17 +478,20 @@ class __logPrinter:
             enc = lambda x: bytes(x, "utf-8")
         outfunc(enc("Logging started...\n"))
         while True:
-            for f in self.data:
-                if not self.data[f]:
-                    self.data.pop(f)
-                    continue
-                self.data[f] = limStr(self.data[f], 8192)
-                data = enc(self.data[f])
-                self.data[f] = ""
-                if f == self.file:
-                    outfunc(data)
-                else:
-                    filePrint(f, data)
+            try:
+                for f in self.data:
+                    if not self.data[f]:
+                        self.data.pop(f)
+                        continue
+                    out = limStr(self.data[f], 8192)
+                    self.data[f] = ""
+                    data = enc(out)
+                    if f == self.file:
+                        outfunc(data)
+                    else:
+                        filePrint(f, data)
+            except:
+                print(traceback.format_exc())
             time.sleep(1)
 
     def logPrint(self, *args, sep=" ", end="\n", prefix="", file=None, **void):

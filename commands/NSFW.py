@@ -257,7 +257,6 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
 
 
 async def searchRandomNSFW(argv, delay=10):
-    t = time.time()
     funcs = [
         pull_booru,
         pull_rule34_paheal,
@@ -423,6 +422,7 @@ class Neko(Command):
 
 class Lewd(Command):
     time_consuming = True
+    _timeout_ = 2
     name = ["nsfw"]
     min_level = 1
     description = "Pulls a random image from a search on Rule34 and e621, and embeds it."
@@ -432,7 +432,7 @@ class Lewd(Command):
     async def __call__(self, _vars, args, flags, channel, **void):
         if not is_nsfw(channel):
             raise PermissionError("This command is only available in NSFW channels.")
-        objs = await searchRandomNSFW(" ".join(args), _vars.timeout - 1)
+        objs = await searchRandomNSFW(" ".join(args), 12)
         url = objs[0]
         if "v" in flags:
             text = (
