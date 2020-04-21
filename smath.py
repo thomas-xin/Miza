@@ -1518,6 +1518,8 @@ lookup time for all elements. Includes many array and numeric operations."""
     @blocking
     def rotate(self, steps):
         s = len(self.data)
+        if not s:
+            return self
         steps = -steps % s
         if steps > s / 2:
             steps -= s
