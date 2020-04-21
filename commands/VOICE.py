@@ -1345,7 +1345,7 @@ class Queue(Command):
                     total_duration -= elapsed
             if auds.stats.shuffle:
                 added = shuffle(added)
-            tdur = float(dur / 128 + frand(0.5) + 2)
+            tdur = 1
             if "f" in flags:
                 for i in range(3):
                     try:
