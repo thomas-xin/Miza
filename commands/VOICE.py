@@ -43,7 +43,7 @@ def getDuration(filename):
     resp = None
     for _ in loop(3):
         try:
-            resp = subprocess.check_output(command)
+            resp = subprocess.check_output(command, timeout=3, shell=True)
             break
         except:
             print(traceback.format_exc())
@@ -60,6 +60,7 @@ def getDuration(filename):
 def getBestAudio(entry):
     fmts = entry["formats"]
     best = -1
+    url = entry["webpage_url"]
     for fmt in fmts:
         q = fmt.get("abr", 0)
         if fmt.get("vcodec", "none") != "none":
