@@ -1379,7 +1379,7 @@ def rdhms(ts):
     t = 0
     mult = 1
     while len(data):
-        t += int(data[-1]) * mult
+        t += float(data[-1]) * mult
         data = data[:-1]
         if mult <= 60:
             mult *= 60

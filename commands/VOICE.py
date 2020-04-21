@@ -32,28 +32,32 @@ async def createPlayer(auds, p_type=0, verbose=False):
 
 
 def getDuration(filename):
-    command = [
-        "ffprobe",
-        "-v",
-        "error",
-        "-show_entries",
-        "format=duration",
-        filename,
-    ]
-    resp = None
+    command = ["ffprobe", filename]
+    resp = bytes()
     for _ in loop(3):
         try:
-            resp = subprocess.check_output(command, timeout=3, shell=True)
+            proc = psutil.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            resp = bytes().join(proc.communicate())
             break
         except:
             print(traceback.format_exc())
-    if resp is None:
-        return "300"
     s = resp.decode("utf-8")
-    i = s.index("duration=")
-    d = s[i + 9:]
-    i = d.index("\r")
-    dur = float(d[:i])
+    try:
+        i = s.index("Duration: ")
+        d = s[i + 10:]
+        i = inf
+        for c in ", \n\r":
+            try:
+                x = d.index(c)
+            except ValueError:
+                pass
+            else:
+                if x < i:
+                    i = x
+        dur = rdhms(d[:i])
+    except:
+        print(traceback.format_exc())
+        return "300"
     return dur
 
 

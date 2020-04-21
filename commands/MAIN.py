@@ -69,7 +69,7 @@ class Help(Command):
                 + "[Commands](https://github.com/thomas-xin/Miza/wiki/Commands) for full command list."
             )
             if _vars.categories:
-                s = "```ini\n" + " ".join([sbHighlight(c) for c in _vars.categories]) + "```"
+                s = "```ini\n" + " ".join((sbHighlight(c) for c in standard_commands)) + "```"
                 emb.add_field(name="Command category list", value=s)
         return freeClass(embed=emb), 1
 

@@ -1097,8 +1097,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         return
     run = False
     if op:
-        if comm == "?":
-            check = comm
+        if len(comm) and comm[0] == "?":
+            check = comm[0]
             i = 1
         else:
             i = len(comm)
