@@ -428,8 +428,10 @@ class AutoRole(Command):
                 if memb.top_role <= role:
                     raise PermissionError("Target role is higher than your highest role.")
             roles.append(role)
-        assigned.append(hlist(role.id for role in roles))
-        update()
+        new = hlist(role.id for role in roles)
+        if new not in assigned:
+            assigned.append(new)
+            update()
         if "x" in flags:
             i = 1
             for member in guild.members:

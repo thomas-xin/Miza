@@ -489,11 +489,11 @@ class customAudio(discord.AudioSource):
                         # "hash": h,
                         "name": p.name,
                         "url": p.url,
-                        "stream": ytdl.getStream(p),
                         "duration": p.duration,
                         "added_by": self._vars.client.user.name,
                         "u_id": self._vars.client.user.id,
                         "skips": (),
+                        "research": True,
                     }
                     break
                 q.append(freeClass(d))

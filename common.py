@@ -9,10 +9,6 @@ urlParse = urllib.parse.quote
 escape_markdown = discord.utils.escape_markdown
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
-getattr(discord, "__builtins__", {})["print"] = print
-getattr(concurrent.futures, "__builtins__", {})["print"] = print
-getattr(asyncio.futures, "__builtins__", {})["print"] = print
-getattr(asyncio, "__builtins__", {})["print"] = print
 
 
 def htmlDecode(s):
@@ -461,7 +457,12 @@ class __logPrinter:
     def updatePrint(self):
 
         def filePrint(fn, b):
-            f = open(fn, "ab")
+            if type(b) in (bytes, bytearray):
+                f = open(fn, "ab")
+            elif type(b) is str:
+                f = open(fn, "a", encoding="utf-8")
+            else:
+                f = fn
             f.write(b)
             f.close()
 
@@ -504,6 +505,11 @@ class __logPrinter:
 
 __printer = __logPrinter("log.txt")
 print = __printer.logPrint
+
+getattr(discord, "__builtins__", {})["print"] = print
+getattr(concurrent.futures, "__builtins__", {})["print"] = print
+getattr(asyncio.futures, "__builtins__", {})["print"] = print
+getattr(asyncio, "__builtins__", {})["print"] = print
 
 
 class Command:
