@@ -1462,7 +1462,7 @@ class Playlist(Command):
                 key = lambda x: noHighlight(x)
                 s = strIter(pl, key=key).replace("'", '"')
             else:
-                key = lambda x: limStr(noHighlight(x.name), 1900 / len(pl) - 10)
+                key = lambda x: limStr(noHighlight(x["name"]), 1900 / len(pl) - 10)
                 s = strIter(pl, key=key)
             return (
                 "Current default playlist for **" + discord.utils.escape_markdown(guild.name)
@@ -1499,7 +1499,7 @@ class Playlist(Command):
             })
         if not names:
             raise LookupError("No results for " + argv + ".")
-        pl.sort(key=lambda x: x.name.lower())
+        pl.sort(key=lambda x: x["name"].lower())
         update()
         return (
             "```css\nAdded [" + noHighlight(", ".join(names))
