@@ -96,9 +96,9 @@ async def recursiveCoro(item):
     rets = hlist()
     for i in range(len(item)):
         try:
-            if type(item[i]) in (str, bytes, dict):
+            if type(item[i]) in (str, bytes):
                 raise TypeError
-            if isinstance(item[i], freeClass):
+            if issubclass(type(item[i]), collections.Mapping):
                 raise TypeError
             if awaitable(item[i]):
                 raise TypeError
@@ -405,12 +405,7 @@ def evalEX(exc):
     except:
         print(exc)
         raise
-    try:
-        if issubclass(ex.__class__, Exception):
-            is_ex = True
-    except AttributeError:
-        pass
-    if is_ex:
+    if issubclass(type(ex), Exception):
         raise ex
     return ex
 

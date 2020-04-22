@@ -470,7 +470,7 @@ def evalSym(f, prec=64, r=False):
             except:
                 pass
     try:
-        if hasattr(f, "__class__") and issubclass(f.__class__, baseFloat):
+        if issubclass(type(f), baseFloat):
             a = str(f.evalf(prec))
             try:
                 b = str(prettyAns(sympy.Rational(str(f.num))))

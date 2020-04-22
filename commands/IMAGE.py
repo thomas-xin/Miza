@@ -108,11 +108,13 @@ class React(Command):
     usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, _vars, flags, guild, argv, args, **void):
+    async def __call__(self, _vars, flags, guild, message, argv, args, **void):
         update = self.data.reacts.update
         _vars = self._vars
         following = _vars.data.reacts
-        curr = following.setdefault(guild.id, {})
+        curr = following.setdefault(guild.id, multiDict())
+        if type(curr) is not multiDict:
+            following[guild.id] = curr = multiDict(curr)
         if not argv:
             if "d" in flags:
                 if guild.id in following:
@@ -140,13 +142,20 @@ class React(Command):
                 )
             else:
                 raise LookupError(str(a) + " is not in the auto react list.")
-        if len(curr) >= 256:
+        if curr.count() >= 256:
             raise OverflowError(
                 "React list for " + guild.name
                 + " has reached the maximum of 256 items. "
                 + "Please remove an item to add another."
             )
-        curr[a] = args[1]
+        try:
+            e_id = int(args[1])
+        except:
+            emoji = args[1]
+        else:
+            emoji = await _vars.fetch_emoji(e_id)
+        await message.add_reaction(emoji)
+        curr.append(a, str(emoji))
         update()
         return (
             "```css\nAdded [" + noHighlight(a) + "] ➡️ [" + noHighlight(args[1]) + "] to the auto react list for ["
@@ -374,22 +383,26 @@ class UpdateReacts(Database):
         if message.guild is None or not orig:
             return
         g_id = message.guild.id
-        following = self.data
-        if g_id in following:
+        data = self.data
+        if g_id in data:
             words = text.split(" ")
             try:
+                following = self.data[g_id]
+                if type(following) != multiDict:
+                    following = self.data[g_id] = multiDict(following)
                 reacting = {}
-                for k in following[g_id]:
+                for k in following:
                     if hasSymbol(k):
                         if k in words:
-                            emoji = following[g_id][k]
-                            reacting[words.index(k) / len(words)] = emoji
+                            emojis = following[k]
+                            reacting[words.index(k) / len(words)] = emojis
                     else:
                         if k in message.content:
-                            emoji = following[g_id][k]
-                            reacting[message.content.index(k) / len(message.content)] = emoji
+                            emojis = following[k]
+                            reacting[message.content.index(k) / len(message.content)] = emojis
                 for r in sorted(list(reacting)):
-                    await message.add_reaction(reacting[r])
+                    for react in reacting[r]:
+                        await message.add_reaction(react)
             except ZeroDivisionError:
                 pass
             except:

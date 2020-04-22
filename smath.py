@@ -1270,7 +1270,7 @@ def strIter(it, key=None, limit=1728):
             it = hlist(i for i in it)
     except:
         it = hlist(it)
-    if type(it) in (dict, freeClass):
+    if issubclass(type(it), collections.Mapping):
         keys = it.keys()
     else:
         keys = range(len(it))
@@ -1629,6 +1629,18 @@ lookup time for all elements. Includes many array and numeric operations."""
                 return self
         raise IndexError(str(value) + " not found.")
 
+    @blocking
+    def removedups(self):
+        found = {}
+        pops = deque()
+        for i in range(len(self)):
+            x = self.data[self.offs + i]
+            if x not in found:
+                found[x] = True
+            else:
+                pops.append(i)
+        return self.pops(pops, force=True)
+
     @waiting
     def index(self, value):
         for i in self:
@@ -1765,6 +1777,8 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @blocking
     def delitems(self, iterable):
+        if len(iterable) == 1:
+            return self.pop(iterable[0])
         popped = False
         x = 1
         for i in iterable:
@@ -2312,6 +2326,35 @@ class freeClass(dict):
 
     to_dict = lambda self: dict(**self)
     to_list = lambda self: list(super().values())
+
+
+class multiDict(freeClass):
+
+    count = lambda self: sum(len(v) for v in super().values())
+    extend = lambda self, k, v: super().setdefault(k, hlist()).extend(v).removedups()
+
+    def append(self, k, v):
+        values = super().setdefault(k, hlist())
+        if v not in values:
+            values.append(v)
+
+    def popleft(self, k):
+        values = super().__getitem__(k)
+        if len(values):
+            v = values.popleft()
+        else:
+            v = None
+        if not values:
+            super().pop(k)
+        return v
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        for it in args:
+            for k, v in it.items():
+                self.extend(k, v)
+        for k, v in kwargs:
+            self.extend(k, v)
 
 
 class pickled:

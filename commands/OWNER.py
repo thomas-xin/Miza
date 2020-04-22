@@ -121,9 +121,9 @@ class UpdateExec(Database):
         try:
             if awaitable(output):
                 raise TypeError
-            if type(output) in (str, bytes, dict):
+            if type(output) in (str, bytes):
                 raise TypeError
-            if isinstance(output, freeClass):
+            if issubclass(type(output), collections.Mapping):
                 raise TypeError
             output = tuple(output)
         except TypeError:

@@ -28,18 +28,19 @@ class main_data:
     savedata = "data.json"
     authdata = "auth.json"
     client = client
-    cache = freeClass(
-        guilds={},
-        channels={},
-        users={},
-        roles={},
-        messages={},
-        deleted={},
-    )
     deleted_user = 456226577798135808
     _globals = globals()
             
     def __init__(self):
+        self.cache = freeClass(
+            guilds={},
+            channels={},
+            users={},
+            roles={},
+            emojis={},
+            messages={},
+            deleted={},
+        )
         print("Time: " + str(datetime.datetime.now()))
         print("Initializing...")
         if not os.path.exists("cache/"):
@@ -296,13 +297,13 @@ class main_data:
             r_id = int(r_id)
         except (ValueError, TypeError):
             raise TypeError("Invalid role identifier: " + str(r_id))
+        if r_id in self.cache.roles:
+            return self.cache.roles[r_id]
         try:
             role = guild.get_role(r_id)
             if role is None:
                 raise EOFError
         except:
-            if r_id in self.cache.roles:
-                return self.cache.roles[r_id]
             if len(guild.roles) <= 1:
                 roles = await guild.fetch_roles()
                 guild.roles = sorted(roles)
@@ -312,6 +313,26 @@ class main_data:
         self.cache.roles[r_id] = role
         self.limitCache("roles")
         return role
+
+    async def fetch_emoji(self, e_id, guild=None):
+        try:
+            e_id = int(e_id)
+        except (ValueError, TypeError):
+            raise TypeError("Invalid emoji identifier: " + str(e_id))
+        if e_id in self.cache.emojis:
+            return self.cache.emojis[e_id]
+        try:
+            emoji = client.get_emoji(e_id)
+            if emoji is None:
+                raise EOFError
+        except:
+            if guild is not None:
+                emoji = await guild.fetch_emoji(e_id)
+            else:
+                raise discord.NotFound("Emoji not found.")
+        self.cache.emojis[e_id] = emoji
+        self.limitCache("emojis")
+        return emoji
     
     def get_mimic(self, m_id, user=None):
         try:
