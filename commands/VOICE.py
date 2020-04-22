@@ -75,7 +75,7 @@ def getBestAudio(entry):
     return url
 
 
-async def forceJoin(guild, channel, user, client, _vars):
+async def forceJoin(guild, channel, user, client, _vars, preparing=False):
     if guild.id not in _vars.database.playlists.audio:
         for func in _vars.categories.voice:
             if "join" in (name.lower() for name in func.name):
@@ -88,6 +88,7 @@ async def forceJoin(guild, channel, user, client, _vars):
     try:
         auds = _vars.database.playlists.audio[guild.id]
         auds.channel = channel
+        auds.preparing = preparing
     except KeyError:
         raise LookupError("Voice channel not found.")
     return auds
@@ -1192,15 +1193,13 @@ class Queue(Command):
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac']
 
     async def __call__(self, _vars, client, user, perm, message, channel, guild, flags, name, argv, **void):
-        auds = await forceJoin(guild, channel, user, client, _vars)
-        if auds.stats.quiet & 2:
-            flags.setdefault("h", 1)
-        elapsed = auds.stats.position
-        q = auds.queue
         if not argv:
             if message.attachments:
                 argv = message.attachments[0].url
         if not argv:
+            auds = await forceJoin(guild, channel, user, client, _vars)
+            elapsed = auds.stats.position
+            q = auds.queue
             v = "v" in flags
             if not v and len(q) and auds.paused & 1 and "p" in name:
                 auds.paused &= -2
@@ -1230,9 +1229,14 @@ class Queue(Command):
         if "f" in flags or "b" in flags:
             if not isAlone(auds, user) and perm < 1:
                 self.permError(perm, 1, "to force play while other users are in voice")
-        auds.preparing = True
+        future = wrap_future(create_task(forceJoin(guild, channel, user, client, _vars, preparing=True)))
         argv = await _vars.followURL(argv)
         resp = await create_future(ytdl.search, argv)
+        auds = await future
+        if auds.stats.quiet & 2:
+            flags.setdefault("h", 1)
+        elapsed = auds.stats.position
+        q = auds.queue
         if type(resp) is str:
             raise evalEX(resp)
         dur = 0
