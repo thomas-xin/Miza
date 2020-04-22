@@ -397,7 +397,7 @@ class UpdateReacts(Database):
                             emojis = following[k]
                             reacting[words.index(k) / len(words)] = emojis
                     else:
-                        if k in message.content:
+                        if k in message.content.lower():
                             emojis = following[k]
                             reacting[message.content.index(k) / len(message.content)] = emojis
                 for r in sorted(list(reacting)):
