@@ -179,7 +179,7 @@ def strActivity(activity):
         return t[0].upper() + t[1:] + " " + activity.name
     return str(activity)
 
-def hasSymbol(string):
+def alphanumeric(string):
     for c in string.lower():
         x = ord(c)
         if x > 122 or (x < 97 and x > 57) or x < 48:
