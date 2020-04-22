@@ -1351,6 +1351,7 @@ def timeConv(s):
 sec2Time = lambda s: " ".join(timeConv(s))
 
 def dhms(s):
+    s = float(s)
     if not isValid(s):
         return str(s)
     s = round(s)

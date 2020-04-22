@@ -1188,7 +1188,8 @@ class Queue(Command):
     min_level = 0
     description = "Shows the music queue, or plays a song in voice."
     usage = "<search_link[]> <verbose(?v)> <hide(?h)> <force(?f)> <budge(?b)>"
-    flags = "hvfb"
+    flags = "hvfbz"
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac']
 
     async def __call__(self, _vars, client, user, perm, message, channel, guild, flags, name, argv, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
@@ -1221,62 +1222,177 @@ class Queue(Command):
                 auds.preparing = False
                 auds.update()
                 return "```ini\nQueue for [" + noHighlight(guild.name) + "] is currently empty. ```", 1
-            if auds.stats.loop:
-                totalTime = inf
+            return (
+                "```" + "\n" * ("z" in flags) + "callback-voice-queue-"
+                + str(user.id) + "_0_" + str(int(v))
+                + "-\nQueue for " + guild.name.replace("`", "") + ":```"
+            )
+        if "f" in flags or "b" in flags:
+            if not isAlone(auds, user) and perm < 1:
+                self.permError(perm, 1, "to force play while other users are in voice")
+        auds.preparing = True
+        argv = await _vars.followURL(argv)
+        resp = await create_future(ytdl.search, argv)
+        if type(resp) is str:
+            raise evalEX(resp)
+        dur = 0
+        added = deque()
+        names = []
+        for e in resp:
+            name = e.name
+            url = e.url
+            duration = e.duration
+            temp = {
+                # "hash": e.hash,
+                "name": name,
+                "url": url,
+                "duration": duration,
+                "added_by": user.name,
+                "u_id": user.id,
+                "skips": [],
+            }
+            if "research" in e:
+                temp["research"] = True
+            added.append(freeClass(temp))
+            if not dur:
+                dur = float(duration)
+            names.append(noHighlight(name))
+        if "b" not in flags:
+            total_duration = 0
+            for e in q:
+                total_duration += float(e.duration)
+            if auds.reverse and len(auds.queue):
+                total_duration += elapsed - float(q[0].duration)
             else:
-                if auds.reverse and len(auds.queue):
-                    totalTime = elapsed - float(auds.queue[0].duration)
-                else:
-                    totalTime = -elapsed
-                i = 1
-                for e in q:
-                    totalTime += float(e.duration)
-                    if not i & 4095:
-                        await asyncio.sleep(0.2)
-                    i += 1
-            cnt = len(q)
-            info = (
-                str(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
-                + sec2Time(totalTime / auds.speed) + "\n"
+                total_duration -= elapsed
+        if auds.stats.shuffle:
+            added = shuffle(added)
+        tdur = 1
+        if "f" in flags:
+            for i in range(3):
+                try:
+                    auds.queue[i].pop("download")
+                except (KeyError, IndexError):
+                    pass
+            auds.queue.extend(added)
+            auds.queue.rotate(len(added))
+            auds.seek(inf)
+            total_duration = tdur
+        elif "b" in flags:
+            auds.queue.rotate(-1)
+            auds.queue.extend(added)
+            auds.queue.rotate(len(added) + 1)
+            total_duration = q[0].duration
+        else:
+            auds.queue.extend(added)
+            total_duration = max(total_duration / auds.speed, tdur)
+        if not names:
+            raise LookupError("No results for " + str(argv) + ".")
+        if "v" in flags:
+            names = noHighlight(hlist(i.name + ": " + dhms(i.duration) for i in added))
+        elif len(names) == 1:
+            names = names[0]
+        else:
+            names = str(len(names)) + " items"
+        if "h" not in flags:
+            return (
+                "```css\n🎶 Added [" + names
+                + "] to the queue! Estimated time until playing: ["
+                + sec2Time(total_duration) + "]. 🎶```", 1
             )
-            duration = float(q[0].duration)
-            sym = "⬜⬛"
-            barsize = 24
-            r = round(min(1, elapsed / duration) * barsize)
-            bar = sym[0] * r + sym[1] * (barsize - r)
-            countstr = "Currently playing [" + discord.utils.escape_markdown(q[0].name) + "](" + q[0].url + ")\n"
-            countstr += (
-                "`(" + uniStr(dhms(elapsed))
-                + "/" + uniStr(dhms(duration)) + ") "
-            )
-            countstr += bar + "`\n"
-            embed=discord.Embed(
-                title=" ",
-                description=info + countstr,
-                colour=randColour(),
-            )
-            embed.set_author(name="Queue for " + guild.name.replace("`", "") + ":")
-            embstr = ""
-            embcnt = 0
-            currTime = 0
-            for i in range(len(q)):
-                if i >= len(q):
-                    break
-                e = q[i]
-                curr = "`"
-                curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
-                curr += "【" + str(i) + "】` ["
-                curr += discord.utils.escape_markdown(limStr(noHighlight(e.name), 64 + 192 * v))
-                curr += "](" + e.url + ")```css\n"
-                if v:
-                    curr += (
-                        "Duration: [" + sec2Time(float(e.duration))
-                        + "], Added by: [" + noHighlight(e.added_by) + "]\n"
-                    )
-                if auds.reverse and len(auds.queue):
-                    estim = currTime + elapsed - float(auds.queue[0].duration)
-                else:
-                    estim = currTime - elapsed
+
+    async def _callback_(self, _vars, message, reaction, user, perm, vals, **void):
+        u_id, pos, v = [int(i) for i in vals.split("_")]
+        # print(vals, reaction, message)
+        if reaction is not None and u_id != user.id and perm < 3:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        auds = await forceJoin(guild, message.channel, user, _vars.client, _vars)
+        q = auds.queue
+        last = len(q) - 10
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - 10)
+            elif i == 2:
+                new = min(last, pos + 10)
+            else:
+                new = last
+            if new == pos:
+                return
+            pos = new
+        content = message.content
+        i = content.index("callback")
+        content = content[:i] + (
+            "callback-voice-queue-"
+            + str(user.id) + "_" + str(pos) + "_" + str(int(v))
+            + "-\nQueue for " + guild.name.replace("`", "") + ":```"
+        )
+        elapsed = auds.stats.position
+        if auds.stats.loop:
+            totalTime = inf
+        else:
+            if auds.reverse and len(auds.queue):
+                totalTime = elapsed - float(auds.queue[0].duration)
+            else:
+                totalTime = -elapsed
+            startTime = 0
+            i = 0
+            for e in q:
+                totalTime += float(e.duration)
+                if i < pos:
+                    startTime += float(e.duration)
+                if not 1 + i & 4095:
+                    await asyncio.sleep(0.2)
+                i += 1
+        cnt = len(q)
+        info = (
+            str(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
+            + sec2Time(totalTime / auds.speed) + "\n"
+        )
+        duration = float(q[0].duration)
+        sym = "⬜⬛"
+        barsize = 24
+        r = round(min(1, elapsed / duration) * barsize)
+        bar = sym[0] * r + sym[1] * (barsize - r)
+        countstr = "Currently playing [" + discord.utils.escape_markdown(q[0].name) + "](" + q[0].url + ")\n"
+        countstr += (
+            "`(" + uniStr(dhms(elapsed))
+            + "/" + uniStr(dhms(duration)) + ") "
+        )
+        countstr += bar + "`\n"
+        emb = discord.Embed(
+            description=info + countstr,
+            colour=randColour(),
+        )
+        user = await _vars.fetch_user(u_id)
+        url = strURL(user.avatar_url)
+        for size in ("?size=1024", "?size=2048"):
+            if url.endswith(size):
+                url = url[:-len(size)] + "?size=4096"
+        emb.set_author(name=str(user), url=url, icon_url=url)
+        embstr = ""
+        currTime = startTime
+        i = pos
+        while i < min(pos + 10, len(q)):
+            e = q[i]
+            curr = "`"
+            curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
+            curr += "【" + str(i) + "】` ["
+            curr += discord.utils.escape_markdown(limStr(noHighlight(e.name), 192))
+            curr += "](" + e.url + ") `("
+            curr += dhms(e.duration) + ")`"
+            if v:
+                curr += "\n```css\n[" + noHighlight(e.added_by) + "]\n"
+            if auds.reverse and len(auds.queue):
+                estim = currTime + elapsed - float(auds.queue[0].duration)
+            else:
+                estim = currTime - elapsed
+            if v:
                 if estim > 0:
                     curr += "Time until playing: "
                     estimate = sec2Time(estim / auds.speed)
@@ -1286,110 +1402,25 @@ class Queue(Command):
                         curr += "{" + estimate + "}"
                 else:
                     curr += "Remaining time: [" + sec2Time((estim + float(e.duration)) / auds.speed) + "]"
-                curr += "```\n"
-                if len(embstr) + len(curr) < 1024:
-                    embstr += curr
-                elif embcnt < v * 4:
-                    embed.add_field(
-                        name="Page " + str(1 + embcnt),
-                        value=embstr,
-                        inline=False,
-                    )
-                    embcnt += 1
-                    embstr = curr
-                else:
-                    embed.set_footer(
-                        text=uniStr("And ", 1) + str(len(q) - i) + uniStr(" more...", 1),
-                    )
-                    break
-                if i <= 1 or not auds.stats.shuffle:
-                    currTime += float(e.duration)
-                if not 1 + i & 4095:
-                    await asyncio.sleep(0.3)
-            embed.add_field(
-                name="Page " + str(1 + embcnt),
-                value=embstr,
-                inline=False,
+                curr += "```"
+            curr += "\n"
+            if len(embstr) + len(curr) > 2048 - len(emb.description):
+                break
+            embstr += curr
+            if i <= 1 or not auds.stats.shuffle:
+                currTime += float(e.duration)
+            if not 1 + 1 & 4095:
+                await asyncio.sleep(0.3)
+            i += 1
+        emb.description += embstr
+        if pos != last:
+            emb.set_footer(
+                text=uniStr("And ", 1) + str(len(q) - i) + uniStr(" more...", 1),
             )
-            return ({
-                "embed": embed,
-            }, 1)
-        else:
-            if "f" in flags or "b" in flags:
-                if not isAlone(auds, user) and perm < 1:
-                    self.permError(perm, 1, "to force play while other users are in voice")
-            auds.preparing = True
-            argv = await _vars.followURL(argv)
-            resp = await create_future(ytdl.search, argv)
-            if type(resp) is str:
-                raise evalEX(resp)
-            dur = 0
-            added = deque()
-            names = []
-            for e in resp:
-                name = e.name
-                url = e.url
-                duration = e.duration
-                temp = {
-                    # "hash": e.hash,
-                    "name": name,
-                    "url": url,
-                    "duration": duration,
-                    "added_by": user.name,
-                    "u_id": user.id,
-                    "skips": [],
-                }
-                if "research" in e:
-                    temp["research"] = True
-                added.append(freeClass(temp))
-                if not dur:
-                    dur = float(duration)
-                names.append(noHighlight(name))
-            if "b" not in flags:
-                total_duration = 0
-                for e in q:
-                    total_duration += float(e.duration)
-                if auds.reverse and len(auds.queue):
-                    total_duration += elapsed - float(q[0].duration)
-                else:
-                    total_duration -= elapsed
-            if auds.stats.shuffle:
-                added = shuffle(added)
-            tdur = 1
-            if "f" in flags:
-                for i in range(3):
-                    try:
-                        auds.queue[i].pop("download")
-                    except (KeyError, IndexError):
-                        pass
-                auds.queue.extend(added)
-                auds.queue.rotate(len(added))
-                auds.seek(inf)
-                total_duration = tdur
-            elif "b" in flags:
-                auds.queue.rotate(-1)
-                auds.queue.extend(added)
-                auds.queue.rotate(len(added) + 1)
-                total_duration = q[0].duration
-            else:
-                auds.queue.extend(added)
-                total_duration = max(total_duration / auds.speed, tdur)
-            if not names:
-                raise LookupError("No results for " + str(argv) + ".")
-            if "v" in flags:
-                names = noHighlight(hlist(subDict(i, ["skips", "added_by", "u_id"]) for i in added))
-            elif len(names) == 1:
-                names = names[0]
-            elif len(names) >= 4:
-                names = str(len(names)) + " items"
-            else:
-                names = ", ".join(names)
-            if "h" not in flags:
-                return (
-                    "```css\n🎶 Added [" + names
-                    + "] to the queue! Estimated time until playing: ["
-                    + sec2Time(total_duration) + "]. 🎶```", 1
-                )
+        await message.edit(content=content, embed=emb)
+        if reaction is None:
+            for react in self.directions:
+                await message.add_reaction(react.decode("utf-8"))
 
 
 class Playlist(Command):
@@ -1790,7 +1821,7 @@ class Seek(Command):
 
 def getDump(auds):
 
-    copyDict = lambda item: {"name": item.title, "url": item.url, "duration": item.duration}
+    copyDict = lambda item: {"name": item.name, "url": item.url, "duration": item.duration}
 
     lim = 32768
     if len(auds.queue) > lim:
