@@ -385,21 +385,19 @@ class UpdateReacts(Database):
         g_id = message.guild.id
         data = self.data
         if g_id in data:
-            words = text.split(" ")
             try:
                 following = self.data[g_id]
                 if type(following) != multiDict:
                     following = self.data[g_id] = multiDict(following)
                 reacting = {}
                 for k in following:
-                    if hasSymbol(k):
-                        if k in words:
-                            emojis = following[k]
-                            reacting[words.index(k) / len(words)] = emojis
+                    if not hasSymbol(k):
+                        words = text.split(" ")
                     else:
-                        if k in message.content.lower():
-                            emojis = following[k]
-                            reacting[message.content.index(k) / len(message.content)] = emojis
+                        words = message.content.lower()
+                    if k in words:
+                        emojis = following[k]
+                        reacting[words.index(k) / len(words)] = emojis
                 for r in sorted(list(reacting)):
                     for react in reacting[r]:
                         await message.add_reaction(react)
