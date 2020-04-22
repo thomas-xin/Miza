@@ -1311,7 +1311,7 @@ class Queue(Command):
         guild = message.guild
         auds = await forceJoin(guild, message.channel, user, _vars.client, _vars)
         q = auds.queue
-        last = len(q) - 10
+        last = max(0, len(q) - 10)
         if reaction is not None:
             i = self.directions.index(reaction)
             if i == 0:
