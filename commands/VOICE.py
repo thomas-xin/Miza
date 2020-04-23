@@ -1840,6 +1840,7 @@ class Pause(Command):
 
 class Seek(Command):
     server_only = True
+    name = ["Replay"]
     min_level = 0
     min_display = "0~1"
     description = "Seeks to a position in the current audio file."
@@ -1850,16 +1851,19 @@ class Seek(Command):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to seek while other users are in voice")
-        orig = auds.stats.position
-        expr = argv
-        _op = None
-        for operator in ("+=", "-=", "*=", "/=", "%="):
-            if expr.startswith(operator):
-                expr = expr[2:].strip(" ")
-                _op = operator[0]
-        num = await _vars.evalTime(expr, guild)
-        if _op is not None:
-            num = eval(str(orig) + _op + str(num), {}, infinum)
+        if name == "replay":
+            num = 0
+        else:
+            orig = auds.stats.position
+            expr = argv
+            _op = None
+            for operator in ("+=", "-=", "*=", "/=", "%="):
+                if expr.startswith(operator):
+                    expr = expr[2:].strip(" ")
+                    _op = operator[0]
+            num = await _vars.evalTime(expr, guild)
+            if _op is not None:
+                num = eval(str(orig) + _op + str(num), {}, infinum)
         pos = auds.seek(num)
         if auds.player is not None:
             auds.player.time = 1 + time.time()
