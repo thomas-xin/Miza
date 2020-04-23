@@ -472,7 +472,6 @@ class customAudio(discord.AudioSource):
             #                 if i < len(q):
             #                     q[i].duration = dur
             if q and not q[0].get("played", False):
-                url = ytdl.getStream(q[0])
                 q[0].played = True
                 self.preparing = False
                 if not self.stats.quiet:
@@ -488,6 +487,7 @@ class customAudio(discord.AudioSource):
                             reacts=["❎"],
                         ))
                 self.lastsent = time.time()
+                url = ytdl.getStream(q[0])
                 self.new(url)
                 # try:
                 #     path = "cache/" + gethash(q[0]) + ".mp3"
@@ -1126,51 +1126,41 @@ class videoDownloader:
         # print(exc)
         # raise exl
     
-    def downloadAs(self, url, fl=8388608, fmt="ogg", message=None):
-        try:
-            name = "&" + str(discord.utils.time_snowflake(datetime.datetime.utcnow()))
-            new_opts = dict(self.ydl_opts)
-            fn = "cache/" + name
-            new_opts["outtmpl"] = fn
-            downloader = youtube_dl.YoutubeDL(new_opts)
-            info = downloader.extract_info(url, download=False, process=True)
-            ov = OverflowError("Maximum time limit is 16 minutes.")
-            try:
-                if "entries" in info:
-                    dur = info["entries"][0]["duration"]
-                else:
-                    dur = info["duration"]
-                if dur > 960:
-                    raise ov
-            except KeyError:
-                pass
-            downloader.extract_info(url, download=True, process=True)
-            dur = getDuration(fn)
-            if dur > 960:
-                raise ov
-            if message is not None:
-                create_task(message.edit(
-                    content="```ini\nConverting [" + name + "]...```",
-                    embed=None,
-                ))
-            br = max(32, min(256, floor(((fl - 262144) / dur / 128) / 4) * 4))
-            print(br)
-            out = fn + "." + fmt
-            ff = ffmpy.FFmpeg(
-                global_options=["-y", "-hide_banner", "-loglevel panic"],
-                inputs={fn: None},
-                outputs={str(br) + "k": "-vn -b:a", out: None},
-            )
-            ff.run()
-            os.remove(fn)
-            if "entries" in info:
-                title = info["entries"][0]["title"]
-            else:
-                title = info["title"]
-            return (out, title + "." + fmt)
-        except:
-            print(traceback.format_exc())
-            raise
+    def download_file(self, url):
+        infos = self.__dict__.setdefault("infos", {})
+        name = "&" + shash(url)
+        fn = "cache/" + name
+        if name in os.listdir("cache"):
+            return fn
+        info = self.extract(url)[0]
+        stream = self.getStream(info)
+        duration = getDuration(stream)
+        info["duration"] = duration
+        infos[fn] = info
+        if duration > 960:
+            raise OverflowError("Maximum time limit is 16 minutes.")
+        with requests.get(stream, stream=True) as resp:
+            resp.raise_for_status()
+            with open(fn, "wb") as f:
+                for data in resp.iter_content(chunk_size=65536):
+                    if data:
+                        f.write(data)
+                        f.flush()
+        return fn
+    
+    def convert_file(self, fn, fmt="ogg", fl=8388608):
+        info = self.__dict__.setdefault("infos", {})[fn]
+        dur = info["duration"]
+        br = max(32, min(256, floor(((fl - 262144) / dur / 128) / 4) * 4))
+        print(br)
+        out = fn + "." + fmt
+        ff = ffmpy.FFmpeg(
+            global_options=["-y", "-hide_banner", "-loglevel error"],
+            inputs={fn: None},
+            outputs={str(br) + "k": "-vn -b:a", out: None},
+        )
+        ff.run()
+        return out, info["name"] + "." + fmt
 
     def extractSingle(self, i):
         item = i.url
@@ -2720,17 +2710,24 @@ class Download(Command):
                         fl = 8388608
                     else:
                         fl = guild.filesize_limit
-                    create_task(message.edit(
+                    create_task(channel.trigger_typing())
+                    await message.edit(
                         content="```ini\nDownloading [" + noHighlight(ensure_url(url)) + "]...```",
                         embed=None,
-                    ))
-                    create_task(channel.trigger_typing())
-                    fn, out = await create_future(
-                        ytdl.downloadAs,
+                    )
+                    fn = await create_future(
+                        ytdl.download_file,
                         url,
-                        fl,
+                    )
+                    create_task(message.edit(
+                        content="```ini\nConverting [" + noHighlight(fn) + "]...```",
+                        embed=None,
+                    ))
+                    fn, out = await create_future(
+                        ytdl.convert_file,
+                        fn,
                         spl[3],
-                        message,
+                        fl,
                     )
                     f = discord.File(fn, out)
                     create_task(message.edit(
@@ -2754,7 +2751,12 @@ class UpdateQueues(Database):
         self.audiocache = {}
         self.connecting = {}
         super().__init__(*args)
-        self.clearAudioCache()
+        pl = self.data
+        for g in pl:
+            for i in range(len(pl[g])):
+                e = pl[g][i]
+                if type(e) is dict:
+                    pl[g][i] = freeClass(e)
 
     def is_connecting(self, g):
         if g in self.connecting:
@@ -2785,22 +2787,6 @@ class UpdateQueues(Database):
                 await asyncio.sleep(0.4)
         await asyncio.sleep(2)
         auds.searching = max(auds.searching - 1, 0)
-
-    def clearAudioCache(self):
-        _vars = self._vars
-        pl = self.data
-        for g in pl:
-            for i in range(len(pl[g])):
-                e = pl[g][i]
-                if type(e) is dict:
-                    pl[g][i] = freeClass(e)
-        for path in os.listdir("cache/"):
-            found = False
-            if ".mp3" in path:
-                try:
-                    os.remove("cache/" + path)
-                except:
-                    print(traceback.format_exc())
 
     async def _typing_(self, channel, user, **void):
         if not hasattr(channel, "guild") or channel.guild is None:
@@ -2836,7 +2822,6 @@ class UpdateQueues(Database):
         _vars = self._vars
         pl = self.data
         client = _vars.client
-        # self.cached_items = self.__dict__.setdefault("cached_items", {})
         try:
             if guild is not None:
                 g = guild
@@ -2851,9 +2836,6 @@ class UpdateQueues(Database):
                         if m.voice.deaf or m.voice.mute or m.voice.afk:
                             create_task(m.edit(mute=False, deafen=False))
             else:
-                # for g in tuple(pl):
-                #     for i in pl[g]:
-                #         self.cached_items[gethash(i)] = time.time()
                 for vc in client.voice_clients:
                     if not self.is_connecting(vc.guild.id) and vc.guild.id not in self.audio:
                         create_task(vc.disconnect(force=True))
@@ -2875,62 +2857,27 @@ class UpdateQueues(Database):
                 auds = self.audio[guild.id]
                 auds.update()
         else:
-            t = time.time()
             a = 1
             for g in tuple(self.audio):
                 try:
                     auds = self.audio[g]
                     create_future(auds.update)
                     create_task(self.research(auds))
-                    q = auds.queue
-                    # if q:
-                    #     for i in range(256):
-                    #         if i < len(q):
-                    #             self.cached_items[gethash(q[i])] = t
-                    #         else:
-                    #             break
                 except:
                     print(traceback.format_exc())
                 if not a & 15:
                     await asyncio.sleep(0.2)
                 a += 1
-            dt = datetime.datetime.utcnow()
+            t = time.time()
             i = 1
-            for path in os.listdir("cache/"):
-                if path.startswith("%"):
-                    continue
+            for path in os.listdir("cache"):
+                fn = "cache/" + path
                 if path.startswith("&"):
-                    if "." in path:
-                        snow = int(path[1:path.index(".")])
-                        if (dt - discord.utils.snowflake_time(snow)).total_seconds() < 3600:
-                            continue
-                    continue
-                # if ".mp3" in path or ".part" in path:
-                #     try:
-                #         i1 = path.index(".mp3")
-                #     except ValueError:
-                #         i1 = len(path)
-                #     try:
-                #         i2 = path.index(".part")
-                #     except ValueError:
-                #         i2 = len(path)
-                #     key = path[:min(i1, i2)]
-                #     if key in self.cached_items:
-                #         if t - self.cached_items[key] < 3600:
-                #             continue
-                #     try:
-                #         fn = "cache/" + path
-                #         os.remove(fn)
-                #         print("Deleted " + fn + "...")
-                #         self.audiocache.pop(key)
-                #     except (KeyError, PermissionError, FileNotFoundError):
-                #         pass
-                #     except:
-                #         print(traceback.format_exc())
-                #     if key in self.cached_items:
-                #         self.cached_items.pop(key)
+                    if t - os.path.getmtime(fn) > 3600:
+                        os.remove(fn)
                 if not i & 1023:
                     await asyncio.sleep(0.2)
+                    t = time.time()
                 i += 1
             await asyncio.sleep(0.5)
         self.busy = max(0, self.busy - 1)

@@ -78,6 +78,7 @@ class main_data:
         self.blocked = 0
         self.updated = False
         print("Initialized.")
+        create_future(self.clearcache)
 
     __call__ = lambda self: self
 
@@ -95,6 +96,13 @@ class main_data:
             eloop.run_until_complete(client.logout())
             eloop.close()
             sys.exit()
+
+    def clearcache(self):
+        for path in os.listdir("cache"):
+            try:
+                os.remove("cache/" + path)
+            except:
+                print(traceback.format_exc())
 
     def print(self, *args, sep=" ", end="\n"):
         sys.stdout.write(str(sep).join(str(i) for i in args) + end)
