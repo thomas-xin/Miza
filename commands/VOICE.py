@@ -653,7 +653,7 @@ class customAudio(discord.AudioSource):
                                         if self.queue:
                                             self.queue[0].url = ""
                                     else:
-                                        self.seek(self.stats.position + 0.25)
+                                        self.seek(self.stats.position + 0.25 * (self.reverse * 2 - 1))
                             elif self.curr_timeout == 0:
                                 self.curr_timeout = time.time()
                     elif not queueable:
