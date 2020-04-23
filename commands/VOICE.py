@@ -1094,7 +1094,8 @@ class videoDownloader:
         stream = i.get("stream", None)
         if stream is None:
             data = self.extract(i.url)
-            stream = data[0].get("stream", data[0].url)
+            stream = data[0].setdefault("stream", data[0].url)
+            i["stream"] = stream
         print(stream)
         return stream
         # if i["url"] in self.downloading:
