@@ -1289,13 +1289,13 @@ class Queue(Command):
                 + str(user.id) + "_0_" + str(int(v))
                 + "-\nQueue for " + guild.name.replace("`", "") + ":```"
             )
-        if "f" in flags or "b" in flags:
-            if not isAlone(auds, user) and perm < 1:
-                self.permError(perm, 1, "to force play while other users are in voice")
         future = wrap_future(create_task(forceJoin(guild, channel, user, client, _vars, preparing=True)))
         argv = await _vars.followURL(argv)
         resp = await create_future(ytdl.search, argv)
         auds = await future
+        if "f" in flags or "b" in flags:
+            if not isAlone(auds, user) and perm < 1:
+                self.permError(perm, 1, "to force play while other users are in voice")
         if auds.stats.quiet & 2:
             flags.setdefault("h", 1)
         elapsed = auds.stats.position
