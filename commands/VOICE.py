@@ -1091,8 +1091,7 @@ class videoDownloader:
         # raise exl
     
     def download_file(self, url, fmt="ogg", fl=8388608):
-        name = "&" + shash(url)
-        fn = "cache/" + name + "." + fmt
+        fn = "cache/&" + str(discord.utils.time_snowflake(datetime.datetime.utcnow())) + "." + fmt
         info = self.extract(url)[0]
         stream = self.getStream(info)
         duration = getDuration(stream)
