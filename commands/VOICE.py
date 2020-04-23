@@ -1147,7 +1147,6 @@ class videoDownloader:
             obj = freeClass(t=time.time())
             obj.data = out = [freeClass(
                 name=data["title"],
-                duration=data["duration"],
                 url=data["webpage_url"],
                 stream=getBestAudio(data),
             )]
