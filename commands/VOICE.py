@@ -1151,9 +1151,9 @@ class videoDownloader:
                 stream=getBestAudio(data),
             )]
             try:
-                out.duration = data["duration"]
+                out[0].duration = data["duration"]
             except KeyError:
-                out.research = True
+                out[0].research = True
             self.searched[item] = obj
             it = out[0]
             i.name = it.name
