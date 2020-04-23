@@ -79,7 +79,7 @@ def pytube2Dict(url):
         "duration": resp.length,
     }
     for i in range(len(entry["formats"])):
-        stream = resp.streams.fmt_streams[i]:
+        stream = resp.streams.fmt_streams[i]
         abr = stream.abr.lower()
         if abr.endswith("kbps"):
             abr = float(abr[:-4])
