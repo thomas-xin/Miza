@@ -572,7 +572,10 @@ class customAudio(discord.AudioSource):
                     source = self.source
                     if source is None:
                         raise StopIteration
-                    temp = source._stdout.read(discord.opus.Encoder.FRAME_SIZE)
+                    stream = source._stdout
+                    if stream is None:
+                        raise StopIteration
+                    temp = stream.read(discord.opus.Encoder.FRAME_SIZE)
                     if not temp:
                         raise StopIteration
                     found = True
@@ -1087,41 +1090,21 @@ class videoDownloader:
         # print(exc)
         # raise exl
     
-    def download_file(self, url):
-        infos = self.__dict__.setdefault("infos", {})
+    def download_file(self, url, fmt="ogg", fl=8388608):
         name = "&" + shash(url)
-        fn = "cache/" + name
-        if name in os.listdir("cache"):
-            return fn
+        fn = "cache/" + name + "." + fmt
         info = self.extract(url)[0]
         stream = self.getStream(info)
-        duration = getDuration(stream)
-        info["duration"] = duration
-        infos[fn] = info
-        if duration > 960:
-            raise OverflowError("Maximum time limit is 16 minutes.")
-        with requests.get(stream, stream=True) as resp:
-            resp.raise_for_status()
-            with open(fn, "wb") as f:
-                for data in resp.iter_content(chunk_size=65536):
-                    if data:
-                        f.write(data)
-                        f.flush()
-        return fn
-    
-    def convert_file(self, fn, fmt="ogg", fl=8388608):
-        info = self.__dict__.setdefault("infos", {})[fn]
-        dur = info["duration"]
+        dur = getDuration(stream)
         br = max(32, min(256, floor(((fl - 262144) / dur / 128) / 4) * 4))
         print(br)
-        out = fn + "." + fmt
         ff = ffmpy.FFmpeg(
-            global_options=["-y", "-hide_banner", "-loglevel error"],
-            inputs={fn: None},
-            outputs={str(br) + "k": "-vn -b:a", out: None},
+            global_options=["-hide_banner", "-loglevel error"],
+            inputs={stream: None},
+            outputs={str(br) + "k": "-vn -b:a", fn: None}
         )
         ff.run()
-        return out, info["name"] + "." + fmt
+        return fn, info["name"] + "." + fmt
 
     def extractSingle(self, i):
         item = i.url
@@ -2676,17 +2659,9 @@ class Download(Command):
                         content="```ini\nDownloading [" + noHighlight(ensure_url(url)) + "]...```",
                         embed=None,
                     )
-                    fn = await create_future(
+                    fn, out = await create_future(
                         ytdl.download_file,
                         url,
-                    )
-                    create_task(message.edit(
-                        content="```ini\nConverting [" + noHighlight(fn) + "]...```",
-                        embed=None,
-                    ))
-                    fn, out = await create_future(
-                        ytdl.convert_file,
-                        fn,
                         spl[3],
                         fl,
                     )
