@@ -966,7 +966,10 @@ class videoDownloader:
                             }
                             output.append(freeClass(temp))
                     else:
-                        for entry in entries:
+                        for i in range(len(entries)):
+                            if not i:
+                                entries[i] = self.extract(entries[i]["url"])
+                            entry = entries[i]
                             try:
                                 found = True
                                 if "title" in entry:
@@ -986,10 +989,12 @@ class videoDownloader:
                                 }
                                 try:
                                     temp["stream"] = getBestAudio(entry)
+                                    if dur is None:
+                                        temp["duration"] = getDuration(temp["stream"])
                                 except KeyError:
                                     found = False
                                 if dur is None:
-                                    temp["duration"] = getDuration(temp["stream"])
+                                    temp["duration"] = "300"
                                 if not found:
                                     temp["research"] = True
                                 output.append(freeClass(temp))
@@ -1292,18 +1297,16 @@ class Queue(Command):
         q = auds.queue
         if type(resp) is str:
             raise evalEX(resp)
-        dur = 0
         added = deque()
         names = []
         for e in resp:
             name = e.name
             url = e.url
-            duration = e.duration
             temp = {
                 # "hash": e.hash,
                 "name": name,
                 "url": url,
-                "duration": duration,
+                "duration": e.get("duration", "300"),
                 "added_by": user.name,
                 "u_id": user.id,
                 "skips": [],
@@ -1311,8 +1314,6 @@ class Queue(Command):
             if "research" in e:
                 temp["research"] = True
             added.append(freeClass(temp))
-            if not dur:
-                dur = float(duration)
             names.append(noHighlight(name))
         if "b" not in flags:
             total_duration = 0
