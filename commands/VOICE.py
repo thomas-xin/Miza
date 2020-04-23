@@ -1095,13 +1095,17 @@ class videoDownloader:
         fn = "cache/" + name + "." + fmt
         info = self.extract(url)[0]
         stream = self.getStream(info)
-        dur = getDuration(stream)
+        duration = getDuration(stream)
+        if type(duration) is str:
+            dur = 960
+        else:
+            dur = min(960, duration)
         br = max(32, min(256, floor(((fl - 262144) / dur / 128) / 4) * 4))
         print(br)
         ff = ffmpy.FFmpeg(
-            global_options=["-hide_banner", "-loglevel error"],
+            global_options=["-hide_banner", "-loglevel error", "-vn"],
             inputs={stream: None},
-            outputs={str(br) + "k": "-vn -b:a", fn: None}
+            outputs={str(dur): "-to", str(br) + "k": "-b:a", fn: None}
         )
         ff.run()
         return fn, info["name"] + "." + fmt
