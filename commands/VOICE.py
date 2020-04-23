@@ -71,11 +71,29 @@ def pytube2Dict(url):
         "title": resp.title,
         "formats": [
             {
-                "abr": stream.abr, "vcodec": stream.video_codec, "url": stream.url
+                "abr": 0,
+                "vcodec": stream.video_codec,
+                "url": stream.url,
             } for stream in resp.streams.fmt_streams
         ],
         "duration": resp.length,
     }
+    for i in range(len(entry["formats"])):
+        stream = resp.streams.fmt_streams[i]:
+        abr = stream.abr.lower()
+        if abr.endswith("kbps"):
+            abr = float(abr[:-4])
+        elif abr.endswith("mbps"):
+            abr = float(abr[:-4]) * 1024
+        elif abr.endswith("bps"):
+            abr = float(abr[:-3]) / 1024
+        else:
+            try:
+                abr = float(abr)
+            except:
+                print(traceback.format_exc())
+                continue
+        entry["formats"][i]["abr"] = abr
     return entry
 
 
@@ -87,7 +105,8 @@ def getBestAudio(entry):
         q = fmt.get("abr", 0)
         if type(q) is not int:
             q = 0
-        if fmt.get("vcodec", "none") != "none":
+        vcodec = fmt.get("vcodec", "none")
+        if vcodec not in (None, "none"):
             q -= 1
         if q > best:
             best = q
