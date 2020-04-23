@@ -968,38 +968,39 @@ class videoDownloader:
                     else:
                         for i in range(len(entries)):
                             if not i:
-                                entries[i] = self.extract(entries[i]["url"])
-                            entry = entries[i]
-                            try:
-                                found = True
-                                if "title" in entry:
-                                    title = entry["title"]
-                                else:
-                                    title = entry["url"].split("/")[-1]
-                                    found = False
-                                if "duration" in entry:
-                                    dur = float(entry["duration"])
-                                else:
-                                    dur = None
-                                temp = {
-                                    # "hash": shash(entry["url"]),
-                                    "name": title,
-                                    "url": entry["url"],
-                                    "duration": dur,
-                                }
+                                temp = self.extract(entries[i]["url"])[0]
+                            else:
+                                entry = entries[i]
                                 try:
-                                    temp["stream"] = getBestAudio(entry)
+                                    found = True
+                                    if "title" in entry:
+                                        title = entry["title"]
+                                    else:
+                                        title = entry["url"].split("/")[-1]
+                                        found = False
+                                    if "duration" in entry:
+                                        dur = float(entry["duration"])
+                                    else:
+                                        dur = None
+                                    temp = {
+                                        # "hash": shash(entry["url"]),
+                                        "name": title,
+                                        "url": entry["url"],
+                                        "duration": dur,
+                                    }
+                                    try:
+                                        temp["stream"] = getBestAudio(entry)
+                                        if dur is None:
+                                            temp["duration"] = getDuration(temp["stream"])
+                                    except KeyError:
+                                        found = False
                                     if dur is None:
-                                        temp["duration"] = getDuration(temp["stream"])
-                                except KeyError:
-                                    found = False
-                                if dur is None:
-                                    temp["duration"] = "300"
-                                if not found:
-                                    temp["research"] = True
-                                output.append(freeClass(temp))
-                            except:
-                                print(traceback.format_exc())
+                                        temp["duration"] = "300"
+                                    if not found:
+                                        temp["research"] = True
+                                except:
+                                    print(traceback.format_exc())
+                            output.append(freeClass(temp))
                 else:
                     found = "duration" in resp
                     if found:
