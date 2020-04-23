@@ -357,10 +357,6 @@ class customAudio(discord.AudioSource):
                     temp.pop("played")
                 except (KeyError, IndexError):
                     pass
-                try:
-                    temp.pop("read")
-                except (KeyError, IndexError):
-                    pass
                 q.append(temp)
             self.queue = q
         if self.player:
@@ -625,9 +621,6 @@ class customAudio(discord.AudioSource):
                     temp = self.source.read()
                     if not temp:
                         raise EOFError
-                    if not found:
-                        if self.queue:
-                            self.queue[0].read = True
                     found = True
                 except:
                     empty = True
@@ -648,12 +641,12 @@ class customAudio(discord.AudioSource):
                     elif empty and queueable and self.source is not None:
                         if time.time() - self.lastEnd > 0.5:
                             if self.reverse:
-                                ended = self.stats.position <= 0
+                                ended = self.stats.position <= 0.25
                             else:
-                                ended = self.stats.position >= float(self.queue[0].duration) - 1
+                                ended = self.stats.position >= float(self.queue[0].duration) - 0.25
                             if self.curr_timeout and time.time() - self.curr_timeout > 1 or ended:
                                 if not found:
-                                    if self.queue and not self.queue[0].get("read", False):
+                                    if self.queue and not ended:
                                         self.queue[0].url = ""
                                     print("Advanced.")
                                     self.lastEnd = time.time()
@@ -1268,10 +1261,6 @@ class Queue(Command):
                     if auds.queue:
                         try:
                             auds.queue[0].pop("played")
-                        except (KeyError, IndexError):
-                            pass
-                        try:
-                            auds.queue[0].pop("read")
                         except (KeyError, IndexError):
                             pass
                 auds.update()
@@ -2144,10 +2133,6 @@ class Rotate(Command):
                     auds.queue[i].pop("played")
                 except (KeyError, IndexError):
                     pass
-                try:
-                    auds.queue[i].pop("read")
-                except (KeyError, IndexError):
-                    pass
             auds.queue.rotate(-amount)
             auds.seek(inf)
         if "h" not in flags:
@@ -2176,10 +2161,6 @@ class Shuffle(Command):
                     auds.queue[i].pop("played")
                 except (KeyError, IndexError):
                     pass
-                try:
-                    auds.queue[i].pop("read")
-                except (KeyError, IndexError):
-                    pass
             shuffle(auds.queue)
             auds.seek(inf)
         if "h" not in flags:
@@ -2205,10 +2186,6 @@ class Reverse(Command):
             for i in range(1, 3):
                 try:
                     auds.queue[i].pop("played")
-                except (KeyError, IndexError):
-                    pass
-                try:
-                    auds.queue[i].pop("read")
                 except (KeyError, IndexError):
                     pass
             reverse(auds.queue)
