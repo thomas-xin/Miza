@@ -327,7 +327,7 @@ class customAudio(discord.AudioSource):
             self.player.time = 1 + time.time()
         if update:
             self.update()
-            self.refilling = False
+        self.refilling = 0
 
     def seek(self, pos):
         duration = float(self.queue[0].duration)
@@ -569,11 +569,14 @@ class customAudio(discord.AudioSource):
                     self.is_playing = True
                     raise EOFError
                 try:
-                    temp = self.source.read()
+                    source = self.source
+                    if source is None:
+                        raise StopIteration
+                    temp = source._stdout.read(discord.opus.Encoder.FRAME_SIZE)
                     if not temp:
                         raise StopIteration
                     found = True
-                except (AttributeError, StopIteration):
+                except StopIteration:
                     empty = True
                     raise EOFError
                 except:
@@ -615,7 +618,8 @@ class customAudio(discord.AudioSource):
                                             4,
                                         )
                                         if not ended:
-                                            self.seek(self.stats.position)
+                                            self.refilling = 2
+                                            create_future(self.seek, self.stats.position)
                                         else:
                                             print("Advanced.")
                                             self.refilling = 2
@@ -648,7 +652,6 @@ class customAudio(discord.AudioSource):
         self.refilling = 2
         for i in range(2):
             self.temp_buffer[i] = numpy.concatenate([self.temp_buffer[i], new_buf[i]])
-        # print("refilled.")
         self.refilling = 0
 
     def read(self):
@@ -667,11 +670,8 @@ class customAudio(discord.AudioSource):
             if not self.refilling:
                 self.refilling = 1
                 self.refill_buffer()
-                # create_future(self.refill_buffer, priority=True)
-                # print("refilling...")
         if len(self.temp_buffer[0]) < buflen or self.refilling > 1:
             return self.emptybuff
-        # print("started.")
         try:
             self.reading = 1
             lbuf, self.temp_buffer[0] = numpy.hsplit(self.temp_buffer[0], [buflen])
@@ -686,14 +686,14 @@ class customAudio(discord.AudioSource):
                         right = samplerate.resample(rtemp, 2 * size / len(rtemp), converter_type="sinc_fastest")[-size - 16:-16]
                     except samplerate.exceptions.ResamplingError:
                         left, right = ltemp, rtemp
-                    if len(left) != size or len(right) != size:
-                        left = numpy.interp([i * len(left) / size for i in range(size)], list(range(len(left))), left)
-                        right = numpy.interp([i * len(right) / size for i in range(size)], list(range(len(right))), right)
                 else:
                     left, right = lbuf, rbuf
                 self.bufadj = [lbuf, rbuf]
             else:
                 left, right = lbuf, rbuf
+            if len(left) != size or len(right) != size:
+                left = numpy.interp([i * len(left) / size for i in range(size)], list(range(len(left))), left)
+                right = numpy.interp([i * len(right) / size for i in range(size)], list(range(len(right))), right)
             # if detune:
             #     if self.cpitch != detune:
             #         self.cpitch = detune
