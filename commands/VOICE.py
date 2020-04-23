@@ -474,7 +474,6 @@ class customAudio(discord.AudioSource):
             #                     q[i].duration = dur
             if q and not playing and not q[0].get("played", False):
                 url = ytdl.getStream(q[0])
-                self.new(url)
                 q[0].played = True
                 self.preparing = False
                 if not self.stats.quiet:
@@ -489,7 +488,8 @@ class customAudio(discord.AudioSource):
                             msg,
                             reacts=["❎"],
                         ))
-                    self.lastsent = time.time()
+                self.lastsent = time.time()
+                self.new(url)
                 # try:
                 #     path = "cache/" + gethash(q[0]) + ".mp3"
                 #     f = open(path, "rb")
@@ -948,13 +948,18 @@ class videoDownloader:
                     if force or len(entries) <= 1:
                         for entry in entries:
                             pyt = create_future_ex(pytube2Dict, entry["url"])
-                            data = self.downloader.extract_info(entry["url"], download=False, process=True)
+                            try:
+                                data = self.downloader.extract_info(entry["url"], download=False, process=True)
+                            except Exception as ex:
+                                data = ex
                             try:
                                 data = pyt.result(timeout=5)
                             except youtube_dl.DownloadError:
                                 pass
                             except:
                                 print(traceback.format_exc())
+                            if issubclass(type(data), Exception):
+                                raise data
                             temp = {
                                 "name": data["title"],
                                 "url": data["webpage_url"],
@@ -1038,13 +1043,18 @@ class videoDownloader:
                 raise ConnectionError(exc + repr(ex))
         if isURL(item):
             pyt = create_future_ex(pytube2Dict, item)
-            data = self.downloader.extract_info(item, download=False, process=False)
+            try:
+                data = self.downloader.extract_info(item, download=False, process=False)
+            except Exception as ex:
+                data = ex
             try:
                 data = pyt.result(timeout=5)
             except youtube_dl.DownloadError:
                 pass
             except:
                 print(traceback.format_exc())
+            if issubclass(type(data), Exception):
+                raise data
             return data
         return self.downloader.extract_info(item, download=False, process=False)
 
@@ -1812,7 +1822,7 @@ class Pause(Command):
     usage = "<hide(?h)>"
     flags = "h"
 
-    async def __call__(self, _vars, name, guild, client, user, perm, channel, message, flags, **void):
+    async def __call__(self, _vars, name, guild, client, user, perm, channel, flags, **void):
         name = name.lower()
         auds = await forceJoin(guild, channel, user, client, _vars)
         auds.preparing = False
@@ -1847,7 +1857,7 @@ class Seek(Command):
     usage = "<position[0]> <hide(?h)>"
     flags = "h"
 
-    async def __call__(self, argv, _vars, guild, client, user, perm, channel, message, flags, **void):
+    async def __call__(self, argv, _vars, guild, client, user, perm, channel, name, flags, **void):
         auds = await forceJoin(guild, channel, user, client, _vars)
         if not isAlone(auds, user) and perm < 1:
             self.permError(perm, 1, "to seek while other users are in voice")
