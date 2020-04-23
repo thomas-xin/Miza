@@ -641,16 +641,19 @@ class customAudio(discord.AudioSource):
                     elif empty and queueable and self.source is not None:
                         if time.time() - self.lastEnd > 0.5:
                             if self.reverse:
-                                ended = self.stats.position <= 0.25
+                                ended = self.stats.position <= 0.5
                             else:
-                                ended = self.stats.position >= float(self.queue[0].duration) - 0.25
+                                ended = self.stats.position >= float(self.queue[0].duration) - 0.5
                             if self.curr_timeout and time.time() - self.curr_timeout > 1 or ended:
                                 if not found:
-                                    if self.queue and not ended:
-                                        self.queue[0].url = ""
                                     print("Advanced.")
                                     self.lastEnd = time.time()
-                                    self.new()
+                                    if self.stats.position == 0 or not self.queue:
+                                        self.new()
+                                        if self.queue:
+                                            self.queue[0].url = ""
+                                    else:
+                                        self.seek(self.stats.position)
                             elif self.curr_timeout == 0:
                                 self.curr_timeout = time.time()
                     elif not queueable:
