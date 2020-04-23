@@ -983,8 +983,11 @@ class videoDownloader:
                                     "name": title,
                                     "url": entry["url"],
                                     "duration": dur,
-                                    "stream": getBestAudio(entry),
                                 }
+                                try:
+                                    temp["stream"] = getBestAudio(entry)
+                                except KeyError:
+                                    found = False
                                 if dur is None:
                                     temp["duration"] = getDuration(temp["stream"])
                                 if not found:
