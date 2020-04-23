@@ -653,7 +653,7 @@ class customAudio(discord.AudioSource):
                                         if self.queue:
                                             self.queue[0].url = ""
                                     else:
-                                        self.seek(self.stats.position)
+                                        self.seek(self.stats.position + 0.25)
                             elif self.curr_timeout == 0:
                                 self.curr_timeout = time.time()
                     elif not queueable:
@@ -1186,13 +1186,18 @@ class videoDownloader:
         try:
             self.requests += 1
             pyt = create_future_ex(pytube2Dict, item)
-            data = self.downloader.extract_info(item, download=False, process=True)
+            try:
+                data = self.downloader.extract_info(item, download=False, process=True)
+            except Exception as ex:
+                data = ex
             try:
                 data = pyt.result(timeout=5)
             except youtube_dl.DownloadError:
                 pass
             except:
                 print(traceback.format_exc())
+            if issubclass(type(data), Exception):
+                raise data
             if "entries" in data:
                 data = data["entries"][0]
             obj = freeClass(t=time.time())
