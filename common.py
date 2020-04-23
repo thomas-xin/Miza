@@ -440,6 +440,7 @@ def wrap_future(fut, loop=None):
     return new_fut
 
 create_future = lambda func, *args, loop=None, priority=False, **kwargs: wrap_future((athreads, pthreads)[priority].submit(func, *args, **kwargs), loop=loop)
+create_future_ex = lambda func, *args, priority=False, **kwargs: (athreads, pthreads)[priority].submit(func, *args, **kwargs)
 
 def create_task(fut, *args, loop=None, **kwargs):
     if loop is None:

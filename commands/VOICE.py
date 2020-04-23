@@ -5,7 +5,7 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-import youtube_dl, pafy, ffmpy, samplerate
+import youtube_dl, pytube, ffmpy, samplerate
 from bs4 import BeautifulSoup
 
 FFRuntimeError = ffmpy.FFRuntimeError
@@ -59,6 +59,24 @@ def getDuration(filename):
         print(traceback.format_exc())
         return "300"
     return dur
+
+
+def pytube2Dict(url):
+    if not url.startswith("https://www.youtube.com/"):
+        if not url.startswith("http://youtu.be/"):
+            raise youtube_dl.DownloadError("Not a youtube link.")
+    resp = pytube.YouTube(url)
+    entry = {
+        "webpage_url": url,
+        "title": resp.title,
+        "formats": [
+            {
+                "abr": stream.abr, "vcodec": stream.video_codec, "url": stream.url
+            } for stream in resp.streams.fmt_streams
+        ],
+        "duration": resp.length,
+    }
+    return entry
 
 
 def getBestAudio(entry):
@@ -891,34 +909,28 @@ class videoDownloader:
             if not len(output) and force != "spotify":
                 resp = self.extract_info(item, count)
                 if resp.get("_type", None) == "url":
+                    pyt = create_future_ex(pytube2Dict, resp["url"])
+                    resp = self.extract_info(resp["url"], count)
                     try:
-                        p_resp = pafy.new(resp["url"])
-                        print(p_resp)
-                        resp = {
-                            "title": p_resp.title,
-                            "duration": p_resp.length,
-                            "webpage_url": p_resp.watchv_url,
-                            "formats": [{"url": p_resp.getbestaudio()}],
-                        }
+                        resp = pyt.result(timeout=5)
+                    except youtube_dl.DownloadError:
+                        pass
                     except:
-                        resp = self.extract_info(resp["url"], count)
+                        print(traceback.format_exc())
                 if resp is None or not len(resp):
                     raise EOFError("No search results found.")
                 if resp.get("_type", None) == "playlist":
                     entries = list(resp["entries"])
                     if force or len(entries) <= 1:
                         for entry in entries:
+                            pyt = create_future_ex(pytube2Dict, entry["url"])
+                            data = self.downloader.extract_info(entry["url"], download=False, process=True)
                             try:
-                                p_resp = pafy.new(entry["id"])
-                                print(p_resp)
-                                data = {
-                                    "title": p_resp.title,
-                                    "duration": p_resp.length,
-                                    "webpage_url": p_resp.watchv_url,
-                                    "formats": [{"url": p_resp.getbestaudio()}],
-                                }
+                                data = pyt.result(timeout=5)
+                            except youtube_dl.DownloadError:
+                                pass
                             except:
-                                data = self.downloader.extract_info(entry["id"], download=False, process=True)
+                                print(traceback.format_exc())
                             temp = {
                                 "name": data["title"],
                                 "url": data["webpage_url"],
@@ -1120,19 +1132,16 @@ class videoDownloader:
             self.searched.pop(next(iter(self.searched)))
         try:
             self.requests += 1
+            pyt = create_future_ex(pytube2Dict, item)
+            data = self.downloader.extract_info(item, download=False, process=True)
             try:
-                p_resp = pafy.new(item)
-                data = {
-                    "title": p_resp.title,
-                    "duration": p_resp.duration,
-                    "webpage_url": p_resp.watchv_url,
-                    "formats": [{"url": p_resp.getbestaudio()}],
-                }
-                print(p_resp)
+                data = pyt.result(timeout=5)
+            except youtube_dl.DownloadError:
+                pass
             except:
-                data = self.downloader.extract_info(item, download=False, process=True)
-                if "entries" in data:
-                    data = data["entries"][0]
+                print(traceback.format_exc())
+            if "entries" in data:
+                data = data["entries"][0]
             obj = freeClass(t=time.time())
             obj.data = data = [freeClass(
                 name=data["title"],

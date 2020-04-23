@@ -464,10 +464,6 @@ class Mimic(Command):
             )
         u_id = user.id
         prefix = args.pop(0)
-        if not prefix:
-            raise IndexError("Prefix must not be empty.")
-        if len(prefix) > 16:
-            raise OverflowError("Must be 16 or fewer in length.")
         if "d" in flags:
             try:
                 mlist = mimics[prefix]
@@ -500,6 +496,12 @@ class Mimic(Command):
                 "```css\nSuccessfully removed webhook mimic [" + mimic.name
                 + "] for [" + noHighlight(user) + "].```"
             )
+        if not prefix:
+            raise IndexError("Prefix must not be empty.")
+        if len(prefix) > 16:
+            raise OverflowError("Prefix must be 16 or fewer in length.")
+        if " " in prefix:
+            raise TypeError("Prefix must not contain spaces.")
         if sum(len(i) for i in iter(mimics.values())) >= 256:
             raise OverflowError(
                 "Mimic list for " + str(user)
