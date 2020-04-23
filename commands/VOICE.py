@@ -332,9 +332,8 @@ class customAudio(discord.AudioSource):
     def seek(self, pos):
         duration = float(self.queue[0].duration)
         pos = max(0, pos)
-        if pos >= duration:
-            self.new()
-            self.update()
+        if (pos >= duration and not self.reverse) or (pos <= 0 and self.reverse):
+            self.new(update=True)
             return duration
         self.new(self.file, pos)
         self.stats.position = pos
@@ -644,7 +643,7 @@ class customAudio(discord.AudioSource):
                                 ended = self.stats.position <= 0.5
                             else:
                                 ended = self.stats.position >= float(self.queue[0].duration) - 0.5
-                            if self.curr_timeout and time.time() - self.curr_timeout > 1 or ended:
+                            if self.curr_timeout and time.time() - self.curr_timeout > 0.5 or ended:
                                 if not found:
                                     print("Advanced.")
                                     self.lastEnd = time.time()
@@ -653,7 +652,14 @@ class customAudio(discord.AudioSource):
                                         if self.queue:
                                             self.queue[0].url = ""
                                     else:
-                                        self.seek(self.stats.position + 0.25 * (self.reverse * 2 - 1))
+                                        self.stats.position = round(
+                                            self.stats.position + self.speed / 6.25 * (self.reverse * -2 + 1),
+                                            4,
+                                        )
+                                        if not ended:
+                                            self.seek(self.stats.position)
+                                        else:
+                                            self.new()
                             elif self.curr_timeout == 0:
                                 self.curr_timeout = time.time()
                     elif not queueable:
