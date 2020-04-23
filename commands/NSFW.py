@@ -17,7 +17,7 @@ image_forms = [
 ]
 
 
-def pull_e621(argv, data, thr, delay=5):
+def pull_e621(argv, delay=5):
     try:
         v1, v2 = 1, 1
         opener = urlBypass()
@@ -93,16 +93,15 @@ def pull_e621(argv, data, thr, delay=5):
                     found = True
             if not found:
                 x = None
-        data[thr] = [url, v1, v2 + 1]
+        return [url, v1, v2 + 1]
     except:
-        data[thr] = 0
-    print(data)
+        return None
 
 
 booruSites = list(pybooru.resources.SITE_LIST.keys())
 
 
-def pull_booru(argv, data, thr, delay=5):
+def pull_booru(argv, delay=5):
     client = pybooru.Moebooru(random.choice(tuple(booruSites)))
     try:
         posts = client.post_list(tags=argv, random=True, limit=16)
@@ -110,10 +109,9 @@ def pull_booru(argv, data, thr, delay=5):
             raise EOFError
         choice = xrand(len(posts))
         url = posts[0]["file_url"]
-        data[thr] = [url, 1, choice + 1]
+        return [url, 1, choice + 1]
     except:
-        data[thr] = 0
-    print(data)
+        return None
 
 
 e_loop = asyncio.new_event_loop()
@@ -121,7 +119,7 @@ asyncio.set_event_loop(e_loop)
 rule34_sync = rule34.Sync()
 
 
-def pull_rule34_xxx(argv, data, thr, delay=5):
+def pull_rule34_xxx(argv, delay=5):
     v1, v2 = 1, 1
     try:
         t = time.time()
@@ -152,15 +150,14 @@ def pull_rule34_xxx(argv, data, thr, delay=5):
             if attempts >= 256:
                 raise TimeoutError
             v1 = 1
-            data[thr] = [url, v1, v2 + 1]
+            return [url, v1, v2 + 1]
         else:
             raise EOFError
     except:
-        data[thr] = 0
-    print(data)
+        return None
 
 
-def pull_rule34_paheal(argv, data, thr, delay=5):
+def pull_rule34_paheal(argv, delay=5):
     try:
         v1, v2 = 1, 1
         items = argv.lower().split(" ")
@@ -250,10 +247,9 @@ def pull_rule34_paheal(argv, data, thr, delay=5):
                 break
         v2 = xrand(len(sources))
         url = sources[v2]
-        data[thr] = [url, v1, v2 + 1]
+        return [url, v1, v2 + 1]
     except:
-        data[thr] = 0
-    print(data)
+        return None
 
 
 async def searchRandomNSFW(argv, delay=10):
@@ -263,15 +259,7 @@ async def searchRandomNSFW(argv, delay=10):
         pull_rule34_xxx,
         pull_e621,
     ]
-    data = [None for i in funcs]
-    for i in range(len(funcs)):
-        data.append(create_future(
-            funcs[i],
-            argv,
-            data,
-            i,
-            delay - 3,
-        ))
+    data = [create_future(f, argv, delay - 3) for f in funcs]
     data = await recursiveCoro(data)
     data = [i for i in data if i]
     if not data:
@@ -380,7 +368,8 @@ class Neko(Command):
                     tagNSFW = True
                     if not isNSFW:
                         raise PermissionError(
-                            "This command is only available in " + uniStr("NSFW") + " channels."
+                            "This command is only available in "
+                            + uniStr("NSFW") + " channels."
                             )
                 selected.append(tag)
         for _ in loop(flags.get("r", 0)):

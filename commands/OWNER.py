@@ -144,9 +144,7 @@ class UpdateExec(Database):
 
     async def _nocommand_(self, message, **void):
         _vars = self._vars
-        if message.author.id != self._vars.owner_id:
-            return
-        if message.channel.id == self.channel.id:
+        if message.author.id != self._vars.owner_id and message.channel.id == self.channel.id:
             proc = message.content
             while proc[0] == " ":
                 proc = proc[1:]
