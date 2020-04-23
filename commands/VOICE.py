@@ -65,7 +65,10 @@ def pytube2Dict(url):
     if not url.startswith("https://www.youtube.com/"):
         if not url.startswith("http://youtu.be/"):
             raise youtube_dl.DownloadError("Not a youtube link.")
-    resp = pytube.YouTube(url)
+    try:
+        resp = pytube.YouTube(url)
+    except pytube.exceptions.RegexMatchError:
+        raise youtube_dl.DownloadError("Invalid single youtube link.")
     entry = {
         "webpage_url": url,
         "title": resp.title,
@@ -84,6 +87,7 @@ def pytube2Dict(url):
             abr = stream.abr.lower()
         except AttributeError:
             abr = 0
+        abr = str(abr)
         if abr.endswith("kbps"):
             abr = float(abr[:-4])
         elif abr.endswith("mbps"):
@@ -1027,6 +1031,16 @@ class videoDownloader:
                 return self.downloader.extract_info("scsearch" + c + ":" + item, download=False, process=False)
             except Exception as ex:
                 raise ConnectionError(exc + repr(ex))
+        if isURL(item):
+            pyt = create_future_ex(pytube2Dict, item)
+            data = self.downloader.extract_info(item, download=False, process=False)
+            try:
+                data = pyt.result(timeout=5)
+            except youtube_dl.DownloadError:
+                pass
+            except:
+                print(traceback.format_exc())
+            return data
         return self.downloader.extract_info(item, download=False, process=False)
 
     def search(self, item, force=False):
