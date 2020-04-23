@@ -363,8 +363,7 @@ class customAudio(discord.AudioSource):
 
     def update(self, *void1, **void2):
         # print(self, "update")
-        if not hasattr(self, "lastsent"):
-            self.lastsent = 0
+        self.__dict__.setdefault("lastsent", 0)
         vc = self.vc
         guild = vc.guild
         g = guild.id
@@ -452,26 +451,6 @@ class customAudio(discord.AudioSource):
             elif dels:
                 while dels:
                     q.pop(dels.popleft())
-            # for i in range(2):
-            #     if i < len(q):
-            #         e_id = gethash(q[i])
-            #         dtime = q[i].get("download", 0)
-            #         if dtime >= 0 and time.time() - dtime > 2:
-            #             q[i].download = time.time()
-            #             search = e_id + ".mp3"
-            #             if search not in os.listdir("cache/"):
-            #                 durc = [q[i].duration]
-            #                 self._vars.database.playlists.audiocache[e_id] = durc
-            #                 create_future(
-            #                     ytdl.downloadSingle,
-            #                     q[i],
-            #                     durc,
-            #                     self,
-            #                 )
-            #             else:
-            #                 dur = getDuration("cache/" + search)
-            #                 if i < len(q):
-            #                     q[i].duration = dur
             if q and not q[0].get("played", False):
                 q[0].played = True
                 self.preparing = False
@@ -490,34 +469,6 @@ class customAudio(discord.AudioSource):
                 self.lastsent = time.time()
                 url = ytdl.getStream(q[0])
                 self.new(url)
-                # try:
-                #     path = "cache/" + gethash(q[0]) + ".mp3"
-                #     f = open(path, "rb")
-                #     minl = 32
-                #     b = f.read(minl)
-                #     f.close()
-                #     if len(b) < minl:
-                #         raise FileNotFoundError
-                #     q[0].download = -1
-                #     name = q[0].name
-                #     added_by = q[0].added_by
-                #     self.new(path)
-                #     if not self.stats.quiet:
-                #         if time.time() - self.lastsent > 1:
-                #             msg = (
-                #                 "```ini\n🎵 Now playing ["
-                #                 + noHighlight(name)
-                #                 + "], added by [" + added_by + "]! 🎵```"
-                #             )
-                #             create_task(sendReact(
-                #                 self.channel,
-                #                 msg,
-                #                 reacts=["❎"],
-                #             ))
-                #         self.lastsent = time.time()
-                #     self.preparing = False
-                # except FileNotFoundError:
-                #     pass
             elif not playing and self.source is None and not self.is_loading:
                 self.advance()
         if not (q or self.preparing):
@@ -622,11 +573,15 @@ class customAudio(discord.AudioSource):
                     if not temp:
                         raise EOFError
                     found = True
-                except:
+                except (AttributeError, StopIteration):
                     empty = True
                     raise EOFError
+                except:
+                    empty = True
+                    print(traceback.format_exc())
+                    raise EOFError
                 self.stats.position = round(
-                    self.stats.position + self.speed / 50 * (self.reverse * -2 + 1),
+                    self.stats.position + self.speed * resample / 50 * (self.reverse * -2 + 1),
                     4,
                 )
                 self.is_playing = True
@@ -646,20 +601,21 @@ class customAudio(discord.AudioSource):
                                 ended = self.stats.position >= float(self.queue[0].duration) - 0.5
                             if self.curr_timeout and time.time() - self.curr_timeout > 0.5 or ended:
                                 if not found:
-                                    print("Advanced.")
                                     self.lastEnd = time.time()
                                     if self.stats.position == 0 or not self.queue:
+                                        print("Advanced.")
                                         self.new()
                                         if self.queue:
                                             self.queue[0].url = ""
                                     else:
                                         self.stats.position = round(
-                                            self.stats.position + self.speed / 6.25 * (self.reverse * -2 + 1),
+                                            self.stats.position + self.speed * resample / 6.25 * (self.reverse * -2 + 1),
                                             4,
                                         )
                                         if not ended:
                                             self.seek(self.stats.position)
                                         else:
+                                            print("Advanced.")
                                             self.new()
                             elif self.curr_timeout == 0:
                                 self.curr_timeout = time.time()
