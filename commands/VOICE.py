@@ -1145,14 +1145,18 @@ class videoDownloader:
             if "entries" in data:
                 data = data["entries"][0]
             obj = freeClass(t=time.time())
-            obj.data = data = [freeClass(
+            obj.data = out = [freeClass(
                 name=data["title"],
                 duration=data["duration"],
                 url=data["webpage_url"],
                 stream=getBestAudio(data),
             )]
+            try:
+                out.duration = data["duration"]
+            except KeyError:
+                out.research = True
             self.searched[item] = obj
-            it = data[0]
+            it = out[0]
             i.name = it.name
             i.duration = it.duration
             i.url = it.url
