@@ -305,11 +305,10 @@ class customAudio(discord.AudioSource):
                     + D + "\""
                 )
             d.options = d.options.strip(" ")
-            if pos != 0:
-                if self.reverse:
-                    d.before_options = "-to " + str(pos)
-                else:
-                    d.before_options = "-ss " + str(pos)
+            if self.reverse:
+                d.before_options = "-ss 0 -to " + str(pos)
+            else:
+                d.before_options = "-ss " + str(pos) + " -to " + str(self.queue[0].duration)
             d.before_options = "-vn " + d.get("before_options", "")
             print(d)
             self.is_loading = True
@@ -328,6 +327,7 @@ class customAudio(discord.AudioSource):
             self.player.time = 1 + time.time()
         if update:
             self.update()
+            self.refilling = False
 
     def seek(self, pos):
         duration = float(self.queue[0].duration)
@@ -335,7 +335,7 @@ class customAudio(discord.AudioSource):
         if (pos >= duration and not self.reverse) or (pos <= 0 and self.reverse):
             self.new(update=True)
             return duration
-        self.new(self.file, pos)
+        self.new(self.file, pos, update=False)
         self.stats.position = pos
         return self.stats.position
 
@@ -571,7 +571,7 @@ class customAudio(discord.AudioSource):
                 try:
                     temp = self.source.read()
                     if not temp:
-                        raise EOFError
+                        raise StopIteration
                     found = True
                 except (AttributeError, StopIteration):
                     empty = True
@@ -592,7 +592,8 @@ class customAudio(discord.AudioSource):
                     if self.queue and not self.queue[0].get("played", False):
                         if not found:
                             self.is_loading = True
-                            self.update()
+                            self.refilling = 2
+                            create_future(self.update)
                     elif empty and queueable and self.source is not None:
                         if time.time() - self.lastEnd > 0.5:
                             if self.reverse:
@@ -604,7 +605,8 @@ class customAudio(discord.AudioSource):
                                     self.lastEnd = time.time()
                                     if self.stats.position == 0 or not self.queue:
                                         print("Advanced.")
-                                        self.new()
+                                        self.refilling = 2
+                                        create_future(self.new)
                                         if self.queue:
                                             self.queue[0].url = ""
                                     else:
@@ -616,7 +618,8 @@ class customAudio(discord.AudioSource):
                                             self.seek(self.stats.position)
                                         else:
                                             print("Advanced.")
-                                            self.new()
+                                            self.refilling = 2
+                                            create_future(self.new)
                             elif self.curr_timeout == 0:
                                 self.curr_timeout = time.time()
                     elif not queueable:
