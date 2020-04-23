@@ -85,6 +85,8 @@ def getBestAudio(entry):
     url = entry["webpage_url"]
     for fmt in fmts:
         q = fmt.get("abr", 0)
+        if type(q) is not int:
+            q = 0
         if fmt.get("vcodec", "none") != "none":
             q -= 1
         if q > best:
