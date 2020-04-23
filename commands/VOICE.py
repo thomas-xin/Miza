@@ -471,7 +471,7 @@ class customAudio(discord.AudioSource):
             #                 dur = getDuration("cache/" + search)
             #                 if i < len(q):
             #                     q[i].duration = dur
-            if q and not playing and not q[0].get("played", False):
+            if q and not q[0].get("played", False):
                 url = ytdl.getStream(q[0])
                 q[0].played = True
                 self.preparing = False
