@@ -1278,11 +1278,11 @@ class Queue(Command):
                             auds.queue[0].pop("played")
                         except (KeyError, IndexError):
                             pass
-                auds.update()
+                create_future(auds.update)
                 return "```css\nSuccessfully resumed audio playback in [" + noHighlight(guild.name) + "].```", 1
             if not len(q):
                 auds.preparing = False
-                auds.update()
+                create_future(auds.update)
                 return "```ini\nQueue for [" + noHighlight(guild.name) + "] is currently empty. ```", 1
             return (
                 "```" + "\n" * ("z" in flags) + "callback-voice-queue-"
@@ -1739,7 +1739,7 @@ class Skip(Command):
                 if not isValid(pos):
                     if "f" in flags:
                         auds.queue.clear()
-                        auds.new()
+                        create_future(auds.new)
                         if "h" not in flags:
                             return "```fix\nRemoved all items from the queue.```", 1
                         return
@@ -1799,7 +1799,7 @@ class Skip(Command):
                     await create_future(auds.advance, False, not count)
                 else:
                     auds.advance(False, not count)
-                auds.new()
+                create_future(auds.new)
                 if count < 4:
                     response += (
                         "[" + noHighlight(song.name)
@@ -1961,12 +1961,12 @@ class Dump(Command):
             else:
                 d["stats"][k] = float(d["stats"][k])
         if "a" not in flags:
-            auds.new()
+            await create_future(auds.new)
             auds.preparing = True
             auds.queue.clear()
             auds.queue.extend(q)
             auds.stats.update(d["stats"])
-            auds.update()
+            create_future(auds.update)
             if not "h" in flags:
                 return (
                     "```css\nSuccessfully loaded audio queue data for [" 
@@ -2088,7 +2088,7 @@ class AudioSettings(Command):
             if disable:
                 pos = auds.stats.position
                 auds.stats = freeClass(**auds.defaults)
-                auds.new(auds.file, pos)
+                await create_future(auds.new, auds.file, pos)
                 return (
                     "```css\nSuccessfully reset all audio settings for ["
                     + noHighlight(guild.name) + "].```"
@@ -2122,7 +2122,7 @@ class AudioSettings(Command):
             else:
                 origVol[op] = val
             if op in "speed pitch chorus" or op == "resample" and max(orig, new) >= 240000:
-                auds.new(auds.file, auds.stats.position)
+                await create_future(auds.new, auds.file, auds.stats.position)
             s += (
                 "\nChanged audio " + str(op)
                 + " setting from [" + str(orig)
@@ -2432,19 +2432,19 @@ class Player(Command):
                     else:
                         c = 1 / 3
                     auds.stats.chorus = c
-                    auds.new(auds.file, auds.stats.position)
+                    await create_future(auds.new, auds.file, auds.stats.position)
                 elif i == 9 or i == 10:
                     s = (i * 2 - 19) * 2 / 11
                     auds.stats.speed = round(auds.stats.speed + s, 5)
-                    auds.new(auds.file, auds.stats.position)
+                    await create_future(auds.new, auds.file, auds.stats.position)
                 elif i == 11 or i == 12:
                     p = i * 2 - 23
                     auds.stats.pitch -= p
-                    auds.new(auds.file, auds.stats.position)
+                    await create_future(auds.new, auds.file, auds.stats.position)
                 elif i == 13:
                     pos = auds.stats.position
                     auds.stats = freeClass(auds.defaults)
-                    auds.new(auds.file, pos)
+                    await create_future(auds.new, auds.file, pos)
                 elif i == 14:
                     auds.dead = True
                     auds.player = None
@@ -2856,7 +2856,7 @@ class UpdateQueues(Database):
         if guild is not None:
             if guild.id in self.audio:
                 auds = self.audio[guild.id]
-                auds.update()
+                create_future(auds.update)
         else:
             a = 1
             for g in tuple(self.audio):
