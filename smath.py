@@ -1416,15 +1416,17 @@ for c in tuple(__map):
     if c in UNIFMTS[-1]:
         __map.pop(c)
 __trans = "".maketrans(__map)
+__unitrans = ["".maketrans({UNIFMTS[-1][x]: UNIFMTS[i][x] for x in range(len(UNIFMTS[-1]))}) for i in range(len(UNIFMTS) - 1)]
 
 def uniStr(s, fmt=0):
     if type(s) is not str:
         s = str(s)
-    for i in range(len(UNIFMTS[-1])):
-        s = s.replace(UNIFMTS[-1][i], UNIFMTS[fmt][i])
-    return s
+    return s.translate(__unitrans[fmt])
 
-reconstitute = lambda s: str(s).translate(__trans)
+def reconstitute(s):
+    if type(s) is not str:
+        s = str(s)
+    return s.translate(__trans)
 
 
 __hlist_maxoff__ = (1 << 31) - 1

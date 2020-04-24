@@ -1628,6 +1628,13 @@ async def on_member_ban(guild, user):
                     print(traceback.format_exc())
 
 
+@client.event
+async def on_guild_remove(guild):
+    if guild.id in _vars.cache.guilds:
+        _vars.cache.guilds.pop(guild.id)
+    print(guild, "removed.")
+
+
 async def updateEdit(before, after):
     if before.content == after.content:
         before = _vars.ghostMessage()

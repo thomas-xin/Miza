@@ -16,6 +16,11 @@ image_forms = [
     ".tiff",
 ]
 
+e_loop = asyncio.new_event_loop()
+asyncio.set_event_loop(e_loop)
+rule34_sync = rule34.Sync()
+booruSites = list(pybooru.resources.SITE_LIST.keys())
+
 
 def pull_e621(argv, delay=5):
     try:
@@ -98,9 +103,6 @@ def pull_e621(argv, delay=5):
         return None
 
 
-booruSites = list(pybooru.resources.SITE_LIST.keys())
-
-
 def pull_booru(argv, delay=5):
     client = pybooru.Moebooru(random.choice(tuple(booruSites)))
     try:
@@ -112,11 +114,6 @@ def pull_booru(argv, delay=5):
         return [url, 1, choice + 1]
     except:
         return None
-
-
-e_loop = asyncio.new_event_loop()
-asyncio.set_event_loop(e_loop)
-rule34_sync = rule34.Sync()
 
 
 def pull_rule34_xxx(argv, delay=5):
@@ -261,6 +258,7 @@ async def searchRandomNSFW(argv, delay=10):
     ]
     data = [create_future(f, argv, delay - 3) for f in funcs]
     data = await recursiveCoro(data)
+    print(data)
     data = [i for i in data if i]
     if not data:
         raise LookupError("No results for " + argv + ".")
