@@ -748,7 +748,7 @@ class customAudio(discord.AudioSource):
                     try:
                         left = samplerate.resample(ltemp, 2 * size / len(ltemp), converter_type="sinc_fastest")[-size - 16:-16]
                         right = samplerate.resample(rtemp, 2 * size / len(rtemp), converter_type="sinc_fastest")[-size - 16:-16]
-                    except samplerate.exceptions.ResamplingError:
+                    except (ZeroDivisionError, samplerate.exceptions.ResamplingError):
                         left, right = ltemp, rtemp
                 else:
                     left, right = lbuf, rbuf
