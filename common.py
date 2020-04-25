@@ -458,14 +458,17 @@ class __logPrinter:
     def updatePrint(self):
 
         def filePrint(fn, b):
-            if type(b) in (bytes, bytearray):
-                f = open(fn, "ab")
-            elif type(b) is str:
-                f = open(fn, "a", encoding="utf-8")
-            else:
-                f = fn
-            f.write(b)
-            f.close()
+            try:
+                if type(b) in (bytes, bytearray):
+                    f = open(fn, "ab")
+                elif type(b) is str:
+                    f = open(fn, "a", encoding="utf-8")
+                else:
+                    f = fn
+                f.write(b)
+                f.close()
+            except:
+                traceback.print_exc()
 
         if self.file is None:
             outfunc = sys.stdout.write
