@@ -216,6 +216,7 @@ class customAudio(discord.AudioSource):
             pass
         if self.source is not None:
             self.source.close()
+            self.source = None
 
     def new(self, source=None, pos=0, update=True):
         # try:
@@ -637,14 +638,17 @@ class customAudio(discord.AudioSource):
                     empty = True
                     print(traceback.format_exc())
                     raise EOFError
-                self.stats.position = round(
-                    self.stats.position + self.speed * resample / 50 * (self.reverse * -2 + 1),
-                    4,
-                )
-                self.has_read = True
+                if not empty:
+                    self.stats.position = round(
+                        self.stats.position + self.speed / 50 * (self.reverse * -2 + 1),
+                        4,
+                    )
+                    self.has_read = True
+                    self.curr_timeout = 0
                 self.is_playing = True
-                self.curr_timeout = 0
             except EOFError:
+                if self.source is not None and self.source.closed:
+                    self.source = None
                 if (empty or not self.paused) and not self.is_loading:
                     queueable = (self.queue or self._vars.data.playlists.get(self.vc.guild.id, None))
                     if self.queue and not self.queue[0].get("played", False):
@@ -1397,6 +1401,7 @@ class Queue(Command):
             + "-\nQueue for " + guild.name.replace("`", "") + ":```"
         )
         elapsed = auds.stats.position
+        startTime = 0
         if auds.stats.loop:
             totalTime = inf
         else:
@@ -1404,7 +1409,6 @@ class Queue(Command):
                 totalTime = elapsed - float(auds.queue[0].duration)
             else:
                 totalTime = -elapsed
-            startTime = 0
             i = 0
             for e in q:
                 totalTime += float(e.duration)
