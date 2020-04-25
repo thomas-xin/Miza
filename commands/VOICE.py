@@ -755,7 +755,10 @@ class customAudio(discord.AudioSource):
                 self.bufadj = [lbuf, rbuf]
             else:
                 left, right = lbuf, rbuf
-            if len(left) != size or len(right) != size:
+            if not len(left) or not len(right):
+                left = numpy.zeros(size, dtype=float)
+                right = numpy.zeros(size, dtype=float)
+            elif len(left) != size or len(right) != size:
                 left = numpy.interp([i * len(left) / size for i in range(size)], list(range(len(left))), left)
                 right = numpy.interp([i * len(right) / size for i in range(size)], list(range(len(right))), right)
             # if detune:
@@ -1977,7 +1980,7 @@ class Dump(Command):
             auds.queue.extend(q)
             auds.stats.update(d["stats"])
             create_future(auds.update)
-            if not "h" in flags:
+            if "h" not in flags:
                 return (
                     "```css\nSuccessfully loaded audio queue data for [" 
                     + noHighlight(guild.name) + "].```", 1
