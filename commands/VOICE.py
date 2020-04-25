@@ -522,7 +522,7 @@ class customAudio(discord.AudioSource):
                 self.lastsent = time.time()
                 self.is_loading = True
                 url = q[0].stream
-                self.new(url)
+                create_future(self.new, url)
             elif not playing and self.source is None and not self.is_loading and not self.preparing:
                 self.advance()
         if not (q or self.preparing):
