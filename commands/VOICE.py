@@ -654,6 +654,7 @@ class customAudio(discord.AudioSource):
                             self.is_loading = True
                             self.refilling = 2
                             create_future(self.update)
+                            return
                     elif empty and queueable and self.source is not None:
                         if time.time() - self.lastEnd > 0.5:
                             if self.reverse:
@@ -669,6 +670,7 @@ class customAudio(discord.AudioSource):
                                         if self.queue:
                                             self.queue[0].url = ""
                                         create_future(self.new)
+                                        return
                                     else:
                                         self.stats.position = round(
                                             self.stats.position + self.speed * resample / 6.25 * (self.reverse * -2 + 1),
@@ -677,15 +679,18 @@ class customAudio(discord.AudioSource):
                                         if not ended:
                                             self.refilling = 2
                                             create_future(self.seek, self.stats.position)
+                                            return
                                         else:
                                             print("Advanced.")
                                             self.refilling = 2
                                             create_future(self.new)
+                                            return
                             elif self.curr_timeout == 0:
                                 self.curr_timeout = time.time()
                     elif not queueable:
                         self.curr_timeout = 0
                         self.vc.stop()
+                        return
                 temp = self.emptybuff
                 # print(traceback.format_exc())
             try:
@@ -2320,14 +2325,14 @@ class Player(Command):
         c = auds.stats.chorus
         if c:
             output += "📊"
-        s = auds.stats.speed
+        s = auds.stats.speed * 2 ** (auds.stats.resample / 12)
         if s < 0:
             output += "⏪"
         elif s > 1:
             output += "⏩"
         elif s > 0 and s < 1:
             output += "🐌"
-        p = auds.stats.pitch
+        p = auds.stats.pitch + auds.stats.resample
         if p > 0:
             output += "⏫"
         elif p < 0:
