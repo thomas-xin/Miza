@@ -78,7 +78,7 @@ class main_data:
         self.blocked = 0
         self.updated = False
         print("Initialized.")
-        create_future(self.clearcache)
+        create_future(self.clearcache, priority=True)
 
     __call__ = lambda self: self
 
@@ -519,7 +519,9 @@ class main_data:
         self.cache.deleted[m_id] = no_log + 1
         self.limitCache("deleted", limit=4096)
     
-    async def silentDelete(self, message, exc=False, no_log=False):
+    async def silentDelete(self, message, exc=False, no_log=False, delay=None):
+        if delay:
+            await asyncio.sleep(float(delay))
         try:
             self.logDelete(message, no_log)
             await message.delete()

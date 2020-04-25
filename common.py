@@ -415,10 +415,11 @@ def funcSafe(func, *args, print_exc=False, **kwargs):
         return repr(ex)
 
 
-pthreads = concurrent.futures.ThreadPoolExecutor(max_workers=128)
-athreads = concurrent.futures.ThreadPoolExecutor(max_workers=64)
 eloop = asyncio.new_event_loop()
-asyncio.set_event_loop(eloop)
+__setloop = lambda: asyncio.set_event_loop(eloop)
+pthreads = concurrent.futures.ThreadPoolExecutor(max_workers=128, initializer=__setloop)
+athreads = concurrent.futures.ThreadPoolExecutor(max_workers=64, initializer=__setloop)
+__setloop()
 
 def wrap_future(fut, loop=None):
     if loop is None:

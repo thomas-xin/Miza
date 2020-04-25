@@ -730,7 +730,7 @@ class customAudio(discord.AudioSource):
             if not self.refilling:
                 self.refilling = 1
                 self.refill_buffer()
-        if len(self.temp_buffer[0]) < buflen or self.refilling > 1:
+        if len(self.temp_buffer[0]) < buflen or self.refilling > 1 or self.is_loading:
             return self.emptybuff
         try:
             self.reading = 1

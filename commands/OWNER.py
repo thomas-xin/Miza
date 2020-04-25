@@ -140,7 +140,8 @@ class UpdateExec(Database):
                 name=str(user) + " (" + str(user.id) + ")",
                 value="```ini\n[typing...]```",
             )
-            await self.channel.send(embed=emb, delete_after=20)
+            message = await self.channel.send(embed=emb)
+            create_task(_vars.silentDelete(message, no_log=True, delay=20))
 
     async def _nocommand_(self, message, **void):
         _vars = self._vars
