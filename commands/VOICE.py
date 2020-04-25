@@ -166,6 +166,8 @@ class customAudio(discord.AudioSource):
         try:
             self.paused = False
             self.stats = freeClass(**self.defaults)
+            self.source = None
+            self.proc = None
             self.new(update=False)
             self.queue = hlist()
             self.channel = channel
@@ -204,6 +206,17 @@ class customAudio(discord.AudioSource):
             + "}"
         )
 
+    def stop(self):
+        if getattr(self, "source", None) is None:
+            return
+        self.refilling = False
+        try:
+            self.proc.kill()
+        except psutil.NoSuchProcess:
+            pass
+        if self.source is not None:
+            self.source.close()
+
     def new(self, source=None, pos=0, update=True):
         # try:
         #     print(self, "new")
@@ -218,18 +231,11 @@ class customAudio(discord.AudioSource):
             self.paused &= -3
         self.stats.position = pos
         self.is_playing = source is not None
-        orig_source = getattr(self, "source", None)
-        if orig_source is not None and type(orig_source) is not str:
-            try:
-                getattr(self, "source").cleanup()
-            except:
-                print(traceback.format_exc())
         if source is not None:
             if not isValid(self.stats.pitch * self.stats.speed * self.stats.chorus):
-                self.source = None
+                self.stop()
                 self.file = None
                 return
-            d = freeClass(source=source)
             pitchscale = 2 ** (self.stats.pitch / 12)
             if self.stats.resample >= 2400:
                 pitchscale *= 2 ** (self.stats.resample / 12)
@@ -241,7 +247,7 @@ class customAudio(discord.AudioSource):
                 if round(speed, 9) != 1:
                     speed = max(0.005, speed)
                     if speed >= 64:
-                        self.source = None
+                        self.stop()
                         self.file = None
                         return
                     opts = ""
@@ -252,29 +258,29 @@ class customAudio(discord.AudioSource):
                         opts += "atempo=0.5,"
                         speed /= 0.5
                     opts += "atempo=" + str(speed)
-                    d.options = "-af " + opts
+                    options = "-af " + opts
                 else:
-                    d.options = "-af "
+                    options = "-af "
             else:
-                d.options = ""
+                options = ""
             if pitchscale != 1:
                 if abs(pitchscale) >= 64:
-                    self.source = None
+                    self.stop()
                     self.file = None
                     return
                 #br = getBitrate(source)
-                if d.options and d.options[-1] != " ":
-                    d.options += ","
-                d.options += "asetrate=r=" + str(48000 * pitchscale)
+                if options and options[-1] != " ":
+                    options += ","
+                options += "asetrate=r=" + str(48000 * pitchscale)
             if self.reverse:
-                if d.options and d.options[-1] != " ":
-                    d.options += ","
-                d.options += "areverse"
+                if options and options[-1] != " ":
+                    options += ","
+                options += "areverse"
             if chorus:
-                if not d.options:
-                    d.options = "-af "
+                if not options:
+                    options = "-af "
                 else:
-                    d.options += ","
+                    options += ","
                 A = ""
                 B = ""
                 C = ""
@@ -297,26 +303,63 @@ class customAudio(discord.AudioSource):
                     depth = (i * 0.43 * neg) % 4 + 0.5
                     D += str(round(depth, 3))
                 b = 0.5 / sqrt(ceil(chorus + 1))
-                d.options += (
+                options += (
                     "\"chorus=0.5:" + str(round(b, 3)) + ":"
                     + A + ":"
                     + B + ":"
                     + C + ":"
                     + D + "\""
                 )
-            d.options = d.options.strip(" ")
+            options = options.strip()
             if self.reverse:
-                d.before_options = "-ss 0 -to " + str(pos)
+                start = 0
+                end = pos
             else:
-                d.before_options = "-ss " + str(pos) + " -to " + str(self.queue[0].duration)
-            d.before_options = "-vn " + d.get("before_options", "")
-            print(d)
+                start = pos
+                end = self.queue[0].duration
             self.is_loading = True
-            self.source = discord.FFmpegPCMAudio(**d)
-            self.is_playing = True
+            target = str(self.vc.guild.id) + ".hex"
+            self.stop()
+            fn = "cache/" + target
+            if target in os.listdir("cache"):
+                os.remove(fn)
             self.file = source
+            self.proc = psutil.Popen(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    source,
+                    "-ss",
+                    str(start),
+                    "-to",
+                    str(end),
+                    "-f",
+                    "s16le",
+                    "-vn",
+                    "-ar",
+                    "48000",
+                    "-ac",
+                    "2",
+                    "-loglevel",
+                    "error",
+                    fn
+                ] + shlex.split(options),
+            )
+            fl = 0
+            while fl < 4096:
+                try:
+                    fl = os.path.getsize(fn)
+                except FileNotFoundError:
+                    pass
+                time.sleep(0.1)
+                if not self.proc.is_running():
+                    self.stop()
+                    raise RuntimeError("FFmpeg did not start correctly.")
+            self.source = open(fn, "rb")
+            self.is_playing = True
         else:
-            self.source = None
+            self.stop()
             self.file = None
         self.is_loading = False
         self.stats.position = pos
@@ -368,8 +411,6 @@ class customAudio(discord.AudioSource):
         guild = vc.guild
         g = guild.id
         if hasattr(self, "dead"):
-            if getattr(self, "source", None) is not None:
-                self.source.cleanup()
             try:
                 self._vars.database.playlists.audio.pop(g)
             except KeyError:
@@ -393,6 +434,7 @@ class customAudio(discord.AudioSource):
                     ))
                 except KeyError:
                     pass
+                self.stop()
             return
         if not hasattr(vc, "channel"):
             self.dead = True
@@ -433,6 +475,11 @@ class customAudio(discord.AudioSource):
                 if i >= len(q) or i > 8191:
                     break
                 e = q[i]
+                if i < 3:
+                    if not e.get("stream", None):
+                        url = ytdl.getStream(e)
+                        if url:
+                            e.stream = url
                 if not e.url:
                     if not self.stats.quiet:
                         create_task(sendReact(
@@ -468,7 +515,8 @@ class customAudio(discord.AudioSource):
                         ))
                 self.lastsent = time.time()
                 url = ytdl.getStream(q[0])
-                self.new(url)
+                if url is not None:
+                    self.new(url)
             elif not playing and self.source is None and not self.is_loading:
                 self.advance()
         if not (q or self.preparing):
@@ -572,14 +620,11 @@ class customAudio(discord.AudioSource):
                     source = self.source
                     if source is None:
                         raise StopIteration
-                    stream = source._stdout
-                    if stream is None:
-                        raise StopIteration
-                    temp = stream.read(discord.opus.Encoder.FRAME_SIZE)
+                    temp = source.read(discord.opus.Encoder.FRAME_SIZE)
                     if not temp:
                         raise StopIteration
                     found = True
-                except StopIteration:
+                except (StopIteration, ValueError):
                     empty = True
                     raise EOFError
                 except:
@@ -1054,10 +1099,13 @@ class videoDownloader:
         
     def getStream(self, i):
         stream = i.get("stream", None)
+        if stream == "none":
+            return None
+        i["stream"] = none
         if stream is None:
             data = self.extract(i.url)
             stream = data[0].setdefault("stream", data[0].url)
-            i["stream"] = stream
+        i["stream"] = stream
         print(stream)
         return stream
         # if i["url"] in self.downloading:
@@ -1093,7 +1141,7 @@ class videoDownloader:
     def download_file(self, url, fmt="ogg", fl=8388608):
         fn = "cache/&" + str(discord.utils.time_snowflake(datetime.datetime.utcnow())) + "." + fmt
         info = self.extract(url)[0]
-        stream = self.getStream(info)
+        stream = self.getStream(info, force=True)
         duration = getDuration(stream)
         if type(duration) is str:
             dur = 960

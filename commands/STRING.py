@@ -95,7 +95,10 @@ class Translate(Command):
             for t in trans:
                 try:
                     resp = await create_future(getTranslate, translators[t], string, dest, source)
-                    output = resp.text
+                    try:
+                        output = resp.text
+                    except AttributeError:
+                        output = str(resp)
                     response += "\n" + output + "  `" + t + "`"
                     source, dest = dest, source
                     break

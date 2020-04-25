@@ -43,7 +43,7 @@ class Text2048(Command):
         "<board_size[4]>  <show_debug(?z)> <special_tiles(?s)> <public(?p)> "
         + "<insanity_mode(?i)> <special_controls(?c)> <easy_mode(?e)>"
     )
-    flags = "vzpice"
+    flags = "zspice"
 
     def shiftTile(self, tiles, p1, p2):
         # print(p1, p2)
