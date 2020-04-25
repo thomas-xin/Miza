@@ -355,7 +355,7 @@ class customAudio(discord.AudioSource):
                 time.sleep(0.1)
                 if not self.proc.is_running():
                     self.stop()
-                    raise RuntimeError("FFmpeg did not start correctly.")
+                    raise RuntimeError("FFmpeg did not start correctly, or file was too small.")
             self.source = open(fn, "rb")
             self.is_playing = True
         else:
@@ -368,6 +368,11 @@ class customAudio(discord.AudioSource):
                 self.stats.position = float(self.queue[0].duration)
         if self.source is not None and self.player:
             self.player.time = 1 + time.time()
+        if self.speed < 0.005:
+            self.speed = 1
+            self.paused |= 2
+        else:
+            self.paused &= -3
         if update:
             self.update()
         self.refilling = 0
@@ -517,6 +522,9 @@ class customAudio(discord.AudioSource):
                 url = ytdl.getStream(q[0])
                 if url is not None:
                     self.new(url)
+                else:
+                    q[0].played = False
+                    self.preparing = True
             elif not playing and self.source is None and not self.is_loading:
                 self.advance()
         if not (q or self.preparing):
@@ -527,7 +535,6 @@ class customAudio(discord.AudioSource):
                     if len(t) > 1 and p.url == self.prev:
                         continue
                     d = {
-                        # "hash": h,
                         "name": p.name,
                         "url": p.url,
                         "duration": p.duration,
@@ -1097,9 +1104,9 @@ class videoDownloader:
             self.requests = max(self.requests - 1, 0)
             return repr(ex)
         
-    def getStream(self, i):
+    def getStream(self, i, force=False):
         stream = i.get("stream", None)
-        if stream == "none":
+        if stream == "none" and not force:
             return None
         i["stream"] = "none"
         if stream is None:
