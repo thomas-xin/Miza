@@ -726,12 +726,14 @@ class customAudio(discord.AudioSource):
         buflen = size
         if resample != 1:
             buflen = max(1, round_random(resample * buflen))
+        if self.refilling > 1 or self.is_loading:
+            return self.emptybuff
         if len(self.temp_buffer[0]) < buflen:
             if not self.refilling:
                 self.refilling = 1
                 self.refill_buffer()
-        if len(self.temp_buffer[0]) < buflen or self.refilling > 1 or self.is_loading:
-            return self.emptybuff
+            else:
+                return self.emptybuff
         try:
             self.reading = 1
             lbuf, self.temp_buffer[0] = numpy.hsplit(self.temp_buffer[0], [buflen])
