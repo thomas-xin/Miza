@@ -487,8 +487,9 @@ class customAudio(discord.AudioSource):
                 if i < 3:
                     if not e.get("stream", None):
                         url = ytdl.getStream(e)
-                        if url:
+                        if url and url != "none":
                             e.stream = url
+                            break
                 if not e.url:
                     if not self.stats.quiet:
                         create_task(sendReact(
