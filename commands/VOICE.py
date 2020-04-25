@@ -523,7 +523,6 @@ class customAudio(discord.AudioSource):
                 if url is not None:
                     self.new(url)
                 else:
-                    q[0].played = False
                     self.preparing = True
             elif not playing and self.source is None and not self.is_loading:
                 self.advance()
