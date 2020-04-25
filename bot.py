@@ -440,6 +440,8 @@ class main_data:
             u_id = int(user)
         if u_id == self.owner_id:
             return nan
+        if self.isSuspended(u_id):
+            return -inf
         if u_id == client.user.id:
             return inf
         if guild is None or hasattr(guild, "ghost"):
@@ -804,10 +806,9 @@ class main_data:
 
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:
-            suspended = _vars.isSuspended(user.id)
-            if suspended:
-                return
             u_perm = self.getPerms(user.id, message.guild)
+            if u_perm <= -inf:
+                return
             msg = message.content
             if msg[:3] != "```" or len(msg) <= 3:
                 return
@@ -1103,9 +1104,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
             op = True
         while len(comm) and comm[0] == " ":
             comm = comm[1:]
-    suspended = _vars.isSuspended(u_id)
-    if (suspended and op) or msg.replace(" ", "") in mention:
-        if not u_perm < 0 and not suspended:
+    if (u_perm <= -inf and op) or msg.replace(" ", "") in mention:
+        if not u_perm < 0 and not u_perm <= -inf:
             create_task(sendReact(
                 channel,
                 (
@@ -1285,7 +1285,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             errmsg,
                             reacts=["❎"],
                         ))
-    if not run and u_id != client.user.id:
+    if not run and u_id != client.user.id and not u_perm <= inf:
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
         temp = list(cpy.lower())
         for i in range(len(temp)):

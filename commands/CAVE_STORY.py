@@ -363,7 +363,7 @@ def _n2f(n):
 
 def _m2f(mem, val):
     val1 = mem
-    val2 = val
+    val2 = val & 4294967295
     curr = 0
     result = ""
     while val2:

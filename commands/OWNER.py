@@ -187,6 +187,7 @@ class UpdateBlacklist(Database):
     user = True
 
     def __init__(self, *args):
+        super().__init__(*args)
         self.suspclear = inf
         try:
             self.lastsusp = None
@@ -212,7 +213,6 @@ class UpdateBlacklist(Database):
             print(self.lastsusp)
         except FileNotFoundError:
             pass
-        super().__init__(*args)
 
     async def _command_(self, user, command, **void):
         if user.id not in (self._vars.client.user.id, self._vars.owner_id):
