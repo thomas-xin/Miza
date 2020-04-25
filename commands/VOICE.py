@@ -181,6 +181,7 @@ class customAudio(discord.AudioSource):
             self.prev = None
             self.refilling = 0
             self.reading = 0
+            self.has_read = False
             self.searching = False
             self.preparing = True
             self.player = None
@@ -359,6 +360,7 @@ class customAudio(discord.AudioSource):
             self.source = open(fn, "rb")
             print(self.source)
             self.is_playing = True
+            self.has_read = False
         else:
             self.stop()
             self.file = None
@@ -639,6 +641,7 @@ class customAudio(discord.AudioSource):
                     self.stats.position + self.speed * resample / 50 * (self.reverse * -2 + 1),
                     4,
                 )
+                self.has_read = True
                 self.is_playing = True
                 self.curr_timeout = 0
             except EOFError:
@@ -658,7 +661,7 @@ class customAudio(discord.AudioSource):
                             if self.curr_timeout and time.time() - self.curr_timeout > 0.5 or ended:
                                 if not found:
                                     self.lastEnd = time.time()
-                                    if self.stats.position == 0 or not self.queue:
+                                    if not self.has_read or not self.queue:
                                         print("Advanced.")
                                         self.refilling = 2
                                         if self.queue:
