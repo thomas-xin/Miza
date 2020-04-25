@@ -186,6 +186,7 @@ class customAudio(discord.AudioSource):
             self.preparing = True
             self.player = None
             self.timeout = time.time()
+            self.lastsent = 0
             self.lastEnd = 0
             self.pausec = False
             self.curr_timeout = 0
@@ -348,16 +349,16 @@ class customAudio(discord.AudioSource):
             print(self.proc)
             fl = 0
             while fl < 4096:
-                try:
-                    fl = os.path.getsize(fn)
-                except FileNotFoundError:
-                    pass
-                time.sleep(0.2)
                 if not self.proc.is_running():
                     self.stop()
                     ex = RuntimeError("FFmpeg did not start correctly, or file was too small.")
                     print(repr(ex))
                     raise ex
+                time.sleep(0.2)
+                try:
+                    fl = os.path.getsize(fn)
+                except FileNotFoundError:
+                    pass
             self.source = open(fn, "rb")
             print(self.source)
             self.is_playing = True
@@ -415,7 +416,6 @@ class customAudio(discord.AudioSource):
 
     def update(self, *void1, **void2):
         # print(self, "update")
-        self.__dict__.setdefault("lastsent", 0)
         vc = self.vc
         guild = vc.guild
         g = guild.id
