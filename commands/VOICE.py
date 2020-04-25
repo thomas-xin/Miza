@@ -519,9 +519,11 @@ class customAudio(discord.AudioSource):
                             reacts=["❎"],
                         ))
                 self.lastsent = time.time()
+                self.is_loading = True
                 url = ytdl.getStream(q[0])
                 self.new(url)
-            elif not playing and self.source is None and not self.is_loading:
+                self.is_loading = False
+            elif not playing and self.source is None and not self.is_loading and not self.preparing:
                 self.advance()
         if not (q or self.preparing):
             t = self._vars.data.playlists.get(guild.id, ())
