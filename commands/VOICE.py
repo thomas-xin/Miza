@@ -520,10 +520,7 @@ class customAudio(discord.AudioSource):
                         ))
                 self.lastsent = time.time()
                 url = ytdl.getStream(q[0])
-                if url is not None:
-                    self.new(url)
-                else:
-                    self.preparing = True
+                self.new(url)
             elif not playing and self.source is None and not self.is_loading:
                 self.advance()
         if not (q or self.preparing):
