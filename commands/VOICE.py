@@ -64,10 +64,14 @@ def pytube2Dict(url):
     if not url.startswith("https://www.youtube.com/"):
         if not url.startswith("http://youtu.be/"):
             raise youtube_dl.DownloadError("Not a youtube link.")
-    try:
-        resp = pytube.YouTube(url)
-    except pytube.exceptions.RegexMatchError:
-        raise youtube_dl.DownloadError("Invalid single youtube link.")
+    for _ in loop(3):
+        try:
+            resp = pytube.YouTube(url)
+            break
+        except pytube.exceptions.RegexMatchError:
+            raise youtube_dl.DownloadError("Invalid single youtube link.")
+        except KeyError:
+            pass
     entry = {
         "webpage_url": url,
         "title": resp.title,
@@ -1096,7 +1100,7 @@ class videoDownloader:
         while self.requests > 4:
             time.sleep(0.1)
         if item in self.searched:
-            if time.time() - self.searched[item].t < 7200:
+            if time.time() - self.searched[item].t < 18000:
                 self.searched[item].t = time.time()
                 return self.searched[item].data
             else:
@@ -1181,7 +1185,7 @@ class videoDownloader:
         while self.requests > 4:
             time.sleep(0.1)
         if item in self.searched:
-            if time.time() - self.searched[item].t < 7200:
+            if time.time() - self.searched[item].t < 18000:
                 self.searched[item].t = time.time()
                 it = self.searched[item].data[0]
                 i.name = it.name
