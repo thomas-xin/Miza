@@ -8,7 +8,6 @@ except ModuleNotFoundError:
 import youtube_dl, pytube, ffmpy, samplerate
 from bs4 import BeautifulSoup
 
-FFRuntimeError = ffmpy.FFRuntimeError
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 getattr(ffmpy, "__builtins__", {})["print"] = print
 
@@ -354,7 +353,9 @@ class customAudio(discord.AudioSource):
                 time.sleep(0.2)
                 if not self.proc.is_running():
                     self.stop()
-                    print(repr(RuntimeError("FFmpeg did not start correctly, or file was too small.")))
+                    ex = RuntimeError("FFmpeg did not start correctly, or file was too small.")
+                    print(repr(ex))
+                    raise ex
             self.source = open(fn, "rb")
             print(self.source)
             self.is_playing = True
@@ -1105,7 +1106,7 @@ class videoDownloader:
         if stream == "none" and not force:
             return None
         i["stream"] = "none"
-        if stream is None:
+        if stream in (None, "none"):
             data = self.extract(i.url)
             stream = data[0].setdefault("stream", data[0].url)
         i["stream"] = stream
