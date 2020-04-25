@@ -216,8 +216,7 @@ class customAudio(discord.AudioSource):
         except psutil.NoSuchProcess:
             pass
         if self.source is not None:
-            self.source.close()
-            self.source = None
+            self.source, _ = None, self.source.close()
 
     def new(self, source=None, pos=0, update=True):
         # try:
@@ -486,10 +485,8 @@ class customAudio(discord.AudioSource):
                 e = q[i]
                 if i < 3:
                     if not e.get("stream", None):
-                        url = ytdl.getStream(e)
-                        if url and url != "none":
-                            e.stream = url
-                            break
+                        create_future(ytdl.getStream, e)
+                        break
                 if not e.url:
                     if not self.stats.quiet:
                         create_task(sendReact(
