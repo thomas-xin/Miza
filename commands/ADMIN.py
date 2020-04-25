@@ -8,6 +8,7 @@ except ModuleNotFoundError:
 
 class Purge(Command):
     time_consuming = True
+    _timeout_ = 16
     name = ["Del", "Delete"]
     min_level = 3
     description = "Deletes a number of messages from a certain user in current channel."
@@ -40,21 +41,31 @@ class Purge(Command):
                         t_user = await _vars.fetch_member(u_id, guild)
                     except LookupError:
                         t_user = freeClass(id=u_id)
-        lim = count * 2 + 16
-        if lim < 0:
-            lim = 0
-        if not isValid(lim):
-            lim = None
-        hist = await channel.history(limit=lim).flatten()
+        if count <= 0:
+            raise ValueError("Please enter a valid amount of messages to delete.")
+        if not count < inf:
+            try:
+                await channel.clone(reason="Purged.")
+                await channel.delete(reason="Purged.")
+                count = 0
+            except discord.Forbidden:
+                pass
         delM = hlist()
-        isbot = t_user is not None and t_user.id == client.user.id
-        deleted = 0
-        for m in hist:
-            if count <= 0:
+        while count > 0:
+            lim = count * 2 + 16
+            if not lim < inf:
+                lim = None
+            hist = await channel.history(limit=lim).flatten()
+            isbot = t_user is not None and t_user.id == client.user.id
+            deleted = 0
+            for m in hist:
+                if t_user is None or isbot and m.author.bot or m.author.id == t_user.id:
+                    delM.append(m)
+                    count -= 1
+                    if count <= 0:
+                        break
+            if lim is None:
                 break
-            if t_user is None or isbot and m.author.bot or m.author.id == t_user.id:
-                delM.append(m)
-                count -= 1
         while len(delM):
             try:
                 if hasattr(channel, "delete_messages"):
@@ -269,7 +280,7 @@ class RoleGiver(Command):
                 react = args[0].lower()
                 assigned = data.get(channel.id, {})
                 if react not in assigned:
-                    raise LookupError("Rolegiver " + react + " not currently assigned for " + channel.name + ".")
+                    raise LookupError("Rolegiver " + react + " not currently assigned for #" + channel.name + ".")
                 assigned.pop(react)
                 return "```css\nRemoved [" + react + "] from the rolegiver list for [#" + noHighlight(channel.name) + "].```"
             if channel.id in data:
@@ -290,7 +301,7 @@ class RoleGiver(Command):
             )
         if sum(len(alist[0]) for alist in assigned) >= 16:
             raise OverflowError(
-                "Rolegiver list for " + channel.name
+                "Rolegiver list for #" + channel.name
                 + " has reached the maximum of 16 items. "
                 + "Please remove an item to add another."
             )
@@ -326,7 +337,7 @@ class RoleGiver(Command):
         return (
             "```css\nAdded [" + noHighlight(react)
             + "] ➡️ [" + noHighlight(role)
-            + "] to channel [" + noHighlight(channel.name) + "].```"
+            + "] to channel [#" + noHighlight(channel.name) + "].```"
         )
 
 
@@ -507,13 +518,12 @@ class Lockdown(Command):
             return ("```asciidoc\n[" + response + "]```")
         u_id = self._vars.client.user.id
         for role in guild.roles:
-            if len(role.members) != 1 or role.members[-1].id != u_id:
+            if len(role.members) != 1 or role.members[-1].id not in (u_id, guild.owner_id):
                 create_task(self.roleLock(role, channel))
-        for inv in guild.invites:
+        invites = await guild.invites()
+        for inv in invites:
             create_task(self.invLock(inv, channel))
-        response = uniStr(
-            "LOCKDOWN REQUESTED."
-        )
+        response = uniStr("LOCKDOWN REQUESTED.")
         return ("```asciidoc\n[" + response + "]```")
 
 

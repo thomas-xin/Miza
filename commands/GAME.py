@@ -616,7 +616,11 @@ class RPSend(Command):
             await _vars.database.mimics.updateMimic(mimic, guild)
             name = mimic.name
             url = mimic.url
-            await w.send(msg, username=name, avatar_url=url)
+            try:
+                await w.send(msg, username=name, avatar_url=url)
+            except discord.NotFound:
+                w = await _vars.ensureWebhook(channel, force=True)
+                await w.send(msg, username=name, avatar_url=url)
             mimic.count += 1
             mimic.total += len(msg)
 
@@ -670,7 +674,12 @@ class UpdateMimics(Database):
                             await self.updateMimic(mimic, guild=message.guild)
                             name = mimic.name
                             url = mimic.url
-                            await w.send(k.msg, username=name, avatar_url=url)
+                            msg = k.msg
+                            try:
+                                await w.send(msg, username=name, avatar_url=url)
+                            except discord.NotFound:
+                                w = await _vars.ensureWebhook(channel, force=True)
+                                await w.send(msg, username=name, avatar_url=url)
                             mimic.count += 1
                             mimic.total += len(k.msg)
                 except Exception as ex:

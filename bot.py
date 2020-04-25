@@ -912,12 +912,12 @@ class main_data:
                 print(traceback.format_exc())
             self.busy = False
 
-    async def ensureWebhook(self, channel):
+    async def ensureWebhook(self, channel, force=False):
         if not hasattr(self, "cw_cache"):
             self.cw_cache = freeClass()
         wlist = None
         if channel.id in self.cw_cache:
-            if time.time() - self.cw_cache[channel.id].time > 300:
+            if time.time() - self.cw_cache[channel.id].time > 300 or force:
                 self.cw_cache.pop(channel.id)
             else:
                 self.cw_cache[channel.id].time = time.time()
@@ -927,7 +927,7 @@ class main_data:
         if not wlist:
             w = await channel.create_webhook(name=_vars.client.user.name)
         else:
-            w = wlist[0]
+            w = random.choice(wlist)
         self.cw_cache[channel.id] = freeClass(time=time.time(), webhook=w)
         return w
 
