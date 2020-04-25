@@ -317,9 +317,9 @@ class customAudio(discord.AudioSource):
                 end = pos
             else:
                 start = pos
-                end = self.queue[0].duration
+                end = self.queue[0].duration + 0.5
             self.is_loading = True
-            target = str(self.vc.guild.id) + ".hex"
+            target = str(self.vc.guild.id) + ".pcm"
             self.stop()
             fn = "cache/" + target
             if target in os.listdir("cache"):
@@ -1405,7 +1405,7 @@ class Queue(Command):
         i = content.index("callback")
         content = content[:i] + (
             "callback-voice-queue-"
-            + str(user.id) + "_" + str(pos) + "_" + str(int(v))
+            + str(u_id) + "_" + str(pos) + "_" + str(int(v))
             + "-\nQueue for " + guild.name.replace("`", "") + ":```"
         )
         elapsed = auds.stats.position
