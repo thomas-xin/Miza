@@ -324,39 +324,39 @@ class customAudio(discord.AudioSource):
             if target in os.listdir("cache"):
                 os.remove(fn)
             self.file = source
-            self.proc = psutil.Popen(
-                [
-                    "ffmpeg",
-                    "-y",
-                    "-i",
-                    source,
-                    "-ss",
-                    str(start),
-                    "-to",
-                    str(end),
-                    "-f",
-                    "s16le",
-                    "-vn",
-                    "-ar",
-                    "48000",
-                    "-ac",
-                    "2",
-                    "-loglevel",
-                    "error",
-                    fn
-                ] + shlex.split(options),
-            )
+            args = [
+                "ffmpeg",
+                "-y",
+                "-i",
+                source,
+                "-ss",
+                str(start),
+                "-to",
+                str(end),
+                "-f",
+                "s16le",
+                "-vn",
+                "-ar",
+                "48000",
+                "-ac",
+                "2",
+            ]
+            args += shlex.split(options) + ["-loglevel", "error", fn]
+            print(args)
+            self.proc = psutil.Popen(args)
+            print(self.proc)
             fl = 0
             while fl < 4096:
                 try:
                     fl = os.path.getsize(fn)
                 except FileNotFoundError:
                     pass
-                time.sleep(0.1)
+                time.sleep(0.2)
                 if not self.proc.is_running():
                     self.stop()
-                    raise RuntimeError("FFmpeg did not start correctly, or file was too small.")
+                    print(repr(RuntimeError("FFmpeg did not start correctly, or file was too small.")))
             self.source = open(fn, "rb")
+            print(self.source)
             self.is_playing = True
         else:
             self.stop()
@@ -503,9 +503,8 @@ class customAudio(discord.AudioSource):
             elif dels:
                 while dels:
                     q.pop(dels.popleft())
-            if q and not q[0].get("played", False):
+            if q and not q[0].get("played", False) and q[0].get("stream", None) not in (None, "none"):
                 q[0].played = True
-                self.preparing = False
                 if not self.stats.quiet:
                     if time.time() - self.lastsent > 1:
                         msg = (
@@ -520,9 +519,8 @@ class customAudio(discord.AudioSource):
                         ))
                 self.lastsent = time.time()
                 self.is_loading = True
-                url = ytdl.getStream(q[0])
+                url = q[0].stream
                 self.new(url)
-                self.is_loading = False
             elif not playing and self.source is None and not self.is_loading and not self.preparing:
                 self.advance()
         if not (q or self.preparing):
@@ -662,9 +660,9 @@ class customAudio(discord.AudioSource):
                                     if self.stats.position == 0 or not self.queue:
                                         print("Advanced.")
                                         self.refilling = 2
-                                        create_future(self.new)
                                         if self.queue:
                                             self.queue[0].url = ""
+                                        create_future(self.new)
                                     else:
                                         self.stats.position = round(
                                             self.stats.position + self.speed * resample / 6.25 * (self.reverse * -2 + 1),
