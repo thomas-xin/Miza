@@ -465,6 +465,10 @@ class customAudio(discord.AudioSource):
         if not hasattr(vc, "channel"):
             self.dead = True
             return
+        m = guild.get_member(self._vars.client.user.id)
+        if m is None:
+            self.dead = True
+            return
         if vc.is_connected() or self._vars.database.playlists.is_connecting(vc.guild.id):
             playing = self.is_playing or self.is_loading
         else:
@@ -492,6 +496,9 @@ class customAudio(discord.AudioSource):
                         create_task(vc.move_to(guild.afk_channel))
         else:
             self.timeout = time.time()
+        if m.voice is not None:
+            if m.voice.deaf or m.voice.mute or m.voice.afk:
+                create_task(m.edit(mute=False, deafen=False))
         self.att = 0
         if q:
             if len(q) > 65536 + 2048:
