@@ -367,9 +367,9 @@ class customAudio(discord.AudioSource):
             fl = 0
             while fl < 4096:
                 if not self.proc.is_running():
-                    self.stop()
                     ex = RuntimeError("FFmpeg did not start correctly, or file was too small.")
                     print(repr(ex))
+                    self.new()
                     raise ex
                 time.sleep(0.1)
                 try:
@@ -1000,7 +1000,7 @@ class videoDownloader:
                     pyt = create_future_ex(pytube2Dict, resp["url"])
                     resp = self.extract_info(resp["url"], count)
                     try:
-                        resp = pyt.result(timeout=5)
+                        resp = pyt.result(timeout=10)
                     except youtube_dl.DownloadError:
                         pass
                     except:
@@ -1017,7 +1017,7 @@ class videoDownloader:
                             except Exception as ex:
                                 data = ex
                             try:
-                                data = pyt.result(timeout=5)
+                                data = pyt.result(timeout=10)
                             except youtube_dl.DownloadError:
                                 pass
                             except:
@@ -1112,7 +1112,7 @@ class videoDownloader:
             except Exception as ex:
                 data = ex
             try:
-                data = pyt.result(timeout=5)
+                data = pyt.result(timeout=10)
             except youtube_dl.DownloadError:
                 pass
             except:
@@ -1232,7 +1232,7 @@ class videoDownloader:
             except Exception as ex:
                 data = ex
             try:
-                data = pyt.result(timeout=5)
+                data = pyt.result(timeout=10)
             except youtube_dl.DownloadError:
                 pass
             except:
