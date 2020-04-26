@@ -1285,7 +1285,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             errmsg,
                             reacts=["❎"],
                         ))
-    if not run and u_id != client.user.id and not u_perm <= inf:
+    if not run and u_id != client.user.id and not u_perm <= -inf:
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
         temp = list(cpy.lower())
         for i in range(len(temp)):
