@@ -50,22 +50,27 @@ class Purge(Command):
                 count = 0
             except discord.Forbidden:
                 pass
-        delM = hlist()
+        dt = None
+        delD = {}
+        deleted = 0
         while count > 0:
             lim = count * 2 + 16
             if not lim < inf:
                 lim = None
-            hist = await channel.history(limit=lim).flatten()
+            hist = await channel.history(limit=lim, before=dt).flatten()
             isbot = t_user is not None and t_user.id == client.user.id
-            deleted = 0
-            for m in hist:
+            for i in range(len(hist)):
+                m = hist[i]
                 if t_user is None or isbot and m.author.bot or m.author.id == t_user.id:
-                    delM.append(m)
+                    delD[m.id] = m
                     count -= 1
                     if count <= 0:
                         break
-            if lim is None:
+                if i == len(hist) - 1:
+                    dt = m.created_at
+            if lim is None or not hist:
                 break
+        delM = hlist(delD.values())
         while len(delM):
             try:
                 if hasattr(channel, "delete_messages"):
