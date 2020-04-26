@@ -108,9 +108,15 @@ def pytube2Dict(url):
 
 
 def getBestAudio(entry):
-    fmts = entry["formats"]
     best = -1
-    url = entry["webpage_url"]
+    try:
+        fmts = entry["formats"]
+    except KeyError:
+        fmts = ()
+    try:
+        url = entry["webpage_url"]
+    except KeyError:
+        url = entry["url"]
     for fmt in fmts:
         q = fmt.get("abr", 0)
         if type(q) is not int:
@@ -121,6 +127,9 @@ def getBestAudio(entry):
         if q > best:
             best = q
             url = fmt["url"]
+    if "dropbox.com" in url:
+        if "?dl=0" in url:
+            url = url.replace("?dl=0", "?dl=1")
     return url
 
 
@@ -220,7 +229,12 @@ class customAudio(discord.AudioSource):
         except psutil.NoSuchProcess:
             pass
         if self.source is not None:
-            self.source, _ = None, self.source.close()
+            self.source, fn, _ = None, self.source, self.source.close()
+            if fn in os.listdir("cache"):
+                try:
+                    os.remove("cache/" + fn)
+                except:
+                    print(traceback.format_exc())
 
     def new(self, source=None, pos=0, update=True):
         # try:
@@ -357,11 +371,11 @@ class customAudio(discord.AudioSource):
                     ex = RuntimeError("FFmpeg did not start correctly, or file was too small.")
                     print(repr(ex))
                     raise ex
-                time.sleep(0.2)
+                time.sleep(0.1)
                 try:
                     fl = os.path.getsize(fn)
                 except FileNotFoundError:
-                    pass
+                    fl = 0
             self.source = open(fn, "rb")
             print(self.source)
             self.is_playing = True
@@ -400,7 +414,7 @@ class customAudio(discord.AudioSource):
         if q:
             if self.stats.loop:
                 temp = q[0]
-            self.prev = q[0]
+            self.prev = q[0]["url"]
             q.popleft()
             if shuffled and self.stats.shuffle:
                 if len(q) > 1:
@@ -468,10 +482,15 @@ class customAudio(discord.AudioSource):
                     self.dead = True
                     return
         cnt = sum(1 for m in vc.channel.members if not m.bot)
-        if not cnt and self.timeout < time.time() - 20:
-            self.dead = True
-            return
-        if cnt:
+        if not cnt:
+            if self.timeout < time.time() - 20:
+                self.dead = True
+                return
+            elif self.timeout < time.time() - 10:
+                if guild.afk_channel is not None:
+                    if guild.afk_channel.id != vc.channel.id:
+                        create_task(vc.move_to(guild.afk_channel))
+        else:
             self.timeout = time.time()
         self.att = 0
         if q:
@@ -527,6 +546,7 @@ class customAudio(discord.AudioSource):
                 self.is_loading = True
                 url = q[0].stream
                 self.new(url)
+                self.preparing = False
             elif not playing and self.source is None and not self.is_loading and not self.preparing:
                 self.advance()
         if not (q or self.preparing):
@@ -654,8 +674,8 @@ class customAudio(discord.AudioSource):
                 if (empty or not self.paused) and not self.is_loading:
                     queueable = (self.queue or self._vars.data.playlists.get(self.vc.guild.id, None))
                     if self.queue and not self.queue[0].get("played", False):
-                        if not found:
-                            self.is_loading = True
+                        if not found and not self.preparing:
+                            self.preparing = True
                             self.refilling = 2
                             create_future(self.update)
                             return

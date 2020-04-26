@@ -415,6 +415,13 @@ def funcSafe(func, *args, print_exc=False, **kwargs):
         return repr(ex)
 
 
+async def safeCoro(coro):
+    try:
+        await coro
+    except:
+        print(traceback.format_exc())
+
+
 eloop = asyncio.new_event_loop()
 __setloop = lambda: asyncio.set_event_loop(eloop)
 pthreads = concurrent.futures.ThreadPoolExecutor(max_workers=128, initializer=__setloop)

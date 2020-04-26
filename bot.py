@@ -1297,16 +1297,13 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         for u in _vars.database.values():
             f = getattr(u, "_nocommand_", None)
             if f is not None:
-                try:
-                    await f(
-                        text=temp,
-                        edit=edit,
-                        orig=orig,
-                        message=message,
-                        perm=u_perm,
-                    )
-                except:
-                    print(traceback.format_exc())
+                create_task(safeCoro(f(
+                    text=temp,
+                    edit=edit,
+                    orig=orig,
+                    message=message,
+                    perm=u_perm,
+                )))
 
 
 async def heartbeatLoop():

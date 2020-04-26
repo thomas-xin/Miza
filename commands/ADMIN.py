@@ -1218,7 +1218,10 @@ class UpdateAutoRoles(Database):
                 except:
                     print(traceback.format_exc())
             print(roles)
-            await user.add_roles(*roles, reason="AutoRole", atomic=False)
+            try:
+                await user.add_roles(*roles, reason="AutoRole", atomic=False)
+            except discord.Forbidden:
+                await user.add_roles(*roles, reason="AutoRole", atomic=True)
 
 
 class UpdateRolePreservers(Database):
@@ -1236,7 +1239,13 @@ class UpdateRolePreservers(Database):
                     except:
                         print(traceback.format_exc())
                 print(user, roles)
-                await user.edit(roles=roles, reason="RolePreserver")
+                try:
+                    await user.edit(roles=roles, reason="RolePreserver")
+                except discord.Forbidden:
+                    try:
+                        await user.add_roles(*roles, reason="RolePreserver", atomic=False)
+                    except discord.Forbidden:
+                        await user.add_roles(*roles, reason="RolePreserver", atomic=True)
                 self.data[guild.id].pop(user.id)
 
     async def _leave_(self, user, guild, **void):
