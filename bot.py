@@ -150,7 +150,9 @@ class main_data:
             raise TypeError("Invalid user identifier: " + str(u_id))
         if u_id == self.deleted_user:
             user = self.ghostUser()
+            user.system = True
             user.name = "Deleted User"
+            user.display_name = "Deleted User"
             user.id = u_id
             user.avatar_url = "https://cdn.discordapp.com/embed/avatars/0.png"
             user.created_at = snowflake_time(u_id)
@@ -821,6 +823,8 @@ class main_data:
             if u_perm <= -inf:
                 return
             msg = message.content
+            if not msg:
+                msg = message.embeds[0].description
             if msg[:3] != "```" or len(msg) <= 3:
                 return
             msg = msg[3:]
@@ -1562,6 +1566,7 @@ async def on_raw_message_delete(payload):
                 message.guild = None
             message.id = payload.message_id
             message.created_at = snowflake_time(message.id)
+            message.author = await _vars.fetch_user(_vars.deleted_user)
     guild = message.guild
     if guild:
         for u in _vars.database.values():
@@ -1597,6 +1602,7 @@ async def on_raw_bulk_message_delete(payload):
                     message.guild = None
                 message.id = m_id
                 message.created_at = snowflake_time(message.id)
+                message.author = await _vars.fetch_user(_vars.deleted_user)
             messages.append(message)
     for message in messages:
         guild = message.guild

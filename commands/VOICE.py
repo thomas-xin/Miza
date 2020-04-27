@@ -1059,24 +1059,29 @@ class videoDownloader:
                                         dur = float(entry["duration"])
                                     else:
                                         dur = None
+                                    url = entry.get("webpage_url", entry.get("url", entry["id"]))
                                     temp = {
                                         # "hash": shash(entry["url"]),
                                         "name": title,
-                                        "url": entry.get("webpage_url", entry.get("url", entry["id"])),
+                                        "url": url,
                                         "duration": dur,
                                     }
-                                    try:
-                                        if not isURL(temp["url"]):
-                                            raise KeyError
-                                        temp["stream"] = getBestAudio(entry)
-                                        if dur is None:
-                                            temp["duration"] = getDuration(temp["stream"])
-                                    except KeyError:
-                                        found = False
+                                    if not isURL(url):
+                                        if entry.get("ie_key", "").lower() == "youtube":
+                                            temp["url"] = "https://www.youtube.com/watch?v=" + url
+                                    # try:
+                                    #     if not isURL(url):
+                                    #         if entry.get("ie_key", "").lower() == "youtube":
+                                    #             temp["url"] = "https://www.youtube.com/watch?v=" + url
+                                    #         raise KeyError
+                                    #     temp["stream"] = getBestAudio(entry)
+                                    #     if dur is None:
+                                    #         temp["duration"] = getDuration(temp["stream"])
+                                    # except KeyError:
+                                    #     found = False
                                     if dur is None:
                                         temp["duration"] = "300"
-                                    if not found:
-                                        temp["research"] = True
+                                    temp["research"] = True
                                 except:
                                     print(traceback.format_exc())
                             output.append(freeClass(temp))
@@ -1167,7 +1172,7 @@ class videoDownloader:
         if stream == "none" and not force:
             return None
         i["stream"] = "none"
-        if stream in (None, "none"):
+        if stream in (None, "none") or stream.startswith("https://cf-hls-media.sndcdn.com/"):
             data = self.extract(i.url, search=False)
             stream = data[0].setdefault("stream", data[0].url)
         i["stream"] = stream
@@ -1270,7 +1275,7 @@ class videoDownloader:
             self.searched[item] = obj
             it = out[0]
             i.name = it.name
-            i.duration = it.duration
+            i.duration = it.get("duration", "300")
             i.url = it.url
             # sethash(i)
             self.requests = max(self.requests - 1, 0)
@@ -1448,11 +1453,13 @@ class Queue(Command):
                 return
             pos = new
         content = message.content
+        if not content:
+            content = message.embeds[0].description
         i = content.index("callback")
         content = content[:i] + (
             "callback-voice-queue-"
             + str(u_id) + "_" + str(pos) + "_" + str(int(v))
-            + "-\nQueue for " + guild.name.replace("`", "") + ":```"
+            + "-\nQueue for " + guild.name.replace("`", "") + ":\n"
         )
         elapsed = auds.stats.position
         startTime = 0
@@ -1474,7 +1481,7 @@ class Queue(Command):
         cnt = len(q)
         info = (
             str(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
-            + sec2Time(totalTime / auds.speed) + "\n"
+            + sec2Time(totalTime / auds.speed) + "```"
         )
         duration = float(q[0].duration)
         sym = "⬜⬛"
@@ -1488,7 +1495,7 @@ class Queue(Command):
         )
         countstr += bar + "`\n"
         emb = discord.Embed(
-            description=info + countstr,
+            description=content + info + countstr,
             colour=randColour(),
         )
         user = await _vars.fetch_user(u_id)
@@ -1505,8 +1512,8 @@ class Queue(Command):
             curr = "`"
             curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
             curr += "【" + str(i) + "】` ["
-            curr += discord.utils.escape_markdown(limStr(noHighlight(e.name), 192))
-            curr += "](" + e.url + ") `("
+            curr += discord.utils.escape_markdown(limStr(noHighlight(e.name), 64))
+            curr += "](" + ensure_url(e.url) + ") `("
             curr += dhms(e.duration) + ")`"
             if v:
                 try:
@@ -1549,7 +1556,7 @@ class Queue(Command):
             emb.set_footer(
                 text=uniStr("And ", 1) + str(len(q) - i) + uniStr(" more...", 1),
             )
-        await message.edit(content=content, embed=emb)
+        await message.edit(content=None, embed=emb)
         if reaction is None:
             for react in self.directions:
                 await message.add_reaction(react.decode("utf-8"))
@@ -1582,13 +1589,13 @@ class Playlist(Command):
                 pl[guild.id] = []
                 update()
                 return (
-                    "```css\nRemoved all entries from the default playlist for ["
-                    + noHighlight(guild.name) + "].```"
+                    "```css\nRemoved all entries from the default playlist for "
+                    + sbHighlight(guild) + ".```"
                 )
             if not pl:
                 return (
-                    "```ini\nDefault playlist for [" + noHighlight(guild.name)
-                    + "] is currently empty.```"
+                    "```ini\nDefault playlist for " + sbHighlight(guild)
+                    + " is currently empty.```"
                 )
             if "v" in flags:
                 key = lambda x: noHighlight(x)
@@ -1606,8 +1613,8 @@ class Playlist(Command):
             pl.pop(i)
             update()
             return (
-                "```css\nRemoved [" + noHighlight(temp.name)
-                + "] from the default playlist for "
+                "```css\nRemoved " + sbHighlight(temp.name)
+                + " from the default playlist for "
                 + sbHighlight(guild.name) + "```"
             )
         if len(pl) >= 64:
@@ -1634,9 +1641,9 @@ class Playlist(Command):
         pl.sort(key=lambda x: x["name"].lower())
         update()
         return (
-            "```css\nAdded [" + noHighlight(", ".join(names))
-            + "] to the default playlist for ["
-            + noHighlight(guild.name) + "].```"
+            "```css\nAdded " + sbHighlight(", ".join(names))
+            + " to the default playlist for "
+            + sbHighlight(guild.name) + ".```"
         )
         
 
@@ -1732,7 +1739,7 @@ class Connect(Command):
         if joined:
             await _vars.database.playlists(guild=guild)
             return (
-                "```css\n🎵 Successfully connected to [" + noHighlight(vc_.name)
+                "```css\n🎵 Successfully connected to [#" + noHighlight(vc_.name)
                 + "] in [" + noHighlight(guild.name) + "]. 🎵```", 1
             )
 
@@ -2882,7 +2889,6 @@ class UpdateQueues(Database):
             return
         self.busy += 1
         _vars = self._vars
-        pl = self.data
         client = _vars.client
         try:
             if guild is not None:

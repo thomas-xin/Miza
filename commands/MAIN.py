@@ -1206,7 +1206,8 @@ class updateUsers(Database):
 
     async def _nocommand_(self, text, message, **void):
         if not message.mentions:
-            if reconstitute(self._vars.client.user.name).lower() not in text:
+            name = self.__dict__.setdefault("name", reconstitute(self._vars.client.user.name).lower())
+            if name not in text:
                 return
         else:
             ids = (u.id for u in message.mentions)

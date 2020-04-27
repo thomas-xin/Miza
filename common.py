@@ -391,7 +391,6 @@ async def mathProc(data, key=-1, timeout=12):
 
 
 def evalEX(exc):
-    is_ex = False
     try:
         ex = eval(exc)
     except NameError:
