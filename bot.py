@@ -198,6 +198,8 @@ class main_data:
 
     async def fetch_whuser(self, u_id, guild=None):
         try:
+            if u_id in self.cache.users:
+                return self.cache.users[u_id]
             try:
                 g_id = guild.id
             except AttributeError:
@@ -212,6 +214,7 @@ class main_data:
                     user = _vars.ghostUser()
                     user.id = u_id
                     user.name = w.name
+                    user.display_name = w.name
                     user.created_at = user.joined_at = w.created_at
                     user.avatar = w.avatar
                     user.avatar_url = w.avatar_url
@@ -224,7 +227,7 @@ class main_data:
             self.limitCache("users")
             return user
         except EOFError:
-            raise LookupError("Unable to find target user.")
+            raise LookupError("Unable to find target from ID.")
 
     async def fetch_guild(self, g_id):
         try:

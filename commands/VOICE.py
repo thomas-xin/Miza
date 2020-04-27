@@ -55,6 +55,7 @@ def getDuration(filename):
                     i = x
         dur = rdhms(d[:i])
     except:
+        print(s)
         print(traceback.format_exc())
         return "300"
     return dur
@@ -539,10 +540,15 @@ class customAudio(discord.AudioSource):
                 q[0].played = True
                 if not self.stats.quiet:
                     if time.time() - self.lastsent > 1:
+                        try:
+                            u = self._vars.cache.users[q[0].u_id]
+                            name = u.display_name
+                        except KeyError:
+                            name = "Deleted User"
                         msg = (
-                            "```ini\n🎵 Now playing ["
-                            + noHighlight(q[0].name)
-                            + "], added by [" + q[0].added_by + "]! 🎵```"
+                            "```ini\n🎵 Now playing "
+                            + sbHighlight(q[0].name)
+                            + ", added by " + sbHighlight(name) + "! 🎵```"
                         )
                         create_task(sendReact(
                             self.channel,
@@ -567,7 +573,6 @@ class customAudio(discord.AudioSource):
                         "name": p.name,
                         "url": p.url,
                         "duration": p.duration,
-                        "added_by": self._vars.client.user.name,
                         "u_id": self._vars.client.user.id,
                         "skips": (),
                         "research": True,
@@ -997,8 +1002,12 @@ class videoDownloader:
             if not len(output) and force != "spotify":
                 resp = self.extract_info(item, count)
                 if resp.get("_type", None) == "url":
-                    pyt = create_future_ex(pytube2Dict, resp["url"])
-                    resp = self.extract_info(resp["url"], count)
+                    if not isURL(resp["url"]):
+                        resp = self.downloader.extract_info(resp["url"], download=False, process=False)
+                        pyt = create_future_ex(pytube2Dict, resp["webpage_url"])
+                    else:
+                        pyt = create_future_ex(pytube2Dict, resp["url"])
+                        resp = self.extract_info(resp["url"], count)
                     try:
                         resp = pyt.result(timeout=10)
                     except youtube_dl.DownloadError:
@@ -1050,10 +1059,12 @@ class videoDownloader:
                                     temp = {
                                         # "hash": shash(entry["url"]),
                                         "name": title,
-                                        "url": entry["url"],
+                                        "url": entry.get("webpage_url", entry.get("url", entry["id"])),
                                         "duration": dur,
                                     }
                                     try:
+                                        if not isURL(temp["url"]):
+                                            raise KeyError
                                         temp["stream"] = getBestAudio(entry)
                                         if dur is None:
                                             temp["duration"] = getDuration(temp["stream"])
@@ -1356,7 +1367,6 @@ class Queue(Command):
                 "name": name,
                 "url": url,
                 "duration": e.get("duration", "300"),
-                "added_by": user.name,
                 "u_id": user.id,
                 "skips": [],
             }
@@ -1494,7 +1504,17 @@ class Queue(Command):
             curr += "](" + e.url + ") `("
             curr += dhms(e.duration) + ")`"
             if v:
-                curr += "\n```css\n[" + noHighlight(e.added_by) + "]\n"
+                try:
+                    u = _vars.cache.users[e.u_id]
+                    name = u.display_name
+                except KeyError:
+                    try:
+                        u = await _vars.fetch_user(e.u_id)
+                        name = u.display_name
+                    except:
+                        print(traceback.format_exc())
+                        name = "Deleted User"
+                curr += "\n```css\n" + sbHighlight(name) + "\n"
             if auds.reverse and len(auds.queue):
                 estim = currTime + elapsed - float(auds.queue[0].duration)
             else:
@@ -1680,13 +1700,14 @@ class Connect(Command):
             while not vc.is_connected() and time.time() - t < 12:
                 try:
                     vc = await vc_.connect(timeout=30, reconnect=False)
-                    for _ in loop(5):
+                    for _ in loop(8):
                         if vc.is_connected():
                             break
                         await asyncio.sleep(0.5)
                 except discord.ClientException:
+                    print(traceback.format_exc())
                     await asyncio.sleep(1)
-            if not hasattr(vc, "guild"):
+            if isinstance(vc, freeClass):
                 connecting[guild.id] = 0
                 raise ConnectionError("Unable to connect to voice channel.")
         if guild.id not in _vars.database.playlists.audio:
@@ -1988,7 +2009,6 @@ class Dump(Command):
         q = d["queue"]
         for i in range(len(q)):
             e = q[i] = freeClass(q[i])
-            e.added_by = user.name
             e.u_id = user.id
             e.skips = []
             if not 1 + i & 2047:
