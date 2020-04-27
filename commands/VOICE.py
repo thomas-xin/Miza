@@ -67,18 +67,18 @@ def pytube2Dict(url):
             if isURL(url):
                 raise youtube_dl.DownloadError("Not a youtube link.")
             url = "https://www.youtube.com/watch?v=" + url
-    print(url)
+    # print(url)
     for _ in loop(3):
         try:
             resp = pytube.YouTube(url)
             break
         except pytube.exceptions.RegexMatchError:
             raise youtube_dl.DownloadError("Invalid single youtube link.")
-        except KeyError:
-            pass
+        except KeyError as ex:
+            resp = ex
+    if issubclass(type(resp), Exception):
+        raise resp
     entry = {
-        "webpage_url": url,
-        "title": resp.title,
         "formats": [
             {
                 "abr": 0,
@@ -232,13 +232,12 @@ class customAudio(discord.AudioSource):
             self.proc.kill()
         except psutil.NoSuchProcess:
             pass
-        if self.source is not None:
-            self.source, fn, _ = None, self.source, self.source.close()
-            if fn in os.listdir("cache"):
-                try:
-                    os.remove("cache/" + fn)
-                except:
-                    print(traceback.format_exc())
+        self.source, fn, _ = None, self.source, self.source.close()
+        if fn in os.listdir("cache"):
+            try:
+                os.remove("cache/" + fn)
+            except:
+                print(traceback.format_exc())
 
     def new(self, source=None, pos=0, update=True):
         # try:
@@ -1011,7 +1010,8 @@ class videoDownloader:
                     pyt = create_future_ex(pytube2Dict, resp["url"])
                     resp = self.extract_info(resp["url"], count, search=False)
                     try:
-                        resp = pyt.result(timeout=10)
+                        res = pyt.result(timeout=10)
+                        resp["formats"], resp["duration"] = res["formats"], res["duration"]
                     except youtube_dl.DownloadError:
                         pass
                     except:
@@ -1028,7 +1028,8 @@ class videoDownloader:
                             except Exception as ex:
                                 data = ex
                             try:
-                                data = pyt.result(timeout=10)
+                                res = pyt.result(timeout=10)
+                                data["formats"], data["duration"] = res["formats"], res["duration"]
                             except youtube_dl.DownloadError:
                                 pass
                             except:
@@ -1125,7 +1126,8 @@ class videoDownloader:
             except Exception as ex:
                 data = ex
             try:
-                data = pyt.result(timeout=10)
+                res = pyt.result(timeout=10)
+                data["formats"], data["duration"] = res["formats"], res["duration"]
             except youtube_dl.DownloadError:
                 pass
             except:
@@ -1149,7 +1151,7 @@ class videoDownloader:
             self.searched.pop(next(iter(self.searched)))
         try:
             self.requests += 1
-            print(item)
+            # print(item)
             obj = freeClass(t=time.time())
             obj.data = output = self.extract(item, force)
             self.searched[item] = obj
@@ -1169,7 +1171,7 @@ class videoDownloader:
             data = self.extract(i.url, search=False)
             stream = data[0].setdefault("stream", data[0].url)
         i["stream"] = stream
-        print(stream)
+        # print(stream)
         return stream
         # if i["url"] in self.downloading:
         #     return
@@ -1211,7 +1213,7 @@ class videoDownloader:
         else:
             dur = min(960, duration)
         br = max(32, min(256, floor(((fl - 262144) / dur / 128) / 4) * 4))
-        print(br)
+        # print(br)
         ff = ffmpy.FFmpeg(
             global_options=["-hide_banner", "-loglevel error", "-vn"],
             inputs={stream: None},
@@ -1245,7 +1247,8 @@ class videoDownloader:
             except Exception as ex:
                 data = ex
             try:
-                data = pyt.result(timeout=10)
+                res = pyt.result(timeout=10)
+                data["formats"], data["duration"] = res["formats"], res["duration"]
             except youtube_dl.DownloadError:
                 pass
             except:

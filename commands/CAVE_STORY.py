@@ -312,9 +312,9 @@ class CS_org2xm(Command):
             org = message.attachments[0].url
             args = [""] + args
         else:
-            org = verifyURL(args[0])
+            org = await _vars.followURL(verifyURL(args[0]))
         if len(args) > 2:
-            wave = verifyURL(args[1])
+            wave = await _vars.followURL(verifyURL(args[1]))
         else:
             wave = None
             #wave = "https://cdn.discordapp.com/attachments/313292557603962881/674183355972976660/ORG210EN.DAT"
