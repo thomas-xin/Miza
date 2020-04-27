@@ -390,12 +390,20 @@ class main_data:
             else:
                 url = m.content
                 if " " in url or "\n" in url or not isURL(url):
-                    for m in m.content.replace("\n", " ").split(" "):
+                    for m in url.replace("\n", " ").split(" "):
                         u = verifyURL(m)
                         if isURL(u):
                             url = u
                             break
                 url = verifyURL(url)
+                if not url:
+                    url = " ".join(e.description for e in m.embeds)
+                    if " " in url or "\n" in url or not isURL(url):
+                        for m in url.replace("\n", " ").replace("(", " ").replace(")", " ").split(" "):
+                            u = verifyURL(m)
+                            if isURL(u):
+                                url = u
+                                break
                 if url in it:
                     return url
                 it[url] = True

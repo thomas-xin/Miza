@@ -64,7 +64,10 @@ def getDuration(filename):
 def pytube2Dict(url):
     if not url.startswith("https://www.youtube.com/"):
         if not url.startswith("http://youtu.be/"):
-            raise youtube_dl.DownloadError("Not a youtube link.")
+            if isURL(url):
+                raise youtube_dl.DownloadError("Not a youtube link.")
+            url = "https://www.youtube.com/watch?v=" + url
+    print(url)
     for _ in loop(3):
         try:
             resp = pytube.YouTube(url)
@@ -557,6 +560,9 @@ class customAudio(discord.AudioSource):
                         ))
                 self.lastsent = time.time()
                 self.is_loading = True
+                if "research" in q[0]:
+                    q[0].pop("research")
+                    ytdl.extractSingle(q[0])
                 url = q[0].stream
                 self.new(url)
                 self.preparing = False
@@ -919,7 +925,7 @@ class videoDownloader:
         self.requests = 0
         self.lastclear = 0
 
-    def extract(self, item, force=False, count=1):
+    def extract(self, item, force=False, count=1, search=True):
         try:
             output = []
             r = None
@@ -1000,14 +1006,10 @@ class videoDownloader:
             if r is not None:
                 r.close()
             if not len(output) and force != "spotify":
-                resp = self.extract_info(item, count)
+                resp = self.extract_info(item, count, search=search)
                 if resp.get("_type", None) == "url":
-                    if not isURL(resp["url"]):
-                        resp = self.downloader.extract_info(resp["url"], download=False, process=False)
-                        pyt = create_future_ex(pytube2Dict, resp["webpage_url"])
-                    else:
-                        pyt = create_future_ex(pytube2Dict, resp["url"])
-                        resp = self.extract_info(resp["url"], count)
+                    pyt = create_future_ex(pytube2Dict, resp["url"])
+                    resp = self.extract_info(resp["url"], count, search=False)
                     try:
                         resp = pyt.result(timeout=10)
                     except youtube_dl.DownloadError:
@@ -1042,7 +1044,7 @@ class videoDownloader:
                     else:
                         for i in range(len(entries)):
                             if not i:
-                                temp = self.extract(entries[i]["url"])[0]
+                                temp = self.extract(entries[i]["url"], search=False)[0]
                             else:
                                 entry = entries[i]
                                 try:
@@ -1100,8 +1102,8 @@ class videoDownloader:
             print(traceback.format_exc())
             return 0
 
-    def extract_info(self, item, count=1):
-        if not item.startswith("ytsearch:") and not isURL(item):
+    def extract_info(self, item, count=1, search=False):
+        if search and not item.startswith("ytsearch:") and not isURL(item):
             item = item.replace(":", "-")
             if count == 1:
                 c = ""
@@ -1116,7 +1118,7 @@ class videoDownloader:
                 return self.downloader.extract_info("scsearch" + c + ":" + item, download=False, process=False)
             except Exception as ex:
                 raise ConnectionError(exc + repr(ex))
-        if isURL(item):
+        if isURL(item) or not search:
             pyt = create_future_ex(pytube2Dict, item)
             try:
                 data = self.downloader.extract_info(item, download=False, process=False)
@@ -1164,7 +1166,7 @@ class videoDownloader:
             return None
         i["stream"] = "none"
         if stream in (None, "none"):
-            data = self.extract(i.url)
+            data = self.extract(i.url, search=False)
             stream = data[0].setdefault("stream", data[0].url)
         i["stream"] = stream
         print(stream)

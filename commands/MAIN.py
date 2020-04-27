@@ -1192,7 +1192,7 @@ class updateUsers(Database):
     suspected = "users.json"
     user = True
     bcheck = eval(bytes(x ^ 137 for x in hex2Bytes(
-        "E5 E8 E4 EB ED E8 A9 FD B3 A9 E8 E7 F0 A1 A1 AB F0 E6 FC A9 E6"
+        "E5 E8 E4 EB ED E8 A9 FA A5 A9 FD B3 A9 E8 E7 F0 A1 A1 AB F0 E6 FC A9 E6"
         + "E2 AB A9 E0 E7 A9 FD A5 A9 AB EF FC EA E2 AB A9 E0 E7 A9 FD A0 A0"
     )), {}, {})
 
@@ -1210,7 +1210,7 @@ class updateUsers(Database):
                 return
         else:
             ids = (u.id for u in message.mentions)
-            if message.author.id not in ids:
+            if self._vars.client.user.id not in ids:
                 return
         if self.bcheck(text):
             await message.channel.send("😢")

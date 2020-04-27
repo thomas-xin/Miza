@@ -406,13 +406,13 @@ def evalEX(exc):
     return ex
 
 
-def funcSafe(func, *args, print_exc=False, **kwargs):
+def funcSafe(func, *args, **kwargs):
     try:
-        return [func(*args, **kwargs)]
-    except Exception as ex:
-        if print_exc:
-            print(traceback.format_exc())
-        return repr(ex)
+        return func(*args, **kwargs)
+    except:
+        print(func, args, kwargs)
+        print(traceback.format_exc())
+        raise
 
 
 async def safeCoro(coro):
