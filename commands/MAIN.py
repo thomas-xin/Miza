@@ -750,7 +750,7 @@ class Status(Command):
 
 
 class Reminder(Command):
-    name = ["RemindMe", "Reminders"]
+    name = ["RemindMe", "Reminders", "Remind"]
     min_level = 0
     description = "Sets a reminder for a certain date and time."
     usage = "<1:message> <0:time> <disable(?d)>"
@@ -794,6 +794,8 @@ class Reminder(Command):
         if len(rems) >= 32:
             raise OverflowError("You have reached the maximum of 32 reminders. Please remove one to add another.")
         while True:
+            if name == "remind" and argv.startswith("me "):
+                argv = argv[3:]
             if argv.startswith("to "):
                 argv = argv[3:]
             spl = None

@@ -381,6 +381,7 @@ class customAudio(discord.AudioSource):
                     fl = 0
             self.source = open(fn, "rb")
             print(self.source)
+            self.preparing = False
             self.is_playing = True
             self.has_read = False
         else:
@@ -538,35 +539,41 @@ class customAudio(discord.AudioSource):
             elif dels:
                 while dels:
                     q.pop(dels.popleft())
-            if q and not q[0].get("played", False) and q[0].get("stream", None) not in (None, "none"):
-                q[0].played = True
-                if not self.stats.quiet:
-                    if time.time() - self.lastsent > 1:
-                        try:
-                            u = self._vars.cache.users[q[0].u_id]
-                            name = u.display_name
-                        except KeyError:
-                            name = "Deleted User"
-                        msg = (
-                            "```ini\n🎵 Now playing "
-                            + sbHighlight(q[0].name)
-                            + ", added by " + sbHighlight(name) + "! 🎵```"
-                        )
-                        create_task(sendReact(
-                            self.channel,
-                            msg,
-                            reacts=["❎"],
-                        ))
-                self.lastsent = time.time()
-                self.is_loading = True
-                if "research" in q[0]:
-                    q[0].pop("research")
-                    ytdl.extractSingle(q[0])
-                url = q[0].stream
-                self.new(url)
-                self.preparing = False
-            elif not playing and self.source is None and not self.is_loading and not self.preparing:
-                self.advance()
+            if q:
+                if not q[0].get("played", False) and q[0].get("stream", None) not in (None, "none"):
+                    q[0].played = True
+                    if not self.stats.quiet:
+                        if time.time() - self.lastsent > 1:
+                            try:
+                                u = self._vars.cache.users[q[0].u_id]
+                                name = u.display_name
+                            except KeyError:
+                                name = "Deleted User"
+                            msg = (
+                                "```ini\n🎵 Now playing "
+                                + sbHighlight(q[0].name)
+                                + ", added by " + sbHighlight(name) + "! 🎵```"
+                            )
+                            create_task(sendReact(
+                                self.channel,
+                                msg,
+                                reacts=["❎"],
+                            ))
+                    self.lastsent = time.time()
+                    self.is_loading = True
+                    if "research" in q[0]:
+                        q[0].pop("research")
+                        ytdl.extractSingle(q[0])
+                    # print(q[0])
+                    url = q[0].stream
+                    try:
+                        self.new(url)
+                    except:
+                        print(traceback.format_exc())
+                        raise
+                    self.preparing = False
+                elif not playing and self.source is None and not self.is_loading:
+                    self.advance()
         if not (q or self.preparing):
             t = self._vars.data.playlists.get(guild.id, ())
             if t:
@@ -711,6 +718,7 @@ class customAudio(discord.AudioSource):
                                         if self.queue:
                                             self.queue[0].url = ""
                                         create_future(self.new)
+                                        self.preparing = False
                                         return
                                     else:
                                         self.stats.position = round(
@@ -1148,7 +1156,7 @@ class videoDownloader:
             time.sleep(0.1)
         if item in self.searched:
             if time.time() - self.searched[item].t < 18000:
-                self.searched[item].t = time.time()
+                # self.searched[item].t = time.time()
                 return self.searched[item].data
             else:
                 self.searched.pop(item)
@@ -1233,7 +1241,7 @@ class videoDownloader:
             time.sleep(0.1)
         if item in self.searched:
             if time.time() - self.searched[item].t < 18000:
-                self.searched[item].t = time.time()
+                # self.searched[item].t = time.time()
                 it = self.searched[item].data[0]
                 i.name = it.name
                 i.duration = it.duration
