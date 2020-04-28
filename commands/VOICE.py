@@ -338,7 +338,7 @@ class customAudio(discord.AudioSource):
                 end = pos
             else:
                 start = pos
-                end = self.queue[0].duration + 0.5
+                end = float(self.queue[0].duration) + 0.5
             self.is_loading = True
             target = str(self.vc.guild.id) + ".pcm"
             self.stop()
@@ -540,39 +540,42 @@ class customAudio(discord.AudioSource):
                 while dels:
                     q.pop(dels.popleft())
             if q:
-                if not q[0].get("played", False) and q[0].get("stream", None) not in (None, "none"):
-                    q[0].played = True
-                    if not self.stats.quiet:
-                        if time.time() - self.lastsent > 1:
-                            try:
-                                u = self._vars.cache.users[q[0].u_id]
-                                name = u.display_name
-                            except KeyError:
-                                name = "Deleted User"
-                            msg = (
-                                "```ini\n🎵 Now playing "
-                                + sbHighlight(q[0].name)
-                                + ", added by " + sbHighlight(name) + "! 🎵```"
-                            )
-                            create_task(sendReact(
-                                self.channel,
-                                msg,
-                                reacts=["❎"],
-                            ))
-                    self.lastsent = time.time()
-                    self.is_loading = True
-                    if "research" in q[0]:
-                        q[0].pop("research")
-                        ytdl.extractSingle(q[0])
-                    # print(q[0])
-                    url = q[0].stream
-                    try:
-                        self.new(url)
-                    except:
-                        print(traceback.format_exc())
-                        raise
-                    self.preparing = False
-                elif not playing and self.source is None and not self.is_loading:
+                if not q[0].get("played", False):
+                    if q[0].get("stream", None) not in (None, "none"):
+                        print(q[0])
+                        q[0].played = True
+                        if not self.stats.quiet:
+                            if time.time() - self.lastsent > 1:
+                                try:
+                                    u = self._vars.cache.users[q[0].u_id]
+                                    name = u.display_name
+                                except KeyError:
+                                    name = "Deleted User"
+                                msg = (
+                                    "```ini\n🎵 Now playing "
+                                    + sbHighlight(q[0].name)
+                                    + ", added by " + sbHighlight(name) + "! 🎵```"
+                                )
+                                create_task(sendReact(
+                                    self.channel,
+                                    msg,
+                                    reacts=["❎"],
+                                ))
+                        self.lastsent = time.time()
+                        self.is_loading = True
+                        if "research" in q[0]:
+                            q[0].pop("research")
+                            ytdl.extractSingle(q[0])
+                        # print(q[0])
+                        url = q[0].stream
+                        try:
+                            self.new(url)
+                        except:
+                            print(traceback.format_exc())
+                            raise
+                        self.preparing = False
+                elif not playing and self.source is None and not self.is_loading and not self.preparing:
+                    print("Queue Advanced.")
                     self.advance()
         if not (q or self.preparing):
             t = self._vars.data.playlists.get(guild.id, ())
@@ -698,8 +701,7 @@ class customAudio(discord.AudioSource):
                 if (empty or not self.paused) and not self.is_loading:
                     queueable = (self.queue or self._vars.data.playlists.get(self.vc.guild.id, None))
                     if self.queue and not self.queue[0].get("played", False):
-                        if not found and not self.preparing:
-                            self.preparing = True
+                        if not found and not self.is_loading:
                             self.refilling = 2
                             create_future(self.update)
                             return
@@ -733,6 +735,7 @@ class customAudio(discord.AudioSource):
                                             print("Advanced.")
                                             self.refilling = 2
                                             create_future(self.new)
+                                            self.preparing = False
                                             return
                             elif self.curr_timeout == 0:
                                 self.curr_timeout = time.time()
@@ -1880,11 +1883,9 @@ class Skip(Command):
         if auds.queue:
             song = auds.queue[0]
             if song.skips is None or len(song.skips) >= required:
-                if len(auds.queue) > 256:
-                    await create_future(auds.advance, False, not count)
-                else:
-                    auds.advance(False, not count)
+                auds.queue.popleft()
                 create_future(auds.new)
+                auds.preparing = False
                 if count < 4:
                     response += (
                         "[" + noHighlight(song.name)
