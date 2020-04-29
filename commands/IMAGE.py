@@ -14,6 +14,7 @@ class IMG(Command):
     description = "Sends an image in the current chat from a list."
     usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <add(?a)> <delete(?d)> <hide(?h)>"
     flags = "vraedh"
+    no_parse = True
 
     async def __call__(self, flags, args, argv, guild, perm, **void):
         update = self.data.images.update
@@ -107,6 +108,7 @@ class React(Command):
     description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
     usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
     flags = "aed"
+    no_parse = True
 
     async def __call__(self, _vars, flags, guild, message, argv, args, **void):
         update = self.data.reacts.update
@@ -131,7 +133,7 @@ class React(Command):
                     "Currently active auto reacts for **" + discord.utils.escape_markdown(guild.name)
                     + "**:\n```ini\n" + strIter(curr) + "```"
                 )
-        a = args[0].lower()[:64]
+        a = reconstitute(args[0]).lower()[:64]
         if "d" in flags:
             if a in curr:
                 curr.pop(a)

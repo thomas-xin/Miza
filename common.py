@@ -182,6 +182,11 @@ def alphanumeric(string):
             return False
     return True
 
+def noCodeBox(s):
+    if s.startswith("```") and s.endswith("```"):
+        s = s[s.index("\n") + 1:-3]
+    return s
+
 
 async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]):
     qlist = qkey(query)

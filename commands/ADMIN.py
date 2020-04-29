@@ -104,7 +104,7 @@ class Ban(Command):
     usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
     flags = "hvf"
 
-    async def __call__(self, _vars, args, user, channel, guild, flags, perm, name, **void):
+    async def __call__(self, _vars, args, user, message, channel, guild, flags, perm, name, **void):
         update = self._vars.database.bans.update
         dtime = datetime.datetime.utcnow().timestamp()
         if args:
@@ -225,9 +225,13 @@ class Ban(Command):
                     + "] is currently not banned from [" + noHighlight(guild.name) + "].```"
                 )
         response = "```css"
+        reacted = False
         for t_user in users:
             if tm >= 0:
                 try:
+                    if not reacted:
+                        create_task(message.add_reaction("❗"))
+                        reacted = True
                     if hasattr(t_user, "webhook"):
                         coro = t_user.webhook.delete()
                     else:
@@ -275,6 +279,7 @@ class RoleGiver(Command):
     description = "Adds an automated role giver to the current channel."
     usage = "<0:react_to[]> <1:role[]> <delete_messages(?x)> <disable(?d)>"
     flags = "aedx"
+    no_parse = True
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
         update = self._vars.database.rolegivers.update
@@ -313,7 +318,7 @@ class RoleGiver(Command):
         react = args[0].lower()
         if len(react) > 64:
             raise OverflowError("Search substring too long.")
-        r = verifyID(" ".join(args[1:]))
+        r = verifyID(reconstitute(" ".join(args[1:])))
         if len(guild.roles) <= 1:
             guild.roles = await guild.fetch_roles()
             guild.roles.sort()

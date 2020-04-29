@@ -407,9 +407,9 @@ class customAudio(discord.AudioSource):
         duration = float(self.queue[0].duration)
         pos = max(0, pos)
         if (pos >= duration and not self.reverse) or (pos <= 0 and self.reverse):
-            self.new(update=True)
+            create_future(self.new, update=True)
             return duration
-        self.new(self.file, pos, update=False)
+        create_future(self.new, self.file, pos, update=False)
         self.stats.position = pos
         return self.stats.position
 
@@ -623,16 +623,17 @@ class customAudio(discord.AudioSource):
 
     async def reconnect(self):
         try:
-            if hasattr(self, "dead"):
+            if hasattr(self, "dead") or self.vc.is_connected():
                 return
             self.att = getattr(self, "att", 0) + 1
             self.vc = await self.vc.channel.connect(timeout=30, reconnect=False)
-            user = self.vc.guild.get_member(client.user.id)
+            user = self.vc.guild.get_member(self._vars.client.user.id)
             if getattr(user, "voice", None) is not None:
                 if user.voice.deaf or user.voice.mute or user.voice.afk:
                     create_task(user.edit(mute=False, deafen=False))
+            self.update()
             self.att = 0
-        except (discord.Forbidden, discord.HTTPException):
+        except (discord.Forbidden):
             self.dead = True
         except:
             print(traceback.format_exc())
@@ -729,7 +730,7 @@ class customAudio(discord.AudioSource):
                                         )
                                         if not ended:
                                             self.refilling = 2
-                                            create_future(self.seek, self.stats.position)
+                                            self.seek(self.stats.position)
                                             return
                                         else:
                                             print("Advanced.")
@@ -1333,6 +1334,7 @@ class Queue(Command):
     description = "Shows the music queue, or plays a song in voice."
     usage = "<search_link[]> <verbose(?v)> <hide(?h)> <force(?f)> <budge(?b)>"
     flags = "hvfbz"
+    no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac']
 
     async def __call__(self, _vars, client, user, perm, message, channel, guild, flags, name, argv, **void):
@@ -1409,12 +1411,12 @@ class Queue(Command):
         if "f" in flags:
             for i in range(3):
                 try:
-                    auds.queue[i].pop("download")
+                    auds.queue[i].pop("played")
                 except (KeyError, IndexError):
                     pass
             auds.queue.extend(added)
             auds.queue.rotate(len(added))
-            auds.seek(inf)
+            create_future(auds.new)
             total_duration = tdur
         elif "b" in flags:
             auds.queue.rotate(-1)
@@ -2319,6 +2321,26 @@ class Unmute(Command):
         if "h" not in flags:
             return (
                 "```css\nSuccessfully unmuted all users in voice channels in ["
+                + noHighlight(guild.name) + "].```", 1
+            )
+
+
+class VoiceNuke(Command):
+    server_only = True
+    time_consuming = True
+    min_level = 3
+    description = "Removes all users from voice channels in the current server."
+    usage = "<hide(?h)>"
+    flags = "h"
+
+    async def __call__(self, guild, flags, **void):
+        for vc in guild.voice_channels:
+            for user in vc.members:
+                if user.voice is not None:
+                    create_task(user.move_to(None))
+        if "h" not in flags:
+            return (
+                "```css\nSuccessfully removed all users in voice channels in ["
                 + noHighlight(guild.name) + "].```", 1
             )
 

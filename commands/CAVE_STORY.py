@@ -467,6 +467,7 @@ class CS_npc(Command):
     description = "Searches the Cave Story NPC list for an NPC by name or ID."
     usage = "<query> <condensed(?c)>"
     flags = "c"
+    no_parse = True
 
     async def __call__(self, _vars, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
@@ -504,6 +505,7 @@ class CS_tsc(Command):
     description = "Searches the Cave Story OOB flags list for a memory variable."
     usage = "<query> <condensed(?c)>"
     flags = "c"
+    no_parse = True
 
     async def __call__(self, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
@@ -542,6 +544,7 @@ class CS_mod(Command):
     min_level = 0
     description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
     usage = "<query>"
+    no_parse = True
 
     async def __call__(self, args, **void):
         argv = " ".join(args)

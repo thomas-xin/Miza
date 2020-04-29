@@ -415,6 +415,7 @@ class Lewd(Command):
     description = "Pulls a random image from a search on Rule34 and e621, and embeds it."
     usage = "<query> <verbose(?v)>"
     flags = "v"
+    no_parse = True
 
     async def __call__(self, _vars, args, flags, channel, **void):
         if not is_nsfw(channel):

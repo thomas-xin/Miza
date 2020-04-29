@@ -1153,7 +1153,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                     i2 = comm.index(end)
                     if i2 < i:
                         i = i2
-            check = comm[:i].lower()
+            check = reconstitute(comm[:i]).lower()
         if check in _vars.commands:
             for command in _vars.commands[check]:
                 if command.catg in enabled or admin:
@@ -1175,6 +1175,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             if loop:
                                 addDict(flags, {"h": 1})
                         if argv:
+                            if not hasattr(command, "no_parse"):
+                                argv = reconstitute(argv)
                             argv = argv.strip()
                             if hasattr(command, "flags"):
                                 flaglist = command.flags
@@ -1302,7 +1304,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         ))
     if not run and u_id != client.user.id and not u_perm <= -inf:
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
-        temp = list(cpy.lower())
+        temp = list(reconstitute(cpy).lower())
         for i in range(len(temp)):
             if not(temp[i] in s):
                 temp[i] = " "
@@ -1452,12 +1454,10 @@ async def on_voice_state_update(member, before, after):
 
 
 async def handleMessage(message, edit=True):
-    msg = message.content
+    cpy = msg = message.content
     try:
         if msg and msg[0] == "\\":
             cpy = msg[1:]
-        else:
-            cpy = reconstitute(msg)
         await processMessage(message, cpy, edit, msg)
     except Exception as ex:
         errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
@@ -1698,6 +1698,9 @@ async def on_raw_message_edit(payload):
     if before:
         after = await before.channel.fetch_message(payload.message_id)
         _vars.cacheMessage(after)
+        if not hasattr(before, "ghost"):
+            if before.content == after.content:
+                return
         await handleMessage(after)
         await updateEdit(before, after)
 

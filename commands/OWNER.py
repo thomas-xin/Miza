@@ -9,12 +9,19 @@ except ModuleNotFoundError:
 class Restart(Command):
     name = ["Shutdown"]
     min_level = nan
-    description = "Restarts or shuts down ⟨MIZA⟩."
+    description = "Restarts or shuts down ⟨MIZA⟩, with an optional delay."
+    _timeout_ = inf
 
-    async def __call__(self, channel, name, **void):
+    async def __call__(self, message, channel, guild, argv, name, **void):
         _vars = self._vars
         client = _vars.client
-        if name.lower() == "shutdown":
+        await message.add_reaction("❗")
+        if argv:
+            delay = await _vars.evalTime(argv, guild)
+            await channel.send("Preparing to " + name + " in " + sec2Time(delay) + "...")
+            if delay > 0:
+                await asyncio.sleep(delay)
+        if name == "shutdown":
             await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
@@ -51,15 +58,13 @@ class Restart(Command):
 class Execute(Command):
     name = ["Exec", "Eval"]
     min_level = nan
-    description = (
-        "Causes all messages in the current channel to be executed as python code on ⟨MIZA⟩."
-        + " WARNING: DO NOT ALLOW UNTRUSTED USERS TO POST IN CHANNEL."
-    )
+    description = "Causes all messages by the bot owner in the current channel to be executed as python code on ⟨MIZA⟩."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, _vars, flags, channel, **void):
+    async def __call__(self, _vars, flags, message, channel, **void):
         if "e" in flags or "a" in flags:
+            create_task(message.add_reaction("❗"))
             _vars.database.exec.channel = channel
             return (
                 "```css\nSuccessfully changed code execution channel to ["

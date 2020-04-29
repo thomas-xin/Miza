@@ -341,6 +341,7 @@ class MimicConfig(Command):
         "<0:mimic_id> <1:option(prefix)([name][username][nickname])([avatar][icon][url])"
         + "([status][description])(gender)(birthday)> <2:new>"
     )
+    no_parse = True
     
     async def __call__(self, _vars, user, perm, flags, args, **void):
         update = self.data.mimics.update
@@ -432,6 +433,7 @@ class Mimic(Command):
     description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes."
     usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)>"
     flags = "aed"
+    no_parse = True
     
     async def __call__(self, _vars, message, user, perm, flags, args, argv, **void):
         update = self.data.mimics.update
@@ -581,6 +583,7 @@ class RPSend(Command):
     min_level = 0
     description = "Sends a message using a webhook mimic, to the target channel."
     usage = "<0:mimic> <1:channel> <2:string>"
+    no_parse = True
 
     async def __call__(self, _vars, user, perm, args, **void):
         update = self.data.mimics.update
