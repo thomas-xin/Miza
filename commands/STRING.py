@@ -1,10 +1,11 @@
-from googletrans import Translator
 try:
     from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
     from common import *
+
+from googletrans import Translator
 
 
 class PapagoTrans:
@@ -73,6 +74,7 @@ class Translate(Command):
     description = "Translates a string into another language."
     usage = "<0:language> <1:string> <verbose(?v)> <papago(?p)>"
     flags = "pv"
+    no_parse = True
 
     async def __call__(self, args, flags, user, **void):
         dest = args[0]
@@ -94,7 +96,10 @@ class Translate(Command):
             for t in trans:
                 try:
                     resp = await create_future(getTranslate, translators[t], string, dest, source)
-                    output = resp.text
+                    try:
+                        output = resp.text
+                    except AttributeError:
+                        output = str(resp)
                     response += "\n" + output + "  `" + t + "`"
                     source, dest = dest, source
                     break
@@ -105,7 +110,6 @@ class Translate(Command):
 
 
 class Math(Command):
-    time_consuming = True
     _timeout_ = 4
     name = ["Python", "PY", "Sympy", "M", "Calc"]
     min_level = 0
@@ -131,6 +135,7 @@ class Uni2Hex(Command):
     min_level = 0
     description = "Converts unicode text to hexadecimal numbers."
     usage = "<string>"
+    no_parse = True
 
     async def __call__(self, argv, **void):
         if not argv:
@@ -178,17 +183,52 @@ class Time2ID(Command):
         return "```fix\n" + str(time_snowflake(argv)) + "```"
 
 
-class UniFmt(Command):
-    name = ["Fancy", "FancyText"]
+class Fancy(Command):
+    name = ["FancyText"]
     min_level = 0
     description = "Creates a representation of a text string using unicode fonts."
-    usage = "<0:font_id> <1:string>"
+    usage = "<string>"
+    no_parse = True
 
-    async def __call__(self, args, guild, **void):
-        if len(args) < 2:
+    async def __call__(self, argv, **void):
+        if not argv:
             raise IndexError("Input string is empty.")
-        i = await self._vars.evalMath(args[0], guild)
-        return "```fix\n" + uniStr(" ".join(args[1:]), i) + "```"
+        emb = discord.Embed(colour=randColour())
+        emb.set_author(name=argv)
+        for i in range(len(UNIFMTS) - 1):
+            s = uniStr(argv, i)
+            if i == len(UNIFMTS) - 2:
+                s = s[::-1]
+            emb.add_field(name="Font " + str(i + 1), value="```" + "fix" * (i & 1) + "\n" + s + "```")
+        if len(emb) > 6000:
+            return "\n\n".join(f.name + "\n" + noCodeBox(f.value) for f in emb.fields)
+        return {
+            "embed": emb
+        }
+
+
+class Zalgo(Command):
+    name = ["ZalgoText"]
+    min_level = 0
+    description = "Generates random accent symbols between characters in a text string."
+    usage = "<string>"
+    no_parse = True
+    nums = numpy.concatenate([numpy.arange(11) + 7616, numpy.arange(4) + 65056, numpy.arange(112) + 768])
+    chrs = [chr(n) for n in nums]
+    randz = lambda self: random.choice(self.chrs)
+    zalgo = lambda self, s, x: "".join("".join(self.randz() + "\u200b" for i in range(x + 1 >> 1)) + c + "\u200a" + "".join(self.randz() + "\u200b" for i in range(x >> 1)) for c in s)
+
+    async def __call__(self, channel, argv, **void):
+        if not argv:
+            raise IndexError("Input string is empty.")
+        emb = discord.Embed(colour=randColour())
+        emb.set_author(name=argv)
+        for i in (1, 2, 3, 4, 5, 6, 7, 8):
+            emb.add_field(name="Level " + str(i), value="```" + "fix" * (i & 1) + "\n" + self.zalgo(argv, i) + "```")
+        try:
+            await channel.send(embed=emb)
+        except discord.HTTPException:
+            return "\n\n".join(f.name + "\n" + noCodeBox(f.value) for f in emb.fields)
 
 
 class OwOify(Command):
@@ -205,6 +245,7 @@ class OwOify(Command):
     min_level = 0
     description = "owo-ifies text."
     usage = "<string>"
+    no_parse = True
 
     async def __call__(self, argv, **void):
         if not argv:

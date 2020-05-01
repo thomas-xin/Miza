@@ -1,5 +1,3 @@
-import csv, knackpy, ffmpy
-from prettytable import PrettyTable as ptable
 try:
     from common import *
 except ModuleNotFoundError:
@@ -7,10 +5,12 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-FFRuntimeError = ffmpy.FFRuntimeError
+import csv, knackpy, ffmpy
+from prettytable import PrettyTable as ptable
 
-knackpy.__builtins__["print"] = print
-ffmpy.__builtins__["print"] = print
+FFRuntimeError = ffmpy.FFRuntimeError
+getattr(knackpy, "__builtins__", {})["print"] = print
+getattr(ffmpy, "__builtins__", {})["print"] = print
 
 
 class DouClub:
@@ -274,7 +274,7 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
             ff = ffmpy.FFmpeg(
                 global_options=["-y", "-hide_banner", "-loglevel panic"],
                 inputs={fi: None},
-                outputs={str(br) + "k": "-b:a", fn: None},
+                outputs={str(br) + "k": "-vn -b:a", fn: None},
             )
             ff.run()
             try:
@@ -300,6 +300,7 @@ class CS_org2xm(Command):
         "ogg",
         "xm",
         "webm"
+        "wav"
     ]
     name = ["CS_o2x", "Org2xm", "Convert_org"]
     min_level = 0
@@ -311,9 +312,9 @@ class CS_org2xm(Command):
             org = message.attachments[0].url
             args = [""] + args
         else:
-            org = verifyURL(args[0])
+            org = await _vars.followURL(verifyURL(args[0]))
         if len(args) > 2:
-            wave = verifyURL(args[1])
+            wave = await _vars.followURL(verifyURL(args[1]))
         else:
             wave = None
             #wave = "https://cdn.discordapp.com/attachments/313292557603962881/674183355972976660/ORG210EN.DAT"
@@ -362,7 +363,7 @@ def _n2f(n):
 
 def _m2f(mem, val):
     val1 = mem
-    val2 = val
+    val2 = val & 4294967295
     curr = 0
     result = ""
     while val2:
@@ -466,6 +467,7 @@ class CS_npc(Command):
     description = "Searches the Cave Story NPC list for an NPC by name or ID."
     usage = "<query> <condensed(?c)>"
     flags = "c"
+    no_parse = True
 
     async def __call__(self, _vars, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
@@ -503,6 +505,7 @@ class CS_tsc(Command):
     description = "Searches the Cave Story OOB flags list for a memory variable."
     usage = "<query> <condensed(?c)>"
     flags = "c"
+    no_parse = True
 
     async def __call__(self, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
@@ -541,6 +544,7 @@ class CS_mod(Command):
     min_level = 0
     description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
     usage = "<query>"
+    no_parse = True
 
     async def __call__(self, args, **void):
         argv = " ".join(args)

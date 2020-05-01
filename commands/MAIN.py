@@ -69,7 +69,7 @@ class Help(Command):
                 + "[Commands](https://github.com/thomas-xin/Miza/wiki/Commands) for full command list."
             )
             if _vars.categories:
-                s = "```ini\n" + " ".join([sbHighlight(c) for c in _vars.categories]) + "```"
+                s = "```ini\n" + " ".join((sbHighlight(c) for c in standard_commands)) + "```"
                 emb.add_field(name="Command category list", value=s)
         return freeClass(embed=emb), 1
 
@@ -411,7 +411,7 @@ class Avatar(Command):
                                     guild = channel.guild
                                 except NameError:
                                     pass
-                                except AttributeError:
+                                except (AttributeError, KeyError):
                                     guild = None
                                     u = channel.recipient
                         if guild is not None:
@@ -464,7 +464,7 @@ class Info(Command):
         try:
             g.region
             pcount = await _vars.database.counts.getUserMessages(None, g)
-        except AttributeError:
+        except (AttributeError, KeyError):
             pcount = 0
         try:
             if "v" in flags:
@@ -486,7 +486,7 @@ class Info(Command):
                             + str(us[u_id])
                         )
                     top = "\n".join(users)
-        except AttributeError:
+        except (AttributeError, KeyError):
             pass
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
         emb.add_field(name="Creation time", value=str(g.created_at), inline=1)
@@ -494,7 +494,7 @@ class Info(Command):
             try:
                 emb.add_field(name="Region", value=str(g.region), inline=1)
                 emb.add_field(name="Nitro boosts", value=str(g.premium_subscription_count), inline=1)
-            except AttributeError:
+            except (AttributeError, KeyError):
                 pass
         emb.add_field(name="User count", value=str(g.member_count), inline=1)
         if pcount:
@@ -591,7 +591,7 @@ class Info(Command):
                                     guild = channel.guild
                                 except NameError:
                                     pass
-                                except AttributeError:
+                                except (AttributeError, KeyError):
                                     guild = None
                                     u = channel.recipient
                         if guild is not None:
@@ -604,7 +604,7 @@ class Info(Command):
         url = strURL(u.avatar_url)
         try:
             is_sys = u.system
-        except AttributeError:
+        except (AttributeError, KeyError):
             is_sys = False
         is_bot = u.bot
         is_self = u.id == client.user.id
@@ -750,7 +750,7 @@ class Status(Command):
 
 
 class Reminder(Command):
-    name = ["RemindMe", "Reminders"]
+    name = ["RemindMe", "Reminders", "Remind"]
     min_level = 0
     description = "Sets a reminder for a certain date and time."
     usage = "<1:message> <0:time> <disable(?d)>"
@@ -794,6 +794,10 @@ class Reminder(Command):
         if len(rems) >= 32:
             raise OverflowError("You have reached the maximum of 32 reminders. Please remove one to add another.")
         while True:
+            if name == "remind" and argv.startswith("me "):
+                argv = argv[3:]
+            if argv.startswith("to "):
+                argv = argv[3:]
             spl = None
             if "in" in argv:
                 if " in " in argv:
@@ -1189,6 +1193,10 @@ class updateUsers(Database):
     name = "users"
     suspected = "users.json"
     user = True
+    bcheck = eval(bytes(x ^ 137 for x in hex2Bytes(
+        "E5 E8 E4 EB ED E8 A9 FA A5 A9 FD B3 A9 E8 E7 F0 A1 A1 AB F0 E6 FC A9 E6"
+        + "E2 AB A9 E0 E7 A9 FD A5 A9 AB EF FC EA E2 AB A9 E0 E7 A9 FD A0 A0"
+    )), {}, {})
 
     async def _seen_(self, user, delay, **void):
         addDict(self.data, {user.id: {"last_seen": 0}})
@@ -1197,3 +1205,15 @@ class updateUsers(Database):
     async def _command_(self, user, command, **void):
         addDict(self.data, {user.id: {"commands": 1}})
         self.update()
+
+    async def _nocommand_(self, text, message, **void):
+        if not message.mentions:
+            name = self.__dict__.setdefault("name", reconstitute(self._vars.client.user.name).lower())
+            if name not in text:
+                return
+        else:
+            ids = (u.id for u in message.mentions)
+            if self._vars.client.user.id not in ids:
+                return
+        if self.bcheck(text):
+            await message.channel.send("😢")

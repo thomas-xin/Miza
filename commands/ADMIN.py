@@ -8,6 +8,7 @@ except ModuleNotFoundError:
 
 class Purge(Command):
     time_consuming = True
+    _timeout_ = 16
     name = ["Del", "Delete"]
     min_level = 3
     description = "Deletes a number of messages from a certain user in current channel."
@@ -40,21 +41,36 @@ class Purge(Command):
                         t_user = await _vars.fetch_member(u_id, guild)
                     except LookupError:
                         t_user = freeClass(id=u_id)
-        lim = count * 2 + 16
-        if lim < 0:
-            lim = 0
-        if not isValid(lim):
-            lim = None
-        hist = await channel.history(limit=lim).flatten()
-        delM = hlist()
-        isbot = t_user is not None and t_user.id == client.user.id
+        if count <= 0:
+            raise ValueError("Please enter a valid amount of messages to delete.")
+        if not count < inf:
+            try:
+                await channel.clone(reason="Purged.")
+                await channel.delete(reason="Purged.")
+                count = 0
+            except discord.Forbidden:
+                pass
+        dt = None
+        delD = {}
         deleted = 0
-        for m in hist:
-            if count <= 0:
+        while count > 0:
+            lim = count * 2 + 16
+            if not lim < inf:
+                lim = None
+            hist = await channel.history(limit=lim, before=dt).flatten()
+            isbot = t_user is not None and t_user.id == client.user.id
+            for i in range(len(hist)):
+                m = hist[i]
+                if t_user is None or isbot and m.author.bot or m.author.id == t_user.id:
+                    delD[m.id] = m
+                    count -= 1
+                    if count <= 0:
+                        break
+                if i == len(hist) - 1:
+                    dt = m.created_at
+            if lim is None or not hist:
                 break
-            if t_user is None or isbot and m.author.bot or m.author.id == t_user.id:
-                delM.append(m)
-                count -= 1
+        delM = hlist(delD.values())
         while len(delM):
             try:
                 if hasattr(channel, "delete_messages"):
@@ -88,7 +104,7 @@ class Ban(Command):
     usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
     flags = "hvf"
 
-    async def __call__(self, _vars, args, user, channel, guild, flags, perm, name, **void):
+    async def __call__(self, _vars, args, user, message, channel, guild, flags, perm, name, **void):
         update = self._vars.database.bans.update
         dtime = datetime.datetime.utcnow().timestamp()
         if args:
@@ -152,8 +168,8 @@ class Ban(Command):
             else:
                 orig = g_bans.get(t_user.id, 0)
             bantype = " ".join(args[1:])
-            if "for" in bantype:
-                i = bantype.index("for")
+            if "for " in bantype:
+                i = bantype.index("for ")
                 expr = bantype[:i].strip()
                 msg = bantype[i + 3:].strip()
             else:
@@ -209,9 +225,13 @@ class Ban(Command):
                     + "] is currently not banned from [" + noHighlight(guild.name) + "].```"
                 )
         response = "```css"
+        reacted = False
         for t_user in users:
             if tm >= 0:
                 try:
+                    if not reacted:
+                        create_task(message.add_reaction("❗"))
+                        reacted = True
                     if hasattr(t_user, "webhook"):
                         coro = t_user.webhook.delete()
                     else:
@@ -259,6 +279,7 @@ class RoleGiver(Command):
     description = "Adds an automated role giver to the current channel."
     usage = "<0:react_to[]> <1:role[]> <delete_messages(?x)> <disable(?d)>"
     flags = "aedx"
+    no_parse = True
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
         update = self._vars.database.rolegivers.update
@@ -269,7 +290,7 @@ class RoleGiver(Command):
                 react = args[0].lower()
                 assigned = data.get(channel.id, {})
                 if react not in assigned:
-                    raise LookupError("Rolegiver " + react + " not currently assigned for " + channel.name + ".")
+                    raise LookupError("Rolegiver " + react + " not currently assigned for #" + channel.name + ".")
                 assigned.pop(react)
                 return "```css\nRemoved [" + react + "] from the rolegiver list for [#" + noHighlight(channel.name) + "].```"
             if channel.id in data:
@@ -278,7 +299,7 @@ class RoleGiver(Command):
             return "```css\nRemoved all automated rolegivers from [#" + noHighlight(channel.name) + "].```"
         assigned = data.setdefault(channel.id, {})
         if not argv:
-            key = lambda alist: "⟨" + ", ".join([str(r) for r in alist[0]]) + "⟩, delete: " + str(alist[1])
+            key = lambda alist: "⟨" + ", ".join(str(r) for r in alist[0]) + "⟩, delete: " + str(alist[1])
             if not assigned:
                 return (
                     "```ini\nNo currently active rolegivers for [#"
@@ -290,14 +311,14 @@ class RoleGiver(Command):
             )
         if sum(len(alist[0]) for alist in assigned) >= 16:
             raise OverflowError(
-                "Rolegiver list for " + channel.name
+                "Rolegiver list for #" + channel.name
                 + " has reached the maximum of 16 items. "
                 + "Please remove an item to add another."
             )
         react = args[0].lower()
         if len(react) > 64:
             raise OverflowError("Search substring too long.")
-        r = verifyID(" ".join(args[1:]))
+        r = verifyID(reconstitute(" ".join(args[1:])))
         if len(guild.roles) <= 1:
             guild.roles = await guild.fetch_roles()
             guild.roles.sort()
@@ -326,7 +347,7 @@ class RoleGiver(Command):
         return (
             "```css\nAdded [" + noHighlight(react)
             + "] ➡️ [" + noHighlight(role)
-            + "] to channel [" + noHighlight(channel.name) + "].```"
+            + "] to channel [#" + noHighlight(channel.name) + "].```"
         )
 
 
@@ -375,7 +396,7 @@ class AutoRole(Command):
                             await asyncio.sleep(5)
                         i += 1
                 update()
-                return "```css\nRemoved " + sbHighlight(", ".join([str(role) for role in removed])) + " from the autorole list for " + sbHighlight(guild) + ".```"
+                return "```css\nRemoved " + sbHighlight(", ".join(str(role) for role in removed)) + " from the autorole list for " + sbHighlight(guild) + ".```"
             if guild.id in data:
                 data.pop(channel.id)
                 update()
@@ -428,8 +449,10 @@ class AutoRole(Command):
                 if memb.top_role <= role:
                     raise PermissionError("Target role is higher than your highest role.")
             roles.append(role)
-        assigned.append(hlist(role.id for role in roles))
-        update()
+        new = hlist(role.id for role in roles)
+        if new not in assigned:
+            assigned.append(new)
+            update()
         if "x" in flags:
             i = 1
             for member in guild.members:
@@ -440,7 +463,7 @@ class AutoRole(Command):
                         await asyncio.sleep(5)
                     i += 1
         return (
-            "```css\nAdded [" + noHighlight(", ".join([str(role) for role in roles]))
+            "```css\nAdded [" + noHighlight(", ".join(str(role) for role in roles))
             + "] to the autorole list for [" + noHighlight(guild) + "].```"
         )
 
@@ -505,13 +528,12 @@ class Lockdown(Command):
             return ("```asciidoc\n[" + response + "]```")
         u_id = self._vars.client.user.id
         for role in guild.roles:
-            if len(role.members) != 1 or role.members[-1].id != u_id:
+            if len(role.members) != 1 or role.members[-1].id not in (u_id, guild.owner_id):
                 create_task(self.roleLock(role, channel))
-        for inv in guild.invites:
+        invites = await guild.invites()
+        for inv in invites:
             create_task(self.invLock(inv, channel))
-        response = uniStr(
-            "LOCKDOWN REQUESTED."
-        )
+        response = uniStr("LOCKDOWN REQUESTED.")
         return ("```asciidoc\n[" + response + "]```")
 
 
@@ -545,7 +567,7 @@ class SaveChannel(Command):
         while h:
             if s:
                 s += "\n\n"
-            s += "\n\n".join([strMessage(m, limit=2048, username=True) for m in h[:4096]])
+            s += "\n\n".join(strMessage(m, limit=2048, username=True) for m in h[:4096])
             h = h[4096:]
             await asyncio.sleep(0.32)
         return bytes(s, "utf-8")
@@ -989,13 +1011,17 @@ class UpdateMessageLogs(Database):
                 emb.add_field(name="After", value=strMessage(after))
                 await channel.send(embed=emb)
 
+    def logDeleted(self, message):
+        if message.author.bot and message.author.id != self._vars.client.user.id:
+            return
+        if self._vars.isDeleted(message) < 2:
+            s = strMessage(message, username=True)
+            print(s, file="deleted.txt")
+
     async def _delete_(self, message, bulk=False, **void):
         cu_id = self._vars.client.user.id
         if bulk:
-            if message.author.bot and message.author.id != cu_id:
-                return
-            if self._vars.isDeleted(message) < 2:
-                print(strMessage(message, username=True))
+            self.logDeleted(message)
             return
         guild = message.guild
         if guild.id in self.data:
@@ -1052,10 +1078,7 @@ class UpdateMessageLogs(Database):
                                 init = "<@" + str(t.id) + ">"
                                 # print(t, e.target)
                 if t.bot or u.id == t.id == cu_id:
-                    if message.author.bot and message.author.id != cu_id:
-                        return
-                    if self._vars.isDeleted(message) < 2:
-                        print(strMessage(message, username=True))
+                    self.logDeleted(message)
                     return
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
@@ -1072,56 +1095,55 @@ class UpdateMessageLogs(Database):
 class UpdateFileLogs(Database):
     name = "logF"
 
-    async def _user_update_(self, before, after, **void):
-        return
-        sending = {}
-        for guild in self._vars.client.guilds:
-            if guild.get_member(after.id) is None:
-                try:
-                    memb = await guild.fetch_member(after.id)
-                    if memb is None:
-                        raise EOFError
-                except:
-                    continue
-            sending[guild.id] = True
-        if not sending:
-            return
-        b_url = strURL(before.avatar_url)
-        a_url = strURL(after.avatar_url)
-        if b_url != a_url:
-            try:
-                obj = before.avatar_url_as(format="gif", static_format="png", size=4096)
-            except discord.InvalidArgument:
-                obj = before.avatar_url_as(format="png", static_format="png", size=4096)
-            if ".gif" in str(obj):
-                fmt = ".gif"
-            else:
-                fmt = ".png"
-            msg = None
-            try:
-                b = await obj.read()
-                fil = discord.File(io.BytesIO(b), filename=str(before.id) + fmt)
-            except:
-                msg = str(obj)
-                fil=None
-            emb = discord.Embed(colour=randColour())
-            emb.description = "File deleted from <@" + str(before.id) + ">"
-            for g_id in sending:
-                guild = self._vars.cache["guilds"].get(g_id, None)
-                create_task(self.send_avatars(msg, fil, emb, guild))
+    # async def _user_update_(self, before, after, **void):
+    #     sending = {}
+    #     for guild in self._vars.client.guilds:
+    #         if guild.get_member(after.id) is None:
+    #             try:
+    #                 memb = await guild.fetch_member(after.id)
+    #                 if memb is None:
+    #                     raise EOFError
+    #             except:
+    #                 continue
+    #         sending[guild.id] = True
+    #     if not sending:
+    #         return
+    #     b_url = strURL(before.avatar_url)
+    #     a_url = strURL(after.avatar_url)
+    #     if b_url != a_url:
+    #         try:
+    #             obj = before.avatar_url_as(format="gif", static_format="png", size=4096)
+    #         except discord.InvalidArgument:
+    #             obj = before.avatar_url_as(format="png", static_format="png", size=4096)
+    #         if ".gif" in str(obj):
+    #             fmt = ".gif"
+    #         else:
+    #             fmt = ".png"
+    #         msg = None
+    #         try:
+    #             b = await obj.read()
+    #             fil = discord.File(io.BytesIO(b), filename=str(before.id) + fmt)
+    #         except:
+    #             msg = str(obj)
+    #             fil=None
+    #         emb = discord.Embed(colour=randColour())
+    #         emb.description = "File deleted from <@" + str(before.id) + ">"
+    #         for g_id in sending:
+    #             guild = self._vars.cache["guilds"].get(g_id, None)
+    #             create_task(self.send_avatars(msg, fil, emb, guild))
 
-    async def send_avatars(self, msg, fil, emb, guild=None):
-        if guild is None:
-            return
-        if guild.id in self.data:
-            c_id = self.data[guild.id]
-            try:
-                channel = await self._vars.fetch_channel(c_id)
-            except (EOFError, discord.NotFound):
-                self.data.pop(guild.id)
-                self.update()
-                return
-            await channel.send(msg, embed=emb, file=fil)
+    # async def send_avatars(self, msg, fil, emb, guild=None):
+    #     if guild is None:
+    #         return
+    #     if guild.id in self.data:
+    #         c_id = self.data[guild.id]
+    #         try:
+    #             channel = await self._vars.fetch_channel(c_id)
+    #         except (EOFError, discord.NotFound):
+    #             self.data.pop(guild.id)
+    #             self.update()
+    #             return
+    #         await channel.send(msg, embed=emb, file=fil)
 
     async def _delete_(self, message, bulk=False, **void):
         guild = message.guild
@@ -1164,7 +1186,7 @@ class UpdateRolegivers(Database):
         _vars = self._vars
         assigned = self.data.get(message.channel.id, ())
         for k in assigned:
-            if ((k in text) if hasSymbol(k) else (k in message.content.lower())):
+            if ((k in text) if alphanumeric(k) else (k in message.content.lower())):
                 alist = assigned[k]
                 for r in alist[0]:
                     role = guild.get_role(r)
@@ -1199,8 +1221,11 @@ class UpdateAutoRoles(Database):
                     roles.append(role)
                 except:
                     print(traceback.format_exc())
-            #print(roles)
-            await user.add_roles(*roles, reason="AutoRole", atomic=False)
+            print(roles)
+            try:
+                await user.add_roles(*roles, reason="AutoRole", atomic=False)
+            except discord.Forbidden:
+                await user.add_roles(*roles, reason="AutoRole", atomic=True)
 
 
 class UpdateRolePreservers(Database):
@@ -1218,7 +1243,13 @@ class UpdateRolePreservers(Database):
                     except:
                         print(traceback.format_exc())
                 print(user, roles)
-                await user.edit(roles=roles, reason="RolePreserver")
+                try:
+                    await user.edit(roles=roles, reason="RolePreserver")
+                except discord.Forbidden:
+                    try:
+                        await user.add_roles(*roles, reason="RolePreserver", atomic=False)
+                    except discord.Forbidden:
+                        await user.add_roles(*roles, reason="RolePreserver", atomic=True)
                 self.data[guild.id].pop(user.id)
 
     async def _leave_(self, user, guild, **void):

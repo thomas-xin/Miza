@@ -87,5 +87,5 @@ delete(hb)
 delete(rs)
 delete(sd)
         
-print("Shutdown signal confirmed. Press [ENTER] to close.")
-input()
+input("Shutdown signal confirmed. Press [ENTER] to close. ")
+raise SystemExit

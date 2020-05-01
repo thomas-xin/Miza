@@ -1,10 +1,11 @@
-import nekos
 try:
     from common import *
 except ModuleNotFoundError:
     import os
     os.chdir("..")
     from common import *
+
+import nekos
 
 
 class IMG(Command):
@@ -13,6 +14,7 @@ class IMG(Command):
     description = "Sends an image in the current chat from a list."
     usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <add(?a)> <delete(?d)> <hide(?h)>"
     flags = "vraedh"
+    no_parse = True
 
     async def __call__(self, flags, args, argv, guild, perm, **void):
         update = self.data.images.update
@@ -25,16 +27,18 @@ class IMG(Command):
                 reason = "to change image list for " + guild.name
                 self.permError(perm, req, reason)
             if "a" in flags or "e" in flags:
-                if len(images) > 64:
+                if len(images) > 256:
                     raise OverflowError(
                         "Image list for " + guild.name
-                        + " has reached the maximum of 64 items. "
+                        + " has reached the maximum of 256 items. "
                         + "Please remove an item to add another."
                     )
                 key = args[0].lower()
                 if len(key) > 64:
                     raise OverflowError("Image tag too long.")
                 url = await _vars.followURL(verifyURL(args[1]))
+                if len(url) > 256:
+                    raise OverflowError("Image url too long.")
                 images[key] = url
                 sort(images)
                 imglists[guild.id] = images
@@ -104,12 +108,15 @@ class React(Command):
     description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
     usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
     flags = "aed"
+    no_parse = True
 
-    async def __call__(self, _vars, flags, guild, argv, args, **void):
+    async def __call__(self, _vars, flags, guild, message, argv, args, **void):
         update = self.data.reacts.update
         _vars = self._vars
         following = _vars.data.reacts
-        curr = following.setdefault(guild.id, {})
+        curr = following.setdefault(guild.id, multiDict())
+        if type(curr) is not multiDict:
+            following[guild.id] = curr = multiDict(curr)
         if not argv:
             if "d" in flags:
                 if guild.id in following:
@@ -126,7 +133,7 @@ class React(Command):
                     "Currently active auto reacts for **" + discord.utils.escape_markdown(guild.name)
                     + "**:\n```ini\n" + strIter(curr) + "```"
                 )
-        a = args[0].lower()[:64]
+        a = reconstitute(args[0]).lower()[:64]
         if "d" in flags:
             if a in curr:
                 curr.pop(a)
@@ -137,13 +144,20 @@ class React(Command):
                 )
             else:
                 raise LookupError(str(a) + " is not in the auto react list.")
-        if len(curr) >= 256:
+        if curr.count() >= 256:
             raise OverflowError(
                 "React list for " + guild.name
                 + " has reached the maximum of 256 items. "
                 + "Please remove an item to add another."
             )
-        curr[a] = args[1]
+        try:
+            e_id = int(args[1])
+        except:
+            emoji = args[1]
+        else:
+            emoji = await _vars.fetch_emoji(e_id)
+        await message.add_reaction(emoji)
+        curr.append(a, str(emoji))
         update()
         return (
             "```css\nAdded [" + noHighlight(a) + "] ➡️ [" + noHighlight(args[1]) + "] to the auto react list for ["
@@ -371,22 +385,24 @@ class UpdateReacts(Database):
         if message.guild is None or not orig:
             return
         g_id = message.guild.id
-        following = self.data
-        if g_id in following:
-            words = text.split(" ")
+        data = self.data
+        if g_id in data:
             try:
+                following = self.data[g_id]
+                if type(following) != multiDict:
+                    following = self.data[g_id] = multiDict(following)
                 reacting = {}
-                for k in following[g_id]:
-                    if hasSymbol(k):
-                        if k in words:
-                            emoji = following[g_id][k]
-                            reacting[words.index(k) / len(words)] = emoji
+                for k in following:
+                    if alphanumeric(k):
+                        words = text.split(" ")
                     else:
-                        if k in message.content:
-                            emoji = following[g_id][k]
-                            reacting[message.content.index(k) / len(message.content)] = emoji
+                        words = message.content.lower()
+                    if k in words:
+                        emojis = following[k]
+                        reacting[words.index(k) / len(words)] = emojis
                 for r in sorted(list(reacting)):
-                    await message.add_reaction(reacting[r])
+                    for react in reacting[r]:
+                        await message.add_reaction(react)
             except ZeroDivisionError:
                 pass
             except:

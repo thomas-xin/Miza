@@ -35,7 +35,7 @@ class Text2048(Command):
         12: [i for i in range(16)],
         13: [i for i in range(100)],
     }
-    numScore = lambda y, x: x * 2 ** (x + 1)
+    numScore = lambda y, x=0: x * 2 ** (x + 1)
     name = ["2048", "Text_2048"]
     min_level = 0
     description = "Plays a game of 2048 using reactions."
@@ -43,7 +43,7 @@ class Text2048(Command):
         "<board_size[4]>  <show_debug(?z)> <special_tiles(?s)> <public(?p)> "
         + "<insanity_mode(?i)> <special_controls(?c)> <easy_mode(?e)>"
     )
-    flags = "vzpice"
+    flags = "zspice"
 
     def shiftTile(self, tiles, p1, p2):
         # print(p1, p2)
@@ -341,6 +341,7 @@ class MimicConfig(Command):
         "<0:mimic_id> <1:option(prefix)([name][username][nickname])([avatar][icon][url])"
         + "([status][description])(gender)(birthday)> <2:new>"
     )
+    no_parse = True
     
     async def __call__(self, _vars, user, perm, flags, args, **void):
         update = self.data.mimics.update
@@ -432,6 +433,7 @@ class Mimic(Command):
     description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes."
     usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)>"
     flags = "aed"
+    no_parse = True
     
     async def __call__(self, _vars, message, user, perm, flags, args, argv, **void):
         update = self.data.mimics.update
@@ -464,10 +466,6 @@ class Mimic(Command):
             )
         u_id = user.id
         prefix = args.pop(0)
-        if not prefix:
-            raise IndexError("Prefix must not be empty.")
-        if len(prefix) > 16:
-            raise OverflowError("Must be 16 or fewer in length.")
         if "d" in flags:
             try:
                 mlist = mimics[prefix]
@@ -500,6 +498,12 @@ class Mimic(Command):
                 "```css\nSuccessfully removed webhook mimic [" + mimic.name
                 + "] for [" + noHighlight(user) + "].```"
             )
+        if not prefix:
+            raise IndexError("Prefix must not be empty.")
+        if len(prefix) > 16:
+            raise OverflowError("Prefix must be 16 or fewer in length.")
+        if " " in prefix:
+            raise TypeError("Prefix must not contain spaces.")
         if sum(len(i) for i in iter(mimics.values())) >= 256:
             raise OverflowError(
                 "Mimic list for " + str(user)
@@ -579,6 +583,7 @@ class RPSend(Command):
     min_level = 0
     description = "Sends a message using a webhook mimic, to the target channel."
     usage = "<0:mimic> <1:channel> <2:string>"
+    no_parse = True
 
     async def __call__(self, _vars, user, perm, args, **void):
         update = self.data.mimics.update
@@ -614,7 +619,11 @@ class RPSend(Command):
             await _vars.database.mimics.updateMimic(mimic, guild)
             name = mimic.name
             url = mimic.url
-            await w.send(msg, username=name, avatar_url=url)
+            try:
+                await w.send(msg, username=name, avatar_url=url)
+            except discord.NotFound:
+                w = await _vars.ensureWebhook(channel, force=True)
+                await w.send(msg, username=name, avatar_url=url)
             mimic.count += 1
             mimic.total += len(msg)
 
@@ -668,7 +677,12 @@ class UpdateMimics(Database):
                             await self.updateMimic(mimic, guild=message.guild)
                             name = mimic.name
                             url = mimic.url
-                            await w.send(k.msg, username=name, avatar_url=url)
+                            msg = k.msg
+                            try:
+                                await w.send(msg, username=name, avatar_url=url)
+                            except discord.NotFound:
+                                w = await _vars.ensureWebhook(channel, force=True)
+                                await w.send(msg, username=name, avatar_url=url)
                             mimic.count += 1
                             mimic.total += len(k.msg)
                 except Exception as ex:
@@ -893,7 +907,7 @@ class UpdateMathTest(Database):
         if xrand(2):
             d = -d
         st = "(" + str(a) + "*x+" + str(b) + ")*(" + str(c) + "*x+" + str(d) + ")"
-        a = [-b / a, -d / c]
+        a = [-sympy.Number(b) / a, -sympy.Number(d) / c]
         q = await create_future(sympy.expand, st)
         q = self.eqtrans(q).replace("^2", "²").replace("∙", "") + " = 0"
         return q, a
@@ -960,7 +974,7 @@ class UpdateMathTest(Database):
         )
         modes = {"easy": easy, "hard": hard}
         qa = random.choice(modes[mode])()
-        if asyncio.iscoroutine(qa):
+        if awaitable(qa):
             return await qa
         return qa
 
@@ -1000,7 +1014,8 @@ class UpdateMathTest(Database):
                         correct = True
                 else:
                     a = await create_future(sympy.sympify, a)
-                    z = await create_future(sympy.simplify, x - a)
+                    d = await create_future(sympy.Add, x, -a)
+                    z = await create_future(sympy.simplify, d)
                     correct = z == 0
                 if correct:
                     create_task(self.newQuestion(channel))

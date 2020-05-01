@@ -60,8 +60,7 @@ TRUE, FALSE = True, False
 true, false = True, False
 
 
-def nop(*args):
-    pass
+nop = lambda *void1, **void2: None
 
 
 def shuffle(it):
@@ -255,6 +254,14 @@ def round(x, y=None):
     except:
         return x
 
+def round_random(x):
+    if x == round(x):
+        return round(x)
+    x, y = divmod(x, 1)
+    if random.random() <= y:
+        x += 1
+    return int(x)
+
 def ceil(x):
     try:
         return math.ceil(x)
@@ -289,21 +296,16 @@ def trunc(x):
         return x
 
 
-def sqr(x):
-    return ((sin(x) >= 0) << 1) - 1
+sqr = lambda x: ((sin(x) >= 0) << 1) - 1
 
-def saw(x):
-    return (x / pi + 1) % 2 - 1
+saw = lambda x: (x / pi + 1) % 2 - 1
 
-def tri(x):
-    return (abs((0.5 - x / pi) % 2 - 1)) * 2 - 1
+tri = lambda x: (abs((0.5 - x / pi) % 2 - 1)) * 2 - 1
 
-def sgn(x):
-    return (((x > 0) << 1) - 1) * (x != 0)
+sgn = lambda x: (((x > 0) << 1) - 1) * (x != 0)
 
 
-def frand(x=1, y=0):
-    return (random.random() * max(x, y) / mpf(random.random())) % x + y
+frand = lambda x=1, y=0: (random.random() * max(x, y) / mpf(random.random())) % x + y
 
 def xrand(x, y=None, z=0):
     if y == None:
@@ -312,8 +314,7 @@ def xrand(x, y=None, z=0):
         return x
     return random.randint(floor(min(x, y)), ceil(max(x, y)) - 1) + z
 
-def rrand(x=1, y=0):
-    return frand(x) ** (1 - y)
+rrand = lambda x=1, y=0: frand(x) ** (1 - y)
 
 
 def modularInv(a, b):
@@ -485,13 +486,6 @@ def generatePrimes(a=2, b=inf, c=1):
     return primes
 
 
-def getFactors(x):
-    f = factorize(x)
-    f.append(1)
-    s = {}
-    print(s)
-
-
 def addDict(a, b, replace=True):
     if replace:
         r = a
@@ -603,8 +597,7 @@ def lcmRange(x):
     return y
 
 
-def mean(*nums):
-    return roundMin(numpy.mean(numpy.array(nums)))
+mean = lambda *nums: roundMin(numpy.mean(numpy.array(nums)))
 
 
 def pwr(x, power=2):
@@ -645,10 +638,10 @@ def approach(x, y, z, threshold=0.125):
 
 
 def scaleRatio(x, y):
-        try:
-            return x * (x - y) / (x + y)
-        except ZeroDivisionError:
-            return 0
+    try:
+        return x * (x - y) / (x + y)
+    except ZeroDivisionError:
+        return 0
 
 
 def xrange(a, b=None, c=None):
@@ -781,7 +774,7 @@ def roundX(num, prec):
 
 def verifyString(string):
     if type(string) is list or type(string) is tuple:
-        return "".join([str(c) for c in string])
+        return "".join(str(c) for c in string)
     else:
         return str(string)
 
@@ -805,8 +798,7 @@ def hex2Bytes(h):
     return bytes(o)
 
 
-def colourCalculation(a, offset=0):
-    return adjColour(colorsys.hsv_to_rgb((a / 1536) % 1, 1, 1), offset, 255)
+colourCalculation = lambda a, offset=0: adjColour(colorsys.hsv_to_rgb((a / 1536) % 1, 1, 1), offset, 255)
 
 def colour2Raw(c):
     if len(c) == 3:
@@ -820,11 +812,9 @@ def raw2Colour(x):
     else:
         return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255))
 
-def hex2Colour(h):
-    return verifyColour(hex2Bytes(h))
+hex2Colour = lambda h: verifyColour(hex2Bytes(h))
 
-def luma(c):
-    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+luma = lambda c: 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
 
 def verifyColour(c):
     c = list(c)
@@ -853,8 +843,7 @@ def negColour(c, t=127):
     else:
         return fillColour(255)
 
-def invColour(c):
-    return [255 - i for i in c]
+invColour = lambda c: [255 - i for i in c]
 
 def adjColour(colour, brightness=0, intensity=1, hue=0, bits=0, scale=False):
     if hue != 0:
@@ -996,8 +985,7 @@ def limitList(source, dest, direction=False):
     return source
 
 
-def randomPolarCoord(x=1):
-    return polarCoords(frand(x), frand(tau))
+randomPolarCoord = lambda x=1: polarCoords(frand(x), frand(tau))
 
 def polarCoords(dist, angle, pos=None):
     p = dist * array([math.cos(angle), math.sin(angle)])
@@ -1282,7 +1270,7 @@ def strIter(it, key=None, limit=1728):
             it = hlist(i for i in it)
     except:
         it = hlist(it)
-    if type(it) in (dict, freeClass):
+    if issubclass(type(it), collections.Mapping):
         keys = it.keys()
     else:
         keys = range(len(it))
@@ -1360,10 +1348,10 @@ def timeConv(s):
         return [str(roundMin(s)) + " seconds"]
     return taken
 
-def sec2Time(s):
-    return " ".join(timeConv(s))
+sec2Time = lambda s: " ".join(timeConv(s))
 
 def dhms(s):
+    s = float(s)
     if not isValid(s):
         return str(s)
     s = round(s)
@@ -1392,7 +1380,7 @@ def rdhms(ts):
     t = 0
     mult = 1
     while len(data):
-        t += int(data[-1]) * mult
+        t += float(data[-1]) * mult
         data = data[:-1]
         if mult <= 60:
             mult *= 60
@@ -1428,16 +1416,17 @@ for c in tuple(__map):
     if c in UNIFMTS[-1]:
         __map.pop(c)
 __trans = "".maketrans(__map)
+__unitrans = ["".maketrans({UNIFMTS[-1][x]: UNIFMTS[i][x] for x in range(len(UNIFMTS[-1]))}) for i in range(len(UNIFMTS) - 1)]
 
 def uniStr(s, fmt=0):
     if type(s) is not str:
         s = str(s)
-    for i in range(len(UNIFMTS[-1])):
-        s = s.replace(UNIFMTS[-1][i], UNIFMTS[fmt][i])
-    return s
+    return s.translate(__unitrans[fmt])
 
 def reconstitute(s):
-    return str(s).translate(__trans)
+    if type(s) is not str:
+        s = str(s)
+    return s.translate(__trans)
 
 
 __hlist_maxoff__ = (1 << 31) - 1
@@ -1532,6 +1521,8 @@ lookup time for all elements. Includes many array and numeric operations."""
     @blocking
     def rotate(self, steps):
         s = len(self.data)
+        if not s:
+            return self
         steps = -steps % s
         if steps > s / 2:
             steps -= s
@@ -1640,6 +1631,18 @@ lookup time for all elements. Includes many array and numeric operations."""
                 return self
         raise IndexError(str(value) + " not found.")
 
+    @blocking
+    def removedups(self):
+        found = {}
+        pops = deque()
+        for i in range(len(self)):
+            x = self.data[self.offs + i]
+            if x not in found:
+                found[x] = True
+            else:
+                pops.append(i)
+        return self.pops(pops, force=True)
+
     @waiting
     def index(self, value):
         for i in self:
@@ -1702,6 +1705,10 @@ lookup time for all elements. Includes many array and numeric operations."""
     def fill(self, value):
         data = (value,) * len(self.data)
         self.__init__(data)
+
+    keys = lambda self: range(len(self))
+    values = lambda self: iter(self)
+    items = lambda self: enumerate(self)
 
     @blocking
     def clip(self, a, b=None):
@@ -1772,6 +1779,8 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @blocking
     def delitems(self, iterable):
+        if len(iterable) == 1:
+            return self.pop(iterable[0])
         popped = False
         x = 1
         for i in iterable:
@@ -2294,30 +2303,63 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     def __contains__(self, item):
         for i in self:
+            if type(item) is hlist:
+                if all(i == item):
+                    return True
             if i == item:
                 return True
         return False
 
     __copy__ = lambda self: self.copy()
 
-def hrange(a, b=None, c=None, maxoff=__hlist_maxoff__):
-    return hlist(xrange(a, b, c), maxoff)
+hrange = lambda a, b=None, c=None, maxoff=__hlist_maxoff__: hlist(xrange(a, b, c), maxoff)
 
-def hzero(size, maxoff=__hlist_maxoff__):
-    return hlist((0 for i in range(size)), maxoff)
+hzero = lambda size, maxoff=__hlist_maxoff__: hlist((0 for i in range(size)), maxoff)
 
 
 class freeClass(dict):
 
     __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
     __repr__ = lambda self: "freeClass(**" + super().__repr__() + ")"
+    __str__ = lambda self: "【" + self.__repr__()[13:-2] + "】"
     __iter__ = lambda self: iter(tuple(super().__iter__()))
     __setattr__ = lambda self, key, value: super().__setitem__(key, value)
-    __getattr__ = lambda self, key: super().__getitem__(key)
-    __str__ = lambda self: "【" + self.__repr__()[13:-2] + "】"
+    def __getattr__(self, key):
+        if key.startswith("__") and key.endswith("__"):
+            return freeClass.__getattribute__(self, key)
+        return super().__getitem__(key)
 
     to_dict = lambda self: dict(**self)
     to_list = lambda self: list(super().values())
+
+
+class multiDict(freeClass):
+
+    count = lambda self: sum(len(v) for v in super().values())
+    extend = lambda self, k, v: super().setdefault(k, hlist()).extend(v).removedups()
+
+    def append(self, k, v):
+        values = super().setdefault(k, hlist())
+        if v not in values:
+            values.append(v)
+
+    def popleft(self, k):
+        values = super().__getitem__(k)
+        if len(values):
+            v = values.popleft()
+        else:
+            v = None
+        if not values:
+            super().pop(k)
+        return v
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        for it in args:
+            for k, v in it.items():
+                self.extend(k, v)
+        for k, v in kwargs:
+            self.extend(k, v)
 
 
 class pickled:

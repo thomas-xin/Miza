@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 try:
     from common import *
 except ModuleNotFoundError:
@@ -26,19 +28,19 @@ class main_data:
     savedata = "data.json"
     authdata = "auth.json"
     client = client
-    cache = freeClass(
-        guilds={},
-        channels={},
-        users={},
-        roles={},
-        messages={},
-        deleted={},
-    )
     deleted_user = 456226577798135808
     _globals = globals()
-    python = ("python3", "python")[os.name == "nt"]
             
     def __init__(self):
+        self.cache = freeClass(
+            guilds={},
+            channels={},
+            users={},
+            roles={},
+            emojis={},
+            messages={},
+            deleted={},
+        )
         print("Time: " + str(datetime.datetime.now()))
         print("Initializing...")
         if not os.path.exists("cache/"):
@@ -76,6 +78,7 @@ class main_data:
         self.blocked = 0
         self.updated = False
         print("Initialized.")
+        create_future(self.clearcache, priority=True)
 
     __call__ = lambda self: self
 
@@ -88,9 +91,18 @@ class main_data:
     def run(self):
         print("Attempting to authorize with token ending in " + self.token[-5:])
         try:
-            self.client.run(self.token)
+            eloop.run_until_complete(client.start(self.token))
         except (KeyboardInterrupt, SystemExit):
+            eloop.run_until_complete(client.logout())
+            eloop.close()
             sys.exit()
+
+    def clearcache(self):
+        for path in os.listdir("cache"):
+            try:
+                os.remove("cache/" + path)
+            except:
+                print(traceback.format_exc())
 
     def print(self, *args, sep=" ", end="\n"):
         sys.stdout.write(str(sep).join(str(i) for i in args) + end)
@@ -138,7 +150,9 @@ class main_data:
             raise TypeError("Invalid user identifier: " + str(u_id))
         if u_id == self.deleted_user:
             user = self.ghostUser()
+            user.system = True
             user.name = "Deleted User"
+            user.display_name = "Deleted User"
             user.id = u_id
             user.avatar_url = "https://cdn.discordapp.com/embed/avatars/0.png"
             user.created_at = snowflake_time(u_id)
@@ -186,6 +200,8 @@ class main_data:
 
     async def fetch_whuser(self, u_id, guild=None):
         try:
+            if u_id in self.cache.users:
+                return self.cache.users[u_id]
             try:
                 g_id = guild.id
             except AttributeError:
@@ -200,6 +216,7 @@ class main_data:
                     user = _vars.ghostUser()
                     user.id = u_id
                     user.name = w.name
+                    user.display_name = w.name
                     user.created_at = user.joined_at = w.created_at
                     user.avatar = w.avatar
                     user.avatar_url = w.avatar_url
@@ -212,7 +229,7 @@ class main_data:
             self.limitCache("users")
             return user
         except EOFError:
-            raise LookupError("Unable to find target user.")
+            raise LookupError("Unable to find target from ID.")
 
     async def fetch_guild(self, g_id):
         try:
@@ -293,13 +310,13 @@ class main_data:
             r_id = int(r_id)
         except (ValueError, TypeError):
             raise TypeError("Invalid role identifier: " + str(r_id))
+        if r_id in self.cache.roles:
+            return self.cache.roles[r_id]
         try:
             role = guild.get_role(r_id)
             if role is None:
                 raise EOFError
         except:
-            if r_id in self.cache.roles:
-                return self.cache.roles[r_id]
             if len(guild.roles) <= 1:
                 roles = await guild.fetch_roles()
                 guild.roles = sorted(roles)
@@ -309,6 +326,26 @@ class main_data:
         self.cache.roles[r_id] = role
         self.limitCache("roles")
         return role
+
+    async def fetch_emoji(self, e_id, guild=None):
+        try:
+            e_id = int(e_id)
+        except (ValueError, TypeError):
+            raise TypeError("Invalid emoji identifier: " + str(e_id))
+        if e_id in self.cache.emojis:
+            return self.cache.emojis[e_id]
+        try:
+            emoji = client.get_emoji(e_id)
+            if emoji is None:
+                raise EOFError
+        except:
+            if guild is not None:
+                emoji = await guild.fetch_emoji(e_id)
+            else:
+                raise discord.NotFound("Emoji not found.")
+        self.cache.emojis[e_id] = emoji
+        self.limitCache("emojis")
+        return emoji
     
     def get_mimic(self, m_id, user=None):
         try:
@@ -355,12 +392,20 @@ class main_data:
             else:
                 url = m.content
                 if " " in url or "\n" in url or not isURL(url):
-                    for m in m.content.replace("\n", " ").split(" "):
+                    for m in url.replace("\n", " ").split(" "):
                         u = verifyURL(m)
                         if isURL(u):
                             url = u
                             break
                 url = verifyURL(url)
+                if not url:
+                    url = " ".join(e.description for e in m.embeds)
+                    if " " in url or "\n" in url or not isURL(url):
+                        for m in url.replace("\n", " ").replace("(", " ").replace(")", " ").split(" "):
+                            u = verifyURL(m)
+                            if isURL(u):
+                                url = u
+                                break
                 if url in it:
                     return url
                 it[url] = True
@@ -408,6 +453,8 @@ class main_data:
             u_id = int(user)
         if u_id == self.owner_id:
             return nan
+        if self.isSuspended(u_id):
+            return -inf
         if u_id == client.user.id:
             return inf
         if guild is None or hasattr(guild, "ghost"):
@@ -487,7 +534,9 @@ class main_data:
         self.cache.deleted[m_id] = no_log + 1
         self.limitCache("deleted", limit=4096)
     
-    async def silentDelete(self, message, exc=False, no_log=False):
+    async def silentDelete(self, message, exc=False, no_log=False, delay=None):
+        if delay:
+            await asyncio.sleep(float(delay))
         try:
             self.logDelete(message, no_log)
             await message.delete()
@@ -562,6 +611,7 @@ class main_data:
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(files))
         for f in files:
             executor.submit(self.getModule, f)
+        executor.shutdown(wait=False)
 
     def update(self):
         saved = hlist()
@@ -684,14 +734,10 @@ class main_data:
                 g_id = guild.id
         except AttributeError:
             g_id = int(guild)
-        args = [
-            g_id,
-            self.python + " misc/math.py",
+        return await mathProc(
             str(f) + "`" + str(int(prec)) + "`" + str(int(r)) + "`" + str(g_id),
-            self.timeout / 2,
-        ]
-        print(args)
-        return await subFunc(*args)
+            g_id,
+        )
 
     timeChecks = {
         "galactic year": ("gy", "galactic year", "galactic years"),
@@ -773,11 +819,12 @@ class main_data:
 
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:
-            suspended = _vars.isSuspended(user.id)
-            if suspended:
-                return
             u_perm = self.getPerms(user.id, message.guild)
+            if u_perm <= -inf:
+                return
             msg = message.content
+            if not msg:
+                msg = message.embeds[0].description
             if msg[:3] != "```" or len(msg) <= 3:
                 return
             msg = msg[3:]
@@ -881,12 +928,12 @@ class main_data:
                 print(traceback.format_exc())
             self.busy = False
 
-    async def ensureWebhook(self, channel):
+    async def ensureWebhook(self, channel, force=False):
         if not hasattr(self, "cw_cache"):
             self.cw_cache = freeClass()
         wlist = None
         if channel.id in self.cw_cache:
-            if time.time() - self.cw_cache[channel.id].time > 300:
+            if time.time() - self.cw_cache[channel.id].time > 300 or force:
                 self.cw_cache.pop(channel.id)
             else:
                 self.cw_cache[channel.id].time = time.time()
@@ -896,7 +943,7 @@ class main_data:
         if not wlist:
             w = await channel.create_webhook(name=_vars.client.user.name)
         else:
-            w = wlist[0]
+            w = random.choice(wlist)
         self.cw_cache[channel.id] = freeClass(time=time.time(), webhook=w)
         return w
 
@@ -1072,9 +1119,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
             op = True
         while len(comm) and comm[0] == " ":
             comm = comm[1:]
-    suspended = _vars.isSuspended(u_id)
-    if (suspended and op) or msg.replace(" ", "") in mention:
-        if not u_perm < 0 and not suspended:
+    if (u_perm <= -inf and op) or msg.replace(" ", "") in mention:
+        if not u_perm < 0 and not u_perm <= -inf:
             create_task(sendReact(
                 channel,
                 (
@@ -1097,13 +1143,17 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         return
     run = False
     if op:
-        i = len(comm)
-        for end in " ?-+":
-            if end in comm:
-                i2 = comm.index(end)
-                if i2 < i:
-                    i = i2
-        check = comm[:i].lower()
+        if len(comm) and comm[0] == "?":
+            check = comm[0]
+            i = 1
+        else:
+            i = len(comm)
+            for end in " ?-+":
+                if end in comm:
+                    i2 = comm.index(end)
+                    if i2 < i:
+                        i = i2
+            check = reconstitute(comm[:i]).lower()
         if check in _vars.commands:
             for command in _vars.commands[check]:
                 if command.catg in enabled or admin:
@@ -1125,6 +1175,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             if loop:
                                 addDict(flags, {"h": 1})
                         if argv:
+                            if not hasattr(command, "no_parse"):
+                                argv = reconstitute(argv)
                             argv = argv.strip()
                             if hasattr(command, "flags"):
                                 flaglist = command.flags
@@ -1240,7 +1292,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                         raise OverflowError("Response too long for file upload.")
                             if sent is not None:
                                 await sent.add_reaction(react)
-                    except TimeoutError:
+                    except (TimeoutError, asyncio.exceptions.TimeoutError):
                         raise TimeoutError("Request timed out.")
                     except Exception as ex:
                         errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
@@ -1250,9 +1302,9 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             errmsg,
                             reacts=["❎"],
                         ))
-    if not run and u_id != client.user.id:
+    if not run and u_id != client.user.id and not u_perm <= -inf:
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
-        temp = list(cpy.lower())
+        temp = list(reconstitute(cpy).lower())
         for i in range(len(temp)):
             if not(temp[i] in s):
                 temp[i] = " "
@@ -1262,16 +1314,13 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         for u in _vars.database.values():
             f = getattr(u, "_nocommand_", None)
             if f is not None:
-                try:
-                    await f(
-                        text=temp,
-                        edit=edit,
-                        orig=orig,
-                        message=message,
-                        perm=u_perm,
-                    )
-                except:
-                    print(traceback.format_exc())
+                create_task(safeCoro(f(
+                    text=temp,
+                    edit=edit,
+                    orig=orig,
+                    message=message,
+                    perm=u_perm,
+                )))
 
 
 async def heartbeatLoop():
@@ -1323,8 +1372,8 @@ async def on_ready():
     await _vars.handleUpdate()
     if not hasattr(_vars, "started"):
         _vars.started = True
-        create_task(updateLoop())
-        create_task(heartbeatLoop())
+        asyncio.create_task(updateLoop())
+        asyncio.create_task(heartbeatLoop())
 
     
 async def seen(user, delay=0):
@@ -1359,7 +1408,6 @@ async def checkDelete(message, reaction, user):
                         await _vars.silentDelete(message, exc=True)
                     except discord.NotFound:
                         pass
-            await _vars.handleUpdate()
 
 
 @client.event
@@ -1372,7 +1420,7 @@ async def on_raw_reaction_add(payload):
         return
     if user.id != client.user.id:
         reaction = str(payload.emoji)
-        await seen(user)
+        create_task(seen(user))
         await _vars.reactCallback(message, reaction, user)
         create_task(checkDelete(message, reaction, user))
 
@@ -1387,7 +1435,7 @@ async def on_raw_reaction_remove(payload):
         return
     if user.id != client.user.id:
         reaction = str(payload.emoji)
-        await seen(user)
+        create_task(seen(user))
         await _vars.reactCallback(message, reaction, user)
         create_task(checkDelete(message, reaction, user))
 
@@ -1402,16 +1450,14 @@ async def on_voice_state_update(member, before, after):
                 await member.edit(mute=False, deafen=False)
             await _vars.handleUpdate()
     if member.voice is not None and not member.voice.afk:
-        await seen(member)
+        create_task(seen(member))
 
 
 async def handleMessage(message, edit=True):
-    msg = message.content
+    cpy = msg = message.content
     try:
         if msg and msg[0] == "\\":
             cpy = msg[1:]
-        else:
-            cpy = reconstitute(msg)
         await processMessage(message, cpy, edit, msg)
     except Exception as ex:
         errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
@@ -1433,7 +1479,7 @@ async def on_typing(channel, user, when):
                 await f(channel=channel, user=user)
             except:
                 print(traceback.format_exc())
-    await seen(user, delay=10)
+    create_task(seen(user, delay=10))
 
 
 @client.event
@@ -1448,10 +1494,9 @@ async def on_message(message):
                     await f(message=message)
                 except:
                     print(traceback.format_exc())
-    await seen(message.author)
+    create_task(seen(message.author))
     await _vars.reactCallback(message, None, message.author)
     await handleMessage(message, False)
-    await _vars.handleUpdate(True)
 
 
 @client.event
@@ -1463,7 +1508,7 @@ async def on_user_update(before, after):
                 await f(before=before, after=after)
             except:
                 print(traceback.format_exc())
-    await seen(after)
+    create_task(seen(after))
 
 
 @client.event
@@ -1486,7 +1531,7 @@ async def on_member_join(member):
                 await f(user=member, guild=member.guild)
             except:
                 print(traceback.format_exc())
-    await seen(member)
+    create_task(seen(member))
 
             
 @client.event
@@ -1521,6 +1566,7 @@ async def on_raw_message_delete(payload):
                 message.guild = None
             message.id = payload.message_id
             message.created_at = snowflake_time(message.id)
+            message.author = await _vars.fetch_user(_vars.deleted_user)
     guild = message.guild
     if guild:
         for u in _vars.database.values():
@@ -1556,6 +1602,7 @@ async def on_raw_bulk_message_delete(payload):
                     message.guild = None
                 message.id = m_id
                 message.created_at = snowflake_time(message.id)
+                message.author = await _vars.fetch_user(_vars.deleted_user)
             messages.append(message)
     for message in messages:
         guild = message.guild
@@ -1597,6 +1644,13 @@ async def on_member_ban(guild, user):
                     print(traceback.format_exc())
 
 
+@client.event
+async def on_guild_remove(guild):
+    if guild.id in _vars.cache.guilds:
+        _vars.cache.guilds.pop(guild.id)
+    print(guild, "removed.")
+
+
 async def updateEdit(before, after):
     if before.content == after.content:
         before = _vars.ghostMessage()
@@ -1614,7 +1668,7 @@ async def updateEdit(before, after):
                     await f(before=before, after=after)
                 except:
                     print(traceback.format_exc())
-    await seen(after.author)
+    create_task(seen(after.author))
 
 
 @client.event
@@ -1622,7 +1676,6 @@ async def on_message_edit(before, after):
     if before.content != after.content:
         _vars.cacheMessage(after)
         await handleMessage(after)
-        await _vars.handleUpdate(True)
         await updateEdit(before, after)
 
 
@@ -1645,8 +1698,10 @@ async def on_raw_message_edit(payload):
     if before:
         after = await before.channel.fetch_message(payload.message_id)
         _vars.cacheMessage(after)
+        if not hasattr(before, "ghost"):
+            if before.content == after.content:
+                return
         await handleMessage(after)
-        await _vars.handleUpdate(True)
         await updateEdit(before, after)
 
 

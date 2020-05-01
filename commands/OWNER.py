@@ -9,12 +9,19 @@ except ModuleNotFoundError:
 class Restart(Command):
     name = ["Shutdown"]
     min_level = nan
-    description = "Restarts or shuts down ⟨MIZA⟩."
+    description = "Restarts or shuts down ⟨MIZA⟩, with an optional delay."
+    _timeout_ = inf
 
-    async def __call__(self, channel, name, **void):
+    async def __call__(self, message, channel, guild, argv, name, **void):
         _vars = self._vars
         client = _vars.client
-        if name.lower() == "shutdown":
+        await message.add_reaction("❗")
+        if argv:
+            delay = await _vars.evalTime(argv, guild)
+            await channel.send("Preparing to " + name + " in " + sec2Time(delay) + "...")
+            if delay > 0:
+                await asyncio.sleep(delay)
+        if name == "shutdown":
             await channel.send("Shutting down... :wave:")
             print("Shutting down...")
             emit('stopped')
@@ -55,15 +62,13 @@ class Restart(Command):
 class Execute(Command):
     name = ["Exec", "Eval"]
     min_level = nan
-    description = (
-        "Causes all messages in the current channel to be executed as python code on ⟨MIZA⟩."
-        + " WARNING: DO NOT ALLOW UNTRUSTED USERS TO POST IN CHANNEL."
-    )
+    description = "Causes all messages by the bot owner in the current channel to be executed as python code on ⟨MIZA⟩."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, _vars, flags, channel, **void):
+    async def __call__(self, _vars, flags, message, channel, **void):
         if "e" in flags or "a" in flags:
+            create_task(message.add_reaction("❗"))
             _vars.database.exec.channel = channel
             return (
                 "```css\nSuccessfully changed code execution channel to ["
@@ -123,7 +128,11 @@ class UpdateExec(Database):
             exec(proc, _vars._globals)
             output = str(proc) + " Successfully executed!"
         try:
-            if type(output) in (str, bytes, dict) or isinstance(output, freeClass):
+            if awaitable(output):
+                raise TypeError
+            if type(output) in (str, bytes):
+                raise TypeError
+            if issubclass(type(output), collections.Mapping):
                 raise TypeError
             output = tuple(output)
         except TypeError:
@@ -140,13 +149,12 @@ class UpdateExec(Database):
                 name=str(user) + " (" + str(user.id) + ")",
                 value="```ini\n[typing...]```",
             )
-            await self.channel.send(embed=emb, delete_after=20)
+            message = await self.channel.send(embed=emb)
+            create_task(_vars.silentDelete(message, no_log=True, delay=20))
 
     async def _nocommand_(self, message, **void):
         _vars = self._vars
-        if message.author.id != self._vars.owner_id:
-            return
-        if message.channel.id == self.channel.id:
+        if message.author.id == self._vars.owner_id and message.channel.id == self.channel.id:
             proc = message.content
             while proc[0] == " ":
                 proc = proc[1:]
@@ -158,10 +166,10 @@ class UpdateExec(Database):
                 return
             output = None
             try:
-                output = await create_future(self.procFunc, proc, _vars)
+                output = await create_future(self.procFunc, proc, _vars, priority=True)
                 if type(output) is tuple:
                     output = await recursiveCoro(output)
-                elif asyncio.iscoroutine(output):
+                elif awaitable(output):
                     output = await output
                 await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
             except:
@@ -188,6 +196,7 @@ class UpdateBlacklist(Database):
     user = True
 
     def __init__(self, *args):
+        super().__init__(*args)
         self.suspclear = inf
         try:
             self.lastsusp = None
@@ -213,7 +222,6 @@ class UpdateBlacklist(Database):
             print(self.lastsusp)
         except FileNotFoundError:
             pass
-        super().__init__(*args)
 
     async def _command_(self, user, command, **void):
         if user.id not in (self._vars.client.user.id, self._vars.owner_id):

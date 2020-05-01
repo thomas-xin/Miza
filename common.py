@@ -2,10 +2,10 @@ import os, sys, subprocess, psutil, asyncio, discord, json, requests, socketio
 import urllib.request, urllib.parse, concurrent.futures
 from smath import *
 
-urlParse = urllib.parse.quote
-create_task = asyncio.ensure_future
+python = ("python3", "python")[os.name == "nt"]
 CalledProcessError = subprocess.CalledProcessError
 Process = psutil.Process()
+urlParse = urllib.parse.quote
 escape_markdown = discord.utils.escape_markdown
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
@@ -46,11 +46,9 @@ ESCAPE_T = {
 }
 __emap = "".maketrans(ESCAPE_T)
 
-def noHighlight(s):
-    return str(s).translate(__emap)
+noHighlight = lambda s: str(s).translate(__emap)
 
-def sbHighlight(s):
-    return "[" + noHighlight(s) + "]"
+sbHighlight = lambda s: "[" + noHighlight(s) + "]"
 
 
 def getLineCount(fn):
@@ -69,9 +67,9 @@ def getLineCount(fn):
             return hlist((size, count))
 
 
-def iscode(fn):
-    fn = str(fn)
-    return fn.endswith(".py") or fn.endswith(".pyw") # or fn.endswith(".c") or fn.endswith(".cpp")
+iscode = lambda fn: str(fn).endswith(".py") or str(fn).endswith(".pyw")
+
+awaitable = lambda obj: asyncio.iscoroutine(obj) or isinstance(obj, asyncio.Future)
 
 
 class returns:
@@ -94,7 +92,11 @@ async def recursiveCoro(item):
     rets = hlist()
     for i in range(len(item)):
         try:
-            if type(item[i]) in (str, bytes, dict) or isinstance(item[i], freeClass):
+            if type(item[i]) in (str, bytes):
+                raise TypeError
+            if issubclass(type(item[i]), collections.Mapping):
+                raise TypeError
+            if awaitable(item[i]):
                 raise TypeError
             item[i] = tuple(item[i])
         except TypeError:
@@ -102,7 +104,7 @@ async def recursiveCoro(item):
         if type(item[i]) is tuple:
             rets.append(returns())
             create_task(parasync(recursiveCoro(item[i]), rets[-1]))
-        elif asyncio.iscoroutine(item[i]):
+        elif awaitable(item[i]):
             rets.append(returns())
             create_task(parasync(item[i], rets[-1]))
         else:
@@ -139,7 +141,7 @@ async def sendFile(channel, msg, file, filename=None):
         except:
             print(traceback.format_exc())
     if message.attachments:
-        await message.edit(content=message.content + "\n" + "\n".join(tuple("<" + a.url + ">" for a in message.attachments)))
+        await message.edit(content=message.content + "\n" + "\n".join("<" + a.url + ">" for a in message.attachments))
 
 
 def strMessage(message, limit=1024, username=False):
@@ -173,12 +175,17 @@ def strActivity(activity):
         return t[0].upper() + t[1:] + " " + activity.name
     return str(activity)
 
-def hasSymbol(string):
+def alphanumeric(string):
     for c in string.lower():
         x = ord(c)
         if x > 122 or (x < 97 and x > 57) or x < 48:
             return False
     return True
+
+def noCodeBox(s):
+    if s.startswith("```") and s.endswith("```"):
+        s = s[s.index("\n") + 1:-3]
+    return s
 
 
 async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]):
@@ -208,14 +215,11 @@ async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)])
     raise LookupError("No results for " + str(query) + ".")
 
 
-def randColour():
-    return colour2Raw(colourCalculation(xrand(12) * 128))
+randColour = lambda: colour2Raw(colourCalculation(xrand(12) * 128))
 
-def strURL(url):
-    return str(url).replace(".webp", ".png")
+strURL = lambda url: str(url).replace(".webp", ".png")
 
-def shash(s):
-    return bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
+shash = lambda s: bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
 
 __imap = {
     "#": "",
@@ -255,8 +259,7 @@ __smap = {
 }
 __strans = "".maketrans(__smap)
 
-def verifySearch(f):
-    return f.strip().translate(__strans)
+verifySearch = lambda f: f.strip().translate(__strans)
 
 DOMAIN_FORMAT = re.compile(
     r"(?:^(\w{1,255}):(.{1,255})@|^)"
@@ -301,153 +304,225 @@ def urlOpen(url):
     if resp.getcode() != 200:
         raise ConnectionError("Error " + str(resp.code))
     return resp
-    
 
-__subs__ = {}
 
-def subCount():
-    count = 0
-    for i in list(__subs__):
-        if __subs__[i].is_running():
-            count += 1
-        else:
-            __subs__.pop(i)
-    return count
+SUBS = freeClass(procs=hlist(), busy=freeClass())
+
+subCount = lambda: sum(1 for proc in SUBS.procs if proc.is_running())
 
 def subKill():
-    for sub in __subs__.values():
+    for sub in SUBS.procs:
         sub.kill()
-    __subs__.clear()
+    SUBS.procs.clear()
+    SUBS.busy.clear()
 
-async def subFunc(key, com, data_in, timeout=60):
-    while len(__subs__) > 256:
-        i = iter(tuple(__subs__))
-        try:
-            while i:
-                k = next(i)
-                if __subs__[k].kill is not None:
-                    __subs__[k].kill()
-                    __subs__.pop(k)
-                    break
-        except StopIteration:
-            pass
-    if key in __subs__:
-        try:
-            while __subs__[key].busy:
-                time.sleep(0.01)
-        except KeyError:
-            return subFunc(key, com, data_in, timeout)
-    else:
-        __subs__[key] = freeClass(
-            busy=True,
-            is_running=lambda: True,
-            kill=None,
-        )
-    if isinstance(__subs__[key], psutil.Popen):
-        proc = __subs__[key]
-        if not proc.is_running():
-            __subs__.pop(key)
-            del proc
-            return subFunc(key, com, data_in, timeout)
-    else:
-        proc = __subs__[key] = psutil.Popen(
-            com,
+def procUpdate():
+    procs = SUBS.procs
+    b = len(SUBS.busy)
+    count = sum(1 for proc in procs if not proc.busy)
+    if count > 16:
+        return
+    if b + 1 > count:
+        proc = psutil.Popen(
+            [python, "misc/math.py"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-    proc.busy = True
-    d = repr(bytes(str(data_in), "utf-8")).encode("utf-8") + b"\n"
-    print(d)
-    proc.stdin.write(d)
-    proc.stdin.flush()
+        proc.busy = False
+        procs.append(proc)
+    att = 0
+    while count > b + 2:
+        for p in range(len(procs)):
+            if p < len(procs):
+                proc = procs[p]
+                if not proc.busy:
+                    proc.kill()
+                    procs.pop(p)
+                    break
+            else:
+                break
+        att += 1
+        if att >= 16:
+            break
+
+procUpdate()
+
+async def mathProc(data, key=-1, timeout=12):
+    procs, busy = SUBS.procs, SUBS.busy
+    while time.time() - busy.get(key, 0) < 60:
+        await asyncio.sleep(0.5)
     try:
+        while True:
+            for p in range(len(procs)):
+                if p < len(procs):
+                    proc = procs[p]
+                    if not proc.busy:
+                        raise StopIteration
+                else:
+                    break
+            procUpdate()
+            await asyncio.sleep(0.5)
+    except StopIteration:
+        pass
+    d = repr(bytes(data, "utf-8")).encode("utf-8") + b"\n"
+    print(d)
+    try:
+        proc.busy = True
+        busy[key] = time.time()
+        procUpdate()
+        proc.stdin.write(d)
+        proc.stdin.flush()
         resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
+        proc.busy = False
     except (TimeoutError, asyncio.exceptions.TimeoutError):
         proc.kill()
+        try:
+            procs.pop(p)
+        except LookupError:
+            pass
+        try:
+            busy.pop(key)
+        except KeyError:
+            pass
+        procUpdate()
         raise
-    proc.busy = False
+    try:
+        busy.pop(key)
+    except KeyError:
+        pass
     output = evalEX(evalEX(resp))
     return output
 
 
 def evalEX(exc):
-    is_ex = False
     try:
         ex = eval(exc)
     except NameError:
         if type(exc) is bytes:
             exc = exc.decode("utf-8")
         ex = RuntimeError(exc[exc.index("(") + 1:exc.index(")")].strip("'"))
-    try:
-        if issubclass(ex.__class__, Exception):
-            is_ex = True
-    except AttributeError:
-        pass
-    if is_ex:
+    except:
+        print(exc)
+        raise
+    if issubclass(type(ex), Exception):
         raise ex
     return ex
 
 
-def funcSafe(func, *args, print_exc=False, **kwargs):
+def funcSafe(func, *args, **kwargs):
     try:
-        return [func(*args, **kwargs)]
-    except Exception as ex:
-        if print_exc:
-            print(traceback.format_exc())
-        return repr(ex)
+        return func(*args, **kwargs)
+    except:
+        print(func, args, kwargs)
+        print(traceback.format_exc())
+        raise
 
 
-athreads = concurrent.futures.ThreadPoolExecutor(max_workers=64)
-
-def create_future(func, *args, **kwargs):
-    return asyncio.wrap_future(athreads.submit(func, *args, **kwargs))
-
-
-def logClear():
-    if os.name == 'nt':
-        os.system('cls')
-    else:
-        os.system('clear')
+async def safeCoro(coro):
+    try:
+        await coro
+    except:
+        print(traceback.format_exc())
 
 
-class __logPrinter():
+eloop = asyncio.new_event_loop()
+__setloop = lambda: asyncio.set_event_loop(eloop)
+pthreads = concurrent.futures.ThreadPoolExecutor(max_workers=128, initializer=__setloop)
+athreads = concurrent.futures.ThreadPoolExecutor(max_workers=64, initializer=__setloop)
+__setloop()
 
-    print_temp = ""
-    
-    def updatePrint(self, file):
-        if file is None:
-            outfunc = sys.stdout.write
-            enc = lambda x: str(x)
+def wrap_future(fut, loop=None):
+    if loop is None:
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = eloop
+    new_fut = loop.create_future()
+
+    def on_done(*void):
+        try:
+            result = fut.result()
+        except Exception as ex:
+            loop.call_soon_threadsafe(new_fut.set_exception, ex)
         else:
-            def filePrint(b):
-                f = open(file, "ab+")
+            loop.call_soon_threadsafe(new_fut.set_result, result)
+
+    fut.add_done_callback(on_done)
+    return new_fut
+
+create_future = lambda func, *args, loop=None, priority=False, **kwargs: wrap_future((athreads, pthreads)[priority].submit(func, *args, **kwargs), loop=loop)
+create_future_ex = lambda func, *args, priority=False, **kwargs: (athreads, pthreads)[priority].submit(func, *args, **kwargs)
+
+def create_task(fut, *args, loop=None, **kwargs):
+    if loop is None:
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = eloop
+    return asyncio.ensure_future(fut, *args, loop=loop, **kwargs)
+
+
+logClear = lambda: os.system(("clear", "cls")[os.name == "nt"])
+
+class __logPrinter:
+    
+    def updatePrint(self):
+
+        def filePrint(fn, b):
+            try:
+                if type(b) in (bytes, bytearray):
+                    f = open(fn, "ab")
+                elif type(b) is str:
+                    f = open(fn, "a", encoding="utf-8")
+                else:
+                    f = fn
                 f.write(b)
                 f.close()
-            outfunc = filePrint
-            enc = lambda x: bytes(str(x), "utf-8")
+            except:
+                traceback.print_exc()
+
+        if self.file is None:
+            outfunc = sys.stdout.write
+            enc = lambda x: x
+        else:
+            outfunc = lambda s: filePrint(self.file, s)
+            enc = lambda x: bytes(x, "utf-8")
         outfunc(enc("Logging started...\n"))
         while True:
-            if self.print_temp:
-                self.print_temp = limStr(self.print_temp, 4096)
-                data = enc(self.print_temp)
-                #sys.stdout.write(repr(data))
-                outfunc(data)
-                self.print_temp = ""
+            try:
+                for f in self.data:
+                    if not self.data[f]:
+                        self.data.pop(f)
+                        continue
+                    out = limStr(self.data[f], 8192)
+                    self.data[f] = ""
+                    data = enc(out)
+                    if f == self.file:
+                        outfunc(data)
+                    else:
+                        filePrint(f, data)
+            except:
+                print(traceback.format_exc())
             time.sleep(1)
-            #sys.stdout.write(str(f))
-    
     def nonEmitLogPrint(self, *args, sep=" ", end="\n", prefix="", **void):
         self.print_temp += str(sep).join((str(i) for i in args)) + str(end) + str(prefix)
-    
-    def logPrint(self, *args, sep=" ", end="\n", prefix="", **void):
-        self.print_temp += str(sep).join((str(i) for i in args)) + str(end) + str(prefix)
+
+    def logPrint(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
+        if file is None:
+            file = self.file
+        if file not in self.data:
+            self.data[file] = ""
+        self.data[file] += str(sep).join(str(i) for i in args) + str(end) + str(prefix)
         if _io.hasAuth:
             global emit
             emit('log', str(sep).join((str(i) for i in args)) + str(end) + str(prefix))   
+
     def __init__(self, file=None):
         self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.future = athreads.submit(self.updatePrint, file)
+        self.data = freeClass()
+        self.file = file
+        self.future = self.exec.submit(self.updatePrint)
 
 sio = False
 
@@ -527,6 +602,11 @@ _io = __ioStuff()
 emit = _io.emit
 __printer = __logPrinter("log.txt")
 print = __printer.logPrint
+
+getattr(discord, "__builtins__", {})["print"] = print
+getattr(concurrent.futures, "__builtins__", {})["print"] = print
+getattr(asyncio.futures, "__builtins__", {})["print"] = print
+getattr(asyncio, "__builtins__", {})["print"] = print
 
 
 class Command:

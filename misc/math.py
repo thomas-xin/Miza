@@ -1,9 +1,12 @@
+#!/usr/bin/python3
+
 import sympy, time, sys, traceback, random, numpy
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
-latex.__builtins__["print"] = lambda *void1, **void2: None
+
+getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
 
 key = "0"
 BF_PREC = 256
@@ -352,7 +355,6 @@ translators = {
     "−": "-",
     "×": "*",
     "·": "*",
-    "·": "*",
     "᛫": "*",
     "•": "*",
     "‧": "*",
@@ -467,7 +469,7 @@ def evalSym(f, prec=64, r=False):
             except:
                 pass
     try:
-        if hasattr(f, "__class__") and issubclass(f.__class__, baseFloat):
+        if issubclass(type(f), baseFloat):
             a = str(f.evalf(prec))
             try:
                 b = str(prettyAns(sympy.Rational(str(f.num))))
