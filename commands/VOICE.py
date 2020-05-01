@@ -34,6 +34,7 @@ class customAudio(discord.AudioSource):
 
     def __init__(self, channel, vc, _vars):
         try:
+            self.guild = channel.guild
             self.paused = False
             self.stats = freeClass(**self.defaults)
             self.new(update=False)
@@ -56,7 +57,6 @@ class customAudio(discord.AudioSource):
             self._vars = _vars
             _vars.database.playlists.audio[vc.guild.id] = self
             print("Initialized custom audio in channel ",channel)
-            print(self.__str__())
         except:
             print(traceback.format_exc())
 
@@ -194,6 +194,7 @@ class customAudio(discord.AudioSource):
             self.player.time = 1 + time.time()
         if update:
             self.update()
+        emit('mus_progress', self.guild.id, pos)
 
     def seek(self, pos):
         duration = float(self.queue[0].duration)
@@ -204,6 +205,7 @@ class customAudio(discord.AudioSource):
             return duration
         self.new(self.file, pos)
         self.stats.position = pos
+        emit('mus_progress', self.guild.id, pos)
         return self.stats.position
 
     def advance(self, looped=True, shuffled=True):
@@ -213,6 +215,7 @@ class customAudio(discord.AudioSource):
                 temp = q[0]
             self.prev = gethash(q[0])
             q.popleft()
+            emit('mus_next', self.guild.id)
             if shuffled and self.stats.shuffle:
                 if len(q) > 1:
                     temp = q.popleft()
@@ -252,6 +255,7 @@ class customAudio(discord.AudioSource):
                         "```css\n🎵 Successfully disconnected from ["
                         + noHighlight(guild.name) + "]. 🎵```"
                     )
+                    emit('mus_dc', guild.id)
                     self.loop.create_task(sendReact(
                         self.channel,
                         msg,
@@ -262,9 +266,14 @@ class customAudio(discord.AudioSource):
             return
         if not hasattr(vc, "channel"):
             self.dead = True
+            emit('mus_dc', guild.id)
             return
         if vc.is_connected() or self._vars.database.playlists.is_connecting(vc.guild.id):
             playing = self.is_playing or self.is_loading
+            if self.is_playing:
+                emit('mus_playing', guild.id)
+            if self.is_loading:
+                emit('mus_loading', guild.id)
         else:
             self.loop.create_task(self.reconnect())
             return
@@ -347,6 +356,7 @@ class customAudio(discord.AudioSource):
                                 + noHighlight(name)
                                 + "], added by [" + added_by + "]! 🎵```"
                             )
+                            emit('mus_next', guild.id)
                             self.loop.create_task(sendReact(
                                 self.channel,
                                 msg,
@@ -377,6 +387,7 @@ class customAudio(discord.AudioSource):
                         break
                     if h != self.prev:
                         break
+                emit('mus_newItem', self.guild.id, d)
                 q.append(freeClass(d))
         if self.pausec and self.paused:
             vc.stop()
@@ -428,6 +439,7 @@ class customAudio(discord.AudioSource):
         try:
             if self.is_loading or self.paused:
                 self.is_playing = True
+                emit('mus_playing', self.guild.id)
                 raise EOFError
             try:
                 temp = self.source.read()
@@ -442,6 +454,7 @@ class customAudio(discord.AudioSource):
             )
             self.is_playing = True
             self.curr_timeout = 0
+            emit('mus_playing', self.guild.id)
         except EOFError:
             if (empty or not self.paused) and not self.is_loading:
                 queueable = (self.queue or self._vars.data.playlists.get(self.vc.guild.id, None))
@@ -599,12 +612,13 @@ class customAudio(discord.AudioSource):
         return
 
 
-async def createPlayer(auds, p_type=0, verbose=False):
+async def createPlayer(auds, guild , p_type=0, verbose=False):
     auds.stats.quiet |= 2 * p_type
     text = (
         "```" + "\n" * verbose + "callback-voice-player-" + str(int(bool(p_type)))
         + "\nInitializing virtual audio player...```"
     )
+    emit('mus_loading', guild.id)
     await auds.channel.send(text)
     await auds.updatePlayer()
 
@@ -1133,10 +1147,13 @@ class Queue(Command):
                     if auds.queue and "download" in auds.queue[0]:
                         auds.queue[0].pop("download")
                 auds.update()
+                emit('mus_playing', guild.id)
                 return "```css\nSuccessfully resumed audio playback in [" + noHighlight(guild.name) + "].```", 1
             if not len(q):
                 auds.preparing = False
                 auds.update()
+                emit('mus_msg', guild.id, "Queue for "+guild.name+" is currently empty")
+                emit('mus_stopped', guild.id)
                 return "```ini\nQueue for [" + noHighlight(guild.name) + "] is currently empty. ```", 1
             if auds.stats.loop:
                 totalTime = inf
@@ -1166,6 +1183,7 @@ class Queue(Command):
                 "`(" + uniStr(dhms(elapsed))
                 + "/" + uniStr(dhms(duration)) + ") "
             )
+            print(str(q[0]))
             countstr += bar + "`\n"
             embed=discord.Embed(
                 title=" ",
@@ -2336,7 +2354,7 @@ class Player(Command):
                 "```css\nDisabled virtual audio players in ["
                 + noHighlight(channel.guild.name) + "].```"
             )
-        await createPlayer(auds, p_type="c" in flags, verbose="z" in flags)
+        await createPlayer(auds, guild, p_type="c" in flags, verbose="z" in flags)
 
 
 f = open("auth.json")

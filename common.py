@@ -436,7 +436,10 @@ class __logPrinter():
                 self.print_temp = ""
             time.sleep(1)
             #sys.stdout.write(str(f))
-
+    
+    def nonEmitLogPrint(self, *args, sep=" ", end="\n", prefix="", **void):
+        self.print_temp += str(sep).join((str(i) for i in args)) + str(end) + str(prefix)
+    
     def logPrint(self, *args, sep=" ", end="\n", prefix="", **void):
         self.print_temp += str(sep).join((str(i) for i in args)) + str(end) + str(prefix)
         if _io.hasAuth:
@@ -488,12 +491,13 @@ class __ioStuff():
                     print("Can't authenticate: web_token hasn't been defined.")
             elif self.web_token:
                     print("Can't authenticate: web_address hasn't been defined.")
-
+                    
+		
         @sio.event
         def authAccepted():
             print("Successfully authenticated with controller.")
             self.hasAuth = True
-
+        
         @sio.event
         def authDenied(data):
             print("Failed to authenticate with controller. Server reports: " + data)
@@ -501,6 +505,7 @@ class __ioStuff():
         
         if self.web_address:
             print("Attempting to connect to controller at "+self.web_address)
+            
             try:
                 sio.connect(self.web_address)
             except:
@@ -510,7 +515,12 @@ class __ioStuff():
     
     def emit(self, *args):
         if self.hasAuth:
-            sio.emit(*args)
+            try:
+                sio.emit(*args)
+            except:
+                print("Exception emitting to controller:")
+                print(traceback.format_exc())
+                
 
     
 _io = __ioStuff()

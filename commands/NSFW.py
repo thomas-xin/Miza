@@ -1,4 +1,4 @@
-import nekos, rule34, pybooru
+import nekos, rule34, pybooru, time
 try:
     from common import *
 except ModuleNotFoundError:
@@ -353,6 +353,39 @@ def is_nsfw(channel):
         return channel.is_nsfw()
     except AttributeError:
         return True
+
+
+class Thicc(Command):
+    min_level = 0
+    description = "thicc."
+    usage = "<thicc[thicc]>"
+    flags = "e"
+
+    async def __call__(self, args, argv, flags, channel, **void):
+        if not is_nsfw(channel):
+            raise PermissionError(
+                "This command is only available in " + uniStr("NSFW") + " channels."
+                )
+        return ":flushed:"
+
+class Nuke(Command):
+    min_level = 1
+    description = "Drop and run."
+
+    async def __call__(self, args, argv, message, channel, callback, _vars, perm, guild, **void):
+        await channel.send('I highly suggest that you evacuate.')
+        await asyncio.sleep(2)
+        await channel.send('Nuking in 3..')
+        await asyncio.sleep(2)
+        await channel.send('Nuking in 2..')
+        await asyncio.sleep(2)
+        await channel.send('Nuking in 1..')
+        await asyncio.sleep(2)
+        await channel.send('Nuking...')
+        for i in range(0, 9):
+            await channel.send('~lewd will_smith')
+            await asyncio.sleep(0.5)
+        return ""
 
 
 class Neko(Command):
