@@ -417,7 +417,7 @@ class Lewd(Command):
     flags = "v"
     no_parse = True
 
-    async def __call__(self, _vars, args, flags, channel, **void):
+    async def __call__(self, args, flags, channel, **void):
         if not is_nsfw(channel):
             raise PermissionError("This command is only available in NSFW channels.")
         objs = await searchRandomNSFW(" ".join(args), 12)

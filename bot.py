@@ -137,7 +137,7 @@ class main_data:
                 print("Deleting " + str(key) + " from " + str(obj) + "...")
                 data.pop(key)
                 obj.update()
-            if random.random() > .9:
+            if random.random() > .99:
                 await asyncio.sleep(0.2)
         await asyncio.sleep(2)
         obj.checking = False
@@ -148,6 +148,8 @@ class main_data:
             u_id = int(u_id)
         except (ValueError, TypeError):
             raise TypeError("Invalid user identifier: " + str(u_id))
+        if u_id in self.cache.users:
+            return self.cache.users[u_id]
         if u_id == self.deleted_user:
             user = self.ghostUser()
             user.system = True
@@ -162,8 +164,6 @@ class main_data:
                 if user is None:
                     raise EOFError
             except:
-                if u_id in self.cache.users:
-                    return self.cache.users[u_id]
                 user = await client.fetch_user(u_id)
         self.cache.users[u_id] = user
         self.limitCache("users")
@@ -213,7 +213,7 @@ class main_data:
                 raise EOFError
             for w in webhooks:
                 if w.id == u_id:
-                    user = _vars.ghostUser()
+                    user = bot.ghostUser()
                     user.id = u_id
                     user.name = w.name
                     user.display_name = w.name
@@ -256,13 +256,13 @@ class main_data:
                 raise LookupError(str(ex))
             except:
                 raise TypeError("Invalid server identifier: " + str(g_id))
+        if g_id in self.cache.guilds:
+            return self.cache.guilds[g_id]
         try:
             guild = client.get_guild(g_id)
             if guild is None:
                 raise EOFError
         except:
-            if g_id in self.cache.guilds:
-                return self.cache.guilds[g_id]
             guild = await client.fetch_guild(g_id)
         self.cache.guilds[g_id] = guild
         self.limitCache("guilds", limit=65536)
@@ -273,13 +273,13 @@ class main_data:
             c_id = int(c_id)
         except (ValueError, TypeError):
             raise TypeError("Invalid channel identifier: " + str(c_id))
+        if c_id in self.cache.channels:
+            return self.cache.channels[c_id]
         try:
             channel = client.get_channel(c_id)
             if channel is None:
                 raise EOFError
         except:
-            if c_id in self.cache.channels:
-                return self.cache.channels[c_id]
             channel = await client.fetch_channel(c_id)
         self.cache.channels[c_id] = channel
         self.limitCache("channels")
@@ -859,7 +859,7 @@ class main_data:
                                     perm=u_perm,
                                     vals=vals,
                                     argv=argv,
-                                    _vars=self,
+                                    bot=self,
                                 ),
                                 timeout=timeout)
                             return
@@ -919,13 +919,9 @@ class main_data:
                     self.status_iter = (self.status_iter + 1) % 3
             except:
                 print(traceback.format_exc())
-            try:
-                self.lastCheck = time.time()
-                for u in self.database.values():
-                    create_task(u())
-                    create_task(self.verifyDelete(u))
-            except:
-                print(traceback.format_exc())
+            for u in self.database.values():
+                create_task(u())
+                create_task(self.verifyDelete(u))
             self.busy = False
 
     async def ensureWebhook(self, channel, force=False):
@@ -941,7 +937,7 @@ class main_data:
         if not wlist:
             wlist = await channel.webhooks()
         if not wlist:
-            w = await channel.create_webhook(name=_vars.client.user.name)
+            w = await channel.create_webhook(name=bot.client.user.name)
         else:
             w = random.choice(wlist)
         self.cw_cache[channel.id] = freeClass(time=time.time(), webhook=w)
@@ -963,7 +959,7 @@ class main_data:
                 self.pins = channel.pins
 
             def fetch_message(self, id):
-                return _vars.fetch_message(id, self.channel)
+                return bot.fetch_message(id, self.channel)
 
             me = client.user
             name = "DM"
@@ -984,7 +980,7 @@ class main_data:
             self.get_channel = lambda *void1, **void2: self.channel
             self.owner_id = client.user.id
             self.owner = client.user
-            self.fetch_member = _vars.fetch_user
+            self.fetch_member = bot.fetch_user
 
         filesize_limit = 8388608
         bitrate_limit = 98304
@@ -1023,7 +1019,7 @@ class main_data:
     class ghostMessage(discord.abc.Snowflake):
         
         def __init__(self):
-            self.author = _vars.ghostUser()
+            self.author = bot.ghostUser()
             self.content = "```css\n" + uniStr("[MESSAGE DATA NOT FOUND]") + "```"
             self.channel = None
             self.guild = None
@@ -1092,16 +1088,16 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
     c_id = channel.id
     if g_id:
         try:
-            enabled = _vars.data.enabled[c_id]
+            enabled = bot.data.enabled[c_id]
         except KeyError:
             try:
-                enabled = _vars.data.enabled[c_id] = ["main", "string", "admin"]
-                _vars.update()
+                enabled = bot.data.enabled[c_id] = ["main", "string", "admin"]
+                bot.update()
             except KeyError:
                 enabled = ["main", "admin"]
     else:
-        enabled = list(_vars.categories)
-    u_perm = _vars.getPerms(u_id, guild)
+        enabled = list(bot.categories)
+    u_perm = bot.getPerms(u_id, guild)
     admin = not inf > u_perm
     mention = (
         "<@" + str(client.user.id) + ">",
@@ -1110,7 +1106,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
     if u_id == client.user.id:
         prefix = "~"
     else:
-        prefix = _vars.getPrefix(guild)
+        prefix = bot.getPrefix(guild)
     op = False
     comm = msg
     for check in (prefix, *mention):
@@ -1154,8 +1150,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                     if i2 < i:
                         i = i2
             check = reconstitute(comm[:i]).lower()
-        if check in _vars.commands:
-            for command in _vars.commands[check]:
+        if check in bot.commands:
+            for command in bot.commands[check]:
                 if command.catg in enabled or admin:
                     alias = command.__name__
                     for a in command.alias:
@@ -1235,14 +1231,14 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
                             create_task(channel.trigger_typing())
-                        for u in _vars.database.values():
+                        for u in bot.database.values():
                             f = getattr(u, "_command_", None)
                             if f is not None:
                                 await f(user, command)
-                        timeout = getattr(f, "_timeout_", 1) * _vars.timeout
+                        timeout = getattr(f, "_timeout_", 1) * bot.timeout
                         response = await asyncio.wait_for(command(
                             client=client,          # for interfacing with discord
-                            _vars=_vars,            # for interfacing with bot's database
+                            bot=bot,            # for interfacing with bot's database
                             argv=argv,              # raw text argument
                             args=args,              # split text arguments
                             flags=flags,            # special flags
@@ -1311,7 +1307,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         temp = "".join(temp)
         while "  " in temp:
             temp = temp.replace("  ", " ")
-        for u in _vars.database.values():
+        for u in bot.database.values():
             f = getattr(u, "_nocommand_", None)
             if f is not None:
                 create_task(safeCoro(f(
@@ -1328,12 +1324,12 @@ async def heartbeatLoop():
     try:
         while True:
             try:
-                _vars
+                bot
             except NameError:
                 sys.exit()
-            if _vars.heartbeat in os.listdir():
+            if bot.heartbeat in os.listdir():
                 try:
-                    os.remove(_vars.heartbeat)
+                    os.remove(bot.heartbeat)
                 except:
                     print(traceback.format_exc())
             await asyncio.sleep(0.5)
@@ -1348,12 +1344,12 @@ async def updateLoop():
         try:
             if time.time() - autosave > 60:
                 autosave = time.time()
-                _vars.update()
-            while _vars.blocked > 0:
+                bot.update()
+            while bot.blocked > 0:
                 print("Blocked...")
-                _vars.blocked -= 1
+                bot.blocked -= 1
                 await asyncio.sleep(1)
-            await _vars.handleUpdate()
+            await bot.handleUpdate()
             await asyncio.sleep(frand(2) + 2)
         except:
             print(traceback.format_exc())
@@ -1362,22 +1358,22 @@ async def updateLoop():
 @client.event
 async def on_ready():
     print("Successfully connected as " + str(client.user))
-    await _vars.getState()
+    await bot.getState()
     print("Servers: ")
     for guild in client.guilds:
         if guild.unavailable:
             print("> " + str(guild.id) + " is not available.")
         else:
             print("> " + guild.name)
-    await _vars.handleUpdate()
-    if not hasattr(_vars, "started"):
-        _vars.started = True
+    await bot.handleUpdate()
+    if not hasattr(bot, "started"):
+        bot.started = True
         asyncio.create_task(updateLoop())
         asyncio.create_task(heartbeatLoop())
 
     
 async def seen(user, delay=0):
-    for u in _vars.database.values():
+    for u in bot.database.values():
         f = getattr(u, "_seen_", None)
         if f is not None:
             try:
@@ -1388,7 +1384,7 @@ async def seen(user, delay=0):
 
 async def checkDelete(message, reaction, user):
     if message.author.id == client.user.id:
-        u_perm = _vars.getPerms(user.id, message.guild)
+        u_perm = bot.getPerms(user.id, message.guild)
         check = False
         if not u_perm < 3:
             check = True
@@ -1405,7 +1401,7 @@ async def checkDelete(message, reaction, user):
                 s = str(reaction)
                 if s in "❌✖️🇽❎":
                     try:
-                        await _vars.silentDelete(message, exc=True)
+                        await bot.silentDelete(message, exc=True)
                     except discord.NotFound:
                         pass
 
@@ -1413,30 +1409,30 @@ async def checkDelete(message, reaction, user):
 @client.event
 async def on_raw_reaction_add(payload):
     try:
-        channel = await _vars.fetch_channel(payload.channel_id)
-        user = await _vars.fetch_user(payload.user_id)
-        message = await _vars.fetch_message(payload.message_id, channel=channel)
+        channel = await bot.fetch_channel(payload.channel_id)
+        user = await bot.fetch_user(payload.user_id)
+        message = await bot.fetch_message(payload.message_id, channel=channel)
     except discord.NotFound:
         return
     if user.id != client.user.id:
         reaction = str(payload.emoji)
         create_task(seen(user))
-        await _vars.reactCallback(message, reaction, user)
+        await bot.reactCallback(message, reaction, user)
         create_task(checkDelete(message, reaction, user))
 
 
 @client.event
 async def on_raw_reaction_remove(payload):
     try:
-        channel = await _vars.fetch_channel(payload.channel_id)
-        user = await _vars.fetch_user(payload.user_id)
-        message = await _vars.fetch_message(payload.message_id, channel=channel)
+        channel = await bot.fetch_channel(payload.channel_id)
+        user = await bot.fetch_user(payload.user_id)
+        message = await bot.fetch_message(payload.message_id, channel=channel)
     except discord.NotFound:
         return
     if user.id != client.user.id:
         reaction = str(payload.emoji)
         create_task(seen(user))
-        await _vars.reactCallback(message, reaction, user)
+        await bot.reactCallback(message, reaction, user)
         create_task(checkDelete(message, reaction, user))
 
 
@@ -1448,7 +1444,7 @@ async def on_voice_state_update(member, before, after):
             if after.mute or after.deaf:
                 print("Unmuted self in " + member.guild.name)
                 await member.edit(mute=False, deafen=False)
-            await _vars.handleUpdate()
+            await bot.handleUpdate()
     if member.voice is not None and not member.voice.afk:
         create_task(seen(member))
 
@@ -1472,7 +1468,7 @@ async def handleMessage(message, edit=True):
 
 @client.event
 async def on_typing(channel, user, when):
-    for u in _vars.database.values():
+    for u in bot.database.values():
         f = getattr(u, "_typing_", None)
         if f is not None:
             try:
@@ -1484,10 +1480,10 @@ async def on_typing(channel, user, when):
 
 @client.event
 async def on_message(message):
-    _vars.cacheMessage(message)
+    bot.cacheMessage(message)
     guild = message.guild
     if guild:
-        for u in _vars.database.values():
+        for u in bot.database.values():
             f = getattr(u, "_send_", None)
             if f is not None:
                 try:
@@ -1495,13 +1491,13 @@ async def on_message(message):
                 except:
                     print(traceback.format_exc())
     create_task(seen(message.author))
-    await _vars.reactCallback(message, None, message.author)
+    await bot.reactCallback(message, None, message.author)
     await handleMessage(message, False)
 
 
 @client.event
 async def on_user_update(before, after):
-    for u in _vars.database.values():
+    for u in bot.database.values():
         f = getattr(u, "_user_update_", None)
         if f is not None:
             try:
@@ -1513,7 +1509,7 @@ async def on_user_update(before, after):
 
 @client.event
 async def on_member_update(before, after):
-    for u in _vars.database.values():
+    for u in bot.database.values():
         f = getattr(u, "_member_update_", None)
         if f is not None:
             try:
@@ -1524,7 +1520,7 @@ async def on_member_update(before, after):
 
 @client.event
 async def on_member_join(member):
-    for u in _vars.database.values():
+    for u in bot.database.values():
         f = getattr(u, "_join_", None)
         if f is not None:
             try:
@@ -1536,7 +1532,7 @@ async def on_member_join(member):
             
 @client.event
 async def on_member_remove(member):
-    for u in _vars.database.values():
+    for u in bot.database.values():
         f = getattr(u, "_leave_", None)
         if f is not None:
             try:
@@ -1552,13 +1548,13 @@ async def on_raw_message_delete(payload):
         if message is None:
             raise LookupError
     except:
-        channel = await _vars.fetch_channel(payload.channel_id)
+        channel = await bot.fetch_channel(payload.channel_id)
         try:
-            message = await _vars.fetch_message(payload.message_id, channel)
+            message = await bot.fetch_message(payload.message_id, channel)
             if message is None:
                 raise LookupError
         except:
-            message = _vars.ghostMessage()
+            message = bot.ghostMessage()
             message.channel = channel
             try:
                 message.guild = channel.guild
@@ -1566,17 +1562,17 @@ async def on_raw_message_delete(payload):
                 message.guild = None
             message.id = payload.message_id
             message.created_at = snowflake_time(message.id)
-            message.author = await _vars.fetch_user(_vars.deleted_user)
+            message.author = await bot.fetch_user(bot.deleted_user)
     guild = message.guild
     if guild:
-        for u in _vars.database.values():
+        for u in bot.database.values():
             f = getattr(u, "_delete_", None)
             if f is not None:
                 try:
                     await f(message=message)
                 except:
                     print(traceback.format_exc())
-    _vars.deleteMessage(message)
+    bot.deleteMessage(message)
 
 
 @client.event
@@ -1587,14 +1583,14 @@ async def on_raw_bulk_message_delete(payload):
             raise LookupError
     except:
         messages = deque()
-        channel = await _vars.fetch_channel(payload.channel_id)
+        channel = await bot.fetch_channel(payload.channel_id)
         for m_id in payload.message_ids:
             try:
-                message = await _vars.fetch_message(m_id, channel)
+                message = await bot.fetch_message(m_id, channel)
                 if message is None:
                     raise LookupError
             except:
-                message = _vars.ghostMessage()
+                message = bot.ghostMessage()
                 message.channel = channel
                 try:
                     message.guild = channel.guild
@@ -1602,19 +1598,19 @@ async def on_raw_bulk_message_delete(payload):
                     message.guild = None
                 message.id = m_id
                 message.created_at = snowflake_time(message.id)
-                message.author = await _vars.fetch_user(_vars.deleted_user)
+                message.author = await bot.fetch_user(bot.deleted_user)
             messages.append(message)
     for message in messages:
         guild = message.guild
         if guild:
-            for u in _vars.database.values():
+            for u in bot.database.values():
                 f = getattr(u, "_delete_", None)
                 if f is not None:
                     try:
                         await f(message=message, bulk=True)
                     except:
                         print(traceback.format_exc())
-        _vars.deleteMessage(message)
+        bot.deleteMessage(message)
 
 
 @client.event
@@ -1622,7 +1618,7 @@ async def on_guild_channel_delete(channel):
     print(channel, "was deleted from", channel.guild)
     guild = channel.guild
     if guild:
-        for u in _vars.database.values():
+        for u in bot.database.values():
             f = getattr(u, "_channel_delete_", None)
             if f is not None:
                 try:
@@ -1635,7 +1631,7 @@ async def on_guild_channel_delete(channel):
 async def on_member_ban(guild, user):
     print(user, "was banned from", guild)
     if guild:
-        for u in _vars.database.values():
+        for u in bot.database.values():
             f = getattr(u, "_ban_", None)
             if f is not None:
                 try:
@@ -1646,14 +1642,14 @@ async def on_member_ban(guild, user):
 
 @client.event
 async def on_guild_remove(guild):
-    if guild.id in _vars.cache.guilds:
-        _vars.cache.guilds.pop(guild.id)
+    if guild.id in bot.cache.guilds:
+        bot.cache.guilds.pop(guild.id)
     print(guild, "removed.")
 
 
 async def updateEdit(before, after):
     if before.content == after.content:
-        before = _vars.ghostMessage()
+        before = bot.ghostMessage()
         before.channel = after.channel
         before.guild = after.guild
         before.author = after.author
@@ -1661,7 +1657,7 @@ async def updateEdit(before, after):
         before.created_at = snowflake_time(before.id)
     guild = after.guild
     if guild:
-        for u in _vars.database.values():
+        for u in bot.database.values():
             f = getattr(u, "_edit_", None)
             if f is not None:
                 try:
@@ -1674,7 +1670,7 @@ async def updateEdit(before, after):
 @client.event
 async def on_message_edit(before, after):
     if before.content != after.content:
-        _vars.cacheMessage(after)
+        bot.cacheMessage(after)
         await handleMessage(after)
         await updateEdit(before, after)
 
@@ -1685,19 +1681,19 @@ async def on_raw_message_edit(payload):
         return
     try:
         c_id = payload.data.get("channel_id", 0)
-        channel = await _vars.fetch_channel(c_id)
-        before = await _vars.fetch_message(payload.message_id, channel)
+        channel = await bot.fetch_channel(c_id)
+        before = await bot.fetch_message(payload.message_id, channel)
         if before is None:
             raise LookupError
     except:
-        before = _vars.ghostMessage()
-        before.channel = await _vars.fetch_channel(c_id)
+        before = bot.ghostMessage()
+        before.channel = await bot.fetch_channel(c_id)
         before.guild = channel.guild
         before.id = payload.message_id
         before.created_at = snowflake_time(before.id)
     if before:
         after = await before.channel.fetch_message(payload.message_id)
-        _vars.cacheMessage(after)
+        bot.cacheMessage(after)
         if not hasattr(before, "ghost"):
             if before.content == after.content:
                 return
@@ -1706,5 +1702,5 @@ async def on_raw_message_edit(payload):
 
 
 if __name__ == "__main__":
-    _vars = main_data()
-    _vars.run()
+    bot = main_data()
+    bot.run()

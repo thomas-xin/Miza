@@ -217,7 +217,7 @@ class Text2048(Command):
                 gamestate[x][y] = v
                 i += 1
 
-    async def _callback_(self, _vars, message, reaction, argv, user, perm, vals, **void):
+    async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
         # print(user, message, reaction, argv)
         u_id, mode = [int(x) for x in vals.split("_")]
         if reaction is not None and u_id != user.id and u_id != 0 and perm < 3:
@@ -241,18 +241,18 @@ class Text2048(Command):
             username = "＠everyone"
         else:
             if user.id != u_id:
-                u = await _vars.fetch_user(u_id)
+                u = await bot.fetch_user(u_id)
                 username = u.name
             else:
                 username = user.name
         await self.nextIter(message, gamestate, username, reaction, mode)
 
-    async def __call__(self, _vars, argv, user, flags, guild, **void):
+    async def __call__(self, bot, argv, user, flags, guild, **void):
         try:
             if not len(argv.replace(" ", "")):
                 size = 4
             else:
-                ans = await _vars.evalMath(argv, guild)
+                ans = await bot.evalMath(argv, guild)
                 size = int(ans)
                 if not size > 1:
                     raise IndexError
@@ -293,8 +293,8 @@ class Dogpile(Command):
 
     async def __call__(self, flags, guild, **void):
         update = self.data.dogpiles.update
-        _vars = self._vars
-        following = _vars.data.dogpiles
+        bot = self.bot
+        following = bot.data.dogpiles
         curr = following.get(guild.id, False)
         if "d" in flags:
             if guild.id in following:
@@ -320,7 +320,7 @@ class MathQuiz(Command):
     flags = "aed"
 
     async def __call__(self, channel, flags, argv, **void):
-        mathdb = self._vars.database.mathtest
+        mathdb = self.bot.database.mathtest
         if "d" in flags:
             if channel.id in mathdb.data:
                 mathdb.data.pop(channel.id)
@@ -343,9 +343,9 @@ class MimicConfig(Command):
     )
     no_parse = True
     
-    async def __call__(self, _vars, user, perm, flags, args, **void):
+    async def __call__(self, bot, user, perm, flags, args, **void):
         update = self.data.mimics.update
-        mimicdb = _vars.data.mimics
+        mimicdb = bot.data.mimics
         m_id = "&" + str(verifyID(args.pop(0)))
         if m_id not in mimicdb:
             raise LookupError("Target mimic ID not found.")
@@ -353,7 +353,7 @@ class MimicConfig(Command):
             mimics = mimicdb.setdefault(user.id, {})
             found = 0
             for prefix in mimics:
-                found += mimics.count(m_id)
+                found += mimics[prefix].count(m_id)
             if not found:
                 raise PermissionError("Target mimic does not belong to you.")
         else:
@@ -397,7 +397,7 @@ class MimicConfig(Command):
             else:
                 mimics[new] = [m_id]
         elif setting == "url":
-            new = await _vars.followURL(verifyURL(new))
+            new = await bot.followURL(verifyURL(new))
         elif setting == "auto":
             if new.lower() in ("none", "null", "0", "false", "f"):
                 new = None
@@ -405,13 +405,13 @@ class MimicConfig(Command):
                 mim = None
                 try:
                     mim = verifyID(new)
-                    user = await _vars.fetch_user(mim)
+                    user = await bot.fetch_user(mim)
                     if user is None:
                         raise EOFError
                     new = user.id
                 except:
                     try:
-                        mimi = _vars.get_mimic(mim, user)
+                        mimi = bot.get_mimic(mim, user)
                         new = mimi.id
                     except:
                         raise LookupError("Target user or mimic ID not found.")
@@ -435,11 +435,11 @@ class Mimic(Command):
     flags = "aed"
     no_parse = True
     
-    async def __call__(self, _vars, message, user, perm, flags, args, argv, **void):
+    async def __call__(self, bot, message, user, perm, flags, args, argv, **void):
         update = self.data.mimics.update
-        mimicdb = _vars.data.mimics
+        mimicdb = bot.data.mimics
         if len(args) == 1 and "d" not in flags:
-            user = await _vars.fetch_user(verifyID(argv))
+            user = await bot.fetch_user(verifyID(argv))
         mimics = mimicdb.setdefault(user.id, {})
         if not argv or (len(args) == 1 and "d" not in flags):
             if "d" in flags:
@@ -481,11 +481,11 @@ class Mimic(Command):
                 if not mlist:
                     mimics.pop(prefix)
             except KeyError:
-                mimic = _vars.get_mimic(prefix, user)
+                mimic = bot.get_mimic(prefix, user)
                 if not isnan(perm) and mimic.u_id != user.id:
                     raise PermissionError("Target mimic does not belong to you.")
                 mimics = mimicdb[mimic.u_id]
-                user = await _vars.fetch_user(mimic.u_id)
+                user = await bot.fetch_user(mimic.u_id)
                 m_id = mimic.id
                 for prefix in mimics:
                     try:
@@ -518,13 +518,13 @@ class Mimic(Command):
         mimic = None
         if len(args):
             if len(args) > 1:
-                url = await _vars.followURL(verifyURL(args[-1]))
+                url = await bot.followURL(verifyURL(args[-1]))
                 name = " ".join(args[:-1])
             else:
                 mim = 0
                 try:
                     mim = verifyID(args[-1])
-                    user = await _vars.fetch_user(mim)
+                    user = await bot.fetch_user(mim)
                     if user is None:
                         raise EOFError
                     dop = user.id
@@ -532,7 +532,7 @@ class Mimic(Command):
                     url = strURL(user.avatar_url)
                 except:
                     try:
-                        mimi = _vars.get_mimic(mim, user)
+                        mimi = bot.get_mimic(mim, user)
                         dop = mimi.id
                         mimic = copy.deepcopy(mimi)
                         mimic.id = m_id
@@ -578,51 +578,51 @@ class Mimic(Command):
         )
 
 
-class RPSend(Command):
-    name = ["MimicSend", "PluralSend"]
+class MimicSend(Command):
+    name = ["RPSend", "PluralSend"]
     min_level = 0
     description = "Sends a message using a webhook mimic, to the target channel."
     usage = "<0:mimic> <1:channel> <2:string>"
     no_parse = True
 
-    async def __call__(self, _vars, user, perm, args, **void):
+    async def __call__(self, bot, user, perm, args, **void):
         update = self.data.mimics.update
-        mimicdb = _vars.data.mimics
+        mimicdb = bot.data.mimics
         mimics = mimicdb.setdefault(user.id, {})
         prefix = args.pop(0)
         c_id = verifyID(args.pop(0))
-        channel = await _vars.fetch_channel(c_id)
+        channel = await bot.fetch_channel(c_id)
         guild = channel.guild
-        w = await _vars.ensureWebhook(channel)
+        w = await bot.ensureWebhook(channel)
         msg = " ".join(args)
         if not msg:
             raise IndexError("Message is empty.")
-        perm = _vars.getPerms(user.id, guild)
+        perm = bot.getPerms(user.id, guild)
         try:
             mlist = mimics[prefix]
             if mlist is None:
                 raise KeyError
-            m = [_vars.get_mimic(verifyID(p)) for p in mlist]
+            m = [bot.get_mimic(verifyID(p)) for p in mlist]
         except KeyError:
-            mimic = _vars.get_mimic(verifyID(prefix))
+            mimic = bot.get_mimic(verifyID(prefix))
             if not isnan(perm) and mimic.u_id != user.id:
                 raise PermissionError("Target mimic does not belong to you.")
             m = [mimic]
         admin = not inf > perm
         try:
-            enabled = _vars.data.enabled[channel.id]
+            enabled = bot.data.enabled[channel.id]
         except KeyError:
             enabled = ()
         if not admin and "game" not in enabled:
             raise PermissionError("Not permitted to send into target channel.")
         for mimic in m:
-            await _vars.database.mimics.updateMimic(mimic, guild)
+            await bot.database.mimics.updateMimic(mimic, guild)
             name = mimic.name
             url = mimic.url
             try:
                 await w.send(msg, username=name, avatar_url=url)
             except discord.NotFound:
-                w = await _vars.ensureWebhook(channel, force=True)
+                w = await bot.ensureWebhook(channel, force=True)
                 await w.send(msg, username=name, avatar_url=url)
             mimic.count += 1
             mimic.total += len(msg)
@@ -637,16 +637,16 @@ class UpdateMimics(Database):
             return
         user = message.author
         if user.id in self.data:
-            _vars = self._vars
-            perm = _vars.getPerms(user.id, message.guild)
+            bot = self.bot
+            perm = bot.getPerms(user.id, message.guild)
             admin = not inf > perm
             if message.guild is not None:
                 try:
-                    enabled = _vars.data.enabled[message.channel.id]
+                    enabled = bot.data.enabled[message.channel.id]
                 except KeyError:
                     enabled = ()
             else:
-                enabled = list(_vars.categories)
+                enabled = list(bot.categories)
             if admin or "game" in enabled:
                 database = self.data[user.id]
                 msg = message.content
@@ -670,8 +670,8 @@ class UpdateMimics(Database):
                         if not found:
                             sending[-1].msg += "\n" + line
                     if sending:
-                        create_task(_vars.silentDelete(message))
-                        w = await _vars.ensureWebhook(channel)
+                        create_task(bot.silentDelete(message))
+                        w = await bot.ensureWebhook(channel)
                         for k in sending:
                             mimic = self.data[k.m_id]
                             await self.updateMimic(mimic, guild=message.guild)
@@ -681,7 +681,7 @@ class UpdateMimics(Database):
                             try:
                                 await w.send(msg, username=name, avatar_url=url)
                             except discord.NotFound:
-                                w = await _vars.ensureWebhook(channel, force=True)
+                                w = await bot.ensureWebhook(channel, force=True)
                                 await w.send(msg, username=name, avatar_url=url)
                             mimic.count += 1
                             mimic.total += len(k.msg)
@@ -690,21 +690,21 @@ class UpdateMimics(Database):
 
     async def updateMimic(self, mimic, guild=None, it=None):
         if mimic.setdefault("auto", None):
-            _vars = self._vars
+            bot = self.bot
             mim = 0
             try:
                 mim = verifyID(mimic.auto)
                 if guild is not None:
                     user = guild.get_member(mim)
                 if user is None:
-                    user = await _vars.fetch_user(mim)
+                    user = await bot.fetch_user(mim)
                 if user is None:
                     raise LookupError
                 mimic.name = user.display_name
                 mimic.url = str(user.avatar_url)
             except (discord.NotFound, LookupError):
                 try:
-                    mimi = _vars.get_mimic(mim)
+                    mimi = bot.get_mimic(mim)
                     if it is None:
                         it = {}
                     elif mim in it:
@@ -941,7 +941,7 @@ class UpdateMathTest(Database):
             if st and i[0] not in "+-":
                 st += "+"
             st += i
-        ans = await self._vars.solveMath(st, -1, 2, 1)
+        ans = await self.bot.solveMath(st, -1, 2, 1)
         a = ans[0]
         q = self.eqtrans(a)
         if xrand(2):
@@ -985,25 +985,25 @@ class UpdateMathTest(Database):
         await channel.send(msg)
 
     async def __call__(self):
-        _vars = self._vars
+        bot = self.bot
         for c_id in self.data:
             if self.data[c_id].answer is None:
                 self.data[c_id].answer = nan
-                channel = await _vars.fetch_channel(c_id)
+                channel = await bot.fetch_channel(c_id)
                 await self.newQuestion(channel)
 
     async def _nocommand_(self, message, **void):
-        _vars = self._vars
+        bot = self.bot
         channel = message.channel
         if channel.id in self.data:
-            if message.author.id != _vars.client.user.id:
+            if message.author.id != bot.client.user.id:
                 msg = message.content.strip("|").strip("`")
                 if not msg or msg.lower() != msg:
                     return
                 if msg.startswith("#") or msg.startswith("//") or msg.startswith("\\"):
                     return
                 try:
-                    x = await _vars.solveMath(msg, getattr(channel, "guild", None), 2, 1)
+                    x = await bot.solveMath(msg, getattr(channel, "guild", None), 2, 1)
                     x = await create_future(sympy.sympify, x[0])
                 except:
                     return

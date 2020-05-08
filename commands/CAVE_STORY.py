@@ -307,14 +307,14 @@ class CS_org2xm(Command):
     description = "Converts a .org file to another file format."
     usage = "<0:org_url{attached_file}> <2:wave_url[]> <1:out_format[xm]>"
 
-    async def __call__(self, args, _vars, message, channel, guild, **void):
+    async def __call__(self, args, bot, message, channel, guild, **void):
         if len(message.attachments):
             org = message.attachments[0].url
             args = [""] + args
         else:
-            org = await _vars.followURL(verifyURL(args[0]))
+            org = await bot.followURL(verifyURL(args[0]))
         if len(args) > 2:
-            wave = await _vars.followURL(verifyURL(args[1]))
+            wave = await bot.followURL(verifyURL(args[1]))
         else:
             wave = None
             #wave = "https://cdn.discordapp.com/attachments/313292557603962881/674183355972976660/ORG210EN.DAT"
@@ -387,10 +387,10 @@ class CS_mem2flag(Command):
     description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
     usage = "<0:address> <1:value[1]>"
 
-    async def __call__(self, _vars, args, guild, **void):
+    async def __call__(self, bot, args, guild, **void):
         if len(args) < 2:
             return "```css\n" + _m2f(args[0], 1) + "```"
-        num = await _vars.evalMath(" ".join(args[1:]), guild.id)
+        num = await bot.evalMath(" ".join(args[1:]), guild.id)
         return "```css\n" + _m2f(args[0], num) + "```"
 
 
@@ -469,7 +469,7 @@ class CS_npc(Command):
     flags = "c"
     no_parse = True
 
-    async def __call__(self, _vars, args, flags, **void):
+    async def __call__(self, bot, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
         argv = " ".join(args)
         data = entity_list.search(argv, lim)

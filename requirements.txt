@@ -27,4 +27,4 @@ scipy>=1.4.1
 sympy>=1.5.1
 urllib3>=1.25.7
 websockets>=6.0
-youtube-dl>=2020.3.24
+youtube-dl>=2020.5.3

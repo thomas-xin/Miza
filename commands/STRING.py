@@ -111,19 +111,19 @@ class Translate(Command):
 
 class Math(Command):
     _timeout_ = 4
-    name = ["Python", "PY", "Sympy", "M", "Calc"]
+    name = ["PY", "Sympy", "M", "Calc"]
     min_level = 0
     description = "Evaluates a math formula."
     usage = "<function> <verbose(?v)> <rationalize(?r)>"
     flags = "rv"
 
-    async def __call__(self, _vars, argv, channel, flags, guild, **void):
+    async def __call__(self, bot, argv, channel, flags, guild, **void):
         f = argv
         if not len(f):
             raise IndexError("Function is empty.")
         r = "r" in flags
         p = flags.get("v", 0) * 2 + 1 << 6
-        resp = await _vars.solveMath(f, guild, p, r)
+        resp = await bot.solveMath(f, guild, p, r)
         if type(resp) is dict and "file" in resp:
             f = discord.File(resp["file"])
             return {"file": f}
@@ -261,7 +261,7 @@ class Time(Command):
 
     async def __call__(self, argv, guild, **void):
         if argv:
-            h = await self._vars.evalMath(argv, guild)
+            h = await self.bot.evalMath(argv, guild)
         else:
             h = 0
         hrs = datetime.timedelta(hours=h)

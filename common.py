@@ -544,7 +544,7 @@ class Command:
             + ", Current level: " + str(perm) + "."
         )
 
-    def __init__(self, _vars, catg):
+    def __init__(self, bot, catg):
         if not hasattr(self, "data"):
             self.data = freeClass()
         if not hasattr(self, "name"):
@@ -559,23 +559,23 @@ class Command:
             self.min_display = self.min_level
         for a in self.alias:
             a = a.lower()
-            if a in _vars.commands:
-                _vars.commands[a].append(self)
+            if a in bot.commands:
+                bot.commands[a].append(self)
             else:
-                _vars.commands[a] = hlist([self])
+                bot.commands[a] = hlist([self])
         self.catg = catg
-        self._vars = _vars
-        self._globals = _vars._globals
+        self.bot = bot
+        self._globals = bot._globals
     
     async def __call__(self, **void):
         pass
 
 
 class Database:
-    _vars = None
+    bot = None
     name = "data"
 
-    def __init__(self, _vars, catg):
+    def __init__(self, bot, catg):
         name = self.name
         self.__name__ = self.__class__.__name__
         if not getattr(self, "no_file", False):
@@ -599,14 +599,14 @@ class Database:
                         print(self.file)
                         print(traceback.format_exc())
                         raise FileNotFoundError
-                _vars.data[name] = self.data = data
+                bot.data[name] = self.data = data
             except FileNotFoundError:
-                _vars.data[name] = self.data = {}
+                bot.data[name] = self.data = {}
         else:
-            _vars.data[name] = self.data = {}
-        _vars.database[name] = self
+            bot.data[name] = self.data = {}
+        bot.database[name] = self
         self.catg = catg
-        self._vars = _vars
+        self.bot = bot
         self.busy = self.checking = False
         self._globals = globals()
         # print(name, self.__name__)

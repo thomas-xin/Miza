@@ -18,8 +18,8 @@ class IMG(Command):
 
     async def __call__(self, flags, args, argv, guild, perm, **void):
         update = self.data.images.update
-        _vars = self._vars
-        imglists = _vars.data.images
+        bot = self.bot
+        imglists = bot.data.images
         images = imglists.get(guild.id, {})
         if "a" in flags or "e" in flags or "d" in flags:
             req = 2
@@ -36,7 +36,7 @@ class IMG(Command):
                 key = args[0].lower()
                 if len(key) > 64:
                     raise OverflowError("Image tag too long.")
-                url = await _vars.followURL(verifyURL(args[1]))
+                url = await bot.followURL(verifyURL(args[1]))
                 if len(url) > 256:
                     raise OverflowError("Image url too long.")
                 images[key] = url
@@ -110,10 +110,10 @@ class React(Command):
     flags = "aed"
     no_parse = True
 
-    async def __call__(self, _vars, flags, guild, message, argv, args, **void):
+    async def __call__(self, bot, flags, guild, message, argv, args, **void):
         update = self.data.reacts.update
-        _vars = self._vars
-        following = _vars.data.reacts
+        bot = self.bot
+        following = bot.data.reacts
         curr = following.setdefault(guild.id, multiDict())
         if type(curr) is not multiDict:
             following[guild.id] = curr = multiDict(curr)
@@ -133,8 +133,8 @@ class React(Command):
                     "Currently active auto reacts for **" + discord.utils.escape_markdown(guild.name)
                     + "**:\n```ini\n" + strIter(curr) + "```"
                 )
-        a = reconstitute(args[0]).lower()[:64]
         if "d" in flags:
+            a = reconstitute(argv).lower()
             if a in curr:
                 curr.pop(a)
                 update()
@@ -150,12 +150,13 @@ class React(Command):
                 + " has reached the maximum of 256 items. "
                 + "Please remove an item to add another."
             )
+        a = reconstitute(" ".join(args[:-1])).lower()[:64]
         try:
-            e_id = int(args[1])
+            e_id = int(args[-1])
         except:
-            emoji = args[1]
+            emoji = args[-1]
         else:
-            emoji = await _vars.fetch_emoji(e_id)
+            emoji = await bot.fetch_emoji(e_id)
         await message.add_reaction(emoji)
         curr.append(a, str(emoji))
         update()

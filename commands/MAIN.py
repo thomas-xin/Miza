@@ -17,10 +17,10 @@ class Help(Command):
     flags = "v"
 
     async def __call__(self, args, user, channel, guild, flags, perm, **void):
-        _vars = self._vars
-        enabled = _vars.data.enabled
+        bot = self.bot
+        enabled = bot.data.enabled
         g_id = guild.id
-        prefix = _vars.getPrefix(g_id)
+        prefix = bot.getPrefix(g_id)
         enabled = enabled.get(channel.id, list(default_commands))
         v = "v" in flags
         emb = discord.Embed(colour=randColour())
@@ -28,10 +28,10 @@ class Help(Command):
         found = {}
         for a in args:
             a = a.lower()
-            if a in _vars.categories:
-                coms = _vars.categories[a]
-            elif a in _vars.commands:
-                coms = _vars.commands[a]
+            if a in bot.categories:
+                coms = bot.categories[a]
+            elif a in bot.commands:
+                coms = bot.commands[a]
             else:
                 continue
             for com in coms:
@@ -50,7 +50,7 @@ class Help(Command):
                     if not a:
                         a = "[none]"
                     s = "```ini\n[Aliases] " + a
-                    s += "\n[Effect] " + com.description.replace("⟨MIZA⟩", _vars.client.user.name)
+                    s += "\n[Effect] " + com.description.replace("⟨MIZA⟩", bot.client.user.name)
                     if v or len(found) <= 1:
                         s += (
                             "\n[Usage] " + prefix + com.__name__ + " " + com.usage
@@ -68,7 +68,7 @@ class Help(Command):
                 "Please enter a command category to display usable commands,\nor see "
                 + "[Commands](https://github.com/thomas-xin/Miza/wiki/Commands) for full command list."
             )
-            if _vars.categories:
+            if bot.categories:
                 s = "```ini\n" + " ".join((sbHighlight(c) for c in standard_commands)) + "```"
                 emb.add_field(name="Command category list", value=s)
         return freeClass(embed=emb), 1
@@ -81,7 +81,7 @@ class Perms(Command):
     usage = "<0:user{self}> <1:level[]> <hide(?h)>"
     flags = "fh"
 
-    async def __call__(self, _vars, args, user, perm, guild, flags, **void):
+    async def __call__(self, bot, args, user, perm, guild, flags, **void):
         if len(args) < 1:
             t_user = user
         else:
@@ -90,19 +90,19 @@ class Perms(Command):
                 args[0] = guild.id
             u_id = verifyID(args[0])
             try:
-                t_user = await _vars.fetch_user(u_id)
+                t_user = await bot.fetch_user(u_id)
             except (TypeError, discord.NotFound):
                 try:
-                    t_user = await _vars.fetch_member(u_id, guild)
+                    t_user = await bot.fetch_member(u_id, guild)
                 except LookupError:
                     try:
                         t_user = guild.get_role(u_id)
                         if t_user is None:
                             raise LookupError
                     except LookupError:
-                        t_user = await _vars.fetch_whuser(u_id, guild)
+                        t_user = await bot.fetch_whuser(u_id, guild)
         print(t_user)
-        t_perm = _vars.getPerms(t_user.id, guild)
+        t_perm = bot.getPerms(t_user.id, guild)
         if len(args) > 1:
             name = str(t_user)
             orig = t_perm
@@ -112,7 +112,7 @@ class Perms(Command):
                 if expr.startswith(operator):
                     expr = expr[2:].strip(" ")
                     _op = operator[0]
-            num = await _vars.evalMath(expr, guild)
+            num = await bot.evalMath(expr, guild)
             if _op is not None:
                 num = eval(str(orig) + _op + str(num), {}, infinum)
             c_perm = num
@@ -125,9 +125,9 @@ class Perms(Command):
                     raise PermissionError("Must be server owner to assign non-finite permission level.")
                 if t_user is None:
                     for u in guild.members:
-                        _vars.setPerms(u.id, guild, c_perm)
+                        bot.setPerms(u.id, guild, c_perm)
                 else:
-                    _vars.setPerms(t_user.id, guild, c_perm)
+                    bot.setPerms(t_user.id, guild, c_perm)
                 if "h" in flags:
                     return
                 return (
@@ -162,8 +162,8 @@ class EnabledCommands(Command):
 
     async def __call__(self, argv, flags, user, channel, perm, **void):
         update = self.data.enabled.update
-        _vars = self._vars
-        enabled = _vars.data.enabled
+        bot = self.bot
+        enabled = bot.data.enabled
         if "a" in flags or "e" in flags or "d" in flags:
             req = 3
             if perm < req:
@@ -180,7 +180,7 @@ class EnabledCommands(Command):
                     + str(standard_commands) + "```"
                 )
             if "e" in flags or "a" in flags:
-                categories = list(standard_commands) #list(_vars.categories)
+                categories = list(standard_commands) #list(bot.categories)
                 enabled[channel.id] = categories
                 update()
                 if "h" in flags:
@@ -204,7 +204,7 @@ class EnabledCommands(Command):
                 + strIter(enabled.get(channel.id, default_commands)) + "```"
             )
         else:
-            if not catg in _vars.categories:
+            if not catg in bot.categories:
                 raise LookupError("Unknown command category " + argv + ".")
             else:
                 enabled = enabled.setdefault(channel.id, {})
@@ -251,8 +251,8 @@ class Prefix(Command):
     usage = "<prefix[]> <default(?d)>"
     flags = "hd"
 
-    async def __call__(self, argv, guild, perm, _vars, flags, **void):
-        pref = _vars.data.prefixes
+    async def __call__(self, argv, guild, perm, bot, flags, **void):
+        pref = bot.data.prefixes
         update = self.data.prefixes.update
         if "d" in flags:
             if guild.id in pref:
@@ -265,7 +265,7 @@ class Prefix(Command):
         if not argv:
             return (
                 "```css\nCurrent command prefix for [" + noHighlight(guild.name)
-                + "]: [" + noHighlight(_vars.getPrefix(guild)) + "].```"
+                + "]: [" + noHighlight(bot.getPrefix(guild)) + "].```"
             )
         req = 3
         if perm < req:
@@ -294,8 +294,8 @@ class Loop(Command):
     description = "Loops a command."
     usage = "<0:iterations> <1:command>"
 
-    async def __call__(self, args, argv, message, channel, callback, _vars, perm, guild, **void):
-        num = await _vars.evalMath(args[0], guild.id)
+    async def __call__(self, args, argv, message, channel, callback, bot, perm, guild, **void):
+        num = await bot.evalMath(args[0], guild.id)
         iters = round(num)
         scale = 3
         limit = perm * scale
@@ -314,9 +314,9 @@ class Loop(Command):
         if not isnan(perm):
             for n in self.name:
                 if (
-                    (_vars.getPrefix(guild) + n).upper() in func.replace(" ", "").upper()
+                    (bot.getPrefix(guild) + n).upper() in func.replace(" ", "").upper()
                 ) or (
-                    (str(_vars.client.user.id) + ">" + n).upper() in func.replace(" ", "").upper()
+                    (str(bot.client.user.id) + ">" + n).upper() in func.replace(" ", "").upper()
                 ):
                     raise PermissionError("Must be owner to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
@@ -371,7 +371,7 @@ class Avatar(Command):
             "embed": emb,
         }
 
-    async def __call__(self, argv, guild, _vars, client, user, **void):
+    async def __call__(self, argv, guild, bot, client, user, **void):
         g, guild = guild, None
         if argv:
             try:
@@ -379,31 +379,31 @@ class Avatar(Command):
             except:
                 u_id = argv
             try:
-                p = _vars.get_mimic(u_id, user)
+                p = bot.get_mimic(u_id, user)
                 return self.getMimicData(p)
             except:
                 try:
-                    u = await _vars.fetch_member(u_id, g)
+                    u = await bot.fetch_member(u_id, g)
                 except:
                     try:
-                        u = await _vars.fetch_user(u_id)
+                        u = await bot.fetch_user(u_id)
                     except:
                         if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
                             guild = g
                         else:
                             try:
-                                guild = await _vars.fetch_guild(u_id)
+                                guild = await bot.fetch_guild(u_id)
                             except:
                                 try:
-                                    channel = await _vars.fetch_channel(u_id)
+                                    channel = await bot.fetch_channel(u_id)
                                 except:
                                     try:
-                                        u = await _vars.fetch_whuser(u_id, g)
+                                        u = await bot.fetch_whuser(u_id, g)
                                     except EOFError:
                                         u = None
-                                        if g.id in _vars.data.counts:
-                                            if u_id in _vars.data.counts[g.id]["counts"]:
-                                                u = _vars.ghostUser()
+                                        if g.id in bot.data.counts:
+                                            if u_id in bot.data.counts[g.id]["counts"]:
+                                                u = bot.ghostUser()
                                                 u.id = u_id
                                         if u is None:
                                             raise LookupError("Unable to find user or server from ID.")
@@ -443,7 +443,7 @@ class Info(Command):
     flags = "v"
 
     async def getGuildData(self, g, flags={}):
-        _vars = self._vars
+        bot = self.bot
         url = strURL(g.icon_url)
         name = g.name
         try:
@@ -463,14 +463,14 @@ class Info(Command):
         top = None
         try:
             g.region
-            pcount = await _vars.database.counts.getUserMessages(None, g)
+            pcount = await bot.database.counts.getUserMessages(None, g)
         except (AttributeError, KeyError):
             pcount = 0
         try:
             if "v" in flags:
-                pavg = await _vars.database.counts.getUserAverage(None, g)
+                pavg = await bot.database.counts.getUserAverage(None, g)
                 users = deque()
-                us = await _vars.database.counts.getGuildMessages(g)
+                us = await bot.database.counts.getGuildMessages(g)
                 if type(us) is str:
                     top = us
                 else:
@@ -509,7 +509,7 @@ class Info(Command):
         }
 
     def getMimicData(self, p, flags={}):
-        _vars = self._vars
+        bot = self.bot
         url = strURL(p.url)
         name = p.name
         emb = discord.Embed(colour=randColour())
@@ -549,7 +549,7 @@ class Info(Command):
             "embed": emb,
         }
 
-    async def __call__(self, argv, guild, _vars, client, user, flags, **void):
+    async def __call__(self, argv, guild, bot, client, user, flags, **void):
         member = True
         g, guild = guild, None
         if argv:
@@ -558,32 +558,32 @@ class Info(Command):
             except:
                 u_id = argv
             try:
-                p = _vars.get_mimic(u_id, user)
+                p = bot.get_mimic(u_id, user)
                 return self.getMimicData(p, flags)
             except:
                 try:
-                    u = await _vars.fetch_member(u_id, g)
+                    u = await bot.fetch_member(u_id, g)
                 except:
                     try:
-                        u = await _vars.fetch_user(u_id)
+                        u = await bot.fetch_user(u_id)
                         member = False
                     except:
                         if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
                             guild = g
                         else:
                             try:
-                                guild = await _vars.fetch_guild(u_id)
+                                guild = await bot.fetch_guild(u_id)
                             except:
                                 try:
-                                    channel = await _vars.fetch_channel(u_id)
+                                    channel = await bot.fetch_channel(u_id)
                                 except:
                                     try:
-                                        u = await _vars.fetch_whuser(u_id, g)
+                                        u = await bot.fetch_whuser(u_id, g)
                                     except EOFError:
                                         u = None
-                                        if g.id in _vars.data.counts:
-                                            if u_id in _vars.data.counts[g.id]["counts"]:
-                                                u = _vars.ghostUser()
+                                        if g.id in bot.data.counts:
+                                            if u_id in bot.data.counts[g.id]["counts"]:
+                                                u = bot.ghostUser()
                                                 u.id = u_id
                                         if u is None:
                                             raise LookupError("Unable to find user or server from ID.")
@@ -608,7 +608,7 @@ class Info(Command):
             is_sys = False
         is_bot = u.bot
         is_self = u.id == client.user.id
-        is_self_owner = u.id == _vars.owner_id
+        is_self_owner = u.id == bot.owner_id
         is_guild_owner = u.id == guild.owner_id
         if member:
             joined = getattr(u, "joined_at", None)
@@ -621,20 +621,20 @@ class Info(Command):
         pos = None
         if "v" in flags:
             try:
-                coms = _vars.data.users[u.id]["commands"]
+                coms = bot.data.users[u.id]["commands"]
             except LookupError:
                 pass
             try:
                 ts = datetime.datetime.utcnow().timestamp()
-                seen = sec2Time(max(0, ts - _vars.data.users[u.id]["last_seen"])) + " ago"
+                seen = sec2Time(max(0, ts - bot.data.users[u.id]["last_seen"])) + " ago"
             except LookupError:
                 pass
             try:
-                gmsg = _vars.database.counts.getUserGlobalMessageCount(u)
-                msgs = await _vars.database.counts.getUserMessages(u, guild)
-                avgs = await _vars.database.counts.getUserAverage(u, guild)
+                gmsg = bot.database.counts.getUserGlobalMessageCount(u)
+                msgs = await bot.database.counts.getUserMessages(u, guild)
+                avgs = await bot.database.counts.getUserAverage(u, guild)
                 if guild.owner.id != client.user.id:
-                    us = await _vars.database.counts.getGuildMessages(guild)
+                    us = await bot.database.counts.getGuildMessages(guild)
                     if type(us) is str:
                         pos = us
                     else:
@@ -653,8 +653,8 @@ class Info(Command):
                                 pos = len(ul) + 1
             except LookupError:
                 pass
-        if is_self and _vars.website is not None:
-            url2 = _vars.website
+        if is_self and bot.website is not None:
+            url2 = bot.website
         else:
             url2 = url
         emb = discord.Embed(colour=randColour())
@@ -704,7 +704,7 @@ class Hello(Command):
     min_level = 0
     description = "Sends a waving emoji. Useful for checking whether the bot is online."
     
-    async def __call__(self, channel, _vars, **void):
+    async def __call__(self, channel, bot, **void):
         return "👋"
 
 
@@ -714,19 +714,19 @@ class Status(Command):
     min_level = 0
     description = "Shows the bot's current internal program state."
 
-    async def __call__(self, flags, client, _vars, **void):
-        active = _vars.getActive()
+    async def __call__(self, flags, client, bot, **void):
+        active = bot.getActive()
         latency = sec2Time(client.latency)
         try:
             shards = len(client.latencies)
         except AttributeError:
             shards = 1
-        size = _vars.codeSize
-        stats = _vars.currState
+        size = bot.codeSize
+        stats = bot.currState
         return (
             "```ini"
             + "\nActive users: " + sbHighlight(len(client.users))
-            + ", Active servers: " + sbHighlight(_vars.guilds)
+            + ", Active servers: " + sbHighlight(bot.guilds)
             + ", Active shards: " + sbHighlight(shards)
             
             + ".\nActive processes: " + sbHighlight(active[0])
@@ -756,7 +756,7 @@ class Reminder(Command):
     usage = "<1:message> <0:time> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, argv, name, message, flags, _vars, user, guild, **void):
+    async def __call__(self, argv, name, message, flags, bot, user, guild, **void):
         msg = message.content
         argv2 = argv
         argv = msg[msg.lower().index(name) + len(name):].strip(" ").strip("\n")
@@ -764,14 +764,14 @@ class Reminder(Command):
             args = shlex.split(argv)
         except ValueError:
             args = argv.split(" ")
-        rems = _vars.data.reminders.get(user.id, [])
-        update = _vars.database.reminders.update
+        rems = bot.data.reminders.get(user.id, [])
+        update = bot.database.reminders.update
         if "d" in flags:
             if not argv:
                 i = 0
             else:
                 print(argv)
-                i = await _vars.evalMath(argv2, guild)
+                i = await bot.evalMath(argv2, guild)
             x = rems.pop(i)
             update()
             return (
@@ -807,7 +807,7 @@ class Reminder(Command):
                     msg = ""
                 if spl is not None:
                     msg = " in ".join(spl[:-1])
-                    t = await _vars.evalTime(spl[-1], guild)
+                    t = await bot.evalTime(spl[-1], guild)
                     break
             if "at" in argv:
                 if " at " in argv:
@@ -820,7 +820,7 @@ class Reminder(Command):
                     t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
                     break
             msg = " ".join(args[:-1])
-            t = await _vars.evalTime(args[-1], guild)
+            t = await bot.evalTime(args[-1], guild)
             break
         msg = msg.strip(" ")
         if not msg:
@@ -829,14 +829,20 @@ class Reminder(Command):
             raise OverflowError("Reminder message too long (" + str(len(msg)) + "> 512).")
         name = str(user)
         url = strURL(user.avatar_url)
+        ts = datetime.datetime.utcnow().timestamp()
         rems.append(freeClass(
             name=name,
             url=url,
             msg=msg,
-            t=t + datetime.datetime.utcnow().timestamp(),
+            t=t + ts,
             u=1
         ))
-        _vars.data.reminders[user.id] = sort(rems, key=lambda x: x["t"])
+        bot.data.reminders[user.id] = sort(rems, key=lambda x: x["t"])
+        try:
+            bot.database.reminders.keyed.remove((0, user.id), key=lambda x: x[-1])
+        except IndexError:
+            pass
+        bot.database.reminders.keyed.insort((t + ts, user.id), key=lambda x: x[0])
         update()
         emb = discord.Embed(description=msg)
         emb.set_author(name=name, url=url, icon_url=url)
@@ -855,20 +861,20 @@ class Announcement(Command):
     usage = "<1:message> <0:time> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, name, message, flags, _vars, user, channel, guild, **void):
+    async def __call__(self, name, message, flags, bot, user, channel, guild, **void):
         msg = message.content
         argv = msg[msg.lower().index(name) + len(name):].strip(" ").strip("\n")
         try:
             args = shlex.split(argv)
         except ValueError:
             args = argv.split(" ")
-        rems = _vars.data.reminders.get(channel.id, [])
-        update = _vars.database.reminders.update
+        rems = bot.data.reminders.get(channel.id, [])
+        update = bot.database.reminders.update
         if "d" in flags:
             if not argv:
                 i = 0
             else:
-                i = await _vars.evalMath(argv, guild)
+                i = await bot.evalMath(argv, guild)
             x = rems.pop(i)
             update()
             return (
@@ -900,7 +906,7 @@ class Announcement(Command):
                     msg = ""
                 if spl is not None:
                     msg = " in ".join(spl[:-1])
-                    t = await _vars.evalTime(spl[-1], guild)
+                    t = await bot.evalTime(spl[-1], guild)
                     break
             if "at" in argv:
                 if " at " in argv:
@@ -913,7 +919,7 @@ class Announcement(Command):
                     t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
                     break
             msg = " ".join(args[:-1])
-            t = await _vars.evalTime(args[-1], guild)
+            t = await bot.evalTime(args[-1], guild)
             break
         msg = msg.strip(" ")
         if not msg:
@@ -922,20 +928,26 @@ class Announcement(Command):
             raise OverflowError("Announcement message too long (" + str(len(msg)) + "> 512).")
         name = str(user)
         url = strURL(user.avatar_url)
+        ts = datetime.datetime.utcnow().timestamp()
         rems.append(freeClass(
             name=name,
             url=url,
             msg=msg,
-            t=t + datetime.datetime.utcnow().timestamp(),
+            t=t + ts,
             u=0
         ))
-        _vars.data.reminders[channel.id] = sort(rems, key=lambda x: x["t"])
+        bot.data.reminders[channel.id] = sort(rems, key=lambda x: x["t"])
+        try:
+            bot.database.reminders.keyed.remove((0, channel.id), key=lambda x: x[-1])
+        except IndexError:
+            pass
+        bot.database.reminders.keyed.insort((t + ts, channel.id), key=lambda x: x[0])
         update()
         emb = discord.Embed(description=msg)
         emb.set_author(name=name, url=url, icon_url=url)
         return {
-            "content": ("```css\nSuccessfully set announcement for [#"
-                + noHighlight(channel) + "] in [" + noHighlight(sec2Time(t)) + "]:```"
+            "content": ("```css\nSuccessfully set reminder for ["
+                + noHighlight(user) + "] in [" + noHighlight(sec2Time(t)) + "]:```"
             ),
             "embed": emb,
         }
@@ -945,39 +957,38 @@ class UpdateReminders(Database):
     name = "reminders"
     no_delete = True
 
+    def __init__(self, *args):
+        super().__init__(*args)
+        d = self.data
+        self.keyed = hlist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
+
     async def __call__(self):
-        if self.busy:
-            return
         t = datetime.datetime.utcnow().timestamp()
-        i = 1
-        changed = False
-        for u_id in tuple(self.data):
+        while self.keyed:
+            p = self.keyed[0]
+            if t < p[0]:
+                break
+            print(self.keyed)
+            self.keyed.popleft()
+            u_id = p[1]
+            temp = self.data[u_id]
+            x = freeClass(temp.pop(0))
+            if not temp:
+                self.data.pop(u_id)
+            else:
+                t = self.data[u_id][0]["t"]
+                self.bot.database.reminders.keyed.insort((t, u_id), key=lambda x: x[0])
+            if x.u:
+                ch = await self.bot.fetch_user(u_id)
+            else:
+                ch = await self.bot.fetch_channel(u_id)
+            emb = discord.Embed(description=x.msg)
+            emb.set_author(name=x.name, url=x.url, icon_url=x.url)
             try:
-                temp = self.data[u_id]
-                if not len(temp):
-                    self.data.pop(u_id)
-                    changed = True
-                    continue
-                x = temp[0]
-                if t >= x["t"]:
-                    x = freeClass(**x)
-                    temp.pop(0)
-                    changed = True
-                    if x.u:
-                        ch = await self._vars.getDM(u_id)
-                    else:
-                        ch = await self._vars.fetch_channel(u_id)
-                    emb = discord.Embed(description=x.msg)
-                    emb.set_author(name=x.name, url=x.url, icon_url=x.url)
-                    await ch.send(embed=emb)
-                if not i & 16383:
-                    await asyncio.sleep(0.3)
-                i += 1
-            except:
-                print(traceback.format_exc())
-        if changed:
+                await ch.send(embed=emb)
+            except discord.Forbidden:
+                pass
             self.update()
-        self.busy = False
 
 
 class UpdateMessageCount(Database):
@@ -992,7 +1003,7 @@ class UpdateMessageCount(Database):
 
     async def getUserMessages(self, user, guild):
         if self.scanned == -1:
-            c_id = self._vars.client.user.id
+            c_id = self.bot.client.user.id
             if guild is None or hasattr(guild, "isDM"):
                 channel = user.dm_channel
                 if channel is None:
@@ -1026,7 +1037,7 @@ class UpdateMessageCount(Database):
 
     async def getUserAverage(self, user, guild):
         if self.scanned == -1:
-            c_id = self._vars.client.user.id
+            c_id = self.bot.client.user.id
             if guild is None or hasattr(guild, "isDM"):
                 channel = user.dm_channel
                 if channel is None:
@@ -1147,7 +1158,7 @@ class UpdateMessageCount(Database):
             return
         self.scanned = True
         year = datetime.timedelta(seconds=31556925.216)
-        guilds = self._vars.client.guilds
+        guilds = self.bot.client.guilds
         i = 1
         for guild in sorted(guilds, key=lambda g: g.member_count, reverse=True):
             if guild.id not in self.data:
@@ -1208,12 +1219,12 @@ class updateUsers(Database):
 
     async def _nocommand_(self, text, message, **void):
         if not message.mentions:
-            name = self.__dict__.setdefault("name", reconstitute(self._vars.client.user.name).lower())
+            name = self.__dict__.setdefault("name", reconstitute(self.bot.client.user.name).lower())
             if name not in text:
                 return
         else:
             ids = (u.id for u in message.mentions)
-            if self._vars.client.user.id not in ids:
+            if self.bot.client.user.id not in ids:
                 return
         if self.bcheck(text):
             await message.channel.send("😢")

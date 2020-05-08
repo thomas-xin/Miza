@@ -15,7 +15,7 @@ class Purge(Command):
     usage = "<1:user{bot}(?a)> <0:count[1]> <hide(?h)>"
     flags = "ah"
 
-    async def __call__(self, client, _vars, argv, args, channel, name, flags, perm, guild, **void):
+    async def __call__(self, client, bot, argv, args, channel, name, flags, perm, guild, **void):
         t_user = -1
         if "a" in flags or "everyone" in argv or "here" in argv:
             t_user = None
@@ -25,20 +25,20 @@ class Purge(Command):
             if len(args) < 1:
                 count = 1
             else:
-                num = await _vars.evalMath(args[0], guild.id)
+                num = await bot.evalMath(args[0], guild.id)
                 count = round(num)
         else:
             a1 = args[0]
             a2 = " ".join(args[1:])
-            num = await _vars.evalMath(a2, guild.id)
+            num = await bot.evalMath(a2, guild.id)
             count = round(num)
             if t_user == -1:
                 u_id = verifyID(a1)
                 try:
-                    t_user = await _vars.fetch_user(u_id)
+                    t_user = await bot.fetch_user(u_id)
                 except (TypeError, discord.NotFound):
                     try:
-                        t_user = await _vars.fetch_member(u_id, guild)
+                        t_user = await bot.fetch_member(u_id, guild)
                     except LookupError:
                         t_user = freeClass(id=u_id)
         if count <= 0:
@@ -48,7 +48,7 @@ class Purge(Command):
                 await channel.clone(reason="Purged.")
                 await channel.delete(reason="Purged.")
                 count = 0
-            except discord.Forbidden:
+            except (AttributeError, discord.Forbidden):
                 pass
         dt = None
         delD = {}
@@ -79,14 +79,14 @@ class Purge(Command):
                     for _ in loop(min(len(delM), 100)):
                         delM.popleft()
                 else:
-                    await _vars.silentDelete(delM[0], exc=True)
+                    await bot.silentDelete(delM[0], exc=True)
                     deleted += 1
                     delM.popleft()
             except:
                 print(traceback.format_exc())
                 for _ in loop(min(5, len(delM))):
                     m = delM.popleft()
-                    await _vars.silentDelete(m, exc=True)
+                    await bot.silentDelete(m, exc=True)
                     deleted += 1
         if not "h" in flags:
             return (
@@ -104,8 +104,8 @@ class Ban(Command):
     usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
     flags = "hvf"
 
-    async def __call__(self, _vars, args, user, message, channel, guild, flags, perm, name, **void):
-        update = self._vars.database.bans.update
+    async def __call__(self, bot, args, user, message, channel, guild, flags, perm, name, **void):
+        update = self.bot.database.bans.update
         dtime = datetime.datetime.utcnow().timestamp()
         if args:
             check = args[0].lower()
@@ -117,13 +117,13 @@ class Ban(Command):
         else:
             u_id = verifyID(args[0])
             try:
-                t_user = await _vars.fetch_user(u_id)
+                t_user = await bot.fetch_user(u_id)
             except (TypeError, discord.NotFound):
                 try:
-                    t_user = await _vars.fetch_member(u_id, guild)
+                    t_user = await bot.fetch_member(u_id, guild)
                 except LookupError:
-                    t_user = await _vars.fetch_whuser(u_id, guild)
-            t_perm = _vars.getPerms(t_user, guild)
+                    t_user = await bot.fetch_whuser(u_id, guild)
+            t_perm = bot.getPerms(t_user, guild)
         if t_perm + 1 > perm or isnan(t_perm):
             if len(args) > 1:
                 reason = (
@@ -131,7 +131,7 @@ class Ban(Command):
                     + " from " + guild.name
                 )
                 self.permError(perm, t_perm + 1, reason)
-        g_bans = await getBans(_vars, guild)
+        g_bans = await getBans(bot, guild)
         msg = None
         if name.lower() == "unban":
             tm = -1
@@ -146,7 +146,7 @@ class Ban(Command):
                 output = ""
                 for u_id in g_bans:
                     try:
-                        user = await _vars.fetch_user(u_id)
+                        user = await bot.fetch_user(u_id)
                         output += (
                             "[" + str(user) + "] "
                             + noHighlight(sec2Time(g_bans[u_id]["unban"] - dtime))
@@ -179,7 +179,7 @@ class Ban(Command):
                 if expr.startswith(operator):
                     expr = expr[2:].strip()
                     _op = operator[0]
-            num = await _vars.evalTime(expr, guild)
+            num = await bot.evalTime(expr, guild)
             if _op is not None:
                 num = eval(str(orig) + _op + str(num), {}, infinum)
             tm = num
@@ -206,7 +206,7 @@ class Ban(Command):
                     + noHighlight(guild.name) + "]...```"
                 ))
             for u_id in g_bans:
-                users.append(await _vars.fetch_user(u_id))
+                users.append(await bot.fetch_user(u_id))
             is_banned = None
         else:
             users = [t_user]
@@ -282,9 +282,9 @@ class RoleGiver(Command):
     no_parse = True
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
-        update = self._vars.database.rolegivers.update
-        _vars = self._vars
-        data = _vars.data.rolegivers
+        update = self.bot.database.rolegivers.update
+        bot = self.bot
+        data = bot.data.rolegivers
         if "d" in flags:
             if argv:
                 react = args[0].lower()
@@ -365,18 +365,18 @@ class AutoRole(Command):
     flags = "aedx"
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
-        update = self._vars.database.autoroles.update
-        _vars = self._vars
-        data = _vars.data.autoroles
+        update = self.bot.database.autoroles.update
+        bot = self.bot
+        data = bot.data.autoroles
         if "d" in flags:
             assigned = data.get(guild.id, None)
             if argv and assigned:
-                i = await _vars.evalMath(argv, guild)
+                i = await bot.evalMath(argv, guild)
                 roles = assigned.pop(i)
                 removed = []
                 for r in roles:
                     try:
-                        role = await _vars.fetch_role(r, guild)
+                        role = await bot.fetch_role(r, guild)
                     except:
                         print(traceback.format_exc())
                         continue
@@ -407,7 +407,7 @@ class AutoRole(Command):
             for roles in assigned:
                 new = hlist()
                 for r in roles:
-                    role = await _vars.fetch_role(r, guild)
+                    role = await bot.fetch_role(r, guild)
                     new.append(role)
                 rlist.append(new)
             if not assigned:
@@ -478,9 +478,9 @@ class RolePreserver(Command):
     flags = "aed"
 
     async def __call__(self, flags, guild, **void):
-        update = self._vars.database.rolepreservers.update
-        _vars = self._vars
-        following = _vars.data.rolepreservers
+        update = self.bot.database.rolepreservers.update
+        bot = self.bot
+        following = bot.data.rolepreservers
         curr = following.get(guild.id)
         if "d" in flags:
             if guild.id in following:
@@ -526,7 +526,7 @@ class Lockdown(Command):
                 + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
             )
             return ("```asciidoc\n[" + response + "]```")
-        u_id = self._vars.client.user.id
+        u_id = self.bot.client.user.id
         for role in guild.roles:
             if len(role.members) != 1 or role.members[-1].id not in (u_id, guild.owner_id):
                 create_task(self.roleLock(role, channel))
@@ -550,12 +550,12 @@ class SaveChannel(Command):
         ch = channel
         if args:
             if len(args) >= 2:
-                num = await self._vars.evalMath(" ".join(args[1:]), guild)
+                num = await self.bot.evalMath(" ".join(args[1:]), guild)
                 if not num <= 65536:
                     raise OverflowError("Maximum number of messages allowed is 65536.")
                 if num <= 0:
                     raise ValueError("Please input a valid message limit.")
-            ch = await self._vars.fetch_channel(verifyID(args[0]))
+            ch = await self.bot.fetch_channel(verifyID(args[0]))
             if guild is None or hasattr(guild, "ghost"):
                 if guild.id != ch.id:
                     raise PermissionError("Target channel is not in this server.")
@@ -580,9 +580,9 @@ class UserLog(Command):
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, _vars, flags, channel, guild, **void):
-        data = _vars.data.logU
-        update = _vars.database.logU.update
+    async def __call__(self, bot, flags, channel, guild, **void):
+        data = bot.data.logU
+        update = bot.database.logU.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
@@ -599,7 +599,7 @@ class UserLog(Command):
             )
         if guild.id in data:
             c_id = data[guild.id]
-            channel = await _vars.fetch_channel(c_id)
+            channel = await bot.fetch_channel(c_id)
             return (
                 "```css\nUser logging for [" + noHighlight(guild.name)
                 + "] is currently enabled in [" + noHighlight(channel.name)
@@ -618,9 +618,9 @@ class MessageLog(Command):
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, _vars, flags, channel, guild, **void):
-        data = _vars.data.logM
-        update = _vars.database.logM.update
+    async def __call__(self, bot, flags, channel, guild, **void):
+        data = bot.data.logM
+        update = bot.database.logM.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
@@ -637,7 +637,7 @@ class MessageLog(Command):
             )
         if guild.id in data:
             c_id = data[guild.id]
-            channel = await _vars.fetch_channel(c_id)
+            channel = await bot.fetch_channel(c_id)
             return (
                 "```css\nMessage logging for [" + noHighlight(guild.name)
                 + "] is currently enabled in [" + noHighlight(channel.name)
@@ -656,9 +656,9 @@ class FileLog(Command):
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, _vars, flags, channel, guild, **void):
-        data = _vars.data.logF
-        update = _vars.database.logF.update
+    async def __call__(self, bot, flags, channel, guild, **void):
+        data = bot.data.logF
+        update = bot.database.logF.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
@@ -675,7 +675,7 @@ class FileLog(Command):
             )
         if guild.id in data:
             c_id = data[guild.id]
-            channel = await _vars.fetch_channel(c_id)
+            channel = await bot.fetch_channel(c_id)
             return (
                 "```css\nFile logging for [" + noHighlight(guild.name)
                 + "] is currently enabled in [" + noHighlight(channel.name)
@@ -692,7 +692,7 @@ class ServerProtector(Database):
     no_file = True
 
     async def kickWarn(self, u_id, guild, owner, msg):
-        user = await self._vars.fetch_user(u_id)
+        user = await self.bot.fetch_user(u_id)
         try:
             await guild.kick(user, reason="Triggered automated server protection response for excessive " + msg + ".")
             await owner.send(
@@ -709,10 +709,10 @@ class ServerProtector(Database):
 
     async def targetWarn(self, u_id, guild, msg):
         print("Channel Deletion warning by <@" + str(u_id) + "> in " + str(guild) + ".")
-        user = self._vars.client.user
+        user = self.bot.client.user
         owner = guild.owner
         if owner.id == user.id:
-            owner = await self._vars.fetch_user(self._vars.owner_id)
+            owner = await self.bot.fetch_user(self.bot.owner_id)
         if u_id == guild.owner.id:
             if u_id == user.id:
                 return
@@ -759,7 +759,7 @@ class UpdateUserLogs(Database):
     name = "logU"
 
     async def _user_update_(self, before, after, **void):
-        for guild in self._vars.client.guilds:
+        for guild in self.bot.client.guilds:
             create_task(self._member_update_(before, after, guild))
 
     async def _member_update_(self, before, after, guild=None):
@@ -775,7 +775,7 @@ class UpdateUserLogs(Database):
         if guild.id in self.data:
             c_id = self.data[guild.id]
             try:
-                channel = await self._vars.fetch_channel(c_id)
+                channel = await self.bot.fetch_channel(c_id)
             except (EOFError, discord.NotFound):
                 self.data.pop(guild.id)
                 self.update()
@@ -847,7 +847,7 @@ class UpdateUserLogs(Database):
         if guild is not None and guild.id in self.data:
             c_id = self.data[guild.id]
             try:
-                channel = await self._vars.fetch_channel(c_id)
+                channel = await self.bot.fetch_channel(c_id)
             except (EOFError, discord.NotFound):
                 self.data.pop(guild.id)
                 self.update()
@@ -866,7 +866,7 @@ class UpdateUserLogs(Database):
         if guild is not None and guild.id in self.data:
             c_id = self.data[guild.id]
             try:
-                channel = await self._vars.fetch_channel(c_id)
+                channel = await self.bot.fetch_channel(c_id)
             except (EOFError, discord.NotFound):
                 self.data.pop(guild.id)
                 self.update()
@@ -971,7 +971,7 @@ class UpdateMessageLogs(Database):
             temp = h[0]
             # print("[" + str(len(temp)) + "]")
             for message in temp:
-                self._vars.cacheMessage(message)
+                self.bot.cacheMessage(message)
                 if not i & 8191:
                     await asyncio.sleep(0.5)
                 i += 1
@@ -983,8 +983,8 @@ class UpdateMessageLogs(Database):
                 self.dc.pop(h)
         if not self.searched:
             self.searched = True
-            lim = floor(1048576 / len(self._vars.client.guilds))
-            for g in self._vars.client.guilds:
+            lim = floor(1048576 / len(self.bot.client.guilds))
+            for g in self.bot.client.guilds:
                 create_task(self.cacheGuild(g, lim=lim))
 
     async def _edit_(self, before, after, **void):
@@ -993,7 +993,7 @@ class UpdateMessageLogs(Database):
             if guild.id in self.data:
                 c_id = self.data[guild.id]
                 try:
-                    channel = await self._vars.fetch_channel(c_id)
+                    channel = await self.bot.fetch_channel(c_id)
                 except (EOFError, discord.NotFound):
                     self.data.pop(guild.id)
                     self.update()
@@ -1013,14 +1013,14 @@ class UpdateMessageLogs(Database):
                 await channel.send(embed=emb)
 
     def logDeleted(self, message):
-        if message.author.bot and message.author.id != self._vars.client.user.id:
+        if message.author.bot and message.author.id != self.bot.client.user.id:
             return
-        if self._vars.isDeleted(message) < 2:
+        if self.bot.isDeleted(message) < 2:
             s = strMessage(message, username=True)
             print(s, file="deleted.txt")
 
     async def _delete_(self, message, bulk=False, **void):
-        cu_id = self._vars.client.user.id
+        cu_id = self.bot.client.user.id
         if bulk:
             self.logDeleted(message)
             return
@@ -1028,7 +1028,7 @@ class UpdateMessageLogs(Database):
         if guild.id in self.data:
             c_id = self.data[guild.id]
             try:
-                channel = await self._vars.fetch_channel(c_id)
+                channel = await self.bot.fetch_channel(c_id)
             except (EOFError, discord.NotFound):
                 self.data.pop(guild.id)
                 self.update()
@@ -1045,8 +1045,8 @@ class UpdateMessageLogs(Database):
             try:
                 t = u
                 init = "<@" + str(t.id) + ">"
-                if self._vars.isDeleted(message):
-                    t = self._vars.client.user
+                if self.bot.isDeleted(message):
+                    t = self.bot.client.user
                 else:
                     al = await guild.audit_logs(
                         limit=5,
@@ -1098,7 +1098,7 @@ class UpdateFileLogs(Database):
 
     # async def _user_update_(self, before, after, **void):
     #     sending = {}
-    #     for guild in self._vars.client.guilds:
+    #     for guild in self.bot.client.guilds:
     #         if guild.get_member(after.id) is None:
     #             try:
     #                 memb = await guild.fetch_member(after.id)
@@ -1130,7 +1130,7 @@ class UpdateFileLogs(Database):
     #         emb = discord.Embed(colour=randColour())
     #         emb.description = "File deleted from <@" + str(before.id) + ">"
     #         for g_id in sending:
-    #             guild = self._vars.cache["guilds"].get(g_id, None)
+    #             guild = self.bot.cache["guilds"].get(g_id, None)
     #             create_task(self.send_avatars(msg, fil, emb, guild))
 
     # async def send_avatars(self, msg, fil, emb, guild=None):
@@ -1139,7 +1139,7 @@ class UpdateFileLogs(Database):
     #     if guild.id in self.data:
     #         c_id = self.data[guild.id]
     #         try:
-    #             channel = await self._vars.fetch_channel(c_id)
+    #             channel = await self.bot.fetch_channel(c_id)
     #         except (EOFError, discord.NotFound):
     #             self.data.pop(guild.id)
     #             self.update()
@@ -1152,7 +1152,7 @@ class UpdateFileLogs(Database):
             c_id = self.data[guild.id]
             if message.attachments:
                 try:
-                    channel = await self._vars.fetch_channel(c_id)
+                    channel = await self.bot.fetch_channel(c_id)
                 except (EOFError, discord.NotFound):
                     self.data.pop(guild.id)
                     self.update()
@@ -1184,7 +1184,7 @@ class UpdateRolegivers(Database):
             return
         user = message.author
         guild = message.guild
-        _vars = self._vars
+        bot = self.bot
         assigned = self.data.get(message.channel.id, ())
         for k in assigned:
             if ((k in text) if alphanumeric(k) else (k in message.content.lower())):
@@ -1206,7 +1206,7 @@ class UpdateRolegivers(Database):
                     )
                     print("Granted role " + str(role) + " to " + str(user) + ".")
                 if alist[1]:
-                    await _vars.silentDelete(message)
+                    await bot.silentDelete(message)
 
 
 class UpdateAutoRoles(Database):
@@ -1218,7 +1218,7 @@ class UpdateAutoRoles(Database):
             assigned = self.data[guild.id]
             for rolelist in assigned:
                 try:
-                    role = await self._vars.fetch_role(random.choice(rolelist), guild)
+                    role = await self.bot.fetch_role(random.choice(rolelist), guild)
                     roles.append(role)
                 except:
                     print(traceback.format_exc())
@@ -1239,7 +1239,7 @@ class UpdateRolePreservers(Database):
                 assigned = self.data[guild.id][user.id]
                 for r_id in assigned:
                     try:
-                        role = await self._vars.fetch_role(r_id, guild)
+                        role = await self.bot.fetch_role(r_id, guild)
                         roles.append(role)
                     except:
                         print(traceback.format_exc())
@@ -1266,8 +1266,8 @@ class UpdatePerms(Database):
     name = "perms"
 
 
-async def getBans(_vars, guild):
-    bans = _vars.data["bans"].setdefault(guild.id, {})
+async def getBans(bot, guild):
+    bans = bot.data["bans"].setdefault(guild.id, {})
     try:
         banlist = await guild.bans()
     except discord.Forbidden:
@@ -1296,25 +1296,25 @@ class UpdateBans(Database):
             await asyncio.sleep(0.5)
         self.busy = True
         try:
-            _vars = self._vars
+            bot = self.bot
             dtime = datetime.datetime.utcnow().timestamp()
             bans = self.data
             changed = False
             if not self.synced:
                 self.synced = True
-                for guild in _vars.client.guilds:
-                    create_task(getBans(_vars, guild))
+                for guild in bot.client.guilds:
+                    create_task(getBans(bot, guild))
                 changed = True
             for g in list(bans):
                 for b in list(bans[g]):
                     utime = bans[g][b]["unban"]
                     if dtime >= utime:
                         try:
-                            u_target = await _vars.fetch_user(b)
-                            g_target = await _vars.fetch_guild(g)
+                            u_target = await bot.fetch_user(b)
+                            g_target = await bot.fetch_guild(g)
                             c_id = bans[g][b]["channel"]
                             if c_id is not None:
-                                c_target = await _vars.fetch_channel(c_id)
+                                c_target = await bot.fetch_channel(c_id)
                             try:
                                 await g_target.unban(u_target)
                                 if c_id is not None:

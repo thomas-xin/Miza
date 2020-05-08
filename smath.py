@@ -1462,340 +1462,13 @@ lookup time for all elements. Includes many array and numeric operations."""
             return output
         return call
 
-    def forceTuple(self, value):
-        try:
-            return tuple(value)
-        except TypeError:
-            return (value,)
-
-    def iterator(self, reverse=False):
-        if reverse:
-            r = xrange(len(self.data) - 1, -1)
+    def __init__(self, *args, maxoff=__hlist_maxoff__, **void):
+        if not args:
+            iterable = ()
+        elif len(args) == 1:
+            iterable = args[0]
         else:
-            r = range(len(self.data))
-        for i in r:
-            if not i + self.offs in self.data:
-                break
-            yield self.data[self.offs + i]
-        return
-
-    def constantIterator(self, other):
-        while True:
-            yield other
-
-    def createIterator(self, other, force=False):
-        d = self.data
-        try:
-            iterable = iter(other)
-            if len(other) != len(d) and not force:
-                raise IndexError(
-                    "Unable to perform operation on objects with size "
-                    + str(len(d)) + " and " + str(len(other)) + "."
-                )
-            return iterable
-        except TypeError:
-            return self.constantIterator(other)
-
-    @blocking
-    def clear(self):
-        self.data.clear()
-        return self
-
-    @waiting
-    def copy(self):
-        return hlist(self)
-
-    @waiting
-    def sort(self):
-        return hlist(sorted(self))
-
-    @waiting
-    def shuffle(self):
-        temp = list(self)
-        return hlist(shuffle(temp))
-
-    @waiting
-    def reverse(self):
-        return hlist(reversed(self))
-
-    @blocking
-    def rotate(self, steps):
-        s = len(self.data)
-        if not s:
-            return self
-        steps = -steps % s
-        if steps > s / 2:
-            steps -= s
-        if steps < 0:
-            for i in xrange(steps):
-                self.appendleft(self.popright(force=True), force=True)
-                if not i - 1 & 8191:
-                    time.sleep(0.01)
-        else:
-            for i in range(steps):
-                self.append(self.popleft(force=True), force=True)
-                if not i + 1 & 8191:
-                    time.sleep(0.01)
-        return self
-
-    @blocking
-    def rotateleft(self, steps):
-        return self.rotate(-steps, force=True)
-
-    rotateright = rotate
-
-    @blocking
-    def isempty(self):
-        s = len(self.data)
-        if s:
-            if abs(self.offs) > self.maxoff:
-                self.reconstitute(force=True)
-            elif s == 1 and self.offs:
-                temp = self.data
-                self.data = {0: self.data[self.offs]}
-                self.offs = 0
-                temp.clear()
-            return False
-        self.offs = 0
-        return True
-
-    @blocking
-    def popleft(self):
-        key = self.offs
-        temp = self.data.pop(key)
-        self.offs += 1
-        self.isempty(force=True)
-        return temp
-
-    @blocking
-    def popright(self):
-        key = self.offs + len(self.data) - 1
-        temp = self.data[key]
-        self.data.pop(key)
-        self.isempty(force=True)
-        return temp
-
-    @blocking
-    def pop(self, index=None):
-        if index is None:
-            return self.popright(force=True)
-        if index >= len(self.data):
-            return self.popright(force=True)
-        elif index == 0:
-            return self.popleft(force=True)
-        index %= len(self.data)
-        temp = self.data[index + self.offs]
-        if index < len(self.data) / 2:
-            for i in range(index + self.offs, self.offs, -1):
-                self.data[i] = self.data[i - 1]
-                if not 1 + i & 4095:
-                    time.sleep(0.01)
-            self.popleft(force=True)
-        else:
-            for i in range(index + self.offs, self.offs + len(self.data) - 1):
-                self.data[i] = self.data[i + 1]
-                if not 1 + i & 4095:
-                    time.sleep(0.01)
-            self.popright(force=True)
-        self.isempty(force=True)
-        return temp
-
-    @blocking
-    def insert(self, index, value):
-        if index >= len(self.data):
-            return self.append(value, force=True)
-        elif index == 0:
-            return self.appendleft(value, force=True)
-        index %= len(self.data)
-        if index < len(self.data) / 2:
-            for i in range(self.offs, self.offs + index):
-                self.data[i - 1] = self.data[i]
-                if not 1 + i & 4095:
-                    time.sleep(0.01)
-            self.offs -= 1
-            self.data[index + self.offs] = value
-        else:
-            for i in range(self.offs + len(self.data) - 1, index + self.offs - 1, - 1):
-                self.data[i + 1] = self.data[i]
-                if not 1 + i & 4095:
-                    time.sleep(0.01)
-            self.data[index + self.offs] = value
-        return self
-
-    @blocking
-    def remove(self, value):
-        for i in range(self.offs, self.offs + len(self.data)):
-            if self.data[i] == value:
-                self.pop(i, force=True)
-                self.isempty(force=True)
-                return self
-        raise IndexError(str(value) + " not found.")
-
-    @blocking
-    def removedups(self):
-        found = {}
-        pops = deque()
-        for i in range(len(self)):
-            x = self.data[self.offs + i]
-            if x not in found:
-                found[x] = True
-            else:
-                pops.append(i)
-        return self.pops(pops, force=True)
-
-    @waiting
-    def index(self, value):
-        for i in self:
-            if i == value:
-                return i
-        raise IndexError(str(value) + " not found.")
-
-    @waiting
-    def search(self, value):
-        output = hlist()
-        for i in self:
-            if i == value:
-                output.append(i, force=True)
-        return output
-
-    @waiting
-    def count(self, value):
-        output = 0
-        for i in self:
-            if i == value:
-                output += 1
-        return output
-
-    @waiting
-    def concat(self, value):
-        temp = self.copy()
-        temp.extend(value, force=True)
-        return temp
-
-    @blocking
-    def appendleft(self, value):
-        self.offs -= 1
-        self.data[self.offs] = value
-        return self
-
-    @blocking
-    def append(self, value):
-        self.data[self.offs + len(self.data)] = value
-        return self
-
-    appendright = append
-
-    @blocking
-    def extendleft(self, value):
-        value = reversed(self.forceTuple(value))
-        for i in value:
-            self.appendleft(i, force=True)
-        return self
-
-    @blocking
-    def extend(self, value):
-        value = self.forceTuple(value)
-        for i in value:
-            self.append(i, force=True)
-        return self
-
-    extendright = extend
-
-    @blocking
-    def fill(self, value):
-        data = (value,) * len(self.data)
-        self.__init__(data)
-
-    keys = lambda self: range(len(self))
-    values = lambda self: iter(self)
-    items = lambda self: enumerate(self)
-
-    @blocking
-    def clip(self, a, b=None):
-        if b is None:
-            b = -a
-        a, b = sorted(a, b)
-        d = self.data
-        for i in d:
-            if d[i] < a:
-                d[i] = a
-            elif d[i] > b:
-                d[i] = b
-        return self
-
-    @waiting
-    def real(self):
-        temp = self.copy()
-        d = temp.data
-        for i in d:
-            d[i] = d[i].real
-        return temp
-
-    @waiting
-    def imag(self):
-        temp = self.copy()
-        d = temp.data
-        for i in d:
-            d[i] = d[i].imag
-        return temp
-
-    @waiting
-    def float(self):
-        temp = self.copy()
-        d = temp.data
-        for i in d:
-            d[i] = float(d[i])
-        return temp
-
-    @waiting
-    def complex(self):
-        temp = self.copy()
-        d = temp.data
-        for i in d:
-            d[i] = complex(d[i])
-        return temp
-
-    @waiting
-    def mpf(self):
-        temp = self.copy()
-        d = temp.data
-        for i in d:
-            d[i] = mpf(d[i])
-        return temp
-
-    @blocking
-    def reconstitute(self, data=None):
-        if data is None:
-            data = self.data
-        values = deque()
-        l = sorted(data)
-        x = 1
-        for i in l:
-            values.append(data.pop(i))
-            if not x & 8191:
-                time.sleep(0.01)
-            x += 1
-        self.__init__(values)
-
-    @blocking
-    def delitems(self, iterable):
-        if len(iterable) == 1:
-            return self.pop(iterable[0])
-        popped = False
-        x = 1
-        for i in iterable:
-            self.data.pop(i + self.offs)
-            popped = True
-            if not x & 8191:
-                time.sleep(0.01)
-            x += 1
-        if popped:
-            self.reconstitute(force=True)
-        return self
-
-    pops = delitems
-
-    def __init__(self, iterable=(), maxoff=__hlist_maxoff__, **void):
+            iterable = args
         self.chash = None
         self.block = True
         self.maxoff = maxoff
@@ -1804,20 +1477,12 @@ lookup time for all elements. Includes many array and numeric operations."""
             self.data = iterable.data.copy()
         else:
             self.offs = 0
-            d = self.data = {}
             try:
-                iterable = iter(iterable)
-                i = 0
-                while True:
-                    try:
-                        d[i] = next(iterable)
-                        i += 1
-                        if not i & 8191:
-                            time.sleep(0.01)
-                    except StopIteration:
-                        break
+                it = iter(iterable)
             except TypeError:
-                d[0] = iterable
+                self.data = {0: iterable}
+            else:
+                self.data = {i[0]: i[1] for i in enumerate(it)}
         self.block = False
 
     def __delattr__(self, *void1, **void2):
@@ -1977,11 +1642,8 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @waiting
     def __neg__(self):
-        temp = self.copy()
-        d = temp.data
-        for i in d:
-            d[i] = -d[i]
-        return temp
+        d = self.data
+        return hlist(-d[i] for i in d)
 
     @waiting
     def __pos__(self):
@@ -1989,19 +1651,13 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @waiting
     def __abs__(self):
-        temp = self.copy()
-        d = temp.data
-        for i in d:
-            d[i] = abs(d[i])
-        return temp
+        d = self.data
+        return hlist(abs(d[i]) for i in d)
 
     @waiting
     def __invert__(self):
-        temp = self.copy()
-        d = temp.data
-        for i in d:
-            d[i] = ~d[i]
-        return temp
+        d = self.data
+        return hlist(~d[i] for i in d)
 
     @waiting
     def __add__(self, other):
@@ -2194,66 +1850,45 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @waiting
     def __lt__(self, other):
-        temp = self.copy()
-        d = temp.data
-        iterable = self.createIterator(other)
-        for i in d:
-            d[i] = d[i] < next(iterable)
-        return temp
+        d = self.data
+        it = self.createIterator(other)
+        return hlist(d[i] < next(it) for i in d)
 
     @waiting
     def __le__(self, other):
-        temp = self.copy()
-        d = temp.data
-        iterable = self.createIterator(other)
-        for i in d:
-            d[i] = d[i] <= next(iterable)
-        return temp
+        d = self.data
+        it = self.createIterator(other)
+        return hlist(d[i] <= next(it) for i in d)
 
     @waiting
     def __eq__(self, other):
-        temp = self.copy()
-        d = temp.data
-        iterable = self.createIterator(other)
-        for i in d:
-            d[i] = d[i] == next(iterable)
-        return temp
+        d = self.data
+        it = self.createIterator(other)
+        return hlist(d[i] == next(it) for i in d)
 
     @waiting
     def __ne__(self, other):
-        temp = self.copy()
-        d = temp.data
-        iterable = self.createIterator(other)
-        for i in d:
-            d[i] = d[i] != next(iterable)
-        return temp
+        d = self.data
+        it = self.createIterator(other)
+        return hlist(d[i] != next(it) for i in d)
 
     @waiting
     def __gt__(self, other):
-        temp = self.copy()
-        d = temp.data
-        iterable = self.createIterator(other)
-        for i in d:
-            d[i] = d[i] > next(iterable)
-        return temp
+        d = self.data
+        it = self.createIterator(other)
+        return hlist(d[i] > next(it) for i in d)
 
     @waiting
     def __ge__(self, other):
-        temp = self.copy()
-        d = temp.data
-        iterable = self.createIterator(other)
-        for i in d:
-            d[i] = d[i] >= next(iterable)
-        return temp
+        d = self.data
+        it = self.createIterator(other)
+        return hlist(d[i] >= next(it) for i in d)
 
     @waiting
     def __getitem__(self, key):
         if type(key) is slice:
-            temp = hlist()
             s = key.indices(len(self.data))
-            for i in xrange(*s):
-                temp.append(self.data[i + self.offs], force=True)
-            return temp
+            return hlist(self.data[i + self.offs] for i in xrange(*s))
         elif type(key) is not int:
             key = complex(key)
             return get(self, key, 1)
@@ -2267,9 +1902,8 @@ lookup time for all elements. Includes many array and numeric operations."""
     def __setitem__(self, key, value):
         if type(key) is slice:
             s = key.indices(len(self.data))
-            iterable = self.createIterator(value, True)
-            for i in xrange(*s):
-                self.data[i + self.offs] = next(iterable)
+            it = self.createIterator(value, True)
+            [self.data.__setitem__(i + self.offs, next(it)) for i in xrange(*s)]
             return value
         elif type(key) is str:
             key = int(key)
@@ -2280,14 +1914,9 @@ lookup time for all elements. Includes many array and numeric operations."""
     @blocking
     def __delitem__(self, key):
         if type(key) is slice:
-            temp = hlist()
             s = key.indices(len(self.data))
-            for i in xrange(*s):
-                temp.append(self.data[i + self.offs], force=True)
-                self.data.pop(i + self.offs)
-            self.reconstitute(force=True)
-            return temp
-        self.pop(key, force=True)
+            return self.pops(xrange(*s))
+        return self.pop(key, force=True)
 
     __len__ = lambda self: len(self.data)
     __length_hint__ = __len__
@@ -2296,10 +1925,7 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @waiting
     def __bytes__(self):
-        temp = bytes()
-        for i in self:
-            temp += bytes((round(i) & 255,))
-        return temp
+        return bytes(round(i) & 255 for i in self)
 
     def __contains__(self, item):
         for i in self:
@@ -2312,9 +1938,350 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     __copy__ = lambda self: self.copy()
 
-hrange = lambda a, b=None, c=None, maxoff=__hlist_maxoff__: hlist(xrange(a, b, c), maxoff)
+    def forceTuple(self, value):
+        try:
+            return tuple(value)
+        except TypeError:
+            return (value,)
 
-hzero = lambda size, maxoff=__hlist_maxoff__: hlist((0 for i in range(size)), maxoff)
+    def iterator(self, reverse=False):
+        if reverse:
+            r = xrange(len(self.data) - 1, -1)
+        else:
+            r = range(len(self.data))
+        for i in r:
+            if not i + self.offs in self.data:
+                break
+            yield self.data[self.offs + i]
+        return
+
+    def constantIterator(self, other):
+        while True:
+            yield other
+
+    def createIterator(self, other, force=False):
+        d = self.data
+        try:
+            iterable = iter(other)
+            if len(other) != len(d) and not force:
+                raise IndexError(
+                    "Unable to perform operation on objects with size "
+                    + str(len(d)) + " and " + str(len(other)) + "."
+                )
+            return iterable
+        except TypeError:
+            return self.constantIterator(other)
+
+    @blocking
+    def clear(self):
+        self.data.clear()
+        return self
+
+    @waiting
+    def copy(self):
+        return hlist(self)
+
+    @waiting
+    def sort(self):
+        return hlist(sorted(self))
+
+    @waiting
+    def shuffle(self):
+        temp = list(self)
+        return hlist(shuffle(temp))
+
+    @waiting
+    def reverse(self):
+        return hlist(reversed(self))
+
+    @blocking
+    def rotate(self, steps):
+        s = len(self.data)
+        if not s:
+            return self
+        steps = -steps % s
+        if steps > s / 2:
+            steps -= s
+        if steps < 0:
+            [self.appendleft(self.popright(force=True), force=True) for _ in loop(-steps)]
+        else:
+            [self.append(self.popleft(force=True), force=True) for _ in loop(steps)]
+        return self
+
+    @blocking
+    def rotateleft(self, steps):
+        return self.rotate(-steps, force=True)
+
+    rotateright = rotate
+
+    @blocking
+    def isempty(self):
+        s = len(self.data)
+        if s:
+            if abs(self.offs) > self.maxoff:
+                self.reconstitute(force=True)
+            elif s == 1 and self.offs:
+                temp = self.data
+                self.data = {0: self.data[self.offs]}
+                self.offs = 0
+                temp.clear()
+            return False
+        self.offs = 0
+        return True
+
+    @waiting
+    def get(self, key, default=None):
+        if type(key) is slice:
+            s = key.indices(len(self.data))
+            return hlist(self.data[i + self.offs] for i in xrange(*s))
+        elif type(key) is not int:
+            key = complex(key)
+            return get(self, key, 1)
+        try:
+            index = self.offs + key % len(self.data)
+        except ZeroDivisionError:
+            return default
+        return self.data[index]
+
+    @blocking
+    def popleft(self):
+        key = self.offs
+        temp = self.data.pop(key)
+        self.offs += 1
+        self.isempty(force=True)
+        return temp
+
+    @blocking
+    def popright(self):
+        key = self.offs + len(self.data) - 1
+        temp = self.data[key]
+        self.data.pop(key)
+        self.isempty(force=True)
+        return temp
+
+    @blocking
+    def pop(self, index=None):
+        if index is None:
+            return self.popright(force=True)
+        if index >= len(self.data):
+            return self.popright(force=True)
+        elif index == 0:
+            return self.popleft(force=True)
+        index %= len(self.data)
+        temp = self.data[index + self.offs]
+        if index < len(self.data) / 2:
+            [self.data.__setitem__(i, self.data[i - 1]) for i in range(self.offs + index, self.offs, -1)]
+            self.popleft(force=True)
+        else:
+            [self.data.__setitem__(i, self.data[i + 1]) for i in range(self.offs + index, self.offs + len(self.data) - 1)]
+            self.popright(force=True)
+        self.isempty(force=True)
+        return temp
+
+    @blocking
+    def insert(self, index, value):
+        if index >= len(self.data):
+            return self.append(value, force=True)
+        elif index == 0:
+            return self.appendleft(value, force=True)
+        index %= len(self.data)
+        if index < len(self.data) / 2:
+            [self.data.__setitem__(i - 1, self.data[i]) for i in range(self.offs, self.offs + index)]
+            self.offs -= 1
+            self.data[index + self.offs] = value
+        else:
+            [self.data.__setitem__(i + 1, self.data[i]) for i in range(self.offs + len(self.data) - 1, self.offs + index - 1, -1)]
+            self.data[index + self.offs] = value
+        return self
+
+    @blocking
+    def insort(self, value, key=lambda x: x, sorted=True):
+        if not sorted:
+            self.__init__(sorted(self, key=key))
+        v = value if key is None else key(value)
+        x = len(self.data)
+        index = (x >> 1) + self.offs
+        gap = x >> 2
+        seen = {}
+        while index not in seen and index in self.data:
+            check = d[index] if key is None else key(d[index])
+            if check < v:
+                seen[index] = True
+                index += gap
+            else:
+                seen[index] = False
+                index -= gap
+            gap = 1 + gap >> 1
+        index -= self.offs - seen.get(index, 0)
+        if index <= 0:
+            return self.appendleft(value, force=True)
+        return self.insert(index, value, force=True)
+
+    @blocking
+    def remove(self, value, key=None, sorted=False):
+        v = value if key is None else key(value)
+        d = self.data
+        if sorted:
+            pops = deque()
+            x = len(d)
+            index = (x >> 1) + self.offs
+            gap = x >> 2
+            seen = {}
+            while index not in seen and index in d:
+                check = d[index] if key is None else key(d[index])
+                if check < v:
+                    seen[index] = True
+                    index += gap
+                elif check == v:
+                    break
+                else:
+                    seen[index] = False
+                    index -= gap
+                gap = 1 + gap >> 1
+            if key is None:
+                key = lambda x: x
+            i = index + seen.get(index, 0)
+            while i in d and key(d[i]) == v:
+                pops.append(i - self.offs)
+                i += 1
+            i = index + seen.get(index, 0) - 1
+            while i in d and key(d[i]) == v:
+                pops.append(i - self.offs)
+                i -= 1
+        else:
+            if key is not None:
+                pops = [i - self.offs for i in d if key(d[i]) == v]
+            else:
+                pops = [i - self.offs for i in d if d[i] == v]
+        if not pops:
+            raise IndexError(str(value) + " not found.")
+        if len(pops) == 1:
+            self.pop(pops[0], force=True)
+        else:
+            self.pops(pops, force=True)
+        return self
+
+    @blocking
+    def removedups(self):
+        found = {}
+        pops = deque()
+        for i in range(len(self)):
+            x = self.data[self.offs + i]
+            if x not in found:
+                found[x] = True
+            else:
+                pops.append(i)
+        return self.pops(pops, force=True)
+
+    @waiting
+    def index(self, value):
+        for i in self:
+            if i == value:
+                return i
+        raise IndexError(str(value) + " not found.")
+
+    @waiting
+    def search(self, value):
+        x = self.offs
+        d = self.data
+        return hlist(i - x for i in d if d[i] == value)
+
+    @waiting
+    def count(self, value):
+        return sum(1 for i in self if i == value)
+
+    @waiting
+    def concat(self, value):
+        temp = self.copy()
+        temp.extend(value, force=True)
+        return temp
+
+    @blocking
+    def appendleft(self, value):
+        self.offs -= 1
+        self.data[self.offs] = value
+        return self
+
+    @blocking
+    def append(self, value):
+        self.data[self.offs + len(self.data)] = value
+        return self
+
+    appendright = append
+
+    @blocking
+    def extendleft(self, value):
+        value = reversed(self.forceTuple(value))
+        [self.appendleft(i, force=True) for i in value]
+        return self
+
+    @blocking
+    def extend(self, value):
+        value = self.forceTuple(value)
+        [self.append(i, force=True) for i in value]
+        return self
+
+    extendright = extend
+
+    @blocking
+    def fill(self, value):
+        data = (value,) * len(self.data)
+        self.__init__(data)
+
+    keys = lambda self: range(len(self))
+    values = lambda self: iter(self)
+    items = lambda self: enumerate(self)
+
+    @blocking
+    def clip(self, a, b=None):
+        if b is None:
+            b = -a
+        a, b = sorted(a, b)
+        d = self.data
+        [self.data.__setitem__(i, max(min(d[i], b), a)) for i in d]
+        return self
+
+    @waiting
+    def real(self):
+        return hlist(i.real for i in self.data.values())
+
+    @waiting
+    def imag(self):
+        return hlist(i.imag for i in self.data.values())
+    
+    @waiting
+    def float(self):
+        return hlist(float(i.real) for i in self.data.values())
+
+    @waiting
+    def complex(self):
+        return hlist(complex(i) for i in self.data.values())
+
+    @waiting
+    def mpf(self):
+        return hlist(mpf(i) for i in self.data.values())
+
+    @blocking
+    def reconstitute(self, data=None):
+        if data is None:
+            data = self.data
+        l = sorted(data)
+        self.__init__(data[i] for i in l)
+
+    @blocking
+    def delitems(self, iterable):
+        if len(iterable) == 1:
+            return self.pop(iterable[0])
+        popped = len([self.data.pop(i + self.offs) for i in iterable])
+        if popped:
+            self.reconstitute(force=True)
+        return self
+
+    pops = delitems
+
+hrange = lambda a, b=None, c=None, maxoff=__hlist_maxoff__: hlist(xrange(a, b, c), maxoff=maxoff)
+
+hzero = lambda size, maxoff=__hlist_maxoff__: hlist((0 for i in range(size)), maxoff=maxoff)
 
 
 class freeClass(dict):

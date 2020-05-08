@@ -13,11 +13,11 @@ class Restart(Command):
     _timeout_ = inf
 
     async def __call__(self, message, channel, guild, argv, name, **void):
-        _vars = self._vars
-        client = _vars.client
+        bot = self.bot
+        client = bot.client
         await message.add_reaction("❗")
         if argv:
-            delay = await _vars.evalTime(argv, guild)
+            delay = await bot.evalTime(argv, guild)
             await channel.send("Preparing to " + name + " in " + sec2Time(delay) + "...")
             if delay > 0:
                 await asyncio.sleep(delay)
@@ -25,12 +25,12 @@ class Restart(Command):
             await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
-        _vars.update()
+        bot.update()
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
         for _ in loop(5):
             try:
-                f = open(_vars.restart, "wb")
+                f = open(bot.restart, "wb")
                 f.close()
                 break
             except:
@@ -45,13 +45,13 @@ class Restart(Command):
                 print(traceback.format_exc())
                 time.sleep(0.1)
         if name.lower() == "shutdown":
-            f = open(_vars.shutdown, "wb")
+            f = open(bot.shutdown, "wb")
             f.close()
         try:
             await client.close()
         except:
             del client
-        del _vars
+        del bot
         sys.exit()
 
 
@@ -62,22 +62,25 @@ class Execute(Command):
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, _vars, flags, message, channel, **void):
+    async def __call__(self, bot, flags, message, channel, **void):
+        update = bot.database.exec.update
         if "e" in flags or "a" in flags:
             create_task(message.add_reaction("❗"))
-            _vars.database.exec.channel = channel
+            bot.data.exec[channel.id] = True
+            update()
             return (
-                "```css\nSuccessfully changed code execution channel to ["
+                "```css\nSuccessfully enabled code execution in ["
                 + noHighlight(channel.name) + "].```"
             )
         elif "d" in flags:
-            _vars.database.exec.channel = freeClass(id=None)
+            bot.data.exec.pop(channel.id)
+            update()
             return (
                 "```fix\nSuccessfully removed code execution channel.```"
             )
         return (
-            "```css\ncode channel is currently set to ["
-            + noHighlight(_vars.database.exec.channel.name) + "].```"
+            "```css\ncode channel is currently set to "
+            + noHighlight(list(bot.data.exec)) + ".```"
         )
 
 
@@ -87,20 +90,20 @@ class Suspend(Command):
     description = "Prevents a user from accessing ⟨MIZA⟩'s commands. Overrides <perms>."
     usage = "<0:user> <1:value[]>"
 
-    async def __call__(self, _vars, user, guild, args, **void):
+    async def __call__(self, bot, user, guild, args, **void):
         update = self.data.blacklist.update
         if len(args) < 2:
             if len(args) >= 1:
-                user = await _vars.fetch_user(verifyID(args[0]))
-            susp = _vars.data.blacklist.get(user.id, None)
+                user = await bot.fetch_user(verifyID(args[0]))
+            susp = bot.data.blacklist.get(user.id, None)
             return (
                 "```css\nCurrent suspension status of [" + noHighlight(user.name) + "]: ["
                 + noHighlight(susp) + "].```"
             )
         else:
-            user = await _vars.fetch_user(verifyID(args[0]))
-            change = await _vars.evalMath(args[1], guild.id)
-            _vars.data.blacklist[user.id] = change
+            user = await bot.fetch_user(verifyID(args[0]))
+            change = await bot.evalMath(args[1], guild.id)
+            bot.data.blacklist[user.id] = change
             update()
             return (
                 "```css\nChanged suspension status of [" + noHighlight(user.name) + "] to ["
@@ -110,19 +113,15 @@ class Suspend(Command):
 
 class UpdateExec(Database):
     name = "exec"
-    no_file = True
+    no_delete = True
 
-    def __init__(self, *args):
-        self.channel = freeClass(id=None)
-        super().__init__(*args)
-
-    def procFunc(self, proc, _vars):
+    def procFunc(self, proc, bot):
         print(proc)
         try:
-            output = eval(proc, _vars._globals)
+            output = eval(proc, bot._globals)
         except:
-            exec(proc, _vars._globals)
-            output = str(proc) + " Successfully executed!"
+            exec(proc, bot._globals)
+            output = None
         try:
             if awaitable(output):
                 raise TypeError
@@ -135,9 +134,15 @@ class UpdateExec(Database):
             pass
         return output
 
+    async def sendDeleteID(self, c_id, delete_after=20, **kwargs):
+        channel = await self.bot.fetch_channel(c_id)
+        message = await channel.send(**kwargs)
+        if isValid(delete_after):
+            create_task(self.bot.silentDelete(message, no_log=True, delay=delete_after))
+
     async def _typing_(self, user, channel, **void):
-        _vars = self._vars
-        if user.id == _vars.client.user.id:
+        bot = self.bot
+        if user.id == bot.client.user.id:
             return
         if not hasattr(channel, "guild") or channel.guild is None:
             emb = discord.Embed()
@@ -145,12 +150,13 @@ class UpdateExec(Database):
                 name=str(user) + " (" + str(user.id) + ")",
                 value="```ini\n[typing...]```",
             )
-            message = await self.channel.send(embed=emb)
-            create_task(_vars.silentDelete(message, no_log=True, delay=20))
+            for c_id in self.data:
+                create_task(self.sendDeleteID(c_id, embed=emb))
 
     async def _nocommand_(self, message, **void):
-        _vars = self._vars
-        if message.author.id == self._vars.owner_id and message.channel.id == self.channel.id:
+        bot = self.bot
+        channel = message.channel
+        if message.author.id == self.bot.owner_id and channel.id in self.data:
             proc = message.content
             while proc[0] == " ":
                 proc = proc[1:]
@@ -162,28 +168,29 @@ class UpdateExec(Database):
                 return
             output = None
             try:
-                output = await create_future(self.procFunc, proc, _vars, priority=True)
+                output = await create_future(self.procFunc, proc, bot, priority=True)
                 if type(output) is tuple:
                     output = await recursiveCoro(output)
                 elif awaitable(output):
                     output = await output
-                await self.channel.send(limStr("```py\n" + str(output) + "```", 2000))
+                await channel.send(limStr("```py\n" + str(output) + "```", 2000))
             except:
                 print(traceback.format_exc())
-                await self.channel.send(limStr(
+                await channel.send(limStr(
                     "```py\n" + traceback.format_exc().replace("```", "") + "```",
                     2000,
                 ))
             if output is not None:
-                _vars._globals["output"] = output
-                _vars._globals["_"] = output
+                bot._globals["output"] = output
+                bot._globals["_"] = output
         elif message.guild is None:
             emb = discord.Embed()
             emb.add_field(
                 name=str(message.author) + " (" + str(message.author.id) + ")",
                 value=strMessage(message),
             )
-            await self.channel.send(embed=emb)
+            for c_id in self.data:
+                create_task(self.sendDeleteID(c_id, delete_after=inf, embed=emb))
 
 
 class UpdateBlacklist(Database):
@@ -211,7 +218,7 @@ class UpdateBlacklist(Database):
                 days += 1.125
                 udata = time.time() + days * 86400
                 self.data[u_id] = udata
-                if days >= self._vars.min_suspend - 1:
+                if days >= self.bot.min_suspend - 1:
                     self.lastsusp = u_id
                 self.update()
                 self.update(True)
@@ -220,7 +227,7 @@ class UpdateBlacklist(Database):
             pass
 
     async def _command_(self, user, command, **void):
-        if user.id not in (self._vars.client.user.id, self._vars.owner_id):
+        if user.id not in (self.bot.client.user.id, self.bot.owner_id):
             tc = getattr(command, "time_consuming", 0)
             self.suspclear = time.time() + 10 + (tc * 2) ** 2
             f = open(self.suspected, "w")
@@ -235,18 +242,18 @@ class UpdateBlacklist(Database):
                     os.remove(self.suspected)
             except:
                 print(traceback.format_exc())
-        _vars = self._vars
+        bot = self.bot
         if self.lastsusp is not None:
-            u_susp = await _vars.fetch_user(self.lastsusp)
+            u_susp = await bot.fetch_user(self.lastsusp)
             self.lastsusp = None
-            channel = await _vars.getDM(u_susp)
+            channel = await bot.getDM(u_susp)
             secs = self.data.get(u_susp.id, 0) - time.time()
             msg = (
                 "Apologies for the inconvenience, but your account has been "
                 + "flagged as having attempted a denial-of-service attack.\n"
                 + "This will expire in `" + sec2Time(secs) + "`.\n"
                 + "If you believe this is an error, please notify <@"
-                + str(_vars.owner_id) + "> as soon as possible."
+                + str(bot.owner_id) + "> as soon as possible."
             )
             print(
                 u_susp.name + " may be attempting a DDOS attack. Expires in "
