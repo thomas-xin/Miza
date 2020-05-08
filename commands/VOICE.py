@@ -962,9 +962,13 @@ class videoDownloader:
             self.lastclear = time.time()
 
     def extract_true(self, url):
+<<<<<<< HEAD
         if isURL(url):
             return self.downloader.extract_info(url, download=False, process=False)
         return self.downloader.extract_info(url, download=False, process=False)
+=======
+        return self.downloader.extract_info(url, download=False, process=True)
+>>>>>>> 0d489903922ad3cc79fa7beb04b2a8ba00a0bd3a
         # pyt = create_future_ex(pytube2Dict, url)
         # resp = self.extract_info(url, search=False)
         # try:
