@@ -41,6 +41,7 @@ class main_data:
             messages={},
             deleted={},
         )
+        self.proc_call = {}
         print("Time: " + str(datetime.datetime.now()))
         print("Initializing...")
         if not os.path.exists("cache/"):
@@ -837,6 +838,11 @@ class main_data:
             else:
                 reacode = None
             if msg.startswith(check):
+                while len(self.proc_call) > 65536:
+                    self.proc_call.pop(next(iter(self.proc_call)))
+                while time.time() - self.proc_call.get(message.id, 0) < 30:
+                    await asyncio.sleep(0.2)
+                self.proc_call[message.id] = time.time()
                 msg = msg[len(check):]
                 args = msg.split("-")
                 catx = args[0]
@@ -870,6 +876,10 @@ class main_data:
                                 "```py\nError: " + repr(ex).replace("`", "") + "\n```",
                                 reacts=["❎"],
                             ))
+                try:
+                    self.proc_call.pop(message.id)
+                except KeyError:
+                    pass
 
     async def handleUpdate(self, force=False):
         if not hasattr(self, "stat_timer"):

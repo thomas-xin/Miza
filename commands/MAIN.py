@@ -798,6 +798,8 @@ class Reminder(Command):
                 argv = argv[3:]
             if argv.startswith("to "):
                 argv = argv[3:]
+            elif argv.startswith("that "):
+                argv = argv[3:]
             spl = None
             if "in" in argv:
                 if " in " in argv:
@@ -817,6 +819,16 @@ class Reminder(Command):
                     msg = ""
                 if spl is not None:
                     msg = " at ".join(spl[:-1])
+                    t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
+                    break
+            if "on" in argv:
+                if " on " in argv:
+                    spl = argv.split(" on ")
+                elif argv.startswith("on "):
+                    spl = [argv[3:]]
+                    msg = ""
+                if spl is not None:
+                    msg = " on ".join(spl[:-1])
                     t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
                     break
             msg = " ".join(args[:-1])
@@ -839,7 +851,7 @@ class Reminder(Command):
         ))
         bot.data.reminders[user.id] = sort(rems, key=lambda x: x["t"])
         try:
-            bot.database.reminders.keyed.remove((0, user.id), key=lambda x: x[-1])
+            bot.database.reminders.keyed.remove((0, user.id), key=lambda x: x[-1], sorted=True)
         except IndexError:
             pass
         bot.database.reminders.keyed.insort((t + ts, user.id), key=lambda x: x[0])
@@ -918,6 +930,16 @@ class Announcement(Command):
                     msg = " at ".join(spl[:-1])
                     t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
                     break
+            if "on" in argv:
+                if " on " in argv:
+                    spl = argv.split(" on ")
+                elif argv.startswith("on "):
+                    spl = [argv[3:]]
+                    msg = ""
+                if spl is not None:
+                    msg = " on ".join(spl[:-1])
+                    t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
+                    break
             msg = " ".join(args[:-1])
             t = await bot.evalTime(args[-1], guild)
             break
@@ -938,7 +960,7 @@ class Announcement(Command):
         ))
         bot.data.reminders[channel.id] = sort(rems, key=lambda x: x["t"])
         try:
-            bot.database.reminders.keyed.remove((0, channel.id), key=lambda x: x[-1])
+            bot.database.reminders.keyed.remove((0, channel.id), key=lambda x: x[-1], sorted=True)
         except IndexError:
             pass
         bot.database.reminders.keyed.insort((t + ts, channel.id), key=lambda x: x[0])

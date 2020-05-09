@@ -505,6 +505,8 @@ class __logPrinter:
             except:
                 print(traceback.format_exc())
             time.sleep(1)
+            while "common.py" not in os.listdir():
+                time.sleep(0.5)
 
     def logPrint(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
         if file is None:

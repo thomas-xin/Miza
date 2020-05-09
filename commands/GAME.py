@@ -267,11 +267,11 @@ class Text2048(Command):
         mode = 0
         if "c" in flags:
             mode |= 16
-        if "v" in flags:
+        if "z" in flags:
             mode |= 8
         if "i" in flags:
             mode |= 4
-        if "z" in flags:
+        if "s" in flags:
             mode |= 2
         if "e" in flags:
             mode |= 1

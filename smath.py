@@ -1897,23 +1897,6 @@ lookup time for all elements. Includes many array and numeric operations."""
         except ZeroDivisionError:
             raise IndexError("Attempted read from empty Hashed List.")
         return self.data[index]
-<<<<<<< HEAD
-=======
-    
-    @waiting
-    def get(self, key, default=None):
-        if type(key) is slice:
-            s = key.indices(len(self.data))
-            return hlist(self.data[i + self.offs] for i in xrange(*s))
-        elif type(key) is not int:
-            key = complex(key)
-            return get(self, key, 1)
-        try:
-            index = self.offs + key % len(self.data)
-        except ZeroDivisionError:
-            return default
-        return self.data[index]
->>>>>>> 0d489903922ad3cc79fa7beb04b2a8ba00a0bd3a
 
     @blocking
     def __setitem__(self, key, value):
@@ -2046,7 +2029,6 @@ lookup time for all elements. Includes many array and numeric operations."""
         self.offs = 0
         return True
 
-<<<<<<< HEAD
     @waiting
     def get(self, key, default=None):
         if type(key) is slice:
@@ -2061,8 +2043,6 @@ lookup time for all elements. Includes many array and numeric operations."""
             return default
         return self.data[index]
 
-=======
->>>>>>> 0d489903922ad3cc79fa7beb04b2a8ba00a0bd3a
     @blocking
     def popleft(self):
         key = self.offs
@@ -2123,7 +2103,8 @@ lookup time for all elements. Includes many array and numeric operations."""
         index = (x >> 1) + self.offs
         gap = x >> 2
         seen = {}
-        while index not in seen and index in self.data:
+        d = self.data
+        while index not in seen and index in d:
             check = d[index] if key is None else key(d[index])
             if check < v:
                 seen[index] = True
