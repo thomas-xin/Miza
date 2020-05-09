@@ -948,7 +948,7 @@ class Announcement(Command):
             msg = "[SAMPLE ANNOUNCEMENT]"
         elif len(msg) > 512:
             raise OverflowError("Announcement message too long (" + str(len(msg)) + "> 512).")
-        name = str(user)
+        name = str(user.display_name)
         url = strURL(user.avatar_url)
         ts = datetime.datetime.utcnow().timestamp()
         rems.append(freeClass(
@@ -968,7 +968,7 @@ class Announcement(Command):
         emb = discord.Embed(description=msg)
         emb.set_author(name=name, url=url, icon_url=url)
         return {
-            "content": ("```css\nSuccessfully set announcement for ["
+            "content": ("```css\nSuccessfully set announcement for [#"
                 + noHighlight(channel) + "] in [" + noHighlight(sec2Time(t)) + "]:```"
             ),
             "embed": emb,
