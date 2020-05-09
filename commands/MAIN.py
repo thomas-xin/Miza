@@ -968,8 +968,8 @@ class Announcement(Command):
         emb = discord.Embed(description=msg)
         emb.set_author(name=name, url=url, icon_url=url)
         return {
-            "content": ("```css\nSuccessfully set reminder for ["
-                + noHighlight(user) + "] in [" + noHighlight(sec2Time(t)) + "]:```"
+            "content": ("```css\nSuccessfully set announcement for ["
+                + noHighlight(channel) + "] in [" + noHighlight(sec2Time(t)) + "]:```"
             ),
             "embed": emb,
         }
