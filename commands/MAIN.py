@@ -998,8 +998,8 @@ class UpdateReminders(Database):
             if not temp:
                 self.data.pop(u_id)
             else:
-                t = self.data[u_id][0]["t"]
-                self.bot.database.reminders.keyed.insort((t, u_id), key=lambda x: x[0])
+                z = temp[0]["t"]
+                self.keyed.insort((z, u_id), key=lambda x: x[0])
             if x.u:
                 ch = await self.bot.fetch_user(u_id)
             else:

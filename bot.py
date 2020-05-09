@@ -889,7 +889,7 @@ class main_data:
         if not hasattr(self, "busy"):
             self.busy = False
         if not hasattr(self, "status_iter"):
-            self.status_iter = 0
+            self.status_iter = xrand(3)
         if time.time() - self.lastCheck > 0.5:
             while self.busy:
                 await asyncio.sleep(0.1)
