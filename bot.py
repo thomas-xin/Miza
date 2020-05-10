@@ -1248,7 +1248,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         timeout = getattr(f, "_timeout_", 1) * bot.timeout
                         response = await asyncio.wait_for(command(
                             client=client,          # for interfacing with discord
-                            bot=bot,            # for interfacing with bot's database
+                            bot=bot,                # for interfacing with bot's database
                             argv=argv,              # raw text argument
                             args=args,              # split text arguments
                             flags=flags,            # special flags

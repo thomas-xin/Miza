@@ -146,10 +146,8 @@ class UpdateExec(Database):
             return
         if not hasattr(channel, "guild") or channel.guild is None:
             emb = discord.Embed()
-            emb.add_field(
-                name=str(user) + " (" + str(user.id) + ")",
-                value="```ini\n[typing...]```",
-            )
+            emb.set_author(name=str(user) + " (" + str(user.id) + ")", url=strURL(user.avatar_url), icon_url=strURL(user.avatar_url))
+            emb.description = "```ini\n[typing...]```"
             for c_id in self.data:
                 create_task(self.sendDeleteID(c_id, embed=emb))
 
@@ -184,11 +182,10 @@ class UpdateExec(Database):
                 bot._globals["output"] = output
                 bot._globals["_"] = output
         elif message.guild is None:
+            user = message.author
             emb = discord.Embed()
-            emb.add_field(
-                name=str(message.author) + " (" + str(message.author.id) + ")",
-                value=strMessage(message),
-            )
+            emb.set_author(name=str(user) + " (" + str(user.id) + ")", url=strURL(user.avatar_url), icon_url=strURL(user.avatar_url))
+            emb.description = strMessage(message)
             for c_id in self.data:
                 create_task(self.sendDeleteID(c_id, delete_after=inf, embed=emb))
 

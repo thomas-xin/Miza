@@ -791,8 +791,8 @@ class Reminder(Command):
                 "Current reminders set for **" + discord.utils.escape_markdown(str(user))
                 + "**:```ini" + s + "```"
             )
-        if len(rems) >= 32:
-            raise OverflowError("You have reached the maximum of 32 reminders. Please remove one to add another.")
+        if len(rems) >= 64:
+            raise OverflowError("You have reached the maximum of 64 reminders. Please remove one to add another.")
         while True:
             if name == "remind" and argv.startswith("me "):
                 argv = argv[3:]
@@ -906,8 +906,8 @@ class Announcement(Command):
                 "Current announcements set for <#" + str(channel.id)
                 + ">:```ini" + s + "```"
             )
-        if len(rems) >= 8:
-            raise OverflowError("Channel has reached the maximum of 8 announcements. Please remove one to add another.")
+        if len(rems) >= 32:
+            raise OverflowError("Channel has reached the maximum of 32 announcements. Please remove one to add another.")
         while True:
             spl = None
             if "in" in argv:
