@@ -309,14 +309,13 @@ class UrbanDictionary(Command):
         if "v" in flags:
             output = (
                 "```ini\n[" + noHighlight(argv) + "]\n"
-                + "\n".join(
+                + clrHighlight("\n".join(
                     "[" + str(i + 1) + "] " + l[i].get(
-                        "definition",
-                        "",
+                        "definition", "",
                     ).replace("\n", " ").replace("\r", "") for i in range(
                         min(len(l), 1 + 2 * flags["v"])
                     )
-                )
+                ))
                 + "```"
             )
         else:

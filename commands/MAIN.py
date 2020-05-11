@@ -851,10 +851,10 @@ class Reminder(Command):
         ))
         bot.data.reminders[user.id] = sort(rems, key=lambda x: x["t"])
         try:
-            bot.database.reminders.keyed.remove((0, user.id), key=lambda x: x[-1], sorted=True)
+            bot.database.reminders.keyed.remove((0, user.id), key=lambda x: x[-1])
         except IndexError:
             pass
-        bot.database.reminders.keyed.insort((t + ts, user.id), key=lambda x: x[0])
+        bot.database.reminders.keyed.insort((bot.data.reminders[user.id][0]["t"], user.id), key=lambda x: x[0])
         update()
         emb = discord.Embed(description=msg)
         emb.set_author(name=name, url=url, icon_url=url)
@@ -948,7 +948,7 @@ class Announcement(Command):
             msg = "[SAMPLE ANNOUNCEMENT]"
         elif len(msg) > 512:
             raise OverflowError("Announcement message too long (" + str(len(msg)) + "> 512).")
-        name = str(user.display_name)
+        name = str(user)
         url = strURL(user.avatar_url)
         ts = datetime.datetime.utcnow().timestamp()
         rems.append(freeClass(
@@ -960,10 +960,10 @@ class Announcement(Command):
         ))
         bot.data.reminders[channel.id] = sort(rems, key=lambda x: x["t"])
         try:
-            bot.database.reminders.keyed.remove((0, channel.id), key=lambda x: x[-1], sorted=True)
+            bot.database.reminders.keyed.remove((0, channel.id), key=lambda x: x[-1])
         except IndexError:
             pass
-        bot.database.reminders.keyed.insort((t + ts, channel.id), key=lambda x: x[0])
+        bot.database.reminders.keyed.insort((bot.data.reminders[channel.id][0]["t"], channel.id), key=lambda x: x[0])
         update()
         emb = discord.Embed(description=msg)
         emb.set_author(name=name, url=url, icon_url=url)

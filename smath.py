@@ -143,7 +143,7 @@ def sort(it, key=lambda x: x, reverse=False):
         it = sorted(it, key=key, reverse=reverse)
         return deque(it)
     elif isinstance(it, hlist):
-        it = hlist(sorted(it, key=key, reverse=reverse))
+        it.__init__(sorted(it, key=key, reverse=reverse))
         return it
     else:
         try:
@@ -1982,8 +1982,8 @@ lookup time for all elements. Includes many array and numeric operations."""
         return hlist(self)
 
     @waiting
-    def sort(self):
-        return hlist(sorted(self))
+    def sort(self, *args, **kwargs):
+        return hlist(sorted(self, *args, **kwargs))
 
     @waiting
     def shuffle(self):
@@ -2095,7 +2095,7 @@ lookup time for all elements. Includes many array and numeric operations."""
         return self
 
     @blocking
-    def insort(self, value, key=lambda x: x, sorted=True):
+    def insort(self, value, key=None, sorted=True):
         if not sorted:
             self.__init__(sorted(self, key=key))
         v = value if key is None else key(value)
@@ -2120,10 +2120,39 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @blocking
     def remove(self, value, key=None, sorted=False):
+        pops = self.search(value, key, sorted, force=True)
+        if len(pops) == 1:
+            self.pop(pops[0], force=True)
+        else:
+            self.pops(pops, force=True)
+        return self
+
+    @blocking
+    def removedups(self):
+        found = {}
+        pops = deque()
+        for i in range(len(self)):
+            x = self.data[self.offs + i]
+            if x not in found:
+                found[x] = True
+            else:
+                pops.append(i)
+        return self.pops(pops, force=True)
+
+    @waiting
+    def index(self, value, key=None, sorted=False):
+        return self.search(value, key, sorted, force=True)[0]
+
+    @waiting
+    def rindex(self, value, key=None, sorted=False):
+        return self.search(value, key, sorted, force=True)[-1]
+    
+    @waiting
+    def search(self, value, key=None, sorted=False):
         v = value if key is None else key(value)
         d = self.data
         if sorted:
-            pops = deque()
+            pops = hlist()
             x = len(d)
             index = (x >> 1) + self.offs
             gap = x >> 2
@@ -2156,46 +2185,17 @@ lookup time for all elements. Includes many array and numeric operations."""
                 pops = [i - self.offs for i in d if d[i] == v]
         if not pops:
             raise IndexError(str(value) + " not found.")
-        if len(pops) == 1:
-            self.pop(pops[0], force=True)
-        else:
-            self.pops(pops, force=True)
-        return self
-
-    @blocking
-    def removedups(self):
-        found = {}
-        pops = deque()
-        for i in range(len(self)):
-            x = self.data[self.offs + i]
-            if x not in found:
-                found[x] = True
-            else:
-                pops.append(i)
-        return self.pops(pops, force=True)
+        return pops
+    
+    find = findall = search
 
     @waiting
-    def index(self, value):
-        for i in self:
-            if i == value:
-                return i
-        raise IndexError(str(value) + " not found.")
+    def count(self, value, key=None):
+        if key is None:
+            return sum(1 for i in self if i == value)
+        return sum(1 for i in self if key(i) == key(value))
 
-    @waiting
-    def search(self, value):
-        x = self.offs
-        d = self.data
-        return hlist(i - x for i in d if d[i] == value)
-
-    @waiting
-    def count(self, value):
-        return sum(1 for i in self if i == value)
-
-    @waiting
-    def concat(self, value):
-        temp = self.copy()
-        temp.extend(value, force=True)
-        return temp
+    concat = lambda self, value: hlist(tuple(self) + tuple(value))
 
     @blocking
     def appendleft(self, value):

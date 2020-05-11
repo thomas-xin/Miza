@@ -43,10 +43,21 @@ ESCAPE_T = {
     "]": "⦎",
     "@": "＠",
     "`": "",
+    "#": "♯",
+    ";": ";",
 }
 __emap = "".maketrans(ESCAPE_T)
 
+ESCAPE_T2 = {
+    "@": "＠",
+    "`": "",
+    "#": "♯",
+    ";": ";",
+}
+__emap2 = "".maketrans(ESCAPE_T2)
+
 noHighlight = lambda s: str(s).translate(__emap)
+clrHighlight = lambda s: str(s).translate(__emap2)
 
 sbHighlight = lambda s: "[" + noHighlight(s) + "]"
 

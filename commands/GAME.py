@@ -188,7 +188,10 @@ class Text2048(Command):
                     except TypeError:
                         pass
                 if a:
-                    await message.clear_reactions()
+                    try:
+                        await message.clear_reactions()
+                    except discord.Forbidden:
+                        pass
                     gameover = ["🇬","🇦","🇲","🇪","⬛","🇴","🇻","3️⃣","🇷"]
                     for g in gameover:
                         await message.add_reaction(g)

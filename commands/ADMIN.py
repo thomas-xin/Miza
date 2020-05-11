@@ -172,6 +172,10 @@ class Ban(Command):
                 i = bantype.index("for ")
                 expr = bantype[:i].strip()
                 msg = bantype[i + 3:].strip()
+            elif "reason " in bantype:
+                i = bantype.index("reason ")
+                expr = bantype[:i].strip()
+                msg = bantype[i + 3:].strip()
             else:
                 expr = bantype
             _op = None
