@@ -1048,6 +1048,8 @@ class PCMFile:
                     str(start),
                     "-to",
                     str(end),
+                    "-f",
+                    "s16le",
                     "-acodec",
                     "copy",
                 ]
@@ -1093,6 +1095,8 @@ class PCMFile:
                     str(start),
                     "-to",
                     str(end),
+                    "-f",
+                    "s16le",
                     "-acodec",
                     "copy",
                 ]
