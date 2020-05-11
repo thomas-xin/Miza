@@ -1011,53 +1011,91 @@ class PCMFile:
             )
         options = options.strip()
         if self.proc.is_running():
-            args = [
-                "ffmpeg",
-                "-f",
-                "s16le",
-                "-ar",
-                str(self.sample_rate),
-                "-ac",
-                "2",
-                "-i",
-                "pipe:0",
-                "-ss",
-                str(start),
-                "-to",
-                str(end),
-                "-f",
-                "s16le",
-                "-ar",
-                "48000",
-                "-ac",
-                "2",
-            ]
+            if "-af" in options:
+                args = [
+                    "ffmpeg",
+                    "-f",
+                    "s16le",
+                    "-ar",
+                    str(self.sample_rate),
+                    "-ac",
+                    "2",
+                    "-i",
+                    "pipe:0",
+                    "-ss",
+                    str(start),
+                    "-to",
+                    str(end),
+                    "-f",
+                    "s16le",
+                    "-ar",
+                    "48000",
+                    "-ac",
+                    "2",
+                ]
+            else:
+                args = [
+                    "ffmpeg",
+                    "-f",
+                    "s16le",
+                    "-ar",
+                    str(self.sample_rate),
+                    "-ac",
+                    "2",
+                    "-i",
+                    "pipe:0",
+                    "-ss",
+                    str(start),
+                    "-to",
+                    str(end),
+                    "-acodec",
+                    "copy",
+                ]
             args += shlex.split(options) + ["-loglevel", "error", "pipe:1"]
             player = BufferedAudioReader(self, args)
             create_future(player.run)
             return player
         else:
-            args = [
-                "ffmpeg",
-                "-f",
-                "s16le",
-                "-ar",
-                str(self.sample_rate),
-                "-ac",
-                "2",
-                "-i",
-                "cache/" + self.file,
-                "-ss",
-                str(start),
-                "-to",
-                str(end),
-                "-f",
-                "s16le",
-                "-ar",
-                "48000",
-                "-ac",
-                "2",
-            ]
+            if "-af" in options:
+                args = [
+                    "ffmpeg",
+                    "-f",
+                    "s16le",
+                    "-ar",
+                    str(self.sample_rate),
+                    "-ac",
+                    "2",
+                    "-i",
+                    "cache/" + self.file,
+                    "-ss",
+                    str(start),
+                    "-to",
+                    str(end),
+                    "-f",
+                    "s16le",
+                    "-ar",
+                    "48000",
+                    "-ac",
+                    "2",
+                ]
+            else:
+                args = [
+                    "ffmpeg",
+                    "-f",
+                    "s16le",
+                    "-ar",
+                    str(self.sample_rate),
+                    "-ac",
+                    "2",
+                    "-i",
+                    "cache/" + self.file,
+                    "-ss",
+                    str(start),
+                    "-to",
+                    str(end),
+                    "-acodec",
+                    "copy",
+                ]
             args += shlex.split(options) + ["-loglevel", "error", "pipe:1"]
             player = LoadedAudioReader(self, args)
             create_future(player.run)
