@@ -721,7 +721,7 @@ class AudioQueue(hlist):
                 if i >= len(q) or i > 8191:
                     break
                 e = q[i]
-                if i < 2:
+                if i < 3:
                     if not e.get("stream", None):
                         create_future(ytdl.getStream, e)
                         break
@@ -844,7 +844,7 @@ class AudioQueue(hlist):
 
 class PCMFile:
 
-    samplerate = 36000
+    sample_rate = 48000
     
     def __init__(self, fn):
         self.file = fn
@@ -860,7 +860,7 @@ class PCMFile:
         ff = ffmpy.FFmpeg(
             global_options=["-y", "-hide_banner", "-loglevel error", "-vn"],
             inputs={stream: None},
-            outputs={"s16le": "-f", str(self.samplerate): "-ar", "2": "-ac", "cache/" + self.file: None},
+            outputs={"s16le": "-f", str(self.sample_rate): "-ar", "2": "-ac", "cache/" + self.file: None},
         )
         cmd = shlex.split(ff.cmd)
         print(cmd)
@@ -970,7 +970,7 @@ class PCMFile:
                 raise OverflowError
             if options and options[-1] != " ":
                 options += ","
-            options += "asetrate=r=" + str(self.samplerate * pitchscale)
+            options += "asetrate=r=" + str(self.sample_rate * pitchscale)
         if auds.reverse:
             if options and options[-1] != " ":
                 options += ","
@@ -1016,7 +1016,7 @@ class PCMFile:
                 "-f",
                 "s16le",
                 "-ar",
-                str(self.samplerate),
+                str(self.sample_rate),
                 "-ac",
                 "2",
                 "-i",
@@ -1042,7 +1042,7 @@ class PCMFile:
                 "-f",
                 "s16le",
                 "-ar",
-                str(self.samplerate),
+                str(self.sample_rate),
                 "-ac",
                 "2",
                 "-i",
