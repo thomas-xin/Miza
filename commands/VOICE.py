@@ -1040,7 +1040,7 @@ class PCMFile:
                 except ZeroDivisionError:
                     pan = 1
                 options += (
-                    "extrastereo=m=" + str(p) + ":c=0,volume=" + str(sqrt(abs(p)))
+                    "extrastereo=m=" + str(p) + ":c=0,volume=" + str(1 / max(1, sqrt(abs(p))))
                 )
         options = options.strip()
         if self.proc.is_running():
