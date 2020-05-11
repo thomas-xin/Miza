@@ -191,7 +191,9 @@ class customAudio(discord.AudioSource):
         "reverb": 0,
         "pitch": 0,
         "speed": 1,
+        "pan": 1,
         "bassboost": 0,
+        "compressor": 0,
         "chorus": 0,
         "resample": 0,
         "loop": False,
@@ -932,7 +934,7 @@ class PCMFile:
         else:
             auds.paused &= -3
         stats.position = pos
-        if not isValid(stats.pitch * stats.speed * stats.chorus):
+        if not isValid(stats.pitch * stats.speed):
             raise OverflowError
         # if auds.reverse:
         #     start = 0
@@ -1009,6 +1011,31 @@ class PCMFile:
                 + C + ":"
                 + D + "\""
             )
+        if stats.compressor:
+            comp = min(8000, abs(stats.compressor + sgn(stats.compressor)))
+            while abs(comp) > 1:
+                if not options:
+                    options = "-af "
+                else:
+                    options += ","
+                c = min(20, comp)
+                comp /= c
+                options += (
+                    "acompressor=mode=" + ("downward", "upward")[stats.compressor < 0]
+                    + ":ratio=" + str(c) + ":level_in=" + str(sqrt(c)) + ":threshold=0.0625:makeup=" + str(sqrt(c))
+                )
+        if stats.pan != 1:
+            pan = min(8000, max(-8000, stats.pan))
+            while abs(abs(pan) - 1) > 0.001:
+                if not options:
+                    options = "-af "
+                else:
+                    options += ","
+                p = max(-20, min(20, pan))
+                pan /= p
+                options += (
+                    "extrastereo=m=" + str(p) + ":c=0,volume=" + str(sqrt(abs(p)))
+                )
         options = options.strip()
         if self.proc.is_running():
             if "-af" in options:
@@ -1138,6 +1165,7 @@ class BufferedAudioReader(discord.AudioSource):
         print(self.proc)
         self.stream = file.open()
         self.buffer = bytes()
+        self.loader = file.proc
 
     def read(self, size=0):
         while len(self.buffer) < size:
@@ -1161,7 +1189,7 @@ class BufferedAudioReader(discord.AudioSource):
                 self.proc.stdin.write(b)
                 self.proc.stdin.flush()
             except (ValueError, EOFError, IndexError, BrokenPipeError):
-                if not self.proc.is_running():
+                if not self.loader.is_running():
                     break
                 time.sleep(0.1)
         self.proc.stdin.close()
@@ -2268,8 +2296,10 @@ class AudioSettings(Command):
         "Volume": "volume",
         "Speed": "speed",
         "Pitch": "pitch",
+        "Pan": "pan",
         "BassBoost": "bassboost",
         "Reverb": "reverb",
+        "Compressor": "compressor",
         "Chorus": "chorus",
         "NightCore": "resample",
         "Resample": "resample",
@@ -2286,8 +2316,10 @@ class AudioSettings(Command):
         "V": "volume",
         "SP": "speed",
         "PI": "pitch",
+        "PN": "pan",
         "BB": "bassboost",
         "RV": "reverb",
+        "CO": "compressor",
         "CH": "chorus",
         "NC": "resample",
         "LQ": "loop",
@@ -2301,8 +2333,8 @@ class AudioSettings(Command):
         self.min_display = "0~1"
         self.description = "Changes the current audio settings for this server."
         self.usage = (
-            "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <bassboost(?b)> <reverb(?r)> <chorus(?c)>"
-            + " <nightcore(?n)> <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)> <hide(?h)>"
+            "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <pan(?e)> <bassboost(?b)> <reverb(?r)> <compressor(?c)>"
+            + " <chorus(?u)> <nightcore(?n)> <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)> <hide(?h)>"
         )
         self.flags = "vspbrcnlxqdh"
         self.map = {k.lower(): self.aliasMap[k] for k in self.aliasMap}
@@ -2325,11 +2357,15 @@ class AudioSettings(Command):
             ops.append("speed")
         if "p" in flags:
             ops.append("pitch")
+        if "e" in flags:
+            ops.append("pan")
         if "b" in flags:
             ops.append("bassboost")
         if "r" in flags:
             ops.append("reverb")
         if "c" in flags:
+            ops.append("compressor")
+        if "u" in flags:
             ops.append("chorus")
         if "n" in flags:
             ops.append("resample")
@@ -2400,7 +2436,7 @@ class AudioSettings(Command):
                 orig = bool(orig)
             else:
                 origVol[op] = val
-            if auds.queue and (op in "speed pitch chorus" or op == "resample" and max(orig, new) >= 240000):
+            if auds.queue and (op in "speed pitch pan compressor chorus" or op == "resample" and max(orig, new) >= 240000):
                 await create_future(auds.new, auds.file, auds.stats.position)
             s += (
                 "\nChanged audio " + str(op)
