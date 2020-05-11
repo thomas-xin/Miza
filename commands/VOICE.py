@@ -1028,13 +1028,13 @@ class PCMFile:
                     + ":ratio=" + str(c) + ":level_in=" + str(sqrt(c)) + ":threshold=0.0625:makeup=" + str(sqrt(c))
                 )
         if stats.pan != 1:
-            pan = min(8000, max(-8000, stats.pan))
+            pan = min(1000, max(-1000, stats.pan))
             while abs(abs(pan) - 1) > 0.001:
                 if not options:
                     options = "-af "
                 else:
                     options += ","
-                p = max(-20, min(20, pan))
+                p = max(-10, min(10, pan))
                 try:
                     pan /= p
                 except ZeroDivisionError:
