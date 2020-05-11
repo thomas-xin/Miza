@@ -788,44 +788,45 @@ class AudioQueue(hlist):
     def update_play(self):
         auds = self.auds
         q = self
-        if not q[0].get("played", False):
-            if q[0].get("stream", None) not in (None, "none"):
-                q[0].played = True
-                if not auds.stats.quiet:
-                    if time.time() - self.lastsent > 1:
-                        try:
-                            u = self.bot.cache.users[q[0].u_id]
-                            name = u.display_name
-                        except KeyError:
-                            name = "Deleted User"
-                        msg = (
-                            "```ini\n🎵 Now playing "
-                            + sbHighlight(q[0].name)
-                            + ", added by " + sbHighlight(name) + "! 🎵```"
-                        )
-                        create_task(sendReact(
-                            auds.channel,
-                            msg,
-                            reacts=["❎"],
-                        ))
-                        self.lastsent = time.time()
-                self.loading = True
-                if "research" in q[0]:
-                    q[0].pop("research")
-                    ytdl.extractSingle(q[0])
-                source = ytdl.getStream(q[0])
-                print(q[0])
-                try:
-                    auds.new(source)
-                    self.loading = False
-                except:
-                    self.loading = False
-                    print(traceback.format_exc())
-                    raise
-                auds.preparing = False
-        elif auds.source is None and not self.loading and not auds.preparing:
-            print("Queue Advanced.")
-            self.advance()
+        if q:
+            if not q[0].get("played", False):
+                if q[0].get("stream", None) not in (None, "none"):
+                    q[0].played = True
+                    if not auds.stats.quiet:
+                        if time.time() - self.lastsent > 1:
+                            try:
+                                u = self.bot.cache.users[q[0].u_id]
+                                name = u.display_name
+                            except KeyError:
+                                name = "Deleted User"
+                            msg = (
+                                "```ini\n🎵 Now playing "
+                                + sbHighlight(q[0].name)
+                                + ", added by " + sbHighlight(name) + "! 🎵```"
+                            )
+                            create_task(sendReact(
+                                auds.channel,
+                                msg,
+                                reacts=["❎"],
+                            ))
+                            self.lastsent = time.time()
+                    self.loading = True
+                    if "research" in q[0]:
+                        q[0].pop("research")
+                        ytdl.extractSingle(q[0])
+                    source = ytdl.getStream(q[0])
+                    print(q[0])
+                    try:
+                        auds.new(source)
+                        self.loading = False
+                    except:
+                        self.loading = False
+                        print(traceback.format_exc())
+                        raise
+                    auds.preparing = False
+            elif auds.source is None and not self.loading and not auds.preparing:
+                print("Queue Advanced.")
+                self.advance()
 
     def enqueue(self, items, position):
         initialize = not len(self)
