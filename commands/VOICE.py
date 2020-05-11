@@ -2327,7 +2327,7 @@ class AudioSettings(Command):
     }
 
     def __init__(self, *args):
-        self.alias = list(self.aliasMap) + list(self.aliasExt)
+        self.alias = list(self.aliasMap) + list(self.aliasExt)[1:]
         self.name = list(self.aliasMap)
         self.min_level = 0
         self.min_display = "0~1"
