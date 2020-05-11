@@ -3212,18 +3212,18 @@ class UpdateQueues(Database):
                 if not a & 15:
                     await asyncio.sleep(0.2)
                 a += 1
-            t = time.time()
-            i = 1
-            for path in os.listdir("cache"):
-                fn = "cache/" + path
-                if path.startswith("&"):
-                    if t - os.path.getmtime(fn) > 3600:
-                        os.remove(fn)
-                if not i & 1023:
-                    await asyncio.sleep(0.2)
-                    t = time.time()
-                i += 1
+            # t = time.time()
+            # i = 1
+            # for path in os.listdir("cache"):
+            #     fn = "cache/" + path
+            #     if path.startswith("&"):
+            #         if t - os.path.getmtime(fn) > 3600:
+            #             os.remove(fn)
+            #     if not i & 1023:
+            #         await asyncio.sleep(0.2)
+            #         t = time.time()
+            #     i += 1
             await asyncio.sleep(0.5)
-        for item in ytdl.cache.values():
-            item.update()
+            for item in tuple(ytdl.cache.values()):
+                item.update()
         self.busy = max(0, self.busy - 1)
