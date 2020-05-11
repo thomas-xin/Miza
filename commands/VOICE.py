@@ -1019,7 +1019,10 @@ class PCMFile:
                 else:
                     options += ","
                 c = min(20, comp)
-                comp /= c
+                try:
+                    comp /= c
+                except ZeroDivisionError:
+                    comp = 1
                 options += (
                     "acompressor=mode=" + ("downward", "upward")[stats.compressor < 0]
                     + ":ratio=" + str(c) + ":level_in=" + str(sqrt(c)) + ":threshold=0.0625:makeup=" + str(sqrt(c))
@@ -1032,7 +1035,10 @@ class PCMFile:
                 else:
                     options += ","
                 p = max(-20, min(20, pan))
-                pan /= p
+                try:
+                    pan /= p
+                except ZeroDivisionError:
+                    pan = 1
                 options += (
                     "extrastereo=m=" + str(p) + ":c=0,volume=" + str(sqrt(abs(p)))
                 )
