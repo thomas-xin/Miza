@@ -394,7 +394,7 @@ class UpdateReacts(Database):
                     following = self.data[g_id] = multiDict(following)
                 reacting = {}
                 for k in following:
-                    if alphanumeric(k):
+                    if is_alphanumeric(k):
                         words = text.split(" ")
                     else:
                         words = message.content.lower()

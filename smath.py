@@ -788,7 +788,9 @@ def bytes2Hex(b, space=True):
         o += c
         if space:
             o += " "
-    return o[:-1]
+    if space:
+        return o.strip()
+    return o
 
 def hex2Bytes(h):
     o = []

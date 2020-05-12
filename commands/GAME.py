@@ -194,7 +194,7 @@ class Text2048(Command):
                         pass
                     gameover = ["🇬","🇦","🇲","🇪","⬛","🇴","🇻","3️⃣","🇷"]
                     for g in gameover:
-                        await message.add_reaction(g)
+                        create_task(message.add_reaction(g))
 
     def spawn(self, gamestate, mode, count=1):
         width = len(gamestate)
@@ -238,7 +238,7 @@ class Text2048(Command):
             for react in self.directions:
                 rval = self.directions[react][0]
                 if rval & mode or not rval:
-                    await message.add_reaction(react.decode("utf-8"))
+                    create_task(message.add_reaction(react.decode("utf-8")))
             self.spawn(gamestate[0], mode, 1)
         if u_id == 0:
             username = "＠everyone"

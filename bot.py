@@ -868,7 +868,7 @@ class main_data:
                                     bot=self,
                                 ),
                                 timeout=timeout)
-                            return
+                            break
                         except Exception as ex:
                             print(traceback.format_exc())
                             create_task(sendReact(

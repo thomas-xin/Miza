@@ -1191,7 +1191,7 @@ class UpdateRolegivers(Database):
         bot = self.bot
         assigned = self.data.get(message.channel.id, ())
         for k in assigned:
-            if ((k in text) if alphanumeric(k) else (k in message.content.lower())):
+            if ((k in text) if is_alphanumeric(k) else (k in message.content.lower())):
                 alist = assigned[k]
                 for r in alist[0]:
                     role = guild.get_role(r)

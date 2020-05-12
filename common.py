@@ -186,12 +186,11 @@ def strActivity(activity):
         return t[0].upper() + t[1:] + " " + activity.name
     return str(activity)
 
-def alphanumeric(string):
-    for c in string.lower():
-        x = ord(c)
-        if x > 122 or (x < 97 and x > 57) or x < 48:
-            return False
-    return True
+asearch = re.compile("([^A-z0-9])")
+is_alphanumeric = lambda string: bool(re.search(asearch, string))
+
+atrans = re.compile("[A-z 0-9]")
+to_alphanumeric = lambda string: "".join(re.findall(atrans, reconstitute(string)))
 
 def noCodeBox(s):
     if s.startswith("```") and s.endswith("```"):

@@ -400,8 +400,10 @@ class customAudio(discord.AudioSource):
                 if user.voice.deaf or user.voice.mute or user.voice.afk:
                     create_task(user.edit(mute=False, deafen=False))
             self.att = 0
-        except (discord.Forbidden):
+        except discord.Forbidden:
             self.dead = True
+        except discord.ClientException:
+            self.att = time.time()
         except:
             print(traceback.format_exc())
             if getattr(self, "att", 0) > 0 and time.time() - self.att > 10:
@@ -758,21 +760,22 @@ class AudioQueue(hlist):
         q = self
         s = self.auds.stats
         if q:
-            if s.loop:
-                temp = q[0]
-            self.prev = q[0]["url"]
-            q.popleft()
-            if s.shuffle and shuffled:
-                if len(q) > 1:
-                    temp = q.popleft()
-                    shuffle(q)
-                    q.appendleft(temp)
-            if s.loop and looped:
-                try:
-                    temp.pop("played")
-                except (KeyError, IndexError):
-                    pass
-                q.append(temp)
+            if q[0].get("played"):
+                if s.loop:
+                    temp = q[0]
+                self.prev = q[0]["url"]
+                q.popleft()
+                if s.shuffle and shuffled:
+                    if len(q) > 1:
+                        temp = q.popleft()
+                        shuffle(q)
+                        q.appendleft(temp)
+                if s.loop and looped:
+                    try:
+                        temp.pop("played")
+                    except (KeyError, IndexError):
+                        pass
+                    q.append(temp)
         if not (q or self.auds.preparing):
             t = self.bot.data.playlists.get(self.vc.guild.id, ())
             if t:
@@ -1499,7 +1502,10 @@ class videoDownloader:
         self.update_dl()
         fn = "cache/&" + str(time_snowflake(datetime.datetime.utcnow())) + "." + fmt
         info = self.extract(url)[0]
-        stream = self.getStream(info, force=True, download=False)
+        self.getStream(info, force=True, download=False)
+        stream = info["stream"]
+        if not stream:
+            raise LookupError("No stream URLs found for " + url)
         duration = getDuration(stream)
         if type(duration) is str:
             dur = 960
@@ -1804,10 +1810,10 @@ class Queue(Command):
             emb.set_footer(
                 text=uniStr("And ", 1) + str(len(q) - i) + uniStr(" more...", 1),
             )
-        await message.edit(content=None, embed=emb)
+        create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
-                await message.add_reaction(react.decode("utf-8"))
+                create_task(message.add_reaction(react.decode("utf-8")))
 
 
 class Playlist(Command):
@@ -2869,20 +2875,24 @@ except:
 
 
 def get_lyrics(item):
-    item = verifySearch(item)
+    item = to_alphanumeric(verifySearch(item))
     url = "https://api.genius.com/search"
     for i in range(3):
         header = {"user-agent": "Mozilla/5." + str(xrand(1, 10)), "Authorization": "Bearer " + genius_key}
-        data = {"q": item}
+        if i == 0:
+            search = item
+        else:
+            search = "".join(shuffle(item.split()))
+        data = {"q": search}
         resp = requests.get(url, data=data, headers=header)
         rdata = json.loads(resp.content)
         hits = rdata["response"]["hits"]
         name = None
         path = None
-        for i in hits:
+        for h in hits:
             try:
-                name = i["result"]["title"]
-                path = i["result"]["api_path"]
+                name = h["result"]["title"]
+                path = h["result"]["api_path"]
                 break
             except KeyError:
                 pass
@@ -3053,7 +3063,7 @@ class Download(Command):
             embed=emb,
         )
         for i in range(len(res)):
-            await sent.add_reaction(str(i) + b"\xef\xb8\x8f\xe2\x83\xa3".decode("utf-8"))
+            create_task(sent.add_reaction(str(i) + b"\xef\xb8\x8f\xe2\x83\xa3".decode("utf-8")))
         # await sent.add_reaction("❎")
 
     async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, user, **void):
@@ -3072,10 +3082,10 @@ class Download(Command):
                     else:
                         fl = guild.filesize_limit
                     create_task(channel.trigger_typing())
-                    await message.edit(
+                    create_task(message.edit(
                         content="```ini\nDownloading [" + noHighlight(ensure_url(url)) + "]...```",
                         embed=None,
-                    )
+                    ))
                     fn, out = await create_future(
                         ytdl.download_file,
                         url,
