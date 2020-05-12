@@ -11,6 +11,8 @@ from bs4 import BeautifulSoup
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 getattr(ffmpy, "__builtins__", {})["print"] = print
 
+SAMPLE_RATE = 48000
+
 
 async def createPlayer(auds, p_type=0, verbose=False):
     auds.stats.quiet |= 2 * p_type
@@ -180,11 +182,11 @@ def ensure_url(url):
 
 class customAudio(discord.AudioSource):
     
-    length = 1920
+    length = round(SAMPLE_RATE / 25)
     empty = numpy.zeros(length >> 1, float)
     emptybuff = numpy.zeros(length, numpy.uint16).tobytes()
     filt = signal.butter(1, 0.125, btype="low", output="sos")
-    #fff = numpy.abs(numpy.fft.fftfreq(960, 1/48000))[:481]
+    #fff = numpy.abs(numpy.fft.fftfreq(SAMPLE_RATE / 50, 1/SAMPLE_RATE))[:ceil(SAMPLE_RATE / 100 + 1)]
     static = lambda self, *args: numpy.random.rand(self.length) * 65536 - 32768
     defaults = {
         "volume": 1,
@@ -845,8 +847,6 @@ class AudioQueue(hlist):
 
 
 class PCMFile:
-
-    sample_rate = 48000
     
     def __init__(self, fn):
         self.file = fn
@@ -862,7 +862,7 @@ class PCMFile:
         ff = ffmpy.FFmpeg(
             global_options=["-y", "-hide_banner", "-loglevel error", "-vn"],
             inputs={stream: None},
-            outputs={"s16le": "-f", str(self.sample_rate): "-ar", "2": "-ac", "cache/" + self.file: None},
+            outputs={"s16le": "-f", str(SAMPLE_RATE): "-ar", "2": "-ac", "cache/" + self.file: None},
         )
         cmd = shlex.split(ff.cmd)
         print(cmd)
@@ -972,7 +972,7 @@ class PCMFile:
                 raise OverflowError
             if options and options[-1] != " ":
                 options += ","
-            options += "asetrate=r=" + str(self.sample_rate * pitchscale)
+            options += "asetrate=r=" + str(SAMPLE_RATE * pitchscale)
         if auds.reverse:
             if options and options[-1] != " ":
                 options += ","
@@ -1051,7 +1051,7 @@ class PCMFile:
                     "-f",
                     "s16le",
                     "-ar",
-                    str(self.sample_rate),
+                    str(SAMPLE_RATE),
                     "-ac",
                     "2",
                     "-i",
@@ -1063,7 +1063,7 @@ class PCMFile:
                     "-f",
                     "s16le",
                     "-ar",
-                    "48000",
+                    str(SAMPLE_RATE),
                     "-ac",
                     "2",
                 ]
@@ -1073,7 +1073,7 @@ class PCMFile:
                     "-f",
                     "s16le",
                     "-ar",
-                    str(self.sample_rate),
+                    str(SAMPLE_RATE),
                     "-ac",
                     "2",
                     "-i",
@@ -1098,7 +1098,7 @@ class PCMFile:
                     "-f",
                     "s16le",
                     "-ar",
-                    str(self.sample_rate),
+                    str(SAMPLE_RATE),
                     "-ac",
                     "2",
                     "-i",
@@ -1110,7 +1110,7 @@ class PCMFile:
                     "-f",
                     "s16le",
                     "-ar",
-                    "48000",
+                    str(SAMPLE_RATE),
                     "-ac",
                     "2",
                 ]
@@ -1120,7 +1120,7 @@ class PCMFile:
                     "-f",
                     "s16le",
                     "-ar",
-                    str(self.sample_rate),
+                    str(SAMPLE_RATE),
                     "-ac",
                     "2",
                     "-i",
