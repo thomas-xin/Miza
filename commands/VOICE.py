@@ -799,7 +799,7 @@ class AudioQueue(hlist):
         auds = self.auds
         q = self
         if q:
-            if (getattr(auds, "source", None) is None or auds.souce.closed) and not q[0].get("played", False):
+            if (auds.source is None or auds.source.closed) and not q[0].get("played", False):
                 if q[0].get("stream", None) not in (None, "none"):
                     q[0].played = True
                     if not auds.stats.quiet:
