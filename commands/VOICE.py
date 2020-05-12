@@ -347,8 +347,9 @@ class customAudio(discord.AudioSource):
                     vc.play(self, after=self.queue.advance)
                 self.att = 0
             except:
-                self.att = getattr(self, "att", 0) + 1
-                if self.att > 5:
+                if getattr(self, "att", 0) <= 0:
+                    self.att = time.time()
+                elif time.time() - self.att > 10:
                     self.dead = True
                     return
         cnt = sum(1 for m in vc.channel.members if not m.bot)
@@ -390,8 +391,9 @@ class customAudio(discord.AudioSource):
         try:
             if hasattr(self, "dead") or self.vc.is_connected():
                 return
-            bot.database.playlists.connecting[self.vc.guild.id] = True
-            self.att = getattr(self, "att", 0) + 1
+            self.bot.database.playlists.connecting[self.vc.guild.id] = True
+            if getattr(self, "att", 0) <= 0:
+                self.att = time.time()
             self.vc = await self.vc.channel.connect(timeout=30, reconnect=False)
             user = self.vc.guild.get_member(self.bot.client.user.id)
             if getattr(user, "voice", None) is not None:
@@ -402,10 +404,10 @@ class customAudio(discord.AudioSource):
             self.dead = True
         except:
             print(traceback.format_exc())
-            if self.att > 5:
+            if getattr(self, "att", 0) > 0 and time.time() - self.att > 10:
                 self.dead = True
         try:
-            bot.database.playlists.connecting.pop(self.vc.guild.id)
+            self.bot.database.playlists.connecting.pop(self.vc.guild.id)
         except:
             print(traceback.format_exc())
 
@@ -797,7 +799,7 @@ class AudioQueue(hlist):
         auds = self.auds
         q = self
         if q:
-            if not q[0].get("played", False):
+            if (auds.source is None or auds.souce.closed) and not q[0].get("played", False):
                 if q[0].get("stream", None) not in (None, "none"):
                     q[0].played = True
                     if not auds.stats.quiet:
