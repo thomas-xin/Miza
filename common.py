@@ -187,7 +187,7 @@ def strActivity(activity):
     return str(activity)
 
 asearch = re.compile("([^A-z0-9])")
-is_alphanumeric = lambda string: bool(re.search(asearch, string))
+is_alphanumeric = lambda string: not re.search(asearch, string)
 
 atrans = re.compile("[A-z 0-9]")
 to_alphanumeric = lambda string: "".join(re.findall(atrans, reconstitute(string)))
