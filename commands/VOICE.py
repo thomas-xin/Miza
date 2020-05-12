@@ -380,7 +380,7 @@ class customAudio(discord.AudioSource):
             create_task(self.reconnect())
         else:
             self.att = 0
-        create_future(self.queue.update_load)
+            create_future(self.queue.update_load)
 
     async def move_unmute(self, vc, channel):
         await vc.move_to(channel)
@@ -390,13 +390,13 @@ class customAudio(discord.AudioSource):
         try:
             if hasattr(self, "dead") or self.vc.is_connected():
                 return
+            bot.database.playlists.connecting[self.vc.guild.id] = True
             self.att = getattr(self, "att", 0) + 1
             self.vc = await self.vc.channel.connect(timeout=30, reconnect=False)
             user = self.vc.guild.get_member(self.bot.client.user.id)
             if getattr(user, "voice", None) is not None:
                 if user.voice.deaf or user.voice.mute or user.voice.afk:
                     create_task(user.edit(mute=False, deafen=False))
-            self.update()
             self.att = 0
         except (discord.Forbidden):
             self.dead = True
@@ -404,6 +404,10 @@ class customAudio(discord.AudioSource):
             print(traceback.format_exc())
             if self.att > 5:
                 self.dead = True
+        try:
+            bot.database.playlists.connecting.pop(self.vc.guild.id)
+        except:
+            print(traceback.format_exc())
 
     async def updatePlayer(self):
         curr = self.player
