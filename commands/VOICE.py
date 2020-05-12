@@ -1023,12 +1023,13 @@ class PCMFile:
                     comp /= c
                 except ZeroDivisionError:
                     comp = 1
+                mult = str(round(math.sqrt(c), 4))
                 options += (
                     "acompressor=mode=" + ("downward", "upward")[stats.compressor < 0]
-                    + ":ratio=" + str(c) + ":level_in=" + str(sqrt(c)) + ":threshold=0.0625:makeup=" + str(sqrt(c))
+                    + ":ratio=" + str(c) + ":level_in=" + mult + ":threshold=0.0625:makeup=" + mult
                 )
         if stats.pan != 1:
-            pan = min(1000, max(-1000, stats.pan))
+            pan = min(10000, max(-10000, stats.pan))
             while abs(abs(pan) - 1) > 0.001:
                 if not options:
                     options = "-af "
@@ -1040,7 +1041,7 @@ class PCMFile:
                 except ZeroDivisionError:
                     pan = 1
                 options += (
-                    "extrastereo=m=" + str(p) + ":c=0,volume=" + str(1 / max(1, sqrt(abs(p))))
+                    "extrastereo=m=" + str(p) + ":c=0,volume=" + str(1 / max(1, round(math.sqrt(abs(p)), 4)))
                 )
         options = options.strip()
         if self.proc.is_running():
