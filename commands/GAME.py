@@ -98,7 +98,7 @@ class Text2048(Command):
             a = 0
         return tiles, a
 
-    def randomSpam(self, gamestate, mode, pool, returns):
+    def randomSpam(self, gamestate, mode, pool):
         gamestate[1] = gamestate[0]
         a = i = 1
         moved = {}
@@ -119,7 +119,7 @@ class Text2048(Command):
             if not i % 20:
                 time.sleep(0.01)
             i += 1
-        returns[0] = (gamestate, a)
+        return gamestate, a
                                         
     async def nextIter(self, message, gamestate, username, direction, mode):
         width = len(gamestate[-1])
@@ -195,6 +195,7 @@ class Text2048(Command):
                     gameover = ["🇬","🇦","🇲","🇪","⬛","🇴","🇻","3️⃣","🇷"]
                     for g in gameover:
                         create_task(message.add_reaction(g))
+                        await asyncio.sleep(0.5)
 
     def spawn(self, gamestate, mode, count=1):
         width = len(gamestate)

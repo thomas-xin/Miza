@@ -250,6 +250,14 @@ class customAudio(discord.AudioSource):
             + "}"
         )
 
+    def ensure_play(self):
+        try:
+            self.vc.play(self, after=self.queue.advance)
+        except discord.ClientException:
+            pass
+        except:
+            print(traceback.format_exc())
+
     def stop(self):
         self.refilling = False
         if getattr(self, "source", None) is None:
@@ -264,6 +272,7 @@ class customAudio(discord.AudioSource):
             new_source = None
             try:
                 new_source = source.create_reader(pos, auds=self)
+                new_source.read(0)
             except OverflowError:
                 source = None
             else:
@@ -297,9 +306,9 @@ class customAudio(discord.AudioSource):
         duration = float(self.queue[0].duration)
         pos = max(0, pos)
         if (pos >= duration and not self.reverse) or (pos <= 0 and self.reverse):
-            create_future(self.new, update=True)
+            create_future_ex(self.new, update=True)
             return duration
-        create_future(self.new, self.file, pos, update=False)
+        create_future_ex(self.new, self.file, pos, update=False)
         self.stats.position = pos
         return self.stats.position
 
@@ -347,6 +356,7 @@ class customAudio(discord.AudioSource):
                     vc.play(self, after=self.queue.advance)
                 self.att = 0
             except:
+                print(traceback.format_exc())
                 if getattr(self, "att", 0) <= 0:
                     self.att = time.time()
                 elif time.time() - self.att > 10:
@@ -381,7 +391,7 @@ class customAudio(discord.AudioSource):
             create_task(self.reconnect())
         else:
             self.att = 0
-            create_future(self.queue.update_load)
+            create_future_ex(self.queue.update_load)
 
     async def move_unmute(self, vc, channel):
         await vc.move_to(channel)
@@ -401,6 +411,7 @@ class customAudio(discord.AudioSource):
                     create_task(user.edit(mute=False, deafen=False))
             self.att = 0
         except discord.Forbidden:
+            print(traceback.format_exc())
             self.dead = True
         except discord.ClientException:
             self.att = time.time()
@@ -500,7 +511,7 @@ class customAudio(discord.AudioSource):
                     if self.queue and not self.queue[0].get("played", False):
                         if not found and not self.queue.loading:
                             self.refilling = 2
-                            create_future(self.queue.advance)
+                            create_future_ex(self.queue.advance)
                             return
                     elif empty and queueable and self.source is not None:
                         if time.time() - self.lastEnd > 0.5:
@@ -516,7 +527,7 @@ class customAudio(discord.AudioSource):
                                         self.refilling = 2
                                         if self.queue:
                                             self.queue[0].url = ""
-                                        create_future(self.new)
+                                        create_future_ex(self.new)
                                         self.preparing = False
                                         return
                                     else:
@@ -531,7 +542,7 @@ class customAudio(discord.AudioSource):
                                         else:
                                             print("Advanced.")
                                             self.refilling = 2
-                                            create_future(self.new)
+                                            create_future_ex(self.new)
                                             self.preparing = False
                                             return
                             elif self.curr_timeout == 0:
@@ -695,7 +706,7 @@ class customAudio(discord.AudioSource):
             array = numpy.stack((left, right), axis=-1).flatten()
             numpy.clip(array, -32767, 32767, out=array)
             temp = array.astype(numpy.int16).tobytes()
-            self.pausec = self.paused and not (max(temp) or min(temp))
+            self.pausec = self.paused & 1 and not (max(temp) or min(temp))
             if self.pausec:
                 self.vc.stop()
         except:
@@ -735,7 +746,7 @@ class AudioQueue(hlist):
                 e = q[i]
                 if i < 3:
                     if not e.get("stream", None):
-                        create_future(ytdl.getStream, e)
+                        create_future_ex(ytdl.getStream, e)
                         break
                 if not e.url:
                     if not self.auds.stats.quiet:
@@ -832,6 +843,7 @@ class AudioQueue(hlist):
                     try:
                         auds.new(source)
                         self.loading = False
+                        create_future_ex(auds.ensure_play)
                     except:
                         self.loading = False
                         print(traceback.format_exc())
@@ -1049,104 +1061,29 @@ class PCMFile:
                     pan /= p
                 except ZeroDivisionError:
                     pan = 1
-                options += (
-                    "extrastereo=m=" + str(p) + ":c=0,volume=" + str(1 / max(1, round(math.sqrt(abs(p)), 4)))
-                )
+                options += "extrastereo=m=" + str(p) + ":c=0"
+                if abs(abs(p) - 1) > 0.001:
+                    options += ",volume=" + str(1 / max(1, round(math.sqrt(abs(p)), 4)))
         options = options.strip()
+        args = ["ffmpeg", "-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "2", "-i"]
         if self.proc.is_running():
-            if "-af" in options:
-                args = [
-                    "ffmpeg",
-                    "-f",
-                    "s16le",
-                    "-ar",
-                    str(SAMPLE_RATE),
-                    "-ac",
-                    "2",
-                    "-i",
-                    "pipe:0",
-                    "-ss",
-                    str(start),
-                    "-to",
-                    str(end),
-                    "-f",
-                    "s16le",
-                    "-ar",
-                    str(SAMPLE_RATE),
-                    "-ac",
-                    "2",
-                ]
-            else:
-                args = [
-                    "ffmpeg",
-                    "-f",
-                    "s16le",
-                    "-ar",
-                    str(SAMPLE_RATE),
-                    "-ac",
-                    "2",
-                    "-i",
-                    "pipe:0",
-                    "-ss",
-                    str(start),
-                    "-to",
-                    str(end),
-                    "-f",
-                    "s16le",
-                    "-acodec",
-                    "copy",
-                ]
-            args += shlex.split(options) + ["-loglevel", "error", "pipe:1"]
-            player = BufferedAudioReader(self, args)
-            create_future(player.run)
-            return player
+            buff = True
+            args.append("pipe:0")
         else:
-            if "-af" in options:
-                args = [
-                    "ffmpeg",
-                    "-f",
-                    "s16le",
-                    "-ar",
-                    str(SAMPLE_RATE),
-                    "-ac",
-                    "2",
-                    "-i",
-                    "cache/" + self.file,
-                    "-ss",
-                    str(start),
-                    "-to",
-                    str(end),
-                    "-f",
-                    "s16le",
-                    "-ar",
-                    str(SAMPLE_RATE),
-                    "-ac",
-                    "2",
-                ]
-            else:
-                args = [
-                    "ffmpeg",
-                    "-f",
-                    "s16le",
-                    "-ar",
-                    str(SAMPLE_RATE),
-                    "-ac",
-                    "2",
-                    "-i",
-                    "cache/" + self.file,
-                    "-ss",
-                    str(start),
-                    "-to",
-                    str(end),
-                    "-f",
-                    "s16le",
-                    "-acodec",
-                    "copy",
-                ]
-            args += shlex.split(options) + ["-loglevel", "error", "pipe:1"]
+            buff = False
+            args.append("cache/" + self.file)
+        args += ["-ss", str(start), "-to", str(end), "-f", "s16le"]
+        if "-af" in options:
+            args += ["-ar", str(SAMPLE_RATE), "-ac", "2"]
+        else:
+            args += ["-acodec", "copy"]
+        args += shlex.split(options) + ["-loglevel", "error", "pipe:1"]
+        if buff:
+            player = BufferedAudioReader(self, args)
+        else:
             player = LoadedAudioReader(self, args)
-            create_future(player.run)
-            return player
+        create_future_ex(player.run)
+        return player
 
 
 class LoadedAudioReader(discord.AudioSource):
@@ -1600,11 +1537,11 @@ class Queue(Command):
                             auds.queue[0].pop("played")
                         except (KeyError, IndexError):
                             pass
-                create_future(auds.update)
+                create_future_ex(auds.update)
                 return "```css\nSuccessfully resumed audio playback in [" + noHighlight(guild.name) + "].```", 1
             if not len(q):
                 auds.preparing = False
-                create_future(auds.update)
+                create_future_ex(auds.update)
                 return "```ini\nQueue for [" + noHighlight(guild.name) + "] is currently empty. ```", 1
             return (
                 "```" + "\n" * ("z" in flags) + "callback-voice-queue-"
@@ -1659,7 +1596,7 @@ class Queue(Command):
                 except (KeyError, IndexError):
                     pass
             auds.queue.enqueue(added, 0)
-            create_future(auds.new)
+            create_future_ex(auds.new)
             total_duration = tdur
         elif "b" in flags:
             auds.queue.enqueue(added, 1)
@@ -1814,6 +1751,7 @@ class Queue(Command):
         if reaction is None:
             for react in self.directions:
                 create_task(message.add_reaction(react.decode("utf-8")))
+                await asyncio.sleep(0.5)
 
 
 class Playlist(Command):
@@ -2070,7 +2008,7 @@ class Skip(Command):
                 if not isValid(pos):
                     if "f" in flags:
                         auds.queue.clear()
-                        create_future(auds.new)
+                        create_future_ex(auds.new)
                         if "h" not in flags:
                             return "```fix\nRemoved all items from the queue.```", 1
                         return
@@ -2127,7 +2065,7 @@ class Skip(Command):
             song = auds.queue[0]
             if song.skips is None or len(song.skips) >= required:
                 auds.queue.popleft()
-                create_future(auds.new)
+                create_future_ex(auds.new)
                 auds.preparing = False
                 if count < 4:
                     response += (
@@ -2168,6 +2106,8 @@ class Pause(Command):
         if not auds.paused > 1:
             auds.paused = name in ("pause", "stop")
             auds.pausec = False
+        if not auds.paused:
+            create_future_ex(auds.ensure_play)
         if auds.player is not None:
             auds.player.time = 1 + time.time()
         await bot.database.playlists(guild=guild)
@@ -2294,7 +2234,7 @@ class Dump(Command):
             auds.queue.clear()
             auds.queue.__init__(q)
             auds.stats.update(d["stats"])
-            create_future(auds.update)
+            create_future_ex(auds.update)
             if "h" not in flags:
                 return (
                     "```css\nSuccessfully loaded audio queue data for [" 
@@ -2731,7 +2671,8 @@ class Player(Command):
         orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]) + "\n"
         if reaction is None and auds.player.type:
             for b in self.buttons:
-                await message.add_reaction(b.decode("utf-8"))
+                create_task(message.add_reaction(b.decode("utf-8")))
+                await asyncio.sleep(0.5)
         else:
             if not auds.player.type:
                 emoji = bytes()
@@ -3064,6 +3005,7 @@ class Download(Command):
         )
         for i in range(len(res)):
             create_task(sent.add_reaction(str(i) + b"\xef\xb8\x8f\xe2\x83\xa3".decode("utf-8")))
+            await asyncio.sleep(0.5)
         # await sent.add_reaction("❎")
 
     async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, user, **void):
@@ -3216,13 +3158,13 @@ class UpdateQueues(Database):
         if guild is not None:
             if guild.id in self.audio:
                 auds = self.audio[guild.id]
-                create_future(auds.update)
+                create_future_ex(auds.update)
         else:
             a = 1
             for g in tuple(self.audio):
                 try:
                     auds = self.audio[g]
-                    create_future(auds.update)
+                    create_future_ex(auds.update)
                     create_task(self.research(auds))
                 except:
                     print(traceback.format_exc())

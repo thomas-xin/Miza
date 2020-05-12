@@ -79,7 +79,7 @@ class main_data:
         self.blocked = 0
         self.updated = False
         print("Initialized.")
-        create_future(self.clearcache, priority=True)
+        create_future_ex(self.clearcache, priority=True)
 
     __call__ = lambda self: self
 
