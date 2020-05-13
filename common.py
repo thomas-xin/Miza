@@ -525,6 +525,7 @@ class __logPrinter:
             self.data[file] = ""
         self.data[file] += str(sep).join(str(i) for i in args) + str(end) + str(prefix)
 
+    read = lambda self, *args, **kwargs: bytes()
     write = lambda self, *args, end="", **kwargs: self.__call__(*args, end, **kwargs)
     open = lambda self: self.__setattr__("closed", False)
     close = lambda self: self.__setattr__("closed", True)

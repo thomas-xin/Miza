@@ -2291,7 +2291,7 @@ class freeClass(dict):
 
     __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
     __repr__ = lambda self: "freeClass(" + super().__repr__() + ")"
-    __str__ = lambda self: "【" + self.__repr__()[13:-2] + "】"
+    __str__ = lambda self: "【" + self.__repr__()[11:-2] + "】"
     __iter__ = lambda self: iter(tuple(super().__iter__()))
     __setattr__ = lambda self, key, value: super().__setitem__(key, value)
     def __getattr__(self, key):
