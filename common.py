@@ -528,6 +528,8 @@ class __logPrinter:
     write = lambda self, *args, end="", **kwargs: self.__call__(*args, end, **kwargs)
     open = lambda self: self.__setattr__("closed", False)
     close = lambda self: self.__setattr__("closed", True)
+    isatty = lambda self: False
+    flush = lambda self: None
 
     def __init__(self, file=None):
         self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
