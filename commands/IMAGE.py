@@ -25,7 +25,7 @@ class IMG(Command):
             req = 2
             if perm < req:
                 reason = "to change image list for " + guild.name
-                self.permError(perm, req, reason)
+                raise self.permError(perm, req, reason)
             if "a" in flags or "e" in flags:
                 if len(images) > 256:
                     raise OverflowError(

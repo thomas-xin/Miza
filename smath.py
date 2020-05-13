@@ -2151,7 +2151,7 @@ lookup time for all elements. Includes many array and numeric operations."""
     
     @waiting
     def search(self, value, key=None, sorted=False):
-        v = value if key is None else key(value)
+        v = value
         d = self.data
         if sorted:
             pops = hlist()
@@ -2195,7 +2195,7 @@ lookup time for all elements. Includes many array and numeric operations."""
     def count(self, value, key=None):
         if key is None:
             return sum(1 for i in self if i == value)
-        return sum(1 for i in self if key(i) == key(value))
+        return sum(1 for i in self if key(i) == value)
 
     concat = lambda self, value: hlist(tuple(self) + tuple(value))
 
@@ -2290,7 +2290,7 @@ hzero = lambda size, maxoff=__hlist_maxoff__: hlist((0 for i in range(size)), ma
 class freeClass(dict):
 
     __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
-    __repr__ = lambda self: "freeClass(**" + super().__repr__() + ")"
+    __repr__ = lambda self: "freeClass(" + super().__repr__() + ")"
     __str__ = lambda self: "【" + self.__repr__()[13:-2] + "】"
     __iter__ = lambda self: iter(tuple(super().__iter__()))
     __setattr__ = lambda self, key, value: super().__setitem__(key, value)

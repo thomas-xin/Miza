@@ -1174,7 +1174,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                     req = command.min_level
                     try:
                         if req > u_perm or (u_perm is not nan and req is nan):
-                            command.permError(u_perm, req, "for command " + alias)
+                            raise command.permError(u_perm, req, "for command " + alias)
                         flags = {}
                         if cb_argv is not None:
                             argv = cb_argv

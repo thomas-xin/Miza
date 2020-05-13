@@ -95,186 +95,6 @@ class Purge(Command):
             )
 
 
-class Ban(Command):
-    server_only = True
-    name = ["Bans", "Unban"]
-    min_level = 3
-    min_display = "3+"
-    description = "Bans a user for a certain amount of time, with an optional reason."
-    usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)> <verbose(?v)>"
-    flags = "hvf"
-
-    async def __call__(self, bot, args, user, message, channel, guild, flags, perm, name, **void):
-        update = self.bot.database.bans.update
-        dtime = datetime.datetime.utcnow().timestamp()
-        if args:
-            check = args[0].lower()
-        else:
-            check = ""
-        if not args or "everyone" in check or "here" in check:
-            t_user = None
-            t_perm = inf
-        else:
-            u_id = verifyID(args[0])
-            try:
-                t_user = await bot.fetch_user(u_id)
-            except (TypeError, discord.NotFound):
-                try:
-                    t_user = await bot.fetch_member(u_id, guild)
-                except LookupError:
-                    t_user = await bot.fetch_whuser(u_id, guild)
-            t_perm = bot.getPerms(t_user, guild)
-        if t_perm + 1 > perm or isnan(t_perm):
-            if len(args) > 1:
-                reason = (
-                    "to ban " + t_user.name
-                    + " from " + guild.name
-                )
-                self.permError(perm, t_perm + 1, reason)
-        g_bans = await getBans(bot, guild)
-        msg = None
-        if name.lower() == "unban":
-            tm = -1
-            args = ["", ""]
-        elif len(args) < 2:
-            if t_user is None:
-                if not g_bans:
-                    return (
-                        "```css\nNo currently banned users for ["
-                        + noHighlight(guild.name) + "].```"
-                    )
-                output = ""
-                for u_id in g_bans:
-                    try:
-                        user = await bot.fetch_user(u_id)
-                        output += (
-                            "[" + str(user) + "] "
-                            + noHighlight(sec2Time(g_bans[u_id]["unban"] - dtime))
-                        )
-                        if "v" in flags:
-                            output += " .ID: " + str(user.id)
-                        output += " .Reason: " + noHighlight(g_bans[u_id]["reason"]) + "\n"
-                    except:
-                        print(traceback.format_exc())
-                return (
-                    "Currently banned users from **" 
-                    + escape_markdown(guild.name) + "**:\n```css\n"
-                    + output.strip("\n") + "```"
-                )
-            tm = 0
-        else:
-            if t_user is None:
-                orig = 0
-            else:
-                orig = g_bans.get(t_user.id, 0)
-            bantype = " ".join(args[1:])
-            if "for " in bantype:
-                i = bantype.index("for ")
-                expr = bantype[:i].strip()
-                msg = bantype[i + 3:].strip()
-            elif "reason " in bantype:
-                i = bantype.index("reason ")
-                expr = bantype[:i].strip()
-                msg = bantype[i + 3:].strip()
-            else:
-                expr = bantype
-            _op = None
-            for operator in ("+=", "-=", "*=", "/=", "%="):
-                if expr.startswith(operator):
-                    expr = expr[2:].strip()
-                    _op = operator[0]
-            num = await bot.evalTime(expr, guild)
-            if _op is not None:
-                num = eval(str(orig) + _op + str(num), {}, infinum)
-            tm = num
-        await channel.trigger_typing()
-        if t_user is None:
-            if "f" not in flags:
-                response = uniStr(
-                    "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
-                    + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
-                )
-                
-                return ("```asciidoc\n[" + response + "]```")
-            if tm >= 0:
-                raise PermissionError(
-                    "Banning every user in a server is no longer allowed "
-                    + "in order to prevent misuse and/or security issues."
-                )
-                # it = guild.fetch_members(limit=None)
-                # users = await it.flatten()
-            else:
-                users = []
-                create_task(channel.send(
-                    "```css\nUnbanning all users from ["
-                    + noHighlight(guild.name) + "]...```"
-                ))
-            for u_id in g_bans:
-                users.append(await bot.fetch_user(u_id))
-            is_banned = None
-        else:
-            users = [t_user]
-            is_banned = g_bans.get(t_user.id, None)
-            if is_banned is not None:
-                is_banned = is_banned["unban"] - dtime
-                if len(args) < 2:
-                    return (
-                        "```css\nCurrent ban for [" + noHighlight(t_user.name)
-                        + "] from [" + noHighlight(guild.name) + "]: ["
-                        + noHighlight(sec2Time(is_banned)) + "].```"
-                    )
-            elif len(args) < 2:
-                return (
-                    "```css\n[" + noHighlight(t_user.name)
-                    + "] is currently not banned from [" + noHighlight(guild.name) + "].```"
-                )
-        response = "```css"
-        reacted = False
-        for t_user in users:
-            if tm >= 0:
-                try:
-                    if not reacted:
-                        create_task(message.add_reaction("❗"))
-                        reacted = True
-                    if hasattr(t_user, "webhook"):
-                        coro = t_user.webhook.delete()
-                    else:
-                        coro = guild.ban(t_user, reason=msg, delete_message_days=0)
-                    if len(users) > 3:
-                        create_task(coro)
-                    else:
-                        await coro
-                    await asyncio.sleep(0.3)
-                except Exception as ex:
-                    response += "\nError: " + repr(ex)
-                    continue
-            if not hasattr(t_user, "webhook"):
-                g_bans[t_user.id] = {
-                    "unban": tm + dtime,
-                    "reason": msg,
-                    "channel": channel.id,
-                }
-                update()
-            else:
-                tm = inf
-            if is_banned:
-                response += (
-                    "\nUpdated ban for [" + noHighlight(t_user.name)
-                    + "] from [" + noHighlight(sec2Time(is_banned))
-                    + "] to [" + noHighlight(sec2Time(tm)) + "]."
-                )
-            elif tm >= 0:
-                response += (
-                    "\n[" + noHighlight(t_user.name)
-                    + "] has been banned from [" + noHighlight(guild.name)
-                    + "] for [" + noHighlight(sec2Time(tm)) + "]."
-                )
-            if msg is not None and tm >= 0:
-                response += " Reason: [" + noHighlight(msg) + "]."
-        if len(response) > 6 and "h" not in flags:
-            return response + "```"
-
-
 class RoleGiver(Command):
     server_only = True
     name = ["Verifier"]
@@ -689,6 +509,249 @@ class FileLog(Command):
             "```css\nFile logging is currently disabled in ["
             + noHighlight(guild.name) + "].```"
         )
+
+
+class Ban(Command):
+    server_only = True
+    name = ["Bans", "Unban"]
+    min_level = 3
+    min_display = "3+"
+    description = "Bans a user for a certain amount of time, with an optional reason."
+    usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)>"
+    flags = "h"
+
+    async def __call__(self, bot, args, message, channel, guild, flags, perm, name, **void):
+        update = self.bot.database.bans.update
+        ts = datetime.datetime.utcnow().timestamp()
+        banlist = bot.data.bans.get(guild.id, [])
+        bans, glob = await self.getBans(guild)
+        if not args:
+            if not bans:
+                return (
+                    "```ini\nNo currently banned users for ["
+                    + noHighlight(guild.name) + "].```"
+                )
+            emb = discord.Embed(colour=discord.Colour(1))
+            emb.description = "Currently banned users from **" + escape_markdown(guild.name) + "**:"
+            for i, ban in enumerate(sorted(bans.values(), key=lambda x: x["t"])):
+                if i >= 25:
+                    break
+                try:
+                    user = await bot.fetch_user(ban["u"])
+                    emb.add_field(
+                        name=str(user) + " (" + str(user.id) + ")",
+                        value=(
+                            "Duration: " + sec2Time(ban["t"] - ts) + "\n"
+                            + "Reason: " + escape_markdown(str(ban["r"]))
+                        )
+                    )
+                except:
+                    print(traceback.format_exc())
+            return dict(embed=emb)
+        u_id = verifyID(args.pop(0))
+        try:
+            user = await bot.fetch_user(u_id)
+            users = [user]
+        except (TypeError, discord.NotFound):
+            try:
+                member = await bot.fetch_member(u_id, guild)
+                users = [member]
+            except LookupError:
+                role = await bot.fetch_role(u_id, guild)
+                users = [role.members]
+        if not args or name == "unban":
+            try:
+                ban = bans[user.id]
+            except LookupError:
+                return (
+                    "```ini\n[" + noHighlight(user)
+                    + "] is currently not banned from [" + noHighlight(guild) + "].```"
+                )
+            if name == "unban":
+                await guild.unban(user)
+                try:
+                    user = banlist.remove(user.id, key=lambda b: b["u"])["u"]
+                    update()
+                except LookupError:
+                    pass
+                return (
+                    "```ini\nSuccessfully unbanned [" + noHighlight(user)
+                    + "] from [" + noHighlight(guild) + "].```"
+                )
+            return (
+                "```ini\nCurrent ban for [" + noHighlight(user)
+                + "] from [" + noHighlight(guild) + "]: ["
+                + sec2Time(ban["t"] - ts) + "].```"
+            )
+        bantype = " ".join(args)
+        if bantype.startswith("for "):
+            bantype = bantype[4:]
+        if "for " in bantype:
+            i = bantype.index("for ")
+            expr = bantype[:i].strip()
+            msg = bantype[i + 4:].strip()
+        elif "reason " in bantype:
+            i = bantype.index("reason ")
+            expr = bantype[:i].strip()
+            msg = bantype[i + 7:].strip()
+        else:
+            expr = bantype
+            msg = None
+        _op = None
+        for operator in ("+=", "-=", "*=", "/=", "%="):
+            if expr.startswith(operator):
+                expr = expr[2:].strip()
+                _op = operator[0]
+        create_task(message.add_reaction("❗"))
+        num = await bot.evalTime(expr, guild)
+        for user in users:
+            p = bot.getPerms(user, guild)
+            if not p < 0 and not isValid(p):
+                await channel.send("```py\nError: " + repr(PermissionError(
+                    str(user) + " has infinite permission level, "
+                    + "and cannot be banned from this server.```"
+                )))
+                continue
+            elif not p + 1 <= perm and not isnan(perm):
+                reason = "to ban " + str(user) + " from " + guild.name
+                await channel.send("```py\nError: " + repr(self.permError(perm, p + 1, reason)) + "```")
+                continue
+            try:
+                ban = bans[user.id]
+                orig = ban["t"] - ts
+            except LookupError:
+                orig = 0
+            if _op is not None:
+                new = eval(str(orig) + _op + str(num), {}, infinum)
+            else:
+                new = num
+            create_task(self.createBan(guild, user, reason=msg, length=new, channel=channel, bans=bans, glob=glob))
+
+    async def getBans(self, guild):
+        loc = self.bot.data.bans.get(guild.id)
+        glob = await guild.bans()
+        bans = {ban.user.id: {"u": ban.user.id, "r": ban.reason, "t": inf} for ban in glob}
+        if loc:
+            for b in tuple(loc):
+                if b["u"] not in bans:
+                    loc.pop(b["u"])
+                    continue
+                bans[b["u"]]["t"] = b["t"]
+                bans[b["u"]]["c"] = b["c"]
+        return bans, glob
+
+    async def createBan(self, guild, user, reason, length, channel, bans, glob):
+        # print(self, guild, user, reason, length, channel, bans, glob)
+        ts = datetime.datetime.utcnow().timestamp()
+        bot = self.bot
+        banlist = bot.data.bans.setdefault(guild.id, hlist())
+        update = bot.database.bans.update
+        for b in glob:
+            u = b.user
+            if user.id == u.id:
+                try:
+                    ban = bans[u.id]
+                    try:
+                        banlist.remove(user.id, key=lambda x: x["u"])
+                    except IndexError:
+                        pass
+                    try:
+                        bot.database.bans.keyed.remove(guild.id, key=lambda x: x[-1])
+                    except LookupError:
+                        pass
+                    if length < inf:
+                        banlist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": ban.get("r", None)}, key=lambda x: x["t"])
+                        bot.database.bans.keyed.insort((banlist[0]["t"], guild.id), key=lambda x: x[-1])
+                    print(banlist)
+                    print(bot.database.bans.keyed)
+                    update()
+                    await channel.send(
+                        "```css\nUpdated ban for " + sbHighlight(user)
+                        + " from [" + sec2Time(ban["t"] - ts)
+                        + "] to [" + sec2Time(length) + "].```"
+                    )
+                except Exception as ex:
+                    print(traceback.format_exc())
+                    await channel.send("```py\nError: " + repr(ex) + "```")
+                return
+        try:
+            await guild.ban(user, reason=reason, delete_message_days=0)
+            try:
+                banlist.remove(user.id, key=lambda x: x["u"])
+            except IndexError:
+                pass
+            try:
+                bot.database.bans.keyed.remove(guild.id, key=lambda x: x[-1])
+            except LookupError:
+                pass
+            if length < inf:
+                banlist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": reason}, key=lambda x: x["t"])
+                bot.database.bans.keyed.insort((banlist[0]["t"], guild.id), key=lambda x: x[-1])
+            print(banlist)
+            print(bot.database.bans.keyed)
+            update()
+            await channel.send(
+                "```css\n" + sbHighlight(user)
+                + " has been banned from " + sbHighlight(guild)
+                + " for [" + sec2Time(length) + "]. Reason: "
+                + sbHighlight(reason) + "```"
+            )
+        except Exception as ex:
+            print(traceback.format_exc())
+            await channel.send("```py\nError: " + repr(ex) + "```")
+
+
+class UpdateBans(Database):
+    name = "bans"
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        d = self.data
+        self.keyed = hlist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
+
+    async def __call__(self):
+        t = datetime.datetime.utcnow().timestamp()
+        while self.keyed:
+            p = self.keyed[0]
+            if t < p[0]:
+                break
+            self.keyed.popleft()
+            g_id = p[1]
+            temp = self.data[g_id]
+            if not temp:
+                self.data.pop(g_id)
+                continue
+            x = temp[0]
+            if t < x["t"]:
+                self.keyed.insort((x["t"], g_id), key=lambda x: x[0])
+                print(self.keyed)
+                continue
+            x = freeClass(temp.pop(0))
+            if not temp:
+                self.data.pop(g_id)
+            else:
+                z = temp[0]["t"]
+                self.keyed.insort((z, g_id), key=lambda x: x[0])
+            print(self.keyed)
+            try:
+                guild = await self.bot.fetch_guild(g_id)
+                user = await self.bot.fetch_user(x.u)
+                channel = await self.bot.fetch_channel(x.c)
+                try:
+                    await guild.unban(user)
+                    text = (
+                        "```css\n[" + noHighlight(user)
+                        + "] has been unbanned from [" + noHighlight(guild) + "].```"
+                    )
+                except:
+                    text = (
+                        "```css\nUnable to unban [" + noHighlight(user)
+                        + "] from [" + noHighlight(guild) + "].```"
+                    )
+                await channel.send(text)
+            except:
+                print(traceback.format_exc())
+            self.update()
 
 
 class ServerProtector(Database):
@@ -1268,79 +1331,3 @@ class UpdateRolePreservers(Database):
 
 class UpdatePerms(Database):
     name = "perms"
-
-
-async def getBans(bot, guild):
-    bans = bot.data["bans"].setdefault(guild.id, {})
-    try:
-        banlist = await guild.bans()
-    except discord.Forbidden:
-        print(traceback.format_exc())
-        print("Unable to retrieve ban list for " + guild.name + ".")
-        return []
-    for ban in banlist:
-        if ban.user.id not in bans:
-            bans[ban.user.id] = {
-                "unban": inf,
-                "reason": ban.reason,
-                "channel": None,
-            }
-    return bans
-
-
-class UpdateBans(Database):
-    name = "bans"
-
-    def __init__(self, *args):
-        self.synced = False
-        super().__init__(*args)
-
-    async def __call__(self, **void):
-        while self.busy:
-            await asyncio.sleep(0.5)
-        self.busy = True
-        try:
-            bot = self.bot
-            dtime = datetime.datetime.utcnow().timestamp()
-            bans = self.data
-            changed = False
-            if not self.synced:
-                self.synced = True
-                for guild in bot.client.guilds:
-                    create_task(getBans(bot, guild))
-                changed = True
-            for g in list(bans):
-                for b in list(bans[g]):
-                    utime = bans[g][b]["unban"]
-                    if dtime >= utime:
-                        try:
-                            u_target = await bot.fetch_user(b)
-                            g_target = await bot.fetch_guild(g)
-                            c_id = bans[g][b]["channel"]
-                            if c_id is not None:
-                                c_target = await bot.fetch_channel(c_id)
-                            try:
-                                await g_target.unban(u_target)
-                                if c_id is not None:
-                                    await c_target.send(
-                                        "```css\n[" + noHighlight(u_target.name)
-                                        + "] has been unbanned from [" + noHighlight(g_target.name) + "].```"
-                                    )
-                            except:
-                                if c_id is not None:
-                                    await c_target.send(
-                                        "```css\nUnable to unban [" + noHighlight(u_target.name)
-                                        + "] from [" + noHighlight(g_target.name) + "].```"
-                                    )
-                                print(traceback.format_exc())
-                            bans[g].pop(b)
-                            changed = True
-                        except:
-                            print(traceback.format_exc())
-                if not len(bans[g]):
-                    bans.pop(g)
-            if changed and len(bans):
-                self.update()
-        except:
-            print(traceback.format_exc())
-        self.busy = False

@@ -41,6 +41,10 @@ def getDuration(filename):
             resp = bytes().join(proc.communicate())
             break
         except:
+            try:
+                proc.kill()
+            except:
+                pass
             print(traceback.format_exc())
     s = resp.decode("utf-8")
     try:
@@ -1062,8 +1066,9 @@ class PCMFile:
                 except ZeroDivisionError:
                     pan = 1
                 options += "extrastereo=m=" + str(p) + ":c=0"
-                if abs(abs(p) - 1) > 0.001:
-                    options += ",volume=" + str(1 / max(1, round(math.sqrt(abs(p)), 4)))
+                v = 1 / max(1, round(math.sqrt(abs(p)), 4))
+                if v != 1:
+                    options += ",volume=" + str(v)
         options = options.strip()
         args = ["ffmpeg", "-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "2", "-i"]
         if self.proc.is_running():
@@ -1554,7 +1559,7 @@ class Queue(Command):
         auds = await future
         if "f" in flags or "b" in flags:
             if not isAlone(auds, user) and perm < 1:
-                self.permError(perm, 1, "to force play while other users are in voice")
+                raise self.permError(perm, 1, "to force play while other users are in voice")
         if auds.stats.quiet & 2:
             flags.setdefault("h", 1)
         elapsed = auds.stats.position
@@ -1774,7 +1779,7 @@ class Playlist(Command):
                     "to modify default playlist for "
                     + guild.name
                 )
-                self.permError(perm, req, reason)
+                raise self.permError(perm, req, reason)
         pl = pl.setdefault(guild.id, [])
         if not argv:
             if "d" in flags:
@@ -1869,14 +1874,14 @@ class Connect(Command):
             guild = vc_.guild
         perm = bot.getPerms(user, guild)
         if perm < 0:
-            self.permError(perm, 0, "for command " + self.name + " in " + str(guild))
+            raise self.permError(perm, 0, "for command " + self.name + " in " + str(guild))
         if vc_ is None:
             try:
                 auds = bot.database.playlists.audio[guild.id]
             except KeyError:
                 raise LookupError("Unable to find connected channel.")
             if not isAlone(auds, user) and perm < 1:
-                self.permError(perm, 1, "to disconnect while other users are in voice")
+                raise self.permError(perm, 1, "to disconnect while other users are in voice")
             auds.dead = True
             try:
                 connecting.pop(guild.id)
@@ -1955,7 +1960,7 @@ class Skip(Command):
             flags["f"] = True
         if "f" in flags:
             if not isAlone(auds, user) and perm < 1:
-                self.permError(perm, 1, "to force skip while other users are in voice")
+                raise self.permError(perm, 1, "to force skip while other users are in voice")
         if not argv:
             elems = [0]
         elif ":" in argv or ".." in argv:
@@ -2097,7 +2102,7 @@ class Pause(Command):
         auds.preparing = False
         if name in ("pause", "stop"):
             if not isAlone(auds, user) and perm < 1:
-                self.permError(perm, 1, "to " + name + " while other users are in voice")
+                raise self.permError(perm, 1, "to " + name + " while other users are in voice")
         elif auds.stats.position <= 0:
             if auds.queue and "played" in auds.queue[0]:
                 auds.queue[0].pop("played")
@@ -2131,7 +2136,7 @@ class Seek(Command):
     async def __call__(self, argv, bot, guild, client, user, perm, channel, name, flags, **void):
         auds = await forceJoin(guild, channel, user, client, bot)
         if not isAlone(auds, user) and perm < 1:
-            self.permError(perm, 1, "to seek while other users are in voice")
+            raise self.permError(perm, 1, "to seek while other users are in voice")
         if name == "replay":
             num = 0
         else:
@@ -2195,7 +2200,7 @@ class Dump(Command):
             create_task(sendFile(channel, "Queue data for **" + guild.name + "**:", f))
             return
         if not isAlone(auds, user) and perm < 1:
-            self.permError(perm, 1, "to load new queue while other users are in voice")
+            raise self.permError(perm, 1, "to load new queue while other users are in voice")
         try:
             if len(message.attachments):
                 url = message.attachments[0].url
@@ -2356,7 +2361,7 @@ class AudioSettings(Command):
                 + "]: [" + str(num) + "].```"
             )
         if not isAlone(auds, user) and perm < 1:
-            self.permError(perm, 1, "to modify audio settings while other users are in voice")
+            raise self.permError(perm, 1, "to modify audio settings while other users are in voice")
         if not ops:
             if disable:
                 pos = auds.stats.position
@@ -2420,7 +2425,7 @@ class Rotate(Command):
         amount = await bot.evalMath(argv, guild.id)
         if len(auds.queue) > 1 and amount:
             if not isAlone(auds, user) and perm < 1:
-                self.permError(perm, 1, "to rotate queue while other users are in voice")
+                raise self.permError(perm, 1, "to rotate queue while other users are in voice")
             for i in range(3):
                 try:
                     auds.queue[i].pop("played")
@@ -2448,7 +2453,7 @@ class Shuffle(Command):
         auds = await forceJoin(guild, channel, user, client, bot)
         if len(auds.queue) > 1:
             if not isAlone(auds, user) and perm < 1:
-                self.permError(perm, 1, "to shuffle queue while other users are in voice")
+                raise self.permError(perm, 1, "to shuffle queue while other users are in voice")
             for i in range(3):
                 try:
                     auds.queue[i].pop("played")
@@ -2475,7 +2480,7 @@ class Reverse(Command):
         auds = await forceJoin(guild, channel, user, client, bot)
         if len(auds.queue) > 1:
             if not isAlone(auds, user) and perm < 1:
-                self.permError(perm, 1, "to reverse queue while other users are in voice")
+                raise self.permError(perm, 1, "to reverse queue while other users are in voice")
             for i in range(1, 3):
                 try:
                     auds.queue[i].pop("played")
@@ -2795,7 +2800,7 @@ class Player(Command):
                         reason = "override"
                 else:
                     reason = "create controllable"
-                self.permError(perm, req, "to " + reason + " virtual audio player for " + noHighlight(guild.name))
+                raise self.permError(perm, req, "to " + reason + " virtual audio player for " + noHighlight(guild.name))
         if "d" in flags:
             auds.player = None
             return (

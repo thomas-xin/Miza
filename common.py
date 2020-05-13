@@ -515,29 +515,36 @@ class __logPrinter:
             except:
                 print(traceback.format_exc())
             time.sleep(1)
-            while "common.py" not in os.listdir():
+            while "common.py" not in os.listdir() or self.closed:
                 time.sleep(0.5)
 
-    def logPrint(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
+    def __call__(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
         if file is None:
             file = self.file
         if file not in self.data:
             self.data[file] = ""
         self.data[file] += str(sep).join(str(i) for i in args) + str(end) + str(prefix)
 
+    write = lambda self, *args, end="", **kwargs: self.__call__(*args, end, **kwargs)
+    open = lambda self: self.__setattr__("closed", False)
+    close = lambda self: self.__setattr__("closed", True)
+
     def __init__(self, file=None):
         self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.data = freeClass()
         self.file = file
         self.future = self.exec.submit(self.updatePrint)
+        self.closed = False
 
-__printer = __logPrinter("log.txt")
-print = __printer.logPrint
+print = __logPrinter("log.txt")
 
 getattr(discord, "__builtins__", {})["print"] = print
 getattr(concurrent.futures, "__builtins__", {})["print"] = print
 getattr(asyncio.futures, "__builtins__", {})["print"] = print
 getattr(asyncio, "__builtins__", {})["print"] = print
+getattr(psutil, "__builtins__", {})["print"] = print
+getattr(subprocess, "__builtins__", {})["print"] = print
+sys.stdout = sys.stderr = print
 
 
 class Command:
@@ -550,7 +557,7 @@ class Command:
             req = self.min_level
         if reason is None:
             reason = "for command " + self.name[-1]
-        raise PermissionError(
+        return PermissionError(
             "Insufficient priviliges " + str(reason)
             + ". Required level: " + str(req)
             + ", Current level: " + str(perm) + "."

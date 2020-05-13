@@ -143,7 +143,7 @@ class Perms(Command):
                     + " from " + str(t_perm)
                     + " to " + str(c_perm)
                 )
-                self.permError(perm, m_perm, reason)
+                raise self.permError(perm, m_perm, reason)
         return (
             "```css\nCurrent permissions for [" + noHighlight(t_user.name)
             + "] in [" + noHighlight(guild.name)
@@ -171,7 +171,7 @@ class EnabledCommands(Command):
                     "to change command list for "
                     + channel.name
                 )
-                self.permError(perm, req, reason)
+                raise self.permError(perm, req, reason)
         catg = argv.lower()
         if not catg:
             if "l" in flags:
@@ -273,7 +273,7 @@ class Prefix(Command):
                 "to change command prefix for "
                 + guild.name
             )
-            self.permError(perm, req, reason)
+            raise self.permError(perm, req, reason)
         prefix = argv
         if prefix.startswith("\\"):
             raise TypeError("Prefix must not begin with backslash.")
@@ -304,7 +304,7 @@ class Loop(Command):
                 "to execute loop of " + str(iters)
                 + " iterations"
             )
-            self.permError(perm, ceil(iters / scale), reason)
+            raise self.permError(perm, ceil(iters / scale), reason)
         elif not isnan(perm) and iters > 256:
             raise PermissionError("Must be owner to execute loop of more than 256 iterations.")
         func = func2 = " ".join(args[1:])
@@ -509,7 +509,6 @@ class Info(Command):
         }
 
     def getMimicData(self, p, flags={}):
-        bot = self.bot
         url = strURL(p.url)
         name = p.name
         emb = discord.Embed(colour=randColour())
@@ -767,12 +766,25 @@ class Reminder(Command):
         rems = bot.data.reminders.get(user.id, [])
         update = bot.database.reminders.update
         if "d" in flags:
+            if not len(rems):
+                return (
+                    "```ini\nNo reminders currently set for ["
+                    + noHighlight(user) + "].```"
+                )
             if not argv:
                 i = 0
             else:
                 print(argv)
                 i = await bot.evalMath(argv2, guild)
+            i %= len(rems)
             x = rems.pop(i)
+            if i == 0:
+                try:
+                    bot.database.reminders.keyed.remove(user.id, key=lambda x: x[-1])
+                except IndexError:
+                    pass
+                if rems:
+                    bot.database.reminders.keyed.insort((rems[0]["t"], user.id), key=lambda x: x[0])
             update()
             return (
                 "```ini\nSuccessfully removed ["
@@ -851,10 +863,12 @@ class Reminder(Command):
         ))
         bot.data.reminders[user.id] = sort(rems, key=lambda x: x["t"])
         try:
-            bot.database.reminders.keyed.remove((0, user.id), key=lambda x: x[-1])
+            bot.database.reminders.keyed.remove(user.id, key=lambda x: x[-1])
         except IndexError:
             pass
         bot.database.reminders.keyed.insort((bot.data.reminders[user.id][0]["t"], user.id), key=lambda x: x[0])
+        print(rems)
+        print(bot.database.reminders.keyed)
         update()
         emb = discord.Embed(description=msg)
         emb.set_author(name=name, url=url, icon_url=url)
@@ -883,11 +897,24 @@ class Announcement(Command):
         rems = bot.data.reminders.get(channel.id, [])
         update = bot.database.reminders.update
         if "d" in flags:
+            if not len(rems):
+                return (
+                    "```ini\nNo announcements currently set for [#"
+                    + noHighlight(channel) + "].```"
+                )
             if not argv:
                 i = 0
             else:
                 i = await bot.evalMath(argv, guild)
+            i %= len(rems)
             x = rems.pop(i)
+            if i == 0:
+                try:
+                    bot.database.reminders.keyed.remove(channel.id, key=lambda x: x[-1])
+                except IndexError:
+                    pass
+                if rems:
+                    bot.database.reminders.keyed.insort((rems[0]["t"], channel.id), key=lambda x: x[0])
             update()
             return (
                 "```ini\nSuccessfully removed ["
@@ -960,10 +987,12 @@ class Announcement(Command):
         ))
         bot.data.reminders[channel.id] = sort(rems, key=lambda x: x["t"])
         try:
-            bot.database.reminders.keyed.remove((0, channel.id), key=lambda x: x[-1])
+            bot.database.reminders.keyed.remove(channel.id, key=lambda x: x[-1])
         except IndexError:
             pass
         bot.database.reminders.keyed.insort((bot.data.reminders[channel.id][0]["t"], channel.id), key=lambda x: x[0])
+        print(rems)
+        print(bot.database.reminders.keyed)
         update()
         emb = discord.Embed(description=msg)
         emb.set_author(name=name, url=url, icon_url=url)
@@ -990,16 +1019,23 @@ class UpdateReminders(Database):
             p = self.keyed[0]
             if t < p[0]:
                 break
-            print(self.keyed)
             self.keyed.popleft()
             u_id = p[1]
             temp = self.data[u_id]
+            if not temp:
+                self.data.pop(u_id)
+                continue
+            x = temp[0]
+            if t < x["t"]:
+                self.keyed.insort((x["t"], u_id), key=lambda x: x[0])
+                print(self.keyed)
+                continue
             x = freeClass(temp.pop(0))
             if not temp:
                 self.data.pop(u_id)
             else:
-                z = temp[0]["t"]
-                self.keyed.insort((z, u_id), key=lambda x: x[0])
+                self.keyed.insort((temp[0]["t"], u_id), key=lambda x: x[0])
+            print(self.keyed)
             if x.u:
                 ch = await self.bot.fetch_user(u_id)
             else:
