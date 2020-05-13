@@ -855,7 +855,11 @@ class AudioQueue(hlist):
                         print(traceback.format_exc())
                         raise
                     auds.preparing = False
-            elif auds.source is None and not self.loading and not auds.preparing or auds.source is not None and auds.source.advanced:
+            elif auds.source is None and not self.loading and not auds.preparing:
+                self.advance()
+            elif auds.source is not None and auds.source.advanced:
+                auds.source.advanced = False
+                auds.source.closed = True
                 self.advance()
 
     def enqueue(self, items, position):
