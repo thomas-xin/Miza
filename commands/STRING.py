@@ -31,7 +31,7 @@ class PapagoTrans:
         resp = urllib.request.urlopen(req, data=data.encode("utf-8"))
         if resp.getcode() != 200:
             raise ConnectionError("Error " + str(resp.getcode()))
-        read = resp.read().decode("utf-8")
+        read = resp.read().decode("utf-8", "replace")
         r = json.loads(read)
         t = r["message"]["result"]["translatedText"]
         output = self.PapagoOutput(t)
@@ -154,7 +154,7 @@ class Hex2Uni(Command):
         if not argv:
             raise IndexError("Input string is empty.")
         b = hex2Bytes(argv.replace("0x", "").replace(" ", ""))
-        return "```fix\n" + b.decode("utf-8") + "```"
+        return "```fix\n" + b.decode("utf-8", "replace") + "```"
 
 
 class ID2Time(Command):

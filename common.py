@@ -410,7 +410,7 @@ def evalEX(exc):
         ex = eval(exc)
     except NameError:
         if type(exc) is bytes:
-            exc = exc.decode("utf-8")
+            exc = exc.decode("utf-8", "replace")
         ex = RuntimeError(exc[exc.index("(") + 1:exc.index(")")].strip("'"))
     except:
         print(exc)

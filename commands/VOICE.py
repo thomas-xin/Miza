@@ -46,7 +46,7 @@ def getDuration(filename):
             except:
                 pass
             print(traceback.format_exc())
-    s = resp.decode("utf-8")
+    s = resp.decode("utf-8", "replace")
     try:
         i = s.index("Duration: ")
         d = s[i + 10:]
@@ -162,7 +162,7 @@ async def forceJoin(guild, channel, user, client, bot, preparing=False):
 async def downloadTextFile(url, bot):
     
     def dreader(file):
-        s = resp.read().decode("utf-8")
+        s = resp.read().decode("utf-8", "replace")
         resp.close()
         return s
 
@@ -256,7 +256,7 @@ class customAudio(discord.AudioSource):
 
     def ensure_play(self):
         try:
-            self.vc.play(self, after=self.queue.advance)
+            self.vc.play(self, after=self.update)
         except discord.ClientException:
             pass
         except:
@@ -357,7 +357,7 @@ class customAudio(discord.AudioSource):
         if not vc.is_playing():
             try:
                 if q and not self.pausec and self.source is not None:
-                    vc.play(self, after=self.queue.advance)
+                    vc.play(self, after=self.update)
                 self.att = 0
             except:
                 print(traceback.format_exc())
@@ -527,7 +527,7 @@ class customAudio(discord.AudioSource):
                                 if not found:
                                     self.lastEnd = time.time()
                                     if not self.has_read or not self.queue:
-                                        print("Advanced.")
+                                        print("{Stopped}")
                                         self.refilling = 2
                                         if self.queue:
                                             self.queue[0].url = ""
@@ -544,9 +544,10 @@ class customAudio(discord.AudioSource):
                                             self.seek(self.stats.position)
                                             return
                                         else:
-                                            print("Advanced.")
+                                            print("{Finished}")
                                             self.refilling = 2
-                                            create_future_ex(self.new)
+                                            self.source.advanced = True
+                                            create_future_ex(self.queue.update_play)
                                             self.preparing = False
                                             return
                             elif self.curr_timeout == 0:
@@ -776,6 +777,7 @@ class AudioQueue(hlist):
         s = self.auds.stats
         if q:
             if q[0].get("played"):
+                print("Queue Advanced.")
                 if s.loop:
                     temp = q[0]
                 self.prev = q[0]["url"]
@@ -817,7 +819,7 @@ class AudioQueue(hlist):
         auds = self.auds
         q = self
         if q:
-            if (auds.source is None or auds.source.closed) and not q[0].get("played", False):
+            if (auds.source is None or auds.source.closed or auds.source.advanced) and not q[0].get("played", False):
                 if q[0].get("stream", None) not in (None, "none"):
                     q[0].played = True
                     if not auds.stats.quiet:
@@ -853,8 +855,7 @@ class AudioQueue(hlist):
                         print(traceback.format_exc())
                         raise
                     auds.preparing = False
-            elif auds.source is None and not self.loading and not auds.preparing:
-                print("Queue Advanced.")
+            elif auds.source is None and not self.loading and not auds.preparing or auds.source is not None and auds.source.advanced:
                 self.advance()
 
     def enqueue(self, items, position):
@@ -1096,6 +1097,7 @@ class LoadedAudioReader(discord.AudioSource):
     def __init__(self, file, args):
         print(args)
         self.closed = False
+        self.advanced = False
         self.proc = psutil.Popen(args, stdout=subprocess.PIPE)
         print(self.proc)
 
@@ -1119,6 +1121,7 @@ class BufferedAudioReader(discord.AudioSource):
     def __init__(self, file, args):
         print(args)
         self.closed = False
+        self.advanced = False
         self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         print(self.proc)
         self.stream = file.open()
@@ -1240,8 +1243,8 @@ class videoDownloader:
                         it = '<meta property="music:duration" content="'
                         s = ""
                         while not it in s:
-                            s += r.read(256).decode("utf-8")
-                        s += r.read(256).decode("utf-8")
+                            s += r.read(4096).decode("utf-8", "replace")
+                        s += r.read(4096).decode("utf-8", "replace")
                         temp = s[s.index(it) + len(it):]
                         duration = temp[:temp.index('" />')]
                         t = '<meta name="description" content="'
@@ -1261,13 +1264,13 @@ class videoDownloader:
                         it = '<meta property="og:type" content="'
                         s = ""
                         while not it in s:
-                            s += r.read(512).decode("utf-8")
-                        s += r.read(256).decode("utf-8")
+                            s += r.read(8192).decode("utf-8", "replace")
+                        s += r.read(4096).decode("utf-8", "replace")
                         temp = s[s.index(it) + len(it):]
                         ptype = temp[:temp.index('" />')]
                         sys.stdout.write(ptype + "\n")
                         if "album" in ptype or "playlist" in ptype:
-                            s += r.read().decode("utf-8")
+                            s += r.read().decode("utf-8", "replace")
                             output = []
                             while s:
                                 try:
@@ -1554,7 +1557,8 @@ class Queue(Command):
                 + "-\nQueue for " + guild.name.replace("`", "") + ":```"
             )
         future = wrap_future(create_task(forceJoin(guild, channel, user, client, bot, preparing=True)))
-        argv = await bot.followURL(argv)
+        if isURL(argv):
+            argv = await bot.followURL(argv)
         resp = await create_future(ytdl.search, argv)
         auds = await future
         if "f" in flags or "b" in flags:
@@ -1820,7 +1824,8 @@ class Playlist(Command):
                 + " has reached the maximum of 64 items. "
                 + "Please remove an item to add another."
             )
-        argv = await bot.followURL(argv)
+        if isURL(argv):
+            argv = await bot.followURL(argv)
         resp = await create_future(ytdl.search, argv)
         if type(resp) is str:
             raise evalEX(resp)
@@ -1906,13 +1911,13 @@ class Connect(Command):
             connecting[guild.id] = time.time()
             vc = freeClass(is_connected = lambda: False)
             t = time.time()
-            while not vc.is_connected() and time.time() - t < 12:
+            while not vc.is_connected() and time.time() - t < 8:
                 try:
                     vc = await vc_.connect(timeout=30, reconnect=False)
-                    for _ in loop(8):
+                    for _ in loop(12):
                         if vc.is_connected():
                             break
-                        await asyncio.sleep(0.5)
+                        await asyncio.sleep(1 / 3)
                 except discord.ClientException:
                     print(traceback.format_exc())
                     await asyncio.sleep(1)
@@ -1920,7 +1925,7 @@ class Connect(Command):
                 connecting[guild.id] = 0
                 raise ConnectionError("Unable to connect to voice channel.")
         if guild.id not in bot.database.playlists.audio:
-            await channel.trigger_typing()
+            create_task(channel.trigger_typing())
             bot.database.playlists.audio[guild.id] = auds = customAudio(channel, vc, bot)
         try:
             joined = connecting.pop(guild.id)
@@ -2874,7 +2879,13 @@ class Lyrics(Command):
                 argv = auds.queue[0].name
             except:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
-        name, lyrics = await create_future(get_lyrics, argv)
+        if isURL(argv):
+            argv = await bot.followURL(argv)
+            resp = await create_future(ytdl.search, argv)
+            search = resp[0]
+        else:
+            search = argv
+        name, lyrics = await create_future(get_lyrics, search)
         text = lyrics.strip()
         msg = "Lyrics for **" + discord.utils.escape_markdown(name) + "**:"
         if "v" not in flags:
@@ -3022,7 +3033,7 @@ class Download(Command):
             if b"\xef\xb8\x8f\xe2\x83\xa3" in reaction:
                 num = int(reaction.decode("utf-8")[0])
                 if num <= int(spl[1]):
-                    data = ast.literal_eval(hex2Bytes(spl[2]).decode("utf-8"))
+                    data = ast.literal_eval(hex2Bytes(spl[2]).decode("utf-8", "replace"))
                     url = data[num]
                     if guild is None:
                         fl = 8388608

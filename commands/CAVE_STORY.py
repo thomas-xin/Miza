@@ -72,7 +72,7 @@ def searchForums(query):
         "https://www.cavestory.org/forums/search/1/?q=" + query.replace(" ", "+")
         + "&t=post&c[child_nodes]=1&c[nodes][0]=33&o=date&g=1"
     )
-    s = urlOpen(url).read().decode("utf-8")
+    s = urlOpen(url).read().decode("utf-8", "replace")
     output = []
     i = 0
     while i < len(s):
@@ -210,7 +210,7 @@ def getDuration(filename):
         filename,
     ]
     try:
-        output = subprocess.check_output(command).decode()
+        output = subprocess.check_output(command).decode("utf-8", "replace")
     except:
         print(traceback.format_exc())
         output = "N/A"

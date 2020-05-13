@@ -1440,6 +1440,8 @@ custom list-like data structure that incorporates the functionality of dicts in 
 order to have average O(1) constant time insertion on both sides as well as O(1) \
 lookup time for all elements. Includes many array and numeric operations."""
 
+    __slots__ = ("chash", "block", "maxoff", "offs", "data")
+
     def waiting(func):
         def call(self, *args, force=False, **kwargs):
             if not force:
@@ -2289,11 +2291,14 @@ hzero = lambda size, maxoff=__hlist_maxoff__: hlist((0 for i in range(size)), ma
 
 class freeClass(dict):
 
+    __slots__ = ()
+
     __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
     __repr__ = lambda self: "freeClass(" + super().__repr__() + ")"
     __str__ = lambda self: "【" + self.__repr__()[11:-2] + "】"
     __iter__ = lambda self: iter(tuple(super().__iter__()))
     __setattr__ = lambda self, key, value: super().__setitem__(key, value)
+
     def __getattr__(self, key):
         if key.startswith("__") and key.endswith("__"):
             return freeClass.__getattribute__(self, key)
@@ -2304,6 +2309,8 @@ class freeClass(dict):
 
 
 class multiDict(freeClass):
+
+    __slots__ = ()
 
     count = lambda self: sum(len(v) for v in super().values())
     extend = lambda self, k, v: super().setdefault(k, hlist()).extend(v).removedups()

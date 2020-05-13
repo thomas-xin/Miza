@@ -1324,7 +1324,7 @@ class UpdateRolePreservers(Database):
         if guild.id in self.data:
             roles = user.roles[1:]
             assigned = [role.id for role in roles]
-            print(user, assigned)
+            print(guild, user, assigned)
             self.data[guild.id][user.id] = assigned
             self.update()
 

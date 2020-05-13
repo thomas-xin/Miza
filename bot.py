@@ -1299,6 +1299,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             if sent is not None:
                                 await sent.add_reaction(react)
                     except (TimeoutError, asyncio.exceptions.TimeoutError):
+                        print(msg)
                         raise TimeoutError("Request timed out.")
                     except Exception as ex:
                         errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)

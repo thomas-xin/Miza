@@ -32,7 +32,7 @@ def pull_e621(argv, delay=5):
         resp = opener.open(url)
         if resp.getcode() != 200:
             raise ConnectionError("Error " + str(resp.getcode()))
-        s = resp.read().decode("utf-8")
+        s = resp.read().decode("utf-8", "replace")
         resp.close()
         try:
             ind = s.index('class="next_page" rel="next"')
@@ -51,7 +51,7 @@ def pull_e621(argv, delay=5):
             resp = opener.open(url)
             if resp.getcode() != 200:
                 raise ConnectionError("Error " + str(resp.getcode()))
-            s = resp.read().decode("utf-8")
+            s = resp.read().decode("utf-8", "replace")
             resp.close()
         except ValueError:
             pass
@@ -85,7 +85,7 @@ def pull_e621(argv, delay=5):
             resp = opener.open(url)
             if resp.getcode() != 200:
                 raise ConnectionError("Error " + str(resp.getcode()))
-            s = resp.read().decode("utf-8")
+            s = resp.read().decode("utf-8", "replace")
             resp.close()
             search = '<a href="https://static1.e621.net/data/'
             ind1 = s.index(search)
@@ -172,7 +172,7 @@ def pull_rule34_paheal(argv, delay=5):
         resp = urllib.request.urlopen(req, timeout=delay)
         if resp.getcode() != 200:
             raise ConnectionError("Error " + str(resp.getcode()))
-        s = resp.read().decode("utf-8")
+        s = resp.read().decode("utf-8", "replace")
         resp.close()
         tags = s.split("href='/post/list/")[1:]
         valid = []
@@ -198,7 +198,7 @@ def pull_rule34_paheal(argv, delay=5):
         if resp.getcode() != 200:
             raise ConnectionError("Error " + str(resp.getcode()))
 
-        s = resp.read().decode("utf-8")
+        s = resp.read().decode("utf-8", "replace")
         resp.close()
         try:
             ind = s.index('">Last</a><br>')
@@ -210,7 +210,7 @@ def pull_rule34_paheal(argv, delay=5):
             resp = urllib.request.urlopen(req, timeout=delay)
             if resp.getcode() != 200:
                 raise ConnectionError("Error " + str(resp.getcode()))
-            s = resp.read().decode("utf-8")
+            s = resp.read().decode("utf-8", "replace")
             resp.close()
         except ValueError:
             pass
