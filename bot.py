@@ -773,7 +773,7 @@ class main_data:
                         elif len(data):
                             raise TypeError("Too many time arguments.")
                 else:
-                    f = re.sub(andcheck, " ", f).lower()
+                    f = re.sub(self.andcheck, " ", f).lower()
                     for tc in self.timeChecks:
                         for check in reversed(self.timeChecks[tc]):
                             if check in f:
@@ -801,7 +801,7 @@ class main_data:
 
     async def getProcState(self, proc):
         try:
-            create_future_ex(proc.cpu_percent)
+            create_future_ex(proc.cpu_percent, priority=True)
             await asyncio.sleep(1)
             c = await create_future(proc.cpu_percent, priority=True)
             m = await create_future(proc.memory_percent, priority=True)
