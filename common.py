@@ -1,4 +1,4 @@
-import os, sys, subprocess, psutil, asyncio, discord, json, requests
+import os, sys, subprocess, psutil, asyncio, discord, json, requests, inspect
 import urllib.request, urllib.parse, concurrent.futures
 from smath import *
 
@@ -80,7 +80,7 @@ def getLineCount(fn):
 
 iscode = lambda fn: str(fn).endswith(".py") or str(fn).endswith(".pyw")
 
-awaitable = lambda obj: asyncio.iscoroutine(obj) or isinstance(obj, asyncio.Future)
+awaitable = lambda obj: issubclass(type(obj), asyncio.Future) or issubclass(type(obj), asyncio.Task) or inspect.isawaitable(obj)
 
 
 class returns:

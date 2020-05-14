@@ -309,6 +309,7 @@ class Cat(Command):
                     requests.get,
                     "https://api.thecatapi.com/v1/images/search",
                     headers=self.header,
+                    timeout=8,
                 )
                 try:
                     d = json.loads(resp.content)
@@ -346,6 +347,7 @@ class Dog(Command):
             resp = await create_future(
                 requests.get,
                 "https://dog.ceo/api/breeds/image/random",
+                timeout=8,
             )
             try:
                 d = json.loads(resp.content)

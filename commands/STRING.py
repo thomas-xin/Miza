@@ -292,7 +292,7 @@ class UrbanDictionary(Command):
             "https://mashape-community-urban-dictionary.p.rapidapi.com/define?term="
             + argv.replace(" ", "%20")
         )
-        resp = await create_future(requests.get, url, returns, headers=self.header)
+        resp = await create_future(requests.get, url, returns, headers=self.header, timeout=8)
         s = resp.content
         resp.close()
         try:

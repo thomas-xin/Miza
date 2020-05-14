@@ -161,7 +161,7 @@ async def forceJoin(guild, channel, user, client, bot, preparing=False):
 
 async def downloadTextFile(url, bot):
     
-    def dreader(file):
+    def dreader(resp):
         s = resp.read().decode("utf-8", "replace")
         resp.close()
         return s
@@ -863,15 +863,16 @@ class AudioQueue(hlist):
                 self.advance()
 
     def enqueue(self, items, position):
-        initialize = not len(self)
+        if not self:
+            self.__init__(items)
+            self.update_play()
+            return self
         if position == -1:
             self.extend(items)
         else:
             self.rotate(-position)
             self.extend(items)
             self.rotate(len(items) + position)
-        if initialize:
-            self.update_play()
         return self
 
 
@@ -1208,8 +1209,6 @@ class videoDownloader:
             self.lastclear = time.time()
 
     def extract_true(self, url):
-        if isURL(url):
-            return self.downloader.extract_info(url, download=False, process=False)
         return self.downloader.extract_info(url, download=False, process=False)
         # pyt = create_future_ex(pytube2Dict, url)
         # resp = self.extract_info(url, search=False)
@@ -1306,6 +1305,16 @@ class videoDownloader:
             if r is not None:
                 r.close()
             if not len(output) and force != "spotify":
+                if isURL(item):
+                    url = verifyURL(item)
+                    if url.endswith(".json") or url.endswith(".txt"):
+                        s = requests.get(url, timeout=8).content
+                        if len(s) > 8388608:
+                            raise OverflowError("Playlist entity data too large.")
+                        s = s[s.index(b"{"):s.rindex(b"}") + 1]
+                        d = json.loads(s)
+                        q = d["queue"]
+                        return [freeClass(name=e["name"], url=e["url"], duration=e.get("duration", "300")) for e in q]
                 resp = self.extract_info(item, count, search=search)
                 if resp.get("_type", None) == "url":
                     resp = self.extract_true(resp["url"])
@@ -2246,9 +2255,8 @@ class Dump(Command):
             await create_future(auds.new)
             auds.preparing = True
             auds.queue.clear()
-            auds.queue.__init__(q)
             auds.stats.update(d["stats"])
-            create_future_ex(auds.update)
+            auds.queue.enqueue(q, -1)
             if "h" not in flags:
                 return (
                     "```css\nSuccessfully loaded audio queue data for [" 
@@ -2839,7 +2847,7 @@ def get_lyrics(item):
         else:
             search = "".join(shuffle(item.split()))
         data = {"q": search}
-        resp = requests.get(url, data=data, headers=header)
+        resp = requests.get(url, data=data, headers=header, timeout=8)
         rdata = json.loads(resp.content)
         hits = rdata["response"]["hits"]
         name = None
@@ -2853,7 +2861,7 @@ def get_lyrics(item):
                 pass
         if not (path and name):
             break
-        page = requests.get("https://genius.com" + path, headers=header)
+        page = requests.get("https://genius.com" + path, headers=header, timeout=8)
         html = BeautifulSoup(page.text, "html.parser")
         lyricobj = html.find('div', class_='lyrics')
         if lyricobj is not None:
