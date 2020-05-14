@@ -753,6 +753,7 @@ class main_data:
         "minute": ("m", "min", "minute", "mins", "minutes"),
         "second": ("s", "sec", "second", "secs", "seconds"),
     }
+    andcheck = re.compile("[^a-z](and)[^a-z]", re.I)
     alphabet = "abcdefghijklmnopqrstuvwxyz"
 
     async def evalTime(self, f, guild):
@@ -772,7 +773,7 @@ class main_data:
                         elif len(data):
                             raise TypeError("Too many time arguments.")
                 else:
-                    f = f.lower()
+                    f = re.sub(andcheck, " ", f).lower()
                     for tc in self.timeChecks:
                         for check in reversed(self.timeChecks[tc]):
                             if check in f:
@@ -798,23 +799,29 @@ class main_data:
         coros = sum(1 for i in asyncio.all_tasks())
         return hlist((procs, thrds, coros))
 
+    async def getProcState(self, proc):
+        try:
+            create_future_ex(proc.cpu_percent)
+            await asyncio.sleep(1)
+            c = await create_future(proc.cpu_percent, priority=True)
+            m = await create_future(proc.memory_percent, priority=True)
+            return float(c), float(m)
+        except psutil.NoSuchProcess:
+            return 0, 0
+
     async def getState(self):
-        stats = hlist((0, 0))
+        stats = hlist(0, 0)
         if getattr(self, "currState", None) is None:
             self.currState = stats
-        proc = self.proc
-        proc.cpu_percent()
-        await asyncio.sleep(0.5)
-        stats += (proc.cpu_percent(), proc.memory_percent())
-        for child in proc.children(True):
-            try:
-                child.cpu_percent()
-                await asyncio.sleep(0.25)
-                stats += (child.cpu_percent(), child.memory_percent())
-            except psutil.NoSuchProcess:
-                pass
-        stats[0] /= psutil.cpu_count()
-        stats[1] *= psutil.virtual_memory().total / 100
+        procs = await create_future(self.proc.children, recursive=True, priority=True)
+        procs.append(self.proc)
+        tasks = [self.getProcState(p) for p in procs]
+        resp = await recursiveCoro(tasks)
+        stats += [sum(st[0] for st in resp), sum(st[1] for st in resp)]
+        cpu = await create_future(psutil.cpu_count, priority=True)
+        mem = await create_future(psutil.virtual_memory, priority=True)
+        stats[0] /= cpu
+        stats[1] *= mem.total / 100
         self.currState = stats
         return stats
 
@@ -1369,7 +1376,10 @@ async def updateLoop():
 @client.event
 async def on_ready():
     print("Successfully connected as " + str(client.user))
-    await bot.getState()
+    try:
+        await bot.getState()
+    except:
+        print(traceback.format_exc())
     print("Servers: ")
     for guild in client.guilds:
         if guild.unavailable:
