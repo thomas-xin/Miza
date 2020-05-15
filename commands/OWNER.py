@@ -196,8 +196,7 @@ class UpdateBlacklist(Database):
     suspected = "blacklist.json"
     user = True
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __load__(self):
         self.suspclear = inf
         try:
             self.lastsusp = None

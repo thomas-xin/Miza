@@ -1008,8 +1008,7 @@ class UpdateReminders(Database):
     name = "reminders"
     no_delete = True
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __load__(self):
         d = self.data
         self.keyed = hlist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
 
@@ -1207,9 +1206,8 @@ class UpdateMessageCount(Database):
         print(guild)
         print(self.data[guild.id])
 
-    def __init__(self, *args):
+    def __load__(self):
         self.scanned = False
-        super().__init__(*args)
 
     async def __call__(self):
         if self.scanned:
@@ -1275,14 +1273,14 @@ class updateUsers(Database):
         addDict(self.data, {user.id: {"commands": 1}})
         self.update()
 
-    async def _nocommand_(self, text, message, **void):
-        if not message.mentions:
-            name = self.__dict__.setdefault("name", reconstitute(self.bot.client.user.name).lower())
-            if name not in text:
-                return
-        else:
-            ids = (u.id for u in message.mentions)
-            if self.bot.client.user.id not in ids:
-                return
-        if self.bcheck(text):
-            await message.channel.send("😢")
+    # async def _nocommand_(self, text, message, **void):
+    #     if not message.mentions:
+    #         name = self.__dict__.setdefault("name", reconstitute(self.bot.client.user.name).lower())
+    #         if name not in text:
+    #             return
+    #     else:
+    #         ids = (u.id for u in message.mentions)
+    #         if self.bot.client.user.id not in ids:
+    #             return
+    #     if self.bcheck(text):
+    #         await message.channel.send("😢")

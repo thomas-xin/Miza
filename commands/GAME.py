@@ -751,9 +751,8 @@ class UpdateMimics(Database):
 class UpdateDogpiles(Database):
     name = "dogpiles"
 
-    def __init__(self, *args):
+    def __load__(self):
         self.msgFollow = {}
-        super().__init__(*args)
 
     async def _nocommand_(self, text, edit, orig, message, **void):
         if message.guild is None or not orig:
@@ -789,12 +788,11 @@ class UpdateMathTest(Database):
     name = "mathtest"
     no_file = True
 
-    def __init__(self, *args):
+    def __load__(self):
         s = "⁰¹²³⁴⁵⁶⁷⁸⁹"
         ss = {str(i): s[i] for i in range(len(s))}
         ss["-"] = "⁻"
         self.sst = "".maketrans(ss)
-        super().__init__(*args)
 
     def format(self, x, y, op):
         length = 6

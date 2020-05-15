@@ -704,8 +704,7 @@ class Ban(Command):
 class UpdateBans(Database):
     name = "bans"
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __load__(self):
         d = self.data
         self.keyed = hlist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
 
@@ -988,10 +987,9 @@ class UpdateUserLogs(Database):
 class UpdateMessageLogs(Database):
     name = "logM"
 
-    def __init__(self, *args):
+    def __load__(self):
         self.searched = False
         self.dc = {}
-        super().__init__(*args)
 
     async def cacheGuild(self, guild, lim=65536):
 

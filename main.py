@@ -1,10 +1,10 @@
-import os, time, datetime, traceback, psutil
+from install_update import os, traceback, python
+import time, datetime, psutil
 
-python = ("python3", "python")[os.name == "nt"]
 try:
     os.system("color")
 except:
-    print(traceback.format_exc())
+    traceback.print_exc()
 
 
 def delete(f):
@@ -13,7 +13,7 @@ def delete(f):
             os.remove(f)
             break
         except:
-            print(traceback.format_exc())
+            traceback.print_exc()
         time.sleep(1)
 
 sd = "shutdown.json"
@@ -80,12 +80,12 @@ while not sd in os.listdir():
     except KeyboardInterrupt:
         raise
     except:
-        print(traceback.format_exc())
+        traceback.print_exc()
     time.sleep(0.5)
     
-delete(hb)
-delete(rs)
 delete(sd)
+delete(rs)
+delete(hb)
         
 input("Shutdown signal confirmed. Press [ENTER] to close. ")
 raise SystemExit

@@ -223,7 +223,6 @@ class customAudio(discord.AudioSource):
             self.feedback = None
             self.bassadj = None
             self.bufadj = None
-            self.prev = None
             self.refilling = 0
             self.reading = 0
             self.has_read = False
@@ -515,6 +514,8 @@ class customAudio(discord.AudioSource):
                     if self.queue and not self.queue[0].get("played", False):
                         if not found and not self.queue.loading:
                             self.refilling = 2
+                            if self.source is not None:
+                                self.source.advanced = True
                             create_future_ex(self.queue.advance)
                             return
                     elif empty and queueable and self.source is not None:
@@ -531,9 +532,9 @@ class customAudio(discord.AudioSource):
                                         self.refilling = 2
                                         if self.queue:
                                             self.queue[0].url = ""
-                                        create_future_ex(self.new)
+                                        self.source.advanced = True
+                                        create_future_ex(self.queue.update_play)
                                         self.preparing = False
-                                        return
                                     else:
                                         self.stats.position = round(
                                             self.stats.position + self.speed * resample / 6.25 * (self.reverse * -2 + 1),
@@ -542,17 +543,16 @@ class customAudio(discord.AudioSource):
                                         if not ended:
                                             self.refilling = 2
                                             self.seek(self.stats.position)
-                                            return
                                         else:
                                             print("{Finished}")
                                             self.refilling = 2
                                             self.source.advanced = True
                                             create_future_ex(self.queue.update_play)
                                             self.preparing = False
-                                            return
+                                    return
                             elif self.curr_timeout == 0:
                                 self.curr_timeout = time.time()
-                    elif not queueable:
+                    elif (empty or self.pausec) and not queueable:
                         self.curr_timeout = 0
                         self.vc.stop()
                         return
@@ -624,8 +624,15 @@ class customAudio(discord.AudioSource):
                 left = numpy.zeros(size, dtype=float)
                 right = numpy.zeros(size, dtype=float)
             elif len(left) != size or len(right) != size:
-                left = numpy.interp([i * len(left) / size for i in range(size)], list(range(len(left))), left)
-                right = numpy.interp([i * len(right) / size for i in range(size)], list(range(len(right))), right)
+                l1 = [i * len(left) / size for i in range(size)]
+                l2 = list(range(len(left)))
+                if len(left) != len(right):
+                    r1 = [i * len(right) / size for i in range(size)]
+                    r2 = list(range(len(right)))
+                else:
+                    r1, r2 = l1, l2
+                left = numpy.interp(l1, l2, left)
+                right = numpy.interp(r1, r2, right)
             # if detune:
             #     if self.cpitch != detune:
             #         self.cpitch = detune
@@ -768,8 +775,7 @@ class AudioQueue(hlist):
             elif dels:
                 while dels:
                     q.pop(dels.popleft())
-            if q:
-                self.update_play()
+            self.update_play()
         create_task(self.auds.updatePlayer())
 
     def advance(self, looped=True, shuffled=True):
@@ -812,8 +818,7 @@ class AudioQueue(hlist):
                 q.append(freeClass(d))
         if self.auds.player:
             self.auds.player.time = 1 + time.time()
-        if q:
-            self.update_play()
+        self.update_play()
         
     def update_play(self):
         auds = self.auds
@@ -861,6 +866,10 @@ class AudioQueue(hlist):
                 auds.source.advanced = False
                 auds.source.closed = True
                 self.advance()
+        else:
+            if auds.source is None or auds.source.closed or auds.source.advanced:
+                auds.vc.stop()
+                auds.source = None
 
     def enqueue(self, items, position):
         if not self:
@@ -891,7 +900,7 @@ class PCMFile:
             return
         self.loading = True
         ff = ffmpy.FFmpeg(
-            global_options=["-y", "-hide_banner", "-loglevel error", "-vn"],
+            global_options=["-nostdin", "-y", "-hide_banner", "-loglevel error", "-vn"],
             inputs={stream: None},
             outputs={"s16le": "-f", str(SAMPLE_RATE): "-ar", "2": "-ac", "cache/" + self.file: None},
         )
@@ -904,7 +913,7 @@ class PCMFile:
             fl = 0
             while fl < 65536:
                 if not self.proc.is_running():
-                    err = self.proc.stderr.read()
+                    err = self.proc.stderr.read().decode("utf-8", "replace")
                     if err:
                         ex = RuntimeError(err)
                     else:
@@ -929,8 +938,9 @@ class PCMFile:
             raise
 
     def update(self):
-        if time.time() - self.time > 18000:
+        if time.time() - self.time > 9000:
             self.expired = True
+            print(self.file, "deleted.")
             try:
                 ytdl.cache.pop(self.file)
             except KeyError:
@@ -938,6 +948,7 @@ class PCMFile:
             for _ in loop(16):
                 try:
                     os.remove("cache/" + self.file)
+                    break
                 except FileNotFoundError:
                     break
                 except PermissionError:
@@ -951,7 +962,7 @@ class PCMFile:
                 pass
 
     def open(self):
-        self.update()
+        self.time = time.time()
         if self.proc is None:
             raise ProcessLookupError
         return open("cache/" + self.file, "rb")
@@ -1082,6 +1093,7 @@ class PCMFile:
             args.append("pipe:0")
         else:
             buff = False
+            args.insert(1, "-nostdin")
             args.append("cache/" + self.file)
         args += ["-ss", str(start), "-to", str(end), "-f", "s16le"]
         if "-af" in options:
@@ -2087,9 +2099,9 @@ class Skip(Command):
         if auds.queue:
             song = auds.queue[0]
             if song.skips is None or len(song.skips) >= required:
-                auds.queue.popleft()
-                create_future_ex(auds.new)
                 auds.preparing = False
+                auds.source.advanced = True
+                auds.queue.advance()
                 if count < 4:
                     response += (
                         "[" + noHighlight(song.name)
@@ -2188,7 +2200,7 @@ def getDump(auds):
             "Too many items in queue (" + str(len(auds.queue))
             + " > " + str(lim) + ")."
         )
-    q = [copyDict(item) for item in auds.queue if random.random() < 0.99 or not time.sleep(0.01)]
+    q = [copyDict(item) for item in auds.queue]
     s = dict(auds.stats)
     d = {
         "stats": s,
@@ -3079,11 +3091,10 @@ class Download(Command):
 class UpdateQueues(Database):
     name = "playlists"
 
-    def __init__(self, *args):
+    def __load__(self):
         self.audio = {}
         self.audiocache = {}
         self.connecting = {}
-        super().__init__(*args)
         pl = self.data
         for g in pl:
             for i in range(len(pl[g])):

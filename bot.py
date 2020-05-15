@@ -45,9 +45,9 @@ class main_data:
         print("Time: " + str(datetime.datetime.now()))
         print("Initializing...")
         if not os.path.exists("cache/"):
-            os.mkdir("cache/")
+            os.mkdir("cache")
         if not os.path.exists("saves/"):
-            os.mkdir("saves/")
+            os.mkdir("saves")
         try:
             f = open(self.authdata)
         except FileNotFoundError:
@@ -504,9 +504,9 @@ class main_data:
             return 4
         elif any((p.ban_members, p.manage_channels, p.manage_guild)):
             return 3
-        elif any([p.kick_members, p.manage_messages, p.manage_nicknames, p.manage_roles, p.manage_webhooks, p.manage_emojis]):
+        elif any((p.kick_members, p.manage_messages, p.manage_nicknames, p.manage_roles, p.manage_webhooks, p.manage_emojis)):
             return 2
-        elif any([p.view_audit_log, p.priority_speaker, p.mention_everyone, p.move_members]):
+        elif any((p.view_audit_log, p.priority_speaker, p.mention_everyone, p.move_members)):
             return 1
         return -1
 
@@ -735,10 +735,7 @@ class main_data:
                 g_id = guild.id
         except AttributeError:
             g_id = int(guild)
-        return await mathProc(
-            str(f) + "`" + str(int(prec)) + "`" + str(int(r)) + "`" + str(g_id),
-            g_id,
-        )
+        return await mathProc(f, int(prec), int(r), g_id)
 
     timeChecks = {
         "galactic year": ("gy", "galactic year", "galactic years"),

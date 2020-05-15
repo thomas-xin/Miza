@@ -1,5 +1,74 @@
 import os, sys, subprocess, psutil, asyncio, discord, json, requests, inspect
 import urllib.request, urllib.parse, concurrent.futures
+
+
+class __logPrinter:
+
+    def filePrint(self, fn, b):
+            try:
+                if type(b) in (bytes, bytearray):
+                    f = open(fn, "ab")
+                elif type(b) is str:
+                    f = open(fn, "a", encoding="utf-8")
+                else:
+                    f = fn
+                f.write(b)
+                f.close()
+            except:
+                traceback.print_exc()
+    
+    def updatePrint(self):
+
+        if self.file is None:
+            outfunc = sys.stdout.write
+            enc = lambda x: x
+        else:
+            outfunc = lambda s: self.filePrint(self.file, s)
+            enc = lambda x: bytes(x, "utf-8")
+        outfunc(enc("Logging started.\n"))
+        while True:
+            try:
+                for f in self.data:
+                    if not self.data[f]:
+                        self.data.pop(f)
+                        continue
+                    out = limStr(self.data[f], 8192)
+                    self.data[f] = ""
+                    data = enc(out)
+                    if f == self.file:
+                        outfunc(data)
+                    else:
+                        self.filePrint(f, data)
+            except:
+                print(traceback.format_exc())
+            time.sleep(1)
+            while "common.py" not in os.listdir() or self.closed:
+                time.sleep(0.5)
+
+    def __call__(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
+        if file is None:
+            file = self.file
+        if file not in self.data:
+            self.data[file] = ""
+        self.data[file] += str(sep).join(str(i) for i in args) + str(end) + str(prefix)
+
+    read = lambda self, *args, **kwargs: bytes()
+    write = lambda self, *args, end="", **kwargs: self.__call__(*args, end, **kwargs)
+    open = lambda self: self.__setattr__("closed", False)
+    close = lambda self: self.__setattr__("closed", True)
+    isatty = lambda self: False
+    flush = lambda self: None
+
+    def __init__(self, file=None):
+        self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.data = {}
+        self.file = file
+        self.future = self.exec.submit(self.updatePrint)
+        self.closed = False
+
+print = __logPrinter("log.txt")
+sys.stdout = sys.stderr = print
+
 from smath import *
 
 python = ("python3", "python")[os.name == "nt"]
@@ -358,7 +427,7 @@ def procUpdate():
 
 procUpdate()
 
-async def mathProc(data, key=-1, timeout=12):
+async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12):
     procs, busy = SUBS.procs, SUBS.busy
     while time.time() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
@@ -375,7 +444,7 @@ async def mathProc(data, key=-1, timeout=12):
             await asyncio.sleep(0.5)
     except StopIteration:
         pass
-    d = repr(bytes(data, "utf-8")).encode("utf-8") + b"\n"
+    d = repr(bytes("`".join(str(i) for i in (expr, prec, rat)), "utf-8")).encode("utf-8") + b"\n"
     print(d)
     try:
         proc.busy = True
@@ -473,81 +542,12 @@ def create_task(fut, *args, loop=None, **kwargs):
     return asyncio.ensure_future(fut, *args, loop=loop, **kwargs)
 
 
-logClear = lambda: os.system(("clear", "cls")[os.name == "nt"])
-
-class __logPrinter:
-    
-    def updatePrint(self):
-
-        def filePrint(fn, b):
-            try:
-                if type(b) in (bytes, bytearray):
-                    f = open(fn, "ab")
-                elif type(b) is str:
-                    f = open(fn, "a", encoding="utf-8")
-                else:
-                    f = fn
-                f.write(b)
-                f.close()
-            except:
-                traceback.print_exc()
-
-        if self.file is None:
-            outfunc = sys.stdout.write
-            enc = lambda x: x
-        else:
-            outfunc = lambda s: filePrint(self.file, s)
-            enc = lambda x: bytes(x, "utf-8")
-        outfunc(enc("Logging started...\n"))
-        while True:
-            try:
-                for f in self.data:
-                    if not self.data[f]:
-                        self.data.pop(f)
-                        continue
-                    out = limStr(self.data[f], 8192)
-                    self.data[f] = ""
-                    data = enc(out)
-                    if f == self.file:
-                        outfunc(data)
-                    else:
-                        filePrint(f, data)
-            except:
-                print(traceback.format_exc())
-            time.sleep(1)
-            while "common.py" not in os.listdir() or self.closed:
-                time.sleep(0.5)
-
-    def __call__(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
-        if file is None:
-            file = self.file
-        if file not in self.data:
-            self.data[file] = ""
-        self.data[file] += str(sep).join(str(i) for i in args) + str(end) + str(prefix)
-
-    read = lambda self, *args, **kwargs: bytes()
-    write = lambda self, *args, end="", **kwargs: self.__call__(*args, end, **kwargs)
-    open = lambda self: self.__setattr__("closed", False)
-    close = lambda self: self.__setattr__("closed", True)
-    isatty = lambda self: False
-    flush = lambda self: None
-
-    def __init__(self, file=None):
-        self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.data = freeClass()
-        self.file = file
-        self.future = self.exec.submit(self.updatePrint)
-        self.closed = False
-
-print = __logPrinter("log.txt")
-
 getattr(discord, "__builtins__", {})["print"] = print
 getattr(concurrent.futures, "__builtins__", {})["print"] = print
 getattr(asyncio.futures, "__builtins__", {})["print"] = print
 getattr(asyncio, "__builtins__", {})["print"] = print
 getattr(psutil, "__builtins__", {})["print"] = print
 getattr(subprocess, "__builtins__", {})["print"] = print
-sys.stdout = sys.stderr = print
 
 
 class Command:
@@ -631,6 +631,14 @@ class Database:
         self.bot = bot
         self.busy = self.checking = False
         self._globals = globals()
+        f = getattr(self, "__load__", None)
+        if callable(f):
+            try:
+                f()
+            except:
+                print(traceback.format_exc())
+                self.data.clear()
+                f()
         # print(name, self.__name__)
 
     async def __call__(self, **void):
