@@ -28,6 +28,7 @@ class main_data:
     savedata = "data.json"
     authdata = "auth.json"
     client = client
+    prefix = "~"
     deleted_user = 456226577798135808
     _globals = globals()
             
@@ -144,6 +145,23 @@ class main_data:
         obj.checking = False
         self.started = True
 
+    async def get_sendable(self, guild, member):
+        if member is None:
+            return guild.owner
+        channel = guild.system_channel
+        if channel is None or not channel.permissions_for(member).send_messages:
+            channel = guild.rules_channel
+            if channel is None or not channel.permissions_for(member).send_messages:
+                found = False
+                if guild.text_channels:
+                    for channel in guild.text_channels:
+                        if channel.permissions_for(member).send_messages:
+                            found = True
+                            break
+                if not found:
+                    return guild.owner
+        return channel
+                    
     async def fetch_user(self, u_id):
         try:
             u_id = int(u_id)
@@ -445,7 +463,7 @@ class main_data:
         try:
             return self.data.prefixes[g_id]
         except KeyError:
-            return "~"
+            return bot.prefix
 
     def getPerms(self, user, guild=None):
         try:
@@ -878,7 +896,7 @@ class main_data:
                             create_task(sendReact(
                                 message.channel,
                                 "```py\nError: " + repr(ex).replace("`", "") + "\n```",
-                                reacts=["❎"],
+                                reacts="❎",
                             ))
                 try:
                     self.proc_call.pop(message.id)
@@ -1118,7 +1136,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         "<@!" + str(client.user.id) + ">",
     )
     if u_id == client.user.id:
-        prefix = "~"
+        prefix = bot.prefix
     else:
         prefix = bot.getPrefix(guild)
     op = False
@@ -1137,7 +1155,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                     "Hi, did you require my services for anything? Use `"
                     + prefix + "?` or `" + prefix + "help` for help."
                 ),
-                reacts=["❎"],
+                reacts="❎",
             ))
         else:
             print(
@@ -1148,7 +1166,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
             create_task(sendReact(
                 channel,
                 "Sorry, you are currently not permitted to request my services.",
-                reacts=["❎"],
+                reacts="❎",
             ))
         return
     run = False
@@ -1311,7 +1329,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         create_task(sendReact(
                             channel,
                             errmsg,
-                            reacts=["❎"],
+                            reacts="❎",
                         ))
     if not run and u_id != client.user.id and not u_perm <= -inf:
         s = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -1388,6 +1406,45 @@ async def on_ready():
         bot.started = True
         asyncio.create_task(updateLoop())
         asyncio.create_task(heartbeatLoop())
+
+
+@client.event
+async def on_guild_join(guild):
+    print("New server: " + str(guild))
+    g = await bot.fetch_guild(guild.id)
+    m = guild.get_member(client.user.id)
+    channel = await bot.get_sendable(g, m)
+    emb = discord.Embed(colour=discord.Colour(8364031))
+    url = strURL(client.user.avatar_url)
+    emb.set_author(name=client.user.name, url=url, icon_url=url)
+    emb.description = (
+        "Hi there! I'm " + client.user.name
+        + ", a multipurpose discord bot created by <@"
+        + str(bot.owner_id) + ">. Thanks for adding me"
+    )
+    user = None
+    try:
+        a = await guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add).flatten()
+    except discord.Forbidden:
+        pass
+    else:
+        for e in a:
+            if e.target.id == client.user.id:
+                user = e.user
+                break
+    if user is not None:
+        emb.description += ", <@" + str(user.id) + ">"
+    emb.description += (
+        "!\nMy default prefix is `" + bot.prefix + "`, which can be changed as desired on a per-server basis. Mentioning me also serves as an alias for all prefixes.\n"
+        + "For more information, use the `" + bot.prefix + "help` command, and my source code is available at " + bot.website + " for those who are interested.\n"
+        + "Pleased to be at your service 🙂"
+    )
+    if not m.guild_permissions.administrator:
+        emb.add_field(name="Psst!", value=(
+            "I noticed you haven't given me administrator permissions here.\n"
+            + "That's completely understandable if intentional, but may cause some features to not work well, or not at all."
+        ))
+    await sendReact(channel=channel, embed=emb, reacts="❎")
 
     
 async def seen(user, delay=0):
@@ -1479,7 +1536,7 @@ async def handleMessage(message, edit=True):
         create_task(sendReact(
             message.channel,
             errmsg,
-            reacts=["❎"],
+            reacts="❎",
         ))
     return
 

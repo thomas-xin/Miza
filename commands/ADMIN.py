@@ -735,7 +735,13 @@ class UpdateBans(Database):
             try:
                 guild = await self.bot.fetch_guild(g_id)
                 user = await self.bot.fetch_user(x.u)
-                channel = await self.bot.fetch_channel(x.c)
+                m = guild.get_member(self.bot.client.user.id)
+                try:
+                    channel = await self.bot.fetch_channel(x.c)
+                    if not channel.permissions_for(m).send_messages:
+                        raise discord.Forbidden
+                except (LookupError, discord.Forbidden, discord.NotFound):
+                    channel = await self.bot.get_sendable(guild, m)
                 try:
                     await guild.unban(user)
                     text = (

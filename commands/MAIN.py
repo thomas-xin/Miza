@@ -1248,7 +1248,7 @@ class UpdatePrefix(Database):
 
     async def __call__(self):
         for g in tuple(self.data):
-            if self.data[g] == "~":
+            if self.data[g] == self.bot.prefix:
                 self.data.pop(g)
 
 
