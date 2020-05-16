@@ -715,8 +715,29 @@ class main_data:
     }
     ctrans = "".maketrans(cmap)
 
-    async def evalMath(self, f, guild):
-        f = f.strip()
+    op = {
+        "+=": "__add__",
+        "-=": "__sub__",
+        "*=": "__mul__",
+        "/=": "__truediv__",
+        "//=": "__floordiv__",
+        "**=": "__pow__",
+        "^=": "__pow__",
+        "%=": "__mod__",
+    }
+
+    async def evalMath(self, expr, guild, default=0, op=True):
+        if op:
+            _op = None
+            for op, at in self.op.items():
+                if expr.startswith(op):
+                    expr = expr[len(op):].strip(" ")
+                    _op = at
+            num = await self.evalMath(expr, guild, op=False)
+            if _op is not None:
+                num = getattr(float(default), _op)(num)
+            return num
+        f = expr.strip()
         try:
             if not f:
                 r = [0]
@@ -771,12 +792,22 @@ class main_data:
     andcheck = re.compile("[^a-z](and)[^a-z]", re.I)
     alphabet = "abcdefghijklmnopqrstuvwxyz"
 
-    async def evalTime(self, f, guild):
+    async def evalTime(self, expr, guild, default=0, op=True):
+        if op:
+            _op = None
+            for op, at in self.op.items():
+                if expr.startswith(op):
+                    expr = expr[len(op):].strip(" ")
+                    _op = at
+            num = await self.evalTime(expr, guild, op=False)
+            if _op is not None:
+                num = getattr(float(default), _op)(num)
+            return num
         t = 0
-        if f:
+        if expr:
             try:
-                if ":" in f:
-                    data = f.split(":")
+                if ":" in expr:
+                    data = expr.split(":")
                     mult = 1
                     while len(data):
                         t += await self.evalMath(data[-1], guild.id) * mult
@@ -788,7 +819,7 @@ class main_data:
                         elif len(data):
                             raise TypeError("Too many time arguments.")
                 else:
-                    f = re.sub(self.andcheck, " ", f).lower()
+                    f = re.sub(self.andcheck, " ", expr).lower()
                     for tc in self.timeChecks:
                         for check in reversed(self.timeChecks[tc]):
                             if check in f:
@@ -806,6 +837,8 @@ class main_data:
                         t += await self.evalMath(f, guild.id)
             except:
                 t = tparser.parse(f).timestamp() - tparser.parse("0s").timestamp()
+        if type(t) is not float:
+            t = float(t)
         return t
 
     def getActive(self):

@@ -103,7 +103,7 @@ class Suspend(Command):
             )
         else:
             user = await bot.fetch_user(verifyID(args[0]))
-            change = await bot.evalMath(args[1], guild.id)
+            change = await bot.evalTime(" ".join(args[1]), guild.id, bot.data.blacklist.get(user.id, time.time()))
             bot.data.blacklist[user.id] = change
             update()
             return (

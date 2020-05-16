@@ -2172,14 +2172,7 @@ class Seek(Command):
         else:
             orig = auds.stats.position
             expr = argv
-            _op = None
-            for operator in ("+=", "-=", "*=", "/=", "%="):
-                if expr.startswith(operator):
-                    expr = expr[2:].strip(" ")
-                    _op = operator[0]
-            num = await bot.evalTime(expr, guild)
-            if _op is not None:
-                num = eval(str(orig) + _op + str(num), {}, infinum)
+            num = await bot.evalTime(expr, guild, orig)
         pos = auds.seek(num)
         if auds.player is not None:
             auds.player.time = 1 + time.time()
@@ -2412,23 +2405,16 @@ class AudioSettings(Command):
                 if type(val) is not bool:
                     val *= 100
                 argv = str(val)
-            origVol = bot.database.playlists.audio[guild.id].stats
-            _op = None
-            for operator in ("+=", "-=", "*=", "/=", "%="):
-                if argv.startswith(operator):
-                    argv = argv[2:].strip(" ")
-                    _op = operator[0]
-            num = await bot.evalMath(argv, guild.id)
-            orig = round(origVol[op] * 100, 9)
-            if _op is not None:
-                num = eval(str(orig) + _op + str(num), {}, infinum)
+            origStats = bot.database.playlists.audio[guild.id].stats
+            orig = round(origStats[op] * 100, 9)
+            num = await bot.evalMath(argv, guild.id, orig)
             val = roundMin(float(num / 100))
-            new = round(val * 100, 9)
+            new = round(num, 9)
             if op in "loop shuffle quiet":
-                origVol[op] = new = bool(val)
+                origStats[op] = new = bool(val)
                 orig = bool(orig)
             else:
-                origVol[op] = val
+                origStats[op] = val
             if auds.queue and (op in "speed pitch pan compressor chorus" or op == "resample" and max(orig, new) >= 240000):
                 await create_future(auds.new, auds.file, auds.stats.position)
             s += (

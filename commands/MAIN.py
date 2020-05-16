@@ -107,14 +107,7 @@ class Perms(Command):
             name = str(t_user)
             orig = t_perm
             expr = " ".join(args[1:])
-            _op = None
-            for operator in ("+=", "-=", "*=", "/=", "%="):
-                if expr.startswith(operator):
-                    expr = expr[2:].strip(" ")
-                    _op = operator[0]
-            num = await bot.evalMath(expr, guild)
-            if _op is not None:
-                num = eval(str(orig) + _op + str(num), {}, infinum)
+            num = await bot.evalMath(expr, guild, orig)
             c_perm = num
             if t_perm is nan or isnan(c_perm):
                 m_perm = nan
