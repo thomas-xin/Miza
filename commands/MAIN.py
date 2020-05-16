@@ -290,16 +290,19 @@ class Loop(Command):
     async def __call__(self, args, argv, message, channel, callback, bot, perm, guild, **void):
         num = await bot.evalMath(args[0], guild.id)
         iters = round(num)
-        scale = 3
-        limit = perm * scale
-        if iters > limit:
-            reason = (
-                "to execute loop of " + str(iters)
-                + " iterations"
-            )
-            raise self.permError(perm, ceil(iters / scale), reason)
-        elif not isnan(perm) and iters > 256:
-            raise PermissionError("Must be owner to execute loop of more than 256 iterations.")
+        if not isnan(perm):
+            if iters > 5 and not bot.isTrusted(guild.id):
+                raise PermissionError("Must be in a trusted server to execute loop of more than 5 iterations.")
+            scale = 3
+            limit = perm * scale
+            if iters > limit:
+                reason = (
+                    "to execute loop of " + str(iters)
+                    + " iterations"
+                )
+                raise self.permError(perm, ceil(iters / scale), reason)
+            elif iters > 256:
+                raise PermissionError("Must be owner to execute loop of more than 256 iterations.")
         func = func2 = " ".join(args[1:])
         if func:
             while func[0] == " ":
@@ -737,6 +740,7 @@ class Status(Command):
             
             + ".\nCPU usage: " + sbHighlight(round(stats[0], 3)) + "%"
             + ", RAM usage: " + sbHighlight(round(stats[1] / 1048576, 3)) + " MB"
+            + ", Disk usage: " + sbHighlight(round(stats[2] / 1048576, 3)) + " MB"
             + ".```"
         )
 
@@ -926,8 +930,9 @@ class Announcement(Command):
                 "Current announcements set for <#" + str(channel.id)
                 + ">:```ini" + s + "```"
             )
-        if len(rems) >= 32:
-            raise OverflowError("Channel has reached the maximum of 32 announcements. Please remove one to add another.")
+        lim = 6 << bot.isTrusted(guild.id) * 2 + 1
+        if len(rems) >= lim:
+            raise OverflowError("Channel has reached the maximum of " + str(lim) + " announcements. Please remove one to add another.")
         while True:
             spl = None
             if "in" in argv:
@@ -1249,7 +1254,7 @@ class UpdateEnabled(Database):
     name = "enabled"
 
 
-class updateUsers(Database):
+class UpdateUsers(Database):
     name = "users"
     suspected = "users.json"
     user = True

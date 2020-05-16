@@ -1,4 +1,4 @@
-import os, sys, subprocess, psutil, asyncio, discord, json, requests, inspect
+import os, sys, subprocess, psutil, asyncio, discord, json, requests, inspect, importlib
 import urllib.request, urllib.parse, concurrent.futures
 
 
@@ -58,10 +58,12 @@ ESCAPE_T2 = {
 }
 __emap2 = "".maketrans(ESCAPE_T2)
 
+__sptrans = re.compile(" +")
+
 noHighlight = lambda s: str(s).translate(__emap)
 clrHighlight = lambda s: str(s).translate(__emap2)
-
 sbHighlight = lambda s: "[" + noHighlight(s) + "]"
+singleSpace = lambda s: re.sub(__sptrans, " ", s)
 
 
 def getLineCount(fn):
@@ -271,7 +273,7 @@ __smap = {
 }
 __strans = "".maketrans(__smap)
 
-verifySearch = lambda f: f.strip().translate(__strans)
+verifySearch = lambda f: singleSpace(f.strip().translate(__strans))
 
 DOMAIN_FORMAT = re.compile(
     r"(?:^(\w{1,255}):(.{1,255})@|^)"
@@ -327,6 +329,7 @@ def subKill():
         sub.kill()
     SUBS.procs.clear()
     SUBS.busy.clear()
+    procUpdate()
 
 def procUpdate():
     procs = SUBS.procs

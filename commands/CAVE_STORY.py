@@ -290,7 +290,7 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
         return [fn]
     except Exception as ex:
         print(traceback.format_exc())
-        return repr(ex)
+        return ex
 
 
 class CS_org2xm(Command):
@@ -308,6 +308,8 @@ class CS_org2xm(Command):
     usage = "<0:org_url{attached_file}> <2:wave_url[]> <1:out_format[xm]>"
 
     async def __call__(self, args, bot, message, channel, guild, **void):
+        if not bot.isTrusted(guild.id):
+            raise PermissionError("Must be in a trusted server to convert .org files.")
         if len(message.attachments):
             org = message.attachments[0].url
             args = [""] + args
@@ -334,10 +336,9 @@ class CS_org2xm(Command):
             "%" + str(guild.id),
             guild.filesize_limit
         )
-        try:
-            f = discord.File(fn[0], filename=name)
-        except TypeError:
-            raise eval(fn)
+        if issubclass(type(fn), Exception):
+            raise fn
+        f = discord.File(fn[0], filename=name)
         create_task(sendFile(channel, "Org successfully converted!", f, fn[0]))
 
 

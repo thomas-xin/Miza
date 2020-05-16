@@ -33,6 +33,8 @@ class main_data:
     _globals = globals()
             
     def __init__(self):
+        self.bot = self
+        self.loaded = False
         self.cache = freeClass(
             guilds={},
             channels={},
@@ -567,6 +569,13 @@ class main_data:
             if exc:
                 raise
 
+    def isTrusted(self, g_id):
+        try:
+            trusted = self.data.trusted
+        except (AttributeError, KeyError):
+            return False
+        return g_id in trusted
+
     def isSuspended(self, u_id):
         u_id = int(u_id)
         if u_id in (self.owner_id, client.user.id):
@@ -585,7 +594,10 @@ class main_data:
             path, module = module, f
             rename = module.lower()
             print("Loading module " + rename + "...")
-            mod = __import__(module)
+            if module in self._globals:
+                mod = importlib.reload(self._globals[module])
+            else:
+                mod = __import__(module)
             self._globals[module] = mod
             commands = hlist()
             dataitems = hlist()
@@ -618,6 +630,8 @@ class main_data:
             print(traceback.format_exc())
 
     def getModules(self, reload=False):
+        if reload:
+            subKill()
         files = [i for i in os.listdir("commands") if iscode(i)]
         self.categories = freeClass()
         self.commands = freeClass()
@@ -631,6 +645,7 @@ class main_data:
         for f in files:
             executor.submit(self.getModule, f)
         executor.shutdown(wait=False)
+        self.loaded = True
 
     def update(self):
         saved = hlist()
@@ -716,6 +731,8 @@ class main_data:
     ctrans = "".maketrans(cmap)
 
     op = {
+        "=": None,
+        ":=": None,
         "+=": "__add__",
         "-=": "__sub__",
         "*=": "__mul__",
@@ -731,7 +748,7 @@ class main_data:
             _op = None
             for op, at in self.op.items():
                 if expr.startswith(op):
-                    expr = expr[len(op):].strip(" ")
+                    expr = expr[len(op):].strip()
                     _op = at
             num = await self.evalMath(expr, guild, op=False)
             if _op is not None:
@@ -856,20 +873,24 @@ class main_data:
             return float(c), float(m)
         except psutil.NoSuchProcess:
             return 0, 0
+        
+    getCacheState = lambda self: sum(os.path.getsize("cache/" + fn) for fn in os.listdir("cache"))
 
     async def getState(self):
-        stats = hlist(0, 0)
+        stats = hlist(0, 0, 0)
         if getattr(self, "currState", None) is None:
             self.currState = stats
         procs = await create_future(self.proc.children, recursive=True, priority=True)
         procs.append(self.proc)
         tasks = [self.getProcState(p) for p in procs]
         resp = await recursiveCoro(tasks)
-        stats += [sum(st[0] for st in resp), sum(st[1] for st in resp)]
+        stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
         cpu = await create_future(psutil.cpu_count, priority=True)
         mem = await create_future(psutil.virtual_memory, priority=True)
+        disk = await create_future(self.getCacheState, priority=True)
         stats[0] /= cpu
         stats[1] *= mem.total / 100
+        stats[2] = disk
         self.currState = stats
         return stats
 
@@ -897,6 +918,16 @@ class main_data:
                     self.proc_call.pop(next(iter(self.proc_call)))
                 while time.time() - self.proc_call.get(message.id, 0) < 30:
                     await asyncio.sleep(0.2)
+                msg = message.content
+                if not msg:
+                    msg = message.embeds[0].description
+                if msg[:3] != "```" or len(msg) <= 3:
+                    return
+                msg = msg[3:]
+                while msg[0] == "\n":
+                    msg = msg[1:]
+                check = "callback-"
+                msg = msg.split("\n")[0]
                 self.proc_call[message.id] = time.time()
                 msg = msg[len(check):]
                 args = msg.split("-")

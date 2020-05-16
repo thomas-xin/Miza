@@ -481,6 +481,8 @@ class FileLog(Command):
     flags = "aed"
 
     async def __call__(self, bot, flags, channel, guild, **void):
+        if not bot.isTrusted(guild.id):
+            raise PermissionError("Must be in a trusted server to log deleted files.")
         data = bot.data.logF
         update = bot.database.logF.update
         if "e" in flags or "a" in flags:
@@ -598,12 +600,12 @@ class Ban(Command):
             expr = bantype
             msg = None
         _op = None
-        for operator in ("+=", "-=", "*=", "/=", "%="):
-            if expr.startswith(operator):
-                expr = expr[2:].strip()
-                _op = operator[0]
+        for op, at in bot.op.items():
+            if expr.startswith(op):
+                expr = expr[len(op):].strip()
+                _op = at
+        num = await bot.evalTime(expr, guild, op=False)
         create_task(message.add_reaction("❗"))
-        num = await bot.evalTime(expr, guild)
         for user in users:
             p = bot.getPerms(user, guild)
             if not p < 0 and not isValid(p):
@@ -616,13 +618,13 @@ class Ban(Command):
                 reason = "to ban " + str(user) + " from " + guild.name
                 await channel.send("```py\nError: " + repr(self.permError(perm, p + 1, reason)) + "```")
                 continue
-            try:
-                ban = bans[user.id]
-                orig = ban["t"] - ts
-            except LookupError:
-                orig = 0
             if _op is not None:
-                new = eval(str(orig) + _op + str(num), {}, infinum)
+                try:
+                    ban = bans[user.id]
+                    orig = ban["t"] - ts
+                except LookupError:
+                    orig = 0
+                new = getattr(float(orig), _op)(num)
             else:
                 new = num
             create_task(self.createBan(guild, user, reason=msg, length=new, channel=channel, bans=bans, glob=glob))
@@ -805,26 +807,28 @@ class ServerProtector(Database):
             await self.kickWarn(u_id, guild, owner, msg)
 
     async def _channel_delete_(self, channel, guild, **void):
-        audits = await guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete).flatten()
-        ts = datetime.datetime.utcnow().timestamp()
-        cnt = {}
-        for log in audits:
-            if ts - log.created_at.timestamp() < 120:
-                addDict(cnt, {log.user.id: 1})
-        for u_id in cnt:
-            if cnt[u_id] > 2:
-                create_task(self.targetWarn(u_id, guild, "channel deletions `(" + str(cnt[u_id]) + ")`"))
+        if self.bot.isTrusted(guild.id):
+            audits = await guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete).flatten()
+            ts = datetime.datetime.utcnow().timestamp()
+            cnt = {}
+            for log in audits:
+                if ts - log.created_at.timestamp() < 120:
+                    addDict(cnt, {log.user.id: 1})
+            for u_id in cnt:
+                if cnt[u_id] > 2:
+                    create_task(self.targetWarn(u_id, guild, "channel deletions `(" + str(cnt[u_id]) + ")`"))
 
     async def _ban_(self, user, guild, **void):
-        audits = await guild.audit_logs(limit=11, action=discord.AuditLogAction.ban).flatten()
-        ts = datetime.datetime.utcnow().timestamp()
-        cnt = {}
-        for log in audits:
-            if ts - log.created_at.timestamp() < 10:
-                addDict(cnt, {log.user.id: 1})
-        for u_id in cnt:
-            if cnt[u_id] > 5:
-                create_task(self.targetWarn(u_id, guild, "banning `(" + str(cnt[u_id]) + ")`"))
+        if self.bot.isTrusted(guild.id):
+            audits = await guild.audit_logs(limit=13, action=discord.AuditLogAction.ban).flatten()
+            ts = datetime.datetime.utcnow().timestamp()
+            cnt = {}
+            for log in audits:
+                if ts - log.created_at.timestamp() < 10:
+                    addDict(cnt, {log.user.id: 1})
+            for u_id in cnt:
+                if cnt[u_id] > 5:
+                    create_task(self.targetWarn(u_id, guild, "banning `(" + str(cnt[u_id]) + ")`"))
 
 
 class UpdateUserLogs(Database):
@@ -1223,6 +1227,8 @@ class UpdateFileLogs(Database):
             c_id = self.data[guild.id]
             if message.attachments:
                 try:
+                    if not self.bot.isTrusted(guild.id):
+                        raise EOFError
                     channel = await self.bot.fetch_channel(c_id)
                 except (EOFError, discord.NotFound):
                     self.data.pop(guild.id)

@@ -323,7 +323,9 @@ class MathQuiz(Command):
     usage = "<mode(easy)(hard)> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, channel, flags, argv, **void):
+    async def __call__(self, channel, guild, flags, argv, **void):
+        if not bot.isTrusted(guild.id):
+            raise PermissionError("Must be in a trusted server for this command.")
         mathdb = self.bot.database.mathtest
         if "d" in flags:
             if channel.id in mathdb.data:

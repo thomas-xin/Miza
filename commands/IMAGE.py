@@ -16,9 +16,8 @@ class IMG(Command):
     flags = "vraedh"
     no_parse = True
 
-    async def __call__(self, flags, args, argv, guild, perm, **void):
+    async def __call__(self, bot, flags, args, argv, guild, perm, **void):
         update = self.data.images.update
-        bot = self.bot
         imglists = bot.data.images
         images = imglists.get(guild.id, {})
         if "a" in flags or "e" in flags or "d" in flags:
@@ -27,10 +26,11 @@ class IMG(Command):
                 reason = "to change image list for " + guild.name
                 raise self.permError(perm, req, reason)
             if "a" in flags or "e" in flags:
-                if len(images) > 256:
+                lim = 32 << bot.isTrusted(guild.id) * 2 + 1
+                if len(images) > lim:
                     raise OverflowError(
                         "Image list for " + guild.name
-                        + " has reached the maximum of 256 items. "
+                        + " has reached the maximum of " + str(lim) + " items. "
                         + "Please remove an item to add another."
                     )
                 key = args[0].lower()
@@ -112,7 +112,6 @@ class React(Command):
 
     async def __call__(self, bot, flags, guild, message, argv, args, **void):
         update = self.data.reacts.update
-        bot = self.bot
         following = bot.data.reacts
         curr = following.setdefault(guild.id, multiDict())
         if type(curr) is not multiDict:
@@ -144,10 +143,11 @@ class React(Command):
                 )
             else:
                 raise LookupError(str(a) + " is not in the auto react list.")
-        if curr.count() >= 256:
+        lim = 32 << bot.isTrusted(guild.id) * 2 + 1
+        if curr.count() >= lim:
             raise OverflowError(
                 "React list for " + guild.name
-                + " has reached the maximum of 256 items. "
+                + " has reached the maximum of " + str(lim) + " items. "
                 + "Please remove an item to add another."
             )
         a = reconstitute(" ".join(args[:-1])).lower()[:64]

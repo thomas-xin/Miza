@@ -339,7 +339,7 @@ class customAudio(discord.AudioSource):
                     create_task(sendReact(
                         self.channel,
                         msg,
-                        reacts=["❎"],
+                        reacts="❎",
                     ))
                 except KeyError:
                     pass
@@ -458,7 +458,7 @@ class customAudio(discord.AudioSource):
         pitch = self.stats.pitch
         bassboost = self.stats.bassboost
         chorus = self.stats.chorus
-        if self.stats.resample >= 2400:
+        if self.stats.resample >= 24:
             resample = 1
         else:
             resample = 2 ** (self.stats.resample / 12)
@@ -585,7 +585,7 @@ class customAudio(discord.AudioSource):
         size = self.length >> 1
         reverb = self.stats.reverb
         bassboost = self.stats.bassboost
-        if self.stats.resample >= 2400:
+        if self.stats.resample >= 24:
             resample = 1
         else:
             resample = 2 ** (self.stats.resample / 12)
@@ -611,8 +611,8 @@ class customAudio(discord.AudioSource):
                     ltemp = numpy.concatenate((self.bufadj[0], lbuf))
                     rtemp = numpy.concatenate((self.bufadj[1], rbuf))
                     try:
-                        left = samplerate.resample(ltemp, 2 * size / len(ltemp), converter_type="sinc_fastest")[-size - 16:-16]
-                        right = samplerate.resample(rtemp, 2 * size / len(rtemp), converter_type="sinc_fastest")[-size - 16:-16]
+                        left = samplerate.resample(ltemp, 2 * size / len(ltemp), converter_type="sinc_fastest")[-size - 24:-24]
+                        right = samplerate.resample(rtemp, 2 * size / len(rtemp), converter_type="sinc_fastest")[-size - 24:-24]
                     except (ZeroDivisionError, samplerate.exceptions.ResamplingError):
                         left, right = ltemp, rtemp
                 else:
@@ -668,11 +668,11 @@ class customAudio(discord.AudioSource):
                         left += signal.sosfilt(
                             filt,
                             numpy.concatenate((self.bassadj[0], left))
-                        )[-size - 16:-16] * bassboost
+                        )[-size - 24:-24] * bassboost
                         right += signal.sosfilt(
                             filt,
                             numpy.concatenate((self.bassadj[1], right))
-                        )[-size - 16:-16] * bassboost
+                        )[-size - 24:-24] * bassboost
                     self.bassadj = [lbass, rbass]
                 except:
                     print(traceback.format_exc())
@@ -703,8 +703,8 @@ class customAudio(discord.AudioSource):
                         + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 8
                     ) * reverb
                     if self.feedback is not None:
-                        left -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[-size - 16:-16]
-                        right -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[-size - 16:-16]
+                        left -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[-size - 24:-24]
+                        right -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[-size - 24:-24]
                     self.feedback = (lfeed, rfeed)
                     a = 1 / 16
                     b = 1 - a
@@ -758,7 +758,11 @@ class AudioQueue(hlist):
                 e = q[i]
                 if i < 3:
                     if not e.get("stream", None):
-                        create_future_ex(ytdl.getStream, e)
+                        if not i:
+                            callback = self.update_play
+                        else:
+                            callback = None
+                        create_future_ex(ytdl.getStream, e, callback=callback)
                         break
                 if not e.url:
                     if not self.auds.stats.quiet:
@@ -766,7 +770,7 @@ class AudioQueue(hlist):
                             self.auds.channel,
                             "```ini\nA problem occurred while loading " + sbHighlight(e.name)
                             + ", and it has been removed from the queue as a result.```",
-                            reacts=["❎"],
+                            reacts="❎",
                         ))
                     dels.append(i)
                     continue
@@ -775,13 +779,13 @@ class AudioQueue(hlist):
             elif dels:
                 while dels:
                     q.pop(dels.popleft())
-            self.update_play()
+            self.advance(process=False)
         create_task(self.auds.updatePlayer())
 
-    def advance(self, looped=True, shuffled=True):
+    def advance(self, looped=True, shuffled=True, process=True):
         q = self
         s = self.auds.stats
-        if q:
+        if q and process:
             if q[0].get("played"):
                 print("Queue Advanced.")
                 if s.loop:
@@ -842,7 +846,7 @@ class AudioQueue(hlist):
                             create_task(sendReact(
                                 auds.channel,
                                 msg,
-                                reacts=["❎"],
+                                reacts="❎",
                             ))
                             self.lastsent = time.time()
                     self.loading = True
@@ -874,7 +878,8 @@ class AudioQueue(hlist):
     def enqueue(self, items, position):
         if not self:
             self.__init__(items)
-            self.update_play()
+            self.auds.source = None
+            create_future_ex(self.advance, process=False)
             return self
         if position == -1:
             self.extend(items)
@@ -985,12 +990,12 @@ class PCMFile:
         start = pos
         end = float(auds.queue[0].duration) + 0.5
         pitchscale = 2 ** (stats.pitch / 12)
-        if stats.resample >= 2400:
+        if stats.resample >= 24:
             pitchscale *= 2 ** (stats.resample / 12)
         chorus = min(16, abs(stats.chorus))
         if pitchscale != 1 or stats.speed != 1:
             speed = abs(stats.speed) / pitchscale
-            if stats.resample >= 2400:
+            if stats.resample >= 24:
                 speed *= 2 ** (stats.resample / 12)
             if round(speed, 9) != 1:
                 speed = max(0.005, speed)
@@ -1445,7 +1450,7 @@ class videoDownloader:
             self.requests = max(self.requests - 1, 0)
             return repr(ex)
         
-    def getStream(self, entry, force=False, download=True):
+    def getStream(self, entry, force=False, download=True, callback=None):
         stream = entry.get("stream", None)
         if stream == "none" and not force:
             return None
@@ -1458,11 +1463,15 @@ class videoDownloader:
         fn = h + ".pcm"
         if fn in self.cache or not download:
             entry["stream"] = stream
+            if callback is not None:
+                create_future_ex(callback)
             return self.cache.get(fn, None)
         try:
             self.cache[fn] = f = PCMFile(fn)
             f.load(stream)
             entry["stream"] = stream
+            if callback is not None:
+                create_future_ex(callback)
             return f
         except:
             print(traceback.format_exc())
@@ -1570,7 +1579,8 @@ class Queue(Command):
                             auds.queue[0].pop("played")
                         except (KeyError, IndexError):
                             pass
-                create_future_ex(auds.update)
+                create_future_ex(auds.queue.update_play)
+                create_future_ex(auds.ensure_play)
                 return "```css\nSuccessfully resumed audio playback in [" + noHighlight(guild.name) + "].```", 1
             if not len(q):
                 auds.preparing = False
@@ -1843,10 +1853,11 @@ class Playlist(Command):
                 + " from the default playlist for "
                 + sbHighlight(guild.name) + "```"
             )
-        if len(pl) >= 64:
+        lim = 8 << self.bot.isTrusted(guild.id) * 2 + 1
+        if len(pl) >= lim:
             raise OverflowError(
                 "Playlist size for " + guild.name
-                + " has reached the maximum of 64 items. "
+                + " has reached the maximum of " + str(lim) + " items. "
                 + "Please remove an item to add another."
             )
         if isURL(argv):
@@ -2142,6 +2153,7 @@ class Pause(Command):
             auds.paused = name in ("pause", "stop")
             auds.pausec = False
         if not auds.paused:
+            create_future_ex(auds.queue.update_play)
             create_future_ex(auds.ensure_play)
         if auds.player is not None:
             auds.player.time = 1 + time.time()
@@ -2222,6 +2234,8 @@ class Dump(Command):
             f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
             create_task(sendFile(channel, "Queue data for **" + guild.name + "**:", f))
             return
+        if not bot.isTrusted(guild.id):
+            raise PermissionError("Must be in a trusted server to load audio data.")
         if not isAlone(auds, user) and perm < 1:
             raise self.permError(perm, 1, "to load new queue while other users are in voice")
         try:
@@ -2398,6 +2412,9 @@ class AudioSettings(Command):
                 ops.append("volume")
         s = ""
         for op in ops:
+            if op not in "volume loop shuffle quiet reset":
+                if not bot.isTrusted(guild.id):
+                    raise PermissionError("Must be in a trusted server to apply complex audio filters.")
             if type(op) is str and op in "loop shuffle quiet" and not argv:
                 argv = str(not bot.database.playlists.audio[guild.id].stats[op])
             if disable:
@@ -2415,7 +2432,7 @@ class AudioSettings(Command):
                 orig = bool(orig)
             else:
                 origStats[op] = val
-            if auds.queue and (op in "speed pitch pan compressor chorus" or op == "resample" and max(orig, new) >= 240000):
+            if auds.queue and (op in "speed pitch pan compressor chorus" or op == "resample" and max(orig, new) >= 2400):
                 await create_future(auds.new, auds.file, auds.stats.position)
             s += (
                 "\nChanged audio " + str(op)
@@ -2836,7 +2853,6 @@ except:
 
 
 def get_lyrics(item):
-    item = to_alphanumeric(verifySearch(item))
     url = "https://api.genius.com/search"
     for i in range(3):
         header = {"user-agent": "Mozilla/5." + str(xrand(1, 10)), "Authorization": "Bearer " + genius_key}
@@ -2857,14 +2873,13 @@ def get_lyrics(item):
                 break
             except KeyError:
                 pass
-        if not (path and name):
-            break
-        page = requests.get("https://genius.com" + path, headers=header, timeout=8)
-        html = BeautifulSoup(page.text, "html.parser")
-        lyricobj = html.find('div', class_='lyrics')
-        if lyricobj is not None:
-            lyrics = lyricobj.get_text()
-            return name, lyrics
+        if path and name:
+            page = requests.get("https://genius.com" + path, headers=header, timeout=8)
+            html = BeautifulSoup(page.text, "html.parser")
+            lyricobj = html.find('div', class_='lyrics')
+            if lyricobj is not None:
+                lyrics = lyricobj.get_text()
+                return name, lyrics
         if i < 2:
             time.sleep(1)
     raise LookupError("No results for " + item + ".")
@@ -2877,6 +2892,7 @@ class Lyrics(Command):
     description = "Searches genius.com for lyrics of a song."
     usage = "<0:search_link{queue}> <verbose(?v)>"
     flags = "v"
+    lyricTrans = re.compile("[([](official)? *(lyric)? *((s)|(video)|(audio)|(ost)|(cover)|(instrumental))[)\\]]", flags=re.I)
 
     async def __call__(self, bot, channel, message, argv, flags, user, **void):
         for a in message.attachments:
@@ -2895,17 +2911,32 @@ class Lyrics(Command):
             search = resp[0]
         else:
             search = argv
-        name, lyrics = await create_future(get_lyrics, search)
-        text = lyrics.strip()
+        search = search.translate(self.bot.mtrans)
+        item = to_alphanumeric(verifySearch(re.sub(self.lyricTrans, "", search)))
+        if not item:
+            item = to_alphanumeric(verifySearch(search))
+            if not item:
+                item = search
+        name, lyrics = await create_future(get_lyrics, item)
+        text = clrHighlight(lyrics.strip())
         msg = "Lyrics for **" + discord.utils.escape_markdown(name) + "**:"
-        if "v" not in flags:
-            return limStr(msg + "```ini\n" + text + "```", 2000)
+        s = msg + "```ini\n" + text + "```"
+        if "v" not in flags and len(s) <= 2000:
+            return s
         emb = discord.Embed(colour=randColour())
         emb.set_author(name=name)
         curr = ""
         i = 1
-        for para in text.split("\n\n"):
-            if len(curr) + len(para) > 1000:
+        for p in text.split("\n\n"):
+            para = limStr(p, 2000 >> bool(emb.description))
+            if not emb.description and len(curr) + len(para) > 2000:
+                emb.description = "```ini\n" + curr + "```"
+                curr = para
+                i += 1
+            if emb.description and len(curr) + len(para) > 1000:
+                if i > 5:
+                    curr = ""
+                    break
                 emb.add_field(name="Page " + str(i), value="```ini\n" + curr + "```", inline=False)
                 curr = para
                 i += 1
@@ -2914,7 +2945,10 @@ class Lyrics(Command):
                     curr += "\n\n"
                 curr += para
         if curr:
-            emb.add_field(name="Page " + str(i), value="```ini\n" + curr + "```", inline=False)
+            if emb.description:
+                emb.add_field(name="Page " + str(i), value="```ini\n" + curr + "```", inline=False)
+            else:
+                emb.description = "```ini\n" + curr + "```"
         return {
             "embed": emb
         }

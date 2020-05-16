@@ -7,9 +7,9 @@ except ModuleNotFoundError:
 
 
 class Restart(Command):
-    name = ["Shutdown"]
+    name = ["Shutdown", "Reload"]
     min_level = nan
-    description = "Restarts or shuts down ⟨MIZA⟩, with an optional delay."
+    description = "Restarts, reloads, or shuts down ⟨MIZA⟩, with an optional delay."
     _timeout_ = inf
 
     async def __call__(self, message, channel, guild, argv, name, **void):
@@ -21,7 +21,10 @@ class Restart(Command):
             await channel.send("Preparing to " + name + " in " + sec2Time(delay) + "...")
             if delay > 0:
                 await asyncio.sleep(delay)
-        if name == "shutdown":
+        if name == "reload":
+            create_future_ex(bot.getModules)
+            return "Reloading... :wave:"
+        elif name == "shutdown":
             await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
@@ -189,6 +192,52 @@ class UpdateExec(Database):
             emb.description = strMessage(message)
             for c_id in self.data:
                 create_task(self.sendDeleteID(c_id, delete_after=inf, embed=emb))
+
+
+class Trust(Command):
+    name = ["Untrust"]
+    min_level = nan
+    description = "Adds or removes a server from the bot's trusted server list."
+    usage = "<server_id(curr)(?a)> <enable(?e)> <disable(?d)>"
+    flags = "aed"
+
+    async def __call__(self, bot, flags, message, guild, argv, **void):
+        update = bot.database.trusted.update
+        if "a" in flags:
+            guilds = bot.client.guilds
+        else:
+            if argv:
+                g_id = verifyID(argv)
+                guild = await bot.fetch_guild(g_id)
+            guilds = [guild]
+        if "e" in flags:
+            create_task(message.add_reaction("❗"))
+            for guild in guilds:
+                bot.data.trusted[guild.id] = True
+            update()
+            return (
+                "```css\nSuccessfully added ["
+                + ", ".join(noHighlight(guild) for guild in guilds) + "] to trusted list.```"
+            )
+        elif "d" in flags:
+            create_task(message.add_reaction("❗"))
+            for guild in guilds:
+                try:
+                    bot.data.trusted.pop(guild.id)
+                except KeyError:
+                    pass
+            update()
+            return (
+                "```fix\nSuccessfully removed trusted server.```"
+            )
+        return (
+            "```css\nTrusted server list "
+            + str(list(noHighlight(bot.cache.guilds[g]) for g in bot.data.trusted)) + ".```"
+        )
+
+
+class UpdateTrusted(Database):
+    name = "trusted"
 
 
 class UpdateBlacklist(Database):
