@@ -1258,10 +1258,6 @@ class UpdateUsers(Database):
     name = "users"
     suspected = "users.json"
     user = True
-    bcheck = eval(bytes(x ^ 137 for x in hex2Bytes(
-        "E5 E8 E4 EB ED E8 A9 FA A5 A9 FD B3 A9 E8 E7 F0 A1 A1 AB F0 E6 FC A9 E6"
-        + "E2 AB A9 E0 E7 A9 FD A5 A9 AB EF FC EA E2 AB A9 E0 E7 A9 FD A0 A0"
-    )), {}, {})
 
     async def _seen_(self, user, delay, **void):
         addDict(self.data, {user.id: {"last_seen": 0}})
@@ -1270,15 +1266,3 @@ class UpdateUsers(Database):
     async def _command_(self, user, command, **void):
         addDict(self.data, {user.id: {"commands": 1}})
         self.update()
-
-    # async def _nocommand_(self, text, message, **void):
-    #     if not message.mentions:
-    #         name = self.__dict__.setdefault("name", reconstitute(self.bot.client.user.name).lower())
-    #         if name not in text:
-    #             return
-    #     else:
-    #         ids = (u.id for u in message.mentions)
-    #         if self.bot.client.user.id not in ids:
-    #             return
-    #     if self.bcheck(text):
-    #         await message.channel.send("😢")
