@@ -881,7 +881,13 @@ class UpdateMathTest(Database):
         x *= mult
         s = self.format(x, y, "÷")
         return s, round(x / y, 9)
-        
+
+    def recurring(self):
+        x = "".join(str(xrand(10)) for _ in loop(xrand(2, 4)))
+        s = "0." + "".join(x[i % len(x)] for i in range(28)) + "..."
+        ans = "0.[" + x + "]"
+        s, ans
+
     def equation(self):
         a = xrand(1, 10)
         b = xrand(1, 10)
@@ -945,7 +951,7 @@ class UpdateMathTest(Database):
             if st and i[0] not in "+-":
                 st += "+"
             st += i
-        ans = await self.bot.solveMath(st, -1, 2, 1)
+        ans = await self.bot.solveMath(st, -1, 0, 1)
         a = ans[0]
         q = self.eqtrans(a)
         if xrand(2):
@@ -967,6 +973,7 @@ class UpdateMathTest(Database):
             self.square_root,
             self.scientific,
             self.fraction,
+            self.recurring,
             self.equation,
         )
         hard = (
@@ -1007,7 +1014,7 @@ class UpdateMathTest(Database):
                 if msg.startswith("#") or msg.startswith("//") or msg.startswith("\\"):
                     return
                 try:
-                    x = await bot.solveMath(msg, getattr(channel, "guild", None), 2, 1)
+                    x = await bot.solveMath(msg, getattr(channel, "guild", None), 0, 1)
                     x = await create_future(sympy.sympify, x[0])
                 except:
                     return
