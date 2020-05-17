@@ -621,7 +621,11 @@ class Info(Command):
                 pass
             try:
                 ts = datetime.datetime.utcnow().timestamp()
-                seen = sec2Time(max(0, ts - bot.data.users[u.id]["last_seen"])) + " ago"
+                ls = bot.data.users[u.id]["last_seen"]
+                if type(ls) is str:
+                    seen = ls
+                else:
+                    seen = sec2Time(max(0, ts - ls)) + " ago"
             except LookupError:
                 pass
             try:

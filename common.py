@@ -380,7 +380,7 @@ async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12):
             await asyncio.sleep(0.5)
     except StopIteration:
         pass
-    d = repr(bytes("`".join(str(i) for i in (expr, prec, rat)), "utf-8")).encode("utf-8") + b"\n"
+    d = repr(bytes("`".join(str(i) for i in (expr, prec, rat, key)), "utf-8")).encode("utf-8") + b"\n"
     print(d)
     try:
         proc.busy = True
