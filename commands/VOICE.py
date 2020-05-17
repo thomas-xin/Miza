@@ -899,6 +899,7 @@ class PCMFile:
         self.time = time.time()
         self.loading = False
         self.expired = False
+        self.readers = {}
     
     def load(self, stream):
         if self.loading:
@@ -943,34 +944,40 @@ class PCMFile:
             raise
 
     def update(self):
-        if time.time() - self.time > 9000:
-            self.expired = True
-            print(self.file, "deleted.")
-            try:
-                ytdl.cache.pop(self.file)
-            except KeyError:
-                pass
-            for _ in loop(16):
-                try:
-                    os.remove("cache/" + self.file)
-                    break
-                except FileNotFoundError:
-                    break
-                except PermissionError:
-                    time.sleep(5)
-                except:
-                    print(traceback.format_exc())
-                    time.sleep(5)
-            try:
-                self.proc.kill()
-            except:
-                pass
+        if self.readers:
+            self.time = time.time()
+        elif time.time() - self.time > 9000:
+            self.destroy()
 
     def open(self):
         self.time = time.time()
         if self.proc is None:
             raise ProcessLookupError
         return open("cache/" + self.file, "rb")
+
+    def destroy(self):
+        self.expired = True
+        try:
+            ytdl.cache.pop(self.file)
+        except KeyError:
+            pass
+        for _ in loop(8):
+            try:
+                os.remove("cache/" + self.file)
+                break
+            except FileNotFoundError:
+                break
+            except PermissionError:
+                self.time = time.time()
+                return
+            except:
+                print(traceback.format_exc())
+                time.sleep(5)
+        try:
+            self.proc.kill()
+        except:
+            pass
+        print(self.file, "deleted.")
 
     def create_reader(self, pos=0, auds=None):
         stats = auds.stats
@@ -1107,31 +1114,38 @@ class PCMFile:
             args += ["-acodec", "copy"]
         args += shlex.split(options) + ["-loglevel", "error", "pipe:1"]
         if buff:
-            player = BufferedAudioReader(self, args)
+            player = BufferedAudioReader(self, args, key=auds.vc.guild.id)
         else:
-            player = LoadedAudioReader(self, args)
+            player = LoadedAudioReader(self, args, key=auds.vc.guild.id)
         create_future_ex(player.run)
         return player
 
 
 class LoadedAudioReader(discord.AudioSource):
 
-    def __init__(self, file, args):
+    def __init__(self, file, args, key=-1):
         print(args)
         self.closed = False
         self.advanced = False
         self.proc = psutil.Popen(args, stdout=subprocess.PIPE)
+        self.file = file
+        self.key = key
+        file.readers[key] = True
         print(self.proc)
 
     read = lambda self, *args, **kwargs: self.proc.stdout.read(*args, **kwargs)
     run = lambda self: None
     process = read
 
-    def close(self):
+    def close(self, *void1, **void2):
         self.closed = True
         try:
             self.proc.kill()
         except:
+            pass
+        try:
+            self.file.readers.pop(self.key)
+        except KeyError:
             pass
 
     is_opus = lambda self: False
@@ -1140,15 +1154,18 @@ class LoadedAudioReader(discord.AudioSource):
 
 class BufferedAudioReader(discord.AudioSource):
 
-    def __init__(self, file, args):
+    def __init__(self, file, args, key=-1):
         print(args)
         self.closed = False
         self.advanced = False
         self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        print(self.proc)
+        self.file = file
+        self.key = key
         self.stream = file.open()
         self.buffer = bytes()
         self.loader = file.proc
+        file.readers[key] = True
+        print(self.proc)
 
     def read(self, size=0):
         while len(self.buffer) < size:
@@ -1188,6 +1205,10 @@ class BufferedAudioReader(discord.AudioSource):
         try:
             self.proc.kill()
         except:
+            pass
+        try:
+            self.file.readers.pop(self.key)
+        except KeyError:
             pass
 
     is_opus = lambda self: False
