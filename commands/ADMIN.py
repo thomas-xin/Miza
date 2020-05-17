@@ -663,7 +663,7 @@ class Ban(Command):
                         pass
                     if length < inf:
                         banlist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": ban.get("r", None)}, key=lambda x: x["t"])
-                        bot.database.bans.keyed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0]])
+                        bot.database.bans.keyed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
                     print(banlist)
                     print(bot.database.bans.keyed)
                     update()
