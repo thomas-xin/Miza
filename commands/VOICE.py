@@ -803,6 +803,8 @@ class AudioQueue(hlist):
                     except (KeyError, IndexError):
                         pass
                     q.append(temp)
+                if self.auds.player:
+                    self.auds.player.time = 1 + time.time()
         if not (q or self.auds.preparing):
             t = self.bot.data.playlists.get(self.vc.guild.id, ())
             if t:
@@ -820,8 +822,8 @@ class AudioQueue(hlist):
                     }
                     break
                 q.append(freeClass(d))
-        if self.auds.player:
-            self.auds.player.time = 1 + time.time()
+                if self.auds.player:
+                    self.auds.player.time = 1 + time.time()
         self.update_play()
         
     def update_play(self):
@@ -2875,7 +2877,7 @@ except:
 
 def get_lyrics(item):
     url = "https://api.genius.com/search"
-    for i in range(3):
+    for i in range(2):
         header = {"user-agent": "Mozilla/5." + str(xrand(1, 10)), "Authorization": "Bearer " + genius_key}
         if i == 0:
             search = item
@@ -2893,7 +2895,7 @@ def get_lyrics(item):
                 path = h["result"]["api_path"]
                 break
             except KeyError:
-                pass
+                print(traceback.format_exc())
         if path and name:
             page = requests.get("https://genius.com" + path, headers=header, timeout=8)
             html = BeautifulSoup(page.text, "html.parser")
@@ -2901,6 +2903,7 @@ def get_lyrics(item):
             if lyricobj is not None:
                 lyrics = lyricobj.get_text()
                 return name, lyrics
+            print(limStr(page.text, 512))
         if i < 2:
             time.sleep(1)
     raise LookupError("No results for " + item + ".")
@@ -2955,7 +2958,7 @@ class Lyrics(Command):
                 curr = para
                 i += 1
             if emb.description and len(curr) + len(para) > 1000:
-                if i > 5:
+                if i > 4:
                     curr = ""
                     break
                 emb.add_field(name="Page " + str(i), value="```ini\n" + curr + "```", inline=False)
