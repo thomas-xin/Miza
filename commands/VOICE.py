@@ -1581,7 +1581,7 @@ class Queue(Command):
     usage = "<search_link[]> <verbose(?v)> <hide(?h)> <force(?f)> <budge(?b)>"
     flags = "hvfbz"
     no_parse = True
-    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac']
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 
     async def __call__(self, bot, client, user, perm, message, channel, guild, flags, name, argv, **void):
         if not argv:
@@ -1689,7 +1689,7 @@ class Queue(Command):
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos, v = [int(i) for i in vals.split("_")]
         # print(vals, reaction, message)
-        if reaction is not None and u_id != user.id and perm < 3:
+        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
             return
@@ -1705,10 +1705,10 @@ class Queue(Command):
                 new = max(0, pos - 10)
             elif i == 2:
                 new = min(last, pos + 10)
-            else:
+            elif i == 3:
                 new = last
-            if new == pos:
-                return
+            else:
+                new = pos
             pos = new
         content = message.content
         if not content:
@@ -2653,7 +2653,7 @@ class Player(Command):
         else:
             output += "🌪️"
         b = auds.stats.bassboost
-        if abs(b) > 1 / 3:
+        if abs(b) > 1 / 6:
             if abs(b) > 5:
                 output += "💥"
             elif b > 0:
@@ -2666,9 +2666,15 @@ class Player(Command):
                 output += "📈"
             else:
                 output += "📉"
-        c = auds.stats.chorus
-        if c:
+        u = auds.stats.chorus
+        if u:
             output += "📊"
+        c = auds.stats.compressor
+        if c:
+            output += "🗜️"
+        e = auds.stats.pan
+        if abs(e - 1) > 0.25:
+            output += "♒"
         s = auds.stats.speed * 2 ** (auds.stats.resample / 12)
         if s < 0:
             output += "⏪"
