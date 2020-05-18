@@ -2134,7 +2134,8 @@ class Skip(Command):
             song = auds.queue[0]
             if song.skips is None or len(song.skips) >= required:
                 auds.preparing = False
-                auds.source.advanced = True
+                if auds.source is not None:
+                    auds.source.advanced = True
                 auds.queue.advance()
                 if count < 4:
                     response += (
