@@ -2905,13 +2905,15 @@ def get_lyrics(item):
             except KeyError:
                 print(traceback.format_exc())
         if path and name:
-            page = requests.get("https://genius.com" + path, headers=header, timeout=8)
+            s = "https://genius.com" + path
+            page = requests.get(s, headers=header, timeout=8)
             html = BeautifulSoup(page.text, "html.parser")
             lyricobj = html.find('div', class_='lyrics')
             if lyricobj is not None:
                 lyrics = lyricobj.get_text()
                 return name, lyrics
-            print(limStr(page.text, 512))
+            print(s)
+            print(limStr(page.text, 8192))
         if i < 2:
             time.sleep(1)
     raise LookupError("No results for " + item + ".")
@@ -2944,7 +2946,7 @@ class Lyrics(Command):
         else:
             search = argv
         search = search.translate(self.bot.mtrans)
-        item = to_alphanumeric(verifySearch(re.sub(self.lyricTrans, "", search)))
+        item = verifySearch(to_alphanumeric(re.sub(self.lyricTrans, "", search)))
         if not item:
             item = to_alphanumeric(verifySearch(search))
             if not item:
