@@ -400,7 +400,7 @@ class main_data:
 
     async def followURL(self, url, it=None):
         if it is None:
-            url = url.strip(" ").strip("\n").strip("`")
+            url = url.strip().strip("`")
             if url.startswith("<") and url[-1] == ">":
                 url = url[1:-1]
             it = {}

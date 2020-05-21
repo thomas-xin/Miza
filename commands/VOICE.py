@@ -1615,7 +1615,7 @@ class Queue(Command):
                 + "-\nQueue for " + guild.name.replace("`", "") + ":```"
             )
         future = wrap_future(create_task(forceJoin(guild, channel, user, client, bot, preparing=True)))
-        if isURL(argv):
+        if isURL(argv) or argv.startswith("<") and argv[-1] == ">":
             argv = await bot.followURL(argv)
         resp = await create_future(ytdl.search, argv)
         auds = await future
@@ -1883,7 +1883,7 @@ class Playlist(Command):
                 + " has reached the maximum of " + str(lim) + " items. "
                 + "Please remove an item to add another."
             )
-        if isURL(argv):
+        if isURL(argv) or argv.startswith("<") and argv[-1] == ">":
             argv = await bot.followURL(argv)
         resp = await create_future(ytdl.search, argv)
         if type(resp) is str:
@@ -2133,6 +2133,7 @@ class Skip(Command):
         if auds.queue:
             song = auds.queue[0]
             if song.skips is None or len(song.skips) >= required:
+                song.played = True
                 auds.preparing = False
                 if auds.source is not None:
                     auds.source.advanced = True
@@ -2923,7 +2924,7 @@ class Lyrics(Command):
     description = "Searches genius.com for lyrics of a song."
     usage = "<0:search_link{queue}> <verbose(?v)>"
     flags = "v"
-    lyricTrans = re.compile("[([](official)? *(lyric)? *((s)|(video)|(audio)|(ost)|(cover)|(instrumental))[)\\]]", flags=re.I)
+    lyricTrans = re.compile("[([]+(official|full)? *(lyric|music)? *((s)|(album)|(video)|(audio)|(ost)|(cover)|(instrumental) *((version)|((ver)?.?)))[)\\]]+", flags=re.I)
 
     async def __call__(self, bot, channel, message, argv, flags, user, **void):
         for a in message.attachments:
@@ -2936,7 +2937,7 @@ class Lyrics(Command):
                 argv = auds.queue[0].name
             except:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
-        if isURL(argv):
+        if isURL(argv) or argv.startswith("<") and argv[-1] == ">":
             argv = await bot.followURL(argv)
             resp = await create_future(ytdl.search, argv)
             search = resp[0]
@@ -3028,7 +3029,7 @@ class Download(Command):
             # print(argv, fmt)
             argv = verifySearch(argv)
             res = []
-            if isURL(argv):
+            if isURL(argv) or argv.startswith("<") and argv[-1] == ">":
                 argv = await bot.followURL(argv)
                 data = await create_future(ytdl.extract, argv)
                 res += data

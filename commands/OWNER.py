@@ -178,10 +178,10 @@ class UpdateExec(Database):
                 await channel.send(limStr("```py\n" + str(output) + "```", 2000))
             except:
                 print(traceback.format_exc())
-                await channel.send(limStr(
+                await sendReact(channel, limStr(
                     "```py\n" + traceback.format_exc().replace("```", "") + "```",
                     2000,
-                ))
+                ), reacts="❎")
             if output is not None:
                 bot._globals["output"] = output
                 bot._globals["_"] = output

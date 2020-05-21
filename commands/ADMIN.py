@@ -158,7 +158,7 @@ class RoleGiver(Command):
                 r,
                 qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
             )
-        if not inf > perm:
+        if inf > perm:
             memb = guild.get_member(user.id)
             if memb is None:
                 memb = await guild.fetch_member(user.id)

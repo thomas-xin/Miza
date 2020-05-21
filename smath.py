@@ -1867,13 +1867,19 @@ lookup time for all elements. Includes many array and numeric operations."""
     @waiting
     def __eq__(self, other):
         d = self.data
-        it = self.createIterator(other)
+        try:
+            it = self.createIterator(other)
+        except IndexError:
+            return False
         return hlist(d[i] == next(it) for i in d)
 
     @waiting
     def __ne__(self, other):
         d = self.data
-        it = self.createIterator(other)
+        try:
+            it = self.createIterator(other)
+        except IndexError:
+            return True
         return hlist(d[i] != next(it) for i in d)
 
     @waiting
