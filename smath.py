@@ -2131,9 +2131,7 @@ lookup time for all elements. Includes many array and numeric operations."""
     @blocking
     def remove(self, value, key=None, sorted=False):
         pops = self.search(value, key, sorted, force=True)
-        if len(pops) == 1:
-            self.pop(pops[0], force=True)
-        else:
+        if pops:
             self.pops(pops, force=True)
         return self
 

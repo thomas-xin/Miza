@@ -190,11 +190,9 @@ def strActivity(activity):
         return t[0].upper() + t[1:] + " " + activity.name
     return str(activity)
 
-asearch = re.compile("([^A-z0-9])")
-is_alphanumeric = lambda string: not re.search(asearch, string)
-
-atrans = re.compile("[A-z 0-9]")
-to_alphanumeric = lambda string: "".join(re.findall(atrans, reconstitute(string)))
+atrans = re.compile("([^A-z 0-9])")
+is_alphanumeric = lambda string: not re.search(atrans, string)
+to_alphanumeric = lambda string: singleSpace(re.sub(atrans, " ", reconstitute(string)))
 
 def noCodeBox(s):
     if s.startswith("```") and s.endswith("```"):

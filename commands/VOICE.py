@@ -2886,7 +2886,7 @@ except:
 def get_lyrics(item):
     url = "https://api.genius.com/search"
     for i in range(2):
-        header = {"user-agent": "Mozilla/5." + str(xrand(1, 10)), "Authorization": "Bearer " + genius_key}
+        header = {"user-agent": "Mozilla/5.0", "Authorization": "Bearer " + genius_key}
         if i == 0:
             search = item
         else:
@@ -2926,7 +2926,7 @@ class Lyrics(Command):
     description = "Searches genius.com for lyrics of a song."
     usage = "<0:search_link{queue}> <verbose(?v)>"
     flags = "v"
-    lyricTrans = re.compile("[([]+((official|full|demo)? *(lyrics?|music)? *(((album)|(video)|(audio)|(ost)|(cover)|(instrumental) *)?((version)|((ver)?.?)))|(feat|ft)[\\s\\S]+)[)\\]]+", flags=re.I)
+    lyricTrans = re.compile("[([]+(((official|full|demo) *)?((version|ver.?) *)?((w\\/)?(lyrics?|vocals?|music|ost|instrumental|acoustic|hd|hq) *)?((album|video|audio|cover) *)?(version|ver.?)?|(feat|ft)[\\s\\S]+)[)\\]]+", flags=re.I)
 
     async def __call__(self, bot, channel, message, argv, flags, user, **void):
         for a in message.attachments:

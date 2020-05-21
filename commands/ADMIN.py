@@ -562,6 +562,7 @@ class Ban(Command):
                 role = await bot.fetch_role(u_id, guild)
                 users = [role.members]
         if not args or name == "unban":
+            user = users[0]
             try:
                 ban = bans[user.id]
             except LookupError:
@@ -572,10 +573,19 @@ class Ban(Command):
             if name == "unban":
                 await guild.unban(user)
                 try:
-                    user = banlist.remove(user.id, key=lambda b: b["u"])["u"]
-                    update()
+                    ind = banlist.search(user.id, key=lambda b: b["u"])
                 except LookupError:
                     pass
+                else:
+                    banlist.pops(ind)["u"]
+                    if 0 in ind:
+                        try:
+                            bot.database.bans.keyed.remove(guild.id, key=lambda x: x[-1])
+                        except LookupError:
+                            pass
+                        if banlist:
+                            bot.database.bans.keyed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
+                    update()
                 return (
                     "```ini\nSuccessfully unbanned [" + noHighlight(user)
                     + "] from [" + noHighlight(guild) + "].```"
