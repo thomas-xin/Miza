@@ -3014,7 +3014,7 @@ class Lyrics(Command):
         title = "Lyrics for " + name + ":"
         emb.set_author(name=title)
         curr = ""
-        paragraphs = [p + "\n" for p in text.split("\n\n")]
+        paragraphs = [p + "\n\n" for p in text.split("\n\n")]
         while paragraphs:
             para = paragraphs.pop(0)
             if not emb.description and len(curr) + len(para) > 2000:
@@ -3022,9 +3022,9 @@ class Lyrics(Command):
                     emb.description = "```ini\n" + curr.strip() + "```"
                     curr = para
                 else:
-                    p = para.split("\n")
+                    p = [i + "\n" for i in para.split("\n")]
                     if len(p) <= 1:
-                        p = para.split()
+                        p = [i + "" for i in para.split()]
                         if len(p) <= 1:
                             p = list(para)
                     paragraphs = p + paragraphs
@@ -3033,21 +3033,19 @@ class Lyrics(Command):
                     emb.add_field(name="Page " + str(i), value="```ini\n" + curr.strip() + "```", inline=False)
                     curr = para
                 else:
-                    p = para.split("\n")
+                    p = [i + "\n" for i in para.split("\n")]
                     if len(p) <= 1:
-                        p = para.split()
+                        p = [i + "" for i in para.split()]
                         if len(p) <= 1:
                             p = list(para)
                     paragraphs = p + paragraphs
             else:
-                if curr:
-                    curr += "\n"
                 curr += para
         if curr:
             if emb.description:
                 emb.add_field(name="Page " + str(i), value="```ini\n" + curr.strip() + "```", inline=False)
             else:
-                emb.description = "```ini\n" + curr + "```"
+                emb.description = "```ini\n" + curr.strip() + "```"
         try:
             await channel.send(embed=emb)
         except discord.HTTPException:
