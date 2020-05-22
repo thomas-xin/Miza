@@ -1452,16 +1452,22 @@ lookup time for all elements. Includes many array and numeric operations."""
     def waiting(func):
         def call(self, *args, force=False, **kwargs):
             if not force:
+                t = time.time()
                 while self.block:
                     time.sleep(0.001)
+                    if time.time() - t > 1:
+                        raise TimeoutError("Request timed out.")
             return func(self, *args, **kwargs)
         return call
 
     def blocking(func):
         def call(self, *args, force=False, **kwargs):
             if not force:
+                t = time.time()
                 while self.block:
                     time.sleep(0.001)
+                    if time.time() - t > 1:
+                        raise TimeoutError("Request timed out.")
             self.block = True
             self.chash = None
             try:
@@ -2287,7 +2293,7 @@ lookup time for all elements. Includes many array and numeric operations."""
     @blocking
     def delitems(self, iterable):
         if len(iterable) == 1:
-            return self.pop(iterable[0])
+            return self.pop(iterable[0], force=True)
         popped = len([self.data.pop(i + self.offs) for i in iterable])
         if popped:
             self.reconstitute(force=True)

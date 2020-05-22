@@ -536,19 +536,19 @@ class customAudio(discord.AudioSource):
                                         create_future_ex(self.queue.update_play)
                                         self.preparing = False
                                     else:
-                                        self.stats.position = round(
-                                            self.stats.position + self.speed * resample / 6.25 * (self.reverse * -2 + 1),
-                                            4,
-                                        )
-                                        if not ended:
-                                            self.refilling = 2
-                                            self.seek(self.stats.position)
-                                        else:
-                                            print("{Finished}")
-                                            self.refilling = 2
-                                            self.source.advanced = True
-                                            create_future_ex(self.queue.update_play)
-                                            self.preparing = False
+                                        # self.stats.position = round(
+                                        #     self.stats.position + self.speed * resample / 6.25 * (self.reverse * -2 + 1),
+                                        #     4,
+                                        # )
+                                        # if not ended:
+                                        #     self.refilling = 2
+                                        #     self.seek(self.stats.position)
+                                        # else:
+                                        print("{Finished}")
+                                        self.refilling = 2
+                                        self.source.advanced = True
+                                        create_future_ex(self.queue.update_play)
+                                        self.preparing = False
                                     return
                             elif self.curr_timeout == 0:
                                 self.curr_timeout = time.time()
