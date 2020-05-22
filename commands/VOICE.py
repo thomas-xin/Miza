@@ -2979,7 +2979,7 @@ class Lyrics(Command):
     description = "Searches genius.com for lyrics of a song."
     usage = "<0:search_link{queue}> <verbose(?v)>"
     flags = "v"
-    lyric_trans = re.compile("[([]+(((official|full|demo|original) *)?((version|ver.?) *)?((w\\/)?(lyrics?|vocals?|music|ost|instrumental|acoustic|hd|hq) *)?((album|video|audio|cover|remix) *)?(upload|reupload|version|ver.?)?|(feat|ft)[\\s\\S]+)[)\\]]+", flags=re.I)
+    lyric_trans = re.compile("[([]+(((official|full|demo|original|extended) *)?((version|ver.?) *)?((w\\/)?(lyrics?|vocals?|music|ost|instrumental|acoustic|hd|hq) *)?((album|video|audio|cover|remix) *)?(upload|reupload|version|ver.?)?|(feat|ft)[\\s\\S]+)[)\\]]+", flags=re.I)
 
     async def __call__(self, bot, channel, message, argv, flags, user, **void):
         for a in message.attachments:
@@ -3011,34 +3011,47 @@ class Lyrics(Command):
         if "v" not in flags and len(s) <= 2000:
             return s
         emb = discord.Embed(colour=randColour())
-        emb.set_author(name="Lyrics for " + name + ":")
+        title = "Lyrics for " + name + ":"
+        emb.set_author(name=title)
         curr = ""
-        i = 1
-        for p in text.split("\n\n"):
-            para = limStr(p, 2000 >> bool(emb.description))
+        paragraphs = [p + "\n" for p in text.split("\n\n")]
+        while paragraphs:
+            para = paragraphs.pop(0)
             if not emb.description and len(curr) + len(para) > 2000:
-                emb.description = "```ini\n" + curr + "```"
-                curr = para
-                i += 1
+                if len(para) <= 2000:
+                    emb.description = "```ini\n" + curr.strip() + "```"
+                    curr = para
+                else:
+                    p = para.split("\n")
+                    if len(p) <= 1:
+                        p = para.split()
+                        if len(p) <= 1:
+                            p = list(para)
+                    paragraphs = p + paragraphs
             elif emb.description and len(curr) + len(para) > 1000:
-                if i > 4:
-                    curr = ""
-                    break
-                emb.add_field(name="Page " + str(i), value="```ini\n" + curr + "```", inline=False)
-                curr = para
-                i += 1
+                if len(para) <= 1000:
+                    emb.add_field(name="Page " + str(i), value="```ini\n" + curr.strip() + "```", inline=False)
+                    curr = para
+                else:
+                    p = para.split("\n")
+                    if len(p) <= 1:
+                        p = para.split()
+                        if len(p) <= 1:
+                            p = list(para)
+                    paragraphs = p + paragraphs
             else:
                 if curr:
-                    curr += "\n\n"
+                    curr += "\n"
                 curr += para
         if curr:
             if emb.description:
-                emb.add_field(name="Page " + str(i), value="```ini\n" + curr + "```", inline=False)
+                emb.add_field(name="Page " + str(i), value="```ini\n" + curr.strip() + "```", inline=False)
             else:
                 emb.description = "```ini\n" + curr + "```"
-        return {
-            "embed": emb
-        }
+        try:
+            await channel.send(embed=emb)
+        except discord.HTTPException:
+            return (title + "\n\n" + emb.description + "\n\n".join(noCodeBox(f.value) for f in emb.fields)).strip()
 
 
 class Download(Command):
