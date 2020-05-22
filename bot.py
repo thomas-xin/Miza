@@ -143,7 +143,7 @@ class main_data:
                 obj.update()
             if random.random() > .99:
                 await asyncio.sleep(0.2)
-        await asyncio.sleep(2)
+        await asyncio.sleep(10)
         obj.checking = False
         self.started = True
 

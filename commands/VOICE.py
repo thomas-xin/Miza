@@ -3010,8 +3010,10 @@ class Lyrics(Command):
         s = msg + "```ini\n" + text + "```"
         if "v" not in flags and len(s) <= 2000:
             return s
-        emb = discord.Embed(colour=randColour())
         title = "Lyrics for " + name + ":"
+        if len(text) > 6000:
+            return (title + "\n\n" + text).strip()
+        emb = discord.Embed(colour=randColour())
         emb.set_author(name=title)
         curr = ""
         paragraphs = [p + "\n\n" for p in text.split("\n\n")]
