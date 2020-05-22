@@ -2951,17 +2951,18 @@ def get_lyrics(item):
             lyricobj = html.find('div', class_='lyrics')
             if lyricobj is not None:
                 lyrics = lyricobj.get_text().strip()
-                print("html", s)
+                print("lyrics_html", s)
                 return name, lyrics
             try:
                 lyrics = extract_lyrics(text).strip()
-                print("json", s)
+                print("lyrics_json", s)
                 return name, lyrics
             except:
+                if i:
+                    raise
                 print(traceback.format_exc())
-            print(text)
-        if i < 2:
-            time.sleep(1)
+                print(s)
+                print(text)
     raise LookupError("No results for " + item + ".")
 
 
