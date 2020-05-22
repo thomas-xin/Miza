@@ -1232,6 +1232,8 @@ class UpdateFileLogs(Database):
     #         await channel.send(msg, embed=emb, file=fil)
 
     async def _delete_(self, message, bulk=False, **void):
+        if bulk or self.bot.isDeleted(message):
+            return
         guild = message.guild
         if guild.id in self.data:
             c_id = self.data[guild.id]
