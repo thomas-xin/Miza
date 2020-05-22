@@ -699,7 +699,7 @@ class Info(Command):
         
 
 class Hello(Command):
-    name = ["Hi", "Ping", "👋", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
+    name = ["Hi", "👋", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
     min_level = 0
     description = "Sends a waving emoji. Useful for checking whether the bot is online."
     
@@ -709,7 +709,7 @@ class Hello(Command):
 
 
 class Status(Command):
-    name = ["State"]
+    name = ["State", "Ping"]
     min_level = 0
     description = "Shows the bot's current internal program state."
 

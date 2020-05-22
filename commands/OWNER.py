@@ -131,7 +131,7 @@ class UpdateExec(Database):
                 raise TypeError
             if type(output) in (str, bytes):
                 raise TypeError
-            if issubclass(type(output), collections.Mapping):
+            if issubclass(type(output), collections.Mapping) or issubclass(type(output), io.IOBase):
                 raise TypeError
             output = tuple(output)
         except TypeError:
@@ -273,12 +273,13 @@ class UpdateBlacklist(Database):
             pass
 
     async def _command_(self, user, command, **void):
-        if user.id not in (self.bot.client.user.id, self.bot.owner_id):
-            tc = getattr(command, "time_consuming", 0)
-            self.suspclear = time.time() + 10 + (tc * 2) ** 2
-            f = open(self.suspected, "w")
-            f.write(str(user.id))
-            f.close()
+        pass
+        # if user.id not in (self.bot.client.user.id, self.bot.owner_id):
+        #     tc = getattr(command, "time_consuming", 0)
+        #     self.suspclear = time.time() + 10 + (tc * 2) ** 2
+        #     f = open(self.suspected, "w")
+        #     f.write(str(user.id))
+        #     f.close()
 
     async def __call__(self, **void):
         if time.time() - self.suspclear:

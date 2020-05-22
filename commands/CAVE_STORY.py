@@ -256,18 +256,26 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
             time.sleep(0.2)
             if "&" + key + ".xm" in os.listdir("cache"):
                 try:
-                    f = open(fi, "rb")
-                    f.read(32)
-                    f.close()
-                    break
+                    if os.path.getsize(fi) >= 32:
+                        break
                 except Exception as ex:
                     print(repr(ex))                
                     pass
+        if time.time() - t >= 12:
+            try:
+                os.remove("cache/" + key + ".org")
+            except (FileNotFoundError, PermissionError):
+                pass
+            try:
+                os.remove("cache/" + key + ".xm")
+            except (FileNotFoundError, PermissionError):
+                pass
+            raise TimeoutError("Request timed out.")
         if fmt != "xm":
             fn = "cache/" + key + "." + fmt
             try:
                 os.remove(fn)
-            except FileNotFoundError:
+            except (FileNotFoundError, PermissionError):
                 pass
             dur = getDuration(fi)
             br = max(32, min(256, floor(((fl - 262144) / dur / 128) / 4) * 4))
@@ -279,11 +287,11 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
             ff.run()
             try:
                 os.remove("cache/" + key + ".org")
-            except FileNotFoundError:
+            except (FileNotFoundError, PermissionError):
                 pass
             try:
                 os.remove("cache/" + key + ".xm")
-            except FileNotFoundError:
+            except (FileNotFoundError, PermissionError):
                 pass
         else:
             fn = fi

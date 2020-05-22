@@ -764,6 +764,8 @@ class AudioQueue(hlist):
                             callback = None
                         create_future_ex(ytdl.getStream, e, callback=callback)
                         break
+                if "file" in e:
+                    e["file"].ensure_time()
                 if not e.url:
                     if not self.auds.stats.quiet:
                         create_task(sendReact(
@@ -898,10 +900,11 @@ class PCMFile:
     def __init__(self, fn):
         self.file = fn
         self.proc = None
-        self.time = time.time()
         self.loading = False
         self.expired = False
+        self.loaded = False
         self.readers = {}
+        self.ensure_time()
     
     def load(self, stream):
         if self.loading:
@@ -932,7 +935,8 @@ class PCMFile:
                     fl = os.path.getsize("cache/" + self.file)
                 except FileNotFoundError:
                     fl = 0
-            self.time = time.time()
+            self.loaded = True
+            self.ensure_time()
         except:
             try:
                 ytdl.cache.pop(self.file)
@@ -945,14 +949,24 @@ class PCMFile:
                     print(traceback.format_exc())
             raise
 
+    ensure_time = lambda self: setattr(self, "time", time.time())
+
     def update(self):
         if self.readers:
-            self.time = time.time()
-        elif time.time() - self.time > 9000:
+            self.ensure_time()
+            return
+        try:
+            fl = os.path.getsize("cache/" + self.file)
+        except FileNotFoundError:
+            fl = 0
+            if self.loaded:
+                self.time = -inf
+        ft = 9000 / (math.log2(fl/134217728 + 1) + 1)
+        if time.time() - self.time > ft:
             self.destroy()
 
     def open(self):
-        self.time = time.time()
+        self.ensure_time()
         if self.proc is None:
             raise ProcessLookupError
         return open("cache/" + self.file, "rb")
@@ -960,8 +974,8 @@ class PCMFile:
     def destroy(self):
         self.expired = True
         try:
-            ytdl.cache.pop(self.file)
-        except KeyError:
+            self.proc.kill()
+        except:
             pass
         for _ in loop(8):
             try:
@@ -970,14 +984,14 @@ class PCMFile:
             except FileNotFoundError:
                 break
             except PermissionError:
-                self.time = time.time()
+                self.ensure_time()
                 return
             except:
                 print(traceback.format_exc())
                 time.sleep(5)
         try:
-            self.proc.kill()
-        except:
+            ytdl.cache.pop(self.file)
+        except KeyError:
             pass
         print(self.file, "deleted.")
 
@@ -1115,24 +1129,26 @@ class PCMFile:
         else:
             args += ["-acodec", "copy"]
         args += shlex.split(options) + ["-loglevel", "error", "pipe:1"]
+        key = auds.vc.guild.id
+        self.readers[key] = True
+        callback = lambda: self.readers.pop(key) if key in self.readers else None
         if buff:
-            player = BufferedAudioReader(self, args, key=auds.vc.guild.id)
+            player = BufferedAudioReader(self, args, callback=callback)
         else:
-            player = LoadedAudioReader(self, args, key=auds.vc.guild.id)
+            player = LoadedAudioReader(self, args, callback=callback)
         create_future_ex(player.run)
         return player
 
 
 class LoadedAudioReader(discord.AudioSource):
 
-    def __init__(self, file, args, key=-1):
+    def __init__(self, file, args, callback=None):
         print(args)
         self.closed = False
         self.advanced = False
         self.proc = psutil.Popen(args, stdout=subprocess.PIPE)
         self.file = file
-        self.key = key
-        file.readers[key] = True
+        self.callback = callback
         print(self.proc)
 
     read = lambda self, *args, **kwargs: self.proc.stdout.read(*args, **kwargs)
@@ -1145,10 +1161,8 @@ class LoadedAudioReader(discord.AudioSource):
             self.proc.kill()
         except:
             pass
-        try:
-            self.file.readers.pop(self.key)
-        except KeyError:
-            pass
+        if callable(self.callback):
+            self.callback()
 
     is_opus = lambda self: False
     cleanup = close
@@ -1156,17 +1170,16 @@ class LoadedAudioReader(discord.AudioSource):
 
 class BufferedAudioReader(discord.AudioSource):
 
-    def __init__(self, file, args, key=-1):
+    def __init__(self, file, args, callback=None):
         print(args)
         self.closed = False
         self.advanced = False
         self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         self.file = file
-        self.key = key
         self.stream = file.open()
         self.buffer = bytes()
         self.loader = file.proc
-        file.readers[key] = True
+        self.callback = callback
         print(self.proc)
 
     def read(self, size=0):
@@ -1208,10 +1221,8 @@ class BufferedAudioReader(discord.AudioSource):
             self.proc.kill()
         except:
             pass
-        try:
-            self.file.readers.pop(self.key)
-        except KeyError:
-            pass
+        if callable(self.callback):
+            self.callback()
 
     is_opus = lambda self: False
     cleanup = close
@@ -1488,11 +1499,17 @@ class videoDownloader:
             entry["stream"] = stream
             if callback is not None:
                 create_future_ex(callback)
-            return self.cache.get(fn, None)
+            f = self.cache.get(fn, None)
+            if f is not None:
+                entry["file"] = f
+                f.ensure_time()
+            return f
         try:
             self.cache[fn] = f = PCMFile(fn)
             f.load(stream)
             entry["stream"] = stream
+            entry["file"] = f
+            f.ensure_time()
             if callback is not None:
                 create_future_ex(callback)
             return f
@@ -2883,10 +2900,32 @@ except:
     print("WARNING: genius_key not found. Unable to use API to search song lyrics.")
 
 
+def extract_lyrics(s):
+    s = s[s.index("JSON.parse(") + len("JSON.parse("):]
+    s = s[:s.index("</script>")]
+    if "window.__" in s:
+        s = s[:s.index("window.__")]
+    s = s[:s.rindex(");")]
+    d = json.loads(ast.literal_eval(s))
+    lyrics = d["songPage"]["lyricsData"]["body"]["children"][0]["children"]
+    output = ""
+    while lyrics:
+        line = lyrics.pop(0)
+        if type(line) is str:
+            if line:
+                if line.startswith("[") and line[-1] == "]":
+                    output += "\n"
+                output += line + "\n"
+        elif type(line) is dict:
+            if "children" in line:
+                lyrics = line["children"] + lyrics
+    return output
+
+
 def get_lyrics(item):
     url = "https://api.genius.com/search"
     for i in range(2):
-        header = {"user-agent": "Mozilla/5.0", "Authorization": "Bearer " + genius_key}
+        header = {"user-agent": "Mozilla/5." + str(xrand(1, 10)), "Authorization": "Bearer " + genius_key}
         if i == 0:
             search = item
         else:
@@ -2907,13 +2946,20 @@ def get_lyrics(item):
         if path and name:
             s = "https://genius.com" + path
             page = requests.get(s, headers=header, timeout=8)
-            html = BeautifulSoup(page.text, "html.parser")
+            text = page.text
+            html = BeautifulSoup(text, "html.parser")
             lyricobj = html.find('div', class_='lyrics')
             if lyricobj is not None:
-                lyrics = lyricobj.get_text()
+                lyrics = lyricobj.get_text().strip()
+                print("html", s)
                 return name, lyrics
-            print(s)
-            print(limStr(page.text, 8192))
+            try:
+                lyrics = extract_lyrics(text).strip()
+                print("json", s)
+                return name, lyrics
+            except:
+                print(traceback.format_exc())
+            print(text)
         if i < 2:
             time.sleep(1)
     raise LookupError("No results for " + item + ".")
@@ -2926,7 +2972,7 @@ class Lyrics(Command):
     description = "Searches genius.com for lyrics of a song."
     usage = "<0:search_link{queue}> <verbose(?v)>"
     flags = "v"
-    lyricTrans = re.compile("[([]+(((official|full|demo) *)?((version|ver.?) *)?((w\\/)?(lyrics?|vocals?|music|ost|instrumental|acoustic|hd|hq) *)?((album|video|audio|cover) *)?(version|ver.?)?|(feat|ft)[\\s\\S]+)[)\\]]+", flags=re.I)
+    lyric_trans = re.compile("[([]+(((official|full|demo|original) *)?((version|ver.?) *)?((w\\/)?(lyrics?|vocals?|music|ost|instrumental|acoustic|hd|hq) *)?((album|video|audio|cover|remix) *)?(upload|reupload|version|ver.?)?|(feat|ft)[\\s\\S]+)[)\\]]+", flags=re.I)
 
     async def __call__(self, bot, channel, message, argv, flags, user, **void):
         for a in message.attachments:
@@ -2946,9 +2992,9 @@ class Lyrics(Command):
         else:
             search = argv
         search = search.translate(self.bot.mtrans)
-        item = verifySearch(to_alphanumeric(re.sub(self.lyricTrans, "", search)))
+        item = verifySearch(to_alphanumeric(re.sub(self.lyric_trans, "", search)))
         if not item:
-            item = to_alphanumeric(verifySearch(search))
+            item = verifySearch(to_alphanumeric(search))
             if not item:
                 item = search
         name, lyrics = await create_future(get_lyrics, item)
@@ -2958,7 +3004,7 @@ class Lyrics(Command):
         if "v" not in flags and len(s) <= 2000:
             return s
         emb = discord.Embed(colour=randColour())
-        emb.set_author(name=name)
+        emb.set_author(name="Lyrics for " + name + ":")
         curr = ""
         i = 1
         for p in text.split("\n\n"):
@@ -2967,7 +3013,7 @@ class Lyrics(Command):
                 emb.description = "```ini\n" + curr + "```"
                 curr = para
                 i += 1
-            if emb.description and len(curr) + len(para) > 1000:
+            elif emb.description and len(curr) + len(para) > 1000:
                 if i > 4:
                     curr = ""
                     break

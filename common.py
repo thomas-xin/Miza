@@ -109,7 +109,7 @@ async def recursiveCoro(item):
         try:
             if type(item[i]) in (str, bytes):
                 raise TypeError
-            if issubclass(type(item[i]), collections.Mapping):
+            if issubclass(type(item[i]), collections.Mapping) or issubclass(type(item[i]), io.IOBase):
                 raise TypeError
             if awaitable(item[i]):
                 raise TypeError

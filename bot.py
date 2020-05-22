@@ -1245,7 +1245,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                     i2 = comm.index(end)
                     if i2 < i:
                         i = i2
-            check = reconstitute(comm[:i]).lower()
+            check = reconstitute(comm[:i]).lower().replace("*", "").replace("_", "").replace("||", "")
         if check in bot.commands:
             for command in bot.commands[check]:
                 if command.catg in enabled or admin:

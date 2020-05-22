@@ -390,6 +390,9 @@ class MimicConfig(Command):
             )
         if setting == "birthday":
             new = tparser.parse(new).timestamp()
+        elif setting == "name":
+            if len(new) > 80:
+                raise OverflowError("Prefix must be 80 or fewer in length.")
         elif setting == "prefix":
             if len(new) > 16:
                 raise OverflowError("Must be 16 or fewer in length.")
@@ -553,6 +556,8 @@ class Mimic(Command):
         else:
             name = user.name
             url = strURL(user.avatar_url)
+        if len(name) > 80:
+            raise OverflowError("Prefix must be 80 or fewer in length.")
         while m_id in mimics:
             mid += 1
             m_id = "&" + str(mid)
@@ -591,12 +596,13 @@ class MimicSend(Command):
     usage = "<0:mimic> <1:channel> <2:string>"
     no_parse = True
 
-    async def __call__(self, bot, user, perm, args, **void):
+    async def __call__(self, bot, channel, user, perm, args, **void):
         update = self.data.mimics.update
         mimicdb = bot.data.mimics
         mimics = mimicdb.setdefault(user.id, {})
         prefix = args.pop(0)
         c_id = verifyID(args.pop(0))
+        orig_channel = channel
         channel = await bot.fetch_channel(c_id)
         guild = channel.guild
         w = await bot.ensureWebhook(channel)
@@ -621,17 +627,20 @@ class MimicSend(Command):
             enabled = ()
         if not admin and "game" not in enabled:
             raise PermissionError("Not permitted to send into target channel.")
-        for mimic in m:
-            await bot.database.mimics.updateMimic(mimic, guild)
-            name = mimic.name
-            url = mimic.url
-            try:
-                await w.send(msg, username=name, avatar_url=url)
-            except discord.NotFound:
-                w = await bot.ensureWebhook(channel, force=True)
-                await w.send(msg, username=name, avatar_url=url)
-            mimic.count += 1
-            mimic.total += len(msg)
+        try:
+            for mimic in m:
+                await bot.database.mimics.updateMimic(mimic, guild)
+                name = mimic.name
+                url = mimic.url
+                try:
+                    await w.send(msg, username=name, avatar_url=url)
+                except discord.NotFound:
+                    w = await bot.ensureWebhook(channel, force=True)
+                    await w.send(msg, username=name, avatar_url=url)
+                mimic.count += 1
+                mimic.total += len(msg)
+        except Exception as ex:
+            await sendReact(orig_channel, "```py\n" + repr(ex) + "```", reacts="❎")
 
 
 class UpdateMimics(Database):
@@ -692,7 +701,7 @@ class UpdateMimics(Database):
                             mimic.count += 1
                             mimic.total += len(k.msg)
                 except Exception as ex:
-                    await channel.send(repr(ex))
+                    await sendReact(channel, "```py\n" + repr(ex) + "```", reacts="❎")
 
     async def updateMimic(self, mimic, guild=None, it=None):
         if mimic.setdefault("auto", None):
