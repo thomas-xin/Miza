@@ -1040,6 +1040,8 @@ class PCMFile:
         if pitchscale != 1:
             if abs(pitchscale) >= 64:
                 raise OverflowError
+            start /= pitchscale
+            end /= pitchscale
             if options and options[-1] != " ":
                 options += ","
             options += "asetrate=r=" + str(SAMPLE_RATE * pitchscale)
