@@ -4,7 +4,7 @@ Adds many useful math-related functions.
 
 import traceback, time, datetime
 import collections, ast, copy, pickle, io
-import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys, re, hashlib
+import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys, re, hashlib, base64
 
 from scipy import interpolate, special, signal
 from dateutil import parser as tparser
@@ -787,6 +787,8 @@ def verifyString(string):
 
 
 def bytes2Hex(b, space=True):
+    if type(b) is str:
+        b = b.encode("utf-8")
     o = ""
     for a in b:
         c = hex(a).upper()[2:]
@@ -800,11 +802,29 @@ def bytes2Hex(b, space=True):
     return o
 
 def hex2Bytes(h):
+    if type(b) is bytes:
+        b = b.decode("utf-8", "replace")
     o = []
     h = h.replace(" ", "").replace("\r", "").replace("\n", "")
     for a in range(0, len(h), 2):
         o.append(int(h[a : a + 2], 16))
     return bytes(o)
+
+def bytes2B64(b, alt_char_set=False):
+    if type(b) is str:
+        b = b.encode("utf-8")
+    b = base64.b64encode(b)
+    if alt_char_set:
+        b = b.replace(b"=", b"-").replace(b"/", b".")
+    return b
+
+def b642Bytes(b, alt_char_set=False):
+    if type(b) is str:
+        b = b.encode("utf-8")
+    if alt_char_set:
+        b = b.replace(b"-", b"=").replace(b".", b"/")
+    b = base64.b64decode(b)
+    return b
 
 
 colourCalculation = lambda a, offset=0: adjColour(colorsys.hsv_to_rgb((a / 1536) % 1, 1, 1), offset, 255)

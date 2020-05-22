@@ -35,10 +35,13 @@ async def createPlayer(auds, p_type=0, verbose=False):
 def getDuration(filename):
     command = ["ffprobe", filename]
     resp = bytes()
+    print(command)
     for _ in loop(3):
         try:
             proc = psutil.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            resp = bytes().join(proc.communicate())
+            fut = create_future_ex(proc.communicate)
+            res = fut.result(timeout=2)
+            resp = bytes().join(res)
             break
         except:
             try:
@@ -3073,7 +3076,7 @@ class Download(Command):
                     raise EOFError
                 res = [{"name": e.name, "url": e.url} for e in auds.queue[:10]]
                 fmt = "ogg"
-                end = "Current items in queue for " + channel.guild.name + ":```"
+                end = "Current items in queue for " + channel.guild.name + ":"
             except:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
         else:
@@ -3144,11 +3147,13 @@ class Download(Command):
             if not res:
                 raise LookupError("No results for " + argv + ".")
             res = res[:10]
-            end = "Search results for " + argv + ":```"
-        url_list = bytes2Hex(bytes(str([e["url"] for e in res]), "utf-8"), space=False)
+            end = "Search results for " + argv + ":"
+        end += "\nDestination format: {." + fmt + "}```"
+        url_bytes = bytes(repr([e["url"] for e in res]), "utf-8")
+        url_enc = bytes2B64(url_bytes, True).decode("utf-8", "replace")
         msg = (
             "```" + "\n" * ("z" in flags) + "callback-voice-download-" + str(user.id) 
-            + "_" + str(len(res)) + "_" + url_list + "_" + fmt + "\n" + end
+            + "_" + str(len(res)) + "_" + fmt + "-" + url_enc + "\n" + end
         )
         emb = discord.Embed(colour=randColour())
         url = strURL(user.avatar_url)
@@ -3168,7 +3173,7 @@ class Download(Command):
             await asyncio.sleep(0.5)
         # await sent.add_reaction("❎")
 
-    async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, user, **void):
+    async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, argv, user, **void):
         if reaction is None or user.id == bot.client.user.id:
             return
         spl = vals.split("_")
@@ -3177,7 +3182,7 @@ class Download(Command):
             if b"\xef\xb8\x8f\xe2\x83\xa3" in reaction:
                 num = int(reaction.decode("utf-8")[0])
                 if num <= int(spl[1]):
-                    data = ast.literal_eval(hex2Bytes(spl[2]).decode("utf-8", "replace"))
+                    data = ast.literal_eval(b642Bytes(argv, True).decode("utf-8", "replace"))
                     url = data[num]
                     if guild is None:
                         fl = 8388608
@@ -3191,7 +3196,7 @@ class Download(Command):
                     fn, out = await create_future(
                         ytdl.download_file,
                         url,
-                        spl[3],
+                        spl[2],
                         fl,
                     )
                     f = discord.File(fn, out)

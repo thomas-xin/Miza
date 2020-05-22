@@ -9,6 +9,7 @@ CalledProcessError = subprocess.CalledProcessError
 Process = psutil.Process()
 urlParse = urllib.parse.quote
 escape_markdown = discord.utils.escape_markdown
+escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere").replace("<@&", "<@\xad&")
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
 

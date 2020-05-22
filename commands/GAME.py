@@ -602,7 +602,6 @@ class MimicSend(Command):
         mimics = mimicdb.setdefault(user.id, {})
         prefix = args.pop(0)
         c_id = verifyID(args.pop(0))
-        orig_channel = channel
         channel = await bot.fetch_channel(c_id)
         guild = channel.guild
         w = await bot.ensureWebhook(channel)
@@ -627,20 +626,18 @@ class MimicSend(Command):
             enabled = ()
         if not admin and "game" not in enabled:
             raise PermissionError("Not permitted to send into target channel.")
-        try:
-            for mimic in m:
-                await bot.database.mimics.updateMimic(mimic, guild)
-                name = mimic.name
-                url = mimic.url
-                try:
-                    await w.send(msg, username=name, avatar_url=url)
-                except discord.NotFound:
-                    w = await bot.ensureWebhook(channel, force=True)
-                    await w.send(msg, username=name, avatar_url=url)
-                mimic.count += 1
-                mimic.total += len(msg)
-        except Exception as ex:
-            await sendReact(orig_channel, "```py\n" + repr(ex) + "```", reacts="❎")
+        msg = escape_everyone(msg)
+        for mimic in m:
+            await bot.database.mimics.updateMimic(mimic, guild)
+            name = mimic.name
+            url = mimic.url
+            try:
+                await w.send(msg, username=name, avatar_url=url)
+            except discord.NotFound:
+                w = await bot.ensureWebhook(channel, force=True)
+                await w.send(msg, username=name, avatar_url=url)
+            mimic.count += 1
+            mimic.total += len(msg)
 
 
 class UpdateMimics(Database):
@@ -692,7 +689,7 @@ class UpdateMimics(Database):
                             await self.updateMimic(mimic, guild=message.guild)
                             name = mimic.name
                             url = mimic.url
-                            msg = k.msg
+                            msg = escape_everyone(k.msg)
                             try:
                                 await w.send(msg, username=name, avatar_url=url)
                             except discord.NotFound:
