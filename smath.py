@@ -30,6 +30,9 @@ Mat = mat = matrix = mpmath.matrix
 inf = Infinity = math.inf
 nan = math.nan
 eval_const = {
+    "none": None,
+    "null": None,
+    "NULL": None,
     "true": True,
     "false": False,
     "TRUE": True,
