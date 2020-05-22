@@ -506,6 +506,9 @@ class Command:
         if not hasattr(self, "min_display"):
             self.min_display = self.min_level
         for a in self.alias:
+            b = a.replace("*", "").replace("_", "").replace("||", "")
+            if b:
+                a = b
             a = a.lower()
             if a in bot.commands:
                 bot.commands[a].append(self)
