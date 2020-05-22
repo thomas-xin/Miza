@@ -29,7 +29,11 @@ Mat = mat = matrix = mpmath.matrix
 
 inf = Infinity = math.inf
 nan = math.nan
-infinum = {
+eval_const = {
+    "true": True,
+    "false": False,
+    "TRUE": True,
+    "FALSE": False,
     "inf": inf,
     "nan": nan,
     "Infinity": inf,

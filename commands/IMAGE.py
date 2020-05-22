@@ -314,7 +314,7 @@ class Cat(Command):
                 try:
                     d = json.loads(resp.content)
                 except:
-                    d = eval(resp.content, {}, infinum)
+                    d = eval(resp.content, {}, eval_const)
                 try:
                     if type(d) is list:
                         d = random.choice(d)
@@ -352,7 +352,7 @@ class Dog(Command):
             try:
                 d = json.loads(resp.content)
             except:
-                d = eval(resp.content, {}, infinum)
+                d = eval(resp.content, {}, eval_const)
             try:
                 if type(d) is list:
                     d = random.choice(d)

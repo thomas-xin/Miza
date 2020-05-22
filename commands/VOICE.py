@@ -2906,7 +2906,11 @@ def extract_lyrics(s):
     if "window.__" in s:
         s = s[:s.index("window.__")]
     s = s[:s.rindex(");")]
-    d = json.loads(ast.literal_eval(s))
+    data = ast.literal_eval(s)
+    try:
+        d = json.loads(data)
+    except json.JSONDecodeError:
+        d = eval(data, {}, eval_const)
     lyrics = d["songPage"]["lyricsData"]["body"]["children"][0]["children"]
     output = ""
     while lyrics:
