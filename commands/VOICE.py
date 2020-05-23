@@ -453,8 +453,90 @@ class customAudio(discord.AudioSource):
         if q == bool(q):
             self.stats.quiet = bool(q)
 
+    def readNext(self):
+        try:
+            found = empty = False
+            if self.queue.loading or self.paused:
+                self.is_playing = True
+                raise EOFError
+            try:
+                source = self.source
+                if source is None:
+                    raise StopIteration
+                temp = source.read(discord.opus.Encoder.FRAME_SIZE)
+                if not temp:
+                    raise StopIteration
+                found = True
+            except (StopIteration, ValueError):
+                empty = True
+                raise EOFError
+            except:
+                empty = True
+                print(traceback.format_exc())
+                raise EOFError
+            if not empty:
+                self.stats.position = round(
+                    self.stats.position + self.speed / 50 * (self.reverse * -2 + 1),
+                    4,
+                )
+                self.has_read = True
+                self.curr_timeout = 0
+            self.is_playing = True
+        except EOFError:
+            if self.source is not None and self.source.closed:
+                self.source = None
+            if (empty or not self.paused) and not self.queue.loading:
+                queueable = (self.queue or self.bot.data.playlists.get(self.vc.guild.id, None))
+                if self.queue and not self.queue[0].get("played", False):
+                    if not found and not self.queue.loading:
+                        self.refilling = 2
+                        if self.source is not None:
+                            self.source.advanced = True
+                        create_future_ex(self.queue.advance)
+                        return
+                elif empty and queueable and self.source is not None:
+                    if time.time() - self.lastEnd > 0.5:
+                        if self.reverse:
+                            ended = self.stats.position <= 0.5
+                        else:
+                            ended = ceil(self.stats.position) >= float(self.queue[0].duration) - 0.5
+                        if self.curr_timeout and time.time() - self.curr_timeout > 0.5 or ended:
+                            if not found:
+                                self.lastEnd = time.time()
+                                if not self.has_read or not self.queue:
+                                    print("{Stopped}")
+                                    self.refilling = 2
+                                    if self.queue:
+                                        self.queue[0].url = ""
+                                    self.source.advanced = True
+                                    create_future_ex(self.queue.update_play)
+                                    self.preparing = False
+                                else:
+                                    # self.stats.position = round(
+                                    #     self.stats.position + self.speed * resample / 6.25 * (self.reverse * -2 + 1),
+                                    #     4,
+                                    # )
+                                    # if not ended:
+                                    #     self.refilling = 2
+                                    #     self.seek(self.stats.position)
+                                    # else:
+                                    print("{Finished}")
+                                    self.refilling = 2
+                                    self.source.advanced = True
+                                    create_future_ex(self.queue.update_play)
+                                    self.preparing = False
+                                return
+                        elif self.curr_timeout == 0:
+                            self.curr_timeout = time.time()
+                elif (empty or self.pausec) and not queueable:
+                    self.curr_timeout = 0
+                    self.vc.stop()
+                    return
+            temp = self.emptybuff
+            # print(traceback.format_exc())
+        return temp
+
     def refill_buffer(self):
-        empty = False
         size = self.length >> 1
         volume = self.stats.volume
         reverb = self.stats.reverb
@@ -483,111 +565,53 @@ class customAudio(discord.AudioSource):
         buflen = size
         if resample != 1:
             buflen = max(1, round_random(resample * buflen))
-        new_buf = [numpy.zeros(0, dtype=float) for _ in loop(2)]
-        found = False
-        while len(self.temp_buffer[0]) + len(new_buf[0]) < buflen:
-            # print(len(self.temp_buffer[0]) + len(new_buf[0]))
-            try:
-                if self.queue.loading or self.paused:
-                    self.is_playing = True
-                    raise EOFError
+            new_buf = [numpy.zeros(0, dtype=float) for _ in loop(2)]
+            while len(self.temp_buffer[0]) + len(new_buf[0]) < buflen:
+                # print(len(self.temp_buffer[0]) + len(new_buf[0]))
+                temp = self.readNext()
                 try:
-                    source = self.source
-                    if source is None:
-                        raise StopIteration
-                    temp = source.read(discord.opus.Encoder.FRAME_SIZE)
-                    if not temp:
-                        raise StopIteration
-                    found = True
-                except (StopIteration, ValueError):
-                    empty = True
-                    raise EOFError
+                    if not isValid(volume):
+                        array = self.static()
+                    else:
+                        array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
+                        if volume != 1 or chorus:
+                            try:
+                                if chorus:
+                                    volume *= 2
+                                array *= volume * (bool(chorus) + 1)
+                            except:
+                                array = self.static()
+                    for i in range(2):
+                        new_buf[i] = numpy.concatenate([new_buf[i], array[i::2]])
                 except:
-                    empty = True
                     print(traceback.format_exc())
-                    raise EOFError
-                if not empty:
-                    self.stats.position = round(
-                        self.stats.position + self.speed / 50 * (self.reverse * -2 + 1),
-                        4,
-                    )
-                    self.has_read = True
-                    self.curr_timeout = 0
-                self.is_playing = True
-            except EOFError:
-                if self.source is not None and self.source.closed:
-                    self.source = None
-                if (empty or not self.paused) and not self.queue.loading:
-                    queueable = (self.queue or self.bot.data.playlists.get(self.vc.guild.id, None))
-                    if self.queue and not self.queue[0].get("played", False):
-                        if not found and not self.queue.loading:
-                            self.refilling = 2
-                            if self.source is not None:
-                                self.source.advanced = True
-                            create_future_ex(self.queue.advance)
-                            return
-                    elif empty and queueable and self.source is not None:
-                        if time.time() - self.lastEnd > 0.5:
-                            if self.reverse:
-                                ended = self.stats.position <= 0.5
-                            else:
-                                ended = ceil(self.stats.position) >= float(self.queue[0].duration) - 0.5
-                            if self.curr_timeout and time.time() - self.curr_timeout > 0.5 or ended:
-                                if not found:
-                                    self.lastEnd = time.time()
-                                    if not self.has_read or not self.queue:
-                                        print("{Stopped}")
-                                        self.refilling = 2
-                                        if self.queue:
-                                            self.queue[0].url = ""
-                                        self.source.advanced = True
-                                        create_future_ex(self.queue.update_play)
-                                        self.preparing = False
-                                    else:
-                                        # self.stats.position = round(
-                                        #     self.stats.position + self.speed * resample / 6.25 * (self.reverse * -2 + 1),
-                                        #     4,
-                                        # )
-                                        # if not ended:
-                                        #     self.refilling = 2
-                                        #     self.seek(self.stats.position)
-                                        # else:
-                                        print("{Finished}")
-                                        self.refilling = 2
-                                        self.source.advanced = True
-                                        create_future_ex(self.queue.update_play)
-                                        self.preparing = False
-                                    return
-                            elif self.curr_timeout == 0:
-                                self.curr_timeout = time.time()
-                    elif (empty or self.pausec) and not queueable:
-                        self.curr_timeout = 0
-                        self.vc.stop()
-                        return
-                temp = self.emptybuff
-                # print(traceback.format_exc())
+            while self.reading or self.refilling > 1:
+                time.sleep(0.03)
+            self.refilling = 2
+            for i in range(2):
+                self.temp_buffer[i] = numpy.concatenate([self.temp_buffer[i], new_buf[i]])
+            self.refilling = 0
+        else:
+            temp = self.readNext()
             try:
                 if not isValid(volume):
                     array = self.static()
                 else:
                     array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
-                    if volume != 1 or chorus:
-                        try:
-                            if chorus:
-                                volume *= 2
-                            array *= volume * (bool(chorus) + 1)
-                        except:
-                            array = self.static()
+                    try:
+                        if chorus:
+                            volume *= 2
+                        array *= volume * (bool(chorus) + 1)
+                    except:
+                        array = self.static()
+                while self.reading or self.refilling > 1:
+                    time.sleep(0.03)
+                self.refilling = 2
                 for i in range(2):
-                    new_buf[i] = numpy.concatenate([new_buf[i], array[i::2]])
+                    self.temp_buffer[i] = array[i::2]
+                self.refilling = 0
             except:
                 print(traceback.format_exc())
-        while self.reading or self.refilling > 1:
-            time.sleep(0.03)
-        self.refilling = 2
-        for i in range(2):
-            self.temp_buffer[i] = numpy.concatenate([self.temp_buffer[i], new_buf[i]])
-        self.refilling = 0
 
     def read(self):
         size = self.length >> 1
@@ -611,8 +635,12 @@ class customAudio(discord.AudioSource):
                 return self.emptybuff
         try:
             self.reading = 1
-            lbuf, self.temp_buffer[0] = numpy.hsplit(self.temp_buffer[0], [buflen])
-            rbuf, self.temp_buffer[1] = numpy.hsplit(self.temp_buffer[1], [buflen])
+            if len(self.temp_buffer[0]) == len(self.temp_buffer[1]) == size:
+                lbuf, rbuf = self.temp_buffer
+                self.temp_buffer = [numpy.zeros(0, dtype=float) for _ in loop(2)]
+            else:
+                lbuf, self.temp_buffer[0] = numpy.hsplit(self.temp_buffer[0], [buflen])
+                rbuf, self.temp_buffer[1] = numpy.hsplit(self.temp_buffer[1], [buflen])
             self.reading = 0
             if resample != 1:
                 if self.bufadj is not None:
@@ -3002,7 +3030,21 @@ class Lyrics(Command):
     description = "Searches genius.com for lyrics of a song."
     usage = "<0:search_link{queue}> <verbose(?v)>"
     flags = "v"
-    lyric_trans = re.compile("[([]+(((official|full|demo|original|extended) *)?((version|ver.?) *)?((w\\/)?(lyrics?|vocals?|music|ost|instrumental|acoustic|hd|hq) *)?((album|video|audio|cover|remix) *)?(upload|reupload|version|ver.?)?|(feat|ft)[\\s\\S]+)[)\\]]+", flags=re.I)
+    lyric_trans = re.compile(
+        (
+            "[([]+"
+            "(((official|full|demo|original|extended) *)?"
+            "((version|ver.?) *)?"
+            "((w\\/)?"
+            "(lyrics?|vocals?|music|ost|instrumental|acoustic|studio|hd|hq) *)?"
+            "((album|video|audio|cover|remix) *)?"
+            "(upload|reupload|version|ver.?)?"
+            "|(feat|ft)"
+            "[\\s\\S]+)"
+            "[)\\]]+"
+        ),
+        flags=re.I,
+    )
     rate_limit = 2
 
     async def __call__(self, bot, channel, message, argv, flags, user, **void):
