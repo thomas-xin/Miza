@@ -195,6 +195,7 @@ class customAudio(discord.AudioSource):
     filt = signal.butter(1, 0.125, btype="low", output="sos")
     #fff = numpy.abs(numpy.fft.fftfreq(SAMPLE_RATE / 50, 1/SAMPLE_RATE))[:ceil(SAMPLE_RATE / 100 + 1)]
     static = lambda self, *args: numpy.random.rand(self.length) * 65536 - 32768
+    max_resample = -inf
     defaults = {
         "volume": 1,
         "reverb": 0,
@@ -543,7 +544,7 @@ class customAudio(discord.AudioSource):
         pitch = self.stats.pitch
         bassboost = self.stats.bassboost
         chorus = self.stats.chorus
-        if self.stats.resample >= 24:
+        if self.stats.resample >= self.max_resample:
             resample = 1
         else:
             resample = 2 ** (self.stats.resample / 12)
@@ -617,7 +618,7 @@ class customAudio(discord.AudioSource):
         size = self.length >> 1
         reverb = self.stats.reverb
         bassboost = self.stats.bassboost
-        if self.stats.resample >= 24:
+        if self.stats.resample >= self.max_resample:
             resample = 1
         else:
             resample = 2 ** (self.stats.resample / 12)
@@ -1047,14 +1048,14 @@ class PCMFile:
         #     end = pos
         # else:
         start = pos
-        end = None
+        # end = None
         pitchscale = 2 ** (stats.pitch / 12)
-        if stats.resample >= 24:
+        if stats.resample >= auds.max_resample:
             pitchscale *= 2 ** (stats.resample / 12)
         chorus = min(16, abs(stats.chorus))
         if pitchscale != 1 or stats.speed != 1:
             speed = abs(stats.speed) / pitchscale
-            if stats.resample >= 24:
+            if stats.resample >= auds.max_resample:
                 speed *= 2 ** (stats.resample / 12)
             if round(speed, 9) != 1:
                 speed = max(0.005, speed)
@@ -2520,7 +2521,7 @@ class AudioSettings(Command):
                 orig = bool(orig)
             else:
                 origStats[op] = val
-            if auds.queue and (op in "speed pitch pan compressor chorus" or op == "resample" and max(orig, new) >= 2400):
+            if auds.queue and (op in "speed pitch pan compressor chorus" or op == "resample" and max(orig, new) >= auds.max_resample * 100):
                 await create_future(auds.new, auds.file, auds.stats.position)
             s += (
                 "\nChanged audio " + str(op)
