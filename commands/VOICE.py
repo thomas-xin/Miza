@@ -279,7 +279,7 @@ class customAudio(discord.AudioSource):
             new_source = None
             try:
                 new_source = source.create_reader(pos, auds=self)
-                new_source.read(2)
+                new_source.read(4)
             except OverflowError:
                 source = None
             else:
