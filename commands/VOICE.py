@@ -465,16 +465,21 @@ class customAudio(discord.AudioSource):
             resample = 1
         else:
             resample = 2 ** (self.stats.resample / 12)
-        if abs(volume) >= 1 << 31:
+        high = (1 << 31) - 1
+        if abs(volume) >= high:
             volume = nan
-        if abs(reverb) >= 1 << 31:
+        if abs(reverb) >= high:
             volume = nan
-        if abs(bassboost) >= 1 << 31:
+            reverb = 0
+        if abs(bassboost) >= high:
             volume = nan
-        if abs(pitch) >= 1 << 31:
+            bassboost = 0
+        if abs(pitch) >= high:
             volume = nan
-        if abs(resample) >= 1 << 31:
+            pitch = 0
+        if abs(resample) >= high:
             volume = nan
+            resample = 0
         buflen = size
         if resample != 1:
             buflen = max(1, round_random(resample * buflen))
@@ -1604,6 +1609,7 @@ class Queue(Command):
     flags = "hvfbz"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    rate_limit = 0.5
 
     async def __call__(self, bot, client, user, perm, message, channel, guild, flags, name, argv, **void):
         if not argv:
@@ -1851,6 +1857,7 @@ class Playlist(Command):
     description = "Shows, appends, or removes from the default playlist."
     usage = "<search_link[]> <remove(?d)> <verbose(?v)>"
     flags = "aedv"
+    rate_limit = 0.5
 
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
         update = self.bot.database.playlists.update
@@ -1936,6 +1943,7 @@ class Connect(Command):
     min_level = 0
     description = "Summons the bot into a voice channel."
     usage = "<channel{curr}(0)>"
+    rate_limit = 3
 
     async def __call__(self, user, channel, name="join", argv="", **void):
         bot = self.bot
@@ -2035,6 +2043,7 @@ class Skip(Command):
     description = "Removes an entry or range of entries from the voice channel queue."
     usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
     flags = "fhv"
+    rate_limit = 0.5
 
     async def __call__(self, client, user, perm, bot, name, args, argv, guild, flags, message, **void):
         if guild.id not in bot.database.playlists.audio:
@@ -2047,6 +2056,9 @@ class Skip(Command):
         if "f" in flags:
             if not isAlone(auds, user) and perm < 1:
                 raise self.permError(perm, 1, "to force skip while other users are in voice")
+        count = len(auds.queue)
+        if not count:
+            raise IndexError("Queue is currently empty.")
         if not argv:
             elems = [0]
         elif ":" in argv or ".." in argv:
@@ -2055,28 +2067,28 @@ class Skip(Command):
             l = argv.replace("..", ":").split(":")
             it = None
             if len(l) > 3:
-                raise ValueError("Too many arguments for range input.")
+                raise ArgumentError("Too many arguments for range input.")
             elif len(l) > 2:
                 num = await bot.evalMath(l[0], guild.id)
                 it = int(round(float(num)))
             if l[0]:
                 num = await bot.evalMath(l[0], guild.id)
-                if num > len(auds.queue):
-                    num = len(auds.queue)
+                if num > count:
+                    num = count
                 else:
-                    num = round(num) % len(auds.queue)
+                    num = round(num) % count
                 left = num
             else:
                 left = 0
             if l[1]:
                 num = await bot.evalMath(l[1], guild.id)
-                if num > len(auds.queue):
-                    num = len(auds.queue)
+                if num > count:
+                    num = count
                 else:
-                    num = round(num) % len(auds.queue)
+                    num = round(num) % count
                 right = num
             else:
-                right = len(auds.queue)
+                right = count
             elems = xrange(left, right, it)
         else:
             elems = [0 for i in args]
@@ -2089,7 +2101,7 @@ class Skip(Command):
                     valid = False
                     break
             if not valid:
-                elems = range(len(auds.queue))
+                elems = range(count)
         members = sum(1 for m in auds.vc.channel.members if not m.bot)
         required = 1 + members >> 1
         response = "```css\n"
@@ -2221,6 +2233,7 @@ class Seek(Command):
     description = "Seeks to a position in the current audio file."
     usage = "<position[0]> <hide(?h)>"
     flags = "h"
+    rate_limit = 0.5
 
     async def __call__(self, argv, bot, guild, client, user, perm, channel, name, flags, **void):
         auds = await forceJoin(guild, channel, user, client, bot)
@@ -2271,12 +2284,13 @@ class Dump(Command):
     description = "Saves or loads the currently playing audio queue state."
     usage = "<data{attached_file}> <append(?a)> <hide(?h)>"
     flags = "ah"
+    rate_limit = 1
 
     async def __call__(self, guild, channel, user, client, bot, perm, name, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, bot)
         if not argv and not len(message.attachments) or name.lower() == "save":
             if name.lower() == "load":
-                raise EOFError("Please input a file, URL or json data to load.")
+                raise ArgumentError("Please input a file, URL or json data to load.")
             resp = await create_future(getDump, auds)
             f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
             create_task(sendFile(channel, "Queue data for **" + guild.name + "**:", f))
@@ -2372,6 +2386,7 @@ class AudioSettings(Command):
         "LQ": "loop",
         "SQ": "shuffle",
     }
+    rate_limit = 0.5
 
     def __init__(self, *args):
         self.alias = list(self.aliasMap) + list(self.aliasExt)[1:]
@@ -2498,6 +2513,7 @@ class Rotate(Command):
     description = "Rotates the queue to the left by a certain amount of steps."
     usage = "<position> <hide(?h)>"
     flags = "h"
+    rate_limit = 5
 
     async def __call__(self, perm, argv, flags, guild, channel, user, client, bot, **void):
         auds = await forceJoin(guild, channel, user, client, bot)
@@ -2527,6 +2543,7 @@ class Shuffle(Command):
     description = "Shuffles the audio queue."
     usage = "<hide(?h)>"
     flags = "h"
+    rate_limit = 5
 
     async def __call__(self, perm, flags, guild, channel, user, client, bot, **void):
         auds = await forceJoin(guild, channel, user, client, bot)
@@ -2554,6 +2571,7 @@ class Reverse(Command):
     description = "Reverses the audio queue direction."
     usage = "<hide(?h)>"
     flags = "h"
+    rate_limit = 5
 
     async def __call__(self, perm, flags, guild, channel, user, client, bot, **void):
         auds = await forceJoin(guild, channel, user, client, bot)
@@ -2582,6 +2600,7 @@ class Unmute(Command):
     description = "Disables server mute for all members."
     usage = "<hide(?h)>"
     flags = "h"
+    rate_limit = 10
 
     async def __call__(self, guild, flags, **void):
         for vc in guild.voice_channels:
@@ -2603,6 +2622,7 @@ class VoiceNuke(Command):
     description = "Removes all users from voice channels in the current server."
     usage = "<hide(?h)>"
     flags = "h"
+    rate_limit = 10
 
     async def __call__(self, guild, flags, **void):
         for vc in guild.voice_channels:
@@ -2618,7 +2638,6 @@ class VoiceNuke(Command):
 
 class Player(Command):
     server_only = True
-    time_consuming = True
     buttons = {
 	b'\xe2\x8f\xb8': 0,
 	b'\xf0\x9f\x94\x84': 1,
@@ -2644,6 +2663,7 @@ class Player(Command):
     description = "Creates an auto-updating virtual audio player for the current server."
     usage = "<controllable(?c)> <disable(?d)> <show_debug(?z)>"
     flags = "cdez"
+    rate_limit = 1
 
     def showCurr(self, auds):
         q = auds.queue
@@ -2983,6 +3003,7 @@ class Lyrics(Command):
     usage = "<0:search_link{queue}> <verbose(?v)>"
     flags = "v"
     lyric_trans = re.compile("[([]+(((official|full|demo|original|extended) *)?((version|ver.?) *)?((w\\/)?(lyrics?|vocals?|music|ost|instrumental|acoustic|hd|hq) *)?((album|video|audio|cover|remix) *)?(upload|reupload|version|ver.?)?|(feat|ft)[\\s\\S]+)[)\\]]+", flags=re.I)
+    rate_limit = 2
 
     async def __call__(self, bot, channel, message, argv, flags, user, **void):
         for a in message.attachments:
@@ -3065,6 +3086,7 @@ class Download(Command):
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or link."
     usage = "<0:search_link{queue}> <-1:out_format[ogg]> <verbose(?v)> <show_debug(?z)>"
     flags = "vz"
+    rate_limit = 1
 
     async def __call__(self, bot, channel, message, argv, flags, user, **void):
         for a in message.attachments:

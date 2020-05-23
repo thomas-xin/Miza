@@ -976,11 +976,12 @@ class main_data:
             self.busy = False
         if not hasattr(self, "status_iter"):
             self.status_iter = xrand(3)
-        if time.time() - self.lastCheck > 0.5:
-            while self.busy:
+        if time.time() - self.lastCheck > 0.5 or force:
+            while self.busy and not force:
                 await asyncio.sleep(0.1)
             self.busy = True
-            create_task(self.getState())
+            if not force:
+                create_task(self.getState())
             try:
                 #print("Sending update...")
                 guilds = len(client.guilds)
@@ -1016,8 +1017,9 @@ class main_data:
             except:
                 print(traceback.format_exc())
             for u in self.database.values():
-                create_task(u())
-                create_task(self.verifyDelete(u))
+                if time.time() - u.used > u.rate_limit or force:
+                    create_task(u())
+                    create_task(self.verifyDelete(u))
             self.busy = False
 
     async def ensureWebhook(self, channel, force=False):
@@ -1259,8 +1261,24 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                     print(str(guild.id) + ": " + str(user) + " (" + str(u_id) + ") issued command " + msg)
                     req = command.min_level
                     try:
-                        if req > u_perm or (u_perm is not nan and req is nan):
-                            raise command.permError(u_perm, req, "for command " + alias)
+                        if u_perm is not nan:
+                            if not u_perm >= req:
+                                raise command.permError(u_perm, req, "for command " + alias)
+                            x = command.rate_limit
+                            if x:
+                                d = command.used
+                                t = d.get(u_id, -inf)
+                                wait = time.time() - t - x
+                                if wait > -1:
+                                    if wait < 0:
+                                        w = max(0.2, -wait)
+                                        d[u_id] = time.time() + w
+                                        await asyncio.sleep(w)
+                                    if len(d) >= 4096:
+                                        d.pop(next(iter(d)))
+                                    d[u_id] = time.time()
+                                else:
+                                    raise TooManyRequests("Command has a rate limit of " + sec2Time(x) + "; please wait " + sec2Time(-wait) + ".")
                         flags = {}
                         if cb_argv is not None:
                             argv = cb_argv

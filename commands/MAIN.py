@@ -286,6 +286,7 @@ class Loop(Command):
     min_display = "1+"
     description = "Loops a command."
     usage = "<0:iterations> <1:command>"
+    rate_limit = 3
 
     async def __call__(self, args, argv, message, channel, callback, bot, perm, guild, **void):
         num = await bot.evalMath(args[0], guild.id)
@@ -437,6 +438,7 @@ class Info(Command):
     description = "Shows information about the target user or server."
     usage = "<user> <verbose(?v)>"
     flags = "v"
+    rate_limit = 1
 
     async def getGuildData(self, g, flags={}):
         bot = self.bot
@@ -613,10 +615,16 @@ class Info(Command):
         activity = "\n".join(strActivity(i) for i in getattr(u, "activities", []))
         role = ", ".join(str(i) for i in getattr(u, "roles", []) if not i.is_default())
         coms = seen = msgs = avgs = gmsg = 0
+        fav = None
         pos = None
         if "v" in flags:
             try:
-                coms = bot.data.users[u.id]["commands"]
+                c = bot.data.users[u.id]["commands"]
+                coms = iterSum(c)
+                try:
+                    fav = dictMax(c, ignore=[None])
+                except IndexError:
+                    pass
             except LookupError:
                 pass
             try:
@@ -680,6 +688,8 @@ class Info(Command):
             emb.add_field(name="Last seen", value=str(seen), inline=1)
         if coms:
             emb.add_field(name="Commands used", value=str(coms), inline=1)
+        if fav:
+            emb.add_field(name="Favourite command", value=str(fav), inline=1)
         if dname:
             emb.add_field(name="Nickname", value=dname, inline=1)
         if gmsg:
@@ -1009,6 +1019,7 @@ class Announcement(Command):
 class UpdateReminders(Database):
     name = "reminders"
     no_delete = True
+    rate_limit = 1
 
     def __load__(self):
         d = self.data
@@ -1268,5 +1279,5 @@ class UpdateUsers(Database):
         self.data[user.id]["last_seen"] = datetime.datetime.utcnow().timestamp() + delay
 
     async def _command_(self, user, command, **void):
-        addDict(self.data, {user.id: {"commands": 1}})
+        addDict(self.data, {user.id: {"commands": {str(command): 1}}})
         self.update()

@@ -75,8 +75,11 @@ class Translate(Command):
     usage = "<0:language> <1:string> <verbose(?v)> <papago(?p)>"
     flags = "pv"
     no_parse = True
+    rate_limit = 2
 
     async def __call__(self, args, flags, user, **void):
+        if not args:
+            raise ArgumentError("Input string is empty.")
         dest = args[0]
         string = " ".join(args[1:])
         detected = translators["Google Translate"].detect(string)
@@ -116,18 +119,18 @@ class Math(Command):
     description = "Evaluates a math formula."
     usage = "<function> <verbose(?v)> <rationalize(?r)>"
     flags = "rv"
+    rate_limit = 0.5
 
     async def __call__(self, bot, argv, channel, flags, guild, **void):
-        f = argv
-        if not len(f):
-            raise IndexError("Function is empty.")
+        if not argv:
+            raise ArgumentError("Input string is empty.")
         r = "r" in flags
         p = flags.get("v", 0) * 2 + 1 << 6
-        resp = await bot.solveMath(f, guild, p, r)
+        resp = await bot.solveMath(argv, guild, p, r)
         if type(resp) is dict and "file" in resp:
             f = discord.File(resp["file"])
             return {"file": f}
-        return "```py\n" + str(f) + " = " + "\n".join(str(i) for i in resp) + "```"
+        return "```py\n" + str(argv) + " = " + "\n".join(str(i) for i in resp) + "```"
 
 
 class Uni2Hex(Command):
@@ -139,7 +142,7 @@ class Uni2Hex(Command):
 
     async def __call__(self, argv, **void):
         if not argv:
-            raise IndexError("Input string is empty.")
+            raise ArgumentError("Input string is empty.")
         b = bytes(argv, "utf-8")
         return "```fix\n" + bytes2Hex(b) + "```"
 
@@ -152,7 +155,7 @@ class Hex2Uni(Command):
 
     async def __call__(self, argv, **void):
         if not argv:
-            raise IndexError("Input string is empty.")
+            raise ArgumentError("Input string is empty.")
         b = hex2Bytes(argv.replace("0x", "").replace(" ", ""))
         return "```fix\n" + b.decode("utf-8", "replace") + "```"
 
@@ -165,7 +168,7 @@ class ID2Time(Command):
 
     async def __call__(self, argv, **void):
         if not argv:
-            raise IndexError("Input string is empty.")
+            raise ArgumentError("Input string is empty.")
         argv = verifyID(argv)
         return "```fix\n" + str(snowflake_time(argv)) + "```"
 
@@ -178,7 +181,7 @@ class Time2ID(Command):
 
     async def __call__(self, argv, **void):
         if not argv:
-            raise IndexError("Input string is empty.")
+            raise ArgumentError("Input string is empty.")
         argv = tparser.parse(argv)
         return "```fix\n" + str(time_snowflake(argv)) + "```"
 
@@ -192,7 +195,7 @@ class Fancy(Command):
 
     async def __call__(self, argv, **void):
         if not argv:
-            raise IndexError("Input string is empty.")
+            raise ArgumentError("Input string is empty.")
         emb = discord.Embed(colour=randColour())
         emb.set_author(name=argv)
         for i in range(len(UNIFMTS) - 1):
@@ -220,7 +223,7 @@ class Zalgo(Command):
 
     async def __call__(self, channel, argv, **void):
         if not argv:
-            raise IndexError("Input string is empty.")
+            raise ArgumentError("Input string is empty.")
         emb = discord.Embed(colour=randColour())
         emb.set_author(name=argv)
         for i in (1, 2, 3, 4, 5, 6, 7, 8):
@@ -249,7 +252,7 @@ class OwOify(Command):
 
     async def __call__(self, argv, **void):
         if not argv:
-            raise IndexError("Input string is empty.")
+            raise ArgumentError("Input string is empty.")
         return "```fix\n" + argv.translate(self.otrans) + "```"
 
 
@@ -286,6 +289,7 @@ class UrbanDictionary(Command):
     description = "Searches Urban Dictionary for an item."
     usage = "<string> <verbose(?v)>"
     flags = "v"
+    rate_limit = 2
 
     async def __call__(self, argv, flags, **void):
         url = (

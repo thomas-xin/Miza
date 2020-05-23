@@ -35,10 +35,10 @@ class IMG(Command):
                     )
                 key = args[0].lower()
                 if len(key) > 64:
-                    raise OverflowError("Image tag too long.")
+                    raise ArgumentError("Image tag too long.")
                 url = await bot.followURL(verifyURL(args[1]))
                 if len(url) > 256:
-                    raise OverflowError("Image url too long.")
+                    raise ArgumentError("Image url too long.")
                 images[key] = url
                 sort(images)
                 imglists[guild.id] = images
@@ -109,6 +109,7 @@ class React(Command):
     usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
     flags = "aed"
     no_parse = True
+    rate_limit = 1
 
     async def __call__(self, bot, flags, guild, message, argv, args, **void):
         update = self.data.reacts.update
@@ -273,7 +274,7 @@ class Char2Emoj(Command):
                     args[i] = "<" + args[i] + ">"
             return _c2e(*args[:3])
         except IndexError:
-            raise IndexError(
+            raise ArgumentError(
                 "Exactly 3 arguments are required for this command.\n"
                 + "Place <> around arguments containing spaces as required."
             )
@@ -299,6 +300,7 @@ class Cat(Command):
     description = "Pulls a random image from thecatapi.com or cdn.nekos.life/meow, and embeds it."
     usage = "<verbose(?v)>"
     flags = "v"
+    rate_limit = 0.25
 
     async def __call__(self, channel, flags, **void):
         if not self.header or random.random() > 0.9375:
@@ -341,6 +343,7 @@ class Dog(Command):
     description = "Pulls a random image from images.dog.ceo and embeds it."
     usage = "<verbose(?v)>"
     flags = "v"
+    rate_limit = 0.25
 
     async def __call__(self, channel, flags, **void):
         for _ in loop(8):

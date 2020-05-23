@@ -5,13 +5,19 @@ import urllib.request, urllib.parse, concurrent.futures
 from smath import *
 
 python = ("python3", "python")[os.name == "nt"]
-CalledProcessError = subprocess.CalledProcessError
 Process = psutil.Process()
 urlParse = urllib.parse.quote
 escape_markdown = discord.utils.escape_markdown
 escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere").replace("<@&", "<@\xad&")
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
+
+CalledProcessError = subprocess.CalledProcessError
+
+class ArgumentError(LookupError):
+    pass
+class TooManyRequests(PermissionError):
+    pass
 
 
 def htmlDecode(s):
@@ -479,6 +485,7 @@ def create_task(fut, *args, loop=None, **kwargs):
 
 class Command:
     min_level = -inf
+    rate_limit = 0
     description = ""
     usage = ""
 
@@ -494,6 +501,7 @@ class Command:
         )
 
     def __init__(self, bot, catg):
+        self.used = {}
         if not hasattr(self, "data"):
             self.data = freeClass()
         if not hasattr(self, "name"):
@@ -518,6 +526,9 @@ class Command:
         self.catg = catg
         self.bot = bot
         self._globals = bot._globals
+
+    __hash__ = lambda self: hash(self.__name__)
+    __str__ = lambda self: self.__name__
     
     async def __call__(self, **void):
         pass
@@ -525,9 +536,11 @@ class Command:
 
 class Database:
     bot = None
+    rate_limit = 3
     name = "data"
 
     def __init__(self, bot, catg):
+        self.used = time.time()
         name = self.name
         self.__name__ = self.__class__.__name__
         if not getattr(self, "no_file", False):
@@ -570,6 +583,9 @@ class Database:
                 self.data.clear()
                 f()
         # print(name, self.__name__)
+
+    __hash__ = lambda self: hash(self.__name__)
+    __str__ = lambda self: self.__name__
 
     async def __call__(self, **void):
         pass

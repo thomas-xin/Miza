@@ -314,6 +314,7 @@ class CS_org2xm(Command):
     min_level = 0
     description = "Converts a .org file to another file format."
     usage = "<0:org_url{attached_file}> <2:wave_url[]> <1:out_format[xm]>"
+    rate_limit = 5
 
     async def __call__(self, args, bot, message, channel, guild, **void):
         if not bot.isTrusted(guild.id):
@@ -395,6 +396,7 @@ class CS_mem2flag(Command):
     min_level = 0
     description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
     usage = "<0:address> <1:value[1]>"
+    rate_limit = 1
 
     async def __call__(self, bot, args, guild, **void):
         if len(args) < 2:
@@ -409,6 +411,7 @@ class CS_hex2xml(Command):
     min_level = 0
     description = "Converts a given Cave Story hex patch to an xml file readable by Booster's Lab."
     usage = "<hex_data>"
+    rate_limit = 3
 
     async def __call__(self, client, argv, channel, **void):
         hacks = {}
@@ -477,6 +480,7 @@ class CS_npc(Command):
     usage = "<query> <condensed(?c)>"
     flags = "c"
     no_parse = True
+    rate_limit = 2
 
     async def __call__(self, bot, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
@@ -515,6 +519,7 @@ class CS_tsc(Command):
     usage = "<query> <condensed(?c)>"
     flags = "c"
     no_parse = True
+    rate_limit = 2
 
     async def __call__(self, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
@@ -554,6 +559,7 @@ class CS_mod(Command):
     description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
     usage = "<query>"
     no_parse = True
+    rate_limit = 2
 
     async def __call__(self, args, **void):
         argv = " ".join(args)

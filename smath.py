@@ -493,20 +493,56 @@ def generatePrimes(a=2, b=inf, c=1):
     return primes
 
 
-def addDict(a, b, replace=True):
-    if replace:
-        r = a
+def iterSum(it):
+    if issubclass(type(it), collections.Mapping):
+        return sum(it.values())
+    try:
+        return sum(iter(it))
+    except TypeError:
+        return it
+
+
+def dictMax(d, ignore=()):
+    if not d:
+        raise IndexError
+    it = [iterSum(i) for i in d.values()]
+    m = max(it)
+    found = deque()
+    for k, v in zip(d.keys(), it):
+        if v >= m and k not in ignore:
+            found.append(k)
+    return random.choice(found)
+
+
+def addDict(a, b, replace=True, insert=None):
+    if type(a) is not dict:
+        if replace:
+            r = b
+        else:
+            r = copy.copy(b)
+        r[insert] = a
+        return r
+    elif type(b) is not dict:
+        if replace:
+            r = a
+        else:
+            r = copy.copy(a)
+        r[insert] = b
+        return r
     else:
-        r = dict(a)
-    for k in b:
-        temp = a.get(k, None)
-        if temp is None:
-            r[k] = b[k]
-            continue
-        if type(temp) is dict or type(b[k]) is dict:
-            r[k] = addDict(b[k], temp, replace)
-            continue
-        r[k] = b[k] + temp
+        if replace:
+            r = a
+        else:
+            r = copy.copy(a)
+        for k in b:
+            temp = a.get(k, None)
+            if temp is None:
+                r[k] = b[k]
+                continue
+            if type(temp) is dict or type(b[k]) is dict:
+                r[k] = addDict(b[k], temp, replace)
+                continue
+            r[k] = b[k] + temp
     return r
 
 def subDict(d, key):

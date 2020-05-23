@@ -14,6 +14,7 @@ class Purge(Command):
     description = "Deletes a number of messages from a certain user in current channel."
     usage = "<1:user{bot}(?a)> <0:count[1]> <hide(?h)>"
     flags = "ah"
+    rate_limit = 2
 
     async def __call__(self, client, bot, argv, args, channel, name, flags, perm, guild, **void):
         t_user = -1
@@ -104,6 +105,7 @@ class RoleGiver(Command):
     usage = "<0:react_to[]> <1:role[]> <delete_messages(?x)> <disable(?d)>"
     flags = "aedx"
     no_parse = True
+    rate_limit = 1
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
         update = self.bot.database.rolegivers.update
@@ -187,6 +189,7 @@ class AutoRole(Command):
     )
     usage = "<role[]> <disable(?d)> <update_all(?x)>"
     flags = "aedx"
+    rate_limit = 1
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
         update = self.bot.database.autoroles.update
@@ -249,7 +252,7 @@ class AutoRole(Command):
                 + "Please remove an item to add another."
             )
         roles = hlist()
-        rolenames = args
+        rolenames = (verifyID(i) for i in args)
         if len(guild.roles) <= 1:
             guild.roles = await guild.fetch_roles()
             guild.roles.sort()
@@ -327,6 +330,7 @@ class Lockdown(Command):
     min_level = inf
     description = "Completely locks down the server by removing send message permissions for all users and revoking all invites."
     flags = "f"
+    rate_limit = 30
 
     async def roleLock(self, role, channel):
         perm = role.permissions
@@ -403,6 +407,7 @@ class UserLog(Command):
     description = "Causes ⟨MIZA⟩ to log user events from the server, in the current channel."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
+    rate_limit = 1
 
     async def __call__(self, bot, flags, channel, guild, **void):
         data = bot.data.logU
@@ -441,6 +446,7 @@ class MessageLog(Command):
     description = "Causes ⟨MIZA⟩ to log message events from the server, in the current channel."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
+    rate_limit = 1
 
     async def __call__(self, bot, flags, channel, guild, **void):
         data = bot.data.logM
@@ -479,6 +485,7 @@ class FileLog(Command):
     description = "Causes ⟨MIZA⟩ to log deleted files from the server, in the current channel."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
+    rate_limit = 1
 
     async def __call__(self, bot, flags, channel, guild, **void):
         if not bot.isTrusted(guild.id):
@@ -521,6 +528,7 @@ class Ban(Command):
     description = "Bans a user for a certain amount of time, with an optional reason."
     usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)>"
     flags = "h"
+    rate_limit = 2
 
     async def __call__(self, bot, args, message, channel, guild, flags, perm, name, **void):
         update = self.bot.database.bans.update

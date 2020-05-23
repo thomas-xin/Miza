@@ -44,6 +44,7 @@ class Text2048(Command):
         + "<insanity_mode(?i)> <special_controls(?c)> <easy_mode(?e)>"
     )
     flags = "zspice"
+    rate_limit = 1
 
     def shiftTile(self, tiles, p1, p2):
         # print(p1, p2)
@@ -294,6 +295,7 @@ class Dogpile(Command):
     description = "Causes ⟨MIZA⟩ to automatically imitate users when 3+ of the same messages are posted in a row."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
+    rate_limit = 0.5
 
     async def __call__(self, flags, guild, **void):
         update = self.data.dogpiles.update
@@ -322,6 +324,7 @@ class MathQuiz(Command):
     description = "Starts a math quiz in the current channel."
     usage = "<mode(easy)(hard)> <disable(?d)>"
     flags = "aed"
+    rate_limit = 3
 
     async def __call__(self, channel, guild, flags, argv, **void):
         if not self.bot.isTrusted(guild.id):
@@ -348,6 +351,7 @@ class MimicConfig(Command):
         + "([status][description])(gender)(birthday)> <2:new>"
     )
     no_parse = True
+    rate_limit = 1
     
     async def __call__(self, bot, user, perm, flags, args, **void):
         update = self.data.mimics.update
@@ -443,6 +447,7 @@ class Mimic(Command):
     usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)>"
     flags = "aed"
     no_parse = True
+    rate_limit = 1
     
     async def __call__(self, bot, message, user, perm, flags, args, argv, **void):
         update = self.data.mimics.update
@@ -595,6 +600,7 @@ class MimicSend(Command):
     description = "Sends a message using a webhook mimic, to the target channel."
     usage = "<0:mimic> <1:channel> <2:string>"
     no_parse = True
+    rate_limit = 0.5
 
     async def __call__(self, bot, channel, user, perm, args, **void):
         update = self.data.mimics.update
