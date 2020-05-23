@@ -623,7 +623,9 @@ class Info(Command):
                 coms = iterSum(c)
                 if type(c) is dict:
                     try:
-                        fav = dictMax(c, ignore=[None])
+                        comfreq = deque(sort(c, reverse=True).keys())
+                        while fav is None:
+                            fav = comfreq.popleft()
                     except IndexError:
                         pass
             except LookupError:

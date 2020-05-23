@@ -131,20 +131,18 @@ def reverse(it):
         except TypeError:
             raise TypeError("Shuffling " + type(it) + " is not supported.")
 
-def sort(it, key=lambda x: x, reverse=False):
+def sort(it, key=None, reverse=False):
     if type(it) is list:
         it.sort(key=key, reverse=reverse)
         return it
     elif type(it) is tuple:
         it = sorted(it, key=key, reverse=reverse)
         return it
-    elif type(it) is dict:
-        ir = sorted(it, key=key, reverse=reverse)
-        new = {}
-        for i in ir:
-            new[i] = it[i]
-        it.clear()
-        it.update(new)
+    elif issubclass(type(it), collections.Mapping):
+        keys = sorted(it, key=it.get if key is None else lambda x: key(it.get(x)))
+        if reverse:
+            keys = reversed(keys)
+        it.__init__((i, it[i]) for i in keys)
         return it
     elif type(it) is deque:
         it = sorted(it, key=key, reverse=reverse)
@@ -500,18 +498,6 @@ def iterSum(it):
         return sum(iter(it))
     except TypeError:
         return it
-
-
-def dictMax(d, ignore=()):
-    if not d:
-        raise IndexError
-    it = [iterSum(i) for i in d.values()]
-    m = max(it)
-    found = deque()
-    for k, v in zip(d.keys(), it):
-        if v >= m and k not in ignore:
-            found.append(k)
-    return random.choice(found)
 
 
 def addDict(a, b, replace=True, insert=None):
