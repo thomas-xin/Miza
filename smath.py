@@ -2009,8 +2009,10 @@ lookup time for all elements. Includes many array and numeric operations."""
     def __contains__(self, item):
         for i in self:
             if type(item) is hlist:
-                if all(i == item):
-                    return True
+                cond = i == item
+                if type(cond) is bool:
+                    return cond
+                return all(cond)
             if i == item:
                 return True
         return False

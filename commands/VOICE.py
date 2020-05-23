@@ -388,6 +388,15 @@ class customAudio(discord.AudioSource):
                                     cnt = c
                                     ch = channel
                         if ch:
+                            msg = (
+                                "```ini\n🎵 Detected " + sbHighlight(cnt) + " user" + "s" * (cnt != 1)
+                                + " in [" + noHighlight(ch) + "], moving... 🎵```"
+                            )
+                            create_task(sendReact(
+                                self.channel,
+                                msg,
+                                reacts="❎",
+                            ))
                             create_task(vc.move_to(ch))
         else:
             self.timeout = time.time()
