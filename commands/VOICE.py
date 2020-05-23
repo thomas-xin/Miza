@@ -1047,7 +1047,7 @@ class PCMFile:
         #     end = pos
         # else:
         start = pos
-        end = float(auds.queue[0].duration) + 0.5
+        end = None
         pitchscale = 2 ** (stats.pitch / 12)
         if stats.resample >= 24:
             pitchscale *= 2 ** (stats.resample / 12)
@@ -1076,8 +1076,6 @@ class PCMFile:
         if pitchscale != 1:
             if abs(pitchscale) >= 64:
                 raise OverflowError
-            start /= pitchscale
-            end /= pitchscale
             if options and options[-1] != " ":
                 options += ","
             options += "asetrate=r=" + str(SAMPLE_RATE * pitchscale)
@@ -1161,7 +1159,7 @@ class PCMFile:
             buff = False
             args.insert(1, "-nostdin")
             args.append("cache/" + self.file)
-        args += ["-ss", str(start), "-to", str(end), "-f", "s16le"]
+        args += ["-ss", str(start), "-f", "s16le"] # "-to", str(end),
         if "-af" in options:
             args += ["-ar", str(SAMPLE_RATE), "-ac", "2"]
         else:
