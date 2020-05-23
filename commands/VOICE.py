@@ -494,7 +494,6 @@ class customAudio(discord.AudioSource):
                         if self.source is not None:
                             self.source.advanced = True
                         create_future_ex(self.queue.advance)
-                        return
                 elif empty and queueable and self.source is not None:
                     if time.time() - self.lastEnd > 0.5:
                         if self.reverse:
@@ -526,13 +525,11 @@ class customAudio(discord.AudioSource):
                                     self.source.advanced = True
                                     create_future_ex(self.queue.update_play)
                                     self.preparing = False
-                                return
                         elif self.curr_timeout == 0:
                             self.curr_timeout = time.time()
                 elif (empty or self.pausec) and not queueable:
                     self.curr_timeout = 0
                     self.vc.stop()
-                    return
             temp = self.emptybuff
             # print(traceback.format_exc())
         return temp
