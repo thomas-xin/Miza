@@ -621,10 +621,11 @@ class Info(Command):
             try:
                 c = bot.data.users[u.id]["commands"]
                 coms = iterSum(c)
-                try:
-                    fav = dictMax(c, ignore=[None])
-                except IndexError:
-                    pass
+                if type(c) is dict:
+                    try:
+                        fav = dictMax(c, ignore=[None])
+                    except IndexError:
+                        pass
             except LookupError:
                 pass
             try:
