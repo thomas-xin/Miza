@@ -360,7 +360,7 @@ class MimicConfig(Command):
         if m_id not in mimicdb:
             raise LookupError("Target mimic ID not found.")
         if not isnan(perm):
-            mimics = mimicdb.setdefault(user.id, {})
+            mimics = setDict(mimicdb, user.id, {})
             found = 0
             for prefix in mimics:
                 found += mimics[prefix].count(m_id)
@@ -454,7 +454,7 @@ class Mimic(Command):
         mimicdb = bot.data.mimics
         if len(args) == 1 and "d" not in flags:
             user = await bot.fetch_user(verifyID(argv))
-        mimics = mimicdb.setdefault(user.id, {})
+        mimics = setDict(mimicdb, user.id, {})
         if not argv or (len(args) == 1 and "d" not in flags):
             if "d" in flags:
                 mimicdb.pop(user.id)
@@ -605,7 +605,7 @@ class MimicSend(Command):
     async def __call__(self, bot, channel, user, perm, args, **void):
         update = self.data.mimics.update
         mimicdb = bot.data.mimics
-        mimics = mimicdb.setdefault(user.id, {})
+        mimics = setDict(mimicdb, user.id, {})
         prefix = args.pop(0)
         c_id = verifyID(args.pop(0))
         channel = await bot.fetch_channel(c_id)
@@ -707,7 +707,7 @@ class UpdateMimics(Database):
                     await sendReact(channel, "```py\n" + repr(ex) + "```", reacts="❎")
 
     async def updateMimic(self, mimic, guild=None, it=None):
-        if mimic.setdefault("auto", None):
+        if setDict(mimic, "auto", None):
             bot = self.bot
             mim = 0
             try:

@@ -200,7 +200,7 @@ class EnabledCommands(Command):
             if not catg in bot.categories:
                 raise LookupError("Unknown command category " + argv + ".")
             else:
-                enabled = enabled.setdefault(channel.id, {})
+                enabled = setDict(enabled, channel.id, {})
                 if "e" in flags or "a" in flags:
                     if catg in enabled:
                         raise ValueError(

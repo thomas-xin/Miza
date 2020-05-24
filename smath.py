@@ -499,6 +499,12 @@ def iterSum(it):
     except TypeError:
         return it
 
+def setDict(d, k, v):
+    try:
+        v = d.__getitem__(k)
+    except LookupError:
+        d.__setitem__(k, v)
+    return v
 
 def addDict(a, b, replace=True, insert=None):
     if type(a) is not dict:
@@ -521,8 +527,9 @@ def addDict(a, b, replace=True, insert=None):
         else:
             r = copy.copy(a)
         for k in b:
-            temp = a.get(k, None)
-            if temp is None:
+            try:
+                temp = a[k]
+            except LookupError:
                 r[k] = b[k]
                 continue
             if type(temp) is dict or type(b[k]) is dict:
@@ -808,29 +815,20 @@ def verifyString(string):
         return str(string)
 
 
+hexByte = lambda n: hex(n)[-2:].upper().replace("X", "0")
+
 def bytes2Hex(b, space=True):
     if type(b) is str:
         b = b.encode("utf-8")
-    o = ""
-    for a in b:
-        c = hex(a).upper()[2:]
-        if len(c) < 2:
-            c = "0" + c
-        o += c
-        if space:
-            o += " "
-    if space:
-        return o.strip()
-    return o
+    return (" " * space).join(hexByte(x) for x in b)
 
-def hex2Bytes(h):
+byteRE = re.compile("[A-F0-9]+", flags=re.I)
+twoChar = re.compile(".{1,2}")
+
+def hex2Bytes(b):
     if type(b) is bytes:
         b = b.decode("utf-8", "replace")
-    o = []
-    h = h.replace(" ", "").replace("\r", "").replace("\n", "")
-    for a in range(0, len(h), 2):
-        o.append(int(h[a : a + 2], 16))
-    return bytes(o)
+    return bytes(int(x, 16) for x in re.findall(twoChar, "".join(re.findall(byteRE, b))))
 
 def bytes2B64(b, alt_char_set=False):
     if type(b) is str:
@@ -2374,10 +2372,10 @@ class multiDict(freeClass):
     __slots__ = ()
 
     count = lambda self: sum(len(v) for v in super().values())
-    extend = lambda self, k, v: super().setdefault(k, hlist()).extend(v).removedups()
+    extend = lambda self, k, v: setDict(super(), k, hlist()).extend(v).removedups()
 
     def append(self, k, v):
-        values = super().setdefault(k, hlist())
+        values = setDict(super(), k, hlist())
         if v not in values:
             values.append(v)
 

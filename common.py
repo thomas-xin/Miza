@@ -166,6 +166,9 @@ async def sendFile(channel, msg, file, filename=None):
         await message.edit(content=message.content + "\n" + "\n".join("<" + a.url + ">" for a in message.attachments))
 
 
+emojiFind = re.compile("<:[^<>]+:[0-9]+>")
+findEmojis = lambda s: re.findall(emojiFind, s)
+
 def strMessage(message, limit=1024, username=False):
     c = message.content
     s = getattr(message, "system_content", "")
@@ -256,9 +259,14 @@ def verifyID(value):
     except ValueError:
         return value
 
+def stripAcc(url):
+    if url.startswith("<") and url[-1] == ">":
+        s = url[1:-1]
+        if isURL(s):
+            return s
+    return url
+
 __umap = {
-    "<": "",
-    ">": "",
     "|": "",
     "*": "",
     " ": "%20",
@@ -267,18 +275,16 @@ __utrans = "".maketrans(__umap)
 
 def verifyURL(f):
     if "file:" in f:
-        raise PermissionError("Unable to open local file " + f + ".")
-    return f.strip().translate(__utrans)
+        raise PermissionError("Not permitted open local file " + f + ".")
+    return stripAcc(f.strip().translate(__utrans))
 
 __smap = {
-    "<": "",
-    ">": "",
     "|": "",
     "*": "",
 }
 __strans = "".maketrans(__smap)
 
-verifySearch = lambda f: singleSpace(f.strip().translate(__strans))
+verifySearch = lambda f: stripAcc(singleSpace(f.strip().translate(__strans)))
 
 DOMAIN_FORMAT = re.compile(
     r"(?:^(\w{1,255}):(.{1,255})@|^)"
@@ -296,9 +302,14 @@ SCHEME_FORMAT = re.compile(
 
 def isURL(url):
     url = url.strip()
+    if url.startswith("<") and url[-1] == ">":
+        url = url[1:-1]
     if not url:
         return None
-    result = urllib.parse.urlparse(url)
+    try:
+        result = urllib.parse.urlparse(url)
+    except:
+        return False
     scheme = result.scheme
     domain = result.netloc
     if not scheme:

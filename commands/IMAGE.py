@@ -33,10 +33,10 @@ class IMG(Command):
                         + " has reached the maximum of " + str(lim) + " items. "
                         + "Please remove an item to add another."
                     )
-                key = args[0].lower()
+                key = " ".join(args[:-1]).lower()
                 if len(key) > 64:
                     raise ArgumentError("Image tag too long.")
-                url = await bot.followURL(verifyURL(args[1]))
+                url = await bot.followURL(verifyURL(args[-1]))
                 if len(url) > 256:
                     raise ArgumentError("Image url too long.")
                 images[key] = url
@@ -55,7 +55,7 @@ class IMG(Command):
                     "```css\nSuccessfully removed all images from the image list for ["
                     + noHighlight(guild.name) + "].```"
                 )
-            key = args[0].lower()
+            key = argv.lower()
             images.pop(key)
             imglists[guild.id] = images
             update()
@@ -101,6 +101,59 @@ class IMG(Command):
         }
 
 
+class CreateEmoji(Command):
+    server_only = True
+    name = ["EmojiCreate", "EmojiCopy", "CopyEmoji"]
+    min_level = 2
+    description = "Creates a custom emoji from a URL or attached file."
+    usage = "<1:name> <0:url{attached_file}>"
+    flags = "ae"
+    no_parse = True
+    rate_limit = 3
+
+    async def __call__(self, bot, guild, message, args, argv, **void):
+        if not args:
+            if message.attachments:
+                args.append(message.attachments[0].url)
+                argv += " " * bool(argv) + " ".join(a.url for a in message.attachments)
+            else:
+                raise ArgumentError("Please enter URL, emoji, or attached file to add.")
+        url = args.pop(-1)
+        url = await bot.followURL(url)
+        if not isURL(url):
+            emojis = emojiFind(argv) + emojiFind(url)
+            if not emojis:
+                raise ArgumentError("Please enter URL, emoji, or attached file to add.")
+            s = emojis[0]
+            name = argv[argv.index(s)].strip()
+            if s.startswith("<:"):
+                s = s[2:]
+            i = s.index(":")
+            if not name:
+                name = s[:i].strip()
+            e_id = i.index(s[i + 1:])
+            url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
+        else:
+            name = " ".join(args).strip()
+            if not name:
+                s = url
+                if "/" in s:
+                    s = s[s.rindex("/") + 1:]
+                if "." in s:
+                    s = s[:s.rindex(".")]
+                name = s.strip()
+        if not name:
+            name = "emoji_" + str(len(guild.emojis))
+        resp = await create_future(requests.get, url, headers={"user-agent": "Mozilla/5." + str(xrand(1, 10))}, timeout=8)
+        image = resp.content
+        emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
+        await message.add_reaction(emoji)
+        return (
+           "```css\Successfully created emoji [" + noHighlight(emoji) + "] in ["
+            + noHighlight(guild.name) + "].```"
+        )
+
+
 class React(Command):
     server_only = True
     name = ["AutoReact"]
@@ -114,7 +167,7 @@ class React(Command):
     async def __call__(self, bot, flags, guild, message, argv, args, **void):
         update = self.data.reacts.update
         following = bot.data.reacts
-        curr = following.setdefault(guild.id, multiDict())
+        curr = setDict(following, guild.id, multiDict())
         if type(curr) is not multiDict:
             following[guild.id] = curr = multiDict(curr)
         if not argv:

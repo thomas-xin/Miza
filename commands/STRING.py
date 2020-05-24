@@ -134,7 +134,7 @@ class Math(Command):
 
 
 class Uni2Hex(Command):
-    name = ["U2H"]
+    name = ["U2H", "HexEncode"]
     min_level = 0
     description = "Converts unicode text to hexadecimal numbers."
     usage = "<string>"
@@ -148,7 +148,7 @@ class Uni2Hex(Command):
 
 
 class Hex2Uni(Command):
-    name = ["H2U"]
+    name = ["H2U", "HexDecode"]
     min_level = 0
     description = "Converts hexadecimal numbers to unicode text."
     usage = "<string>"
@@ -161,7 +161,7 @@ class Hex2Uni(Command):
 
 
 class ID2Time(Command):
-    name = ["I2T"]
+    name = ["I2T", "CreateTime", "Timestamp"]
     min_level = 0
     description = "Converts a discord ID to its corresponding UTC time."
     usage = "<string>"
@@ -174,7 +174,7 @@ class ID2Time(Command):
 
 
 class Time2ID(Command):
-    name = ["T2I"]
+    name = ["T2I", "RTimestamp"]
     min_level = 0
     description = "Converts a UTC time to its corresponding discord ID."
     usage = "<string>"

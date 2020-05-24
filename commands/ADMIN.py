@@ -123,7 +123,7 @@ class RoleGiver(Command):
                 data.pop(channel.id)
                 update()
             return "```css\nRemoved all automated rolegivers from [#" + noHighlight(channel.name) + "].```"
-        assigned = data.setdefault(channel.id, {})
+        assigned = setDict(data, channel.id, {})
         if not argv:
             key = lambda alist: "⟨" + ", ".join(str(r) for r in alist[0]) + "⟩, delete: " + str(alist[1])
             if not assigned:
@@ -166,7 +166,7 @@ class RoleGiver(Command):
                 memb = await guild.fetch_member(user.id)
             if memb.top_role <= role:
                 raise PermissionError("Target role is higher than your highest role.")
-        alist = assigned.setdefault(react, [[], False])
+        alist = setDict(assigned, react, [[], False])
         alist[1] |= "x" in flags
         alist[0].append(role.id) 
         update()
@@ -228,7 +228,7 @@ class AutoRole(Command):
                 data.pop(channel.id)
                 update()
             return "```css\nRemoved all items from the autorole list for " + sbHighlight(guild) + ".```"
-        assigned = data.setdefault(guild.id, hlist())
+        assigned = setDict(data, guild.id, hlist())
         if not argv:
             rlist = hlist()
             for roles in assigned:
@@ -664,7 +664,7 @@ class Ban(Command):
         # print(self, guild, user, reason, length, channel, bans, glob)
         ts = datetime.datetime.utcnow().timestamp()
         bot = self.bot
-        banlist = bot.data.bans.setdefault(guild.id, hlist())
+        banlist = setDict(bot.data.bans, guild.id, hlist())
         update = bot.database.bans.update
         for b in glob:
             u = b.user
@@ -1152,7 +1152,7 @@ class UpdateMessageLogs(Database):
                         except AttributeError:
                             cnt = int(e.extra.get("count", 1)) - 1
                         h = e.created_at
-                        cs = self.dc.setdefault(h, 0)
+                        cs = setDict(self.dc, h, 0)
                         c = cnt - cs
                         if c > 0:
                             self.dc[h] += 1

@@ -16,7 +16,7 @@ client = discord.AutoShardedClient(
 )
 
 
-class main_data:
+class Bot:
     
     timeout = 24
     min_suspend = 3
@@ -400,9 +400,7 @@ class main_data:
 
     async def followURL(self, url, it=None):
         if it is None:
-            url = url.strip().strip("`")
-            if url.startswith("<") and url[-1] == ">":
-                url = url[1:-1]
+            url = stripAcc(url.strip().strip("`"))
             it = {}
         if url.startswith("https://discordapp.com/channels/"):
             spl = url[32:].split("/")
@@ -536,7 +534,7 @@ class main_data:
             u_id = user.id
         except AttributeError:
             u_id = user
-        g_perm = perms.setdefault(guild.id, {})
+        g_perm = setDict(perms, guild.id, {})
         g_perm.update({u_id: value})
         self.database.perms.update()
 
@@ -1335,7 +1333,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             except ValueError:
                                 args = argv.replace("\n", " ").replace("\r", "").replace("\t", " ").split(" ")
                         if guild is None:
-                            guild = main_data.userGuild(
+                            guild = bot.userGuild(
                                 user=user,
                                 channel=channel,
                             )
@@ -1859,5 +1857,5 @@ async def on_raw_message_edit(payload):
 
 
 if __name__ == "__main__":
-    bot = main_data()
+    bot = Bot()
     bot.run()

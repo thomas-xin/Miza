@@ -71,6 +71,7 @@ def getDuration(filename):
 
 
 def pytube2Dict(url):
+    url = verifyURL(url)
     if not url.startswith("https://www.youtube.com/"):
         if not url.startswith("http://youtu.be/"):
             if isURL(url):
@@ -390,7 +391,7 @@ class customAudio(discord.AudioSource):
                         if ch:
                             msg = (
                                 "```ini\n🎵 Detected " + sbHighlight(cnt) + " user" + "s" * (cnt != 1)
-                                + " in [" + noHighlight(ch) + "], moving... 🎵```"
+                                + " in [#" + noHighlight(ch) + "], moving... 🎵```"
                             )
                             create_task(sendReact(
                                 self.channel,
@@ -1534,7 +1535,7 @@ class videoDownloader:
         entry["stream"] = "none"
         if stream in (None, "none") or stream.startswith("https://cf-hls-media.sndcdn.com/"):
             data = self.extract(entry["url"], search=False)
-            stream = data[0].setdefault("stream", data[0].url)
+            stream = setDict(data[0], "stream", data[0].url)
         # print(stream)
         h = shash(entry["url"])
         fn = h + ".pcm"
@@ -1676,7 +1677,7 @@ class Queue(Command):
                 + "-\nQueue for " + guild.name.replace("`", "") + ":```"
             )
         future = wrap_future(create_task(forceJoin(guild, channel, user, client, bot, preparing=True)))
-        if isURL(argv) or argv.startswith("<") and argv[-1] == ">":
+        if isURL(argv):
             argv = await bot.followURL(argv)
         resp = await create_future(ytdl.search, argv)
         auds = await future
@@ -1684,7 +1685,7 @@ class Queue(Command):
             if not isAlone(auds, user) and perm < 1:
                 raise self.permError(perm, 1, "to force play while other users are in voice")
         if auds.stats.quiet & 2:
-            flags.setdefault("h", 1)
+            setDict(flags, "h", 1)
         elapsed = auds.stats.position
         q = auds.queue
         if type(resp) is str:
@@ -1895,7 +1896,6 @@ class Playlist(Command):
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
         update = self.bot.database.playlists.update
         bot = self.bot
-        pl = bot.data.playlists
         if argv or "d" in flags:
             req = 2
             if perm < req:
@@ -1904,7 +1904,7 @@ class Playlist(Command):
                     + guild.name
                 )
                 raise self.permError(perm, req, reason)
-        pl = pl.setdefault(guild.id, [])
+        pl = setDict(bot.data.playlists, guild.id, [])
         if not argv:
             if "d" in flags:
                 pl[guild.id] = []
@@ -1945,7 +1945,7 @@ class Playlist(Command):
                 + " has reached the maximum of " + str(lim) + " items. "
                 + "Please remove an item to add another."
             )
-        if isURL(argv) or argv.startswith("<") and argv[-1] == ">":
+        if isURL(argv):
             argv = await bot.followURL(argv)
         resp = await create_future(ytdl.search, argv)
         if type(resp) is str:
@@ -3045,7 +3045,7 @@ class Lyrics(Command):
             "((album|video|audio|cover|remix) *)?"
             "(upload|reupload|version|ver.?)?"
             "|(feat|ft)"
-            "[\\s\\S]+)"
+            ".+)"
             "[)\\]]+"
         ),
         flags=re.I,
@@ -3063,7 +3063,7 @@ class Lyrics(Command):
                 argv = auds.queue[0].name
             except:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
-        if isURL(argv) or argv.startswith("<") and argv[-1] == ">":
+        if isURL(argv):
             argv = await bot.followURL(argv)
             resp = await create_future(ytdl.search, argv)
             search = resp[0]
@@ -3169,7 +3169,7 @@ class Download(Command):
             # print(argv, fmt)
             argv = verifySearch(argv)
             res = []
-            if isURL(argv) or argv.startswith("<") and argv[-1] == ">":
+            if isURL(argv):
                 argv = await bot.followURL(argv)
                 data = await create_future(ytdl.extract, argv)
                 res += data
