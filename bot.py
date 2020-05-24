@@ -411,8 +411,8 @@ class Bot:
             else:
                 url = m.content
                 if " " in url or "\n" in url or not isURL(url):
-                    for m in url.replace("\n", " ").split(" "):
-                        u = verifyURL(m)
+                    for i in url.replace("\n", " ").split(" "):
+                        u = verifyURL(i)
                         if isURL(u):
                             url = u
                             break
@@ -420,8 +420,8 @@ class Bot:
                 if not url:
                     url = " ".join(e.description for e in m.embeds)
                     if " " in url or "\n" in url or not isURL(url):
-                        for m in url.replace("\n", " ").replace("(", " ").replace(")", " ").split(" "):
-                            u = verifyURL(m)
+                        for i in url.replace("\n", " ").replace("(", " ").replace(")", " ").split(" "):
+                            u = verifyURL(i)
                             if isURL(u):
                                 url = u
                                 break

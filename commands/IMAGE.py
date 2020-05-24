@@ -121,17 +121,15 @@ class CreateEmoji(Command):
         url = args.pop(-1)
         url = await bot.followURL(url)
         if not isURL(url):
-            emojis = emojiFind(argv) + emojiFind(url)
+            emojis = findEmojis(argv) + findEmojis(url)
             if not emojis:
                 raise ArgumentError("Please enter URL, emoji, or attached file to add.")
             s = emojis[0]
-            name = argv[argv.index(s)].strip()
+            name = argv[:argv.index(s)].strip()
             if s.startswith("<:"):
                 s = s[2:]
             i = s.index(":")
-            # if not name:
-            #     name = s[:i].strip()
-            e_id = i.index(s[i + 1:])
+            e_id = s[i + 1:s.rindex(">")]
             url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
         else:
             name = " ".join(args).strip()
@@ -144,6 +142,7 @@ class CreateEmoji(Command):
             #     name = s.strip()
         if not name:
             name = "emoji_" + str(len(guild.emojis))
+        print(name, url)
         resp = await create_future(requests.get, url, headers={"user-agent": "Mozilla/5." + str(xrand(1, 10))}, timeout=8)
         image = resp.content
         emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
