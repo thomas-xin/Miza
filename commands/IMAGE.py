@@ -103,7 +103,7 @@ class IMG(Command):
 
 class CreateEmoji(Command):
     server_only = True
-    name = ["EmojiCreate", "EmojiCopy", "CopyEmoji"]
+    name = ["EmojiCreate", "EmojiCopy", "CopyEmoji", "Emoji"]
     min_level = 2
     description = "Creates a custom emoji from a URL or attached file."
     usage = "<1:name> <0:url{attached_file}>"
@@ -129,19 +129,19 @@ class CreateEmoji(Command):
             if s.startswith("<:"):
                 s = s[2:]
             i = s.index(":")
-            if not name:
-                name = s[:i].strip()
+            # if not name:
+            #     name = s[:i].strip()
             e_id = i.index(s[i + 1:])
             url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
         else:
             name = " ".join(args).strip()
-            if not name:
-                s = url
-                if "/" in s:
-                    s = s[s.rindex("/") + 1:]
-                if "." in s:
-                    s = s[:s.rindex(".")]
-                name = s.strip()
+            # if not name:
+            #     s = url
+            #     if "/" in s:
+            #         s = s[s.rindex("/") + 1:]
+            #     if "." in s:
+            #         s = s[:s.rindex(".")]
+            #     name = s.strip()
         if not name:
             name = "emoji_" + str(len(guild.emojis))
         resp = await create_future(requests.get, url, headers={"user-agent": "Mozilla/5." + str(xrand(1, 10))}, timeout=8)
@@ -149,7 +149,7 @@ class CreateEmoji(Command):
         emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
         await message.add_reaction(emoji)
         return (
-           "```css\Successfully created emoji [" + noHighlight(emoji) + "] in ["
+           "```css\nSuccessfully created emoji [" + noHighlight(emoji) + "] in ["
             + noHighlight(guild.name) + "].```"
         )
 
