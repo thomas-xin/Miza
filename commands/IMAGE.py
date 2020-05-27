@@ -198,7 +198,7 @@ async def get_image(bot, message, args, argv):
 
 
 class Saturate(Command):
-    name = ["ImageSaturate"]
+    name = ["Saturation", "ImageSaturate"]
     min_level = 0
     description = "Changes colour saturation of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
@@ -230,7 +230,7 @@ class Contrast(Command):
 
 
 class Brightness(Command):
-    name = ["ImageBrightness"]
+    name = ["Brighten", "ImageBrightness"]
     min_level = 0
     description = "Changes colour brightness of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
@@ -246,7 +246,7 @@ class Brightness(Command):
 
 
 class Sharpness(Command):
-    name = ["ImageSharpness"]
+    name = ["Sharpen", "ImageSharpness"]
     min_level = 0
     description = "Changes colour sharpness of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
@@ -259,6 +259,51 @@ class Sharpness(Command):
         fn = resp[0]
         f = discord.File(fn, filename=name)
         await sendFile(message.channel, "", f)
+
+
+class HueShift(Command):
+    name = ["Hue"]
+    min_level = 0
+    description = "Changes colour hue of supplied image."
+    usage = "<0:url{attached_file}> <1:adjustment[0.5]>"
+    no_parse = True
+    rate_limit = 3
+
+    async def __call__(self, bot, guild, message, args, argv, **void):
+        name, value, url = await get_image(bot, message, args, argv)
+        resp = await imageProc(url, "hue_shift", [value], guild.id)
+        fn = resp[0]
+        f = discord.File(fn, filename=name)
+        await sendFile(message.channel, "", f)
+
+
+class Colour(Command):
+    name = ["Color"]
+    min_level = 0
+    description = "Creates a 128x128 image filled with the target RGB colour."
+    usage = "<Colour>"
+    no_parse = True
+    rate_limit = 2
+
+    async def __call__(self, bot, guild, channel, argv, **void):
+        argv = argv.replace("#", "").replace(",", " ").strip()
+        if " " in argv:
+            channels = [i.strip() for i in argv.split(" ") if i.strip()]
+            if len(channels) not in (3, 4):
+                raise ArgumentError("Please input valid amount of colours for RGB/RGBA input.")
+        else:
+            try:
+                raw = int(argv, 16)
+                if len(argv) <= 6:
+                    channels = [raw >> 16 & 255, raw >> 8 & 255, raw & 255]
+                elif len(argv) <= 8:
+                    channels = [raw >> 16 & 255, raw >> 8 & 255, raw & 255, raw >> 24 & 255]
+            except ValueError:
+                raise ArgumentError("Please input a valid hex colour.")
+        resp = await imageProc("from_colour", "$", [channels], guild.id)
+        fn = resp[0]
+        f = discord.File(fn, filename="colour.png")
+        await sendFile(channel, "", f)
 
 
 class Resize(Command):
@@ -339,7 +384,7 @@ class Blend(Command):
     description = "Combines the two supplied images, using an optional blend operation."
     usage = "<0:url1{attached_file}> <1:url2{attached_file}> <2:operation[replace](?l)> <3:opacity[1]>"
     no_parse = True
-    rate_limit = 3
+    rate_limit = 4
     flags = "l"
 
     async def __call__(self, bot, guild, message, flags, args, argv, **void):
@@ -351,8 +396,9 @@ class Blend(Command):
                 if "l" in flags:
                     return (
                         "```ini\nAvailable blend operations: ["
-                        + "replace, add, sub, mul, div, difference, overlay, "
-                        + "soft, hard, lighten, darken, extract, merge, dodge]```"
+                        + "replace, add, sub, mul, div, mod, and, or, xor, "
+                        + "difference, overlay, screen, soft, hard, lighten, darken, "
+                        + "burn, linearburn, dodge, lineardodge, hue, sat, lum, extract, merge]```"
                     )
                 raise ArgumentError("Please input an image by URL or attachment.")
         url1 = args.pop(0)

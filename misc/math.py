@@ -8,6 +8,20 @@ from sympy.plotting.plot import Plot
 
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
 
+
+def logging(func):
+    def call(self, *args, file="log.txt", **kwargs):
+        try:
+            output = func(self, *args, **kwargs)
+        except:
+            f = open(file, "ab")
+            f.write(traceback.format_exc().encode("utf-8"))
+            f.close()
+            raise
+        return output
+    return call
+
+
 key = "0"
 BF_PREC = 256
 BF_ALPHA = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -19,12 +33,6 @@ def tryWrapper(func):
         except:
             print(traceback.format_exc())
     return __call__
-
-
-def printFile(s):
-    f = open("log.txt", "ab")
-    f.write(str(s).encode("utf-8"))
-    f.close()
 
 
 class dice(sympy.Basic):
@@ -288,14 +296,14 @@ _globals.update({
     "random": dice,
     "rand": dice,
     "dice": dice,
-    "base": arbFloat,
-    "h2d": h2d,
-    "o2d": o2d,
-    "b2d": b2d,
-    "hex": hexFloat,
-    "dec": debase,
-    "oct": octFloat,
-    "bin": binFloat,
+    # "base": arbFloat,
+    # "h2d": h2d,
+    # "o2d": o2d,
+    # "b2d": b2d,
+    # "hex": hexFloat,
+    # "dec": debase,
+    # "oct": octFloat,
+    # "bin": binFloat,
     "plt": plot,
     "factors": sympy.factorint,
     "factorize": factorize,
@@ -419,6 +427,8 @@ def prettyAns(f):
         mat_symbol_style="bold",
     ).replace("zoo", "ℂ∞").replace("nan", "NaN").replace("⋅", "∙")
 
+
+@logging
 def evalSym(f, prec=64, r=False):
     global BF_PREC
     BF_PREC = sympy.ceiling(int(prec) * 1.25)
@@ -468,21 +478,21 @@ def evalSym(f, prec=64, r=False):
                 f = f.subs(i, i.doit())
             except:
                 pass
-    try:
-        if issubclass(type(f), baseFloat):
-            a = str(f.evalf(prec))
-            try:
-                b = str(prettyAns(sympy.Rational(str(f.num))))
-            except:
-                b = str(prettyAns(sympy.Number(str(f.num))))
-            if b == a:
-                b = ""
-            return [a, b]
-    except:
-        p = prettyAns(f)
-        if p == convAns(f):
-            p = ""
-        return [f, p]
+    # try:
+    #     if issubclass(type(f), baseFloat):
+    #         a = str(f.evalf(prec))
+    #         try:
+    #             b = str(prettyAns(sympy.Rational(str(f.num))))
+    #         except:
+    #             b = str(prettyAns(sympy.Number(str(f.num))))
+    #         if b == a:
+    #             b = ""
+    #         return [a, b]
+    # except:
+    #     p = prettyAns(f)
+    #     if p == convAns(f):
+    #         p = ""
+    #     return [f, p]
     if prec:
         try:
             y = f.evalf(prec, chop=True)

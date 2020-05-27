@@ -1,5 +1,7 @@
-import os, sys, requests, io, time, re, traceback, urllib, numpy, blend_modes
-from PIL import Image, ImageStat, ImageEnhance
+#!/usr/bin/python3
+
+import os, sys, io, time, re, traceback, requests, urllib, numpy, blend_modes
+from PIL import Image, ImageChops, ImageEnhance, ImageMath, ImageStat
 
 
 def logging(func):
@@ -52,6 +54,9 @@ def isURL(url):
     return True
 
 
+from_colour = lambda colour, size=128: Image.fromarray(numpy.tile(numpy.array(colour, dtype=numpy.uint8), (size, size, 1)))
+
+
 def resize_max(image, maxsize, resample=Image.LANCZOS, box=None, reducing_gap=None):
     w = image.width
     h = image.height
@@ -62,7 +67,6 @@ def resize_max(image, maxsize, resample=Image.LANCZOS, box=None, reducing_gap=No
         h = int(h * r)
         image = image.resize([w, h], resample, box, reducing_gap)
     return image
-
 
 resizers = {
     "sinc": Image.LANCZOS,
@@ -110,66 +114,174 @@ def resize_to(image, w, h, operation):
 
 
 blenders = {
-    "normal": blend_modes.normal,
-    "blit": blend_modes.normal,
-    "blend": blend_modes.normal,
-    "replace": blend_modes.normal,
-    "+": blend_modes.addition,
-    "add": blend_modes.addition,
-    "addition": blend_modes.addition,
-    "-": blend_modes.subtract,
-    "sub": blend_modes.subtract,
-    "subtract": blend_modes.subtract,
-    "subtraction": blend_modes.subtract,
-    "*": blend_modes.multiply,
-    "mul": blend_modes.multiply,
-    "mult": blend_modes.multiply,
-    "multiply": blend_modes.multiply,
-    "multiplication": blend_modes.multiply,
+    "normal": "blend",
+    "blt": "blend",
+    "blit": "blend",
+    "blend": "blend",
+    "replace": "blend",
+    "+": "add",
+    "add": "add",
+    "addition": "add",
+    "-": "subtract",
+    "sub": "subtract",
+    "subtract": "subtract",
+    "subtraction": "subtract",
+    "*": "multiply",
+    "mul": "multiply",
+    "mult": "multiply",
+    "multiply": "multiply",
+    "multiplication": "multiply",
     "/": blend_modes.divide,
     "div": blend_modes.divide,
     "divide": blend_modes.divide,
     "division": blend_modes.divide,
-    "diff": blend_modes.difference,
-    "difference": blend_modes.difference,
-    "overlay": blend_modes.overlay,
-    "soft": blend_modes.soft_light,
-    "softlight": blend_modes.soft_light,
-    "hard": blend_modes.hard_light,
-    "hardlight": blend_modes.hard_light,
-    "lighten": blend_modes.lighten_only,
-    "lightenonly": blend_modes.lighten_only,
-    "darken": blend_modes.darken_only,
-    "darkenonly": blend_modes.darken_only,
+    "mod": "OP_X%Y",
+    "modulo": "OP_X%Y",
+    "%": "OP_X%Y",
+    "and": "OP_X&Y",
+    "&": "OP_X&Y",
+    "or": "OP_X|Y",
+    "|": "OP_X|Y",
+    "xor": "OP_X^Y",
+    "^": "OP_X^Y",
+    "diff": "difference",
+    "difference": "difference",
+    "overlay": "overlay",
+    "screen": "screen",
+    "soft": "soft_light",
+    "softlight": "soft_light",
+    "hard": "hard_light",
+    "hardlight": "hard_light",
+    "lighter": "lighter",
+    "lighten": "lighter",
+    "darker": "darker",
+    "darken": "darker",
     "extract": blend_modes.grain_extract,
     "grainextract": blend_modes.grain_extract,
     "merge": blend_modes.grain_merge,
     "grainmerge": blend_modes.grain_merge,
+    "burn": "OP_255*(1-((255-Y)/X))",
+    "colorburn": "OP_255*(1-((255-Y)/X))",
+    "colourburn": "OP_255*(1-((255-Y)/X))",
+    "linearburn": "OP_(X+Y)-255",
     "dodge": blend_modes.dodge,
+    "colordodge": blend_modes.dodge,
+    "colourdodge": blend_modes.dodge,
+    "lineardodge": "add",
+    "hue": "SP_HUE",
+    "sat": "SP_SAT",
+    "saturation": "SP_SAT",
+    "lum": "SP_LUM",
+    "luminosity": "SP_LUM",
 }
 
 def blend_op(image, url, operation, amount):
-    op = operation.lower().replace(" ", "").replace("_", "").replace("color", "").replace("colour", "")
+    op = operation.lower().replace(" ", "").replace("_", "")
     if op in blenders:
         filt = blenders[op]
     elif op == "auto":
-        filt = blend_modes.normal
+        filt = "blend"
     else:
         raise TypeError("Invalid image operation: \"" + op + '"')
     image2 = get_image(url, url)
     if image2.width != image.width or image2.height != image.height:
         image2 = resize_to(image2, image.width, image.height, "auto")
-    if str(image.mode) != "RGBA":
-        image = image.convert("RGBA")
-    if str(image2.mode) != "RGBA":
-        image2 = image2.convert("RGBA")
-    imgA = numpy.array(image).astype(float)
-    imgB = numpy.array(image2).astype(float)
-    imgC = numpy.uint8(filt(imgA, imgB, amount))
-    return Image.fromarray(imgC)
+    if type(filt) is not str:
+        if str(image.mode) != "RGBA":
+            image = image.convert("RGBA")
+        if str(image2.mode) != "RGBA":
+            image2 = image2.convert("RGBA")
+        imgA = numpy.array(image).astype(float)
+        imgB = numpy.array(image2).astype(float)
+        out = Image.fromarray(numpy.uint8(filt(imgA, imgB, amount)))
+    else:
+        if filt == "blend":
+            out = image2
+        elif filt.startswith("OP_"):
+            f = filt[3:]
+            if str(image.mode) != str(image2.mode):
+                if str(image.mode) != "RGBA":
+                    image = image.convert("RGBA")
+                if str(image2.mode) != "RGBA":
+                    image2 = image2.convert("RGBA")
+            mode = image.mode
+            ch1 = image.split()
+            ch2 = image2.split()
+            c = len(ch1)
+            ch3 = [ImageMath.eval(f, dict(X=ch1[i], Y=ch2[i])).convert("L") for i in range(3)]
+            if c > 3:
+                ch3.append(ImageMath.eval("max(X,Y)", dict(X=ch1[-1], Y=ch2[-1])).convert("L"))
+            out = Image.merge(mode, ch3)
+        elif filt.startswith("SP_"):
+            f = filt[3:]
+            if str(image.mode) == "RGBA":
+                A1 = image.split()[-1]
+            else:
+                A1 = None
+            if str(image2.mode) == "RGBA":
+                A2 = image2.split()[-1]
+            else:
+                A2 = None
+            if str(image.mode) != "HSV":
+                image = image.convert("HSV")
+            channels = list(image.split())
+            if str(image2.mode) != "HSV":
+                image2 = image2.convert("HSV")
+            channels2 = list(image2.split())
+            if f == "HUE":
+                channels = [channels2[0], channels[1], channels[2]]
+            elif f == "SAT":
+                channels = [channels[0], channels2[1], channels[2]]
+            elif f == "LUM":
+                channels = [channels[0], channels[1], channels2[2]]
+            out = Image.merge("RGB", channels)
+            if A1 or A2:
+                out = out.convert("RGBA")
+                spl = list(out.split())
+                if not A1:
+                    A = A2
+                elif not A2:
+                    A = A1
+                else:
+                    A = ImageMath.eval("max(X,Y)", dict(X=A1, Y=A2)).convert("L")
+                spl[-1] = A
+        else:
+            if str(image.mode) != str(image2.mode):
+                if str(image.mode) != "RGBA":
+                    image = image.convert("RGBA")
+                if str(image2.mode) != "RGBA":
+                    image2 = image2.convert("RGBA")
+            filt = getattr(ImageChops, filt)
+            out = filt(image, image2)
+        if str(image.mode) != str(out.mode):
+            if str(image.mode) != "RGBA":
+                image = image.convert("RGBA")
+            if str(out.mode) != "RGBA":
+                out = out.convert("RGBA")
+        out = ImageChops.blend(image, out, amount)
+    return out
 
 
 Enhance = lambda image, operation, value: getattr(ImageEnhance, operation)(image).enhance(value)
+
+def hue_shift(image, value):
+    if str(image.mode) == "RGBA":
+        A = image.split()[-1]
+    else:
+        A = None
+    if str(image.mode) != "HSV":
+        image = image.convert("HSV")
+    channels = list(image.split())
+    value *= 256
+    channels[0] = channels[0].point(lambda x: (x + value) % 256)
+    image = Image.merge("HSV", channels)
+    if A is not None:
+        channels = list(image.convert("RGBA").split())
+        channels[-1] = A
+        image = Image.merge("RGBA", channels)
+    else:
+        image = image.convert("RGB")
+    return image
 
 
 def get_image(out, url):
@@ -195,12 +307,15 @@ def get_image(out, url):
 def evalImg(url, operation, args, key):
     out = "cache/" + key + ".png"
     args = eval(args)
-    image = get_image(out, url)
-    f = getattr(image, operation, None)
-    if f is None:
-        new = eval(operation)(image, *args)
+    if operation != "$":
+        image = get_image(out, url)
+        f = getattr(image, operation, None)
+        if f is None:
+            new = eval(operation)(image, *args)
+        else:
+            new = f(*args)
     else:
-        new = f(*args)
+        new = eval(url)(*args)
     if issubclass(type(new), Image.Image):
         new.save(out, "png")
         return repr([out])
