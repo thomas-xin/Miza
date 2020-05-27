@@ -171,7 +171,7 @@ async def downloadTextFile(url, bot):
         return s
 
     url = await bot.followURL(url)
-    resp = urlOpen(url)
+    resp = await create_future(urlOpen, url)
     return create_future(dreader, resp)
 
 
@@ -800,7 +800,7 @@ class AudioQueue(hlist):
                 if i >= len(q) or i > 8191:
                     break
                 e = q[i]
-                if i < 3:
+                if i < 2:
                     if not e.get("stream", None):
                         if not i:
                             callback = self.update_play

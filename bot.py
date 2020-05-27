@@ -418,13 +418,16 @@ class Bot:
                             break
                 url = verifyURL(url)
                 if not url:
-                    url = " ".join(e.description for e in m.embeds)
-                    if " " in url or "\n" in url or not isURL(url):
-                        for i in url.replace("\n", " ").replace("(", " ").replace(")", " ").split(" "):
-                            u = verifyURL(i)
-                            if isURL(u):
-                                url = u
-                                break
+                    url = " ".join(e.description for e in m.embeds if type(e.description) is str)
+                    if url:
+                        if " " in url or "\n" in url or not isURL(url):
+                            for i in url.replace("\n", " ").replace("(", " ").replace(")", " ").split(" "):
+                                u = verifyURL(i)
+                                if isURL(u):
+                                    url = u
+                                    break
+                    if not url:
+                        url = " ".join(e.image if type(e.image) is str else e.thumbnail if type(e.thumbnail) is str else e.video for e in m.embeds)
                 if url in it:
                     return url
                 it[url] = True
@@ -1270,11 +1273,11 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                 if wait > -1:
                                     if wait < 0:
                                         w = max(0.2, -wait)
-                                        d[u_id] = time.time() + w
+                                        d[u_id] = max(t, time.time()) + w
                                         await asyncio.sleep(w)
                                     if len(d) >= 4096:
                                         d.pop(next(iter(d)))
-                                    d[u_id] = time.time()
+                                    d[u_id] = max(t, time.time())
                                 else:
                                     raise TooManyRequests("Command has a rate limit of " + sec2Time(x) + "; please wait " + sec2Time(-wait) + ".")
                         flags = {}

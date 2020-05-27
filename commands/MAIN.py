@@ -546,7 +546,7 @@ class Info(Command):
             "embed": emb,
         }
 
-    async def __call__(self, argv, guild, bot, client, user, flags, **void):
+    async def __call__(self, argv, name, guild, bot, client, user, flags, **void):
         member = True
         g, guild = guild, None
         if argv:
@@ -593,8 +593,10 @@ class Info(Command):
                                     u = channel.recipient
                         if guild is not None:
                             return await self.getGuildData(guild, flags)                        
-        else:
+        elif not name.startswith("server"):
             u = user
+        else:
+            return await self.getGuildData(g, flags)
         guild = g
         name = str(u)
         dname = u.display_name * (u.display_name != u.name)

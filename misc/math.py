@@ -68,136 +68,136 @@ class dice(sympy.Basic):
     __str__ = __repr__
 
 
-class baseFloat(sympy.Float):
+# class baseFloat(sympy.Float):
 
-    def __base__(self, b):
-        self.base = b
-        return self
+#     def __base__(self, b):
+#         self.base = b
+#         return self
 
-    def __repr__(self):
-        if not hasattr(self, "base"):
-            self.base = 10
-        return base(self.__add__(0).__str__(), self.base, sympy.ceiling(self._prec * sympy.log(2, 10)))
+#     def __repr__(self):
+#         if not hasattr(self, "base"):
+#             self.base = 10
+#         return base(self.__add__(0).__str__(), self.base, sympy.ceiling(self._prec * sympy.log(2, 10)))
 
-    @tryWrapper
-    def evalf(self, prec):
-        temp = baseFloat(self, prec * 1.25)
-        temp.__base__(self.base)
-        s = repr(temp)
-        d = sympy.ceiling(prec / sympy.log(self.base, 10))
-        try:
-            d += s.index(".")
-        except ValueError:
-            pass
-        if len(s) >= d:
-            f = s.lower()
-            up = f != s
-            s = f
-            x = s[d].lower()
-            s = s[:d]
-            if self.base != 64:
-                i = BF_ALPHA.index(x)
-                if i >= self.base / 2:
-                    s = s[:-1] + BF_ALPHA[(1 + BF_ALPHA.index(s[-1])) % len(BF_ALPHA)]
-            if up:
-                s = s.upper()
-        return s
+#     @tryWrapper
+#     def evalf(self, prec):
+#         temp = baseFloat(self, prec * 1.25)
+#         temp.__base__(self.base)
+#         s = repr(temp)
+#         d = sympy.ceiling(prec / sympy.log(self.base, 10))
+#         try:
+#             d += s.index(".")
+#         except ValueError:
+#             pass
+#         if len(s) >= d:
+#             f = s.lower()
+#             up = f != s
+#             s = f
+#             x = s[d].lower()
+#             s = s[:d]
+#             if self.base != 64:
+#                 i = BF_ALPHA.index(x)
+#                 if i >= self.base / 2:
+#                     s = s[:-1] + BF_ALPHA[(1 + BF_ALPHA.index(s[-1])) % len(BF_ALPHA)]
+#             if up:
+#                 s = s.upper()
+#         return s
 
-    def nsimplify(self, **void):
-        return self
+#     def nsimplify(self, **void):
+#         return self
     
-    __str__ = __repr__
+#     __str__ = __repr__
 
 
-def base(x, b, p, alphabet=None, upper=True):
-    """Converts a number from decimal to another base."""
-    if not alphabet:
-        alphabet = BF_ALPHA
-    x = sympy.Float(str(x), dps=p)
-    b = int(round(float(b)))
-    if b == 64:
-        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    elif b > len(alphabet):
-        raise ValueError("Invalid number base.")
-    if b < 2:
-        raise ValueError("Invalid number base.")
-    if x <= 0:
-        if x == 0:
-            return alphabet[0]
-        else:
-            return  "-" + base(-x, b, p, alphabet)
-    r = sympy.ceiling(p / sympy.log(b, 10))
-    for i in range(r):
-        if x == round(x):
-            break
-        x *= b
-        i += 1
-    x = int(round(x))
-    dp = bool(i)
-    s = ""
-    for j in range(i):
-        x, d = divmod(x, b)
-        if not j and r >= b / 2:
-            d += 1
-        s = alphabet[d] + s
-    s = "." * dp + s
-    while x:
-        x, d = divmod(x, b)
-        s = alphabet[d] + s
-    if upper:
-        s = s.upper()
-    return s
+# def base(x, b, p, alphabet=None, upper=True):
+#     """Converts a number from decimal to another base."""
+#     if not alphabet:
+#         alphabet = BF_ALPHA
+#     x = sympy.Float(str(x), dps=p)
+#     b = int(round(float(b)))
+#     if b == 64:
+#         alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+#     elif b > len(alphabet):
+#         raise ValueError("Invalid number base.")
+#     if b < 2:
+#         raise ValueError("Invalid number base.")
+#     if x <= 0:
+#         if x == 0:
+#             return alphabet[0]
+#         else:
+#             return  "-" + base(-x, b, p, alphabet)
+#     r = sympy.ceiling(p / sympy.log(b, 10))
+#     for i in range(r):
+#         if x == round(x):
+#             break
+#         x *= b
+#         i += 1
+#     x = int(round(x))
+#     dp = bool(i)
+#     s = ""
+#     for j in range(i):
+#         x, d = divmod(x, b)
+#         if not j and r >= b / 2:
+#             d += 1
+#         s = alphabet[d] + s
+#     s = "." * dp + s
+#     while x:
+#         x, d = divmod(x, b)
+#         s = alphabet[d] + s
+#     if upper:
+#         s = s.upper()
+#     return s
 
-def debase(x, b=10):
-    """Converts a number from a base to decimal."""
-    b = int(round(float(b)))
-    i = str(x).lower()
-    try:
-        i = str(sympy.Number(i).evalf(BF_PREC))
-    except:
-        pass
-    print(i)
-    try:
-        ind = i.index(".")
-        f = i[ind + 1:]
-        i = i[:ind]
-    except ValueError:
-        f = ""
-    temp = str(int(i, b)) + "."
-    fp = sympy.Rational(0)
-    m = 1
-    while f:
-        m *= b
-        fp += sympy.Rational(int(f[0], b)) / m
-        f = f[1:]
-    s = temp + str(fp.evalf(BF_PREC)).replace("0.", "")
-    print(s)
-    return rounder(sympy.Rational(s))
+# def debase(x, b=10):
+#     """Converts a number from a base to decimal."""
+#     b = int(round(float(b)))
+#     i = str(x).lower()
+#     try:
+#         i = str(sympy.Number(i).evalf(BF_PREC))
+#     except:
+#         pass
+#     print(i)
+#     try:
+#         ind = i.index(".")
+#         f = i[ind + 1:]
+#         i = i[:ind]
+#     except ValueError:
+#         f = ""
+#     temp = str(int(i, b)) + "."
+#     fp = sympy.Rational(0)
+#     m = 1
+#     while f:
+#         m *= b
+#         fp += sympy.Rational(int(f[0], b)) / m
+#         f = f[1:]
+#     s = temp + str(fp.evalf(BF_PREC)).replace("0.", "")
+#     print(s)
+#     return rounder(sympy.Rational(s))
 
-def h2d(x):
-    return debase(x, 16)
+# def h2d(x):
+#     return debase(x, 16)
 
-def o2d(x):
-    return debase(x, 8)
+# def o2d(x):
+#     return debase(x, 8)
 
-def b2d(x):
-    return debase(x, 2)
+# def b2d(x):
+#     return debase(x, 2)
 
-def arbFloat(x, b):
-    f = baseFloat(x, BF_PREC)
-    return f.__base__(b)
+# def arbFloat(x, b):
+#     f = baseFloat(x, BF_PREC)
+#     return f.__base__(b)
 
-def hexFloat(x):
-    f = baseFloat(x, BF_PREC)
-    return f.__base__(16)
+# def hexFloat(x):
+#     f = baseFloat(x, BF_PREC)
+#     return f.__base__(16)
 
-def octFloat(x):
-    f = baseFloat(x, BF_PREC)
-    return f.__base__(8)
+# def octFloat(x):
+#     f = baseFloat(x, BF_PREC)
+#     return f.__base__(8)
 
-def binFloat(x):
-    f = baseFloat(x, BF_PREC)
-    return f.__base__(2)
+# def binFloat(x):
+#     f = baseFloat(x, BF_PREC)
+#     return f.__base__(2)
 
 
 def plotArgs(args):
@@ -513,9 +513,9 @@ def evalSym(f, prec=64, r=False):
 
 while True:
     try:
-        i = eval(sys.stdin.readline()).decode("utf-8").replace("\n", "").split("`")
+        i = eval(sys.stdin.readline()).decode("utf-8", "replace").replace("\n", "").split("`")
         if len(i) <= 1:
-            i.append("0")
+            i.append("-1")
         key = i[-1]
         resp = evalSym(*i[:-1])
         if isinstance(resp[0], Plot):

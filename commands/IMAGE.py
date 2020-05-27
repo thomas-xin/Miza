@@ -126,31 +126,299 @@ class CreateEmoji(Command):
                 raise ArgumentError("Please enter URL, emoji, or attached file to add.")
             s = emojis[0]
             name = argv[:argv.index(s)].strip()
-            if s.startswith("<:"):
-                s = s[2:]
+            s = s[2:]
             i = s.index(":")
             e_id = s[i + 1:s.rindex(">")]
             url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
         else:
             name = " ".join(args).strip()
-            # if not name:
-            #     s = url
-            #     if "/" in s:
-            #         s = s[s.rindex("/") + 1:]
-            #     if "." in s:
-            #         s = s[:s.rindex(".")]
-            #     name = s.strip()
         if not name:
             name = "emoji_" + str(len(guild.emojis))
         print(name, url)
         resp = await create_future(requests.get, url, headers={"user-agent": "Mozilla/5." + str(xrand(1, 10))}, timeout=8)
         image = resp.content
+        if len(image) > 67108864:
+            raise OverflowError("Max file size to load is 64MB.")
+        if len(image) > 262144:
+            path = "cache/" + str(guild.id) + ".png"
+            f = await create_future(open, path, "wb")
+            await create_future(f.write, image)
+            await create_future(f.close)
+            resp = await imageProc(path, "resize_max", [128], guild.id)
+            fn = resp[0]
+            f = await create_future(open, fn, "rb")
+            image = await create_future(f.read)
+            create_future_ex(f.close)
         emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
         await message.add_reaction(emoji)
         return (
            "```css\nSuccessfully created emoji [" + noHighlight(emoji) + "] in ["
             + noHighlight(guild.name) + "].```"
         )
+
+
+async def get_image(bot, message, args, argv):
+    if not args:
+        if message.attachments:
+            args.insert(0, message.attachments[0].url)
+            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
+        else:
+            raise ArgumentError("Please input an image by URL or attachment.")
+    url = args.pop(0)
+    url = await bot.followURL(url)
+    if not isURL(url):
+        emojis = findEmojis(argv) + findEmojis(url)
+        if not emojis:
+            raise ArgumentError("Please input an image by URL or attachment.")
+        s = emojis[0]
+        value = argv[argv.index(s) + len(s):].strip()
+        s = s[2:]
+        i = s.index(":")
+        e_id = s[i + 1:s.rindex(">")]
+        url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
+    else:
+        value = " ".join(args).strip()
+    if not value:
+        value = 2
+    else:
+        value = await bot.evalMath(value, message.guild.id)
+        if not value >= -16 or not value <= 16:
+            raise OverflowError("Maximum multiplier input is 16.")
+    try:
+        name = url[url.rindex("/") + 1:]
+        if not name:
+            raise ValueError
+        if "." in name:
+            name = name[:name.rindex(".")]
+    except ValueError:
+        name = "unknown"
+    if "." not in name:
+        name += ".png"
+    return name, value, url
+
+
+class Saturate(Command):
+    name = ["ImageSaturate"]
+    min_level = 0
+    description = "Changes colour saturation of supplied image."
+    usage = "<0:url{attached_file}> <1:multiplier[2]>"
+    no_parse = True
+    rate_limit = 3
+
+    async def __call__(self, bot, guild, message, args, argv, **void):
+        name, value, url = await get_image(bot, message, args, argv)
+        resp = await imageProc(url, "Enhance", ["Color", value], guild.id)
+        fn = resp[0]
+        f = discord.File(fn, filename=name)
+        await sendFile(message.channel, "", f)
+
+
+class Contrast(Command):
+    name = ["ImageContrast"]
+    min_level = 0
+    description = "Changes colour contrast of supplied image."
+    usage = "<0:url{attached_file}> <1:multiplier[2]>"
+    no_parse = True
+    rate_limit = 3
+
+    async def __call__(self, bot, guild, message, args, argv, **void):
+        name, value, url = await get_image(bot, message, args, argv)
+        resp = await imageProc(url, "Enhance", ["Contrast", value], guild.id)
+        fn = resp[0]
+        f = discord.File(fn, filename=name)
+        await sendFile(message.channel, "", f)
+
+
+class Brightness(Command):
+    name = ["ImageBrightness"]
+    min_level = 0
+    description = "Changes colour brightness of supplied image."
+    usage = "<0:url{attached_file}> <1:multiplier[2]>"
+    no_parse = True
+    rate_limit = 3
+
+    async def __call__(self, bot, guild, message, args, argv, **void):
+        name, value, url = await get_image(bot, message, args, argv)
+        resp = await imageProc(url, "Enhance", ["Brightness", value], guild.id)
+        fn = resp[0]
+        f = discord.File(fn, filename=name)
+        await sendFile(message.channel, "", f)
+
+
+class Sharpness(Command):
+    name = ["ImageSharpness"]
+    min_level = 0
+    description = "Changes colour sharpness of supplied image."
+    usage = "<0:url{attached_file}> <1:multiplier[2]>"
+    no_parse = True
+    rate_limit = 3
+
+    async def __call__(self, bot, guild, message, args, argv, **void):
+        name, value, url = await get_image(bot, message, args, argv)
+        resp = await imageProc(url, "Enhance", ["Sharpness", value], guild.id)
+        fn = resp[0]
+        f = discord.File(fn, filename=name)
+        await sendFile(message.channel, "", f)
+
+
+class Resize(Command):
+    name = ["ImageScale", "Scale", "ImageResize"]
+    min_level = 0
+    description = "Changes size of supplied image, using an optional scaling operation."
+    usage = "<0:url{attached_file}> <1:x_multiplier[0.5]> <2:y_multiplier[x]> <3:operation[auto](?l)>"
+    no_parse = True
+    rate_limit = 3
+    flags = "l"
+
+    async def __call__(self, bot, guild, message, flags, args, argv, **void):
+        if not args:
+            if message.attachments:
+                args.insert(0, message.attachments[0].url)
+                argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
+            else:
+                if "l" in flags:
+                    return (
+                        "```ini\nAvailable scaling operations: ["
+                        + "nearest, linear, hamming, bicubic, lanczos, auto]```"
+                    )
+                raise ArgumentError("Please input an image by URL or attachment.")
+        url = args.pop(0)
+        url = await bot.followURL(url)
+        if not isURL(url):
+            emojis = findEmojis(argv) + findEmojis(url)
+            if not emojis:
+                raise ArgumentError("Please input an image by URL or attachment.")
+            s = emojis[0]
+            value = argv[argv.index(s) + len(s):].strip()
+            s = s[2:]
+            i = s.index(":")
+            e_id = s[i + 1:s.rindex(">")]
+            url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
+        else:
+            value = " ".join(args).strip()
+        if not value:
+            x = y = 0.5
+            op = "auto"
+        else:
+            value = value.replace("x", " ").replace("X", " ").replace("*", " ").replace("×", " ")
+            try:
+                spl = shlex.split(value)
+            except ValueError:
+                spl = value.split()
+            x = await bot.evalMath(spl.pop(0), message.guild.id)
+            if spl:
+                y = await bot.evalMath(spl.pop(0), message.guild.id)
+            else:
+                y = x
+            for value in (x, y):
+                if not value >= -16 or not value <= 16:
+                    raise OverflowError("Maximum multiplier input is 16.")
+            if spl:
+                op = " ".join(spl)
+            else:
+                op = "auto"
+        try:
+            name = url[url.rindex("/") + 1:]
+            if not name:
+                raise ValueError
+            if "." in name:
+                name = name[:name.rindex(".")]
+        except ValueError:
+            name = "unknown"
+        if "." not in name:
+            name += ".png"
+        resp = await imageProc(url, "resize_mult", [x, y, op], guild.id)
+        fn = resp[0]
+        f = discord.File(fn, filename=name)
+        await sendFile(message.channel, "", f)
+
+
+class Blend(Command):
+    name = ["ImageBlend", "ImageOP"]
+    min_level = 0
+    description = "Combines the two supplied images, using an optional blend operation."
+    usage = "<0:url1{attached_file}> <1:url2{attached_file}> <2:operation[replace](?l)> <3:opacity[1]>"
+    no_parse = True
+    rate_limit = 3
+    flags = "l"
+
+    async def __call__(self, bot, guild, message, flags, args, argv, **void):
+        if not args:
+            if message.attachments:
+                args = [a.url for a in message.attachments] + args
+                argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
+            else:
+                if "l" in flags:
+                    return (
+                        "```ini\nAvailable blend operations: ["
+                        + "replace, add, sub, mul, div, difference, overlay, "
+                        + "soft, hard, lighten, darken, extract, merge, dodge]```"
+                    )
+                raise ArgumentError("Please input an image by URL or attachment.")
+        url1 = args.pop(0)
+        url1 = await bot.followURL(url1)
+        url2 = args.pop(0)
+        url2 = await bot.followURL(url2)
+        fromA = False
+        if not isURL(url1):
+            emojis = findEmojis(argv) + findEmojis(url1)
+            if not emojis:
+                raise ArgumentError("Please input an image by URL or attachment.")
+            s = emojis[0]
+            argv = argv[argv.index(s) + len(s):].strip()
+            s = s[2:]
+            i = s.index(":")
+            e_id = s[i + 1:s.rindex(">")]
+            url1 = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
+            fromA = True
+        if not isURL(url2):
+            emojis = findEmojis(argv) + findEmojis(url2)
+            if not emojis:
+                raise ArgumentError("Please input an image by URL or attachment.")
+            s = emojis[0]
+            argv = argv[argv.index(s) + len(s):].strip()
+            s = s[2:]
+            i = s.index(":")
+            e_id = s[i + 1:s.rindex(">")]
+            url1 = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
+            fromA = True
+        if fromA:
+            value = argv
+        else:
+            value = " ".join(args).strip()
+        if not value:
+            opacity = 1
+            operation = "replace"
+        else:
+            try:
+                spl = shlex.split(value)
+            except ValueError:
+                spl = value.split()
+            operation = spl.pop(0)
+            if spl:
+                opacity = await bot.evalMath(spl.pop(-1), message.guild.id)
+            else:
+                opacity = 1
+            if not opacity >= -16 or not opacity <= 16:
+                raise OverflowError("Maximum multiplier input is 16.")
+            if spl:
+                operation += " ".join(spl)
+            if not operation:
+                operation = "replace"
+        try:
+            name = url1[url1.rindex("/") + 1:]
+            if not name:
+                raise ValueError
+            if "." in name:
+                name = name[:name.rindex(".")]
+        except ValueError:
+            name = "unknown"
+        if "." not in name:
+            name += ".png"
+        resp = await imageProc(url1, "blend_op", [url2, operation, opacity], guild.id)
+        fn = resp[0]
+        f = discord.File(fn, filename=name)
+        await sendFile(message.channel, "", f)
 
 
 class React(Command):

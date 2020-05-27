@@ -467,7 +467,7 @@ class CS_hex2xml(Command):
             + '\t</panel>\n'
             + '</hack>'
         )
-        data = bytes(output, "utf-8")
+        data = await create_future(bytes, output, "utf-8")
         b = io.BytesIO(data)
         f = discord.File(b, filename="patch.xml")
         create_task(sendFile(channel, "Patch successfully converted!", f))
@@ -485,7 +485,7 @@ class CS_npc(Command):
     async def __call__(self, bot, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
         argv = " ".join(args)
-        data = entity_list.search(argv, lim)
+        data = await create_future(entity_list.search, argv, lim)
         if len(data):
             head = entity_list.data[0][1]
             for i in range(len(head)):
@@ -524,7 +524,7 @@ class CS_tsc(Command):
     async def __call__(self, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
         argv = " ".join(args)
-        data = tsc_list.search(argv, lim)
+        data = await create_future(tsc_list.search, argv, lim)
         if len(data):
             head = tsc_list.data[0][0]
             for i in range(len(head)):
@@ -564,7 +564,7 @@ class CS_mod(Command):
     async def __call__(self, args, **void):
         argv = " ".join(args)
         data = await create_future(searchForums, argv)
-        data += douclub.search(argv)
+        data += await create_future(douclub.search, argv)
         if len(data):
             response = "Search results for **" + argv + "**:\n"
             for l in data:

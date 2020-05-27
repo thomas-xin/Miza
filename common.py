@@ -336,51 +336,111 @@ def urlOpen(url):
     return resp
 
 
-SUBS = freeClass(procs=hlist(), busy=freeClass())
+SUBS = freeClass(math=freeClass(procs=hlist(), busy=freeClass()), image=freeClass(procs=hlist(), busy=freeClass()))
 
-subCount = lambda: sum(1 for proc in SUBS.procs if proc.is_running())
+subCount = lambda: sum(1 for ptype in SUBS.values() for proc in ptype.procs if proc.is_running())
 
 def subKill():
-    for sub in SUBS.procs:
-        sub.kill()
-    SUBS.procs.clear()
-    SUBS.busy.clear()
+    for ptype in SUBS.values():
+        for sub in ptype.procs:
+            try:
+                sub.kill()
+            except psutil.NoSuchProcess:
+                pass
+        ptype.procs.clear()
+        ptype.busy.clear()
     procUpdate()
 
 def procUpdate():
-    procs = SUBS.procs
-    b = len(SUBS.busy)
-    count = sum(1 for proc in procs if not proc.busy)
-    if count > 16:
-        return
-    if b + 1 > count:
-        proc = psutil.Popen(
-            [python, "misc/math.py"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        proc.busy = False
-        procs.append(proc)
-    att = 0
-    while count > b + 2:
-        for p in range(len(procs)):
-            if p < len(procs):
-                proc = procs[p]
-                if not proc.busy:
-                    proc.kill()
-                    procs.pop(p)
+    for pname, ptype in SUBS.items():
+        procs = ptype.procs
+        b = len(ptype.busy)
+        count = sum(1 for proc in procs if not proc.busy)
+        if count > 16:
+            return
+        if b + 1 > count:
+            if pname == "math":
+                proc = psutil.Popen(
+                    [python, "misc/math.py"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+            elif pname == "image":
+                proc = psutil.Popen(
+                    [python, "misc/image.py"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+            proc.busy = False
+            procs.append(proc)
+        att = 0
+        while count > b + 2:
+            for p in range(len(procs)):
+                if p < len(procs):
+                    proc = procs[p]
+                    if not proc.busy:
+                        proc.kill()
+                        procs.pop(p)
+                        break
+                else:
                     break
-            else:
+            att += 1
+            if att >= 16:
                 break
-        att += 1
-        if att >= 16:
-            break
 
 procUpdate()
 
+async def imageProc(image, operation, args, key=-1, timeout=12):
+    procs, busy = SUBS.image.procs, SUBS.image.busy
+    while time.time() - busy.get(key, 0) < 60:
+        await asyncio.sleep(0.5)
+    try:
+        while True:
+            for p in range(len(procs)):
+                if p < len(procs):
+                    proc = procs[p]
+                    if not proc.busy:
+                        raise StopIteration
+                else:
+                    break
+            procUpdate()
+            await asyncio.sleep(0.5)
+    except StopIteration:
+        pass
+    d = repr(bytes("`".join(str(i) for i in (image, operation, args, key)), "utf-8")).encode("utf-8") + b"\n"
+    print(d)
+    try:
+        proc.busy = True
+        busy[key] = time.time()
+        procUpdate()
+        proc.stdin.write(d)
+        proc.stdin.flush()
+        resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
+        proc.busy = False
+    except (TimeoutError, asyncio.exceptions.TimeoutError):
+        proc.kill()
+        try:
+            procs.pop(p)
+        except LookupError:
+            pass
+        try:
+            busy.pop(key)
+        except KeyError:
+            pass
+        procUpdate()
+        raise
+    try:
+        busy.pop(key)
+    except KeyError:
+        pass
+    print(resp)
+    output = evalEX(evalEX(resp))
+    return output
+
 async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12):
-    procs, busy = SUBS.procs, SUBS.busy
+    procs, busy = SUBS.math.procs, SUBS.math.busy
     while time.time() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
     try:
