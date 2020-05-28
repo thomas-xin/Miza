@@ -112,12 +112,11 @@ class CreateEmoji(Command):
     rate_limit = 3
 
     async def __call__(self, bot, guild, message, args, argv, **void):
+        if message.attachments:
+            args = [a.url for a in message.attachments] + args
+            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
         if not args:
-            if message.attachments:
-                args.append(message.attachments[0].url)
-                argv += " " * bool(argv) + " ".join(a.url for a in message.attachments)
-            else:
-                raise ArgumentError("Please enter URL, emoji, or attached file to add.")
+            raise ArgumentError("Please enter URL, emoji, or attached file to add.")
         url = args.pop(-1)
         url = await bot.followURL(url)
         if not isURL(url):
@@ -158,12 +157,11 @@ class CreateEmoji(Command):
 
 
 async def get_image(bot, message, args, argv):
+    if message.attachments:
+        args = [a.url for a in message.attachments] + args
+        argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
     if not args:
-        if message.attachments:
-            args.insert(0, message.attachments[0].url)
-            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
-        else:
-            raise ArgumentError("Please input an image by URL or attachment.")
+        raise ArgumentError("Please input an image by URL or attachment.")
     url = args.pop(0)
     url = await bot.followURL(url)
     if not isURL(url):
@@ -316,17 +314,16 @@ class Resize(Command):
     flags = "l"
 
     async def __call__(self, bot, guild, message, flags, args, argv, **void):
+        if message.attachments:
+            args = [a.url for a in message.attachments] + args
+            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
         if not args:
-            if message.attachments:
-                args.insert(0, message.attachments[0].url)
-                argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
-            else:
-                if "l" in flags:
-                    return (
-                        "```ini\nAvailable scaling operations: ["
-                        + "nearest, linear, hamming, bicubic, lanczos, auto]```"
-                    )
-                raise ArgumentError("Please input an image by URL or attachment.")
+            if "l" in flags:
+                return (
+                    "```ini\nAvailable scaling operations: ["
+                    + "nearest, linear, hamming, bicubic, lanczos, auto]```"
+                )
+            raise ArgumentError("Please input an image by URL or attachment.")
         url = args.pop(0)
         url = await bot.followURL(url)
         if not isURL(url):
@@ -388,19 +385,18 @@ class Blend(Command):
     flags = "l"
 
     async def __call__(self, bot, guild, message, flags, args, argv, **void):
+        if message.attachments:
+            args = [a.url for a in message.attachments] + args
+            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
         if not args:
-            if message.attachments:
-                args = [a.url for a in message.attachments] + args
-                argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
-            else:
-                if "l" in flags:
-                    return (
-                        "```ini\nAvailable blend operations: ["
-                        + "replace, add, sub, mul, div, mod, and, or, xor, "
-                        + "difference, overlay, screen, soft, hard, lighten, darken, "
-                        + "burn, linearburn, dodge, lineardodge, hue, sat, lum, extract, merge]```"
-                    )
-                raise ArgumentError("Please input an image by URL or attachment.")
+            if "l" in flags:
+                return (
+                    "```ini\nAvailable blend operations: ["
+                    + "replace, add, sub, mul, div, mod, and, or, xor, nand, nor, xnor, "
+                    + "difference, overlay, screen, soft, hard, lighten, darken, "
+                    + "burn, linearburn, dodge, lineardodge, hue, sat, lum, extract, merge]```"
+                )
+            raise ArgumentError("Please input an image by URL or attachment.")
         url1 = args.pop(0)
         url1 = await bot.followURL(url1)
         url2 = args.pop(0)

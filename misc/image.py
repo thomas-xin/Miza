@@ -144,6 +144,13 @@ blenders = {
     "|": "OP_X|Y",
     "xor": "OP_X^Y",
     "^": "OP_X^Y",
+    "nand": "OP_255-(X&Y)",
+    "~&": "OP_255-(X&Y)",
+    "nor": "OP_255-(X|Y)",
+    "~|": "OP_255-(X|Y)",
+    "xnor": "OP_255-(X^Y)",
+    "~^": "OP_255-(X^Y)",
+    "xand": "OP_255-(X^Y)",
     "diff": "difference",
     "difference": "difference",
     "overlay": "overlay",
@@ -261,6 +268,8 @@ def blend_op(image, url, operation, amount):
         out = ImageChops.blend(image, out, amount)
     return out
 
+# def ColourDeficiency(image, operation, value):
+#     pass
 
 Enhance = lambda image, operation, value: getattr(ImageEnhance, operation)(image).enhance(value)
 

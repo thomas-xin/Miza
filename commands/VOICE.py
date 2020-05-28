@@ -898,9 +898,6 @@ class AudioQueue(hlist):
                             ))
                             self.lastsent = time.time()
                     self.loading = True
-                    if "research" in q[0]:
-                        q[0].pop("research")
-                        ytdl.extractSingle(q[0])
                     source = ytdl.getStream(q[0])
                     print(q[0])
                     try:
@@ -1303,7 +1300,7 @@ class videoDownloader:
             self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
             self.lastclear = time.time()
 
-    def extract_true(self, url):
+    def extract_from(self, url):
         return self.downloader.extract_info(url, download=False, process=False)
         # pyt = create_future_ex(pytube2Dict, url)
         # resp = self.extract_info(url, search=False)
@@ -1317,6 +1314,9 @@ class videoDownloader:
         # if issubclass(type(data), Exception):
         #     raise data
         # return resp
+
+    def extract_true(self, url):
+        return self.downloader.extract_info(url, download=False, process=True)
 
     def extract(self, item, force=False, count=1, search=True):
         self.update_dl()
@@ -1412,14 +1412,14 @@ class videoDownloader:
                         return [freeClass(name=e["name"], url=e["url"], duration=e.get("duration", "300")) for e in q]
                 resp = self.extract_info(item, count, search=search)
                 if resp.get("_type", None) == "url":
-                    resp = self.extract_true(resp["url"])
+                    resp = self.extract_from(resp["url"])
                 if resp is None or not len(resp):
                     raise EOFError("No search results found.")
                 if resp.get("_type", None) == "playlist":
                     entries = list(resp["entries"])
                     if force or len(entries) <= 1:
                         for entry in entries:
-                            data = self.extract_true(entry["url"])
+                            data = self.extract_from(entry["url"])
                             temp = {
                                 "name": data["title"],
                                 "url": data["webpage_url"],
@@ -1499,7 +1499,7 @@ class videoDownloader:
             except Exception as ex:
                 raise ConnectionError(exc + repr(ex))
         if isURL(item) or not search:
-            return self.extract_true(item)
+            return self.extract_from(item)
         return self.downloader.extract_info(item, download=False, process=False)
 
     def search(self, item, force=False):
@@ -1532,6 +1532,9 @@ class videoDownloader:
         stream = entry.get("stream", None)
         if stream == "none" and not force:
             return None
+        if "research" in entry:
+            entry.pop("research")
+            ytdl.extractSingle(entry)
         entry["stream"] = "none"
         if stream in (None, "none") or stream.startswith("https://cf-hls-media.sndcdn.com/"):
             data = self.extract(entry["url"], search=False)
