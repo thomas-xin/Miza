@@ -1532,10 +1532,21 @@ class videoDownloader:
         stream = entry.get("stream", None)
         if stream == "none" and not force:
             return None
-        if "research" in entry:
-            entry.pop("research")
-            ytdl.extractSingle(entry)
         entry["stream"] = "none"
+        if "research" in entry:
+            try:
+                self.extractSingle(entry)
+                try:
+                    entry.pop("research")
+                except KeyError:
+                    pass
+            except:
+                print(traceback.format_exc())
+                try:
+                    entry.pop("research")
+                except KeyError:
+                    pass
+                raise
         if stream in (None, "none") or stream.startswith("https://cf-hls-media.sndcdn.com/"):
             data = self.extract(entry["url"], search=False)
             stream = setDict(data[0], "stream", data[0].url)
@@ -2973,14 +2984,21 @@ def extract_lyrics(s):
     except json.JSONDecodeError:
         d = eval(data, {}, eval_const)
     lyrics = d["songPage"]["lyricsData"]["body"]["children"][0]["children"]
+    newline = True
     output = ""
     while lyrics:
         line = lyrics.pop(0)
         if type(line) is str:
             if line:
-                if line.startswith("[") and line[-1] == "]":
+                if line.startswith("["):
                     output += "\n"
-                output += line + "\n"
+                    newline = False
+                if "]" in line:
+                    if line == "]":
+                        if output.endswith(" ") or output.endswith("\n"):
+                            output = output[:-1]
+                    newline = True
+                output += line + ("\n" if newline else (" " if not line.endswith(" ") else ""))
         elif type(line) is dict:
             if "children" in line:
                 lyrics = line["children"] + lyrics
@@ -3106,7 +3124,7 @@ class Lyrics(Command):
                     paragraphs = p + paragraphs
             elif emb.description and len(curr) + len(para) > 1000:
                 if len(para) <= 1000:
-                    emb.add_field(name="Page " + str(i), value="```ini\n" + curr.strip() + "```", inline=False)
+                    emb.add_field(name="Page " + str(len(emb.fields) + 2), value="```ini\n" + curr.strip() + "```", inline=False)
                     curr = para
                 else:
                     p = [i + "\n" for i in para.split("\n")]
@@ -3119,12 +3137,13 @@ class Lyrics(Command):
                 curr += para
         if curr:
             if emb.description:
-                emb.add_field(name="Page " + str(i), value="```ini\n" + curr.strip() + "```", inline=False)
+                emb.add_field(name="Page " + str(len(emb.fields) + 2), value="```ini\n" + curr.strip() + "```", inline=False)
             else:
                 emb.description = "```ini\n" + curr.strip() + "```"
         try:
             await channel.send(embed=emb)
         except discord.HTTPException:
+            print(traceback.format_exc())
             return (title + "\n\n" + emb.description + "\n\n".join(noCodeBox(f.value) for f in emb.fields)).strip()
 
 
@@ -3317,11 +3336,18 @@ class UpdateQueues(Database):
                 break
             if "research" in i:
                 try:
-                    i.pop("research")
                     await create_future(ytdl.extractSingle, i)
+                    try:
+                        i.pop("research")
+                    except KeyError:
+                        pass
                     print(i.name)
                     searched += 1
                 except:
+                    try:
+                        i.pop("research")
+                    except KeyError:
+                        pass
                     print(traceback.format_exc())
                     break
             if random.random() > 0.99:
