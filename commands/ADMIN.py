@@ -763,7 +763,7 @@ class UpdateBans(Database):
                 except (LookupError, discord.Forbidden, discord.NotFound):
                     channel = await self.bot.get_sendable(guild, m)
                 try:
-                    await guild.unban(user)
+                    await guild.unban(user, reason="Temporary ban expired.")
                     text = (
                         "```css\n[" + noHighlight(user)
                         + "] has been unbanned from [" + noHighlight(guild) + "].```"

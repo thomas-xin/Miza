@@ -2166,7 +2166,7 @@ lookup time for all elements. Includes many array and numeric operations."""
         v = value if key is None else key(value)
         x = len(self.data)
         index = (x >> 1) + self.offs
-        gap = x >> 2
+        gap = 3 + x >> 2
         seen = {}
         d = self.data
         while index not in seen and index in d:
