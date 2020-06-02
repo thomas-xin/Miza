@@ -296,6 +296,8 @@ class Colour(Command):
                     channels = [raw >> 16 & 255, raw >> 8 & 255, raw & 255]
                 elif len(argv) <= 8:
                     channels = [raw >> 16 & 255, raw >> 8 & 255, raw & 255, raw >> 24 & 255]
+                else:
+                    raise ValueError
             except ValueError:
                 raise ArgumentError("Please input a valid hex colour.")
         resp = await imageProc("from_colour", "$", [channels], guild.id)
