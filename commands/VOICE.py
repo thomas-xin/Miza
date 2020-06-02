@@ -208,8 +208,10 @@ class customAudio(discord.AudioSource):
         "chorus": 0,
         "resample": 0,
         "loop": False,
+        "repeat": False,
         "shuffle": False,
         "quiet": False,
+        "stay": False,
         "position": 0,
     }
 
@@ -370,7 +372,10 @@ class customAudio(discord.AudioSource):
                 elif time.time() - self.att > 10:
                     self.dead = True
                     return
-        cnt = sum(1 for m in vc.channel.members if not m.bot)
+        if self.stats.stay:
+            cnt = inf
+        else:
+            cnt = sum(1 for m in vc.channel.members if not m.bot)
         if not cnt:
             if self.timeout < time.time() - 20:
                 self.dead = True
@@ -828,27 +833,33 @@ class AudioQueue(hlist):
             self.advance(process=False)
         create_task(self.auds.updatePlayer())
 
-    def advance(self, looped=True, shuffled=True, process=True):
+    def advance(self, looped=True, repeated=True, shuffled=True, process=True):
         q = self
         s = self.auds.stats
         if q and process:
             if q[0].get("played"):
                 print("Queue Advanced.")
-                if s.loop:
-                    temp = q[0]
                 self.prev = q[0]["url"]
-                q.popleft()
-                if s.shuffle and shuffled:
-                    if len(q) > 1:
-                        temp = q.popleft()
-                        shuffle(q)
-                        q.appendleft(temp)
-                if s.loop and looped:
+                if s.repeat:
                     try:
-                        temp.pop("played")
+                        q[0].pop("played")
                     except (KeyError, IndexError):
                         pass
-                    q.append(temp)
+                else:
+                    if s.loop:
+                        temp = q[0]
+                    q.popleft()
+                    if s.shuffle and shuffled:
+                        if len(q) > 1:
+                            temp = q.popleft()
+                            shuffle(q)
+                            q.appendleft(temp)
+                    if s.loop and looped:
+                        try:
+                            q[0].pop("played")
+                        except (KeyError, IndexError):
+                            pass
+                        q.append(temp)
                 if self.auds.player:
                     self.auds.player.time = 1 + time.time()
         if not (q or self.auds.preparing):
@@ -2412,9 +2423,12 @@ class AudioSettings(Command):
         "NightCore": "resample",
         "Resample": "resample",
         "LoopQueue": "loop",
+        "LoopOne": "repeat",
+        "Repeat": "repeat",
         "ShuffleQueue": "shuffle",
         "Quiet": "quiet",
         "Reset": "reset",
+        "Stay": "stay",
     }
     aliasExt = {
         "AudioSettings": None,
@@ -2431,7 +2445,9 @@ class AudioSettings(Command):
         "CH": "chorus",
         "NC": "resample",
         "LQ": "loop",
+        "L1": "repeat",
         "SQ": "shuffle",
+        "24/7": "stay",
     }
     rate_limit = 0.5
 
@@ -2443,7 +2459,7 @@ class AudioSettings(Command):
         self.description = "Changes the current audio settings for this server."
         self.usage = (
             "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <pan(?e)> <bassboost(?b)> <reverb(?r)> <compressor(?c)>"
-            + " <chorus(?u)> <nightcore(?n)> <loop(?l)> <shuffle(?x)> <quiet(?q)> <disable_all(?d)> <hide(?h)>"
+            + " <chorus(?u)> <nightcore(?n)> <loop(?l)> <repeat(?1)> <shuffle(?x)> <quiet(?q)> <stay(?t)> <disable_all(?d)> <hide(?h)>"
         )
         self.flags = "vspbrcnlxqdh"
         self.map = {k.lower(): self.aliasMap[k] for k in self.aliasMap}
@@ -2480,11 +2496,15 @@ class AudioSettings(Command):
             ops.append("resample")
         if "l" in flags:
             ops.append("loop")
+        if "1" in flags:
+            ops.append("repeat")
         if "x" in flags:
             ops.append("shuffle")
         if "q" in flags:
             ops.append("quiet")
-        if not disable and not argv and (len(ops) != 1 or ops[-1] not in "loop shuffle quiet"):
+        if "t" in flags:
+            ops.append("stay")
+        if not disable and not argv and (len(ops) != 1 or ops[-1] not in "loop repeat shuffle quiet stay"):
             if len(ops) == 1:
                 op = ops[0]
             else:
@@ -2521,10 +2541,10 @@ class AudioSettings(Command):
                 ops.append("volume")
         s = ""
         for op in ops:
-            if op not in "volume loop shuffle quiet reset":
+            if op not in "volume loop repeat shuffle quiet stay reset":
                 if not bot.isTrusted(guild.id):
                     raise PermissionError("Must be in a trusted server to apply complex audio filters.")
-            if type(op) is str and op in "loop shuffle quiet" and not argv:
+            if type(op) is str and op in "loop repeat shuffle quiet stay" and not argv:
                 argv = str(not bot.database.playlists.audio[guild.id].stats[op])
             if disable:
                 val = auds.defaults[op]
@@ -2536,7 +2556,7 @@ class AudioSettings(Command):
             num = await bot.evalMath(argv, guild.id, orig)
             val = roundMin(float(num / 100))
             new = round(num, 9)
-            if op in "loop shuffle quiet":
+            if op in "loop repeat shuffle quiet stay":
                 origStats[op] = new = bool(val)
                 orig = bool(orig)
             else:

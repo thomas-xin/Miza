@@ -242,7 +242,7 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
             opener.retrieve(wave, "cache/" + key + ".dat")
             com = "org2xm ../cache/" + key + ".org ../cache/" + key + ".dat"
         else:
-            com = "org2xm ../cache/" + key + ".org ORG210EN.DAT"
+            com = "org2xm ../misc/" + key + ".org ORG210EN.DAT"
         os.chdir("misc")
         try:
             os.system(com)
@@ -307,8 +307,8 @@ class CS_org2xm(Command):
         "mp3",
         "ogg",
         "xm",
-        "webm"
-        "wav"
+        "webm",
+        "wav",
     ]
     name = ["CS_o2x", "Org2xm", "Convert_org"]
     min_level = 0
@@ -317,13 +317,12 @@ class CS_org2xm(Command):
     rate_limit = 5
 
     async def __call__(self, args, bot, message, channel, guild, **void):
+        raise NotImplementedError("Command is currently under maintenance, please be patient...")
         if not bot.isTrusted(guild.id):
             raise PermissionError("Must be in a trusted server to convert .org files.")
         if len(message.attachments):
-            org = message.attachments[0].url
-            args = [""] + args
-        else:
-            org = await bot.followURL(verifyURL(args[0]))
+            args = [a.url for a in message.attachments] + args
+        org = await bot.followURL(verifyURL(args[0]))
         if len(args) > 2:
             wave = await bot.followURL(verifyURL(args[1]))
         else:
@@ -559,7 +558,7 @@ class CS_mod(Command):
     description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
     usage = "<query>"
     no_parse = True
-    rate_limit = 2
+    rate_limit = 3
 
     async def __call__(self, args, **void):
         argv = " ".join(args)

@@ -402,8 +402,8 @@ class Bot:
         if it is None:
             url = stripAcc(url.strip().strip("`"))
             it = {}
-        if url.startswith("https://discordapp.com/channels/"):
-            spl = url[32:].split("/")
+        if "channels/" in url and ("discord" in url or url.startswith("channels/")):
+            spl = url[url.index("channels/") + 9:].split("/")
             c = await self.fetch_channel(spl[1])
             m = await self.fetch_message(spl[2], c)
             if m.attachments:
@@ -906,19 +906,22 @@ class Bot:
             if msg[:3] != "```" or len(msg) <= 3:
                 return
             msg = msg[3:]
-            while msg[0] == "\n":
+            while msg.startswith("\n"):
                 msg = msg[1:]
             check = "callback-"
-            msg = msg.split("\n")[0]
-            if reaction is not None:
-                reacode = str(reaction).encode("utf-8")
-            else:
-                reacode = None
+            try:
+                msg = msg[:msg.index("\n")]
+            except ValueError:
+                pass
             if msg.startswith(check):
                 while len(self.proc_call) > 65536:
                     self.proc_call.pop(next(iter(self.proc_call)))
                 while time.time() - self.proc_call.get(message.id, 0) < 30:
                     await asyncio.sleep(0.2)
+                if reaction is not None:
+                    reacode = str(reaction).encode("utf-8")
+                else:
+                    reacode = None
                 msg = message.content
                 if not msg:
                     msg = message.embeds[0].description
@@ -932,13 +935,12 @@ class Bot:
                 self.proc_call[message.id] = time.time()
                 msg = msg[len(check):]
                 args = msg.split("-")
-                catx = args[0]
-                func = args[1]
-                vals = args[2]
+                catn, func, vals = args[:3]
+                func = func.lower()
                 argv = "-".join(args[3:])
-                catg = self.categories[catx]
+                catg = self.categories[catn]
                 for f in catg:
-                    if f.__name__.lower() == func.lower():
+                    if f.__name__.lower() == func:
                         try:
                             timeout = getattr(f, "_timeout_", 1) * self.timeout
                             await asyncio.wait_for(
@@ -993,11 +995,11 @@ class Bot:
                     try:
                         u = await self.fetch_user(self.owner_id)
                         n = u.name
-                        place = "live from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place, "
+                        place = ", from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place!"
                         activity = discord.Streaming(
                             name=(
-                                place + "to " + uniStr(guilds) + " server"
-                                + "s" * (guilds != 1) + "!"
+                                "live to " + uniStr(guilds) + " server"
+                                + "s" * (guilds != 1) + place
                             ),
                             url=self.website,
                         )
@@ -1172,19 +1174,19 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         msg = msg[2:-2]
     msg = msg.replace("`", "")
     while len(msg):
-        if msg[0] == "\n" or msg[0] == "\r":
+        if msg[0] in (" ", "\n", "\t", "\r"):
             msg = msg[1:]
         else:
             break
     user = message.author
     guild = message.guild
     u_id = user.id
+    channel = message.channel
+    c_id = channel.id
     if guild:
         g_id = guild.id
     else:
         g_id = 0
-    channel = message.channel
-    c_id = channel.id
     if g_id:
         try:
             enabled = bot.data.enabled[c_id]
@@ -1331,18 +1333,19 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         if not argv:
                             args = []
                         else:
+                            argv = argv.replace("\n", " ").replace("\r", "").replace("\t", " ")
                             try:
-                                args = shlex.split(argv.replace("\n", " ").replace("\r", "").replace("\t", " "))
+                                args = shlex.split(argv)
                             except ValueError:
-                                args = argv.replace("\n", " ").replace("\r", "").replace("\t", " ").split(" ")
+                                args = argv.split(" ")
                         if guild is None:
+                            if getattr(command, "server_only", False):
+                                raise ReferenceError("This command is only available in servers.")
                             guild = bot.userGuild(
                                 user=user,
                                 channel=channel,
                             )
                             channel = guild.channel
-                            if getattr(command, "server_only", False):
-                                raise ReferenceError("This command is only available in servers.")
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
                             create_task(channel.trigger_typing())
@@ -1365,44 +1368,45 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             name=alias,             # alias the command was called as
                             callback=processMessage,# function that called the command
                         ), timeout=timeout)
-                        if response is not None and len(response):
-                            if type(response) is tuple:
-                                response, react = response
-                                if react == 1:
-                                    react = "❎"
-                            else:
-                                react = False
-                            sent = None
-                            if type(response) is list:
-                                for r in response:
-                                    create_task(channel.send(r))
-                            elif type(response) is dict or isinstance(response, freeClass):
-                                if react:
-                                    sent = await channel.send(**response)
+                        if response is not None:
+                            if issubclass(type(response), Exception):
+                                raise response
+                            elif bool(response) is not False:
+                                if type(response) is tuple:
+                                    response, react = response
+                                    if react == 1:
+                                        react = "❎"
                                 else:
-                                    create_task(channel.send(**response))
-                            else:
-                                if type(response) is str and len(response) <= 2000:
+                                    react = False
+                                sent = None
+                                if type(response) is list:
+                                    for r in response:
+                                        create_task(channel.send(r))
+                                elif type(response) is dict or isinstance(response, freeClass):
                                     if react:
-                                        sent = await channel.send(response)
+                                        sent = await channel.send(**response)
                                     else:
-                                        create_task(channel.send(response))
+                                        create_task(channel.send(**response))
                                 else:
-                                    if type(response) is not bytes:
-                                        response = bytes(str(response), "utf-8")
-                                        filemsg = "Response too long for message."
+                                    if type(response) is str and len(response) <= 2000:
+                                        if react:
+                                            sent = await channel.send(response)
+                                        else:
+                                            create_task(channel.send(response))
                                     else:
-                                        filemsg = "Response data:"
-                                    if len(response) <= guild.filesize_limit:
-                                        b = io.BytesIO(response)
-                                        f = discord.File(b, filename="message.txt")
-                                        create_task(
-                                            sendFile(channel, filemsg, f),
-                                        )
-                                    else:
-                                        raise OverflowError("Response too long for file upload.")
-                            if sent is not None:
-                                await sent.add_reaction(react)
+                                        if type(response) is not bytes:
+                                            response = bytes(str(response), "utf-8")
+                                            filemsg = "Response too long for message."
+                                        else:
+                                            filemsg = "Response data:"
+                                        if len(response) <= guild.filesize_limit:
+                                            b = io.BytesIO(response)
+                                            f = discord.File(b, filename="message.txt")
+                                            create_task(sendFile(channel, filemsg, f))
+                                        else:
+                                            raise OverflowError("Response too long for file upload.")
+                                if sent is not None:
+                                    await sent.add_reaction(react)
                     except (TimeoutError, asyncio.exceptions.TimeoutError):
                         print(msg)
                         raise TimeoutError("Request timed out.")
@@ -1415,14 +1419,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             reacts="❎",
                         ))
     if not run and u_id != client.user.id and not u_perm <= -inf:
-        s = "0123456789abcdefghijklmnopqrstuvwxyz"
-        temp = list(reconstitute(cpy).lower())
-        for i in range(len(temp)):
-            if not(temp[i] in s):
-                temp[i] = " "
-        temp = "".join(temp)
-        while "  " in temp:
-            temp = temp.replace("  ", " ")
+        temp = to_alphanumeric(reconstitute(cpy).lower())
         for u in bot.database.values():
             f = getattr(u, "_nocommand_", None)
             if f is not None:
@@ -1440,7 +1437,7 @@ async def heartbeatLoop():
     try:
         while True:
             try:
-                bot
+                bot.client
             except NameError:
                 sys.exit()
             if bot.heartbeat in os.listdir():
@@ -1450,7 +1447,7 @@ async def heartbeatLoop():
                     print(traceback.format_exc())
             await asyncio.sleep(0.5)
     except asyncio.CancelledError:
-        sys.exit()        
+        sys.exit(1)        
 
 
 async def updateLoop():
@@ -1462,7 +1459,7 @@ async def updateLoop():
                 autosave = time.time()
                 bot.update()
             while bot.blocked > 0:
-                print("Blocked...")
+                print("Update event blocked.")
                 bot.blocked -= 1
                 await asyncio.sleep(1)
             await bot.handleUpdate()
@@ -1487,8 +1484,8 @@ async def on_ready():
     await bot.handleUpdate()
     if not hasattr(bot, "started"):
         bot.started = True
-        asyncio.create_task(updateLoop())
-        asyncio.create_task(heartbeatLoop())
+        create_task(updateLoop())
+        create_task(heartbeatLoop())
 
 
 @client.event
@@ -1525,9 +1522,9 @@ async def on_guild_join(guild):
     if not m.guild_permissions.administrator:
         emb.add_field(name="Psst!", value=(
             "I noticed you haven't given me administrator permissions here.\n"
-            + "That's completely understandable if intentional, but may cause some features to not work well, or not at all."
+            + "That's completely understandable if intentional, but please note that it may cause some features to not function well, or not at all."
         ))
-    await sendReact(channel=channel, embed=emb, reacts="❎")
+    await channel.send(embed=emb)
 
     
 async def seen(user, delay=0):

@@ -281,7 +281,7 @@ class Prefix(Command):
 
 class Loop(Command):
     time_consuming = 3
-    name = ["For", "Rep", "Repeat", "While"]
+    name = ["For", "Rep", "While"]
     min_level = 1
     min_display = "1+"
     description = "Loops a command."
@@ -433,7 +433,7 @@ class Avatar(Command):
 
 
 class Info(Command):
-    name = ["UserInfo", "ServerInfo"]
+    name = ["UserInfo", "ServerInfo", "WhoIs"]
     min_level = 0
     description = "Shows information about the target user or server."
     usage = "<user> <verbose(?v)>"
