@@ -759,9 +759,9 @@ class Bot:
         try:
             if not f:
                 r = [0]
-            elif f in ("t", "T", "true", "TRUE"):
+            elif f.lower() in ("t", "true", "y", "yes", "on"):
                 r = [True]
-            elif f in ("f", "F", "false", "FALSE"):
+            elif f.lower() in ("f", "false", "n", "no", "off"):
                 r = [False]
             elif f.lower() == "inf":
                 r = [inf]
@@ -1522,7 +1522,7 @@ async def on_guild_join(guild):
     if not m.guild_permissions.administrator:
         emb.add_field(name="Psst!", value=(
             "I noticed you haven't given me administrator permissions here.\n"
-            + "That's completely understandable if intentional, but please note that it may cause some features to not function well, or not at all."
+            + "That's completely understandable if intentional, but please note that without it, some features may not function well, or not at all."
         ))
     await channel.send(embed=emb)
 
@@ -1671,6 +1671,8 @@ async def on_member_update(before, after):
                 await f(before=before, after=after)
             except:
                 print(traceback.format_exc())
+    if str(before.status) != str(after.status) or str(before.activity) != str(after.activity):
+        create_task(seen(after))
 
 
 @client.event

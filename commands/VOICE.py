@@ -2541,9 +2541,9 @@ class AudioSettings(Command):
                 ops.append("volume")
         s = ""
         for op in ops:
-            if op not in "volume loop repeat shuffle quiet stay reset":
+            if op not in "volume loop repeat shuffle quiet reset":
                 if not bot.isTrusted(guild.id):
-                    raise PermissionError("Must be in a trusted server to apply complex audio filters.")
+                    raise PermissionError("Must be in a trusted server for targeted audio setting.")
             if type(op) is str and op in "loop repeat shuffle quiet stay" and not argv:
                 argv = str(not bot.database.playlists.audio[guild.id].stats[op])
             if disable:
@@ -2564,8 +2564,8 @@ class AudioSettings(Command):
             if auds.queue and (op in "speed pitch pan compressor chorus" or op == "resample" and max(orig, new) >= auds.max_resample * 100):
                 await create_future(auds.new, auds.file, auds.stats.position)
             s += (
-                "\nChanged audio " + str(op)
-                + " setting from [" + str(orig)
+                "\nChanged audio \"" + str(op)
+                + "\" setting from [" + str(orig)
                 + "] to [" + str(new) + "]."
             )
         if "h" not in flags:
