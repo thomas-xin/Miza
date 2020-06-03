@@ -166,7 +166,7 @@ async def sendFile(channel, msg, file, filename=None):
         await message.edit(content=message.content + "\n" + "\n".join("<" + a.url + ">" for a in message.attachments))
 
 
-emojiFind = re.compile("<:[^<>]+:[0-9]+>")
+emojiFind = re.compile("<a?:[^<>]+:[0-9]+>")
 findEmojis = lambda s: re.findall(emojiFind, s)
 
 def strMessage(message, limit=1024, username=False):
