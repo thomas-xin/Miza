@@ -236,7 +236,7 @@ class customAudio(discord.AudioSource):
             self.searching = False
             self.preparing = True
             self.player = None
-            self.timeout = time.time()
+            self.timeout = utc()
             self.lastsent = 0
             self.lastEnd = 0
             self.pausec = False
@@ -301,7 +301,7 @@ class customAudio(discord.AudioSource):
             if self.reverse and len(self.queue):
                 self.stats.position = float(self.queue[0].duration)
         if self.source is not None and self.player:
-            self.player.time = 1 + time.time()
+            self.player.time = 1 + utc()
         if self.speed < 0.005:
             self.speed = 1
             self.paused |= 2
@@ -368,8 +368,8 @@ class customAudio(discord.AudioSource):
             except:
                 print(traceback.format_exc())
                 if getattr(self, "att", 0) <= 0:
-                    self.att = time.time()
-                elif time.time() - self.att > 10:
+                    self.att = utc()
+                elif utc() - self.att > 10:
                     self.dead = True
                     return
         if self.stats.stay:
@@ -377,10 +377,10 @@ class customAudio(discord.AudioSource):
         else:
             cnt = sum(1 for m in vc.channel.members if not m.bot)
         if not cnt:
-            if self.timeout < time.time() - 20:
+            if self.timeout < utc() - 20:
                 self.dead = True
                 return
-            elif self.timeout < time.time() - 10:
+            elif self.timeout < utc() - 10:
                 if guild.afk_channel is not None:
                     if guild.afk_channel.id != vc.channel.id:
                         create_task(self.move_unmute(vc, guild.afk_channel))
@@ -405,7 +405,7 @@ class customAudio(discord.AudioSource):
                             ))
                             create_task(vc.move_to(ch))
         else:
-            self.timeout = time.time()
+            self.timeout = utc()
         if m.voice is not None:
             if m.voice.deaf or m.voice.mute or m.voice.afk:
                 create_task(m.edit(mute=False, deafen=False))
@@ -425,7 +425,7 @@ class customAudio(discord.AudioSource):
                 return
             self.bot.database.playlists.connecting[self.vc.guild.id] = True
             if getattr(self, "att", 0) <= 0:
-                self.att = time.time()
+                self.att = utc()
             self.vc = await self.vc.channel.connect(timeout=30, reconnect=False)
             user = self.vc.guild.get_member(self.bot.client.user.id)
             if getattr(user, "voice", None) is not None:
@@ -436,10 +436,10 @@ class customAudio(discord.AudioSource):
             print(traceback.format_exc())
             self.dead = True
         except discord.ClientException:
-            self.att = time.time()
+            self.att = utc()
         except:
             print(traceback.format_exc())
-            if getattr(self, "att", 0) > 0 and time.time() - self.att > 10:
+            if getattr(self, "att", 0) > 0 and utc() - self.att > 10:
                 self.dead = True
         try:
             self.bot.database.playlists.connecting.pop(self.vc.guild.id)
@@ -458,7 +458,7 @@ class customAudio(discord.AudioSource):
             except:
                 self.player = None
                 print(traceback.format_exc())
-            if time.time() > curr.time:
+            if utc() > curr.time:
                 curr.time = inf
                 try:
                     await self.bot.reactCallback(curr.message, "❎", self.bot.client.user)
@@ -510,14 +510,14 @@ class customAudio(discord.AudioSource):
                             self.source.advanced = True
                         create_future_ex(self.queue.advance)
                 elif empty and queueable and self.source is not None:
-                    if time.time() - self.lastEnd > 0.5:
+                    if utc() - self.lastEnd > 0.5:
                         if self.reverse:
                             ended = self.stats.position <= 0.5
                         else:
                             ended = ceil(self.stats.position) >= float(self.queue[0].duration) - 0.5
-                        if self.curr_timeout and time.time() - self.curr_timeout > 0.5 or ended:
+                        if self.curr_timeout and utc() - self.curr_timeout > 0.5 or ended:
                             if not found:
-                                self.lastEnd = time.time()
+                                self.lastEnd = utc()
                                 if not self.has_read or not self.queue:
                                     print("{Stopped}")
                                     self.refilling = 2
@@ -541,7 +541,7 @@ class customAudio(discord.AudioSource):
                                     create_future_ex(self.queue.update_play)
                                     self.preparing = False
                         elif self.curr_timeout == 0:
-                            self.curr_timeout = time.time()
+                            self.curr_timeout = utc()
                 elif (empty or self.pausec) and not queueable:
                     self.curr_timeout = 0
                     self.vc.stop()
@@ -861,7 +861,7 @@ class AudioQueue(hlist):
                             pass
                         q.append(temp)
                 if self.auds.player:
-                    self.auds.player.time = 1 + time.time()
+                    self.auds.player.time = 1 + utc()
         if not (q or self.auds.preparing):
             t = self.bot.data.playlists.get(self.vc.guild.id, ())
             if t:
@@ -880,7 +880,7 @@ class AudioQueue(hlist):
                     break
                 q.append(freeClass(d))
                 if self.auds.player:
-                    self.auds.player.time = 1 + time.time()
+                    self.auds.player.time = 1 + utc()
         self.update_play()
         
     def update_play(self):
@@ -891,7 +891,7 @@ class AudioQueue(hlist):
                 if q[0].get("stream", None) not in (None, "none"):
                     q[0].played = True
                     if not auds.stats.quiet:
-                        if time.time() - self.lastsent > 1:
+                        if utc() - self.lastsent > 1:
                             try:
                                 u = self.bot.cache.users[q[0].u_id]
                                 name = u.display_name
@@ -907,7 +907,7 @@ class AudioQueue(hlist):
                                 msg,
                                 reacts="❎",
                             ))
-                            self.lastsent = time.time()
+                            self.lastsent = utc()
                     self.loading = True
                     source = ytdl.getStream(q[0])
                     print(q[0])
@@ -1001,7 +1001,7 @@ class PCMFile:
                     print(traceback.format_exc())
             raise
 
-    ensure_time = lambda self: setattr(self, "time", time.time())
+    ensure_time = lambda self: setattr(self, "time", utc())
 
     def update(self):
         if self.readers:
@@ -1014,7 +1014,7 @@ class PCMFile:
             if self.loaded:
                 self.time = -inf
         ft = 9000 / (math.log2(fl/134217728 + 1) + 1)
-        if time.time() - self.time > ft:
+        if utc() - self.time > ft:
             self.destroy()
 
     def open(self):
@@ -1307,9 +1307,9 @@ class videoDownloader:
         self.update_dl()
 
     def update_dl(self):
-        if time.time() - self.lastclear > 3600:
+        if utc() - self.lastclear > 3600:
             self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
-            self.lastclear = time.time()
+            self.lastclear = utc()
 
     def extract_from(self, url):
         return self.downloader.extract_info(url, download=False, process=False)
@@ -1518,8 +1518,8 @@ class videoDownloader:
         while self.requests > 4:
             time.sleep(0.1)
         if item in self.searched:
-            if time.time() - self.searched[item].t < 18000:
-                # self.searched[item].t = time.time()
+            if utc() - self.searched[item].t < 18000:
+                # self.searched[item].t = utc()
                 return self.searched[item].data
             else:
                 self.searched.pop(item)
@@ -1529,7 +1529,7 @@ class videoDownloader:
         try:
             self.requests += 1
             # print(item)
-            obj = freeClass(t=time.time())
+            obj = freeClass(t=utc())
             obj.data = output = self.extract(item, force)
             self.searched[item] = obj
             self.requests = max(self.requests - 1, 0)
@@ -1614,8 +1614,8 @@ class videoDownloader:
         while self.requests > 4:
             time.sleep(0.1)
         if item in self.searched:
-            if time.time() - self.searched[item].t < 18000:
-                # self.searched[item].t = time.time()
+            if utc() - self.searched[item].t < 18000:
+                # self.searched[item].t = utc()
                 it = self.searched[item].data[0]
                 i.name = it.name
                 i.duration = it.duration
@@ -1632,7 +1632,7 @@ class videoDownloader:
             data = self.extract_true(item)
             if "entries" in data:
                 data = data["entries"][0]
-            obj = freeClass(t=time.time())
+            obj = freeClass(t=utc())
             obj.data = out = [freeClass(
                 name=data["title"],
                 url=data["webpage_url"],
@@ -2046,7 +2046,7 @@ class Connect(Command):
             if vc.guild.id == guild.id:
                 joined = True
                 if vc.channel.id != vc_.id:
-                    connecting[guild.id] = time.time()
+                    connecting[guild.id] = utc()
                     try:
                         await vc.move_to(vc_)
                         connecting[guild.id] = 0
@@ -2055,10 +2055,10 @@ class Connect(Command):
                         raise
                 break
         if not joined:
-            connecting[guild.id] = time.time()
+            connecting[guild.id] = utc()
             vc = freeClass(is_connected = lambda: False)
-            t = time.time()
-            while not vc.is_connected() and time.time() - t < 8:
+            t = utc()
+            while not vc.is_connected() and utc() - t < 8:
                 try:
                     vc = await vc_.connect(timeout=30, reconnect=False)
                     for _ in loop(12):
@@ -2273,7 +2273,7 @@ class Pause(Command):
             create_future_ex(auds.queue.update_play)
             create_future_ex(auds.ensure_play)
         if auds.player is not None:
-            auds.player.time = 1 + time.time()
+            auds.player.time = 1 + utc()
         await bot.database.playlists(guild=guild)
         if "h" not in flags:
             past = name + "pe" * (name == "stop") + "d"
@@ -2305,7 +2305,7 @@ class Seek(Command):
             num = await bot.evalTime(expr, guild, orig)
         pos = auds.seek(num)
         if auds.player is not None:
-            auds.player.time = 1 + time.time()
+            auds.player.time = 1 + utc()
         if "h" not in flags:
             return (
                 "```css\nSuccessfully moved audio position to ["
@@ -2379,7 +2379,7 @@ class Dump(Command):
             if not 1 + i & 2047:
                 await asyncio.sleep(0.2)
         if auds.player is not None:
-            auds.player.time = 1 + time.time()
+            auds.player.time = 1 + utc()
         if auds.stats.shuffle:
             shuffle(q)
         for k in d["stats"]:
@@ -2958,7 +2958,7 @@ class Player(Command):
                 delay = 6
         else:
             delay = inf
-        auds.player.time = time.time() + delay
+        auds.player.time = utc() + delay
 
     async def __call__(self, guild, channel, user, client, bot, flags, perm, **void):
         auds = await forceJoin(channel.guild, channel, user, client, bot)
@@ -3340,7 +3340,7 @@ class UpdateQueues(Database):
 
     def is_connecting(self, g):
         if g in self.connecting:
-            if time.time() - self.connecting[g] < 12:
+            if utc() - self.connecting[g] < 12:
                 return True
             self.connecting.pop(g)
         return False
@@ -3381,7 +3381,7 @@ class UpdateQueues(Database):
         if channel.guild.id in self.audio and user.id != self.bot.client.user.id:
             auds = self.audio[channel.guild.id]
             if auds.player is not None and channel.id == auds.channel.id:
-                t = time.time() + 10
+                t = utc() + 10
                 if auds.player.time < t:
                     auds.player.time = t
 
@@ -3389,7 +3389,7 @@ class UpdateQueues(Database):
         if message.guild.id in self.audio and message.author.id != self.bot.client.user.id:
             auds = self.audio[message.guild.id]
             if auds.player is not None and message.channel.id == auds.channel.id:
-                t = time.time() + 10
+                t = utc() + 10
                 if auds.player.time < t:
                     auds.player.time = t
 
@@ -3453,7 +3453,7 @@ class UpdateQueues(Database):
                 if not a & 15:
                     await asyncio.sleep(0.2)
                 a += 1
-            # t = time.time()
+            # t = utc()
             # i = 1
             # for path in os.listdir("cache"):
             #     fn = "cache/" + path
@@ -3462,7 +3462,7 @@ class UpdateQueues(Database):
             #             os.remove(fn)
             #     if not i & 1023:
             #         await asyncio.sleep(0.2)
-            #         t = time.time()
+            #         t = utc()
             #     i += 1
             await asyncio.sleep(0.5)
             for item in tuple(ytdl.cache.values()):

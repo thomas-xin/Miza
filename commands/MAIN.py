@@ -633,7 +633,7 @@ class Info(Command):
             except LookupError:
                 pass
             try:
-                ts = datetime.datetime.utcnow().timestamp()
+                ts = utc()
                 ls = bot.data.users[u.id]["last_seen"]
                 if type(ls) is str:
                     seen = ls
@@ -813,7 +813,7 @@ class Reminder(Command):
                     "```ini\nNo reminders currently set for ["
                     + noHighlight(user) + "].```"
                 )
-            d = datetime.datetime.utcnow().timestamp()
+            d = utc()
             s = strIter(rems, key=lambda x: limStr(noHighlight(x["msg"]), 64) + " ➡️ " + sec2Time(x["t"] - d))
             return (
                 "Current reminders set for **" + discord.utils.escape_markdown(str(user))
@@ -847,7 +847,7 @@ class Reminder(Command):
                     msg = ""
                 if spl is not None:
                     msg = " at ".join(spl[:-1])
-                    t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
+                    t = utc_ts(tparser.parse(spl[-1])) - utc()
                     break
             if "on" in argv:
                 if " on " in argv:
@@ -857,7 +857,7 @@ class Reminder(Command):
                     msg = ""
                 if spl is not None:
                     msg = " on ".join(spl[:-1])
-                    t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
+                    t = utc_ts(tparser.parse(spl[-1])) - utc()
                     break
             msg = " ".join(args[:-1])
             t = await bot.evalTime(args[-1], guild)
@@ -869,7 +869,7 @@ class Reminder(Command):
             raise OverflowError("Reminder message too long (" + str(len(msg)) + "> 512).")
         name = str(user)
         url = strURL(user.avatar_url)
-        ts = datetime.datetime.utcnow().timestamp()
+        ts = utc()
         rems.append(freeClass(
             name=name,
             url=url,
@@ -943,7 +943,7 @@ class Announcement(Command):
                     "```ini\nNo announcements currently set for [#"
                     + noHighlight(channel) + "].```"
                 )
-            d = datetime.datetime.utcnow().timestamp()
+            d = utc()
             s = strIter(rems, key=lambda x: limStr(noHighlight(x["name"] + ": " + x["msg"]), 128) + " ➡️ " + sec2Time(x["t"] - d))
             return (
                 "Current announcements set for <#" + str(channel.id)
@@ -972,7 +972,7 @@ class Announcement(Command):
                     msg = ""
                 if spl is not None:
                     msg = " at ".join(spl[:-1])
-                    t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
+                    t = utc_ts(tparser.parse(spl[-1])) - utc()
                     break
             if "on" in argv:
                 if " on " in argv:
@@ -982,7 +982,7 @@ class Announcement(Command):
                     msg = ""
                 if spl is not None:
                     msg = " on ".join(spl[:-1])
-                    t = tparser.parse(spl[-1]).timestamp() - datetime.datetime.utcnow().timestamp()
+                    t = utc_ts(tparser.parse(spl[-1])) - utc()
                     break
             msg = " ".join(args[:-1])
             t = await bot.evalTime(args[-1], guild)
@@ -994,7 +994,7 @@ class Announcement(Command):
             raise OverflowError("Announcement message too long (" + str(len(msg)) + "> 512).")
         name = str(user)
         url = strURL(user.avatar_url)
-        ts = datetime.datetime.utcnow().timestamp()
+        ts = utc()
         rems.append(freeClass(
             name=name,
             url=url,
@@ -1031,7 +1031,7 @@ class UpdateReminders(Database):
         self.keyed = hlist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
 
     async def __call__(self):
-        t = datetime.datetime.utcnow().timestamp()
+        t = utc()
         while self.keyed:
             p = self.keyed[0]
             if t < p[0]:
@@ -1281,7 +1281,7 @@ class UpdateUsers(Database):
 
     async def _seen_(self, user, delay, **void):
         addDict(self.data, {user.id: {"last_seen": 0}})
-        self.data[user.id]["last_seen"] = datetime.datetime.utcnow().timestamp() + delay
+        self.data[user.id]["last_seen"] = utc() + delay
 
     async def _command_(self, user, command, **void):
         addDict(self.data, {user.id: {"commands": {str(command): 1}}})

@@ -584,7 +584,7 @@ class Bot:
         try:
             return self.data.blacklist.get(
                 u_id, 0
-            ) >= time.time() + self.min_suspend * 86400
+            ) >= utc() + self.min_suspend * 86400
         except KeyError:
             return True
 
@@ -854,7 +854,7 @@ class Bot:
                     if f.strip():
                         t += await self.evalMath(f, guild.id)
             except:
-                t = tparser.parse(f).timestamp() - tparser.parse("0s").timestamp()
+                t = utc_ts(tparser.parse(f)) - utc_ts(tparser.parse("0s"))
         if type(t) is not float:
             t = float(t)
         return t
@@ -916,7 +916,7 @@ class Bot:
             if msg.startswith(check):
                 while len(self.proc_call) > 65536:
                     self.proc_call.pop(next(iter(self.proc_call)))
-                while time.time() - self.proc_call.get(message.id, 0) < 30:
+                while utc() - self.proc_call.get(message.id, 0) < 30:
                     await asyncio.sleep(0.2)
                 if reaction is not None:
                     reacode = str(reaction).encode("utf-8")
@@ -932,7 +932,7 @@ class Bot:
                     msg = msg[1:]
                 check = "callback-"
                 msg = msg.split("\n")[0]
-                self.proc_call[message.id] = time.time()
+                self.proc_call[message.id] = utc()
                 msg = msg[len(check):]
                 args = msg.split("-")
                 catn, func, vals = args[:3]
@@ -979,7 +979,7 @@ class Bot:
             self.busy = False
         if not hasattr(self, "status_iter"):
             self.status_iter = xrand(3)
-        if time.time() - self.lastCheck > 0.5 or force:
+        if utc() - self.lastCheck > 0.5 or force:
             while self.busy and not force:
                 await asyncio.sleep(0.1)
             self.busy = True
@@ -989,8 +989,8 @@ class Bot:
                 #print("Sending update...")
                 guilds = len(client.guilds)
                 changed = guilds != self.guilds
-                if changed or time.time() > self.stat_timer:
-                    self.stat_timer = time.time() + float(frand(5)) + 12
+                if changed or utc() > self.stat_timer:
+                    self.stat_timer = utc() + float(frand(5)) + 12
                     self.guilds = guilds
                     try:
                         u = await self.fetch_user(self.owner_id)
@@ -1020,7 +1020,7 @@ class Bot:
             except:
                 print(traceback.format_exc())
             for u in self.database.values():
-                if time.time() - u.used > u.rate_limit or force:
+                if utc() - u.used > u.rate_limit or force:
                     create_task(u())
                     create_task(self.verifyDelete(u))
             self.busy = False
@@ -1030,10 +1030,10 @@ class Bot:
             self.cw_cache = freeClass()
         wlist = None
         if channel.id in self.cw_cache:
-            if time.time() - self.cw_cache[channel.id].time > 300 or force:
+            if utc() - self.cw_cache[channel.id].time > 300 or force:
                 self.cw_cache.pop(channel.id)
             else:
-                self.cw_cache[channel.id].time = time.time()
+                self.cw_cache[channel.id].time = utc()
                 wlist = [self.cw_cache[channel.id].webhook]
         if not wlist:
             wlist = await channel.webhooks()
@@ -1041,7 +1041,7 @@ class Bot:
             w = await channel.create_webhook(name=bot.client.user.name)
         else:
             w = random.choice(wlist)
-        self.cw_cache[channel.id] = freeClass(time=time.time(), webhook=w)
+        self.cw_cache[channel.id] = freeClass(time=utc(), webhook=w)
         return w
 
     class userGuild(discord.Object):
@@ -1271,15 +1271,15 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             if x:
                                 d = command.used
                                 t = d.get(u_id, -inf)
-                                wait = time.time() - t - x
+                                wait = utc() - t - x
                                 if wait > -1:
                                     if wait < 0:
                                         w = max(0.2, -wait)
-                                        d[u_id] = max(t, time.time()) + w
+                                        d[u_id] = max(t, utc()) + w
                                         await asyncio.sleep(w)
                                     if len(d) >= 4096:
                                         d.pop(next(iter(d)))
-                                    d[u_id] = max(t, time.time())
+                                    d[u_id] = max(t, utc())
                                 else:
                                     raise TooManyRequests("Command has a rate limit of " + sec2Time(x) + "; please wait " + sec2Time(-wait) + ".")
                         flags = {}
@@ -1455,8 +1455,8 @@ async def updateLoop():
     autosave = 0
     while True:
         try:
-            if time.time() - autosave > 60:
-                autosave = time.time()
+            if utc() - autosave > 60:
+                autosave = utc()
                 bot.update()
             while bot.blocked > 0:
                 print("Update event blocked.")

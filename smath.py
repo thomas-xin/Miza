@@ -1355,6 +1355,11 @@ def intKey(d):
     return c
 
 
+utc = time.time
+ep = datetime.datetime(1970, 1, 1)
+utc_ts = lambda dt: (dt - ep).total_seconds()
+# utc_ts = lambda dt: dt.replace(tzinfo=datetime.timezone.utc).timestamp()
+
 TIMEUNITS = {
     "galactic year": 7157540528801820.28133333333333,
     "millenium": [31556925216., "millenia"],

@@ -106,7 +106,7 @@ class Suspend(Command):
             )
         else:
             user = await bot.fetch_user(verifyID(args[0]))
-            change = await bot.evalTime(" ".join(args[1]), guild.id, bot.data.blacklist.get(user.id, time.time()))
+            change = await bot.evalTime(" ".join(args[1]), guild.id, bot.data.blacklist.get(user.id, utc()))
             bot.data.blacklist[user.id] = change
             update()
             return (
@@ -256,13 +256,13 @@ class UpdateBlacklist(Database):
             if susp:
                 u_id = int(susp)
                 udata = self.data.get(u_id, 0)
-                days = max(0, (udata - time.time()) / 86400)
+                days = max(0, (udata - utc()) / 86400)
                 try:
                     days **= 4
                 except (OverflowError, ValueError, TypeError):
                     days = inf
                 days += 1.125
-                udata = time.time() + days * 86400
+                udata = utc() + days * 86400
                 self.data[u_id] = udata
                 if days >= self.bot.min_suspend - 1:
                     self.lastsusp = u_id
@@ -276,13 +276,13 @@ class UpdateBlacklist(Database):
         pass
         # if user.id not in (self.bot.client.user.id, self.bot.owner_id):
         #     tc = getattr(command, "time_consuming", 0)
-        #     self.suspclear = time.time() + 10 + (tc * 2) ** 2
+        #     self.suspclear = utc() + 10 + (tc * 2) ** 2
         #     f = open(self.suspected, "w")
         #     f.write(str(user.id))
         #     f.close()
 
     async def __call__(self, **void):
-        if time.time() - self.suspclear:
+        if utc() - self.suspclear:
             self.suspclear = inf
             try:
                 if self.suspected in os.listdir():
@@ -294,7 +294,7 @@ class UpdateBlacklist(Database):
             u_susp = await bot.fetch_user(self.lastsusp)
             self.lastsusp = None
             channel = await bot.getDM(u_susp)
-            secs = self.data.get(u_susp.id, 0) - time.time()
+            secs = self.data.get(u_susp.id, 0) - utc()
             msg = (
                 "Apologies for the inconvenience, but your account has been "
                 + "flagged as having attempted a denial-of-service attack.\n"

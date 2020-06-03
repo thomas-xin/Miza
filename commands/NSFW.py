@@ -119,8 +119,8 @@ def pull_booru(argv, delay=5):
 def pull_rule34_xxx(argv, delay=5):
     v1, v2 = 1, 1
     try:
-        t = time.time()
-        while time.time() - t < delay:
+        t = utc()
+        while utc() - t < delay:
             try:
                 sources = rule34_sync.getImages(
                     tags=argv,

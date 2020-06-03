@@ -22,10 +22,10 @@ class DouClub:
 
     def pull(self):
         kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret)
-        self.data = [kn.data, time.time()]
+        self.data = [kn.data, utc()]
 
     def search(self, query):
-        if time.time() - self.data[1] > 720:
+        if utc() - self.data[1] > 720:
             create_future(self.pull)
         output = []
         query = query.lower()
@@ -114,7 +114,7 @@ class SheetPull:
         text = requests.get(url).text
         data = text.split("\r\n")
         columns = 0
-        sdata = [[], time.time()]
+        sdata = [[], utc()]
         for i in range(len(data)):
             line = data[i]
             read = list(csv.reader(line))
@@ -138,7 +138,7 @@ class SheetPull:
         self.data = sdata
 
     def search(self, query, lim):
-        if time.time() - self.data[1] > 60:
+        if utc() - self.data[1] > 60:
             create_future(self.pull)
         output = []
         query = query.lower()
@@ -251,8 +251,8 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
             os.chdir("..")
             raise
         fi = "cache/" + key + ".xm"
-        t = time.time()
-        while time.time() - t < 12:
+        t = utc()
+        while utc() - t < 12:
             time.sleep(0.2)
             if "&" + key + ".xm" in os.listdir("cache"):
                 try:
@@ -261,7 +261,7 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
                 except Exception as ex:
                     print(repr(ex))                
                     pass
-        if time.time() - t >= 12:
+        if utc() - t >= 12:
             try:
                 os.remove("cache/" + key + ".org")
             except (FileNotFoundError, PermissionError):

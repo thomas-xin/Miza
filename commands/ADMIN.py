@@ -532,7 +532,7 @@ class Ban(Command):
 
     async def __call__(self, bot, args, message, channel, guild, flags, perm, name, **void):
         update = self.bot.database.bans.update
-        ts = datetime.datetime.utcnow().timestamp()
+        ts = utc()
         banlist = bot.data.bans.get(guild.id, [])
         bans, glob = await self.getBans(guild)
         if not args:
@@ -662,7 +662,7 @@ class Ban(Command):
 
     async def createBan(self, guild, user, reason, length, channel, bans, glob):
         # print(self, guild, user, reason, length, channel, bans, glob)
-        ts = datetime.datetime.utcnow().timestamp()
+        ts = utc()
         bot = self.bot
         banlist = setDict(bot.data.bans, guild.id, hlist())
         update = bot.database.bans.update
@@ -729,7 +729,7 @@ class UpdateBans(Database):
         self.keyed = hlist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
 
     async def __call__(self):
-        t = datetime.datetime.utcnow().timestamp()
+        t = utc()
         while self.keyed:
             p = self.keyed[0]
             if t < p[0]:
@@ -827,10 +827,10 @@ class ServerProtector(Database):
     async def _channel_delete_(self, channel, guild, **void):
         if self.bot.isTrusted(guild.id):
             audits = await guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete).flatten()
-            ts = datetime.datetime.utcnow().timestamp()
+            ts = utc()
             cnt = {}
             for log in audits:
-                if ts - log.created_at.timestamp() < 120:
+                if ts - utc_ts(log.created_at) < 120:
                     addDict(cnt, {log.user.id: 1})
             for u_id in cnt:
                 if cnt[u_id] > 2:
@@ -839,10 +839,10 @@ class ServerProtector(Database):
     async def _ban_(self, user, guild, **void):
         if self.bot.isTrusted(guild.id):
             audits = await guild.audit_logs(limit=13, action=discord.AuditLogAction.ban).flatten()
-            ts = datetime.datetime.utcnow().timestamp()
+            ts = utc()
             cnt = {}
             for log in audits:
-                if ts - log.created_at.timestamp() < 10:
+                if ts - utc_ts(log.created_at) < 10:
                     addDict(cnt, {log.user.id: 1})
             for u_id in cnt:
                 if cnt[u_id] > 5:
@@ -971,16 +971,16 @@ class UpdateUserLogs(Database):
             kick = None
             ban = None
             try:
-                ts = datetime.datetime.utcnow().timestamp()
+                ts = utc()
                 bans = await guild.audit_logs(limit=4, action=discord.AuditLogAction.ban).flatten()
                 kicks = await guild.audit_logs(limit=4, action=discord.AuditLogAction.kick).flatten()
                 for log in bans:
-                    if ts - log.created_at.timestamp() < 3:
+                    if ts - utc_ts(log.created_at) < 3:
                         if log.target.id == user.id:
                             ban = freeClass(id=log.user.id, reason=log.reason)
                             raise StopIteration
                 for log in kicks:
-                    if ts - log.created_at.timestamp() < 3:
+                    if ts - utc_ts(log.created_at) < 3:
                         if log.target.id == user.id:
                             kick = freeClass(id=log.user.id, reason=log.reason)
                             raise StopIteration

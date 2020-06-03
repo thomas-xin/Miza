@@ -394,7 +394,7 @@ procUpdate()
 
 async def imageProc(image, operation, args, key=-1, timeout=12):
     procs, busy = SUBS.image.procs, SUBS.image.busy
-    while time.time() - busy.get(key, 0) < 60:
+    while utc() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
     try:
         while True:
@@ -413,7 +413,7 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
     print(d)
     try:
         proc.busy = True
-        busy[key] = time.time()
+        busy[key] = utc()
         procUpdate()
         proc.stdin.write(d)
         proc.stdin.flush()
@@ -441,7 +441,7 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
 
 async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12):
     procs, busy = SUBS.math.procs, SUBS.math.busy
-    while time.time() - busy.get(key, 0) < 60:
+    while utc() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
     try:
         while True:
@@ -460,7 +460,7 @@ async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12):
     print(d)
     try:
         proc.busy = True
-        busy[key] = time.time()
+        busy[key] = utc()
         procUpdate()
         proc.stdin.write(d)
         proc.stdin.flush()
@@ -611,7 +611,7 @@ class Database:
     name = "data"
 
     def __init__(self, bot, catg):
-        self.used = time.time()
+        self.used = utc()
         name = self.name
         self.__name__ = self.__class__.__name__
         if not getattr(self, "no_file", False):
