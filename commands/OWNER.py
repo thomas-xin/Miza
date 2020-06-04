@@ -17,6 +17,8 @@ class Restart(Command):
         client = bot.client
         await message.add_reaction("❗")
         if argv:
+            if "in" in argv:
+                argv = argv[argv.rindex("in") + 2:]
             delay = await bot.evalTime(argv, guild)
             await channel.send("Preparing to " + name + " in " + sec2Time(delay) + "...")
             emb = discord.Embed(colour=discord.Colour(1))

@@ -947,6 +947,8 @@ class Bot:
                     if f.__name__.lower() == func:
                         try:
                             timeout = getattr(f, "_timeout_", 1) * self.timeout
+                            if timeout >= inf:
+                                timeout = None
                             await asyncio.wait_for(
                                 f._callback_(
                                     client=client,
@@ -1360,6 +1362,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             if f is not None:
                                 await f(user, command)
                         timeout = getattr(f, "_timeout_", 1) * bot.timeout
+                        if timeout >= inf:
+                            timeout = None
                         response = await asyncio.wait_for(command(
                             client=client,          # for interfacing with discord
                             bot=bot,                # for interfacing with bot's database
