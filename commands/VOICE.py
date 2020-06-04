@@ -814,7 +814,7 @@ class AudioQueue(hlist):
                     e["file"].ensure_time()
                 if not e.url:
                     if not self.auds.stats.quiet:
-                        auds.announce(
+                        self.auds.announce(
                             "```ini\nA problem occurred while loading " + sbHighlight(e.name)
                             + ", and it has been removed from the queue as a result.```"
                         )

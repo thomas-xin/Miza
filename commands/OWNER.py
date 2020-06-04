@@ -21,7 +21,7 @@ class Restart(Command):
             await channel.send("Preparing to " + name + " in " + sec2Time(delay) + "...")
             for d in self.bot.database.values():
                 if hasattr(d, "_announce_"):
-                    d.announce("I will be going offline in " + sec2Time(delay) + ", apologies for any inconvenience.")
+                    d._announce_("I will be going offline in " + sec2Time(delay) + ", apologies for any inconvenience.")
             if delay > 0:
                 await asyncio.sleep(delay)
         if name == "reload":
@@ -36,7 +36,7 @@ class Restart(Command):
         t = time.time()
         for d in self.bot.database.values():
             if hasattr(d, "_destroy_"):
-                d.destroy()
+                d._destroy_()
         bot.update()
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
