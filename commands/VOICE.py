@@ -786,6 +786,7 @@ class AudioQueue(hlist):
             self.vc = auds.vc
         self.prev = ""
         self.lastsent = 0
+        self.loading = False
 
     def update_load(self):
         q = self
@@ -3465,4 +3466,4 @@ class UpdateQueues(Database):
 
     def _destroy_(self):
         for auds in self.audio.values():
-            auds.kill(reason="Leaving voice and shutting down, most likely for maintenance. Sorry for the inconvenience.")
+            auds.kill()
