@@ -120,11 +120,16 @@ class CreateEmoji(Command):
         url = args.pop(-1)
         url = await bot.followURL(url)
         if not isURL(url):
-            emojis = findEmojis(argv) + findEmojis(url)
+            emojis = findEmojis(argv)
             if not emojis:
-                raise ArgumentError("Please enter URL, emoji, or attached file to add.")
-            s = emojis[0]
-            name = argv[:argv.index(s)].strip()
+                emojis = findEmojis(url)
+                if not emojis:
+                    raise ArgumentError("Please input an image by URL or attachment.")
+                s = emojis[0]
+                name = url[:url.index(s)].strip()
+            else:
+                s = emojis[0]
+                name = argv[:argv.index(s)].strip()
             s = s[2:]
             i = s.index(":")
             e_id = s[i + 1:s.rindex(">")]
@@ -165,11 +170,16 @@ async def get_image(bot, message, args, argv):
     url = args.pop(0)
     url = await bot.followURL(url)
     if not isURL(url):
-        emojis = findEmojis(argv) + findEmojis(url)
+        emojis = findEmojis(argv)
         if not emojis:
-            raise ArgumentError("Please input an image by URL or attachment.")
-        s = emojis[0]
-        value = argv[argv.index(s) + len(s):].strip()
+            emojis = findEmojis(url)
+            if not emojis:
+                raise ArgumentError("Please input an image by URL or attachment.")
+            s = emojis[0]
+            value = url[url.index(s) + len(s):].strip()
+        else:
+            s = emojis[0]
+            value = argv[argv.index(s) + len(s):].strip()
         s = s[2:]
         i = s.index(":")
         e_id = s[i + 1:s.rindex(">")]
@@ -405,22 +415,32 @@ class Blend(Command):
         url2 = await bot.followURL(url2)
         fromA = False
         if not isURL(url1):
-            emojis = findEmojis(argv) + findEmojis(url1)
+            emojis = findEmojis(argv)
             if not emojis:
-                raise ArgumentError("Please input an image by URL or attachment.")
-            s = emojis[0]
-            argv = argv[argv.index(s) + len(s):].strip()
+                emojis = findEmojis(url1)
+                if not emojis:
+                    raise ArgumentError("Please input an image by URL or attachment.")
+                s = emojis[0]
+                argv = url1[url1.index(s) + len(s):].strip()
+            else:
+                s = emojis[0]
+                argv = argv[argv.index(s) + len(s):].strip()
             s = s[2:]
             i = s.index(":")
             e_id = s[i + 1:s.rindex(">")]
             url1 = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
             fromA = True
         if not isURL(url2):
-            emojis = findEmojis(argv) + findEmojis(url2)
+            emojis = findEmojis(argv)
             if not emojis:
-                raise ArgumentError("Please input an image by URL or attachment.")
-            s = emojis[0]
-            argv = argv[argv.index(s) + len(s):].strip()
+                emojis = findEmojis(url2)
+                if not emojis:
+                    raise ArgumentError("Please input an image by URL or attachment.")
+                s = emojis[0]
+                argv = url2[url2.index(s) + len(s):].strip()
+            else:
+                s = emojis[0]
+                argv = argv[argv.index(s) + len(s):].strip()
             s = s[2:]
             i = s.index(":")
             e_id = s[i + 1:s.rindex(">")]
@@ -526,7 +546,7 @@ class React(Command):
         curr.append(a, str(emoji))
         update()
         return (
-            "```css\nAdded [" + noHighlight(a) + "] ➡️ [" + noHighlight(args[1]) + "] to the auto react list for ["
+            "```css\nAdded [" + noHighlight(a) + "] ➡️ [" + noHighlight(args[-1]) + "] to the auto react list for ["
             + noHighlight(guild.name) + "].```"
         )
 
@@ -763,7 +783,7 @@ class UpdateReacts(Database):
                     following = self.data[g_id] = multiDict(following)
                 reacting = {}
                 for k in following:
-                    if is_alphanumeric(k):
+                    if is_alphanumeric(k) and " " not in k:
                         words = text.split(" ")
                     else:
                         words = message.content.lower()

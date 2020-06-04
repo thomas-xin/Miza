@@ -34,6 +34,7 @@ class Bot:
             
     def __init__(self):
         self.bot = self
+        self.closed = False
         self.loaded = False
         self.cache = freeClass(
             guilds={},
@@ -897,6 +898,8 @@ class Bot:
 
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:
+            if self.closed:
+                return
             u_perm = self.getPerms(user.id, message.guild)
             if u_perm <= -inf:
                 return
@@ -1167,6 +1170,8 @@ class Bot:
 
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=False):
+    if bot.closed:
+        return
     cpy = msg
     if msg[:2] == "> ":
         msg = msg[2:]

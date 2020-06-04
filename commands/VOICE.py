@@ -322,6 +322,20 @@ class customAudio(discord.AudioSource):
         self.stats.position = pos
         return self.stats.position
 
+    announce = lambda self, msg="": create_task(sendReact(self.channel, msg, reacts="❎"))
+
+    def kill(self, reason=""):
+        try:
+            if not reason:
+                reason = (
+                    "```css\n🎵 Successfully disconnected from ["
+                    + noHighlight(self.vc.guild.name) + "]. 🎵```"
+                )
+            self.announce(reason)
+        except LookupError:
+            pass
+        self.stop()
+
     def update(self, *void1, **void2):
         vc = self.vc
         guild = vc.guild
@@ -338,19 +352,7 @@ class customAudio(discord.AudioSource):
             create_task(vc.disconnect())
             if self.dead is not None:
                 self.dead = None
-                try:
-                    msg = (
-                        "```css\n🎵 Successfully disconnected from ["
-                        + noHighlight(guild.name) + "]. 🎵```"
-                    )
-                    create_task(sendReact(
-                        self.channel,
-                        msg,
-                        reacts="❎",
-                    ))
-                except KeyError:
-                    pass
-                self.stop()
+                self.kill()
             return
         if not hasattr(vc, "channel"):
             self.dead = True
@@ -394,15 +396,10 @@ class customAudio(discord.AudioSource):
                                     cnt = c
                                     ch = channel
                         if ch:
-                            msg = (
+                            self.announce(
                                 "```ini\n🎵 Detected " + sbHighlight(cnt) + " user" + "s" * (cnt != 1)
                                 + " in [#" + noHighlight(ch) + "], moving... 🎵```"
                             )
-                            create_task(sendReact(
-                                self.channel,
-                                msg,
-                                reacts="❎",
-                            ))
                             create_task(vc.move_to(ch))
         else:
             self.timeout = utc()
@@ -817,12 +814,10 @@ class AudioQueue(hlist):
                     e["file"].ensure_time()
                 if not e.url:
                     if not self.auds.stats.quiet:
-                        create_task(sendReact(
-                            self.auds.channel,
+                        auds.announce(
                             "```ini\nA problem occurred while loading " + sbHighlight(e.name)
-                            + ", and it has been removed from the queue as a result.```",
-                            reacts="❎",
-                        ))
+                            + ", and it has been removed from the queue as a result.```"
+                        )
                     dels.append(i)
                     continue
             if len(dels) > 2:
@@ -897,16 +892,11 @@ class AudioQueue(hlist):
                                 name = u.display_name
                             except KeyError:
                                 name = "Deleted User"
-                            msg = (
+                            auds.announce(
                                 "```ini\n🎵 Now playing "
                                 + sbHighlight(q[0].name)
                                 + ", added by " + sbHighlight(name) + "! 🎵```"
                             )
-                            create_task(sendReact(
-                                auds.channel,
-                                msg,
-                                reacts="❎",
-                            ))
                             self.lastsent = utc()
                     self.loading = True
                     source = ytdl.getStream(q[0])
@@ -3468,3 +3458,11 @@ class UpdateQueues(Database):
             for item in tuple(ytdl.cache.values()):
                 item.update()
         self.busy = max(0, self.busy - 1)
+
+    def _announce_(self, msg):
+        for auds in self.audio.values():
+            auds.announce(msg)
+
+    def _destroy_(self):
+        for auds in self.audio.values():
+            auds.kill(reason="Leaving voice and shutting down, most likely for maintenance. Sorry for the inconvenience.")

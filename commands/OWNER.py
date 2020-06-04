@@ -19,6 +19,9 @@ class Restart(Command):
         if argv:
             delay = await bot.evalTime(argv, guild)
             await channel.send("Preparing to " + name + " in " + sec2Time(delay) + "...")
+            for d in self.bot.database.values():
+                if hasattr(d, "_announce_"):
+                    d.announce("I will be going offline in " + sec2Time(delay) + ", apologies for any inconvenience.")
             if delay > 0:
                 await asyncio.sleep(delay)
         if name == "reload":
@@ -28,7 +31,12 @@ class Restart(Command):
             await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
+        bot.closed = True
         print.close()
+        t = time.time()
+        for d in self.bot.database.values():
+            if hasattr(d, "_destroy_"):
+                d.destroy()
         bot.update()
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
@@ -51,6 +59,8 @@ class Restart(Command):
         if name.lower() == "shutdown":
             f = open(bot.shutdown, "wb")
             f.close()
+        if time.time() - t < 1:
+            await asyncio.sleep(1)
         try:
             await client.close()
         except:
