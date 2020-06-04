@@ -7,15 +7,6 @@ except ModuleNotFoundError:
 
 import nekos, rule34, pybooru
 
-image_forms = [
-    ".gif",
-    ".png",
-    ".bmp",
-    ".jpg",
-    ".jpeg",
-    ".tiff",
-]
-
 e_loop = asyncio.new_event_loop()
 asyncio.set_event_loop(e_loop)
 rule34_sync = rule34.Sync()
@@ -93,9 +84,8 @@ def pull_e621(argv, delay=5):
             ind2 = s.index('"')
             s = s[:ind2]
             url = s
-            for i in image_forms:
-                if i in url:
-                    found = True
+            if is_image(url) is not None:
+                found = True
             if not found:
                 x = None
         return [url, v1, v2 + 1]
@@ -136,12 +126,7 @@ def pull_rule34_xxx(argv, delay=5):
             while attempts < 256:
                 v2 = xrand(len(sources))
                 url = sources[v2].file_url
-                found = False
-                for i in image_forms:
-                    if i in url:
-                        found = True
-                        break
-                if found:
+                if is_image(url) is not None:
                     break
                 attempts += 1
             if attempts >= 256:
@@ -234,10 +219,7 @@ def pull_rule34_paheal(argv, delay=5):
                     continue
                 elif ".js" in target:
                     continue
-                found = False
-                for i in image_forms:
-                    if i in target:
-                        found = True
+                found = is_image(target) is not None
                 if target[0] == "h" and found:
                     sources.append(target)
             except ValueError:

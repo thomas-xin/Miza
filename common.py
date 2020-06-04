@@ -325,6 +325,23 @@ def isURL(url):
     return True
 
 
+IMAGE_FORMS = {
+    ".gif": True,
+    ".png": True,
+    ".bmp": False,
+    ".jpg": True,
+    ".jpeg": True,
+    ".tiff": False,
+    ".webp": True,
+}
+
+def is_image(url):
+    if "." in url:
+        url = url[url.rindex(".") + 1:]
+    url = url.lower()
+    return IMAGE_FORMS.get(url)
+
+
 class urlBypass(urllib.request.FancyURLopener):
     version = "Mozilla/5." + str(xrand(1, 10))
 

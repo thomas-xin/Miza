@@ -121,6 +121,23 @@ def pytube2Dict(url):
     return entry
 
 
+def getBestIcon(entry):
+    try:
+        return entry["thumbnail"]
+    except KeyError:
+        try:
+            return entry["thumbnails"][0]["url"]
+        except LookupError:
+            try:
+                url = entry["webpage_url"]
+            except KeyError:
+                url = entry["url"]
+            if "discord" in url and "attachments/" in url:
+                if not is_image(url):
+                    return "https://cdn.discordapp.com/embed/avatars/0.png"
+            return url
+
+
 def getBestAudio(entry):
     best = -1
     try:
@@ -1471,6 +1488,7 @@ class videoDownloader:
                         "url": resp["webpage_url"],
                         "duration": dur,
                         "stream": getBestAudio(resp),
+                        "icon": getBestIcon(resp),
                     }
                     if dur is None:
                         temp["duration"] = getDuration(temp["stream"])
@@ -1531,6 +1549,7 @@ class videoDownloader:
         
     def getStream(self, entry, force=False, download=True, callback=None):
         stream = entry.get("stream", None)
+        icon = entry.get("icon", None)
         if stream == "none" and not force:
             return None
         entry["stream"] = "none"
@@ -1551,11 +1570,13 @@ class videoDownloader:
         if stream in (None, "none") or stream.startswith("https://cf-hls-media.sndcdn.com/"):
             data = self.extract(entry["url"], search=False)
             stream = setDict(data[0], "stream", data[0].url)
+            icon = setDict(data[0], "icon", data[0].url)
         # print(stream)
         h = shash(entry["url"])
         fn = h + ".pcm"
         if fn in self.cache or not download:
             entry["stream"] = stream
+            entry["icon"] = icon
             if callback is not None:
                 create_future_ex(callback)
             f = self.cache.get(fn, None)
@@ -1567,6 +1588,7 @@ class videoDownloader:
             self.cache[fn] = f = PCMFile(fn)
             f.load(stream)
             entry["stream"] = stream
+            entry["icon"] = icon
             entry["file"] = f
             f.ensure_time()
             if callback is not None:
@@ -1627,6 +1649,7 @@ class videoDownloader:
                 name=data["title"],
                 url=data["webpage_url"],
                 stream=getBestAudio(data),
+                icon=getBestIcon(data),
             )]
             try:
                 out[0].duration = data["duration"]
@@ -1744,7 +1767,7 @@ class Queue(Command):
             total_duration = tdur
         elif "b" in flags:
             auds.queue.enqueue(added, 1)
-            total_duration = q[0].duration
+            total_duration = max(3, q[0].duration - elapsed if q else 0)
         else:
             auds.queue.enqueue(added, -1)
             total_duration = max(total_duration / auds.speed, tdur)
@@ -1839,6 +1862,11 @@ class Queue(Command):
             if url.endswith(size):
                 url = url[:-len(size)] + "?size=4096"
         emb.set_author(name=str(user), url=url, icon_url=url)
+        if q:
+            icon = q[0].get("icon", "")
+        else:
+            icon = ""
+        emb.set_thumbnail(url=icon)
         embstr = ""
         currTime = startTime
         i = pos

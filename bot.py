@@ -21,6 +21,7 @@ class Bot:
     timeout = 24
     min_suspend = 3
     website = "https://github.com/thomas-xin/Miza"
+    discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
     heartbeat = "heartbeat.json"
     restart = "restart.json"
     shutdown = "shutdown.json"
@@ -178,7 +179,7 @@ class Bot:
             user.name = "Deleted User"
             user.display_name = "Deleted User"
             user.id = u_id
-            user.avatar_url = "https://cdn.discordapp.com/embed/avatars/0.png"
+            user.avatar_url = self.discord_icon
             user.created_at = snowflake_time(u_id)
         else:
             try:
@@ -1154,7 +1155,7 @@ class Bot:
         clean_content = ""
         system_content = ""
         edited_at = None
-        jump_url = "https://discordapp.com/channels/-1/-1/-1"
+        jump_url = "https://discord.com/channels/-1/-1/-1"
         is_system = lambda self: None
         created_at = 0
         edit = delete
