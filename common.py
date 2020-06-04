@@ -241,7 +241,7 @@ randColour = lambda: colour2Raw(colourCalculation(xrand(12) * 128))
 
 strURL = lambda url: str(url).replace(".webp", ".png")
 
-shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest())
+shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).decode("utf-8", "replace")
 
 hhash = lambda s: bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
 

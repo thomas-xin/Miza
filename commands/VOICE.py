@@ -600,7 +600,6 @@ class customAudio(discord.AudioSource):
             self.refilling = 2
             for i in range(2):
                 self.temp_buffer[i] = numpy.concatenate([self.temp_buffer[i], new_buf[i]])
-            self.refilling = 0
         else:
             temp = self.readNext()
             try:
@@ -619,9 +618,9 @@ class customAudio(discord.AudioSource):
                 self.refilling = 2
                 for i in range(2):
                     self.temp_buffer[i] = array[i::2]
-                self.refilling = 0
             except:
                 print(traceback.format_exc())
+        self.refilling = 0
 
     def read(self):
         size = self.length >> 1
