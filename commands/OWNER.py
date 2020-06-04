@@ -19,9 +19,12 @@ class Restart(Command):
         if argv:
             delay = await bot.evalTime(argv, guild)
             await channel.send("Preparing to " + name + " in " + sec2Time(delay) + "...")
+            emb = discord.Embed(colour=discord.Colour(1))
+            emb.set_author(name=str(client.user), url=bot.website, icon_url=strURL(client.user.avatar_url))
+            emb.description = "```ini\n[I will be going offline in " + sec2Time(delay) + ", apologies for any inconvenience.]```"
             for d in self.bot.database.values():
                 if hasattr(d, "_announce_"):
-                    d._announce_("I will be going offline in " + sec2Time(delay) + ", apologies for any inconvenience.")
+                    d._announce_(embed=emb)
             if delay > 0:
                 await asyncio.sleep(delay)
         if name == "reload":

@@ -322,7 +322,7 @@ class customAudio(discord.AudioSource):
         self.stats.position = pos
         return self.stats.position
 
-    announce = lambda self, msg="": create_task(sendReact(self.channel, msg, reacts="❎"))
+    announce = lambda self, *args, **kwargs: create_task(sendReact(self.channel, *args, reacts="❎", **kwargs))
 
     def kill(self, reason=""):
         try:
@@ -2554,8 +2554,8 @@ class AudioSettings(Command):
             if auds.queue and (op in "speed pitch pan compressor chorus" or op == "resample" and max(orig, new) >= auds.max_resample * 100):
                 await create_future(auds.new, auds.file, auds.stats.position)
             s += (
-                "\nChanged audio \"" + str(op)
-                + "\" setting from [" + str(orig)
+                "\nChanged audio {" + str(op)
+                + "} setting from [" + str(orig)
                 + "] to [" + str(new) + "]."
             )
         if "h" not in flags:
@@ -3459,9 +3459,9 @@ class UpdateQueues(Database):
                 item.update()
         self.busy = max(0, self.busy - 1)
 
-    def _announce_(self, msg):
+    def _announce_(self, *args, **kwargs):
         for auds in self.audio.values():
-            auds.announce(msg)
+            auds.announce(*args, **kwargs)
 
     def _destroy_(self):
         for auds in self.audio.values():
