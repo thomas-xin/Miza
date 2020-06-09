@@ -141,16 +141,6 @@ class UpdateExec(Database):
         except:
             exec(proc, bot._globals)
             output = None
-        try:
-            if awaitable(output):
-                raise TypeError
-            if type(output) in (str, bytes):
-                raise TypeError
-            if issubclass(type(output), collections.Mapping) or issubclass(type(output), io.IOBase):
-                raise TypeError
-            output = tuple(output)
-        except TypeError:
-            pass
         return output
 
     async def sendDeleteID(self, c_id, delete_after=20, **kwargs):
@@ -187,9 +177,7 @@ class UpdateExec(Database):
                 output = None
                 try:
                     output = await create_future(self.procFunc, proc, bot, priority=True)
-                    if type(output) is tuple:
-                        output = await recursiveCoro(output)
-                    elif awaitable(output):
+                    if awaitable(output):
                         output = await output
                     await channel.send(limStr("```py\n" + str(output) + "```", 2000))
                 except:

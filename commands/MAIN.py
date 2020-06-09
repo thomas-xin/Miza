@@ -565,7 +565,8 @@ class Info(Command):
                     u = await bot.fetch_member_ex(u_id, g)
                 except:
                     try:
-                        u = await bot.fetch_member(u_id, g)
+                        u = await bot.fetch_member(u_id, g, find_others=True)
+                        member = False
                     except:
                         try:
                             u = await bot.fetch_user(u_id)
@@ -605,7 +606,7 @@ class Info(Command):
             return await self.getGuildData(g, flags)
         guild = g
         name = str(u)
-        dname = u.display_name * (u.display_name != u.name)
+        dname = u.display_name * (u.display_name != u.name) if member else None
         url = strURL(u.avatar_url)
         try:
             is_sys = u.system
@@ -621,13 +622,37 @@ class Info(Command):
             joined = None
         created = u.created_at
         activity = "\n".join(strActivity(i) for i in getattr(u, "activities", []))
-        role = ", ".join("<@&" + str(i.id) + ">" for i in getattr(u, "roles", []) if not i.is_default())
+        status = None
+        if hasattr(u, "status"):
+            s = u.status
+            if s == discord.Status.online:
+                status = "Online 🟢"
+            elif s == discord.Status.idle:
+                status = "Idle 🟡"
+            elif s == discord.Status.dnd:
+                status = "DND 🔴"
+            elif s in (discord.Status.offline, discord.Status.invisible):
+                status = "Offline ⚫"
+        if member:
+            role = ", ".join("<@&" + str(i.id) + ">" for i in getattr(u, "roles", ()) if not i.is_default())
+        else:
+            role = None
         coms = seen = msgs = avgs = gmsg = 0
         fav = None
         pos = None
         if "v" in flags:
             try:
-                c = bot.data.users[u.id]["commands"]
+                if is_self:
+                    c = {}
+                    for i, v in enumerate(tuple(bot.data.users.values())):
+                        try:
+                            addDict(c, v["commands"])
+                        except KeyError:
+                            pass
+                        if not i + 1 & 8191:
+                            await asyncio.sleep(0.2)
+                else:
+                    c = bot.data.users[u.id]["commands"]
                 coms = iterSum(c)
                 if type(c) is dict:
                     try:
@@ -695,6 +720,8 @@ class Info(Command):
         emb.add_field(name="Creation time", value=str(created), inline=1)
         if joined is not None:
             emb.add_field(name="Join time", value=str(joined), inline=1)
+        if status:
+            emb.add_field(name="Status", value=str(status), inline=1)
         if seen:
             emb.add_field(name="Last seen", value=str(seen), inline=1)
         if coms:

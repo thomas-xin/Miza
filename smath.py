@@ -143,7 +143,9 @@ def sort(it, key=None, reverse=False):
         keys = sorted(it, key=it.get if key is None else lambda x: key(it.get(x)))
         if reverse:
             keys = reversed(keys)
-        it.__init__((i, it[i]) for i in keys)
+        items = tuple((i, it[i]) for i in keys)
+        it.clear()
+        it.__init__(items)
         return it
     elif type(it) is deque:
         it = sorted(it, key=key, reverse=reverse)
@@ -494,9 +496,21 @@ def generatePrimes(a=2, b=inf, c=1):
 
 def iterSum(it):
     if issubclass(type(it), collections.Mapping):
-        return sum(it.values())
+        return sum(tuple(it.values()))
     try:
         return sum(iter(it))
+    except TypeError:
+        return it
+
+def iterMax(it):
+    if issubclass(type(it), collections.Mapping):
+        keys, values = tuple(it.keys()), tuple(it.values())
+        m = max(values)
+        for i in keys:
+            if it[i] >= m:
+                return i
+    try:
+        return max(iter(it))
     except TypeError:
         return it
 
@@ -513,14 +527,20 @@ def addDict(a, b, replace=True, insert=None):
             r = b
         else:
             r = copy.copy(b)
-        r[insert] = a
+        try:
+            r[insert] += a
+        except KeyError:
+            r[insert] = a
         return r
     elif type(b) is not dict:
         if replace:
             r = a
         else:
             r = copy.copy(a)
-        r[insert] = b
+        try:
+            r[insert] += b
+        except KeyError:
+            r[insert] = b
         return r
     else:
         if replace:

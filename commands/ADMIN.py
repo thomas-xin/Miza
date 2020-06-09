@@ -860,11 +860,11 @@ class UpdateUserLogs(Database):
         if guild is None:
             guild = after.guild
         try:
-            memb = await self.bot.fetch_member_ex(after.id, guild)
+            memb = guild.get_member(after.id)
             if memb is None:
                 raise LookupError
         except LookupError:
-            pass
+            return
         except:
             print(traceback.format_exc())
             return

@@ -213,7 +213,7 @@ class Bot:
                 try:
                     member = await strLookup(
                         members,
-                        u_id,
+                        str(u_id),
                         qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
                         ikey=lambda x: [str(x), reconstitute(x.name), reconstitute(x.display_name)],
                     )
@@ -221,7 +221,7 @@ class Bot:
                     raise LookupError("Unable to find member data.")
         return member
 
-    async def fetch_member(self, u_id, guild=None):
+    async def fetch_member(self, u_id, guild=None, find_others=False):
         try:
             u_id = int(u_id)
         except (ValueError, TypeError):
@@ -230,8 +230,11 @@ class Bot:
         if guild is None:
             guilds = list(bot.cache.guilds.values())
         else:
-            guilds = [g[i] for i in g if g[i].id != guild.id]
-            guilds.insert(0, guild)
+            if find_others:
+                guilds = [g[i] for i in g if g[i].id != guild.id]
+                guilds.insert(0, guild)
+            else:
+                guilds = [guild]
         member = None
         for guild in guilds:
             member = guild.get_member(u_id)
@@ -1503,28 +1506,28 @@ async def on_ready():
     print("Successfully connected as " + str(client.user))
     try:
         await bot.getState()
+        print("Servers: ")
+        for guild in client.guilds:
+            if guild.unavailable:
+                print("> " + str(guild.id) + " is not available.")
+            else:
+                print("> " + guild.name)
+        await bot.handleUpdate()
+        if not hasattr(bot, "started"):
+            bot.started = True
+            create_task(updateLoop())
+            create_task(heartbeatLoop())
+            if "init.tmp" not in os.listdir("misc"):
+                print("Setting bot avatar...")
+                f = await create_future(open, "misc/avatar.png", "rb")
+                b = await create_future(f.read)
+                create_future_ex(f.close)
+                await client.user.edit(avatar=b)
+                f = await create_future(open, "misc/init.tmp", "wb")
+                create_future_ex(f.close)
+            print("Initialization complete.")
     except:
         print(traceback.format_exc())
-    print("Servers: ")
-    for guild in client.guilds:
-        if guild.unavailable:
-            print("> " + str(guild.id) + " is not available.")
-        else:
-            print("> " + guild.name)
-    await bot.handleUpdate()
-    if not hasattr(bot, "started"):
-        bot.started = True
-        create_task(updateLoop())
-        create_task(heartbeatLoop())
-        if "init.tmp" not in os.listdir("misc"):
-            print("Setting bot avatar...")
-            f = await create_future(open, "misc/avatar.png", "rb")
-            b = await create_future(f.read)
-            create_future_ex(f.close)
-            await client.edit(avatar=b)
-            f = await create_future(open, "misc/init.tmp", "wb")
-            create_future_ex(f.close)
-        print("Initialization complete.")
 
 
 @client.event
