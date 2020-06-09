@@ -638,10 +638,10 @@ class MimicSend(Command):
             name = mimic.name
             url = mimic.url
             try:
-                await w.send(msg, username=name, avatar_url=url)
+                await waitOnNone(w.send(msg, username=name, avatar_url=url))
             except discord.NotFound:
                 w = await bot.ensureWebhook(channel, force=True)
-                await w.send(msg, username=name, avatar_url=url)
+                await waitOnNone(w.send(msg, username=name, avatar_url=url))
             mimic.count += 1
             mimic.total += len(msg)
 
@@ -697,10 +697,10 @@ class UpdateMimics(Database):
                             url = mimic.url
                             msg = escape_everyone(k.msg)
                             try:
-                                await w.send(msg, username=name, avatar_url=url)
+                                await waitOnNone(w.send(msg, username=name, avatar_url=url))
                             except discord.NotFound:
                                 w = await bot.ensureWebhook(channel, force=True)
-                                await w.send(msg, username=name, avatar_url=url)
+                                await waitOnNone(w.send(msg, username=name, avatar_url=url))
                             mimic.count += 1
                             mimic.total += len(k.msg)
                 except Exception as ex:

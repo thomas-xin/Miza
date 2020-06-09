@@ -83,7 +83,6 @@ class Bot:
         self.guilds = 0
         self.blocked = 0
         self.updated = False
-        print("Initialized.")
         create_future_ex(self.clearcache, priority=True)
 
     __call__ = lambda self: self
@@ -192,7 +191,7 @@ class Bot:
         self.limitCache("users")
         return user
 
-    async def fetch_member(self, u_id, guild=None):
+    async def fetch_member_ex(self, u_id, guild=None):
         try:
             u_id = int(u_id)
         except:
@@ -210,6 +209,7 @@ class Bot:
                 members = guild.members
                 if not members:
                     members = guild.members = await guild.fetch_members(limit=None)
+                    guild._members = {m.id: m for m in members}
                 try:
                     member = await strLookup(
                         members,
@@ -219,6 +219,26 @@ class Bot:
                     )
                 except LookupError:
                     raise LookupError("Unable to find member data.")
+        return member
+
+    async def fetch_member(self, u_id, guild=None):
+        try:
+            u_id = int(u_id)
+        except (ValueError, TypeError):
+            raise TypeError("Invalid user identifier: " + str(u_id))
+        g = bot.cache.guilds
+        if guild is None:
+            guilds = list(bot.cache.guilds.values())
+        else:
+            guilds = [g[i] for i in g if g[i].id != guild.id]
+            guilds.insert(0, guild)
+        member = None
+        for guild in guilds:
+            member = guild.get_member(u_id)
+            if member is not None:
+                break
+        if member is None:
+            raise LookupError("Unable to find member data.")
         return member
 
     async def fetch_whuser(self, u_id, guild=None):
@@ -1496,6 +1516,15 @@ async def on_ready():
         bot.started = True
         create_task(updateLoop())
         create_task(heartbeatLoop())
+        if "init.tmp" not in os.listdir("misc"):
+            print("Setting bot avatar...")
+            f = await create_future(open, "misc/avatar.png", "rb")
+            b = await create_future(f.read)
+            create_future_ex(f.close)
+            await client.edit(avatar=b)
+            f = await create_future(open, "misc/init.tmp", "wb")
+            create_future_ex(f.close)
+        print("Initialization complete.")
 
 
 @client.event

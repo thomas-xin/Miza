@@ -5,7 +5,46 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-import nekos
+import youtube_dl, nekos
+
+getattr(youtube_dl, "__builtins__", {})["print"] = print
+
+ydl_opts = {
+    "quiet": 1,
+    "format": "bestvideo/best",
+    "nocheckcertificate": 1,
+    "no_call_home": 1,
+    "nooverwrites": 1,
+    "noplaylist": 1,
+    "logtostderr": 0,
+    "ignoreerrors": 0,
+    "default_search": "auto",
+    "source_address": "0.0.0.0",
+}
+downloader = youtube_dl.YoutubeDL(ydl_opts)
+
+def get_video(url):
+    entry = downloader.extract_info(url, download=False)
+    best = 0
+    size = None
+    dur = None
+    try:
+        fmts = entry["formats"]
+    except KeyError:
+        fmts = ""
+    for fmt in fmts:
+        q = fmt.get("width", 0)
+        if type(q) is not int:
+            q = 0
+        if abs(q - 512) < abs(best - 512):
+            best = q
+            url = fmt["url"]
+            size = [fmt["width"], fmt["height"]]
+            dur = entry.get("duration")
+    if "dropbox.com" in url:
+        if "?dl=0" in url:
+            url = url.replace("?dl=0", "?dl=1")
+    return url, size, dur
 
 
 class IMG(Command):
@@ -286,19 +325,26 @@ class HueShift(Command):
 
 
 class Colour(Command):
-    name = ["Color"]
+    name = ["RGB", "HSV", "CMY", "LAB", "LUV", "XYZ", "Color"]
     min_level = 0
-    description = "Creates a 128x128 image filled with the target RGB colour."
+    description = "Creates a 128x128 image filled with the target colour."
     usage = "<Colour>"
     no_parse = True
     rate_limit = 2
+    trans = {
+        "hsv": hsv_to_rgb,
+        "cmy": cmy_to_rgb,
+        "lab": lab_to_rgb,
+        "luv": luv_to_rgb,
+        "xyz": xyz_to_rgb,
+    }
 
     async def __call__(self, bot, guild, channel, argv, **void):
         argv = argv.replace("#", "").replace(",", " ").strip()
         if " " in argv:
-            channels = [i.strip() for i in argv.split(" ") if i.strip()]
+            channels = [min(255, max(0, int(round(float(i.strip()))))) for i in argv.split(" ")[:5] if i.strip()]
             if len(channels) not in (3, 4):
-                raise ArgumentError("Please input valid amount of colours for RGB/RGBA input.")
+                raise ArgumentError("Please input 3 or 4 channels for colour input.")
         else:
             try:
                 raw = int(argv, 16)
@@ -310,14 +356,78 @@ class Colour(Command):
                     raise ValueError
             except ValueError:
                 raise ArgumentError("Please input a valid hex colour.")
+        if name in self.trans:
+            adj = [i / 255 for x in channels]
+            channels = [round(x * 255) for x in self.trans[name](adj)]
         resp = await imageProc("from_colour", "$", [channels], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename="colour.png")
+        adj = [i / 255 for x in channels]
+        msg = (
+            "```ini\nHex colour code: " + sbHighlight("".join(hex(i)[2:].upper() for i in channels))
+            + "\nDec colour code: " + sbHighlight(colour2Raw(channels))
+            + "\nRGB values: " + str(channels)
+            + "\nHSV values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_hsv(adj)))
+            + "\nCMY values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_cmy(adj)))
+            + "\nLAB values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_lab(adj)))
+            + "\nLUV values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_luv(adj)))
+            + "\nXYZ values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
+            + "```"
+        )
         await sendFile(channel, "", f)
 
 
+class CreateGIF(Command):
+    name = ["Animate", "GIF"]
+    min_level = 0
+    description = "Combines multiple supplied images, and/or optionally a video, into an animated .gif image."
+    usage = "<0*:urls{attached_files}> <-2:framerate_setting(?r)> <-1:framerate[25]>"
+    no_parse = True
+    rate_limit = 12
+    _timeout_ = 5
+    flags = "r"
+
+    async def __call__(self, bot, guild, message, flags, args, **void):
+        if message.attachments:
+            args += [a.url for a in message.attachments]
+        if not args:
+            raise ArgumentError("Please input images by URL or attachment.")
+        if "r" in flags:
+            fr = args.pop(-1)
+            rate = await bot.evalMath(fr, guild)
+        else:
+            rate = 25
+        if rate <= 0:
+            args = args[:1]
+            rate = 1
+        delay = round(1000 / rate)
+        if delay <= 0:
+            args = args[-1:]
+            delay = 1000
+        if delay > 16777215:
+            raise OverflowError("GIF image framerate too low.")
+        video = None
+        for i, url in enumerate(args):
+            url = await bot.followURL(url)
+            if "discord" not in url and "channels" not in url:
+                url, size, dur = await create_future(get_video, url)
+                if size and dur:
+                    video = (url, size, dur)
+            if not isURL(url):
+                raise ArgumentError("Invalid URL detected: \"" + url + '"')
+            args[i] = url
+        name = "unknown.gif"
+        if video is not None:
+            resp = await imageProc("create_gif", "$", ["video", video, delay], guild.id, timeout=64)
+        else:
+            resp = await imageProc("create_gif", "$", ["image", args, delay], guild.id, timeout=64)
+        fn = resp[0]
+        f = discord.File(fn, filename=name)
+        await sendFile(message.channel, "", f)
+
+
 class Resize(Command):
-    name = ["ImageScale", "Scale", "ImageResize"]
+    name = ["ImageScale", "Scale", "Rescale", "ImageResize"]
     min_level = 0
     description = "Changes size of supplied image, using an optional scaling operation."
     usage = "<0:url{attached_file}> <1:x_multiplier[0.5]> <2:y_multiplier[x]> <3:operation[auto](?l)>"
@@ -384,6 +494,132 @@ class Resize(Command):
         resp = await imageProc(url, "resize_mult", [x, y, op], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
+        await sendFile(message.channel, "", f)
+
+
+class Resize(Command):
+    name = ["ImageScale", "Scale", "Rescale", "ImageResize"]
+    min_level = 0
+    description = "Changes size of supplied image, using an optional scaling operation."
+    usage = "<0:url{attached_file}> <1:x_multiplier[0.5]> <2:y_multiplier[x]> <3:operation[auto](?l)>"
+    no_parse = True
+    rate_limit = 3
+    flags = "l"
+
+    async def __call__(self, bot, guild, message, flags, args, argv, **void):
+        if message.attachments:
+            args = [a.url for a in message.attachments] + args
+            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
+        if not args:
+            if "l" in flags:
+                return (
+                    "```ini\nAvailable scaling operations: ["
+                    + "nearest, linear, hamming, bicubic, lanczos, auto]```"
+                )
+            raise ArgumentError("Please input an image by URL or attachment.")
+        url = args.pop(0)
+        url = await bot.followURL(url)
+        if not isURL(url):
+            emojis = findEmojis(argv) + findEmojis(url)
+            if not emojis:
+                raise ArgumentError("Please input an image by URL or attachment.")
+            s = emojis[0]
+            value = argv[argv.index(s) + len(s):].strip()
+            s = s[2:]
+            i = s.index(":")
+            e_id = s[i + 1:s.rindex(">")]
+            url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
+        else:
+            value = " ".join(args).strip()
+        if not value:
+            x = y = 0.5
+            op = "auto"
+        else:
+            value = value.replace("x", " ").replace("X", " ").replace("*", " ").replace("×", " ")
+            try:
+                spl = shlex.split(value)
+            except ValueError:
+                spl = value.split()
+            x = await bot.evalMath(spl.pop(0), message.guild.id)
+            if spl:
+                y = await bot.evalMath(spl.pop(0), message.guild.id)
+            else:
+                y = x
+            for value in (x, y):
+                if not value >= -16 or not value <= 16:
+                    raise OverflowError("Maximum multiplier input is 16.")
+            if spl:
+                op = " ".join(spl)
+            else:
+                op = "auto"
+        try:
+            name = url[url.rindex("/") + 1:]
+            if not name:
+                raise ValueError
+            if "." in name:
+                name = name[:name.rindex(".")]
+        except ValueError:
+            name = "unknown"
+        if "." not in name:
+            name += ".png"
+        resp = await imageProc(url, "resize_mult", [x, y, op], guild.id)
+        fn = resp[0]
+        f = discord.File(fn, filename=name)
+        await sendFile(message.channel, "", f)
+
+
+class Magik(Command):
+    name = ["ImageMagik", "IMGMagik"]
+    min_level = 0
+    description = "Applies the Magik filter to an image."
+    usage = "<0:url{attached_file}>"
+    no_parse = True
+    rate_limit = 6
+    _timeout_ = 2
+
+    async def __call__(self, bot, guild, message, args, argv, **void):
+        if message.attachments:
+            args = [a.url for a in message.attachments] + args
+            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
+        if not args:
+            raise ArgumentError("Please input an image by URL or attachment.")
+        url = args.pop(0)
+        url = await bot.followURL(url)
+        if not isURL(url):
+            emojis = findEmojis(argv) + findEmojis(url)
+            if not emojis:
+                raise ArgumentError("Please input an image by URL or attachment.")
+            s = emojis[0]
+            s = s[2:]
+            i = s.index(":")
+            e_id = s[i + 1:s.rindex(">")]
+            url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
+        try:
+            name = url[url.rindex("/") + 1:]
+            if not name:
+                raise ValueError
+            if "." in name:
+                name = name[:name.rindex(".")]
+        except ValueError:
+            name = "unknown"
+        if "." not in name:
+            name += ".png"
+        if "cdn.discord" not in url:
+            resp = await imageProc(url, "resize_to", [512, 512, "auto"], guild.id)
+            fn = resp[0]
+            f = discord.File(fn, filename=name)
+            msg = await channel.send(file=f)
+            url = msg.attachments[0].url
+        else:
+            msg = None
+        try:
+            resp = requests.get("https://api.alexflipnote.dev/filter/magik?image=" + url)
+        except:
+            await bot.silentDelete(msg)
+            raise
+        create_task(bot.silentDelete(msg))
+        b = resp.content
+        f = discord.File(io.BytesIO(b), filename=name)
         await sendFile(message.channel, "", f)
 
 
@@ -671,7 +907,7 @@ try:
     cat_key = auth["cat_api_key"]
 except:
     cat_key = None
-    print("WARNING: cat_api_key not found. Unable to use API to pull cat images.")
+    print("WARNING: cat_api_key not found. Unable to use Cat API to pull cat images.")
 
 
 class Cat(Command):
@@ -681,18 +917,41 @@ class Cat(Command):
     else:
         header = None
     min_level = 0
-    description = "Pulls a random image from thecatapi.com or cdn.nekos.life/meow, and embeds it."
+    description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it."
     usage = "<verbose(?v)>"
     flags = "v"
     rate_limit = 0.25
 
-    async def __call__(self, channel, flags, **void):
-        if not self.header or random.random() > 0.9375:
-            url = nekos.cat()
+    def __load__(self):
+        self.buffer = deque()
+        create_future_ex(self.refill_buffer, 64)
+    
+    def fetch_one(self):
+        if not self.header or random.random() > 0.75:
+            if random.random() > 0.75:
+                url = nekos.cat()
+            else:
+                for _ in loop(8):
+                    resp = requests.get(
+                        "https://api.alexflipnote.dev/cats",
+                        headers=self.header,
+                        timeout=8,
+                    )
+                    try:
+                        d = json.loads(resp.content)
+                    except:
+                        d = eval(resp.content, {}, eval_const)
+                    try:
+                        if type(d) is list:
+                            d = random.choice(d)
+                        url = d["file"]
+                        break
+                    except KeyError:
+                        pass
+                time.sleep(0.25)
         else:
             for _ in loop(8):
-                resp = await create_future(
-                    requests.get,
+                resp = requests.get(
                     "https://api.thecatapi.com/v1/images/search",
                     headers=self.header,
                     timeout=8,
@@ -707,7 +966,23 @@ class Cat(Command):
                     url = d["url"]
                     break
                 except KeyError:
-                    await asyncio.sleep(0.5)
+                    pass
+            time.sleep(0.25)
+        return url
+
+    def refill_buffer(self, amount):
+        while len(self.buffer) < amount + 1:
+            url = self.fetch_one()
+            self.buffer.append(url)
+
+    def get_buffer(self, amount):
+        if len(self.buffer) < amount + 1:
+            create_future_ex(self.refill_buffer(amount << 1))
+            return self.fetch_one()
+        return self.buffer.popleft()
+
+    async def __call__(self, channel, flags, **void):
+        url = await create_future(self.get_buffer, 32)
         if "v" in flags:
             text = "Pulled from " + url
             return text
@@ -724,18 +999,28 @@ class Cat(Command):
 
 class Dog(Command):
     min_level = 0
-    description = "Pulls a random image from images.dog.ceo and embeds it."
+    description = "Pulls a random image from api.alexflipnote.dev/dogs or images.dog.ceo and embeds it."
     usage = "<verbose(?v)>"
     flags = "v"
     rate_limit = 0.25
 
-    async def __call__(self, channel, flags, **void):
+    def __load__(self):
+        self.buffer = deque()
+        create_future_ex(self.refill_buffer, 64)
+
+    def fetch_one(self):
         for _ in loop(8):
-            resp = await create_future(
-                requests.get,
-                "https://dog.ceo/api/breeds/image/random",
-                timeout=8,
-            )
+            x = random.random() > 0.75
+            if x:
+                resp = requests.get(
+                    "https://api.alexflipnote.dev/dogs",
+                    timeout=8,
+                )
+            else:
+                resp = requests.get(
+                    "https://dog.ceo/api/breeds/image/random",
+                    timeout=8,
+                )
             try:
                 d = json.loads(resp.content)
             except:
@@ -743,13 +1028,29 @@ class Dog(Command):
             try:
                 if type(d) is list:
                     d = random.choice(d)
-                url = d["message"]
+                url = d["file" if x else "message"]
                 break
             except KeyError:
-                await asyncio.sleep(0.5)
+                pass
+        time.sleep(0.25)
         url = url.replace("\\", "/")
         while "///" in url:
             url = url.replace("///", "//")
+        return url
+
+    def refill_buffer(self, amount):
+        while len(self.buffer) < amount + 1:
+            url = self.fetch_one()
+            self.buffer.append(url)
+
+    def get_buffer(self, amount):
+        if len(self.buffer) < amount + 1:
+            create_future_ex(self.refill_buffer(amount << 1))
+            return self.fetch_one()
+        return self.buffer.popleft()
+
+    async def __call__(self, channel, flags, **void):
+        url = await create_future(self.get_buffer, 32)
         if "v" in flags:
             text = "Pulled from " + url
             return text

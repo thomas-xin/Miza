@@ -537,7 +537,10 @@ while True:
             s = "{'file':'" + fn + "'}\n"
         else:
             s = repr([convAns(i) for i in resp])
-        sys.stdout.write(repr(s.encode("utf-8")) + "\n")
+        b = s.encode("utf-8")
+        if len(b) > 8388608:
+            raise OverflowError("Output data too large.")
+        sys.stdout.write(repr(b) + "\n")
         sys.stdout.flush()
     except Exception as ex:
         sys.stdout.write(repr(ex) + "\n")

@@ -12,8 +12,6 @@ escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@he
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
 
-CalledProcessError = subprocess.CalledProcessError
-
 class ArgumentError(LookupError):
     pass
 class TooManyRequests(PermissionError):
@@ -92,6 +90,12 @@ def getLineCount(fn):
 iscode = lambda fn: str(fn).endswith(".py") or str(fn).endswith(".pyw")
 
 awaitable = lambda obj: issubclass(type(obj), asyncio.Future) or issubclass(type(obj), asyncio.Task) or inspect.isawaitable(obj)
+
+async def waitOnNone(coro, seconds=0.5):
+    resp = await coro
+    if resp is None:
+        await asyncio.sleep(seconds)
+    return resp
 
 
 class returns:
@@ -616,6 +620,14 @@ class Command:
         self.catg = catg
         self.bot = bot
         self._globals = bot._globals
+        f = getattr(self, "__load__", None)
+        if callable(f):
+            try:
+                f()
+            except:
+                print(traceback.format_exc())
+                self.data.clear()
+                f()
 
     __hash__ = lambda self: hash(self.__name__)
     __str__ = lambda self: self.__name__

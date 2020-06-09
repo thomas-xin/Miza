@@ -7,7 +7,7 @@ except ModuleNotFoundError:
 
 
 class Restart(Command):
-    name = ["Shutdown", "Reload"]
+    name = ["Shutdown", "Reload", "Reboot"]
     min_level = nan
     description = "Restarts, reloads, or shuts down ⟨MIZA⟩, with an optional delay."
     _timeout_ = inf
@@ -175,31 +175,32 @@ class UpdateExec(Database):
         channel = message.channel
         if message.author.id == self.bot.owner_id and channel.id in self.data:
             proc = message.content
-            while proc[0] == " ":
-                proc = proc[1:]
-            if proc.startswith("//") or proc.startswith("||") or proc.startswith("\\") or proc.startswith("#"):
-                return
-            if proc.startswith("`") and proc.endswith("`"):
-                proc = proc.strip("`")
-            if not proc:
-                return
-            output = None
-            try:
-                output = await create_future(self.procFunc, proc, bot, priority=True)
-                if type(output) is tuple:
-                    output = await recursiveCoro(output)
-                elif awaitable(output):
-                    output = await output
-                await channel.send(limStr("```py\n" + str(output) + "```", 2000))
-            except:
-                print(traceback.format_exc())
-                await sendReact(channel, limStr(
-                    "```py\n" + traceback.format_exc().replace("```", "") + "```",
-                    2000,
-                ), reacts="❎")
-            if output is not None:
-                bot._globals["output"] = output
-                bot._globals["_"] = output
+            if proc:
+                while proc[0] == " ":
+                    proc = proc[1:]
+                if proc.startswith("//") or proc.startswith("||") or proc.startswith("\\") or proc.startswith("#"):
+                    return
+                if proc.startswith("`") and proc.endswith("`"):
+                    proc = proc.strip("`")
+                if not proc:
+                    return
+                output = None
+                try:
+                    output = await create_future(self.procFunc, proc, bot, priority=True)
+                    if type(output) is tuple:
+                        output = await recursiveCoro(output)
+                    elif awaitable(output):
+                        output = await output
+                    await channel.send(limStr("```py\n" + str(output) + "```", 2000))
+                except:
+                    print(traceback.format_exc())
+                    await sendReact(channel, limStr(
+                        "```py\n" + traceback.format_exc().replace("```", "") + "```",
+                        2000,
+                    ), reacts="❎")
+                if output is not None:
+                    bot._globals["output"] = output
+                    bot._globals["_"] = output
         elif message.guild is None:
             user = message.author
             emb = discord.Embed()

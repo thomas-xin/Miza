@@ -1,7 +1,11 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, re, traceback, requests, urllib, numpy, blend_modes
+import os, sys, io, time, re, traceback, requests, urllib, numpy, blend_modes, subprocess, psutil
+import PIL, concurrent.futures
 from PIL import Image, ImageChops, ImageEnhance, ImageMath, ImageStat
+
+
+exc = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
 
 def logging(func):
@@ -15,6 +19,22 @@ def logging(func):
             raise
         return output
     return call
+
+
+def rdhms(ts):
+    data = ts.split(":")
+    t = 0
+    mult = 1
+    while len(data):
+        t += float(data[-1]) * mult
+        data = data[:-1]
+        if mult <= 60:
+            mult *= 60
+        elif mult <= 3600:
+            mult *= 24
+        elif len(data):
+            raise TypeError("Too many time arguments.")
+    return t
 
 
 DOMAIN_FORMAT = re.compile(
@@ -54,7 +74,103 @@ def isURL(url):
     return True
 
 
-from_colour = lambda colour, size=128: Image.fromarray(numpy.tile(numpy.array(colour, dtype=numpy.uint8), (size, size, 1)))
+from_colour = lambda colour, size=128, key=None: Image.fromarray(numpy.tile(numpy.array(colour, dtype=numpy.uint8), (size, size, 1)))
+
+
+sizecheck = re.compile("[1-9][0-9]*x[0-9]+")
+
+def video2img(data, maxsize, fps, out, size=None, dur=None):
+    ts = round(time.time() * 1000)
+    fn = "cache/" + str(ts)
+    file = open(fn, "wb")
+    images = []
+    try:
+        file.write(data)
+    except:
+        file.close()
+        raise
+    file.close()
+    try:
+        command = ["ffprobe", "-hide_banner", fn]
+        resp = bytes()
+        for _ in range(3):
+            try:
+                proc = psutil.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                fut = exc.submit(proc.communicate)
+                res = fut.result(timeout=2)
+                resp = bytes().join(res)
+                break
+            except:
+                try:
+                    proc.kill()
+                except:
+                    raise
+        s = resp.decode("utf-8", "replace")
+        if dur is None:
+            i = s.index("Duration: ")
+            d = s[i + 10:]
+            i = 2147483647
+            for c in ", \n\r":
+                try:
+                    x = d.index(c)
+                except ValueError:
+                    pass
+                else:
+                    if x < i:
+                        i = x
+            dur = rdhms(d[:i])
+        fps = min(fps, 2048 / dur)
+        i = d.index(" fps")
+        f = d[i - 5:i]
+        while f[0] < "0" or f[0] > "9":
+            f = f[1:]
+        orig_fps = float(f)
+        if size is None:
+            sfind = re.finditer(sizecheck, d)
+            sizestr = next(sfind).group()
+            size = [int(i) for i in sizestr.split("x")]
+        fn2 = fn + ".gif"
+        command = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", fn, "-fs", str(8388608 - 131072), "-an", "-vf"]
+        vf = ""
+        s = max(size)
+        if s > maxsize:
+            r = maxsize / s
+            scale = int(size[0] * r)
+            vf += "scale=" + str(scale) + ":-1:flags=lanczos,"
+        vf += "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"
+        command += [vf, "-loop", "0", "-r", str(fps), out]
+        subprocess.check_output(command)
+        os.remove(fn)
+    except:
+        try:
+            os.remove(fn)
+        except:
+            pass
+        raise
+
+def create_gif(in_type, args, delay, key=None):
+    out = "cache/" + key + ".gif"
+    maxsize = 512
+    if in_type == "video":
+        video2img(args[0], maxsize, round(1000 / delay), out, args[1], args[2])
+        return "$" + out
+    images = args
+    imgs = []
+    for url in images:
+        data = requests.get(url, timeout=8).content
+        try:
+            img = get_image(data, None)
+        except (PIL.UnidentifiedImageError, OverflowError):
+            if len(data) < 268435456:
+                video2img(data, maxsize, round(1000 / delay), out)
+                return "$" + out
+            else:
+                raise OverflowError("Max file size to load is 256MB.")
+        else:
+            imgs.append(img)
+    frames = [resize_max(i, maxsize) for i in imgs]
+    frames[0].save(out, format='GIF', append_images=frames[1:], save_all=True, duration=delay, loop=0)
+    return "$" + out
 
 
 def resize_max(image, maxsize, resample=Image.LANCZOS, box=None, reducing_gap=None):
@@ -85,11 +201,11 @@ def resize_mult(image, x, y, operation):
         return image
     w = image.width * x
     h = image.height * y
-    if abs(w * h) > 16777216:
-        raise OverflowError("Resulting image size too large.")
     return resize_to(image, round(w), round(h), operation)
 
 def resize_to(image, w, h, operation):
+    if abs(w * h) > 16777216:
+        raise OverflowError("Resulting image size too large.")
     op = operation.lower().replace(" ", "").replace("_", "")
     if op in resizers:
         filt = resizers[op]
@@ -293,20 +409,23 @@ def hue_shift(image, value):
     return image
 
 
-def get_image(out, url):
-    if isURL(url):
-        data = requests.get(url, timeout=8).content
+def get_image(url, out):
+    if type(url) not in (bytes, bytearray, io.BytesIO):
+        if isURL(url):
+            data = requests.get(url, timeout=8).content
+        else:
+            if os.path.getsize(url) > 67108864:
+                raise OverflowError("Max file size to load is 64MB.")
+            f = open(url, "rb")
+            data = f.read()
+            f.close()
+            if out != url and out:
+                try:
+                    os.remove(url)
+                except:
+                    pass
     else:
-        if os.path.getsize(url) > 67108864:
-            raise OverflowError("Max file size to load is 64MB.")
-        f = open(url, "rb")
-        data = f.read()
-        f.close()
-        if out != url:
-            try:
-                os.remove(url)
-            except:
-                pass
+        data = url
     if len(data) > 67108864:
         raise OverflowError("Max file size to load is 64MB.")
     return Image.open(io.BytesIO(data))
@@ -317,17 +436,19 @@ def evalImg(url, operation, args, key):
     out = "cache/" + key + ".png"
     args = eval(args)
     if operation != "$":
-        image = get_image(out, url)
+        image = get_image(url, out)
         f = getattr(image, operation, None)
         if f is None:
             new = eval(operation)(image, *args)
         else:
             new = f(*args)
     else:
-        new = eval(url)(*args)
+        new = eval(url)(*args, key=key)
     if issubclass(type(new), Image.Image):
         new.save(out, "png")
         return repr([out])
+    elif type(new) is str and new.startswith("$"):
+        return repr([new[1:]])
     return repr(str(new).encode("utf-8"))
 
 

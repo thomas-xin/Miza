@@ -5,11 +5,10 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-import youtube_dl, pytube, ffmpy, samplerate
+import youtube_dl, pytube, samplerate
 from bs4 import BeautifulSoup
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
-getattr(ffmpy, "__builtins__", {})["print"] = print
 
 SAMPLE_RATE = 48000
 
@@ -32,9 +31,12 @@ async def createPlayer(auds, p_type=0, verbose=False):
 #     return entry.hash
 
 
+e_dur = lambda d: d if d is not None else 300
+
+
 def getDuration(filename):
-    command = ["ffprobe", filename]
-    resp = bytes()
+    command = ["ffprobe", "-hide_banner", filename]
+    resp = None
     print(command)
     for _ in loop(3):
         try:
@@ -49,11 +51,13 @@ def getDuration(filename):
             except:
                 pass
             print(traceback.format_exc())
+    if not resp:
+        return None
     s = resp.decode("utf-8", "replace")
     try:
         i = s.index("Duration: ")
         d = s[i + 10:]
-        i = inf
+        i = 2147483647
         for c in ", \n\r":
             try:
                 x = d.index(c)
@@ -97,6 +101,7 @@ def pytube2Dict(url):
             } for stream in resp.streams.fmt_streams
         ],
         "duration": resp.length,
+        "thumbnail": getattr(resp, "thumbnail_url", None),
     }
     for i in range(len(entry["formats"])):
         stream = resp.streams.fmt_streams[i]
@@ -213,7 +218,6 @@ class customAudio(discord.AudioSource):
     filt = signal.butter(1, 0.125, btype="low", output="sos")
     #fff = numpy.abs(numpy.fft.fftfreq(SAMPLE_RATE / 50, 1/SAMPLE_RATE))[:ceil(SAMPLE_RATE / 100 + 1)]
     static = lambda self, *args: numpy.random.rand(self.length) * 65536 - 32768
-    max_resample = -inf
     defaults = {
         "volume": 1,
         "reverb": 0,
@@ -247,7 +251,6 @@ class customAudio(discord.AudioSource):
             self.feedback = None
             self.bassadj = None
             self.bufadj = None
-            self.refilling = 0
             self.reading = 0
             self.has_read = False
             self.searching = False
@@ -286,7 +289,6 @@ class customAudio(discord.AudioSource):
             print(traceback.format_exc())
 
     def stop(self):
-        self.refilling = False
         if getattr(self, "source", None) is None:
             return
         create_future_ex(self.source.close)
@@ -299,7 +301,16 @@ class customAudio(discord.AudioSource):
             new_source = None
             try:
                 new_source = source.create_reader(pos, auds=self)
-                new_source.read(4)
+                b = bytes()
+                for i in range(4):
+                    try:
+                        b += new_source.read(4)
+                        if len(b) < 4:
+                            raise EOFError
+                    except EOFError:
+                        if i >= 3:
+                            raise
+                        time.sleep(0.25)
             except OverflowError:
                 source = None
             else:
@@ -316,7 +327,7 @@ class customAudio(discord.AudioSource):
         self.stats.position = pos
         if pos == 0:
             if self.reverse and len(self.queue):
-                self.stats.position = float(self.queue[0].duration)
+                self.stats.position = e_dur(self.queue[0].duration)
         if self.source is not None and self.player:
             self.player.time = 1 + utc()
         if self.speed < 0.005:
@@ -327,10 +338,9 @@ class customAudio(discord.AudioSource):
         if update:
             self.update()
             self.queue.update_play()
-        self.refilling = 0
 
     def seek(self, pos):
-        duration = float(self.queue[0].duration)
+        duration = e_dur(self.queue[0].duration)
         pos = max(0, pos)
         if (pos >= duration and not self.reverse) or (pos <= 0 and self.reverse):
             create_future_ex(self.new, update=True)
@@ -483,7 +493,124 @@ class customAudio(discord.AudioSource):
         if q == bool(q):
             self.stats.quiet = bool(q)
 
-    def readNext(self):
+    def construct_options(self, volume=True):
+        stats = self.stats
+        pitchscale = 2 ** ((stats.pitch + stats.resample) / 12)
+        chorus = min(16, abs(stats.chorus))
+        reverb = stats.reverb
+        if reverb:
+            args = ["-i", "misc/SNB3,0all.wav"]
+        else:
+            args = []
+        options = []
+        if self.reverse:
+            options.append("areverse")
+        if pitchscale != 1 or stats.speed != 1:
+            speed = abs(stats.speed) / pitchscale
+            speed *= 2 ** (stats.resample / 12)
+            if round(speed, 9) != 1:
+                speed = max(0.005, speed)
+                if speed >= 64:
+                    raise OverflowError
+                opts = ""
+                while speed > 3:
+                    opts += "atempo=3,"
+                    speed /= 3
+                while speed < 0.5:
+                    opts += "atempo=0.5,"
+                    speed /= 0.5
+                opts += "atempo=" + str(speed)
+                options.append(opts)
+        if pitchscale != 1:
+            if abs(pitchscale) >= 64:
+                raise OverflowError
+            options.append("asetrate=" + str(SAMPLE_RATE * pitchscale))
+        if chorus:
+            A = ""
+            B = ""
+            C = ""
+            D = ""
+            for i in range(ceil(chorus)):
+                neg = ((i & 1) << 1) - 1
+                i = 1 + i >> 1
+                i *= stats.chorus / ceil(chorus)
+                if i:
+                    A += "|"
+                    B += "|"
+                    C += "|"
+                    D += "|"
+                delay = (25 + i * tau * neg) % 39 + 18
+                A += str(round(delay, 3))
+                decay = (0.125 + i * 0.03 * neg) % 0.25 + 0.25
+                B += str(round(decay, 3))
+                speed = (2 + i * 0.61 * neg) % 4.5 + 0.5
+                C += str(round(speed, 3))
+                depth = (i * 0.43 * neg) % max(4, stats.chorus) + 0.5
+                D += str(round(depth, 3))
+            b = 0.5 / sqrt(ceil(chorus + 1))
+            options.append(
+                "\"chorus=0.5:" + str(round(b, 3)) + ":"
+                + A + ":"
+                + B + ":"
+                + C + ":"
+                + D + "\""
+            )
+            options.append("volume=2")
+        if stats.compressor:
+            comp = min(8000, abs(stats.compressor + sgn(stats.compressor)))
+            while abs(comp) > 1:
+                c = min(20, comp)
+                try:
+                    comp /= c
+                except ZeroDivisionError:
+                    comp = 1
+                mult = str(round(math.sqrt(c), 4))
+                options.append(
+                    "acompressor=mode=" + ("upward" if stats.compressor < 0 else "downward")
+                    + ":ratio=" + str(c) + ":level_in=" + mult + ":threshold=0.0625:makeup=" + mult
+                )
+        if stats.bassboost:
+            opt = "anequalizer="
+            width = 4096
+            x = round(sqrt(1 + abs(stats.bassboost)), 5)
+            coeff = width * max(0.03125, (0.25 / x))
+            ch = " f=" + str(coeff if stats.bassboost > 0 else width - coeff) + " w=" + str(coeff / 2) + " g=" + str(max(0.5, min(48, 8 * math.log2(x))))
+            opt += "c0" + ch + "|c1" + ch
+            options.append(opt)
+        if reverb:
+            coeff = abs(reverb)
+            wet = min(2, coeff) / 2
+            if wet != 1:
+                options.append("asplit[2]")
+            options.append("afir=dry=10:wet=10")
+            if wet != 1:
+                dry = 1 - wet
+                options.append("[2]amix=weights=" + str(round(dry, 6)) + " " + str(round(wet, 6)))
+            if coeff > 1:
+                decay = str(round(1 - 4 / (3 + coeff), 4))
+                options.append("aecho=1:1:479|613:" + decay + "|" + decay)
+        if stats.pan != 1:
+            pan = min(10000, max(-10000, stats.pan))
+            while abs(abs(pan) - 1) > 0.001:
+                p = max(-10, min(10, pan))
+                try:
+                    pan /= p
+                except ZeroDivisionError:
+                    pan = 1
+                options.append("extrastereo=m=" + str(p) + ":c=0")
+                v = 1 / max(1, round(math.sqrt(abs(p)), 4))
+                if v != 1:
+                    options.append("volume=" + str(v))
+        if stats.volume != 1 and volume:
+            options.append("volume=" + str(round(stats.volume, 7)))
+        if options:
+            options.append("asoftclip=atan")
+            args.append(("-af", "-filter_complex")[bool(reverb)])
+            args.append(",".join(options))
+        print(options, args)
+        return args
+
+    def read(self):
         try:
             found = empty = False
             if self.queue.loading or self.paused:
@@ -519,7 +646,6 @@ class customAudio(discord.AudioSource):
                 queueable = (self.queue or self.bot.data.playlists.get(self.vc.guild.id, None))
                 if self.queue and not self.queue[0].get("played", False):
                     if not found and not self.queue.loading:
-                        self.refilling = 2
                         if self.source is not None:
                             self.source.advanced = True
                         create_future_ex(self.queue.advance)
@@ -528,13 +654,12 @@ class customAudio(discord.AudioSource):
                         if self.reverse:
                             ended = self.stats.position <= 0.5
                         else:
-                            ended = ceil(self.stats.position) >= float(self.queue[0].duration) - 0.5
+                            ended = ceil(self.stats.position) >= e_dur(self.queue[0].duration) - 0.5
                         if self.curr_timeout and utc() - self.curr_timeout > 0.5 or ended:
                             if not found:
                                 self.lastEnd = utc()
                                 if not self.has_read or not self.queue:
                                     print("{Stopped}")
-                                    self.refilling = 2
                                     if self.queue:
                                         self.queue[0].url = ""
                                     self.source.advanced = True
@@ -550,7 +675,6 @@ class customAudio(discord.AudioSource):
                                     #     self.seek(self.stats.position)
                                     # else:
                                     print("{Finished}")
-                                    self.refilling = 2
                                     self.source.advanced = True
                                     create_future_ex(self.queue.update_play)
                                     self.preparing = False
@@ -560,233 +684,165 @@ class customAudio(discord.AudioSource):
                     self.curr_timeout = 0
                     self.vc.stop()
             temp = self.emptybuff
+            self.pausec = self.paused & 1
             # print(traceback.format_exc())
+        else:
+            self.pausec = False
+            if self.stats.volume != 1:
+                array = numpy.frombuffer(temp, dtype=numpy.int16).astype(numpy.float)
+                array *= self.stats.volume
+                numpy.clip(array, -32767, 32767, out=array)
+                temp = array.astype(numpy.int16).tobytes()
         return temp
 
-    def refill_buffer(self):
-        size = self.length >> 1
-        volume = self.stats.volume
-        reverb = self.stats.reverb
-        pitch = self.stats.pitch
-        bassboost = self.stats.bassboost
-        chorus = self.stats.chorus
-        if self.stats.resample >= self.max_resample:
-            resample = 1
-        else:
-            resample = 2 ** (self.stats.resample / 12)
-        high = (1 << 31) - 1
-        if abs(volume) >= high:
-            volume = nan
-        if abs(reverb) >= high:
-            volume = nan
-            reverb = 0
-        if abs(bassboost) >= high:
-            volume = nan
-            bassboost = 0
-        if abs(pitch) >= high:
-            volume = nan
-            pitch = 0
-        if abs(resample) >= high:
-            volume = nan
-            resample = 0
-        buflen = size
-        if resample != 1:
-            buflen = max(1, round_random(resample * buflen))
-            new_buf = [numpy.zeros(0, dtype=float) for _ in loop(2)]
-            while len(self.temp_buffer[0]) + len(new_buf[0]) < buflen:
-                # print(len(self.temp_buffer[0]) + len(new_buf[0]))
-                temp = self.readNext()
-                try:
-                    if not isValid(volume):
-                        array = self.static()
-                    else:
-                        array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
-                        if volume != 1 or chorus:
-                            try:
-                                if chorus:
-                                    volume *= 2
-                                array *= volume * (bool(chorus) + 1)
-                            except:
-                                array = self.static()
-                    for i in range(2):
-                        new_buf[i] = numpy.concatenate([new_buf[i], array[i::2]])
-                except:
-                    print(traceback.format_exc())
-            while self.reading or self.refilling > 1:
-                time.sleep(0.03)
-            self.refilling = 2
-            for i in range(2):
-                self.temp_buffer[i] = numpy.concatenate([self.temp_buffer[i], new_buf[i]])
-        else:
-            temp = self.readNext()
-            try:
-                if not isValid(volume):
-                    array = self.static()
-                else:
-                    array = numpy.frombuffer(temp, dtype=numpy.int16).astype(float)
-                    try:
-                        if chorus:
-                            volume *= 2
-                        array *= volume * (bool(chorus) + 1)
-                    except:
-                        array = self.static()
-                while self.reading or self.refilling > 1:
-                    time.sleep(0.03)
-                self.refilling = 2
-                for i in range(2):
-                    self.temp_buffer[i] = array[i::2]
-            except:
-                print(traceback.format_exc())
-        self.refilling = 0
-
-    def read(self):
-        size = self.length >> 1
-        reverb = self.stats.reverb
-        bassboost = self.stats.bassboost
-        if self.stats.resample >= self.max_resample:
-            resample = 1
-        else:
-            resample = 2 ** (self.stats.resample / 12)
-        delay = 16
-        buflen = size
-        if resample != 1:
-            buflen = max(1, round_random(resample * buflen))
-        if self.refilling > 1 or self.queue.loading:
-            return self.emptybuff
-        if len(self.temp_buffer[0]) < buflen:
-            if not self.refilling:
-                self.refilling = 1
-                self.refill_buffer()
-            else:
-                return self.emptybuff
-        try:
-            self.reading = 1
-            if len(self.temp_buffer[0]) == len(self.temp_buffer[1]) == size:
-                lbuf, rbuf = self.temp_buffer
-                self.temp_buffer = [numpy.zeros(0, dtype=float) for _ in loop(2)]
-            else:
-                lbuf, self.temp_buffer[0] = numpy.hsplit(self.temp_buffer[0], [buflen])
-                rbuf, self.temp_buffer[1] = numpy.hsplit(self.temp_buffer[1], [buflen])
-            self.reading = 0
-            if resample != 1:
-                if self.bufadj is not None:
-                    ltemp = numpy.concatenate((self.bufadj[0], lbuf))
-                    rtemp = numpy.concatenate((self.bufadj[1], rbuf))
-                    try:
-                        left = samplerate.resample(ltemp, 2 * size / len(ltemp), converter_type="sinc_fastest")[-size - 24:-24]
-                        right = samplerate.resample(rtemp, 2 * size / len(rtemp), converter_type="sinc_fastest")[-size - 24:-24]
-                    except (ZeroDivisionError, samplerate.exceptions.ResamplingError):
-                        left, right = ltemp, rtemp
-                else:
-                    left, right = lbuf, rbuf
-                self.bufadj = [lbuf, rbuf]
-            else:
-                left, right = lbuf, rbuf
-            if not len(left) or not len(right):
-                left = numpy.zeros(size, dtype=float)
-                right = numpy.zeros(size, dtype=float)
-            elif len(left) != size or len(right) != size:
-                l1 = [i * len(left) / size for i in range(size)]
-                l2 = list(range(len(left)))
-                if len(left) != len(right):
-                    r1 = [i * len(right) / size for i in range(size)]
-                    r2 = list(range(len(right)))
-                else:
-                    r1, r2 = l1, l2
-                left = numpy.interp(l1, l2, left)
-                right = numpy.interp(r1, r2, right)
-            # if detune:
-            #     if self.cpitch != detune:
-            #         self.cpitch = detune
-            #         self.fftrans = numpy.clip(self.fff * 2 ** (detune / 12) / 50, 1, len(self.fff) - 1)
-            #         self.fftrans[0] = 0
-            #     lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
-            #     s = len(lft) + len(rft) >> 1
-            #     temp = numpy.zeros(s, dtype=complex)
-            #     lsh, rsh = temp, numpy.array(temp)
-            #     for i in range(s):
-            #         j = self.fftrans[i]
-            #         x = int(j)
-            #         y = min(x + 1, s - 1)
-            #         z = j % 1
-            #         lsh[x] += lft[i] * (1 - z)
-            #         lsh[y] += lft[i] * z
-            #         rsh[x] += rft[i] * (1 - z)
-            #         rsh[y] += rft[i] * z
-            #     left, right = numpy.fft.irfft(lsh), numpy.fft.irfft(rsh)
-            if bassboost:
-                try:
-                    lbass = numpy.array(left)
-                    rbass = numpy.array(right)
-                    if self.bassadj is not None:
-                        x = float(sqrt(abs(bassboost)))
-                        f = min(8, 2 + round(x))
-                        if bassboost > 0:
-                            g = max(1 / 128, (1 - x / 64) / 9)
-                            filt = signal.butter(f, g, btype="low", output="sos")
-                        else:
-                            g = min(127 / 128, (1 + x / 64) / 9)
-                            filt = signal.butter(f, g, btype="high", output="sos")
-                        left += signal.sosfilt(
-                            filt,
-                            numpy.concatenate((self.bassadj[0], left))
-                        )[-size - 24:-24] * bassboost
-                        right += signal.sosfilt(
-                            filt,
-                            numpy.concatenate((self.bassadj[1], right))
-                        )[-size - 24:-24] * bassboost
-                    self.bassadj = [lbass, rbass]
-                except:
-                    print(traceback.format_exc())
-            else:
-                self.bassadj = None
-            if reverb:
-                try:
-                    if not len(self.buffer):
-                        self.buffer = [[self.empty] * 2] * delay
-                    r = 18
-                    p1 = round(size * (0.5 - 2 / r))
-                    # p2 = round(size * (0.5 - 1 / r))
-                    p3 = round(size * 0.5)
-                    # p4 = round(size * (0.5 + 1 / r))
-                    p5 = round(size * (0.5 + 2 / r))
-                    lfeed = (
-                        + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 8
-                        # + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
-                        + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
-                        # + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
-                        + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 8
-                    ) * reverb
-                    rfeed = (
-                        + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 8
-                        # + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
-                        + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
-                        # + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
-                        + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 8
-                    ) * reverb
-                    if self.feedback is not None:
-                        left -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[-size - 24:-24]
-                        right -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[-size - 24:-24]
-                    self.feedback = (lfeed, rfeed)
-                    a = 1 / 16
-                    b = 1 - a
-                    self.buffer.append((left * a + right * b, left * b + right * a))
-                except:
-                    print(traceback.format_exc())
-                self.buffer = self.buffer[-delay:]
-            else:
-                self.buffer = []
-                self.feedback = None
-            array = numpy.stack((left, right), axis=-1).flatten()
-            numpy.clip(array, -32767, 32767, out=array)
-            temp = array.astype(numpy.int16).tobytes()
-            self.pausec = self.paused & 1 and not (max(temp) or min(temp))
-            if self.pausec:
-                self.vc.stop()
-        except:
-            self.reading = 0
-            print(traceback.format_exc())
-        return temp
+    # def read(self):
+    #     size = self.length >> 1
+    #     reverb = self.stats.reverb
+    #     bassboost = self.stats.bassboost
+    #     if self.stats.resample >= self.max_resample:
+    #         resample = 1
+    #     else:
+    #         resample = 2 ** (self.stats.resample / 12)
+    #     delay = 16
+    #     buflen = size
+    #     if resample != 1:
+    #         buflen = max(1, round_random(resample * buflen))
+    #     if self.refilling > 1 or self.queue.loading:
+    #         return self.emptybuff
+    #     if len(self.temp_buffer[0]) < buflen:
+    #         if not self.refilling:
+    #             self.refilling = 1
+    #             self.refill_buffer()
+    #         else:
+    #             return self.emptybuff
+    #     try:
+    #         self.reading = 1
+    #         if len(self.temp_buffer[0]) == len(self.temp_buffer[1]) == size:
+    #             lbuf, rbuf = self.temp_buffer
+    #             self.temp_buffer = [numpy.zeros(0, dtype=float) for _ in loop(2)]
+    #         else:
+    #             lbuf, self.temp_buffer[0] = numpy.hsplit(self.temp_buffer[0], [buflen])
+    #             rbuf, self.temp_buffer[1] = numpy.hsplit(self.temp_buffer[1], [buflen])
+    #         self.reading = 0
+    #         if resample != 1:
+    #             if self.bufadj is not None:
+    #                 ltemp = numpy.concatenate((self.bufadj[0], lbuf))
+    #                 rtemp = numpy.concatenate((self.bufadj[1], rbuf))
+    #                 try:
+    #                     left = samplerate.resample(ltemp, 2 * size / len(ltemp), converter_type="sinc_fastest")[-size - 24:-24]
+    #                     right = samplerate.resample(rtemp, 2 * size / len(rtemp), converter_type="sinc_fastest")[-size - 24:-24]
+    #                 except (ZeroDivisionError, samplerate.exceptions.ResamplingError):
+    #                     left, right = ltemp, rtemp
+    #             else:
+    #                 left, right = lbuf, rbuf
+    #             self.bufadj = [lbuf, rbuf]
+    #         else:
+    #             left, right = lbuf, rbuf
+    #         if not len(left) or not len(right):
+    #             left = numpy.zeros(size, dtype=float)
+    #             right = numpy.zeros(size, dtype=float)
+    #         elif len(left) != size or len(right) != size:
+    #             l1 = [i * len(left) / size for i in range(size)]
+    #             l2 = list(range(len(left)))
+    #             if len(left) != len(right):
+    #                 r1 = [i * len(right) / size for i in range(size)]
+    #                 r2 = list(range(len(right)))
+    #             else:
+    #                 r1, r2 = l1, l2
+    #             left = numpy.interp(l1, l2, left)
+    #             right = numpy.interp(r1, r2, right)
+    #         # if detune:
+    #         #     if self.cpitch != detune:
+    #         #         self.cpitch = detune
+    #         #         self.fftrans = numpy.clip(self.fff * 2 ** (detune / 12) / 50, 1, len(self.fff) - 1)
+    #         #         self.fftrans[0] = 0
+    #         #     lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
+    #         #     s = len(lft) + len(rft) >> 1
+    #         #     temp = numpy.zeros(s, dtype=complex)
+    #         #     lsh, rsh = temp, numpy.array(temp)
+    #         #     for i in range(s):
+    #         #         j = self.fftrans[i]
+    #         #         x = int(j)
+    #         #         y = min(x + 1, s - 1)
+    #         #         z = j % 1
+    #         #         lsh[x] += lft[i] * (1 - z)
+    #         #         lsh[y] += lft[i] * z
+    #         #         rsh[x] += rft[i] * (1 - z)
+    #         #         rsh[y] += rft[i] * z
+    #         #     left, right = numpy.fft.irfft(lsh), numpy.fft.irfft(rsh)
+    #         if bassboost:
+    #             try:
+    #                 lbass = numpy.array(left)
+    #                 rbass = numpy.array(right)
+    #                 if self.bassadj is not None:
+    #                     x = float(sqrt(abs(bassboost)))
+    #                     f = min(8, 2 + round(x))
+    #                     if bassboost > 0:
+    #                         g = max(1 / 128, (1 - x / 64) / 9)
+    #                         filt = signal.butter(f, g, btype="low", output="sos")
+    #                     else:
+    #                         g = min(127 / 128, (1 + x / 64) / 9)
+    #                         filt = signal.butter(f, g, btype="high", output="sos")
+    #                     left += signal.sosfilt(
+    #                         filt,
+    #                         numpy.concatenate((self.bassadj[0], left))
+    #                     )[-size - 24:-24] * bassboost
+    #                     right += signal.sosfilt(
+    #                         filt,
+    #                         numpy.concatenate((self.bassadj[1], right))
+    #                     )[-size - 24:-24] * bassboost
+    #                 self.bassadj = [lbass, rbass]
+    #             except:
+    #                 print(traceback.format_exc())
+    #         else:
+    #             self.bassadj = None
+    #         if reverb:
+    #             try:
+    #                 if not len(self.buffer):
+    #                     self.buffer = [[self.empty] * 2] * delay
+    #                 r = 18
+    #                 p1 = round(size * (0.5 - 2 / r))
+    #                 # p2 = round(size * (0.5 - 1 / r))
+    #                 p3 = round(size * 0.5)
+    #                 # p4 = round(size * (0.5 + 1 / r))
+    #                 p5 = round(size * (0.5 + 2 / r))
+    #                 lfeed = (
+    #                     + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 8
+    #                     # + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
+    #                     + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
+    #                     # + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
+    #                     + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 8
+    #                 ) * reverb
+    #                 rfeed = (
+    #                     + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 8
+    #                     # + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
+    #                     + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
+    #                     # + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
+    #                     + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 8
+    #                 ) * reverb
+    #                 if self.feedback is not None:
+    #                     left -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[-size - 24:-24]
+    #                     right -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[-size - 24:-24]
+    #                 self.feedback = (lfeed, rfeed)
+    #                 a = 1 / 16
+    #                 b = 1 - a
+    #                 self.buffer.append((left * a + right * b, left * b + right * a))
+    #             except:
+    #                 print(traceback.format_exc())
+    #             self.buffer = self.buffer[-delay:]
+    #         else:
+    #             self.buffer = []
+    #             self.feedback = None
+    #         array = numpy.stack((left, right), axis=-1).flatten()
+    #         numpy.clip(array, -32767, 32767, out=array)
+    #         temp = array.astype(numpy.int16).tobytes()
+    #         self.pausec = self.paused & 1 and not (numpy.max(temp) or numpy.min(temp))
+    #         if self.pausec:
+    #             self.vc.stop()
+    #     except:
+    #         self.reading = 0
+    #         print(traceback.format_exc())
+    #     return temp
 
     is_opus = lambda self: False
     cleanup = lambda self: None
@@ -963,18 +1019,15 @@ class PCMFile:
         self.expired = False
         self.loaded = False
         self.readers = {}
+        self.assign = deque()
         self.ensure_time()
     
     def load(self, stream):
         if self.loading:
             return
+        self.stream = stream
         self.loading = True
-        ff = ffmpy.FFmpeg(
-            global_options=["-nostdin", "-y", "-hide_banner", "-loglevel error", "-vn"],
-            inputs={stream: None},
-            outputs={"s16le": "-f", str(SAMPLE_RATE): "-ar", "2": "-ac", "cache/" + self.file: None},
-        )
-        cmd = shlex.split(ff.cmd)
+        cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "2", "cache/" + self.file]
         print(cmd)
         self.proc = None
         try:
@@ -1011,6 +1064,13 @@ class PCMFile:
     ensure_time = lambda self: setattr(self, "time", utc())
 
     def update(self):
+        if self.loaded and not self.proc.is_running():
+            dur = self.duration()
+            if dur is not None:
+                for e in self.assign:
+                    e["duration"] = dur
+                    print(e)
+                self.assign.clear()
         if self.readers:
             self.ensure_time()
             return
@@ -1065,116 +1125,11 @@ class PCMFile:
         stats.position = pos
         if not isValid(stats.pitch * stats.speed):
             raise OverflowError
-        # if auds.reverse:
-        #     start = 0
-        #     end = pos
-        # else:
-        start = pos
-        # end = None
-        pitchscale = 2 ** (stats.pitch / 12)
-        if stats.resample >= auds.max_resample:
-            pitchscale *= 2 ** (stats.resample / 12)
-        chorus = min(16, abs(stats.chorus))
-        if pitchscale != 1 or stats.speed != 1:
-            speed = abs(stats.speed) / pitchscale
-            if stats.resample >= auds.max_resample:
-                speed *= 2 ** (stats.resample / 12)
-            if round(speed, 9) != 1:
-                speed = max(0.005, speed)
-                if speed >= 64:
-                    raise OverflowError
-                opts = ""
-                while speed > 2:
-                    opts += "atempo=2,"
-                    speed /= 2
-                while speed < 0.5:
-                    opts += "atempo=0.5,"
-                    speed /= 0.5
-                opts += "atempo=" + str(speed)
-                options = "-af " + opts
-            else:
-                options = "-af "
-        else:
-            options = ""
-        if pitchscale != 1:
-            if abs(pitchscale) >= 64:
-                raise OverflowError
-            if options and options[-1] != " ":
-                options += ","
-            options += "asetrate=r=" + str(SAMPLE_RATE * pitchscale)
-        if auds.reverse:
-            if options and options[-1] != " ":
-                options += ","
-            options += "areverse"
-        if chorus:
-            if not options:
-                options = "-af "
-            else:
-                options += ","
-            A = ""
-            B = ""
-            C = ""
-            D = ""
-            for i in range(ceil(chorus)):
-                neg = ((i & 1) << 1) - 1
-                i = 1 + i >> 1
-                i *= stats.chorus / ceil(chorus)
-                if i:
-                    A += "|"
-                    B += "|"
-                    C += "|"
-                    D += "|"
-                delay = (25 + i * tau * neg) % 39 + 18
-                A += str(round(delay, 3))
-                decay = (0.125 + i * 0.03 * neg) % 0.25 + 0.25
-                B += str(round(decay, 3))
-                speed = (2 + i * 0.61 * neg) % 4.5 + 0.5
-                C += str(round(speed, 3))
-                depth = (i * 0.43 * neg) % 4 + 0.5
-                D += str(round(depth, 3))
-            b = 0.5 / sqrt(ceil(chorus + 1))
-            options += (
-                "\"chorus=0.5:" + str(round(b, 3)) + ":"
-                + A + ":"
-                + B + ":"
-                + C + ":"
-                + D + "\""
-            )
-        if stats.compressor:
-            comp = min(8000, abs(stats.compressor + sgn(stats.compressor)))
-            while abs(comp) > 1:
-                if not options:
-                    options = "-af "
-                else:
-                    options += ","
-                c = min(20, comp)
-                try:
-                    comp /= c
-                except ZeroDivisionError:
-                    comp = 1
-                mult = str(round(math.sqrt(c), 4))
-                options += (
-                    "acompressor=mode=" + ("downward", "upward")[stats.compressor < 0]
-                    + ":ratio=" + str(c) + ":level_in=" + mult + ":threshold=0.0625:makeup=" + mult
-                )
-        if stats.pan != 1:
-            pan = min(10000, max(-10000, stats.pan))
-            while abs(abs(pan) - 1) > 0.001:
-                if not options:
-                    options = "-af "
-                else:
-                    options += ","
-                p = max(-10, min(10, pan))
-                try:
-                    pan /= p
-                except ZeroDivisionError:
-                    pan = 1
-                options += "extrastereo=m=" + str(p) + ":c=0"
-                v = 1 / max(1, round(math.sqrt(abs(p)), 4))
-                if v != 1:
-                    options += ",volume=" + str(v)
-        options = options.strip()
-        args = ["ffmpeg", "-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "2", "-i"]
+        args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "2"]
+        if pos:
+            arg = "-to" if auds.reverse else "-ss"
+            args += [arg, str(pos)]
+        args.append("-i")
         if self.proc.is_running():
             buff = True
             args.append("pipe:0")
@@ -1182,12 +1137,14 @@ class PCMFile:
             buff = False
             args.insert(1, "-nostdin")
             args.append("cache/" + self.file)
-        args += ["-ss", str(start), "-f", "s16le"] # "-to", str(end),
-        if "-af" in options:
+        options = auds.construct_options(volume=False)
+        args += options
+        args += ["-f", "s16le"]
+        if options:
             args += ["-ar", str(SAMPLE_RATE), "-ac", "2"]
         else:
-            args += ["-acodec", "copy"]
-        args += shlex.split(options) + ["-loglevel", "error", "pipe:1"]
+            args += ["-c:a", "copy"]
+        args.append("pipe:1")
         key = auds.vc.guild.id
         self.readers[key] = True
         callback = lambda: self.readers.pop(key) if key in self.readers else None
@@ -1197,6 +1154,8 @@ class PCMFile:
             player = LoadedAudioReader(self, args, callback=callback)
         create_future_ex(player.run)
         return player
+
+    duration = lambda self: self.dur if getattr(self, "dur", None) is not None else setattr(self, "dur", getDuration(self.stream) if self.proc.is_running() else os.path.getsize("cache/" + self.file) / 48000 / 4)
 
 
 class LoadedAudioReader(discord.AudioSource):
@@ -1245,7 +1204,8 @@ class BufferedAudioReader(discord.AudioSource):
         while len(self.buffer) < size:
             b = self.process(8192)
             if not b:
-                raise EOFError
+                if not self.loader.is_running():
+                    raise EOFError
             self.buffer += b
         temp = self.buffer[:size]
         self.buffer = self.buffer[size:]
@@ -1287,7 +1247,7 @@ class BufferedAudioReader(discord.AudioSource):
     cleanup = close
 
     
-class videoDownloader:
+class AudioDownloader:
     
     opener = urlBypass()
     _globals = globals()
@@ -1319,7 +1279,12 @@ class videoDownloader:
             self.lastclear = utc()
 
     def extract_from(self, url):
-        return self.downloader.extract_info(url, download=False, process=False)
+        try:
+            return self.downloader.extract_info(url, download=False, process=False)
+        except youtube_dl.DownloadError:
+            if isURL(url):
+                return pytube2Dict(url)
+            raise
         # pyt = create_future_ex(pytube2Dict, url)
         # resp = self.extract_info(url, search=False)
         # try:
@@ -1334,7 +1299,21 @@ class videoDownloader:
         # return resp
 
     def extract_true(self, url):
-        return self.downloader.extract_info(url, download=False, process=True)
+        while not isURL(url):
+            resp = self.extract_from(url)
+            if "entries" in resp:
+                resp = resp["entries"][0]
+            try:
+                url = resp["webpage_url"]
+            except KeyError:
+                try:
+                    url = resp["url"]
+                except KeyError:
+                    url = resp["id"]
+        try:
+            return self.downloader.extract_info(url, download=False, process=True)
+        except youtube_dl.DownloadError:
+            return pytube2Dict(url)
 
     def extract(self, item, force=False, count=1, search=True):
         self.update_dl()
@@ -1427,7 +1406,7 @@ class videoDownloader:
                         s = s[s.index(b"{"):s.rindex(b"}") + 1]
                         d = json.loads(s)
                         q = d["queue"]
-                        return [freeClass(name=e["name"], url=e["url"], duration=e.get("duration", "300")) for e in q]
+                        return [freeClass(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
                 resp = self.extract_info(item, count, search=search)
                 if resp.get("_type", None) == "url":
                     resp = self.extract_from(resp["url"])
@@ -1470,8 +1449,6 @@ class videoDownloader:
                                     if not isURL(url):
                                         if entry.get("ie_key", "").lower() == "youtube":
                                             temp["url"] = "https://www.youtube.com/watch?v=" + url
-                                    if dur is None:
-                                        temp["duration"] = "300"
                                     temp["research"] = True
                                 except:
                                     print(traceback.format_exc())
@@ -1490,8 +1467,8 @@ class videoDownloader:
                         "stream": getBestAudio(resp),
                         "icon": getBestIcon(resp),
                     }
-                    if dur is None:
-                        temp["duration"] = getDuration(temp["stream"])
+                    # if dur is None:
+                    #     temp["duration"] = getDuration(temp["stream"])
                     output.append(freeClass(temp))
             return output
         except:
@@ -1587,6 +1564,9 @@ class videoDownloader:
         try:
             self.cache[fn] = f = PCMFile(fn)
             f.load(stream)
+            dur = entry.get("duration", None)
+            if dur is None:
+                f.assign.append(entry)
             entry["stream"] = stream
             entry["icon"] = icon
             entry["file"] = f
@@ -1598,7 +1578,7 @@ class videoDownloader:
             print(traceback.format_exc())
             entry["url"] = ""
     
-    def download_file(self, url, fmt="ogg", fl=8388608):
+    def download_file(self, url, fmt="ogg", auds=None, fl=8388608):
         self.update_dl()
         fn = "cache/&" + str(time_snowflake(datetime.datetime.utcnow())) + "." + fmt
         info = self.extract(url)[0]
@@ -1607,18 +1587,18 @@ class videoDownloader:
         if not stream:
             raise LookupError("No stream URLs found for " + url)
         duration = getDuration(stream)
-        if type(duration) is str:
+        if type(duration) not in (int, float):
             dur = 960
         else:
             dur = min(960, duration)
-        br = max(32, min(256, floor(((fl - 262144) / dur / 128) / 4) * 4))
+        fs = fl - 131072
+        br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
         # print(br)
-        ff = ffmpy.FFmpeg(
-            global_options=["-hide_banner", "-loglevel error", "-vn"],
-            inputs={stream: None},
-            outputs={str(dur): "-to", str(br) + "k": "-b:a", fn: None},
-        )
-        ff.run()
+        args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-vn", "-i", stream]
+        if auds is not None:
+            args += auds.construct_options(volume=True)
+        args += ["-ar", "48000", "-b:a", str(br), "-fs", str(fs), fn]
+        subprocess.check_output(args)
         return fn, info["name"] + "." + fmt
 
     def extractSingle(self, i):
@@ -1658,7 +1638,7 @@ class videoDownloader:
             self.searched[item] = obj
             it = out[0]
             i.name = it.name
-            i.duration = it.get("duration", "300")
+            i.duration = it.get("duration")
             i.url = it.url
             # sethash(i)
             self.requests = max(self.requests - 1, 0)
@@ -1668,7 +1648,7 @@ class videoDownloader:
             print(traceback.format_exc())
         return True
 
-ytdl = videoDownloader()
+ytdl = AudioDownloader()
 
 
 class Queue(Command):
@@ -1737,7 +1717,7 @@ class Queue(Command):
                 # "hash": e.hash,
                 "name": name,
                 "url": url,
-                "duration": e.get("duration", "300"),
+                "duration": e.get("duration"),
                 "u_id": user.id,
                 "skips": [],
             }
@@ -1748,9 +1728,9 @@ class Queue(Command):
         if "b" not in flags:
             total_duration = 0
             for e in q:
-                total_duration += float(e.duration)
+                total_duration += e_dur(e.duration)
             if auds.reverse and len(auds.queue):
-                total_duration += elapsed - float(q[0].duration)
+                total_duration += elapsed - e_dur(q[0].duration)
             else:
                 total_duration -= elapsed
         if auds.stats.shuffle:
@@ -1767,14 +1747,14 @@ class Queue(Command):
             total_duration = tdur
         elif "b" in flags:
             auds.queue.enqueue(added, 1)
-            total_duration = max(3, q[0].duration - elapsed if q else 0)
+            total_duration = max(3, e_dur(q[0].duration) - elapsed if q else 0)
         else:
             auds.queue.enqueue(added, -1)
             total_duration = max(total_duration / auds.speed, tdur)
         if not names:
             raise LookupError("No results for " + str(argv) + ".")
         if "v" in flags:
-            names = noHighlight(hlist(i.name + ": " + dhms(i.duration) for i in added))
+            names = noHighlight(hlist(i.name + ": " + dhms(e_dur(i.duration)) for i in added))
         elif len(names) == 1:
             names = names[0]
         else:
@@ -1825,14 +1805,14 @@ class Queue(Command):
             totalTime = inf
         else:
             if auds.reverse and len(auds.queue):
-                totalTime = elapsed - float(auds.queue[0].duration)
+                totalTime = elapsed - e_dur(auds.queue[0].duration)
             else:
                 totalTime = -elapsed
             i = 0
             for e in q:
-                totalTime += float(e.duration)
+                totalTime += e_dur(e.duration)
                 if i < pos:
-                    startTime += float(e.duration)
+                    startTime += e_dur(e.duration)
                 if not 1 + i & 4095:
                     await asyncio.sleep(0.2)
                 i += 1
@@ -1841,7 +1821,7 @@ class Queue(Command):
             str(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
             + sec2Time(totalTime / auds.speed) + "```"
         )
-        duration = float(q[0].duration)
+        duration = e_dur(q[0].duration)
         sym = "⬜⬛"
         barsize = 24
         r = round(min(1, elapsed / duration) * barsize)
@@ -1877,7 +1857,7 @@ class Queue(Command):
             curr += "【" + str(i) + "】` ["
             curr += discord.utils.escape_markdown(limStr(noHighlight(e.name), 64))
             curr += "](" + ensure_url(e.url) + ") `("
-            curr += dhms(e.duration) + ")`"
+            curr += dhms(e_dur(e.duration)) + ")`"
             if v:
                 try:
                     u = bot.cache.users[e.u_id]
@@ -1891,7 +1871,7 @@ class Queue(Command):
                         name = "Deleted User"
                 curr += "\n```css\n" + sbHighlight(name) + "\n"
             if auds.reverse and len(auds.queue):
-                estim = currTime + elapsed - float(auds.queue[0].duration)
+                estim = currTime + elapsed - e_dur(auds.queue[0].duration)
             else:
                 estim = currTime - elapsed
             if v:
@@ -1903,14 +1883,14 @@ class Queue(Command):
                     else:
                         curr += "{" + estimate + "}"
                 else:
-                    curr += "Remaining time: [" + sec2Time((estim + float(e.duration)) / auds.speed) + "]"
+                    curr += "Remaining time: [" + sec2Time((estim + e_dur(e.duration)) / auds.speed) + "]"
                 curr += "```"
             curr += "\n"
             if len(embstr) + len(curr) > 2048 - len(emb.description):
                 break
             embstr += curr
             if i <= 1 or not auds.stats.shuffle:
-                currTime += float(e.duration)
+                currTime += e_dur(e.duration)
             if not 1 + 1 & 4095:
                 await asyncio.sleep(0.3)
             i += 1
@@ -2167,7 +2147,7 @@ class Skip(Command):
                 right = count
             elems = xrange(left, right, it)
         else:
-            elems = [0 for i in args]
+            elems = [0] * len(args)
             for i in range(len(args)):
                 elems[i] = await bot.evalMath(args[i], guild.id)
         if not "f" in flags:
@@ -2183,6 +2163,7 @@ class Skip(Command):
         response = "```css\n"
         i = 1
         for pos in elems:
+            pos = float(pos)
             try:
                 if not isValid(pos):
                     if "f" in flags:
@@ -2548,8 +2529,13 @@ class AudioSettings(Command):
         if not ops:
             if disable:
                 pos = auds.stats.position
+                res = False
+                for k, v in auds.defaults.items():
+                    if k != "volume" and auds.stats.get(k) != v:
+                        res = True
+                        break
                 auds.stats = freeClass(auds.defaults)
-                if auds.queue:
+                if auds.queue and res:
                     await create_future(auds.new, auds.file, pos)
                 return (
                     "```css\nSuccessfully reset all audio settings for ["
@@ -2579,7 +2565,7 @@ class AudioSettings(Command):
                 orig = bool(orig)
             else:
                 origStats[op] = val
-            if auds.queue and (op in "speed pitch pan compressor chorus" or op == "resample" and max(orig, new) >= auds.max_resample * 100):
+            if auds.queue and op in "speed pitch pan bassboost reverb compressor chorus resample":
                 await create_future(auds.new, auds.file, auds.stats.position)
             s += (
                 "\nChanged audio {" + str(op)
@@ -2824,7 +2810,7 @@ class Player(Command):
         else:
             output += "◀️"
         if q:
-            p = [auds.stats.position, float(q[0].duration)]
+            p = [auds.stats.position, e_dur(q[0].duration)]
         else:
             p = [0, 0.25]
         output += (
@@ -2968,8 +2954,8 @@ class Player(Command):
             auds.player.message = message
             await bot.silentDelete(temp, no_log=True)
         if auds.queue and not auds.paused & 1:
-            maxdel = float(auds.queue[0].duration) - auds.stats.position + 2
-            delay = min(maxdel, float(auds.queue[0].duration) / self.barsize / abs(auds.stats.speed))
+            maxdel = e_dur(auds.queue[0].duration) - auds.stats.position + 2
+            delay = min(maxdel, e_dur(auds.queue[0].duration) / self.barsize / abs(auds.stats.speed))
             if delay > 20:
                 delay = 20
             elif delay < 6:
@@ -3188,14 +3174,16 @@ class Lyrics(Command):
 class Download(Command):
     time_consuming = True
     _timeout_ = 8
-    name = ["Search", "YTDL", "Youtube_DL", "Convert"]
+    name = ["Search", "YTDL", "Youtube_DL", "Convert", "AF", "AudioFilter"]
     min_level = 0
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or link."
-    usage = "<0:search_link{queue}> <-1:out_format[ogg]> <verbose(?v)> <show_debug(?z)>"
-    flags = "vz"
-    rate_limit = 1
+    usage = "<0:search_link{queue}> <-1:out_format[ogg]> <apply_settings(?a)> <verbose_search(?v)> <show_debug(?z)>"
+    flags = "avz"
+    rate_limit = 7
 
-    async def __call__(self, bot, channel, message, argv, flags, user, **void):
+    async def __call__(self, bot, channel, message, name, argv, flags, user, **void):
+        if name in ("af", "audiofilter"):
+            setDict(flags, "a", 1)
         for a in message.attachments:
             argv = a.url + " " + argv
         if not argv:
@@ -3277,12 +3265,16 @@ class Download(Command):
                 raise LookupError("No results for " + argv + ".")
             res = res[:10]
             end = "Search results for " + argv + ":"
-        end += "\nDestination format: {." + fmt + "}```"
+        a = flags.get("a", 0)
+        end += "\nDestination format: {." + fmt + "}"
+        if a:
+            end += ", Audio settings: {ON}"
+        end += "```"
         url_bytes = bytes(repr([e["url"] for e in res]), "utf-8")
         url_enc = bytes2B64(url_bytes, True).decode("utf-8", "replace")
         msg = (
             "```" + "\n" * ("z" in flags) + "callback-voice-download-" + str(user.id) 
-            + "_" + str(len(res)) + "_" + fmt + "-" + url_enc + "\n" + end
+            + "_" + str(len(res)) + "_" + fmt + "_" + str(int(bool(a))) + "-" + url_enc + "\n" + end
         )
         emb = discord.Embed(colour=randColour())
         url = strURL(user.avatar_url)
@@ -3322,11 +3314,19 @@ class Download(Command):
                         content="```ini\nDownloading [" + noHighlight(ensure_url(url)) + "]...```",
                         embed=None,
                     ))
+                    try:
+                        if int(spl[3]):
+                            auds = bot.database.playlists.audio[guild.id]
+                        else:
+                            auds = None
+                    except LookupError:
+                        auds = None
                     fn, out = await create_future(
                         ytdl.download_file,
                         url,
-                        spl[2],
-                        fl,
+                        fmt=spl[2],
+                        auds=auds,
+                        fl=fl,
                     )
                     f = discord.File(fn, out)
                     create_task(message.edit(

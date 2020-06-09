@@ -4,7 +4,7 @@ Meurer A, Smith CP, Paprocki M, Čertík O, Kirpichev SB, Rocklin M, Kumar A, Iv
 -SymPy: symbolic computing in Python. PeerJ Computer Science 3:e103 {https://doi.org/10.7717/peerj-cs.103}
 
 Fredrik Johansson and others
--mpmath: a Python library for arbitrary-precision floating-point arithmetic {http://mpmath.org/}
+-mpmath: a Python library for arbitrary-precision floating-point arithmetic {http://mpmath.org}
 
 Virtanen, Pauli and Gommers, Ralf and Oliphant, Travis E. and Haberland, Matt and Reddy, Tyler and Cournapeau, David and Burovski, Evgeni and Peterson, Pearu and Weckesser, Warren and Bright, Jonathan and van der Walt,Stefan J.  and Brett, Matthew and Wilson, Joshua and Jarrod Millman, K. and Mayorov, Nikolay and Nelson, Andrew R.~J. and Jones, Eric and Kern, Robert and Larson, Eric and Carey, CJ and Polat, Ilhan and Feng, Yu and Moore, Eric W. and Vand erPlas, Jake and Laxalde, Denis and Perktold, Josef and Cimrman, Robert and Henriksen, Ian and Quintero, E.~A. and Harris, Charles R and Archibald, Anne M. and Ribeiro, Antonio H. and Pedregosa, Fabian and van Mulbregt, Paul and Contributors
 -SciPy 1.0: Fundamental Algorithms for Scientific Computing in Python {https://doi.org/10.1038/s41592-019-0686-2}
@@ -16,18 +16,30 @@ Sergey M. and others
 -youtube_dl: Command-line program to download videos from YouTube.com and other video sites {https://github.com/ytdl-org/youtube-dl}
 
 
+OTHERS:
+
+Gregot Hennig and others
+-STUDIO NORTH BREMEN: The ideal space for the sound of the present. {http://www.studio-nord.net}
+
+Fabrice Bellard, Michael Niedermayer and others
+-FFmpeg: A complete, cross-platform solution to record, convert and stream audio and video. {https://ffmpeg.org}
+
 
 MISC:
 
 Gabriel Ravier (https://github.com/GabrielRavier)
 -Help with code style
--Debugging
+-Help with testing
 
 Brayconn (https://github.com/Brayconn)
 -Help with finding APIs for functions
--Debugging
+-Help with testing
 
-Bombchu Link (https://github.com/BombchuLink)
-Clownacy (https://github.com/Clownacy)
+smudgedpasta (https://www.deviantart.com/smudgedpasta)
+-Created art for the bot's profile picture
+-Help with testing
+
 pachuco (https://github.com/pachuco)
--Making the org2xm program for converting org files to xm tracked music
+Clownacy (https://github.com/Clownacy)
+Bombchu Link (https://github.com/BombchuLink)
+-Making and updating the org2xm program for converting org files to xm tracked music

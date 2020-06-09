@@ -93,7 +93,7 @@ class Perms(Command):
                 t_user = await bot.fetch_user(u_id)
             except (TypeError, discord.NotFound):
                 try:
-                    t_user = await bot.fetch_member(u_id, guild)
+                    t_user = await bot.fetch_member_ex(u_id, guild)
                 except LookupError:
                     try:
                         t_user = guild.get_role(u_id)
@@ -380,39 +380,42 @@ class Avatar(Command):
                 return self.getMimicData(p)
             except:
                 try:
-                    u = await bot.fetch_member(u_id, g)
+                    u = await bot.fetch_member_ex(u_id, g)
                 except:
                     try:
-                        u = await bot.fetch_user(u_id)
+                        u = await bot.fetch_member(u_id, g)
                     except:
-                        if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
-                            guild = g
-                        else:
-                            try:
-                                guild = await bot.fetch_guild(u_id)
-                            except:
+                        try:
+                            u = await bot.fetch_user(u_id)
+                        except:
+                            if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
+                                guild = g
+                            else:
                                 try:
-                                    channel = await bot.fetch_channel(u_id)
+                                    guild = await bot.fetch_guild(u_id)
                                 except:
                                     try:
-                                        u = await bot.fetch_whuser(u_id, g)
-                                    except EOFError:
-                                        u = None
-                                        if g.id in bot.data.counts:
-                                            if u_id in bot.data.counts[g.id]["counts"]:
-                                                u = bot.ghostUser()
-                                                u.id = u_id
-                                        if u is None:
-                                            raise LookupError("Unable to find user or server from ID.")
-                                try:
-                                    guild = channel.guild
-                                except NameError:
-                                    pass
-                                except (AttributeError, KeyError):
-                                    guild = None
-                                    u = channel.recipient
-                        if guild is not None:
-                            return await self.getGuildData(guild)                        
+                                        channel = await bot.fetch_channel(u_id)
+                                    except:
+                                        try:
+                                            u = await bot.fetch_whuser(u_id, g)
+                                        except EOFError:
+                                            u = None
+                                            if g.id in bot.data.counts:
+                                                if u_id in bot.data.counts[g.id]["counts"]:
+                                                    u = bot.ghostUser()
+                                                    u.id = u_id
+                                            if u is None:
+                                                raise LookupError("Unable to find user or server from ID.")
+                                    try:
+                                        guild = channel.guild
+                                    except NameError:
+                                        pass
+                                    except (AttributeError, KeyError):
+                                        guild = None
+                                        u = channel.recipient
+                            if guild is not None:
+                                return await self.getGuildData(guild)                        
         else:
             u = user
         guild = g
@@ -559,40 +562,43 @@ class Info(Command):
                 return self.getMimicData(p, flags)
             except:
                 try:
-                    u = await bot.fetch_member(u_id, g)
+                    u = await bot.fetch_member_ex(u_id, g)
                 except:
                     try:
-                        u = await bot.fetch_user(u_id)
-                        member = False
+                        u = await bot.fetch_member(u_id, g)
                     except:
-                        if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
-                            guild = g
-                        else:
-                            try:
-                                guild = await bot.fetch_guild(u_id)
-                            except:
+                        try:
+                            u = await bot.fetch_user(u_id)
+                            member = False
+                        except:
+                            if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
+                                guild = g
+                            else:
                                 try:
-                                    channel = await bot.fetch_channel(u_id)
+                                    guild = await bot.fetch_guild(u_id)
                                 except:
                                     try:
-                                        u = await bot.fetch_whuser(u_id, g)
-                                    except EOFError:
-                                        u = None
-                                        if g.id in bot.data.counts:
-                                            if u_id in bot.data.counts[g.id]["counts"]:
-                                                u = bot.ghostUser()
-                                                u.id = u_id
-                                        if u is None:
-                                            raise LookupError("Unable to find user or server from ID.")
-                                try:
-                                    guild = channel.guild
-                                except NameError:
-                                    pass
-                                except (AttributeError, KeyError):
-                                    guild = None
-                                    u = channel.recipient
-                        if guild is not None:
-                            return await self.getGuildData(guild, flags)                        
+                                        channel = await bot.fetch_channel(u_id)
+                                    except:
+                                        try:
+                                            u = await bot.fetch_whuser(u_id, g)
+                                        except EOFError:
+                                            u = None
+                                            if g.id in bot.data.counts:
+                                                if u_id in bot.data.counts[g.id]["counts"]:
+                                                    u = bot.ghostUser()
+                                                    u.id = u_id
+                                            if u is None:
+                                                raise LookupError("Unable to find user or server from ID.")
+                                    try:
+                                        guild = channel.guild
+                                    except NameError:
+                                        pass
+                                    except (AttributeError, KeyError):
+                                        guild = None
+                                        u = channel.recipient
+                            if guild is not None:
+                                return await self.getGuildData(guild, flags)                        
         elif not name.startswith("server"):
             u = user
         else:
@@ -615,7 +621,7 @@ class Info(Command):
             joined = None
         created = u.created_at
         activity = "\n".join(strActivity(i) for i in getattr(u, "activities", []))
-        role = ", ".join(str(i) for i in getattr(u, "roles", []) if not i.is_default())
+        role = ", ".join("<@&" + str(i.id) + ">" for i in getattr(u, "roles", []) if not i.is_default())
         coms = seen = msgs = avgs = gmsg = 0
         fav = None
         pos = None

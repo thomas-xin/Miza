@@ -5,12 +5,10 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-import csv, knackpy, ffmpy
+import csv, knackpy
 from prettytable import PrettyTable as ptable
 
-FFRuntimeError = ffmpy.FFRuntimeError
 getattr(knackpy, "__builtins__", {})["print"] = print
-getattr(ffmpy, "__builtins__", {})["print"] = print
 
 
 class DouClub:
@@ -279,12 +277,8 @@ def orgConv(org, wave, fmt, key="temp", fl=8388608):
                 pass
             dur = getDuration(fi)
             br = max(32, min(256, floor(((fl - 262144) / dur / 128) / 4) * 4))
-            ff = ffmpy.FFmpeg(
-                global_options=["-y", "-hide_banner", "-loglevel panic"],
-                inputs={fi: None},
-                outputs={str(br) + "k": "-vn -b:a", fn: None},
-            )
-            ff.run()
+            args = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-i", fi, "-vn", "-b:a", str(br) + "k", fn]
+            subprocess.check_output(args)
             try:
                 os.remove("cache/" + key + ".org")
             except (FileNotFoundError, PermissionError):

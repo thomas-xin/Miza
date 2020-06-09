@@ -10,6 +10,7 @@ from scipy import interpolate, special, signal
 from dateutil import parser as tparser
 from sympy.parsing.sympy_parser import parse_expr
 from itertools import repeat
+from colormath import color_objects, color_conversions
 
 loop = lambda x: repeat(None, x)
 
@@ -814,21 +815,22 @@ def verifyString(string):
     else:
         return str(string)
 
-
-hexByte = lambda n: hex(n)[-2:].upper().replace("X", "0")
-
 def bytes2Hex(b, space=True):
     if type(b) is str:
         b = b.encode("utf-8")
-    return (" " * space).join(hexByte(x) for x in b)
+    if space:
+        return b.hex(" ").upper()
+    return b.hex().upper()
 
-byteRE = re.compile("[A-F0-9]+", flags=re.I)
-twoChar = re.compile(".{1,2}")
+hex2Bytes = lambda b: bytes.fromhex(b if type(b) is str else b.decode("utf-8", "replace"))
 
-def hex2Bytes(b):
-    if type(b) is bytes:
-        b = b.decode("utf-8", "replace")
-    return bytes(int(x, 16) for x in re.findall(twoChar, "".join(re.findall(byteRE, b))))
+# byteRE = re.compile("[A-F0-9]+", flags=re.I)
+# twoChar = re.compile(".{1,2}")
+
+# def hex2Bytes(b):
+#     if type(b) is bytes:
+#         b = b.decode("utf-8", "replace")
+#     return bytes(int(x, 16) for x in re.findall(twoChar, "".join(re.findall(byteRE, b))))
 
 def bytes2B64(b, alt_char_set=False):
     if type(b) is str:
@@ -860,6 +862,17 @@ def raw2Colour(x):
         return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255, (x >> 24) & 255))
     else:
         return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255))
+
+rgb_to_hsv = lambda c: colorsys.rgb_to_hsv(*c[:3]) + c[3:]
+hsv_to_rgb = lambda c: colorsys.hsv_to_rgb(*c[:3]) + c[3:]
+rgb_to_cmy = lambda c: [1 - x for x in c[:3]] + c[3:]
+cmy_to_rgb = rgb_to_cmy
+rgb_to_lab = lambda c: list(color_conversions.convert_color(color_objects.sRGBColor(*c[:3]), color_objects.LabColor).get_value_tuple()) + c[3:]
+lab_to_rgb = lambda c: list(color_conversions.convert_color(color_objects.LabColor(*c[:3]), color_objects.sRGBColor).get_value_tuple()) + c[3:]
+rgb_to_luv = lambda c: list(color_conversions.convert_color(color_objects.sRGBColor(*c[:3]), color_objects.LuvColor).get_value_tuple()) + c[3:]
+luv_to_rgb = lambda c: list(color_conversions.convert_color(color_objects.LuvColor(*c[:3]), color_objects.sRGBColor).get_value_tuple()) + c[3:]
+rgb_to_xyz = lambda c: list(color_conversions.convert_color(color_objects.sRGBColor(*c[:3]), color_objects.XYZColor).get_value_tuple()) + c[3:]
+xyz_to_rgb = lambda c: list(color_conversions.convert_color(color_objects.XYZColor(*c[:3]), color_objects.sRGBColor).get_value_tuple()) + c[3:]
 
 hex2Colour = lambda h: verifyColour(hex2Bytes(h))
 
@@ -1561,7 +1574,7 @@ lookup time for all elements. Includes many array and numeric operations."""
             self.chash = hash(tuple(self))
         return self.chash
 
-    __str__ = lambda self: "⟨" + ", ".join(str(i) for i in iter(self)) + "⟩"
+    __str__ = lambda self: "⟨" + ", ".join(repr(i) for i in iter(self)) + "⟩"
     __repr__ = lambda self: "hlist(" + str(tuple(self)) + ")"
     __bool__ = lambda self: bool(len(self.data))
 
@@ -2426,6 +2439,6 @@ class pickled:
             return "None"
         return (
             "pickled(pickle.loads(hex2Bytes('''"
-            + bytes2Hex(d).replace(" ", "")
+            + bytes2Hex(d, space=False)
             + "''')))"
         )

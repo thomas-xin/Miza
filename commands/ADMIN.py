@@ -39,7 +39,7 @@ class Purge(Command):
                     t_user = await bot.fetch_user(u_id)
                 except (TypeError, discord.NotFound):
                     try:
-                        t_user = await bot.fetch_member(u_id, guild)
+                        t_user = await bot.fetch_member_ex(u_id, guild)
                     except LookupError:
                         t_user = freeClass(id=u_id)
         if count <= 0:
@@ -161,9 +161,9 @@ class RoleGiver(Command):
                 qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
             )
         if inf > perm:
-            memb = guild.get_member(user.id)
+            memb = await self.bot.fetch_member_ex(user.id, guild)
             if memb is None:
-                memb = await guild.fetch_member(user.id)
+                raise LookupError("Member data not found for this server.")
             if memb.top_role <= role:
                 raise PermissionError("Target role is higher than your highest role.")
         alist = setDict(assigned, react, [[], False])
@@ -270,9 +270,9 @@ class AutoRole(Command):
                     qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
                 )
             if not inf > perm:
-                memb = guild.get_member(user.id)
+                memb = await self.bot.fetch_member_ex(user.id, guild)
                 if memb is None:
-                    memb = await guild.fetch_member(user.id)
+                    raise LookupError("Member data not found for this server.")
                 if memb.top_role <= role:
                     raise PermissionError("Target role is higher than your highest role.")
             roles.append(role)
@@ -564,7 +564,7 @@ class Ban(Command):
             users = [user]
         except (TypeError, discord.NotFound):
             try:
-                member = await bot.fetch_member(u_id, guild)
+                member = await bot.fetch_member_ex(u_id, guild)
                 users = [member]
             except LookupError:
                 role = await bot.fetch_role(u_id, guild)
@@ -859,13 +859,15 @@ class UpdateUserLogs(Database):
     async def _member_update_(self, before, after, guild=None):
         if guild is None:
             guild = after.guild
-        elif guild.get_member(after.id) is None:
-            try:
-                memb = await guild.fetch_member(after.id)
-                if memb is None:
-                    raise EOFError
-            except:
-                return
+        try:
+            memb = await self.bot.fetch_member_ex(after.id, guild)
+            if memb is None:
+                raise LookupError
+        except LookupError:
+            pass
+        except:
+            print(traceback.format_exc())
+            return
         if guild.id in self.data:
             c_id = self.data[guild.id]
             try:
