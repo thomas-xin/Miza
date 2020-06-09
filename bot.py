@@ -443,16 +443,24 @@ class Bot:
                             break
                 url = verifyURL(url)
                 if not url:
-                    url = " ".join(e.description for e in m.embeds if type(e.description) is str)
-                    if url:
-                        if " " in url or "\n" in url or not isURL(url):
-                            for i in url.replace("\n", " ").replace("(", " ").replace(")", " ").split(" "):
-                                u = verifyURL(i)
-                                if isURL(u):
-                                    url = u
+                    for e in m.embeds:
+                        if not url:
+                            for a in "video", "image", "thumbnail":
+                                obj = getattr(e, a, None)
+                                if obj and obj.url:
+                                    url = obj.url
                                     break
+                        else:
+                            break
                     if not url:
-                        url = " ".join(e.image if type(e.image) is str else e.thumbnail if type(e.thumbnail) is str else e.video for e in m.embeds)
+                        url = " ".join(e.description for e in m.embeds if type(e.description) is str)
+                        if url:
+                            if " " in url or "\n" in url or not isURL(url):
+                                for i in url.replace("\n", " ").replace("(", " ").replace(")", " ").split(" "):
+                                    u = verifyURL(i)
+                                    if isURL(u):
+                                        url = u
+                                        break
                 if url in it:
                     return url
                 it[url] = True

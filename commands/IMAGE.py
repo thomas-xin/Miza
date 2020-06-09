@@ -34,17 +34,20 @@ def get_video(url):
         fmts = ""
     for fmt in fmts:
         q = fmt.get("width", 0)
+        try:
+            q = int(q)
         if type(q) is not int:
             q = 0
         if abs(q - 512) < abs(best - 512):
             best = q
             url = fmt["url"]
             size = [fmt["width"], fmt["height"]]
-            dur = entry.get("duration")
+            dur = fmt.get("duration", entry.get("duration"))
+            fps = fmt.get("fps", entry.get("fps"))
     if "dropbox.com" in url:
         if "?dl=0" in url:
             url = url.replace("?dl=0", "?dl=1")
-    return url, size, dur
+    return url, size, dur, fps
 
 
 class IMG(Command):
@@ -410,9 +413,9 @@ class CreateGIF(Command):
         for i, url in enumerate(args):
             url = await bot.followURL(url)
             if "discord" not in url and "channels" not in url:
-                url, size, dur = await create_future(get_video, url)
-                if size and dur:
-                    video = (url, size, dur)
+                url, size, dur, fps = await create_future(get_video, url)
+                if size and dur and fps:
+                    video = (url, size, dur, fps)
             if not isURL(url):
                 raise ArgumentError("Invalid URL detected: \"" + url + '"')
             args[i] = url
@@ -577,7 +580,7 @@ class Magik(Command):
     rate_limit = 6
     _timeout_ = 2
 
-    async def __call__(self, bot, guild, message, args, argv, **void):
+    async def __call__(self, bot, guild, channel, message, args, argv, **void):
         if message.attachments:
             args = [a.url for a in message.attachments] + args
             argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
@@ -615,9 +618,11 @@ class Magik(Command):
         try:
             resp = requests.get("https://api.alexflipnote.dev/filter/magik?image=" + url)
         except:
-            await bot.silentDelete(msg)
+            if msg is not None:
+                await bot.silentDelete(msg)
             raise
-        create_task(bot.silentDelete(msg))
+        if msg is not None:
+            create_task(bot.silentDelete(msg))
         b = resp.content
         f = discord.File(io.BytesIO(b), filename=name)
         await sendFile(message.channel, "", f)

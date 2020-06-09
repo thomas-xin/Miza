@@ -79,58 +79,65 @@ from_colour = lambda colour, size=128, key=None: Image.fromarray(numpy.tile(nump
 
 sizecheck = re.compile("[1-9][0-9]*x[0-9]+")
 
-def video2img(data, maxsize, fps, out, size=None, dur=None):
+def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None):
+    direct = any((size is None, dur is None, orig_fps is None))
     ts = round(time.time() * 1000)
     fn = "cache/" + str(ts)
-    file = open(fn, "wb")
-    images = []
-    try:
-        file.write(data)
-    except:
+    if direct:
+        data = requests.get(url, timeout=8).content
+        file = open(fn, "wb")
+        try:
+            file.write(data)
+        except:
+            file.close()
+            raise
         file.close()
-        raise
-    file.close()
     try:
-        command = ["ffprobe", "-hide_banner", fn]
-        resp = bytes()
-        for _ in range(3):
-            try:
-                proc = psutil.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                fut = exc.submit(proc.communicate)
-                res = fut.result(timeout=2)
-                resp = bytes().join(res)
-                break
-            except:
+        if direct:
+            command = ["ffprobe", "-hide_banner", fn]
+            resp = bytes()
+            for _ in range(3):
                 try:
-                    proc.kill()
+                    proc = psutil.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    fut = exc.submit(proc.communicate)
+                    res = fut.result(timeout=12)
+                    resp = bytes().join(res)
+                    break
                 except:
-                    raise
-        s = resp.decode("utf-8", "replace")
-        if dur is None:
-            i = s.index("Duration: ")
-            d = s[i + 10:]
-            i = 2147483647
-            for c in ", \n\r":
-                try:
-                    x = d.index(c)
-                except ValueError:
-                    pass
-                else:
-                    if x < i:
-                        i = x
-            dur = rdhms(d[:i])
-        fps = min(fps, 2048 / dur)
-        i = d.index(" fps")
-        f = d[i - 5:i]
-        while f[0] < "0" or f[0] > "9":
-            f = f[1:]
-        orig_fps = float(f)
-        if size is None:
-            sfind = re.finditer(sizecheck, d)
-            sizestr = next(sfind).group()
-            size = [int(i) for i in sizestr.split("x")]
+                    try:
+                        proc.kill()
+                    except:
+                        pass
+            s = resp.decode("utf-8", "replace")
+            if dur is None:
+                i = s.index("Duration: ")
+                d = s[i + 10:]
+                i = 2147483647
+                for c in ", \n\r":
+                    try:
+                        x = d.index(c)
+                    except ValueError:
+                        pass
+                    else:
+                        if x < i:
+                            i = x
+                dur = rdhms(d[:i])
+            else:
+                d = s
+            if orig_fps is None:
+                i = d.index(" fps")
+                f = d[i - 5:i]
+                while f[0] < "0" or f[0] > "9":
+                    f = f[1:]
+                orig_fps = float(f)
+            if size is None:
+                sfind = re.finditer(sizecheck, d)
+                sizestr = next(sfind).group()
+                size = [int(i) for i in sizestr.split("x")]
+        fps = min(fps, 256 / dur)
         fn2 = fn + ".gif"
-        command = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", fn, "-fs", str(8388608 - 131072), "-an", "-vf"]
+        f_in = fn if direct else url
+        command = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-fs", str(8388608 - 131072), "-an", "-vf"]
         vf = ""
         s = max(size)
         if s > maxsize:
@@ -140,19 +147,22 @@ def video2img(data, maxsize, fps, out, size=None, dur=None):
         vf += "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"
         command += [vf, "-loop", "0", "-r", str(fps), out]
         subprocess.check_output(command)
-        os.remove(fn)
-    except:
-        try:
+        if direct:
             os.remove(fn)
-        except:
-            pass
+    except:
+        if direct:
+            try:
+                os.remove(fn)
+            except:
+                pass
         raise
+
 
 def create_gif(in_type, args, delay, key=None):
     out = "cache/" + key + ".gif"
     maxsize = 512
     if in_type == "video":
-        video2img(args[0], maxsize, round(1000 / delay), out, args[1], args[2])
+        video2img(args[0], maxsize, round(1000 / delay), out, args[1], args[2], args[3])
         return "$" + out
     images = args
     imgs = []
@@ -167,20 +177,25 @@ def create_gif(in_type, args, delay, key=None):
             else:
                 raise OverflowError("Max file size to load is 256MB.")
         else:
+            if not imgs:
+                w, h = max_size(img.width, img.height, maxsize)
             imgs.append(img)
-    frames = [resize_max(i, maxsize) for i in imgs]
+    frames = [resize_to(i, w, h) for i in imgs]
     frames[0].save(out, format='GIF', append_images=frames[1:], save_all=True, duration=delay, loop=0)
     return "$" + out
 
 
-def resize_max(image, maxsize, resample=Image.LANCZOS, box=None, reducing_gap=None):
-    w = image.width
-    h = image.height
+def max_size(w, h, maxsize):
     s = max(w, h)
     if s > maxsize:
         r = maxsize / s
         w = int(w * r)
         h = int(h * r)
+    return w, h
+
+def resize_max(image, maxsize, resample=Image.LANCZOS, box=None, reducing_gap=None):
+    w, h = max_size(image.width, image.height, maxsize)
+    if w != image.width or h != image.height:
         image = image.resize([w, h], resample, box, reducing_gap)
     return image
 
@@ -203,9 +218,11 @@ def resize_mult(image, x, y, operation):
     h = image.height * y
     return resize_to(image, round(w), round(h), operation)
 
-def resize_to(image, w, h, operation):
+def resize_to(image, w, h, operation="auto"):
     if abs(w * h) > 16777216:
         raise OverflowError("Resulting image size too large.")
+    if w == image.width and h == image.height:
+        return image
     op = operation.lower().replace(" ", "").replace("_", "")
     if op in resizers:
         filt = resizers[op]
