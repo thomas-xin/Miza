@@ -555,7 +555,7 @@ class customAudio(discord.AudioSource):
                 + C + ":"
                 + D + "\""
             )
-            options.append("volume=2")
+            options.append("volume=1.2")
         if stats.compressor:
             comp = min(8000, abs(stats.compressor + sgn(stats.compressor)))
             while abs(comp) > 1:
