@@ -1105,9 +1105,15 @@ class PCMFile:
         self.loading = False
         self.expired = False
         self.loaded = False
+        self.finalized = False
         self.readers = {}
         self.assign = deque()
         self.ensure_time()
+
+    def __str__(self):
+        classname = str(self.__class__).replace("'>", "")
+        classname = classname[classname.index("'") + 1:]
+        return "<" + classname + " object " + self.file + " at " + hex(id(self)).upper() + ">"
     
     def load(self, stream, check_fmt=False, force=False):
         if self.loading and not force:
@@ -1141,9 +1147,9 @@ class PCMFile:
                     fl = os.path.getsize("cache/" + self.file)
                 except FileNotFoundError:
                     fl = 0
-            print(stream, fl)
             self.loaded = True
             self.ensure_time()
+            print(self.file, "buffered", fl)
         except:
             try:
                 ytdl.cache.pop(self.file)
@@ -1167,13 +1173,20 @@ class PCMFile:
                     e["duration"] = dur
                     print(e)
                 self.assign.clear()
-            if not isURL(self.stream):
-                for _ in loop(3):
-                    try:
-                        os.remove(self.stream)
-                        break
-                    except (PermissionError, FileNotFoundError):
-                        time.sleep(0.5)
+            if not self.finalized:
+                self.finalized = True
+                if not isURL(self.stream):
+                    for _ in loop(3):
+                        try:
+                            os.remove(self.stream)
+                            break
+                        except (PermissionError, FileNotFoundError):
+                            time.sleep(0.5)
+                try:
+                    fl = os.path.getsize("cache/" + self.file)
+                except FileNotFoundError:
+                    fl = 0
+                print(self.file, "loaded", fl)
         if self.readers:
             self.ensure_time()
             return
@@ -1466,7 +1479,7 @@ class AudioDownloader:
     def extract(self, item, force=False, count=1, search=True):
         try:
             output = deque()
-            if re.search(spotifyFind, item):
+            if re.search(self.spotifyFind, item):
                 if "playlist" in item:
                     url = item[item.index("playlist"):]
                     url = url[url.index("/") + 1:]
@@ -1493,6 +1506,8 @@ class AudioDownloader:
                     futs = deque()
                     maxitems = 10000
                     for i, curr in enumerate(range(0, maxitems, count)):
+                        if curr > maxitems:
+                            break
                         search = url + "&offset=" + str(curr) + "&limit=" + str(count)
                         fut = create_future_ex(self.get_spotify_part, search)
                         futs.append(fut)
