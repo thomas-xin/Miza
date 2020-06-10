@@ -1435,7 +1435,10 @@ class AudioDownloader:
                 try:
                     track = item["episode"]
                 except KeyError:
-                    continue
+                    if "id" in item:
+                        track = item
+                    else:
+                        continue
             name = track.get("name", track["id"])
             artists = ", ".join(a["name"] for a in track.get("artists", []))
             dur = track.get("duration_ms")
@@ -1485,6 +1488,8 @@ class AudioDownloader:
                                 futs.clear()
                                 break
                             output += res[0]
+                    else:
+                        time.sleep(0.125)
                 while futs:
                     output += futs.popleft().result()[0]
             if r is not None:
@@ -1772,6 +1777,7 @@ class Queue(Command):
     flags = "hvfbz"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    _timeout_ = 2
     rate_limit = 0.5
 
     async def __call__(self, bot, client, user, perm, message, channel, guild, flags, name, argv, **void):
