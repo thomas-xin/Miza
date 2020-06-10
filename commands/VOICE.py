@@ -555,7 +555,7 @@ class customAudio(discord.AudioSource):
                 + C + ":"
                 + D + "\""
             )
-            options.append("volume=1.2")
+            options.append("volume=2")
         if stats.compressor:
             comp = min(8000, abs(stats.compressor + sgn(stats.compressor)))
             while abs(comp) > 1:
@@ -582,7 +582,7 @@ class customAudio(discord.AudioSource):
             wet = min(2, coeff) / 2
             if wet != 1:
                 options.append("asplit[2]")
-            options.append("volume=2")
+            options.append("volume=1.2")
             options.append("afir=dry=10:wet=10")
             if wet != 1:
                 dry = 1 - wet
