@@ -34,8 +34,6 @@ def get_video(url):
         fmts = ""
     for fmt in fmts:
         q = fmt.get("width", 0)
-        try:
-            q = int(q)
         if type(q) is not int:
             q = 0
         if abs(q - 512) < abs(best - 512):
@@ -78,7 +76,7 @@ class IMG(Command):
                 key = " ".join(args[:-1]).lower()
                 if len(key) > 64:
                     raise ArgumentError("Image tag too long.")
-                url = await bot.followURL(verifyURL(args[-1]))
+                url = await bot.followURL(verifyURL(args[-1]), best=True)
                 if len(url) > 256:
                     raise ArgumentError("Image url too long.")
                 images[key] = url
@@ -155,12 +153,12 @@ class CreateEmoji(Command):
 
     async def __call__(self, bot, guild, message, args, argv, **void):
         if message.attachments:
-            args = [a.url for a in message.attachments] + args
-            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
+            args = [bestURL(a) for a in message.attachments] + args
+            argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args:
             raise ArgumentError("Please enter URL, emoji, or attached file to add.")
         url = args.pop(-1)
-        url = await bot.followURL(url)
+        url = await bot.followURL(url, best=True)
         if not isURL(url):
             emojis = findEmojis(argv)
             if not emojis:
@@ -205,12 +203,12 @@ class CreateEmoji(Command):
 
 async def get_image(bot, message, args, argv):
     if message.attachments:
-        args = [a.url for a in message.attachments] + args
-        argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
+        args = [bestURL(a) for a in message.attachments] + args
+        argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
     if not args:
         raise ArgumentError("Please input an image by URL or attachment.")
     url = args.pop(0)
-    url = await bot.followURL(url)
+    url = await bot.followURL(url, best=True)
     if not isURL(url):
         emojis = findEmojis(argv)
         if not emojis:
@@ -392,7 +390,7 @@ class CreateGIF(Command):
 
     async def __call__(self, bot, guild, message, flags, args, **void):
         if message.attachments:
-            args += [a.url for a in message.attachments]
+            args += [bestURL(a) for a in message.attachments]
         if not args:
             raise ArgumentError("Please input images by URL or attachment.")
         if "r" in flags:
@@ -411,7 +409,7 @@ class CreateGIF(Command):
             raise OverflowError("GIF image framerate too low.")
         video = None
         for i, url in enumerate(args):
-            url = await bot.followURL(url)
+            url = await bot.followURL(url, best=True)
             if "discord" not in url and "channels" not in url:
                 url, size, dur, fps = await create_future(get_video, url)
                 if size and dur and fps:
@@ -440,8 +438,8 @@ class Resize(Command):
 
     async def __call__(self, bot, guild, message, flags, args, argv, **void):
         if message.attachments:
-            args = [a.url for a in message.attachments] + args
-            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
+            args = [bestURL(a) for a in message.attachments] + args
+            argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args:
             if "l" in flags:
                 return (
@@ -450,7 +448,7 @@ class Resize(Command):
                 )
             raise ArgumentError("Please input an image by URL or attachment.")
         url = args.pop(0)
-        url = await bot.followURL(url)
+        url = await bot.followURL(url, best=True)
         if not isURL(url):
             emojis = findEmojis(argv) + findEmojis(url)
             if not emojis:
@@ -511,8 +509,8 @@ class Resize(Command):
 
     async def __call__(self, bot, guild, message, flags, args, argv, **void):
         if message.attachments:
-            args = [a.url for a in message.attachments] + args
-            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
+            args = [bestURL(a) for a in message.attachments] + args
+            argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args:
             if "l" in flags:
                 return (
@@ -521,7 +519,7 @@ class Resize(Command):
                 )
             raise ArgumentError("Please input an image by URL or attachment.")
         url = args.pop(0)
-        url = await bot.followURL(url)
+        url = await bot.followURL(url, best=True)
         if not isURL(url):
             emojis = findEmojis(argv) + findEmojis(url)
             if not emojis:
@@ -582,8 +580,8 @@ class Magik(Command):
 
     async def __call__(self, bot, guild, channel, message, args, argv, **void):
         if message.attachments:
-            args = [a.url for a in message.attachments] + args
-            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
+            args = [bestURL(a) for a in message.attachments] + args
+            argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args:
             raise ArgumentError("Please input an image by URL or attachment.")
         url = args.pop(0)
@@ -612,7 +610,7 @@ class Magik(Command):
             fn = resp[0]
             f = discord.File(fn, filename=name)
             msg = await channel.send(file=f)
-            url = msg.attachments[0].url
+            url = bestURL(msg.attachments[0])
         else:
             msg = None
         try:
@@ -639,8 +637,8 @@ class Blend(Command):
 
     async def __call__(self, bot, guild, message, flags, args, argv, **void):
         if message.attachments:
-            args = [a.url for a in message.attachments] + args
-            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
+            args = [bestURL(a) for a in message.attachments] + args
+            argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args:
             if "l" in flags:
                 return (
@@ -651,9 +649,9 @@ class Blend(Command):
                 )
             raise ArgumentError("Please input an image by URL or attachment.")
         url1 = args.pop(0)
-        url1 = await bot.followURL(url1)
+        url1 = await bot.followURL(url1, best=True)
         url2 = args.pop(0)
-        url2 = await bot.followURL(url2)
+        url2 = await bot.followURL(url2, best=True)
         fromA = False
         if not isURL(url1):
             emojis = findEmojis(argv)

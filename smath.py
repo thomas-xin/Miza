@@ -771,7 +771,8 @@ def romanNumerals(num, order=0):
 
 
 def limStr(s, maxlen=10):
-    s = str(s)
+    if type(s) is not str:
+        s = str(s)
     over = (len(s) - maxlen) / 2
     if over > 0:
         half = len(s) / 2
@@ -833,7 +834,9 @@ def verifyString(string):
     if type(string) is list or type(string) is tuple:
         return "".join(str(c) for c in string)
     else:
-        return str(string)
+        if type(string) is not str:
+            string = str(string)
+        return string
 
 def bytes2Hex(b, space=True):
     if type(b) is str:

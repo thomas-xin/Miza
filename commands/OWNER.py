@@ -22,8 +22,8 @@ class Restart(Command):
             delay = await bot.evalTime(argv, guild)
             await channel.send("Preparing to " + name + " in " + sec2Time(delay) + "...")
             emb = discord.Embed(colour=discord.Colour(1))
-            emb.set_author(name=str(client.user), url=bot.website, icon_url=strURL(client.user.avatar_url))
-            emb.description = "```ini\n[I will be going offline in " + sec2Time(delay) + ", apologies for any inconvenience.]```"
+            emb.set_author(name=str(client.user), url=bot.website, icon_url=bestURL(client.user))
+            emb.description = "```ini\n[I will be " + ("restarting", "shutting down")[name == "shutdown"] + " in " + sec2Time(delay) + ", apologies for any inconvenience.]```"
             for d in self.bot.database.values():
                 if hasattr(d, "_announce_"):
                     d._announce_(embed=emb)
@@ -155,7 +155,7 @@ class UpdateExec(Database):
             return
         if not hasattr(channel, "guild") or channel.guild is None:
             emb = discord.Embed()
-            emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=strURL(user.avatar_url))
+            emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=bestURL(user))
             emb.description = "```ini\n[typing...]```"
             for c_id in self.data:
                 create_task(self.sendDeleteID(c_id, embed=emb))
@@ -192,7 +192,7 @@ class UpdateExec(Database):
         elif message.guild is None:
             user = message.author
             emb = discord.Embed()
-            emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=strURL(user.avatar_url))
+            emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=bestURL(user))
             emb.description = strMessage(message)
             for c_id in self.data:
                 create_task(self.sendDeleteID(c_id, delete_after=inf, embed=emb))

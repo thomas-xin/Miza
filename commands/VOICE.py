@@ -1009,6 +1009,92 @@ class AudioQueue(hlist):
         return self
 
 
+# def isORG(url):
+#     try:
+#         resp = requests.get(url, timeout=8, stream=True)
+#         it = resp.iter_content(4096)
+#         b = bytes()
+#         while len(b) < 4:
+#             b += next(it)
+#         if not b.startswith(b"Org-"):
+#             raise ValueError("Invalid file header.")
+#         resp.close()
+#     except:
+#         if resp is not None:
+#             try:
+#                 resp.close()
+#             except:
+#                 pass
+#         raise
+#     return True
+
+def org2xm(org, dat=None):
+    print(org)
+    if not org or type(org) is not bytes:
+        if not isURL(org):
+            raise TypeError("Invalid input URL.")
+        org = verifyURL(org)
+        data = None
+        resp = None
+        try:
+            resp = requests.get(org, timeout=8, stream=True)
+            it = resp.iter_content(4096)
+            b = bytes()
+            while len(b) < 4:
+                b += next(it)
+            if not b.startswith(b"Org-"):
+                raise ValueError("Invalid file header.")
+            data = b + resp.content
+            resp.close()
+        except:
+            if resp is not None:
+                try:
+                    resp.close()
+                except:
+                    pass
+            raise
+        if not data:
+            raise FileNotFoundError("Error downloading file content.")
+    else:
+        if not org.startswith(b"Org-"):
+            raise ValueError("Invalid file header.")
+        data = org
+    compat = not data.startswith(b"Org-02")
+    ts = round(utc() * 1000)
+    r_org = "cache/" + str(ts) + ".org"
+    f = open(r_org, "wb")
+    f.write(data)
+    f.close()
+    r_dat = "cache/" + str(ts) + ".dat"
+    orig = False
+    if dat is not None and isURL(dat):
+        dat = verifyURL(dat)
+        urlBypass().retrieve(dat, r_dat)
+    else:
+        if type(dat) is bytes and dat:
+            f = open(r_dat, "wb")
+            f.write(dat)
+            f.close()
+        else:
+            r_dat = "misc/ORG210EN.DAT"
+            orig = True
+    args = ["misc/org2xm.exe", r_org, r_dat]
+    if compat:
+        args.append("c")
+    print(args)
+    subprocess.check_output(args)
+    r_xm = "cache/" + str(ts) + ".xm"
+    if str(ts) + ".xm" not in os.listdir("cache"):
+        raise FileNotFoundError("Unable to locate converted file.")
+    if not os.path.getsize(r_xm):
+        raise RuntimeError("Converted file is empty.")
+    for f in (r_org, r_dat)[:2 - orig]:
+        try:
+            os.remove(f)
+        except (PermissionError, FileNotFoundError):
+            pass
+    return r_xm
+
 
 class PCMFile:
     
@@ -1022,8 +1108,8 @@ class PCMFile:
         self.assign = deque()
         self.ensure_time()
     
-    def load(self, stream):
-        if self.loading:
+    def load(self, stream, check_fmt=False, force=False):
+        if self.loading and not force:
             return
         self.stream = stream
         self.loading = True
@@ -1036,6 +1122,13 @@ class PCMFile:
             fl = 0
             while fl < 65536:
                 if not self.proc.is_running():
+                    if check_fmt:
+                        try:
+                            xm = org2xm(stream)
+                        except ValueError:
+                            pass
+                        else:
+                            return self.load(xm, check_fmt=False, force=True)
                     err = self.proc.stderr.read().decode("utf-8", "replace")
                     if err:
                         ex = RuntimeError(err)
@@ -1047,6 +1140,7 @@ class PCMFile:
                     fl = os.path.getsize("cache/" + self.file)
                 except FileNotFoundError:
                     fl = 0
+            print(stream, fl)
             self.loaded = True
             self.ensure_time()
         except:
@@ -1060,6 +1154,7 @@ class PCMFile:
                 except:
                     print(traceback.format_exc())
             raise
+        return self
 
     ensure_time = lambda self: setattr(self, "time", utc())
 
@@ -1071,6 +1166,11 @@ class PCMFile:
                     e["duration"] = dur
                     print(e)
                 self.assign.clear()
+            if not isURL(self.stream):
+                try:
+                    os.remove(self.stream)
+                except (PermissionError, FileNotFoundError):
+                    pass
         if self.readers:
             self.ensure_time()
             return
@@ -1563,7 +1663,7 @@ class AudioDownloader:
             return f
         try:
             self.cache[fn] = f = PCMFile(fn)
-            f.load(stream)
+            f.load(stream, check_fmt=entry.get("duration") is None)
             dur = entry.get("duration", None)
             if dur is None:
                 f.assign.append(entry)
@@ -1590,15 +1690,33 @@ class AudioDownloader:
         if type(duration) not in (int, float):
             dur = 960
         else:
-            dur = min(960, duration)
+            dur = duration
         fs = fl - 131072
-        br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
         # print(br)
         args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-vn", "-i", stream]
         if auds is not None:
             args += auds.construct_options(volume=True)
+            dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
+        if dur > 960:
+            dur = 960
+        br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
         args += ["-ar", "48000", "-b:a", str(br), "-fs", str(fs), fn]
-        subprocess.check_output(args)
+        try:
+            subprocess.check_output(args)
+        except subprocess.CalledProcessError:
+            try:
+                xm = org2xm(stream)
+            except ValueError:
+                pass
+            else:
+                args[8] = xm
+                subprocess.check_output(args)
+                try:
+                    os.remove(xm)
+                except (PermissionError, FileNotFoundError):
+                    pass
+                return fn, info["name"] + "." + fmt
+            raise
         return fn, info["name"] + "." + fmt
 
     def extractSingle(self, i):
@@ -1666,7 +1784,7 @@ class Queue(Command):
     async def __call__(self, bot, client, user, perm, message, channel, guild, flags, name, argv, **void):
         if not argv:
             if message.attachments:
-                argv = message.attachments[0].url
+                argv = bestURL(message.attachments[0])
         if not argv:
             auds = await forceJoin(guild, channel, user, client, bot)
             elapsed = auds.stats.position
@@ -1837,10 +1955,7 @@ class Queue(Command):
             colour=randColour(),
         )
         user = await bot.fetch_user(u_id)
-        url = strURL(user.avatar_url)
-        for size in ("?size=1024", "?size=2048"):
-            if url.endswith(size):
-                url = url[:-len(size)] + "?size=4096"
+        url = bestURL(user)
         emb.set_author(name=str(user), url=url, icon_url=url)
         if q:
             icon = q[0].get("icon", "")
@@ -2358,7 +2473,7 @@ class Dump(Command):
             raise self.permError(perm, 1, "to load new queue while other users are in voice")
         try:
             if len(message.attachments):
-                url = message.attachments[0].url
+                url = bestURL(message.attachments[0])
             else:
                 url = verifyURL(argv)
             f = await downloadTextFile(url, bot)
@@ -3099,7 +3214,7 @@ class Lyrics(Command):
 
     async def __call__(self, bot, channel, message, argv, flags, user, **void):
         for a in message.attachments:
-            argv = a.url + " " + argv
+            argv = bestURL(a) + " " + argv
         if not argv:
             try:
                 auds = await forceJoin(channel.guild, channel, user, bot.client, bot)
@@ -3174,9 +3289,9 @@ class Lyrics(Command):
 class Download(Command):
     time_consuming = True
     _timeout_ = 8
-    name = ["Search", "YTDL", "Youtube_DL", "Convert", "AF", "AudioFilter"]
+    name = ["Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "ConvertORG", "Org2xm", "Convert"]
     min_level = 0
-    description = "Searches and/or downloads a song from a YouTube/SoundCloud query or link."
+    description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
     usage = "<0:search_link{queue}> <-1:out_format[ogg]> <apply_settings(?a)> <verbose_search(?v)> <show_debug(?z)>"
     flags = "avz"
     rate_limit = 7
@@ -3185,7 +3300,7 @@ class Download(Command):
         if name in ("af", "audiofilter"):
             setDict(flags, "a", 1)
         for a in message.attachments:
-            argv = a.url + " " + argv
+            argv = bestURL(a) + " " + argv
         if not argv:
             try:
                 auds = await forceJoin(channel.guild, channel, user, bot.client, bot)
@@ -3277,10 +3392,7 @@ class Download(Command):
             + "_" + str(len(res)) + "_" + fmt + "_" + str(int(bool(a))) + "-" + url_enc + "\n" + end
         )
         emb = discord.Embed(colour=randColour())
-        url = strURL(user.avatar_url)
-        for size in ("?size=1024", "?size=2048"):
-            if url.endswith(size):
-                url = url[:-len(size)] + "?size=4096"
+        url = bestURL(user)
         emb.set_author(name=str(user), url=url, icon_url=url)
         emb.description = "\n".join(
             ["`【" + str(i) + "】` [" + discord.utils.escape_markdown(e["name"] + "](" + ensure_url(e["url"]) + ")") for i in range(len(res)) for e in [res[i]]]

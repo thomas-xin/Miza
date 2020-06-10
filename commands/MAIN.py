@@ -341,9 +341,6 @@ class Avatar(Command):
 
     async def getGuildData(self, g):
         url = strURL(g.icon_url)
-        for size in ("?size=1024", "?size=2048"):
-            if url.endswith(size):
-                url = url[:-len(size)] + "?size=4096"
         name = g.name
         emb = discord.Embed(colour=randColour())
         emb.set_thumbnail(url=url)
@@ -420,10 +417,7 @@ class Avatar(Command):
             u = user
         guild = g
         name = str(u)
-        url = strURL(u.avatar_url)
-        for size in ("?size=1024", "?size=2048"):
-            if url.endswith(size):
-                url = url[:-len(size)] + "?size=4096"
+        url = bestURL(u)
         emb = discord.Embed(colour=randColour())
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
@@ -607,7 +601,7 @@ class Info(Command):
         guild = g
         name = str(u)
         dname = u.display_name * (u.display_name != u.name) if member else None
-        url = strURL(u.avatar_url)
+        url = bestURL(u)
         try:
             is_sys = u.system
         except (AttributeError, KeyError):
@@ -901,11 +895,10 @@ class Reminder(Command):
         elif len(msg) > 512:
             raise OverflowError("Reminder message too long (" + str(len(msg)) + "> 512).")
         name = str(user)
-        url = strURL(user.avatar_url)
+        url = bestURL(user)
         ts = utc()
         rems.append(freeClass(
-            name=name,
-            url=url,
+            user=user.id,
             msg=msg,
             t=t + ts,
             u=1
@@ -967,7 +960,7 @@ class Announcement(Command):
             update()
             return (
                 "```ini\nSuccessfully removed ["
-                + limStr(noHighlight(x["name"] + ": " + x["msg"]), 128) + "] from announcements list for [#"
+                + limStr(noHighlight(bot.get_user(x.get("user", None), replace=True).name + ": " + x["msg"]), 128) + "] from announcements list for [#"
                 + noHighlight(channel) + "].```"
             )
         if not argv:
@@ -977,7 +970,7 @@ class Announcement(Command):
                     + noHighlight(channel) + "].```"
                 )
             d = utc()
-            s = strIter(rems, key=lambda x: limStr(noHighlight(x["name"] + ": " + x["msg"]), 128) + " ➡️ " + sec2Time(x["t"] - d))
+            s = strIter(rems, key=lambda x: limStr(noHighlight(bot.get_user(x.get("user", None), replace=True).name + ": " + x["msg"]), 128) + " ➡️ " + sec2Time(x["t"] - d))
             return (
                 "Current announcements set for <#" + str(channel.id)
                 + ">:```ini" + s + "```"
@@ -1026,11 +1019,10 @@ class Announcement(Command):
         elif len(msg) > 512:
             raise OverflowError("Announcement message too long (" + str(len(msg)) + "> 512).")
         name = str(user)
-        url = strURL(user.avatar_url)
+        url = bestURL(user)
         ts = utc()
         rems.append(freeClass(
-            name=name,
-            url=url,
+            user=user.id,
             msg=msg,
             t=t + ts,
             u=0
@@ -1091,7 +1083,11 @@ class UpdateReminders(Database):
             else:
                 ch = await self.bot.fetch_channel(u_id)
             emb = discord.Embed(description=x.msg)
-            emb.set_author(name=x.name, url=x.url, icon_url=x.url)
+            try:
+                u = bot.get_user(x["user"], replace=True)
+            except KeyError:
+                u = x
+            emb.set_author(name=u.name, url=bestURL(u), icon_url=bestURL(u))
             try:
                 await ch.send(embed=emb)
             except discord.Forbidden:

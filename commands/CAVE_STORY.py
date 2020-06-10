@@ -196,152 +196,152 @@ tsc_list = SheetPull(
 ##    return
 
 
-def getDuration(filename):
-    command = [
-        "ffprobe",
-        "-v",
-        "error",
-        "-show_entries",
-        "format=duration",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-        filename,
-    ]
-    try:
-        output = subprocess.check_output(command).decode("utf-8", "replace")
-    except:
-        print(traceback.format_exc())
-        output = "N/A"
-    try:
-        i = output.index("\r")
-        output = output[:i]
-    except ValueError:
-        output = "N/A"
-    if output == "N/A":
-        n = 0
-    else:
-        n = roundMin(float(output))
-    return max(1 / (1 << 24), n)
+# def getDuration(filename):
+#     command = [
+#         "ffprobe",
+#         "-v",
+#         "error",
+#         "-show_entries",
+#         "format=duration",
+#         "-of",
+#         "default=noprint_wrappers=1:nokey=1",
+#         filename,
+#     ]
+#     try:
+#         output = subprocess.check_output(command).decode("utf-8", "replace")
+#     except:
+#         print(traceback.format_exc())
+#         output = "N/A"
+#     try:
+#         i = output.index("\r")
+#         output = output[:i]
+#     except ValueError:
+#         output = "N/A"
+#     if output == "N/A":
+#         n = 0
+#     else:
+#         n = roundMin(float(output))
+#     return max(1 / (1 << 24), n)
 
 
-def orgConv(org, wave, fmt, key="temp", fl=8388608):
-    try:
-        try:
-            os.remove("cache/" + key + ".org")
-        except FileNotFoundError:
-            pass
-        try:
-            os.remove("cache/" + key + ".xm")
-        except FileNotFoundError:
-            pass
-        opener = urlBypass()
-        opener.retrieve(org, "cache/" + key + ".org")
-        if wave is not None:
-            opener.retrieve(wave, "cache/" + key + ".dat")
-            com = "org2xm ../cache/" + key + ".org ../cache/" + key + ".dat"
-        else:
-            com = "org2xm ../misc/" + key + ".org ORG210EN.DAT"
-        os.chdir("misc")
-        try:
-            os.system(com)
-            os.chdir("..")
-        except:
-            os.chdir("..")
-            raise
-        fi = "cache/" + key + ".xm"
-        t = utc()
-        while utc() - t < 12:
-            time.sleep(0.2)
-            if "&" + key + ".xm" in os.listdir("cache"):
-                try:
-                    if os.path.getsize(fi) >= 32:
-                        break
-                except Exception as ex:
-                    print(repr(ex))                
-                    pass
-        if utc() - t >= 12:
-            try:
-                os.remove("cache/" + key + ".org")
-            except (FileNotFoundError, PermissionError):
-                pass
-            try:
-                os.remove("cache/" + key + ".xm")
-            except (FileNotFoundError, PermissionError):
-                pass
-            raise TimeoutError("Request timed out.")
-        if fmt != "xm":
-            fn = "cache/" + key + "." + fmt
-            try:
-                os.remove(fn)
-            except (FileNotFoundError, PermissionError):
-                pass
-            dur = getDuration(fi)
-            br = max(32, min(256, floor(((fl - 262144) / dur / 128) / 4) * 4))
-            args = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-i", fi, "-vn", "-b:a", str(br) + "k", fn]
-            subprocess.check_output(args)
-            try:
-                os.remove("cache/" + key + ".org")
-            except (FileNotFoundError, PermissionError):
-                pass
-            try:
-                os.remove("cache/" + key + ".xm")
-            except (FileNotFoundError, PermissionError):
-                pass
-        else:
-            fn = fi
-        return [fn]
-    except Exception as ex:
-        print(traceback.format_exc())
-        return ex
+# def orgConv(org, wave, fmt, key="temp", fl=8388608):
+#     try:
+#         try:
+#             os.remove("cache/" + key + ".org")
+#         except FileNotFoundError:
+#             pass
+#         try:
+#             os.remove("cache/" + key + ".xm")
+#         except FileNotFoundError:
+#             pass
+#         opener = urlBypass()
+#         opener.retrieve(org, "cache/" + key + ".org")
+#         if wave is not None:
+#             opener.retrieve(wave, "cache/" + key + ".dat")
+#             com = "org2xm ../cache/" + key + ".org ../cache/" + key + ".dat"
+#         else:
+#             com = "org2xm ../misc/" + key + ".org ORG210EN.DAT"
+#         os.chdir("misc")
+#         try:
+#             os.system(com)
+#             os.chdir("..")
+#         except:
+#             os.chdir("..")
+#             raise
+#         fi = "cache/" + key + ".xm"
+#         t = utc()
+#         while utc() - t < 12:
+#             time.sleep(0.2)
+#             if "&" + key + ".xm" in os.listdir("cache"):
+#                 try:
+#                     if os.path.getsize(fi) >= 32:
+#                         break
+#                 except Exception as ex:
+#                     print(repr(ex))                
+#                     pass
+#         if utc() - t >= 12:
+#             try:
+#                 os.remove("cache/" + key + ".org")
+#             except (FileNotFoundError, PermissionError):
+#                 pass
+#             try:
+#                 os.remove("cache/" + key + ".xm")
+#             except (FileNotFoundError, PermissionError):
+#                 pass
+#             raise TimeoutError("Request timed out.")
+#         if fmt != "xm":
+#             fn = "cache/" + key + "." + fmt
+#             try:
+#                 os.remove(fn)
+#             except (FileNotFoundError, PermissionError):
+#                 pass
+#             dur = getDuration(fi)
+#             br = max(32, min(256, floor(((fl - 262144) / dur / 128) / 4) * 4))
+#             args = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-i", fi, "-vn", "-b:a", str(br) + "k", fn]
+#             subprocess.check_output(args)
+#             try:
+#                 os.remove("cache/" + key + ".org")
+#             except (FileNotFoundError, PermissionError):
+#                 pass
+#             try:
+#                 os.remove("cache/" + key + ".xm")
+#             except (FileNotFoundError, PermissionError):
+#                 pass
+#         else:
+#             fn = fi
+#         return [fn]
+#     except Exception as ex:
+#         print(traceback.format_exc())
+#         return ex
 
 
-class CS_org2xm(Command):
-    time_consuming = True
-    fmts = [
-        "mp3",
-        "ogg",
-        "xm",
-        "webm",
-        "wav",
-    ]
-    name = ["CS_o2x", "Org2xm", "Convert_org"]
-    min_level = 0
-    description = "Converts a .org file to another file format."
-    usage = "<0:org_url{attached_file}> <2:wave_url[]> <1:out_format[xm]>"
-    rate_limit = 5
+# class CS_org2xm(Command):
+#     time_consuming = True
+#     fmts = [
+#         "mp3",
+#         "ogg",
+#         "xm",
+#         "webm",
+#         "wav",
+#     ]
+#     name = ["CS_o2x", "Org2xm", "Convert_org"]
+#     min_level = 0
+#     description = "Converts a .org file to another file format."
+#     usage = "<0:org_url{attached_file}> <2:wave_url[]> <1:out_format[xm]>"
+#     rate_limit = 5
 
-    async def __call__(self, args, bot, message, channel, guild, **void):
-        raise NotImplementedError("Command is currently under maintenance, please be patient...")
-        if not bot.isTrusted(guild.id):
-            raise PermissionError("Must be in a trusted server to convert .org files.")
-        if len(message.attachments):
-            args = [a.url for a in message.attachments] + args
-        org = await bot.followURL(verifyURL(args[0]))
-        if len(args) > 2:
-            wave = await bot.followURL(verifyURL(args[1]))
-        else:
-            wave = None
-            #wave = "https://cdn.discordapp.com/attachments/313292557603962881/674183355972976660/ORG210EN.DAT"
-            #wave = "https://cdn.discordapp.com/attachments/317898572458754049/674166849763672064/wave100"
-        if len(args) > 1:
-            fmt = args[-1]
-        else:
-            fmt = "xm"
-        if fmt not in self.fmts:
-            raise TypeError(fmt + " is not a supported output format.")
-        name = org.split("/")[-1].replace(".org", "") + "." + fmt
-        fn = await create_future(
-            orgConv,
-            org,
-            wave,
-            fmt,
-            "%" + str(guild.id),
-            guild.filesize_limit
-        )
-        if issubclass(type(fn), Exception):
-            raise fn
-        f = discord.File(fn[0], filename=name)
-        create_task(sendFile(channel, "Org successfully converted!", f, fn[0]))
+#     async def __call__(self, args, bot, message, channel, guild, **void):
+#         raise NotImplementedError("Command is currently under maintenance, please be patient...")
+#         if not bot.isTrusted(guild.id):
+#             raise PermissionError("Must be in a trusted server to convert .org files.")
+#         if len(message.attachments):
+#             args = [a.url for a in message.attachments] + args
+#         org = await bot.followURL(verifyURL(args[0]))
+#         if len(args) > 2:
+#             wave = await bot.followURL(verifyURL(args[1]))
+#         else:
+#             wave = None
+#             #wave = "https://cdn.discordapp.com/attachments/313292557603962881/674183355972976660/ORG210EN.DAT"
+#             #wave = "https://cdn.discordapp.com/attachments/317898572458754049/674166849763672064/wave100"
+#         if len(args) > 1:
+#             fmt = args[-1]
+#         else:
+#             fmt = "xm"
+#         if fmt not in self.fmts:
+#             raise TypeError(fmt + " is not a supported output format.")
+#         name = org.split("/")[-1].replace(".org", "") + "." + fmt
+#         fn = await create_future(
+#             orgConv,
+#             org,
+#             wave,
+#             fmt,
+#             "%" + str(guild.id),
+#             guild.filesize_limit
+#         )
+#         if issubclass(type(fn), Exception):
+#             raise fn
+#         f = discord.File(fn[0], filename=name)
+#         create_task(sendFile(channel, "Org successfully converted!", f, fn[0]))
 
 
 def _n2f(n):

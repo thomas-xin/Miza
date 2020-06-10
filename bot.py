@@ -167,6 +167,15 @@ class Bot:
                     
     async def fetch_user(self, u_id):
         try:
+            return self.get_user(u_id)
+        except KeyError:
+            user = await client.fetch_user(u_id)
+        self.cache.users[u_id] = user
+        self.limitCache("users")
+        return user
+
+    def get_user(self, u_id, replace=False):
+        try:
             u_id = int(u_id)
         except (ValueError, TypeError):
             raise TypeError("Invalid user identifier: " + str(u_id))
@@ -184,9 +193,11 @@ class Bot:
             try:
                 user = client.get_user(u_id)
                 if user is None:
-                    raise EOFError
+                    raise TypeError
             except:
-                user = await client.fetch_user(u_id)
+                if replace:
+                    return self.get_user(self.deleted_user)
+                raise KeyError("Target user ID not found.")
         self.cache.users[u_id] = user
         self.limitCache("users")
         return user
@@ -214,11 +225,19 @@ class Bot:
                     member = await strLookup(
                         members,
                         str(u_id),
-                        qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
-                        ikey=lambda x: [str(x), reconstitute(x.name), reconstitute(x.display_name)],
+                        qkey=lambda x: [str(x), reconstitute(x).lower()],
+                        ikey=lambda x: [str(x), reconstitute(x.name).lower(), reconstitute(x.display_name).lower()],
                     )
                 except LookupError:
-                    raise LookupError("Unable to find member data.")
+                    try:
+                        member = await strLookup(
+                            members,
+                            str(u_id),
+                            qkey=lambda x: [to_alphanumeric(x).replace(" ", "").lower()],
+                            ikey=lambda x: [to_alphanumeric(x).replace(" ", "").lower(), to_alphanumeric(x.display_name).replace(" ", "").lower()],
+                        )
+                    except LookupError:
+                        raise LookupError("Unable to find member data.")
         return member
 
     async def fetch_member(self, u_id, guild=None, find_others=False):
@@ -423,7 +442,7 @@ class Bot:
             channel = await user.create_dm()
         return channel
 
-    async def followURL(self, url, it=None):
+    async def followURL(self, url, it=None, best=False):
         if it is None:
             url = stripAcc(url.strip().strip("`"))
             it = {}
@@ -432,7 +451,10 @@ class Bot:
             c = await self.fetch_channel(spl[1])
             m = await self.fetch_message(spl[2], c)
             if m.attachments:
-                url = m.attachments[0].url
+                if best:
+                    url = bestURL(m.attachments[0])
+                else:
+                    url = m.attachments[0].url
             else:
                 url = m.content
                 if " " in url or "\n" in url or not isURL(url):
@@ -447,9 +469,13 @@ class Bot:
                         if not url:
                             for a in "video", "image", "thumbnail":
                                 obj = getattr(e, a, None)
-                                if obj and obj.url:
-                                    url = obj.url
-                                    break
+                                if obj:
+                                    if best:
+                                        url = bestURL(obj)
+                                    else:
+                                        url = obj.url
+                                    if url:
+                                        break
                         else:
                             break
                     if not url:
@@ -1460,7 +1486,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             reacts="❎",
                         ))
     if not run and u_id != client.user.id and not u_perm <= -inf:
-        temp = to_alphanumeric(reconstitute(cpy).lower())
+        temp = to_alphanumeric(cpy).lower()
         for u in bot.database.values():
             f = getattr(u, "_nocommand_", None)
             if f is not None:
@@ -1525,6 +1551,7 @@ async def on_ready():
             bot.started = True
             create_task(updateLoop())
             create_task(heartbeatLoop())
+            await bot.fetch_user(bot.deleted_user)
             if "init.tmp" not in os.listdir("misc"):
                 print("Setting bot avatar...")
                 f = await create_future(open, "misc/avatar.png", "rb")

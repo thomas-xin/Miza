@@ -167,7 +167,11 @@ async def sendFile(channel, msg, file, filename=None):
         except:
             print(traceback.format_exc())
     if message.attachments:
-        await message.edit(content=message.content + "\n" + "\n".join("<" + a.url + ">" for a in message.attachments))
+        await message.edit(content=message.content + "\n" + "\n".join("<" + bestURL(a) + ">" for a in message.attachments))
+
+
+
+bestURL = lambda obj: obj if type(obj) is str else (strURL(obj.avatar_url) if hasattr(obj, "avatar_url") else (obj.proxy_url if obj.proxy_url else obj.url))
 
 
 emojiFind = re.compile("<a?:[^<>]+:[0-9]+>")
@@ -182,7 +186,7 @@ def strMessage(message, limit=1024, username=False):
         c = "<@" + str(message.author.id) + ">:\n" + c
     data = limStr(c, limit)
     if message.attachments:
-        data += "\n[" + ", ".join(i.url for i in message.attachments) + "]"
+        data += "\n[" + ", ".join(bestURL(i) for i in message.attachments) + "]"
     if message.embeds:
         data += "\n⟨" + ", ".join(str(i.to_dict()) for i in message.embeds) + "⟩"
     if message.reactions:
@@ -204,7 +208,7 @@ def strActivity(activity):
         return t[0].upper() + t[1:] + " " + activity.name
     return str(activity)
 
-atrans = re.compile("([^A-z 0-9])")
+atrans = re.compile("[^a-z 0-9]", re.I)
 is_alphanumeric = lambda string: not re.search(atrans, string)
 to_alphanumeric = lambda string: singleSpace(re.sub(atrans, " ", reconstitute(string)))
 
@@ -215,11 +219,16 @@ def noCodeBox(s):
 
 
 async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]):
-    qlist = qkey(query)
+    queries = qkey(query)
+    qlist = [q for q in queries if q]
+    if not qlist:
+        qlist = queries
     cache = [[[inf, None], [inf, None]] for _ in qlist]
     x = 1
     for i in shuffle(it):
         for c in ikey(i):
+            if not c and i:
+                continue
             for a, b in enumerate(qkey(c)):
                 if b == qlist[a]:
                     return i
@@ -243,7 +252,12 @@ async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)])
 
 randColour = lambda: colour2Raw(colourCalculation(xrand(12) * 128))
 
-strURL = lambda url: str(url).replace(".webp", ".png")
+def strURL(url):
+    if type(url) is not str:
+        url = str(url)
+    if url.endswith("?size=1024"):
+        url = url[:-10] + "?size=4096"
+    return url.replace(".webp", ".png")
 
 shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).replace(b"/", b"-").decode("utf-8", "replace")
 
@@ -307,6 +321,10 @@ SCHEME_FORMAT = re.compile(
 )
 
 def isURL(url):
+    if type(url) is bytes:
+        url = url.decode("utf-8", "replace")
+    elif type(url) is not str:
+        return None
     url = url.strip()
     if url.startswith("<") and url[-1] == ">":
         url = url[1:-1]

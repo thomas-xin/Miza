@@ -347,8 +347,8 @@ class MimicConfig(Command):
     min_level = 0
     description = "Modifies an existing webhook mimic's attributes."
     usage = (
-        "<0:mimic_id> <1:option(prefix)([name][username][nickname])([avatar][icon][url])"
-        + "([status][description])(gender)(birthday)> <2:new>"
+        "<0:mimic_id> <1:option(prefix)(name)(avatar)"
+        + "(description)(gender)(birthday)[]> <2:new>"
     )
     no_parse = True
     rate_limit = 1
@@ -377,7 +377,7 @@ class MimicConfig(Command):
             new = None
         if opt in ("name", "username", "nickname"):
             setting = "name"
-        elif opt in ("avatar", "icon", "url"):
+        elif opt in ("avatar", "icon", "url", "pfp", "image"):
             setting = "url"
         elif opt in ("status", "description"):
             setting = "description"
@@ -410,7 +410,7 @@ class MimicConfig(Command):
             else:
                 mimics[new] = [m_id]
         elif setting == "url":
-            new = await bot.followURL(verifyURL(new))
+            new = await bot.followURL(verifyURL(new), best=True)
         elif setting == "auto":
             if new.lower() in ("none", "null", "0", "false", "f"):
                 new = None
@@ -532,7 +532,7 @@ class Mimic(Command):
         mimic = None
         if len(args):
             if len(args) > 1:
-                url = await bot.followURL(verifyURL(args[-1]))
+                url = await bot.followURL(verifyURL(args[-1]), best=True)
                 name = " ".join(args[:-1])
             else:
                 mim = 0
@@ -543,7 +543,7 @@ class Mimic(Command):
                         raise EOFError
                     dop = user.id
                     name = user.name
-                    url = strURL(user.avatar_url)
+                    url = bestURL(user)
                 except:
                     try:
                         mimi = bot.get_mimic(mim, user)
@@ -560,7 +560,7 @@ class Mimic(Command):
                         url = "https://cdn.discordapp.com/embed/avatars/0.png"
         else:
             name = user.name
-            url = strURL(user.avatar_url)
+            url = bestURL(user)
         if len(name) > 80:
             raise OverflowError("Prefix must be 80 or fewer in length.")
         while m_id in mimics:
@@ -719,7 +719,7 @@ class UpdateMimics(Database):
                 if user is None:
                     raise LookupError
                 mimic.name = user.display_name
-                mimic.url = str(user.avatar_url)
+                mimic.url = bestURL(user)
             except (discord.NotFound, LookupError):
                 try:
                     mimi = bot.get_mimic(mim)

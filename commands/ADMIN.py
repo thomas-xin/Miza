@@ -877,8 +877,8 @@ class UpdateUserLogs(Database):
                 self.update()
                 return
             emb = discord.Embed()
-            b_url = strURL(before.avatar_url)
-            a_url = strURL(after.avatar_url)
+            b_url = bestURL(before)
+            a_url = bestURL(after)
             emb.set_author(name=str(after), icon_url=a_url, url=a_url)
             emb.description = (
                 "<@" + str(after.id)
@@ -949,7 +949,7 @@ class UpdateUserLogs(Database):
                 self.update()
                 return
             emb = discord.Embed(colour=16777214)
-            url = strURL(user.avatar_url)
+            url = bestURL(user)
             emb.set_author(name=str(user), icon_url=url, url=url)
             emb.description = (
                 "<@" + str(user.id)
@@ -968,7 +968,7 @@ class UpdateUserLogs(Database):
                 self.update()
                 return
             emb = discord.Embed(colour=1)
-            url = strURL(user.avatar_url)
+            url = bestURL(user)
             emb.set_author(name=str(user), icon_url=url, url=url)
             kick = None
             ban = None
@@ -1096,7 +1096,7 @@ class UpdateMessageLogs(Database):
                 u = before.author
                 name = u.name
                 name_id = name + bool(u.display_name) * ("#" + u.discriminator)
-                url = strURL(u.avatar_url)
+                url = bestURL(u)
                 emb = discord.Embed(colour=colour2Raw([0, 0, 255]))
                 emb.set_author(name=name_id, icon_url=url, url=url)
                 emb.description = (
@@ -1132,7 +1132,7 @@ class UpdateMessageLogs(Database):
             u = message.author
             name = u.name
             name_id = name + bool(u.display_name) * ("#" + u.discriminator)
-            url = strURL(u.avatar_url)
+            url = bestURL(u)
             action = (
                 discord.AuditLogAction.message_delete,
                 discord.AuditLogAction.message_bulk_delete,
@@ -1267,7 +1267,7 @@ class UpdateFileLogs(Database):
                         fil = discord.File(io.BytesIO(b), filename=str(a).split("/")[-1])
                         fils.append(fil)
                     except:
-                        msg += a.url + "\n"
+                        msg += bestURL(a) + "\n"
                 emb = discord.Embed(colour=randColour())
                 emb.description = "File" + "s" * (len(fils) + len(msg) != 1) + " deleted from <@" + str(message.author.id) + ">"
                 if not msg:
