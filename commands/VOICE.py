@@ -623,7 +623,7 @@ class customAudio(discord.AudioSource):
             options.append("asoftclip=atan")
             args.append(("-af", "-filter_complex")[bool(reverb)])
             args.append(",".join(options))
-        print(options, args)
+        # print(options, args)
         return args
 
     def read(self):
@@ -1545,7 +1545,7 @@ class AudioDownloader:
                     futs = deque()
                     maxitems = 5000
                     for i, curr in enumerate(range(0, maxitems, page)):
-                        if curr > maxitems:
+                        if curr >= maxitems:
                             break
                         search = url + "&pageToken=" + self.yt_pages[i]
                         fut = create_future_ex(self.get_youtube_part, search)
@@ -1565,7 +1565,7 @@ class AudioDownloader:
                             time.sleep(0.03125)
                     while futs:
                         output += futs.popleft().result()[0]
-                    print(output)
+                    # print(output)
             if re.search(self.spotifyFind, item):
                 if "playlist" in item:
                     url = item[item.index("playlist"):]
@@ -1593,7 +1593,7 @@ class AudioDownloader:
                     futs = deque()
                     maxitems = 10000
                     for i, curr in enumerate(range(0, maxitems, page)):
-                        if curr > maxitems:
+                        if curr >= maxitems:
                             break
                         search = url + "&offset=" + str(curr) + "&limit=" + str(page)
                         fut = create_future_ex(self.get_spotify_part, search)
