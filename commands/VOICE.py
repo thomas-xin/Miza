@@ -13,6 +13,21 @@ getattr(youtube_dl, "__builtins__", {})["print"] = print
 SAMPLE_RATE = 48000
 
 
+f = open("auth.json")
+auth = ast.literal_eval(f.read())
+f.close()
+try:
+    genius_key = auth["genius_key"]
+except:
+    genius_key = None
+    print("WARNING: genius_key not found. Unable to use API to search song lyrics.")
+try:
+    google_api_key = auth["google_api_key"]
+except:
+    google_api_key = None
+    print("WARNING: genius_key not found. Unable to use API to search youtube playlists.")
+
+
 async def createPlayer(auds, p_type=0, verbose=False):
     auds.stats.quiet |= 2 * p_type
     text = (
@@ -1388,6 +1403,12 @@ class AudioDownloader:
         self.searched = {}
         self.requests = 0
         self.update_dl()
+        self.setup_pages()
+
+    def setup_pages(self):
+        resp = requests.get("https://raw.githubusercontent.com/Quihico/handy.stuff/master/yt.pagetokens.x10")
+        page10 = resp.text.split("\n")
+        self.yt_pages = [page10[i] for i in range(0, len(page10), 5)]
 
     def update_dl(self):
         if utc() - self.lastclear > 720:
@@ -1474,41 +1495,107 @@ class AudioDownloader:
             out.append(temp)
         return out, total
 
+    def get_youtube_part(self, url):
+        out = deque()
+        resp = requests.get(url, timeout=8)
+        try:
+            d = json.loads(resp.content)
+        except:
+            d = eval(resp.content, {}, eval_const)
+        # print(d)
+        try:
+            items = d["items"]
+            total = d.get("pageInfo", {}).get("totalResults", 0)
+        except KeyError:
+            raise
+        for item in items:
+            try:
+                snip = item["snippet"]
+                v_id = snip["resourceId"]["videoId"]
+            except KeyError:
+                continue
+            name = snip.get("title", v_id)
+            url = "https://www.youtube.com/watch?v=" + v_id
+            temp = freeClass(
+                name=name,
+                url=url,
+                duration=None,
+                research=True,
+            )
+            out.append(temp)
+        return out, total
+
     spotifyFind = re.compile("(play|open|api)\\.spotify\\.com")
 
     def extract(self, item, force=False, count=1, search=True):
         try:
+            page = None
             output = deque()
+            if google_api_key and ("youtube.com" in item or "youtu.be/" in item):
+                p_id = None
+                for x in ("?list=", "&list="):
+                    if x in item:
+                        p_id = item[item.index(x) + len(x):]
+                        p_id = p_id.split("&")[0]
+                        break
+                if p_id:
+                    url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&key=" + google_api_key + "&playlistId=" + p_id
+                    page = 50
+                if page:
+                    futs = deque()
+                    maxitems = 5000
+                    for i, curr in enumerate(range(0, maxitems, page)):
+                        if curr > maxitems:
+                            break
+                        search = url + "&pageToken=" + self.yt_pages[i]
+                        fut = create_future_ex(self.get_youtube_part, search)
+                        futs.append(fut)
+                        if not math.log2(i + 4) % 1 or not 4 + i & 15:
+                            while futs:
+                                fut = futs.popleft()
+                                res = fut.result()
+                                if not i:
+                                    maxitems = res[1] + page
+                                if not res[0]:
+                                    maxitems = 0
+                                    futs.clear()
+                                    break
+                                output += res[0]
+                        else:
+                            time.sleep(0.03125)
+                    while futs:
+                        output += futs.popleft().result()[0]
+                    print(output)
             if re.search(self.spotifyFind, item):
                 if "playlist" in item:
                     url = item[item.index("playlist"):]
                     url = url[url.index("/") + 1:]
                     key = url.split("/")[0]
                     url = "https://api.spotify.com/v1/playlists/" + str(key) + "/tracks?type=track,episode"
-                    count = 100
+                    page = 100
                 elif "album" in item:
                     url = item[item.index("album"):]
                     url = url[url.index("/") + 1:]
                     key = url.split("/")[0]
                     url = "https://api.spotify.com/v1/albums/" + str(key) + "/tracks?type=track,episode"
-                    count = 50
+                    page = 50
                 elif "track" in item:
                     url = item[item.index("track"):]
                     url = url[url.index("/") + 1:]
                     key = url.split("/")[0]
                     url = "https://api.spotify.com/v1/tracks/" + str(key)
-                    count = 1
+                    page = 1
                 else:
                     raise TypeError("Unsupported Spotify URL.")
-                if count == 1:
+                if page == 1:
                     output += self.get_spotify_part(url)
                 else:
                     futs = deque()
                     maxitems = 10000
-                    for i, curr in enumerate(range(0, maxitems, count)):
+                    for i, curr in enumerate(range(0, maxitems, page)):
                         if curr > maxitems:
                             break
-                        search = url + "&offset=" + str(curr) + "&limit=" + str(count)
+                        search = url + "&offset=" + str(curr) + "&limit=" + str(page)
                         fut = create_future_ex(self.get_spotify_part, search)
                         futs.append(fut)
                         if not math.log2(i + 1) % 1 or not i & 7:
@@ -1516,9 +1603,9 @@ class AudioDownloader:
                                 fut = futs.popleft()
                                 res = fut.result()
                                 if not i:
-                                    maxitems = res[1] + count
+                                    maxitems = res[1] + page
                                 if not res[0]:
-                                    fin = True
+                                    maxitems = 0
                                     futs.clear()
                                     break
                                 output += res[0]
@@ -3128,16 +3215,6 @@ class Player(Command):
         await createPlayer(auds, p_type="c" in flags, verbose="z" in flags)
 
 
-f = open("auth.json")
-auth = ast.literal_eval(f.read())
-f.close()
-try:
-    genius_key = auth["genius_key"]
-except:
-    genius_key = None
-    print("WARNING: genius_key not found. Unable to use API to search song lyrics.")
-
-
 def extract_lyrics(s):
     s = s[s.index("JSON.parse(") + len("JSON.parse("):]
     s = s[:s.index("</script>")]
@@ -3522,7 +3599,7 @@ class UpdateQueues(Database):
                         i.pop("research")
                     except KeyError:
                         pass
-                    print(i.name)
+                    # print(i.name)
                     searched += 1
                 except:
                     try:

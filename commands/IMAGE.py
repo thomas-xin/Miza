@@ -930,8 +930,8 @@ class Cat(Command):
         create_future_ex(self.refill_buffer, 64)
     
     def fetch_one(self):
-        if not self.header or random.random() > 0.75:
-            if random.random() > 0.75:
+        if not self.header or random.random() > 2 / 3:
+            if random.random() > 2 / 3:
                 url = nekos.cat()
             else:
                 for _ in loop(8):
@@ -1013,7 +1013,7 @@ class Dog(Command):
 
     def fetch_one(self):
         for _ in loop(8):
-            x = random.random() > 0.75
+            x = random.random() > 2 / 3
             if x:
                 resp = requests.get(
                     "https://api.alexflipnote.dev/dogs",
