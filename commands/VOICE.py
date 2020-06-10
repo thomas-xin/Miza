@@ -582,6 +582,7 @@ class customAudio(discord.AudioSource):
             wet = min(2, coeff) / 2
             if wet != 1:
                 options.append("asplit[2]")
+            options.append("volume=2")
             options.append("afir=dry=10:wet=10")
             if wet != 1:
                 dry = 1 - wet
@@ -1167,10 +1168,12 @@ class PCMFile:
                     print(e)
                 self.assign.clear()
             if not isURL(self.stream):
-                try:
-                    os.remove(self.stream)
-                except (PermissionError, FileNotFoundError):
-                    pass
+                for _ in loop(3):
+                    try:
+                        os.remove(self.stream)
+                        break
+                    except (PermissionError, FileNotFoundError):
+                        time.sleep(0.5)
         if self.readers:
             self.ensure_time()
             return
@@ -3451,6 +3454,10 @@ class Download(Command):
                         file=f,
                         filename=fn
                     )
+                    try:
+                        os.remove(fn)
+                    except (PermissionError, FileNotFoundError):
+                        pass
                     create_task(bot.silentDelete(message))
 
 
