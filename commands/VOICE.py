@@ -1427,7 +1427,15 @@ class AudioDownloader:
             d = json.loads(resp.content)
         except:
             d = eval(resp.content, {}, eval_const)
-        items = d["items"]
+        try:
+            items = d["items"]
+            total = d.get("total", 0)
+        except KeyError:
+            if "type" in d:
+                items = [d]
+                total = 1
+            else:
+                items = []
         for item in items:
             try:
                 track = item["track"]
@@ -1451,13 +1459,14 @@ class AudioDownloader:
                 research=True,
             )
             out.append(temp)
-        return out, d.get("total", 0)
+        return out, total
+
+    spotifyFind = re.compile("(play|open|api)\\.spotify\\.com")
 
     def extract(self, item, force=False, count=1, search=True):
         try:
             output = deque()
-            r = None
-            if "open.spotify.com" in item or "api.spotify.com" in item:
+            if re.search(spotifyFind, item):
                 if "playlist" in item:
                     url = item[item.index("playlist"):]
                     url = url[url.index("/") + 1:]
@@ -1470,29 +1479,38 @@ class AudioDownloader:
                     key = url.split("/")[0]
                     url = "https://api.spotify.com/v1/albums/" + str(key) + "/tracks?type=track,episode"
                     count = 50
-                futs = deque()
-                maxitems = 10000
-                for i, curr in enumerate(range(0, maxitems, count)):
-                    search = url + "&offset=" + str(curr) + "&limit=" + str(count)
-                    fut = create_future_ex(self.get_spotify_part, search)
-                    futs.append(fut)
-                    if not math.log2(i + 1) % 1 or not i & 7:
-                        while futs:
-                            fut = futs.popleft()
-                            res = fut.result()
-                            if not i:
-                                maxitems = res[1] + count
-                            if not res[0]:
-                                fin = True
-                                futs.clear()
-                                break
-                            output += res[0]
-                    else:
-                        time.sleep(0.125)
-                while futs:
-                    output += futs.popleft().result()[0]
-            if r is not None:
-                r.close()
+                elif "track" in item:
+                    url = item[item.index("track"):]
+                    url = url[url.index("/") + 1:]
+                    key = url.split("/")[0]
+                    url = "https://api.spotify.com/v1/tracks/" + str(key)
+                    count = 1
+                else:
+                    raise TypeError("Unsupported Spotify URL.")
+                if count == 1:
+                    output += self.get_spotify_part(url)
+                else:
+                    futs = deque()
+                    maxitems = 10000
+                    for i, curr in enumerate(range(0, maxitems, count)):
+                        search = url + "&offset=" + str(curr) + "&limit=" + str(count)
+                        fut = create_future_ex(self.get_spotify_part, search)
+                        futs.append(fut)
+                        if not math.log2(i + 1) % 1 or not i & 7:
+                            while futs:
+                                fut = futs.popleft()
+                                res = fut.result()
+                                if not i:
+                                    maxitems = res[1] + count
+                                if not res[0]:
+                                    fin = True
+                                    futs.clear()
+                                    break
+                                output += res[0]
+                        else:
+                            time.sleep(0.125)
+                    while futs:
+                        output += futs.popleft().result()[0]
             if not len(output):
                 if isURL(item):
                     url = verifyURL(item)
