@@ -1377,9 +1377,10 @@ class AudioDownloader:
         self.update_dl()
 
     def update_dl(self):
-        if utc() - self.lastclear > 3600:
-            self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
+        if utc() - self.lastclear > 1800:
             self.lastclear = utc()
+            self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
+            self.spotify_headers = deque({"authorization": "Bearer " + json.loads(requests.get("https://open.spotify.com/get_access_token").content[:1000])["accessToken"]} for _ in loop(8))
 
     def extract_from(self, url):
         try:
@@ -1418,88 +1419,77 @@ class AudioDownloader:
         except youtube_dl.DownloadError:
             return pytube2Dict(url)
 
+    def get_spotify_part(self, url):
+        out = deque()
+        self.spotify_headers.rotate()
+        resp = requests.get(url, headers=self.spotify_headers[0], timeout=8)
+        try:
+            d = json.loads(resp.content)
+        except:
+            d = eval(resp.content, {}, eval_const)
+        items = d["items"]
+        for item in items:
+            try:
+                track = item["track"]
+            except KeyError:
+                try:
+                    track = item["episode"]
+                except KeyError:
+                    continue
+            name = track.get("name", track["id"])
+            artists = ", ".join(a["name"] for a in track.get("artists", []))
+            dur = track.get("duration_ms")
+            if dur:
+                dur /= 1000
+            temp = freeClass(
+                name=name,
+                url="ytsearch:" + (name + " ~ " + artists).replace(":", "-"),
+                duration=dur,
+                research=True,
+            )
+            out.append(temp)
+        return out, d.get("total", 0)
+
     def extract(self, item, force=False, count=1, search=True):
         self.update_dl()
         try:
-            output = []
+            output = deque()
             r = None
-            if "open.spotify.com" in item or force == "spotify":
-                try:
-                    op = urlBypass()
-                    for i in range(4):
-                        try:
-                            r = op.open(item)
-                            rescode = r.getcode()
-                            if rescode != 200:
-                                r.close()
-                                raise ConnectionError(rescode)
-                            continue
-                        except:
-                            time.sleep(i + 1)
-                    if force == "spotify":
-                        time.sleep(frand(2))
-                        it = '<meta property="music:duration" content="'
-                        s = ""
-                        while not it in s:
-                            s += r.read(4096).decode("utf-8", "replace")
-                        s += r.read(4096).decode("utf-8", "replace")
-                        temp = s[s.index(it) + len(it):]
-                        duration = temp[:temp.index('" />')]
-                        t = '<meta name="description" content="'
-                        s = s[s.index(t) + len(t):]
-                        item = htmlDecode(s[:s.index('" />')]).replace(", a song by ", " ~ ").replace(" on Spotify", "").strip(" ")
-                        search = "ytsearch:" + item.replace(":", "-")
-                        temp = {
-                            # "hash": shash(search),
-                            "name": item,
-                            "url": search,
-                            "duration": float(duration),
-                            "research": True,
-                            }
-                        sys.stdout.write(repr(temp) + "\n")
-                        output.append(freeClass(temp))
-                    else:
-                        it = '<meta property="og:type" content="'
-                        s = ""
-                        while not it in s:
-                            s += r.read(8192).decode("utf-8", "replace")
-                        s += r.read(4096).decode("utf-8", "replace")
-                        temp = s[s.index(it) + len(it):]
-                        ptype = temp[:temp.index('" />')]
-                        sys.stdout.write(ptype + "\n")
-                        if "album" in ptype or "playlist" in ptype:
-                            s += r.read().decode("utf-8", "replace")
-                            output = []
-                            while s:
-                                try:
-                                    i = s.index('<meta property="music:song')
-                                    s = s[i:]
-                                    it = 'content="'
-                                    i = s.index(it) + len(it)
-                                    s = s[i:]
-                                    if s[:5] == ":disc":
-                                        continue
-                                    x = s[:s.index('" />')]
-                                    if len(x) > 12:
-                                        output.append(create_future_ex(self.extract, x, "spotify"))
-                                except ValueError:
-                                    break
-                            outlist = []
-                            for i in output:
-                                if i:
-                                    outlist += i.result()
-                            output = outlist
-                            # sys.stdout.write(repr(outlist) + "\n\n")
-                        else:
-                            t = '<meta name="description" content="'
-                            s = s[s.index(t) + len(t):]
-                            item = htmlDecode(s[:s.index('" />')]).replace(" on Spotify", "")
-                            # sys.stdout.write(item + "\n")
-                except urllib.error.URLError:
-                    pass
+            if "open.spotify.com" in item or "api.spotify.com" in item:
+                if "playlist" in item:
+                    url = item[item.index("playlist"):]
+                    url = url[url.index("/") + 1:]
+                    key = url.split("/")[0]
+                    url = "https://api.spotify.com/v1/playlists/" + str(key) + "/tracks?type=track,episode"
+                    count = 100
+                elif "album" in item:
+                    url = item[item.index("album"):]
+                    url = url[url.index("/") + 1:]
+                    key = url.split("/")[0]
+                    url = "https://api.spotify.com/v1/albums/" + str(key) + "/tracks?type=track,episode"
+                    count = 50
+                futs = deque()
+                maxitems = 10000
+                for i, curr in enumerate(range(0, maxitems, count)):
+                    search = url + "&offset=" + str(curr) + "&limit=" + str(count)
+                    fut = create_future_ex(self.get_spotify_part, search)
+                    futs.append(fut)
+                    if not math.log2(i + 1) % 1 or not i & 7:
+                        while futs:
+                            fut = futs.popleft()
+                            res = fut.result()
+                            if not i:
+                                maxitems = res[1] + count
+                            if not res[0]:
+                                fin = True
+                                futs.clear()
+                                break
+                            output += res[0]
+                while futs:
+                    output += futs.popleft().result()[0]
             if r is not None:
                 r.close()
-            if not len(output) and force != "spotify":
+            if not len(output):
                 if isURL(item):
                     url = verifyURL(item)
                     if url.endswith(".json") or url.endswith(".txt"):
