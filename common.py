@@ -171,7 +171,7 @@ async def sendFile(channel, msg, file, filename=None):
 
 
 
-bestURL = lambda obj: obj if type(obj) is str else (strURL(obj.avatar_url) if hasattr(obj, "avatar_url") else (obj.proxy_url if obj.proxy_url else obj.url))
+bestURL = lambda obj: obj if type(obj) is str else (strURL(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if obj.proxy_url else obj.url))
 
 
 emojiFind = re.compile("<a?:[^<>]+:[0-9]+>")
