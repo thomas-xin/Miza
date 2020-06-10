@@ -1377,7 +1377,7 @@ class AudioDownloader:
         self.update_dl()
 
     def update_dl(self):
-        if utc() - self.lastclear > 1800:
+        if utc() - self.lastclear > 720:
             self.lastclear = utc()
             self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
             self.spotify_headers = deque({"authorization": "Bearer " + json.loads(requests.get("https://open.spotify.com/get_access_token").content[:1000])["accessToken"]} for _ in loop(8))
@@ -1454,7 +1454,6 @@ class AudioDownloader:
         return out, d.get("total", 0)
 
     def extract(self, item, force=False, count=1, search=True):
-        self.update_dl()
         try:
             output = deque()
             r = None
@@ -1576,7 +1575,6 @@ class AudioDownloader:
             return 0
 
     def extract_info(self, item, count=1, search=False):
-        self.update_dl()
         if search and not item.startswith("ytsearch:") and not isURL(item):
             item = item.replace(":", "-")
             if count == 1:
@@ -1608,7 +1606,6 @@ class AudioDownloader:
                 self.searched.pop(item)
         while len(self.searched) > 262144:
             self.searched.pop(next(iter(self.searched)))
-        self.update_dl()
         try:
             self.requests += 1
             # print(item)
@@ -1677,7 +1674,6 @@ class AudioDownloader:
             entry["url"] = ""
     
     def download_file(self, url, fmt="ogg", auds=None, fl=8388608):
-        self.update_dl()
         fn = "cache/&" + str(time_snowflake(datetime.datetime.utcnow())) + "." + fmt
         info = self.extract(url)[0]
         self.getStream(info, force=True, download=False)
@@ -1734,7 +1730,6 @@ class AudioDownloader:
                 self.searched.pop(item)
         while len(self.searched) > 262144:
             self.searched.pop(next(iter(self.searched)))
-        self.update_dl()
         try:
             self.requests += 1
             data = self.extract_true(item)
@@ -3600,6 +3595,7 @@ class UpdateQueues(Database):
             await asyncio.sleep(0.5)
             for item in tuple(ytdl.cache.values()):
                 item.update()
+        create_future_ex(ytdl.update_dl)
         self.busy = max(0, self.busy - 1)
 
     def _announce_(self, *args, **kwargs):
