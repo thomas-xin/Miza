@@ -139,7 +139,7 @@ def sort(it, key=None, reverse=False):
     elif type(it) is tuple:
         it = sorted(it, key=key, reverse=reverse)
         return it
-    elif issubclass(type(it), collections.Mapping):
+    elif issubclass(type(it), collections.abc.Mapping):
         keys = sorted(it, key=it.get if key is None else lambda x: key(it.get(x)))
         if reverse:
             keys = reversed(keys)
@@ -495,7 +495,7 @@ def generatePrimes(a=2, b=inf, c=1):
 
 
 def iterSum(it):
-    if issubclass(type(it), collections.Mapping):
+    if issubclass(type(it), collections.abc.Mapping):
         return sum(tuple(it.values()))
     try:
         return sum(iter(it))
@@ -503,7 +503,7 @@ def iterSum(it):
         return it
 
 def iterMax(it):
-    if issubclass(type(it), collections.Mapping):
+    if issubclass(type(it), collections.abc.Mapping):
         keys, values = tuple(it.keys()), tuple(it.values())
         m = max(values)
         for i in keys:
@@ -514,9 +514,11 @@ def iterMax(it):
     except TypeError:
         return it
 
-def setDict(d, k, v):
+def setDict(d, k, v, ignore=False):
     try:
         v = d.__getitem__(k)
+        if v is None and ignore:
+            raise LookupError
     except LookupError:
         d.__setitem__(k, v)
     return v
@@ -1355,7 +1357,7 @@ def strIter(it, key=None, limit=1728):
             it = hlist(i for i in it)
     except:
         it = hlist(it)
-    if issubclass(type(it), collections.Mapping):
+    if issubclass(type(it), collections.abc.Mapping):
         keys = it.keys()
     else:
         keys = range(len(it))

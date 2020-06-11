@@ -379,7 +379,7 @@ class Colour(Command):
             + "\nXYZ values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
             + "```"
         )
-        await sendFile(channel, msg, f)
+        await sendFile(channel, msg, f, best=True)
 
 
 class CreateGIF(Command):

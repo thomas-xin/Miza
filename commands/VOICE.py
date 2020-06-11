@@ -5,7 +5,7 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-import youtube_dl, pytube, samplerate
+import youtube_dl, pytube
 from bs4 import BeautifulSoup
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
@@ -87,58 +87,6 @@ def getDuration(filename):
         print(traceback.format_exc())
         return "300"
     return dur
-
-
-def pytube2Dict(url):
-    url = verifyURL(url)
-    if not url.startswith("https://www.youtube.com/"):
-        if not url.startswith("http://youtu.be/"):
-            if isURL(url):
-                raise youtube_dl.DownloadError("Not a youtube link.")
-            url = "https://www.youtube.com/watch?v=" + url
-    # print(url)
-    for _ in loop(3):
-        try:
-            resp = pytube.YouTube(url)
-            break
-        except pytube.exceptions.RegexMatchError:
-            raise youtube_dl.DownloadError("Invalid single youtube link.")
-        except KeyError as ex:
-            resp = ex
-    if issubclass(type(resp), Exception):
-        raise resp
-    entry = {
-        "formats": [
-            {
-                "abr": 0,
-                "vcodec": stream.video_codec,
-                "url": stream.url,
-            } for stream in resp.streams.fmt_streams
-        ],
-        "duration": resp.length,
-        "thumbnail": getattr(resp, "thumbnail_url", None),
-    }
-    for i in range(len(entry["formats"])):
-        stream = resp.streams.fmt_streams[i]
-        try:
-            abr = stream.abr.lower()
-        except AttributeError:
-            abr = 0
-        abr = str(abr)
-        if abr.endswith("kbps"):
-            abr = float(abr[:-4])
-        elif abr.endswith("mbps"):
-            abr = float(abr[:-4]) * 1024
-        elif abr.endswith("bps"):
-            abr = float(abr[:-3]) / 1024
-        else:
-            try:
-                abr = float(abr)
-            except:
-                print(traceback.format_exc())
-                continue
-        entry["formats"][i]["abr"] = abr
-    return entry
 
 
 def getBestIcon(entry):
@@ -225,7 +173,7 @@ def ensure_url(url):
     return url
 
 
-class customAudio(discord.AudioSource):
+class CustomAudio(discord.AudioSource):
     
     length = round(SAMPLE_RATE / 25)
     empty = numpy.zeros(length >> 1, float)
@@ -306,7 +254,8 @@ class customAudio(discord.AudioSource):
     def stop(self):
         if getattr(self, "source", None) is None:
             return
-        create_future_ex(self.source.close)
+        if not self.source.closed:
+            create_future_ex(self.source.close)
         self.source = None
 
     def new(self, source=None, pos=0, update=True):
@@ -1288,7 +1237,7 @@ class PCMFile:
         create_future_ex(player.run)
         return player
 
-    duration = lambda self: self.dur if getattr(self, "dur", None) is not None else setattr(self, "dur", getDuration(self.stream) if self.proc.is_running() else os.path.getsize("cache/" + self.file) / 48000 / 4)
+    duration = lambda self: self.dur if getattr(self, "dur", None) is not None else setDict(self.__dict__, "dur", getDuration(self.stream) if self.proc.is_running() else os.path.getsize("cache/" + self.file) / 48000 / 4, ignore=True)
 
 
 class LoadedAudioReader(discord.AudioSource):
@@ -1418,42 +1367,56 @@ class AudioDownloader:
             self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
             self.spotify_headers = deque({"authorization": "Bearer " + json.loads(requests.get("https://open.spotify.com/get_access_token").content[:1000])["accessToken"]} for _ in loop(8))
 
-    def extract_from(self, url):
-        try:
-            return self.downloader.extract_info(url, download=False, process=False)
-        except youtube_dl.DownloadError:
-            if isURL(url):
-                return pytube2Dict(url)
-            raise
-        # pyt = create_future_ex(pytube2Dict, url)
-        # resp = self.extract_info(url, search=False)
-        # try:
-        #     res = pyt.result(timeout=10)
-        #     resp["formats"], resp["duration"] = res["formats"], res["duration"]
-        # except youtube_dl.DownloadError:
-        #     pass
-        # except:
-        #     print(traceback.format_exc())
-        # if issubclass(type(data), Exception):
-        #     raise data
-        # return resp
-
-    def extract_true(self, url):
-        while not isURL(url):
-            resp = self.extract_from(url)
-            if "entries" in resp:
-                resp = resp["entries"][0]
+    def from_pytube(self, url):
+        url = verifyURL(url)
+        if not url.startswith("https://www.youtube.com/"):
+            if not url.startswith("http://youtu.be/"):
+                if isURL(url):
+                    raise youtube_dl.DownloadError("Not a youtube link.")
+                url = "https://www.youtube.com/watch?v=" + url
+        # print(url)
+        for _ in loop(3):
             try:
-                url = resp["webpage_url"]
-            except KeyError:
+                resp = pytube.YouTube(url)
+                break
+            except pytube.exceptions.RegexMatchError:
+                raise youtube_dl.DownloadError("Invalid single youtube link.")
+            except KeyError as ex:
+                resp = ex
+        if issubclass(type(resp), Exception):
+            raise resp
+        entry = {
+            "formats": [
+                {
+                    "abr": 0,
+                    "vcodec": stream.video_codec,
+                    "url": stream.url,
+                } for stream in resp.streams.fmt_streams
+            ],
+            "duration": resp.length,
+            "thumbnail": getattr(resp, "thumbnail_url", None),
+        }
+        for i in range(len(entry["formats"])):
+            stream = resp.streams.fmt_streams[i]
+            try:
+                abr = stream.abr.lower()
+            except AttributeError:
+                abr = 0
+            abr = str(abr)
+            if abr.endswith("kbps"):
+                abr = float(abr[:-4])
+            elif abr.endswith("mbps"):
+                abr = float(abr[:-4]) * 1024
+            elif abr.endswith("bps"):
+                abr = float(abr[:-3]) / 1024
+            else:
                 try:
-                    url = resp["url"]
-                except KeyError:
-                    url = resp["id"]
-        try:
-            return self.downloader.extract_info(url, download=False, process=True)
-        except youtube_dl.DownloadError:
-            return pytube2Dict(url)
+                    abr = float(abr)
+                except:
+                    print(traceback.format_exc())
+                    continue
+            entry["formats"][i]["abr"] = abr
+        return entry
 
     def get_spotify_part(self, url):
         out = deque()
@@ -1528,6 +1491,65 @@ class AudioDownloader:
         return out, total
 
     spotifyFind = re.compile("(play|open|api)\\.spotify\\.com")
+
+    def extract_true(self, url):
+        while not isURL(url):
+            resp = self.extract_from(url)
+            if "entries" in resp:
+                resp = resp["entries"][0]
+            if "duration" in resp and "formats" in resp:
+                return resp
+            try:
+                url = resp["webpage_url"]
+            except KeyError:
+                try:
+                    url = resp["url"]
+                except KeyError:
+                    url = resp["id"]
+        try:
+            return self.downloader.extract_info(url, download=False, process=True)
+        except youtube_dl.DownloadError:
+            return self.from_pytube(url)
+    
+    def extract_from(self, url):
+        try:
+            return self.downloader.extract_info(url, download=False, process=False)
+        except youtube_dl.DownloadError:
+            if isURL(url):
+                return self.from_pytube(url)
+            raise
+        # pyt = create_future_ex(self.from_pytube, url)
+        # resp = self.extract_info(url, search=False)
+        # try:
+        #     res = pyt.result(timeout=10)
+        #     resp["formats"], resp["duration"] = res["formats"], res["duration"]
+        # except youtube_dl.DownloadError:
+        #     pass
+        # except:
+        #     print(traceback.format_exc())
+        # if issubclass(type(data), Exception):
+        #     raise data
+        # return resp
+
+    def extract_info(self, item, count=1, search=False):
+        if search and not item.startswith("ytsearch:") and not isURL(item):
+            item = item.replace(":", "-")
+            if count == 1:
+                c = ""
+            else:
+                c = str(count)
+            exc = ""
+            try:
+                return self.downloader.extract_info("ytsearch" + c + ":" + item, download=False, process=False)
+            except Exception as ex:
+                exc = repr(ex)
+            try:
+                return self.downloader.extract_info("scsearch" + c + ":" + item, download=False, process=False)
+            except Exception as ex:
+                raise ConnectionError(exc + repr(ex))
+        if isURL(item) or not search:
+            return self.extract_from(item)
+        return self.downloader.extract_info(item, download=False, process=False)
 
     def extract(self, item, force=False, count=1, search=True):
         try:
@@ -1695,26 +1717,6 @@ class AudioDownloader:
                 raise
             print(traceback.format_exc())
             return 0
-
-    def extract_info(self, item, count=1, search=False):
-        if search and not item.startswith("ytsearch:") and not isURL(item):
-            item = item.replace(":", "-")
-            if count == 1:
-                c = ""
-            else:
-                c = str(count)
-            exc = ""
-            try:
-                return self.downloader.extract_info("ytsearch" + c + ":" + item, download=False, process=False)
-            except Exception as ex:
-                exc = repr(ex)
-            try:
-                return self.downloader.extract_info("scsearch" + c + ":" + item, download=False, process=False)
-            except Exception as ex:
-                raise ConnectionError(exc + repr(ex))
-        if isURL(item) or not search:
-            return self.extract_from(item)
-        return self.downloader.extract_info(item, download=False, process=False)
 
     def search(self, item, force=False):
         item = verifySearch(item)
@@ -2035,7 +2037,7 @@ class Queue(Command):
         )
         elapsed = auds.stats.position
         startTime = 0
-        if auds.stats.loop:
+        if auds.stats.loop or auds.stats.repeat:
             totalTime = inf
         else:
             if auds.reverse and len(auds.queue):
@@ -2302,7 +2304,7 @@ class Connect(Command):
                 raise ConnectionError("Unable to connect to voice channel.")
         if guild.id not in bot.database.playlists.audio:
             create_task(channel.trigger_typing())
-            bot.database.playlists.audio[guild.id] = auds = customAudio(channel, vc, bot)
+            bot.database.playlists.audio[guild.id] = auds = CustomAudio(channel, vc, bot)
         try:
             joined = connecting.pop(guild.id)
         except KeyError:
@@ -2336,7 +2338,7 @@ class Skip(Command):
         if guild.id not in bot.database.playlists.audio:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.database.playlists.audio[guild.id]
-        if name.lower().startswith("c"):
+        if name.startswith("c"):
             argv = "inf"
             args = [argv]
             flags["f"] = True
@@ -2485,7 +2487,6 @@ class Pause(Command):
     flags = "h"
 
     async def __call__(self, bot, name, guild, client, user, perm, channel, flags, **void):
-        name = name.lower()
         auds = await forceJoin(guild, channel, user, client, bot)
         auds.preparing = False
         if name in ("pause", "stop"):
@@ -2576,8 +2577,8 @@ class Dump(Command):
 
     async def __call__(self, guild, channel, user, client, bot, perm, name, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, bot)
-        if not argv and not len(message.attachments) or name.lower() == "save":
-            if name.lower() == "load":
+        if not argv and not len(message.attachments) or name == "save":
+            if name == "load":
                 raise ArgumentError("Please input a file, URL or json data to load.")
             resp = await create_future(getDump, auds)
             f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
@@ -3477,8 +3478,6 @@ class Download(Command):
                                             "name": e["title"],
                                             "url": "https://www.youtube.com/watch?v=" + e["url"],
                                         })
-                        else:
-                            print(r)
                     except:
                         print(r)
                         print(traceback.format_exc())
@@ -3555,7 +3554,7 @@ class Download(Command):
                         channel=channel,
                         msg="",
                         file=f,
-                        filename=fn
+                        filename=fn,
                     )
                     try:
                         os.remove(fn)

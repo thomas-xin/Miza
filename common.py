@@ -120,7 +120,7 @@ async def recursiveCoro(item):
         try:
             if type(item[i]) in (str, bytes):
                 raise TypeError
-            if issubclass(type(item[i]), collections.Mapping) or issubclass(type(item[i]), io.IOBase):
+            if issubclass(type(item[i]), collections.abc.Mapping) or issubclass(type(item[i]), io.IOBase):
                 raise TypeError
             if awaitable(item[i]):
                 raise TypeError
@@ -157,7 +157,7 @@ async def sendReact(channel, *args, reacts=(), **kwargs):
     except:
         print(traceback.format_exc())
 
-async def sendFile(channel, msg, file, filename=None):
+async def sendFile(channel, msg, file, filename=None, best=False):
     message = await channel.send(msg, file=file)
     if filename is not None:
         try:
@@ -167,8 +167,7 @@ async def sendFile(channel, msg, file, filename=None):
         except:
             print(traceback.format_exc())
     if message.attachments:
-        await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + a.url + ">" for a in message.attachments))
-
+        await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + bestURL(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
 
 
 bestURL = lambda obj: obj if type(obj) is str else (strURL(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if obj.proxy_url else obj.url))
@@ -561,7 +560,7 @@ async def safeCoro(coro):
 eloop = asyncio.new_event_loop()
 __setloop = lambda: asyncio.set_event_loop(eloop)
 pthreads = concurrent.futures.ThreadPoolExecutor(max_workers=128, initializer=__setloop)
-athreads = concurrent.futures.ThreadPoolExecutor(max_workers=64, initializer=__setloop)
+athreads = concurrent.futures.ThreadPoolExecutor(max_workers=128, initializer=__setloop)
 __setloop()
 
 def wrap_future(fut, loop=None):

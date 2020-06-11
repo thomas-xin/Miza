@@ -882,6 +882,7 @@ class Bot:
             return num
         t = 0
         if expr:
+            f = None
             try:
                 if ":" in expr:
                     data = expr.split(":")
@@ -913,7 +914,7 @@ class Bot:
                     if f.strip():
                         t += await self.evalMath(f, guild.id)
             except:
-                t = utc_ts(tparser.parse(f)) - utc_ts(tparser.parse("0s"))
+                t = utc_ts(tparser.parse(f if f is not None else expr)) - utc_ts(tparser.parse("0s"))
         if type(t) is not float:
             t = float(t)
         return t
