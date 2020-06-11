@@ -167,7 +167,7 @@ async def sendFile(channel, msg, file, filename=None):
         except:
             print(traceback.format_exc())
     if message.attachments:
-        await message.edit(content=message.content + "\n" + "\n".join("<" + a.url + ">" for a in message.attachments))
+        await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + a.url + ">" for a in message.attachments))
 
 
 

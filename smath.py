@@ -886,8 +886,8 @@ def raw2Colour(x):
     else:
         return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255))
 
-rgb_to_hsv = lambda c: colorsys.rgb_to_hsv(*c[:3]) + c[3:]
-hsv_to_rgb = lambda c: colorsys.hsv_to_rgb(*c[:3]) + c[3:]
+rgb_to_hsv = lambda c: list(colorsys.rgb_to_hsv(*c[:3])) + c[3:]
+hsv_to_rgb = lambda c: list(colorsys.hsv_to_rgb(*c[:3])) + c[3:]
 rgb_to_cmy = lambda c: [1 - x for x in c[:3]] + c[3:]
 cmy_to_rgb = rgb_to_cmy
 rgb_to_lab = lambda c: list(color_conversions.convert_color(color_objects.sRGBColor(*c[:3]), color_objects.LabColor).get_value_tuple()) + c[3:]

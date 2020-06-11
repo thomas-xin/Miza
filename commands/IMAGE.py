@@ -332,6 +332,7 @@ class Colour(Command):
     usage = "<Colour>"
     no_parse = True
     rate_limit = 2
+    flags = "v"
     trans = {
         "hsv": hsv_to_rgb,
         "cmy": cmy_to_rgb,
@@ -358,24 +359,27 @@ class Colour(Command):
             except ValueError:
                 raise ArgumentError("Please input a valid hex colour.")
         if name in self.trans:
-            adj = [i / 255 for x in channels]
+            if name in "lab luv":
+                adj = channels
+            else:
+                adj = [x / 255 for x in channels]
             channels = [round(x * 255) for x in self.trans[name](adj)]
         resp = await imageProc("from_colour", "$", [channels], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename="colour.png")
-        adj = [i / 255 for x in channels]
+        adj = [x / 255 for x in channels]
         msg = (
-            "```ini\nHex colour code: " + sbHighlight("".join(hex(i)[2:].upper() for i in channels))
-            + "\nDec colour code: " + sbHighlight(colour2Raw(channels))
+            "```ini\nHEX colour code: " + sbHighlight(bytes(channels).hex().upper())
+            + "\nDEC colour code: " + sbHighlight(colour2Raw(channels))
             + "\nRGB values: " + str(channels)
             + "\nHSV values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_hsv(adj)))
             + "\nCMY values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_cmy(adj)))
-            + "\nLAB values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_lab(adj)))
-            + "\nLUV values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_luv(adj)))
+            + "\nLAB values: " + sbHighlight(", ".join(str(round(x)) for x in rgb_to_lab(adj)))
+            + "\nLUV values: " + sbHighlight(", ".join(str(round(x)) for x in rgb_to_luv(adj)))
             + "\nXYZ values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
             + "```"
         )
-        await sendFile(channel, "", f)
+        await sendFile(channel, msg, f)
 
 
 class CreateGIF(Command):
