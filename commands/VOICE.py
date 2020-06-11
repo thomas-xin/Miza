@@ -508,7 +508,7 @@ class customAudio(discord.AudioSource):
         if q == bool(q):
             self.stats.quiet = bool(q)
 
-    def construct_options(self, volume=True):
+    def construct_options(self, full=True):
         stats = self.stats
         pitchscale = 2 ** ((stats.pitch + stats.resample) / 12)
         chorus = min(16, abs(stats.chorus))
@@ -539,6 +539,8 @@ class customAudio(discord.AudioSource):
         if pitchscale != 1:
             if abs(pitchscale) >= 64:
                 raise OverflowError
+            if full:
+                options.append("aresample=" + str(SAMPLE_RATE))
             options.append("asetrate=" + str(SAMPLE_RATE * pitchscale))
         if chorus:
             A = ""
@@ -589,7 +591,7 @@ class customAudio(discord.AudioSource):
             width = 4096
             x = round(sqrt(1 + abs(stats.bassboost)), 5)
             coeff = width * max(0.03125, (0.25 / x))
-            ch = " f=" + str(coeff if stats.bassboost > 0 else width - coeff) + " w=" + str(coeff / 2) + " g=" + str(max(0.5, min(48, 8 * math.log2(x))))
+            ch = " f=" + str(coeff if stats.bassboost > 0 else width - coeff) + " w=" + str(coeff / 2) + " g=" + str(max(0.5, min(48, 2 * math.log2(x * 5))))
             opt += "c0" + ch + "|c1" + ch
             options.append(opt)
         if reverb:
@@ -617,7 +619,7 @@ class customAudio(discord.AudioSource):
                 v = 1 / max(1, round(math.sqrt(abs(p)), 4))
                 if v != 1:
                     options.append("volume=" + str(v))
-        if stats.volume != 1 and volume:
+        if stats.volume != 1 and full:
             options.append("volume=" + str(round(stats.volume, 7)))
         if options:
             options.append("asoftclip=atan")
@@ -1135,7 +1137,7 @@ class PCMFile:
             return
         self.stream = stream
         self.loading = True
-        cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "2", "cache/" + self.file]
+        cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "2", "-bufsize", "65536", "cache/" + self.file]
         print(cmd)
         self.proc = None
         try:
@@ -1268,14 +1270,14 @@ class PCMFile:
             buff = False
             args.insert(1, "-nostdin")
             args.append("cache/" + self.file)
-        options = auds.construct_options(volume=False)
+        options = auds.construct_options(full=False)
         args += options
         args += ["-f", "s16le"]
         if options:
             args += ["-ar", str(SAMPLE_RATE), "-ac", "2"]
         else:
             args += ["-c:a", "copy"]
-        args.append("pipe:1")
+        args += ["-bufsize", "65536", "pipe:1"]
         key = auds.vc.guild.id
         self.readers[key] = True
         callback = lambda: self.readers.pop(key) if key in self.readers else None
@@ -1809,7 +1811,7 @@ class AudioDownloader:
         # print(br)
         args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-vn", "-i", stream]
         if auds is not None:
-            args += auds.construct_options(volume=True)
+            args += auds.construct_options(full=True)
             dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
         if dur > 960:
             dur = 960

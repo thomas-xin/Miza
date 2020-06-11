@@ -1084,7 +1084,7 @@ class UpdateReminders(Database):
                 ch = await self.bot.fetch_channel(u_id)
             emb = discord.Embed(description=x.msg)
             try:
-                u = bot.get_user(x["user"], replace=True)
+                u = self.bot.get_user(x["user"], replace=True)
             except KeyError:
                 u = x
             emb.set_author(name=u.name, url=bestURL(u), icon_url=bestURL(u))

@@ -340,7 +340,7 @@ class Colour(Command):
         "xyz": xyz_to_rgb,
     }
 
-    async def __call__(self, bot, guild, channel, argv, **void):
+    async def __call__(self, bot, guild, channel, name, argv, **void):
         argv = argv.replace("#", "").replace(",", " ").strip()
         if " " in argv:
             channels = [min(255, max(0, int(round(float(i.strip()))))) for i in argv.split(" ")[:5] if i.strip()]
@@ -444,7 +444,7 @@ class Resize(Command):
             if "l" in flags:
                 return (
                     "```ini\nAvailable scaling operations: ["
-                    + "nearest, linear, hamming, bicubic, lanczos, auto]```"
+                    + "nearest, linear, hamming, cubic, lanczos, auto]```"
                 )
             raise ArgumentError("Please input an image by URL or attachment.")
         url = args.pop(0)
@@ -610,11 +610,11 @@ class Magik(Command):
             fn = resp[0]
             f = discord.File(fn, filename=name)
             msg = await channel.send(file=f)
-            url = bestURL(msg.attachments[0])
+            url = msg.attachments[0].url
         else:
             msg = None
         try:
-            resp = requests.get("https://api.alexflipnote.dev/filter/magik?image=" + url)
+            resp = await create_future(requests.get, "https://api.alexflipnote.dev/filter/magik?image=" + url, timeout=8)
         except:
             if msg is not None:
                 await bot.silentDelete(msg)
