@@ -1401,8 +1401,9 @@ class AudioDownloader:
             try:
                 abr = stream.abr.lower()
             except AttributeError:
-                abr = 0
-            abr = str(abr)
+                abr = "0"
+            if type(abr) is not str:
+                abr = str(abr)
             if abr.endswith("kbps"):
                 abr = float(abr[:-4])
             elif abr.endswith("mbps"):
@@ -3407,7 +3408,7 @@ class Download(Command):
         if name in ("af", "audiofilter"):
             setDict(flags, "a", 1)
         for a in message.attachments:
-            argv = bestURL(a) + " " + argv
+            argv = a.url + " " + argv
         if not argv:
             try:
                 auds = await forceJoin(channel.guild, channel, user, bot.client, bot)

@@ -185,7 +185,7 @@ def strMessage(message, limit=1024, username=False):
         c = "<@" + str(message.author.id) + ">:\n" + c
     data = limStr(c, limit)
     if message.attachments:
-        data += "\n[" + ", ".join(bestURL(i) for i in message.attachments) + "]"
+        data += "\n[" + ", ".join(i.url for i in message.attachments) + "]"
     if message.embeds:
         data += "\n⟨" + ", ".join(str(i.to_dict()) for i in message.embeds) + "⟩"
     if message.reactions:
@@ -779,7 +779,7 @@ class __logPrinter:
             file = self.file
         if file not in self.data:
             self.data[file] = ""
-        self.data[file] += str(sep).join(str(i) for i in args) + str(end) + str(prefix)
+        self.data[file] += str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)
 
     read = lambda self, *args, **kwargs: bytes()
     write = lambda self, *args, end="", **kwargs: self.__call__(*args, end, **kwargs)
