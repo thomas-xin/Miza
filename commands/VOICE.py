@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
 SAMPLE_RATE = 48000
+FRAME_SIZE = discord.opus.Encoder.FRAME_SIZE
 
 
 f = open("auth.json")
@@ -149,15 +150,15 @@ async def forceJoin(guild, channel, user, client, bot, preparing=False):
 
 
 async def downloadTextFile(url, bot):
-    
-    def dreader(resp):
+
+    def fetch_text_file(url):
+        resp = urlOpen(url)
         s = resp.read().decode("utf-8", "replace")
         resp.close()
         return s
 
     url = await bot.followURL(url)
-    resp = await create_future(urlOpen, url)
-    return create_future(dreader, resp)
+    return create_future(fetch_text_file, url)
 
 
 def isAlone(auds, user):
@@ -264,17 +265,8 @@ class CustomAudio(discord.AudioSource):
         if source is not None:
             new_source = None
             try:
+                self.stats.position = 0
                 new_source = source.create_reader(pos, auds=self)
-                b = bytes()
-                for i in range(4):
-                    try:
-                        b += new_source.read(4)
-                        if len(b) < 4:
-                            raise EOFError
-                    except EOFError:
-                        if i >= 3:
-                            raise
-                        time.sleep(0.25)
             except OverflowError:
                 source = None
             else:
@@ -587,7 +579,7 @@ class CustomAudio(discord.AudioSource):
                 source = self.source
                 if source is None:
                     raise StopIteration
-                temp = source.read(discord.opus.Encoder.FRAME_SIZE)
+                temp = source.read()
                 if not temp:
                     raise StopIteration
                 found = True
@@ -875,12 +867,11 @@ class AudioQueue(hlist):
             if q[0].get("played"):
                 print("Queue Advanced.")
                 self.prev = q[0]["url"]
-                if s.repeat:
-                    try:
-                        q[0].pop("played")
-                    except (KeyError, IndexError):
-                        pass
-                else:
+                try:
+                    q[0].pop("played")
+                except (KeyError, IndexError):
+                    pass
+                if not (s.repeat and looped):
                     if s.loop:
                         temp = q[0]
                     q.popleft()
@@ -890,10 +881,6 @@ class AudioQueue(hlist):
                             shuffle(q)
                             q.appendleft(temp)
                     if s.loop and looped:
-                        try:
-                            q[0].pop("played")
-                        except (KeyError, IndexError):
-                            pass
                         q.append(temp)
                 if self.auds.player:
                     self.auds.player.time = 1 + utc()
@@ -1070,8 +1057,8 @@ class PCMFile:
         self.proc = None
         self.loading = False
         self.expired = False
+        self.buffered = False
         self.loaded = False
-        self.finalized = False
         self.readers = {}
         self.assign = deque()
         self.ensure_time()
@@ -1113,7 +1100,7 @@ class PCMFile:
                     fl = os.path.getsize("cache/" + self.file)
                 except FileNotFoundError:
                     fl = 0
-            self.loaded = True
+            self.buffered = True
             self.ensure_time()
             print(self.file, "buffered", fl)
         except:
@@ -1132,15 +1119,16 @@ class PCMFile:
     ensure_time = lambda self: setattr(self, "time", utc())
 
     def update(self):
-        if self.loaded and not self.proc.is_running():
+        if self.loaded:
             dur = self.duration()
             if dur is not None:
                 for e in self.assign:
                     e["duration"] = dur
                     print(e)
                 self.assign.clear()
-            if not self.finalized:
-                self.finalized = True
+        elif self.buffered and not self.proc.is_running():
+            if not self.loaded:
+                self.loaded = True
                 if not isURL(self.stream):
                     for _ in loop(3):
                         try:
@@ -1156,15 +1144,16 @@ class PCMFile:
         if self.readers:
             self.ensure_time()
             return
-        try:
-            fl = os.path.getsize("cache/" + self.file)
-        except FileNotFoundError:
-            fl = 0
-            if self.loaded:
-                self.time = -inf
-        ft = 9000 / (math.log2(fl/134217728 + 1) + 1)
-        if utc() - self.time > ft:
-            self.destroy()
+        if utc() - self.time > 1800:
+            try:
+                fl = os.path.getsize("cache/" + self.file)
+            except FileNotFoundError:
+                fl = 0
+                if self.buffered:
+                    self.time = -inf
+            ft = 9000 / (math.log2(fl / 134217728 + 1) + 1)
+            if utc() - self.time > ft:
+                self.destroy()
 
     def open(self):
         self.ensure_time()
@@ -1212,13 +1201,13 @@ class PCMFile:
             arg = "-to" if auds.reverse else "-ss"
             args += [arg, str(pos)]
         args.append("-i")
-        if self.proc.is_running():
-            buff = True
-            args.append("pipe:0")
-        else:
+        if self.loaded:
             buff = False
             args.insert(1, "-nostdin")
             args.append("cache/" + self.file)
+        else:
+            buff = True
+            args.append("pipe:0")
         options = auds.construct_options(full=False)
         args += options
         args += ["-f", "s16le"]
@@ -1234,10 +1223,11 @@ class PCMFile:
             player = BufferedAudioReader(self, args, callback=callback)
         else:
             player = LoadedAudioReader(self, args, callback=callback)
+        return player.start()
         create_future_ex(player.run)
         return player
 
-    duration = lambda self: self.dur if getattr(self, "dur", None) is not None else setDict(self.__dict__, "dur", getDuration(self.stream) if self.proc.is_running() else os.path.getsize("cache/" + self.file) / 48000 / 4, ignore=True)
+    duration = lambda self: self.dur if getattr(self, "dur", None) is not None else setDict(self.__dict__, "dur", os.path.getsize("cache/" + self.file) / 48000 / 4 if self.loaded else getDuration(self.stream), ignore=True)
 
 
 class LoadedAudioReader(discord.AudioSource):
@@ -1248,12 +1238,19 @@ class LoadedAudioReader(discord.AudioSource):
         self.advanced = False
         self.proc = psutil.Popen(args, stdout=subprocess.PIPE)
         self.file = file
+        self.buffer = None
         self.callback = callback
         print(self.proc)
 
-    read = lambda self, *args, **kwargs: self.proc.stdout.read(*args, **kwargs)
-    run = lambda self: None
-    process = read
+    def read(self, size=FRAME_SIZE):
+        if self.buffer:
+            b, self.buffer = self.buffer, None
+            return b
+        return self.proc.stdout.read(size)
+    
+    def start(self):
+        self.buffer = self.proc.stdout.read(FRAME_SIZE)
+        return self
 
     def close(self, *void1, **void2):
         self.closed = True
@@ -1277,40 +1274,37 @@ class BufferedAudioReader(discord.AudioSource):
         self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         self.file = file
         self.stream = file.open()
-        self.buffer = bytes()
-        self.loader = file.proc
+        self.buffer = None
         self.callback = callback
+        self.full = False
         print(self.proc)
 
-    def read(self, size=0):
-        while len(self.buffer) < size:
-            b = self.process(8192)
-            if not b:
-                if not self.loader.is_running():
-                    raise EOFError
-            self.buffer += b
-        temp = self.buffer[:size]
-        self.buffer = self.buffer[size:]
-        if len(self.buffer) < 65536:
-            self.buffer += self.process(65536)
-        return temp
+    def read(self, size=FRAME_SIZE):
+        if self.buffer:
+            b, self.buffer = self.buffer, None
+            return b
+        return self.proc.stdout.read(size)
 
     def run(self):
         while True:
             b = bytes()
             try:
-                b = self.stream.read(65536)
+                b += self.stream.read(65536)
                 if not b:
                     raise EOFError
                 self.proc.stdin.write(b)
                 self.proc.stdin.flush()
-            except (ValueError, EOFError, IndexError, BrokenPipeError):
-                if not self.loader.is_running():
+            except (ValueError, EOFError):
+                if self.file.loaded:
                     break
                 time.sleep(0.1)
+        self.full = True
         self.proc.stdin.close()
-
-    process = lambda self, *args, **kwargs: self.proc.stdout.read(*args, **kwargs)
+    
+    def start(self):
+        create_future_ex(self.run)
+        self.buffer = self.proc.stdout.read(FRAME_SIZE)
+        return self
 
     def close(self):
         self.closed = True
@@ -1365,7 +1359,7 @@ class AudioDownloader:
         if utc() - self.lastclear > 720:
             self.lastclear = utc()
             self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
-            self.spotify_headers = deque({"authorization": "Bearer " + json.loads(requests.get("https://open.spotify.com/get_access_token").content[:1000])["accessToken"]} for _ in loop(8))
+            self.spotify_headers = deque({"authorization": "Bearer " + json.loads(requests.get("https://open.spotify.com/get_access_token").content[:512])["accessToken"]} for _ in loop(8))
 
     def from_pytube(self, url):
         url = verifyURL(url)
@@ -1779,14 +1773,17 @@ class AudioDownloader:
             f = self.cache.get(fn, None)
             if f is not None:
                 entry["file"] = f
+                if f.loaded:
+                    entry["duration"] = f.duration()
+                else:
+                    f.assign.append(entry)
                 f.ensure_time()
             return f
         try:
             self.cache[fn] = f = PCMFile(fn)
             f.load(stream, check_fmt=entry.get("duration") is None)
             dur = entry.get("duration", None)
-            if dur is None:
-                f.assign.append(entry)
+            f.assign.append(entry)
             entry["stream"] = stream
             entry["icon"] = icon
             entry["file"] = f
@@ -1903,7 +1900,7 @@ class Queue(Command):
     async def __call__(self, bot, client, user, perm, message, channel, guild, flags, name, argv, **void):
         if not argv:
             if message.attachments:
-                argv = bestURL(message.attachments[0])
+                argv = message.attachments[0].url
         if not argv:
             auds = await forceJoin(guild, channel, user, client, bot)
             elapsed = auds.stats.position
@@ -2591,7 +2588,7 @@ class Dump(Command):
             raise self.permError(perm, 1, "to load new queue while other users are in voice")
         try:
             if len(message.attachments):
-                url = bestURL(message.attachments[0])
+                url = message.attachments[0].url
             else:
                 url = verifyURL(argv)
             f = await downloadTextFile(url, bot)
@@ -3322,7 +3319,7 @@ class Lyrics(Command):
 
     async def __call__(self, bot, channel, message, argv, flags, user, **void):
         for a in message.attachments:
-            argv = bestURL(a) + " " + argv
+            argv = a.url + " " + argv
         if not argv:
             try:
                 auds = await forceJoin(channel.guild, channel, user, bot.client, bot)
@@ -3404,19 +3401,19 @@ class Download(Command):
     flags = "avz"
     rate_limit = 7
 
-    async def __call__(self, bot, channel, message, name, argv, flags, user, **void):
+    async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
         if name in ("af", "audiofilter"):
             setDict(flags, "a", 1)
         for a in message.attachments:
             argv = a.url + " " + argv
         if not argv:
             try:
-                auds = await forceJoin(channel.guild, channel, user, bot.client, bot)
+                auds = await forceJoin(guild, channel, user, bot.client, bot)
                 if not auds.queue:
                     raise EOFError
                 res = [{"name": e.name, "url": e.url} for e in auds.queue[:10]]
                 fmt = "ogg"
-                end = "Current items in queue for " + channel.guild.name + ":"
+                end = "Current items in queue for " + guild.name + ":"
             except:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
         else:
@@ -3503,7 +3500,7 @@ class Download(Command):
         emb.description = "\n".join(
             ["`【" + str(i) + "】` [" + discord.utils.escape_markdown(e["name"] + "](" + ensure_url(e["url"]) + ")") for i in range(len(res)) for e in [res[i]]]
         )
-        sent = await message.channel.send(
+        sent = await channel.send(
             msg,
             embed=emb,
         )
@@ -3561,7 +3558,7 @@ class Download(Command):
                         os.remove(fn)
                     except (PermissionError, FileNotFoundError):
                         pass
-                    create_task(bot.silentDelete(message))
+                    create_task(bot.silentDelete(message, no_log=True))
 
 
 class UpdateQueues(Database):

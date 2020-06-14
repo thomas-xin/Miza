@@ -301,7 +301,7 @@ class Bot:
             g_id = int(g_id)
         except (ValueError, TypeError):
             try:
-                invite = await client.fetch_invite(g_id)
+                invite = await client.fetch_invite(verifyURL(g_id))
                 g = invite.guild
                 if not hasattr(g, "member_count"):
                     guild = freeClass(member_count=invite.approximate_member_count)

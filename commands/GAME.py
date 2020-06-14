@@ -848,13 +848,13 @@ class UpdateMathTest(Database):
     def division(self):
         y = xrand(2, 20)
         x = xrand(2, 14) * y
-        s = self.format(x, y, "÷")
+        s = self.format(x, y, "/")
         return s, x // y
 
     def exponentiation(self):
         x = xrand(2, 20)
         y = xrand(2, max(3, 14 / x))
-        s = str(x) + str(y).translate(self.sst)
+        s = str(x) + "^" + str(y)
         return s, x ** y
 
     def exponentiation2(self):
@@ -863,7 +863,7 @@ class UpdateMathTest(Database):
             y = xrand(7, 35)
         else:
             y = xrand(5, 11)
-        s = str(x) + str(y).translate(self.sst)
+        s = str(x) + "^" + str(y)
         return s, x ** y
         
     def square_root(self):
@@ -882,7 +882,7 @@ class UpdateMathTest(Database):
         x = xrand(100, 10000)
         x /= 10 ** int(math.log10(x))
         y = xrand(-3, 6)
-        s = str(x) + "×10" + str(y).translate(self.sst)
+        s = str(x) + "×10^" + str(y)
         return s, round(x * 10 ** y, 9)
         
     def fraction(self):
@@ -891,7 +891,7 @@ class UpdateMathTest(Database):
         mult = xrand(4) + 1
         y *= mult
         x *= mult
-        s = self.format(x, y, "÷")
+        s = self.format(x, y, "/")
         return s, round(x / y, 9)
 
     def recurring(self):
@@ -909,7 +909,7 @@ class UpdateMathTest(Database):
             b = -b
         bx = -a - b
         cx = a * b
-        s = "x² "
+        s = "x^2 "
         if bx:
             s += ("+", "-")[bx < 0] + " " + (str(abs(bx))) * (abs(bx) != 1) +  "x "
         s += ("+", "-")[cx < 0] + " " + str(abs(cx)) + " = 0"
@@ -931,7 +931,7 @@ class UpdateMathTest(Database):
         st = "(" + str(a) + "*x+" + str(b) + ")*(" + str(c) + "*x+" + str(d) + ")"
         a = [-sympy.Number(b) / a, -sympy.Number(d) / c]
         q = await create_future(sympy.expand, st)
-        q = self.eqtrans(q).replace("^2", "²").replace("∙", "") + " = 0"
+        q = self.eqtrans(q).replace("∙", "") + " = 0"
         return q, a
 
     async def calculus(self):
