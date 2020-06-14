@@ -582,6 +582,8 @@ class CustomAudio(discord.AudioSource):
                 temp = source.read()
                 if not temp:
                     raise StopIteration
+                if len(temp) < FRAME_SIZE:
+                    temp += b"\0" * (FRAME_SIZE - len(temp))
                 found = True
             except (StopIteration, ValueError):
                 empty = True
