@@ -2323,7 +2323,7 @@ class Connect(Command):
                 create_task(user.edit(mute=False, deafen=False))
                 break
         if joined:
-            await bot.database.playlists(guild=guild)
+            create_task(bot.database.playlists(guild=guild))
             return (
                 "```css\n🎵 Successfully connected to [#" + noHighlight(vc_.name)
                 + "] in [" + noHighlight(guild.name) + "]. 🎵```", 1
