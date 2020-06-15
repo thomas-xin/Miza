@@ -138,7 +138,7 @@ class UpdateExec(Database):
         print(proc)
         try:
             output = eval(proc, bot._globals)
-        except:
+        except SyntaxError:
             exec(proc, bot._globals)
             output = None
         return output

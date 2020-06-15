@@ -873,7 +873,7 @@ class AudioQueue(hlist):
                     q[0].pop("played")
                 except (KeyError, IndexError):
                     pass
-                if not (s.repeat and looped):
+                if not (s.repeat and repeated):
                     if s.loop:
                         temp = q[0]
                     q.popleft()
@@ -1126,7 +1126,7 @@ class PCMFile:
             if dur is not None:
                 for e in self.assign:
                     e["duration"] = dur
-                    print(e)
+                    # print(e)
                 self.assign.clear()
         elif self.buffered and not self.proc.is_running():
             if not self.loaded:
@@ -1506,14 +1506,20 @@ class AudioDownloader:
         try:
             return self.downloader.extract_info(url, download=False, process=True)
         except youtube_dl.DownloadError:
-            return self.from_pytube(url)
+            try:
+                return self.from_pytube(url)
+            except youtube_dl.DownloadError:
+                raise youtube_dl.utils.ExtractorError("Unable to fetch audio data.")
     
     def extract_from(self, url):
         try:
             return self.downloader.extract_info(url, download=False, process=False)
         except youtube_dl.DownloadError:
             if isURL(url):
-                return self.from_pytube(url)
+                try:
+                    return self.from_pytube(url)
+                except youtube_dl.DownloadError:
+                    raise youtube_dl.utils.ExtractorError("Unable to fetch audio data.")
             raise
         # pyt = create_future_ex(self.from_pytube, url)
         # resp = self.extract_info(url, search=False)
