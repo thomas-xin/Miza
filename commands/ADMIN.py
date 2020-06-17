@@ -1357,9 +1357,15 @@ class UpdateRolePreservers(Database):
             roles = user.roles[1:]
             if roles:
                 assigned = [role.id for role in roles]
-                print(guild, user, assigned)
+                print("_leave_", guild, user, assigned)
                 self.data[guild.id][user.id] = assigned
-                self.update()
+            else:
+                try:
+                    print("_leave_", guild, user, None)
+                    self.data[guild.id].pop(user.id)
+                except LookupError:
+                    pass
+            self.update()
 
 
 class UpdatePerms(Database):
