@@ -529,11 +529,13 @@ while True:
         key = i[-1]
         resp = evalSym(*i[:-1])
         if isinstance(resp[0], Plot):
-            fn = "cache/" + key + ".png"
+            ts = round(time.time() * 1000)
+            name = str(ts) + ".png"
+            fn = "cache/" + name
             try:
                 resp[0].save(fn)
             except FileNotFoundError:
-                resp[0].save(key + ".png")
+                resp[0].save(name)
             s = "{'file':'" + fn + "'}\n"
         else:
             s = repr([convAns(i) for i in resp])

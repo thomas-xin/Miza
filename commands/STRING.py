@@ -128,8 +128,10 @@ class Math(Command):
         p = flags.get("v", 0) * 2 + 1 << 6
         resp = await bot.solveMath(argv, guild, p, r)
         if type(resp) is dict and "file" in resp:
-            f = discord.File(resp["file"])
-            return {"file": f}
+            fn = resp["file"]
+            f = discord.File(fn)
+            await sendFile(channel, "", f, filename=fn, best=True)
+            return
         return "```py\n" + str(argv) + " = " + "\n".join(str(i) for i in resp) + "```"
 
 

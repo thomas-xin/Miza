@@ -1355,10 +1355,11 @@ class UpdateRolePreservers(Database):
     async def _leave_(self, user, guild, **void):
         if guild.id in self.data:
             roles = user.roles[1:]
-            assigned = [role.id for role in roles]
-            print(guild, user, assigned)
-            self.data[guild.id][user.id] = assigned
-            self.update()
+            if roles:
+                assigned = [role.id for role in roles]
+                print(guild, user, assigned)
+                self.data[guild.id][user.id] = assigned
+                self.update()
 
 
 class UpdatePerms(Database):

@@ -145,7 +145,7 @@ async def forceJoin(guild, channel, user, client, bot, preparing=False):
         auds.channel = channel
         auds.preparing = preparing
     except KeyError:
-        raise LookupError("Voice channel not found.")
+        raise LookupError("Unable to find voice channel.")
     return auds
 
 
@@ -424,7 +424,7 @@ class CustomAudio(discord.AudioSource):
         try:
             self.bot.database.playlists.connecting.pop(self.vc.guild.id)
         except:
-            print(traceback.format_exc())
+            pass
 
     async def updatePlayer(self):
         curr = self.player
@@ -1458,6 +1458,7 @@ class AudioDownloader:
         return out, total
 
     def get_youtube_part(self, url):
+        print(url)
         out = deque()
         resp = requests.get(url, timeout=8)
         try:
@@ -2268,7 +2269,7 @@ class Connect(Command):
             try:
                 auds = bot.database.playlists.audio[guild.id]
             except KeyError:
-                raise LookupError("Unable to find connected channel.")
+                raise LookupError("Unable to find voice channel.")
             if not isAlone(auds, user) and perm < 1:
                 raise self.permError(perm, 1, "to disconnect while other users are in voice")
             auds.dead = True
@@ -3563,7 +3564,7 @@ class Download(Command):
                         filename=fn,
                     )
                     try:
-                        os.remove(fn)
+                        create_future_ex(os.remove, fn)
                     except (PermissionError, FileNotFoundError):
                         pass
                     create_task(bot.silentDelete(message, no_log=True))
@@ -3711,7 +3712,7 @@ class UpdateQueues(Database):
             #     i += 1
             await asyncio.sleep(0.5)
             for item in tuple(ytdl.cache.values()):
-                item.update()
+                await create_future(item.update)
         create_future_ex(ytdl.update_dl)
         self.busy = max(0, self.busy - 1)
 

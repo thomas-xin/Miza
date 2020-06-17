@@ -160,12 +160,7 @@ async def sendReact(channel, *args, reacts=(), **kwargs):
 async def sendFile(channel, msg, file, filename=None, best=False):
     message = await channel.send(msg, file=file)
     if filename is not None:
-        try:
-            os.remove(filename)
-        except FileNotFoundError:
-            pass
-        except:
-            print(traceback.format_exc())
+        create_future_ex(os.remove, filename)
     if message.attachments:
         await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + bestURL(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
 

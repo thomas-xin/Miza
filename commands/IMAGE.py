@@ -258,7 +258,7 @@ class Saturate(Command):
         resp = await imageProc(url, "Enhance", ["Color", value], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f)
+        await sendFile(message.channel, "", f, filename=fn)
 
 
 class Contrast(Command):
@@ -274,7 +274,7 @@ class Contrast(Command):
         resp = await imageProc(url, "Enhance", ["Contrast", value], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f)
+        await sendFile(message.channel, "", f, filename=fn)
 
 
 class Brightness(Command):
@@ -290,7 +290,7 @@ class Brightness(Command):
         resp = await imageProc(url, "Enhance", ["Brightness", value], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f)
+        await sendFile(message.channel, "", f, filename=fn)
 
 
 class Sharpness(Command):
@@ -306,7 +306,7 @@ class Sharpness(Command):
         resp = await imageProc(url, "Enhance", ["Sharpness", value], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f)
+        await sendFile(message.channel, "", f, filename=fn)
 
 
 class HueShift(Command):
@@ -322,7 +322,7 @@ class HueShift(Command):
         resp = await imageProc(url, "hue_shift", [value], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f)
+        await sendFile(message.channel, "", f, filename=fn)
 
 
 class Colour(Command):
@@ -379,7 +379,7 @@ class Colour(Command):
             + "\nXYZ values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
             + "```"
         )
-        await sendFile(channel, msg, f, best=True)
+        await sendFile(channel, msg, f, filename=fn, best=True)
 
 
 class CreateGIF(Command):
@@ -428,7 +428,7 @@ class CreateGIF(Command):
             resp = await imageProc("create_gif", "$", ["image", args, delay], guild.id, timeout=64)
         fn = resp[0]
         f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f)
+        await sendFile(message.channel, "", f, filename=fn)
 
 
 class Resize(Command):
@@ -499,7 +499,7 @@ class Resize(Command):
         resp = await imageProc(url, "resize_mult", [x, y, op], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f)
+        await sendFile(message.channel, "", f, filename=fn)
 
 
 class Resize(Command):
@@ -570,7 +570,7 @@ class Resize(Command):
         resp = await imageProc(url, "resize_mult", [x, y, op], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f)
+        await sendFile(message.channel, "", f, filename=fn)
 
 
 class Magik(Command):
@@ -725,7 +725,7 @@ class Blend(Command):
         resp = await imageProc(url1, "blend_op", [url2, operation, opacity], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f)
+        await sendFile(message.channel, "", f, filename=fn)
 
 
 class React(Command):
