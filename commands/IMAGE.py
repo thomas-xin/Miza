@@ -201,7 +201,7 @@ class CreateEmoji(Command):
         )
 
 
-async def get_image(bot, message, args, argv):
+async def get_image(bot, message, args, argv, ext="png"):
     if message.attachments:
         args = [bestURL(a) for a in message.attachments] + args
         argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
@@ -241,7 +241,7 @@ async def get_image(bot, message, args, argv):
     except ValueError:
         name = "unknown"
     if "." not in name:
-        name += ".png"
+        name += "." + ext
     return name, value, url
 
 
@@ -382,17 +382,35 @@ class Colour(Command):
         await sendFile(channel, msg, f, filename=fn, best=True)
 
 
+class Rainbow(Command):
+    name = ["RainbowGIF"]
+    min_level = 0
+    description = "Creates a .gif image from repeatedly hueshifting supplied image."
+    usage = "<0:url{attached_file}> <1:duration[2]>"
+    no_parse = True
+    rate_limit = 8
+
+    async def __call__(self, bot, guild, message, args, argv, **void):
+        name, value, url = await get_image(bot, message, args, argv, ext="gif")
+        resp = await imageProc(url, "rainbow_gif", [value], guild.id)
+        fn = resp[0]
+        f = discord.File(fn, filename=name)
+        await sendFile(message.channel, "", f, filename=fn)
+
+
 class CreateGIF(Command):
     name = ["Animate", "GIF"]
     min_level = 0
     description = "Combines multiple supplied images, and/or optionally a video, into an animated .gif image."
-    usage = "<0*:urls{attached_files}> <-2:framerate_setting(?r)> <-1:framerate[25]>"
+    usage = "<0*:urls{attached_files}> <-2:framerate_setting(?r)> <-1:framerate[16]>"
     no_parse = True
     rate_limit = 12
     _timeout_ = 5
     flags = "r"
 
     async def __call__(self, bot, guild, message, flags, args, **void):
+        if not bot.isTrusted(guild.id):
+            raise PermissionError("Must be in a trusted server to create GIF images.")
         if message.attachments:
             args += [bestURL(a) for a in message.attachments]
         if not args:
@@ -401,7 +419,7 @@ class CreateGIF(Command):
             fr = args.pop(-1)
             rate = await bot.evalMath(fr, guild)
         else:
-            rate = 25
+            rate = 16
         if rate <= 0:
             args = args[:1]
             rate = 1

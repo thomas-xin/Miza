@@ -157,14 +157,15 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None):
                 pass
         raise
 
-
-def create_gif(in_type, args, delay, key=None):
-    out = "cache/" + key + ".gif"
+def create_gif(in_type, args, delay):
+    ts = round(time.time() * 1000)
+    out = "cache/" + str(ts) + ".gif"
     maxsize = 512
     if in_type == "video":
         video2img(args[0], maxsize, round(1000 / delay), out, args[1], args[2], args[3])
         return "$" + out
     images = args
+    maxsize = int(min(maxsize, 32768 / len(images) ** 0.5))
     imgs = []
     for url in images:
         data = requests.get(url, timeout=8).content
@@ -182,6 +183,45 @@ def create_gif(in_type, args, delay, key=None):
             imgs.append(img)
     frames = [resize_to(i, w, h) for i in imgs]
     frames[0].save(out, format='GIF', append_images=frames[1:], save_all=True, duration=delay, loop=0)
+    return "$" + out
+
+def rainbow_gif(image, duration=4):
+    ts = round(time.time() * 1000)
+    out = "cache/" + str(ts) + ".gif"
+    image = resize_max(image, 512, resample=Image.HAMMING)
+    size = [image.width, image.height]
+    if duration == 0:
+        fps = 0
+    else:
+        fps = round(64 / abs(duration))
+    rate = 4
+    while fps > 32:
+        fps >>= 1
+        rate <<= 1
+    if fps <= 0:
+        raise ValueError("Invalid framerate value.")
+    command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
+    command += ["-fs", str(8388608 - 131072), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out]
+    proc = psutil.Popen(command, stdin=subprocess.PIPE)
+    if str(image.mode) != "HSV":
+        curr = image.convert("HSV")
+        if str(image.mode) != "RGB":
+            image = image.convert("RGB")
+    else:
+        curr, image = image, image.convert("RGB")
+    channels = list(curr.split())
+    if duration > 0:
+        func = lambda x: (x + rate) & 255
+    else:
+        func = lambda x: (x - rate) & 255
+    for i in range(0, 256, rate):
+        if i:
+            channels[0] = channels[0].point(func)
+            image = Image.merge("HSV", channels).convert("RGB")
+        b = numpy.array(image).tobytes()
+        proc.stdin.write(b)
+    proc.stdin.close()
+    proc.wait()
     return "$" + out
 
 
@@ -449,8 +489,9 @@ def get_image(url, out):
 
 
 @logging
-def evalImg(url, operation, args, key):
-    out = "cache/" + key + ".png"
+def evalImg(url, operation, args):
+    ts = round(time.time() * 1000)
+    out = "cache/" + str(ts) + ".png"
     args = eval(args)
     if operation != "$":
         image = get_image(url, out)
@@ -460,7 +501,7 @@ def evalImg(url, operation, args, key):
         else:
             new = f(*args)
     else:
-        new = eval(url)(*args, key=key)
+        new = eval(url)(*args)
     if issubclass(type(new), Image.Image):
         new.save(out, "png")
         return repr([out])
@@ -471,10 +512,8 @@ def evalImg(url, operation, args, key):
 
 while True:
     try:
-        i = eval(sys.stdin.readline()).decode("utf-8", "replace").replace("\n", "").split("`")
-        if len(i) <= 1:
-            i.append("0")
-        resp = evalImg(*i)
+        args = eval(sys.stdin.readline()).decode("utf-8", "replace").replace("\n", "").split("`")
+        resp = evalImg(*args)
         sys.stdout.write(repr(resp.encode("utf-8")) + "\n")
         sys.stdout.flush()
     except Exception as ex:

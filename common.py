@@ -158,9 +158,14 @@ async def sendReact(channel, *args, reacts=(), **kwargs):
         print(traceback.format_exc())
 
 async def sendFile(channel, msg, file, filename=None, best=False):
-    message = await channel.send(msg, file=file)
-    if filename is not None:
-        create_future_ex(os.remove, filename)
+    try:
+        message = await channel.send(msg, file=file)
+        if filename is not None:
+            create_future_ex(os.remove, filename)
+    except:
+        if filename is not None:
+            create_future_ex(os.remove, filename)
+        raise
     if message.attachments:
         await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + bestURL(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
 
@@ -444,7 +449,7 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
             await asyncio.sleep(0.5)
     except StopIteration:
         pass
-    d = repr(bytes("`".join(str(i) for i in (image, operation, args, key)), "utf-8")).encode("utf-8") + b"\n"
+    d = repr(bytes("`".join(str(i) for i in (image, operation, args)), "utf-8")).encode("utf-8") + b"\n"
     print(d)
     try:
         proc.busy = True
@@ -491,7 +496,7 @@ async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12):
             await asyncio.sleep(0.5)
     except StopIteration:
         pass
-    d = repr(bytes("`".join(str(i) for i in (expr, prec, rat, key)), "utf-8")).encode("utf-8") + b"\n"
+    d = repr(bytes("`".join(str(i) for i in (expr, prec, rat)), "utf-8")).encode("utf-8") + b"\n"
     print(d)
     try:
         proc.busy = True

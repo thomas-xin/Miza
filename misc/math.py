@@ -523,11 +523,8 @@ def evalSym(f, prec=64, r=False):
 
 while True:
     try:
-        i = eval(sys.stdin.readline()).decode("utf-8", "replace").replace("\n", "").split("`")
-        if len(i) <= 1:
-            i.append("-1")
-        key = i[-1]
-        resp = evalSym(*i[:-1])
+        args = eval(sys.stdin.readline()).decode("utf-8", "replace").replace("\n", "").split("`")
+        resp = evalSym(*args)
         if isinstance(resp[0], Plot):
             ts = round(time.time() * 1000)
             name = str(ts) + ".png"
