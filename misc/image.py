@@ -181,14 +181,14 @@ def create_gif(in_type, args, delay):
             if not imgs:
                 w, h = max_size(img.width, img.height, maxsize)
             imgs.append(img)
-    frames = [resize_to(i, w, h) for i in imgs]
+    frames = [resize_to(i, w, h, resample=Image.HAMMING) for i in imgs]
     frames[0].save(out, format='GIF', append_images=frames[1:], save_all=True, duration=delay, loop=0)
     return "$" + out
 
-def rainbow_gif(image, duration=4):
+def rainbow_gif(image, duration):
     ts = round(time.time() * 1000)
     out = "cache/" + str(ts) + ".gif"
-    image = resize_max(image, 512, resample=Image.HAMMING)
+    image = resize_max(image, 480, resample=Image.HAMMING)
     size = [image.width, image.height]
     if duration == 0:
         fps = 0
@@ -210,11 +210,10 @@ def rainbow_gif(image, duration=4):
     else:
         curr, image = image, image.convert("RGB")
     channels = list(curr.split())
-    if duration > 0:
-        func = lambda x: (x + rate) & 255
-    else:
-        func = lambda x: (x - rate) & 255
-    for i in range(0, 256, rate):
+    if duration < 0:
+        rate = -rate
+    func = lambda x: (x + rate) & 255
+    for i in range(0, 256, abs(rate)):
         if i:
             channels[0] = channels[0].point(func)
             image = Image.merge("HSV", channels).convert("RGB")

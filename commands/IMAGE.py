@@ -628,7 +628,7 @@ class Magik(Command):
         if "." not in name:
             name += ".png"
         if "cdn.discord" not in url:
-            resp = await imageProc(url, "resize_to", [512, 512, "auto"], guild.id)
+            resp = await imageProc(url, "resize_to", [512, 512, "hamming"], guild.id)
             fn = resp[0]
             f = discord.File(fn, filename=name)
             msg = await channel.send(file=f)
