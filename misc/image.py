@@ -181,7 +181,7 @@ def create_gif(in_type, args, delay):
             if not imgs:
                 w, h = max_size(img.width, img.height, maxsize)
             imgs.append(img)
-    frames = [resize_to(i, w, h, resample=Image.HAMMING) for i in imgs]
+    frames = [resize_to(i, w, h, operation="hamming") for i in imgs]
     frames[0].save(out, format='GIF', append_images=frames[1:], save_all=True, duration=delay, loop=0)
     return "$" + out
 

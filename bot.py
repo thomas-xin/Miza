@@ -1508,9 +1508,10 @@ async def heartbeatLoop():
                 bot.client
             except NameError:
                 sys.exit()
-            if bot.heartbeat in os.listdir():
+            d = await create_future(os.listdir)
+            if bot.heartbeat in d:
                 try:
-                    os.remove(bot.heartbeat)
+                    await create_future(os.remove, bot.heartbeat)
                 except:
                     print(traceback.format_exc())
             await asyncio.sleep(0.5)

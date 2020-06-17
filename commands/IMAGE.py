@@ -364,9 +364,6 @@ class Colour(Command):
             else:
                 adj = [x / 255 for x in channels]
             channels = [round(x * 255) for x in self.trans[name](adj)]
-        resp = await imageProc("from_colour", "$", [channels], guild.id)
-        fn = resp[0]
-        f = discord.File(fn, filename="colour.png")
         adj = [x / 255 for x in channels]
         msg = (
             "```ini\nHEX colour code: " + sbHighlight(bytes(channels).hex().upper())
@@ -379,6 +376,9 @@ class Colour(Command):
             + "\nXYZ values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
             + "```"
         )
+        resp = await imageProc("from_colour", "$", [channels], guild.id)
+        fn = resp[0]
+        f = discord.File(fn, filename="colour.png")
         await sendFile(channel, msg, f, filename=fn, best=True)
 
 
@@ -389,10 +389,11 @@ class Rainbow(Command):
     usage = "<0:url{attached_file}> <1:duration[2]>"
     no_parse = True
     rate_limit = 8
+    _timeout_ = 3
 
     async def __call__(self, bot, guild, message, args, argv, **void):
         name, value, url = await get_image(bot, message, args, argv, ext="gif")
-        resp = await imageProc(url, "rainbow_gif", [value], guild.id)
+        resp = await imageProc(url, "rainbow_gif", [value], guild.id, timeout=32)
         fn = resp[0]
         f = discord.File(fn, filename=name)
         await sendFile(message.channel, "", f, filename=fn)
@@ -602,8 +603,8 @@ class Magik(Command):
 
     async def __call__(self, bot, guild, channel, message, args, argv, **void):
         if message.attachments:
-            args = [bestURL(a) for a in message.attachments] + args
-            argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
+            args = [a.url for a in message.attachments] + args
+            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
         if not args:
             raise ArgumentError("Please input an image by URL or attachment.")
         url = args.pop(0)
