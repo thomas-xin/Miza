@@ -21,4 +21,4 @@ requests>=2.22.0
 rule34>=1.6.0
 scipy>=1.4.1
 sympy>=1.5.1
-youtube-dl>=2020.6.6
+youtube-dl>=2020.6.16.1

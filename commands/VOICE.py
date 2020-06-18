@@ -1510,7 +1510,7 @@ class AudioDownloader:
             try:
                 return self.from_pytube(url)
             except youtube_dl.DownloadError:
-                raise youtube_dl.utils.ExtractorError("Unable to fetch audio data.")
+                raise FileNotFoundError("Unable to fetch audio data.")
     
     def extract_from(self, url):
         try:
@@ -1520,7 +1520,7 @@ class AudioDownloader:
                 try:
                     return self.from_pytube(url)
                 except youtube_dl.DownloadError:
-                    raise youtube_dl.utils.ExtractorError("Unable to fetch audio data.")
+                    raise FileNotFoundError("Unable to fetch audio data.")
             raise
         # pyt = create_future_ex(self.from_pytube, url)
         # resp = self.extract_info(url, search=False)
