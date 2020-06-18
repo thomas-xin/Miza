@@ -1666,6 +1666,8 @@ class AudioDownloader:
                                 "name": data["title"],
                                 "url": data["webpage_url"],
                                 "duration": float(data["duration"]),
+                                "stream": getBestAudio(resp),
+                                "icon": getBestIcon(resp),
                             }
                             output.append(freeClass(temp))
                     else:
