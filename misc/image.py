@@ -188,14 +188,14 @@ def create_gif(in_type, args, delay):
 def rainbow_gif(image, duration):
     ts = round(time.time() * 1000)
     out = "cache/" + str(ts) + ".gif"
-    image = resize_max(image, 480, resample=Image.HAMMING)
+    image = resize_max(image, 512, resample=Image.HAMMING)
     size = [image.width, image.height]
     if duration == 0:
         fps = 0
     else:
         fps = round(64 / abs(duration))
     rate = 4
-    while fps > 32:
+    while fps > 16:
         fps >>= 1
         rate <<= 1
     if fps <= 0:
