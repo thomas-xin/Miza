@@ -289,6 +289,8 @@ class Loop(Command):
     rate_limit = 3
 
     async def __call__(self, args, argv, message, channel, callback, bot, perm, guild, **void):
+        if not args:
+            raise ArgumentError("Please input loop iterations and target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioSettings command.")
         num = await bot.evalMath(args[0], guild.id)
         iters = round(num)
         if not isnan(perm):

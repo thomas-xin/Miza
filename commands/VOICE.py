@@ -1897,7 +1897,7 @@ ytdl = AudioDownloader()
 
 class Queue(Command):
     server_only = True
-    name = ["Q", "Play", "P"]
+    name = ["Q", "Play", "Enqueue", "P"]
     alias = name + ["LS"]
     min_level = 0
     description = "Shows the music queue, or plays a song in voice."
@@ -2150,7 +2150,7 @@ class Queue(Command):
 
 class Playlist(Command):
     server_only = True
-    name = ["DefaultPlaylist", "PL"]
+    name = ["Default_Playlist", "PL"]
     min_level = 0
     min_display = "0~2"
     description = "Shows, appends, or removes from the default playlist."
@@ -2237,7 +2237,7 @@ class Playlist(Command):
 
 class Connect(Command):
     server_only = True
-    name = ["Summon", "Join", "DC", "Disconnect", "Move", "Reconnect"]
+    name = ["Summon", "Join", "DC", "Disconnect", "FuckOff", "Move", "Reconnect"]
     min_level = 0
     description = "Summons the bot into a voice channel."
     usage = "<channel{curr}(0)>"
@@ -2246,7 +2246,7 @@ class Connect(Command):
     async def __call__(self, user, channel, name="join", argv="", **void):
         bot = self.bot
         client = bot.client
-        if name in ("dc", "disconnect"):
+        if name in ("dc", "disconnect", "fuckoff"):
             vc_ = None
         elif argv or name == "move":
             c_id = verifyID(argv)
@@ -2576,7 +2576,8 @@ def getDump(auds):
 class Dump(Command):
     server_only = True
     time_consuming = True
-    name = ["Save", "Load", "Dujmpö"]
+    name = ["Save", "Load"]
+    alias = name + ["Dujmpö"]
     min_level = 0
     min_display = "0~1"
     description = "Saves or loads the currently playing audio queue state."
