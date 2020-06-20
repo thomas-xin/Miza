@@ -47,7 +47,7 @@ async def createPlayer(auds, p_type=0, verbose=False):
 #     return entry.hash
 
 
-e_dur = lambda d: d if d is not None else 300
+e_dur = lambda d: float(d) if type(d) is str else (d if d is not None else 300)
 
 
 def getDuration(filename):

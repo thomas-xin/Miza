@@ -88,7 +88,7 @@ class Execute(Command):
             bot.data.exec[channel.id] = True
             update()
             return (
-                "```css\nSuccessfully enabled code execution in ["
+                "```css\nSuccessfully enabled code execution in [#"
                 + noHighlight(channel.name) + "].```"
             )
         elif "d" in flags:
@@ -98,7 +98,7 @@ class Execute(Command):
                 "```fix\nSuccessfully removed code execution channel.```"
             )
         return (
-            "```css\ncode channel is currently set to "
+            "```css\nCode execution channel is currently set to "
             + noHighlight(list(bot.data.exec)) + ".```"
         )
 
@@ -116,7 +116,7 @@ class Suspend(Command):
                 user = await bot.fetch_user(verifyID(args[0]))
             susp = bot.data.blacklist.get(user.id, None)
             return (
-                "```css\nCurrent suspension status of [" + noHighlight(user.name) + "]: ["
+                "```css\nCurrent blacklist status of [" + noHighlight(user.name) + "]: ["
                 + noHighlight(susp) + "].```"
             )
         else:
@@ -125,7 +125,7 @@ class Suspend(Command):
             bot.data.blacklist[user.id] = change
             update()
             return (
-                "```css\nChanged suspension status of [" + noHighlight(user.name) + "] to ["
+                "```css\nChanged blacklist status of [" + noHighlight(user.name) + "] to ["
                 + noHighlight(change) + "].```"
             )
 

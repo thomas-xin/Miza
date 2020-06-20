@@ -1091,6 +1091,146 @@ class Dog(Command):
         }
 
 
+class DeviantArt(Command):
+    server_only = True
+    min_level = 2
+    description = "Subscribes to a DeviantArt Gallery, reposting links to all new posts."
+    usage = "<reversed(?r)> <disable(?d)>"
+    flags = "raed"
+    rate_limit = 4
+
+    async def __call__(self, argv, flags, channel, guild, bot, **void):
+        if not bot.isTrusted(guild.id):
+            raise PermissionError("Must be in a trusted server to subscribe to DeviantArt Galleries.")
+        data = bot.data.deviantart
+        update = bot.database.deviantart.update
+        if not argv:
+            assigned = data.get(channel.id, ())
+            if not assigned:
+                return "```ini\nNo currently subscribed DeviantArt Galleries for [#" + noHighlight(channel) + "].```"
+            if "d" in flags:
+                try:
+                    data.pop(channel.id)
+                except KeyError:
+                    pass
+                return "```css\nSuccessfully removed all DeviantArt Gallery subscriptions from [#" + noHighlight(channel) + "].```"
+            return "```ini\nCurrently subscribed DeviantArt Galleries:\n" + strIter(assigned, key=lambda x: x["user"]) + "```"
+        url = await bot.followURL(argv)
+        if not isURL(url):
+            raise ArgumentError("Please input a valid URL.")
+        if "deviantart.com" not in url:
+            raise ArgumentError("Please input a DeviantArt Gallery URL.")
+        url = url[url.index("deviantart.com") + 15:]
+        spl = url.split("/")
+        user = spl[0]
+        if spl[1] != "gallery":
+            raise ArgumentError("Please input a DeviantArt Gallery URL.")
+        content = int(spl[2].split("&")[0])
+        folder = noHighlight(spl[-1].split("&")[0])
+        if content in self.data.get(channel.id, {}):
+            raise KeyError("Already subscribed to " + user + ": " + folder)
+        if "d" in flags:
+            try:
+                data.get(channel.id).pop(content)
+            except KeyError:
+                raise KeyError("Not currently subscribed to " + user + ": " + folder)
+            else:
+                if channel.id in data and not data[channel.id]:
+                    data.pop(channel.id)
+                update()
+                return "```css\nSuccessfully unsubscribed from " + sbHighlight(user) + ": " + sbHighlight(folder) + ".```"
+        setDict(data, channel.id, {}).__setitem__(content, {"user": user, "type": "gallery", "reversed": ("r" in flags), "entries": {}})
+        update()
+        return "```css\nSuccessfully subscribed to " + sbHighlight(user) + ": " + sbHighlight(folder) + ", posting in reverse order" * ("r" in flags) + ".```"
+
+
+class UpdateDeviantArt(Database):
+    name = "deviantart"
+
+    async def processPart(self, found, c_id):
+        bot = self.bot
+        try:
+            channel = await bot.fetch_channel(c_id)
+            if not bot.isTrusted(channel.guild.id):
+                raise LookupError
+        except LookupError:
+            self.data.pop(c_id)
+            return
+        try:
+            assigned = self.data[c_id]
+            for content in assigned:
+                items = found[content]
+                entries = assigned[content]["entries"]
+                new = tuple(items)
+                orig = tuple(entries)
+                if hash(tuple(sorted(new))) != hash(tuple(sorted(orig))):
+                    if assigned[content].get("reversed", False):
+                        it = reversed(new)
+                    else:
+                        it = new
+                    for i in it:
+                        if i not in entries:
+                            entries[i] = True
+                            self.update()
+                            home = "https://www.deviantart.com/" + items[i][2]
+                            emb = discord.Embed(
+                                colour=discord.Colour(1),
+                                description="🔔 New Deviation from " + items[i][2] + " 🔔\n" + items[i][0],
+                            ).set_image(url=items[i][1]).set_author(name=items[i][2], url=home, icon_url=items[i][3])
+                            await channel.send(embed=emb)
+                    for i in orig:
+                        if i not in items:
+                            entries.pop(i)
+                            self.update()
+        except:
+            print(traceback.format_exc())
+
+    async def __call__(self):
+        t = setDict(self.__dict__, "time", 0)
+        if utc() - t < 300:
+            return
+        self.time = inf
+        conts = deque()
+        for assigned in tuple(self.data.values()):
+            conts.extend((i, assigned[i]["user"]) for i in assigned)
+        found = {}
+        base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?limit=24&username="
+        for content, user in conts:
+            items = {}
+            try:
+                url = base + user + "&folderid=" + str(content) + "&offset="
+                for i in range(0, 13824, 24):
+                    req = url + str(i)
+                    print(req)
+                    resp = await create_future(requests.get, req, timeout=8)
+                    try:
+                        d = json.loads(resp.content)
+                    except:
+                        d = eval(resp.content, {}, eval_const)
+                    for res in d["results"]:
+                        deviation = res["deviation"]
+                        media = deviation["media"]
+                        prettyName = media["prettyName"]
+                        orig = media["baseUri"]
+                        extra = ""
+                        token = "?token=" + media["token"][0]
+                        for t in reversed(media["types"]):
+                            if t["t"].lower() == "fullview":
+                                if "c" in t:
+                                    extra = "/" + t["c"].replace("<prettyName>", prettyName)
+                                    break
+                        image_url = orig + extra + token
+                        items[deviation["deviationId"]] = (deviation["url"], image_url, deviation["author"]["username"], deviation["author"]["usericon"])
+                    if not d.get("hasMore", None):
+                        break
+            except:
+                print(traceback.format_exc())
+            found[content] = items
+        for c_id in tuple(self.data):
+            create_task(self.processPart(found, c_id))
+        self.time = utc()
+
+
 class UpdateImages(Database):
     name = "images"
 

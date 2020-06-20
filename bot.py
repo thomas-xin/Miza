@@ -534,7 +534,7 @@ class Bot:
             u_id = int(user)
         if u_id == self.owner_id:
             return nan
-        if self.isSuspended(u_id):
+        if self.isBlacklisted(u_id):
             return -inf
         if u_id == client.user.id:
             return inf
@@ -636,7 +636,7 @@ class Bot:
             return False
         return g_id in trusted
 
-    def isSuspended(self, u_id):
+    def isBlacklisted(self, u_id):
         u_id = int(u_id)
         if u_id in (self.owner_id, client.user.id):
             return False
@@ -1294,7 +1294,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
             ))
         else:
             print(
-                "Ignoring command from suspended user "
+                "Ignoring command from blacklisted user "
                 + user.name + " (" + str(u_id) + "): "
                 + limStr(message.content, 256)
             )
@@ -1909,6 +1909,9 @@ async def on_message_edit(before, after):
         bot.cacheMessage(after)
         await handleMessage(after)
         await updateEdit(before, after)
+    elif after.author.id == client.user.id:
+        if isZeroEnc(after.content):
+            pass
 
 
 @client.event
