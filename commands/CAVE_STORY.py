@@ -417,7 +417,7 @@ class CS_hex2xml(Command):
             hack = hack[i:]
             i = hack.index("\n")
             offs = hack[:i]
-            hack = hack[i+1:]
+            hack = hack[i + 1:]
             try:
                 i = hack.index("0x")
                 curr = hack[:i]

@@ -23,7 +23,7 @@ ydl_opts = {
 }
 downloader = youtube_dl.YoutubeDL(ydl_opts)
 
-def get_video(url):
+def get_video(url, fps):
     entry = downloader.extract_info(url, download=False)
     best = 0
     size = None
@@ -434,7 +434,7 @@ class CreateGIF(Command):
         for i, url in enumerate(args):
             url = await bot.followURL(url, best=True)
             if "discord" not in url and "channels" not in url:
-                url, size, dur, fps = await create_future(get_video, url)
+                url, size, dur, fps = await create_future(get_video, url, 16)
                 if size and dur and fps:
                     video = (url, size, dur, fps)
             if not isURL(url):

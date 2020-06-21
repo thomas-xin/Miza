@@ -179,10 +179,20 @@ def create_gif(in_type, args, delay):
                 raise OverflowError("Max file size to load is 256MB.")
         else:
             if not imgs:
-                w, h = max_size(img.width, img.height, maxsize)
+                size = max_size(img.width, img.height, maxsize)
+            img = resize_to(img, *size, operation="hamming")
+            if str(img.mode) != "RGB":
+                img = img.convert("RGB")
             imgs.append(img)
-    frames = [resize_to(i, w, h, operation="hamming") for i in imgs]
-    frames[0].save(out, format='GIF', append_images=frames[1:], save_all=True, duration=delay, loop=0)
+    command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(1000 / delay), "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
+    command += ["-fs", str(8388608 - 131072), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out]
+    proc = psutil.Popen(command, stdin=subprocess.PIPE)
+    for img in imgs:
+        b = numpy.array(img).tobytes()
+        proc.stdin.write(b)
+        time.sleep(0.02)
+    proc.stdin.close()
+    proc.wait()
     return "$" + out
 
 def rainbow_gif(image, duration):
@@ -219,6 +229,7 @@ def rainbow_gif(image, duration):
             image = Image.merge("HSV", channels).convert("RGB")
         b = numpy.array(image).tobytes()
         proc.stdin.write(b)
+        time.sleep(0.02)
     proc.stdin.close()
     proc.wait()
     return "$" + out

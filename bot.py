@@ -1399,11 +1399,11 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         if not argv:
                             args = []
                         else:
-                            argv = argv.replace("\n", " ").replace("\r", "").replace("\t", " ")
+                            argv2 = singleSpace(argv.replace("\n", " ").replace("\r", "").replace("\t", " "))
                             try:
-                                args = shlex.split(argv)
+                                args = shlex.split(argv2)
                             except ValueError:
-                                args = argv.split(" ")
+                                args = argv2.split()
                         if guild is None:
                             if getattr(command, "server_only", False):
                                 raise ReferenceError("This command is only available in servers.")
