@@ -1190,12 +1190,10 @@ class UpdateDeviantArt(Database):
         if utc() - t < 300:
             return
         self.time = inf
-        conts = deque()
-        for assigned in tuple(self.data.values()):
-            conts.extend((i, assigned[i]["user"]) for i in assigned)
+        conts = {i: a[i]["user"] for a in tuple(self.data.values()) for i in a}
         found = {}
         base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?limit=24&username="
-        for content, user in conts:
+        for content, user in conts.items():
             items = {}
             try:
                 url = base + user + "&folderid=" + str(content) + "&offset="
