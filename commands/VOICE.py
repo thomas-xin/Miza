@@ -2506,6 +2506,8 @@ class Pause(Command):
             auds.seek(0)
         if not auds.paused > 1:
             auds.paused = auds.pausec = name in ("pause", "stop")
+            if auds.paused:
+                create_future_ex(auds.vc.stop)
         if not auds.paused:
             create_future_ex(auds.queue.update_play)
             create_future_ex(auds.ensure_play)
