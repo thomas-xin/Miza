@@ -135,12 +135,17 @@ class UpdateExec(Database):
     no_delete = True
 
     def procFunc(self, proc, channel, bot):
-        printc = dict(print=lambda *args, sep=" ", end="\n", prefix="", **void: create_task(channel.send(limStr("```py\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2000))))
+        local = dict(print=lambda *args, sep=" ", end="\n", prefix="", **void: create_task(channel.send(limStr("```py\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2000))))
         print(proc)
         try:
-            output = eval(proc, bot._globals, printc)
+            output = eval(proc, bot._globals, local)
         except SyntaxError:
-            output = exec(proc, bot._globals, printc)
+            output = exec(proc, bot._globals, local)
+        try:
+            local.pop(print)
+        except KeyError:
+            pass
+        bot._globals.update(local)
         return output
 
     async def sendDeleteID(self, c_id, delete_after=20, **kwargs):

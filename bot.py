@@ -1582,7 +1582,7 @@ async def on_guild_join(guild):
     emb.description = (
         "Hi there! I'm " + client.user.name
         + ", a multipurpose discord bot created by <@"
-        + str(bot.owner_id) + ">. Thanks for adding me"
+        + "201548633244565504" + ">. Thanks for adding me"
     )
     user = None
     try:
@@ -1604,7 +1604,7 @@ async def on_guild_join(guild):
     if not m.guild_permissions.administrator:
         emb.add_field(name="Psst!", value=(
             "I noticed you haven't given me administrator permissions here.\n"
-            + "That's completely understandable if intentional, but please note that without it, some features may not function well, or not at all."
+            + "That's completely understandable if intentional, but please note that without the required permissions, some features may not function well, or not at all."
         ))
     await channel.send(embed=emb)
 

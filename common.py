@@ -444,7 +444,7 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
                         raise StopIteration
                 else:
                     break
-            procUpdate()
+            await create_future(procUpdate)
             await asyncio.sleep(0.5)
     except StopIteration:
         pass
@@ -453,13 +453,13 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
     try:
         proc.busy = True
         busy[key] = utc()
-        procUpdate()
-        proc.stdin.write(d)
-        proc.stdin.flush()
+        await create_future(procUpdate)
+        await create_future(proc.stdin.write, d)
+        await create_future(proc.stdin.flush)
         resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
         proc.busy = False
     except (TimeoutError, asyncio.exceptions.TimeoutError):
-        proc.kill()
+        create_future_ex(proc.kill)
         try:
             procs.pop(p)
         except LookupError:
@@ -468,7 +468,7 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
             busy.pop(key)
         except KeyError:
             pass
-        procUpdate()
+        create_future_ex(procUpdate)
         raise
     try:
         busy.pop(key)
@@ -491,7 +491,7 @@ async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12):
                         raise StopIteration
                 else:
                     break
-            procUpdate()
+            await create_future(procUpdate)
             await asyncio.sleep(0.5)
     except StopIteration:
         pass
@@ -500,13 +500,13 @@ async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12):
     try:
         proc.busy = True
         busy[key] = utc()
-        procUpdate()
-        proc.stdin.write(d)
-        proc.stdin.flush()
+        await create_future(procUpdate)
+        await create_future(proc.stdin.write, d)
+        await create_future(proc.stdin.flush)
         resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
         proc.busy = False
     except (TimeoutError, asyncio.exceptions.TimeoutError):
-        proc.kill()
+        create_future_ex(proc.kill)
         try:
             procs.pop(p)
         except LookupError:
@@ -515,7 +515,7 @@ async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12):
             busy.pop(key)
         except KeyError:
             pass
-        procUpdate()
+        create_future_ex(procUpdate)
         raise
     try:
         busy.pop(key)
