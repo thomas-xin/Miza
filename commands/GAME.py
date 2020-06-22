@@ -44,7 +44,7 @@ class Text2048(Command):
         + "<insanity_mode(?i)> <special_controls(?c)> <easy_mode(?e)>"
     )
     flags = "zspice"
-    rate_limit = 1
+    rate_limit = (1, 2)
 
     def shiftTile(self, tiles, p1, p2):
         # print(p1, p2)
@@ -347,8 +347,8 @@ class MimicConfig(Command):
     min_level = 0
     description = "Modifies an existing webhook mimic's attributes."
     usage = (
-        "<0:mimic_id> <1:option(prefix)(name)(avatar)"
-        + "(description)(gender)(birthday)[]> <2:new>"
+        "<0:mimic_id> <1:option(prefix)(name[])(avatar)"
+        + "(description)(gender)(birthday)> <2:new>"
     )
     no_parse = True
     rate_limit = 1
@@ -375,7 +375,7 @@ class MimicConfig(Command):
             new = " ".join(args)
         else:
             new = None
-        if opt in ("name", "username", "nickname"):
+        if opt in ("name", "username", "nickname", ""):
             setting = "name"
         elif opt in ("avatar", "icon", "url", "pfp", "image"):
             setting = "url"

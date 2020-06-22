@@ -98,7 +98,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None):
             resp = bytes()
             for _ in range(3):
                 try:
-                    proc = psutil.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     fut = exc.submit(proc.communicate)
                     res = fut.result(timeout=12)
                     resp = bytes().join(res)
@@ -186,7 +186,7 @@ def create_gif(in_type, args, delay):
             imgs.append(img)
     command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(1000 / delay), "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
     command += ["-fs", str(8388608 - 131072), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out]
-    proc = psutil.Popen(command, stdin=subprocess.PIPE)
+    proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for img in imgs:
         b = numpy.array(img).tobytes()
         proc.stdin.write(b)
@@ -212,7 +212,7 @@ def rainbow_gif(image, duration):
         raise ValueError("Invalid framerate value.")
     command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
     command += ["-fs", str(8388608 - 131072), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out]
-    proc = psutil.Popen(command, stdin=subprocess.PIPE)
+    proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if str(image.mode) != "HSV":
         curr = image.convert("HSV")
         if str(image.mode) != "RGB":

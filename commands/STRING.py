@@ -321,7 +321,7 @@ class UrbanDictionary(Command):
                     ).replace("\n", " ").replace("\r", "") for i in range(
                         min(len(l), 1 + 2 * flags["v"])
                     )
-                ))
+                )).replace("#", "♯")
                 + "```"
             )
         else:

@@ -56,7 +56,7 @@ def getDuration(filename):
     print(command)
     for _ in loop(3):
         try:
-            proc = psutil.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             fut = create_future_ex(proc.communicate)
             res = fut.result(timeout=2)
             resp = bytes().join(res)
@@ -177,11 +177,12 @@ def ensure_url(url):
 class CustomAudio(discord.AudioSource):
     
     length = round(SAMPLE_RATE / 25)
-    empty = numpy.zeros(length >> 1, float)
-    emptybuff = numpy.zeros(length, numpy.uint16).tobytes()
-    filt = signal.butter(1, 0.125, btype="low", output="sos")
-    #fff = numpy.abs(numpy.fft.fftfreq(SAMPLE_RATE / 50, 1/SAMPLE_RATE))[:ceil(SAMPLE_RATE / 100 + 1)]
-    static = lambda self, *args: numpy.random.rand(self.length) * 65536 - 32768
+    # empty = numpy.zeros(length >> 1, float)
+    # emptybuff = numpy.zeros(length, numpy.uint16).tobytes()
+    # filt = signal.butter(1, 0.125, btype="low", output="sos")
+    # #fff = numpy.abs(numpy.fft.fftfreq(SAMPLE_RATE / 50, 1/SAMPLE_RATE))[:ceil(SAMPLE_RATE / 100 + 1)]
+    # static = lambda self, *args: numpy.random.rand(self.length) * 65536 - 32768
+    emptyopus = b"OggS\x00\x00\x80\xbb\x00\x00\x00\x00\x00\x00\x0f8Z4\x02\x00\x00\x00q\x0f\xc3\x8c2" + b"\x03" * 50 + b"\xfc\xff\xfe" * 50
     defaults = {
         "volume": 1,
         "reverb": 0,
@@ -560,7 +561,7 @@ class CustomAudio(discord.AudioSource):
                 v = 1 / max(1, round(math.sqrt(abs(p)), 4))
                 if v != 1:
                     options.append("volume=" + str(v))
-        if stats.volume != 1 and full:
+        if stats.volume != 1:# and full:
             options.append("volume=" + str(round(stats.volume, 7)))
         if options:
             options.append("asoftclip=atan")
@@ -582,8 +583,6 @@ class CustomAudio(discord.AudioSource):
                 temp = source.read()
                 if not temp:
                     raise StopIteration
-                if len(temp) < FRAME_SIZE:
-                    temp += b"\0" * (FRAME_SIZE - len(temp))
                 found = True
             except (StopIteration, ValueError):
                 empty = True
@@ -641,19 +640,19 @@ class CustomAudio(discord.AudioSource):
                                     self.preparing = False
                         elif self.curr_timeout == 0:
                             self.curr_timeout = utc()
-                elif (empty or self.pausec) and not queueable:
+                elif (empty and not queueable) or self.pausec:
                     self.curr_timeout = 0
                     self.vc.stop()
-            temp = self.emptybuff
+            temp = self.emptyopus
             self.pausec = self.paused & 1
             # print(traceback.format_exc())
         else:
             self.pausec = False
-            if self.stats.volume != 1:
-                array = numpy.frombuffer(temp, dtype=numpy.int16).astype(numpy.float)
-                array *= self.stats.volume
-                numpy.clip(array, -32767, 32767, out=array)
-                temp = array.astype(numpy.int16).tobytes()
+            # if self.stats.volume != 1:
+            #     array = numpy.frombuffer(temp, dtype=numpy.int16).astype(numpy.float)
+            #     array *= self.stats.volume
+            #     numpy.clip(array, -32767, 32767, out=array)
+            #     temp = array.astype(numpy.int16).tobytes()
         return temp
 
     # def read(self):
@@ -805,7 +804,7 @@ class CustomAudio(discord.AudioSource):
     #         print(traceback.format_exc())
     #     return temp
 
-    is_opus = lambda self: False
+    is_opus = lambda self: True#None if self.source is None else self.source.is_opus()
     cleanup = lambda self: None
 
 
@@ -1079,7 +1078,7 @@ class PCMFile:
         print(cmd)
         self.proc = None
         try:
-            self.proc = psutil.Popen(cmd, stderr=subprocess.PIPE)
+            self.proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             print(self.proc)
             fl = 0
             while fl < 65536:
@@ -1211,13 +1210,8 @@ class PCMFile:
             buff = True
             args.append("pipe:0")
         options = auds.construct_options(full=False)
-        args += options
-        args += ["-f", "s16le"]
-        if options:
-            args += ["-ar", str(SAMPLE_RATE), "-ac", "2"]
-        else:
-            args += ["-c:a", "copy"]
-        args += ["-bufsize", "65536", "pipe:1"]
+        args.extend(options)
+        args.extend(("-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "-bufsize", "8192", "pipe:1"))
         key = auds.vc.guild.id
         self.readers[key] = True
         callback = lambda: self.readers.pop(key) if key in self.readers else None
@@ -1238,20 +1232,22 @@ class LoadedAudioReader(discord.AudioSource):
         print(args)
         self.closed = False
         self.advanced = False
-        self.proc = psutil.Popen(args, stdout=subprocess.PIPE)
+        self.proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+        self._packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
         self.file = file
         self.buffer = None
         self.callback = callback
         print(self.proc)
-
+    
     def read(self, size=FRAME_SIZE):
         if self.buffer:
             b, self.buffer = self.buffer, None
             return b
-        return self.proc.stdout.read(size)
+        return next(self._packet_iter)
     
     def start(self):
-        self.buffer = self.proc.stdout.read(FRAME_SIZE)
+        self.buffer = None
+        self.buffer = self.read()
         return self
 
     def close(self, *void1, **void2):
@@ -1263,7 +1259,7 @@ class LoadedAudioReader(discord.AudioSource):
         if callable(self.callback):
             self.callback()
 
-    is_opus = lambda self: False
+    is_opus = lambda self: True
     cleanup = close
 
 
@@ -1274,6 +1270,7 @@ class BufferedAudioReader(discord.AudioSource):
         self.closed = False
         self.advanced = False
         self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self._packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
         self.file = file
         self.stream = file.open()
         self.buffer = None
@@ -1285,13 +1282,13 @@ class BufferedAudioReader(discord.AudioSource):
         if self.buffer:
             b, self.buffer = self.buffer, None
             return b
-        return self.proc.stdout.read(size)
+        return next(self._packet_iter)
 
     def run(self):
         while True:
             b = bytes()
             try:
-                b += self.stream.read(65536)
+                b = self.stream.read(65536)
                 if not b:
                     raise EOFError
                 self.proc.stdin.write(b)
@@ -1305,7 +1302,8 @@ class BufferedAudioReader(discord.AudioSource):
     
     def start(self):
         create_future_ex(self.run)
-        self.buffer = self.proc.stdout.read(FRAME_SIZE)
+        self.buffer = None
+        self.buffer = self.read()
         return self
 
     def close(self):
@@ -1321,7 +1319,7 @@ class BufferedAudioReader(discord.AudioSource):
         if callable(self.callback):
             self.callback()
 
-    is_opus = lambda self: False
+    is_opus = lambda self: True
     cleanup = close
 
     
@@ -1906,7 +1904,7 @@ class Queue(Command):
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     _timeout_ = 2
-    rate_limit = 0.5
+    rate_limit = (0.5, 1)
 
     async def __call__(self, bot, client, user, perm, message, channel, guild, flags, name, argv, **void):
         if not argv:
@@ -2341,7 +2339,7 @@ class Skip(Command):
     description = "Removes an entry or range of entries from the voice channel queue."
     usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
     flags = "fhv"
-    rate_limit = 0.5
+    rate_limit = (0.5, 1.5)
 
     async def __call__(self, client, user, perm, bot, name, args, argv, guild, flags, message, **void):
         if guild.id not in bot.database.playlists.audio:
@@ -2507,8 +2505,7 @@ class Pause(Command):
         if name == "stop":
             auds.seek(0)
         if not auds.paused > 1:
-            auds.paused = name in ("pause", "stop")
-            auds.pausec = False
+            auds.paused = auds.pausec = name in ("pause", "stop")
         if not auds.paused:
             create_future_ex(auds.queue.update_play)
             create_future_ex(auds.ensure_play)
@@ -2531,7 +2528,7 @@ class Seek(Command):
     description = "Seeks to a position in the current audio file."
     usage = "<position[0]> <hide(?h)>"
     flags = "h"
-    rate_limit = 0.5
+    rate_limit = (0.5, 2.5)
 
     async def __call__(self, argv, bot, guild, client, user, perm, channel, name, flags, **void):
         auds = await forceJoin(guild, channel, user, client, bot)
@@ -2583,7 +2580,7 @@ class Dump(Command):
     description = "Saves or loads the currently playing audio queue state."
     usage = "<data{attached_file}> <append(?a)> <hide(?h)>"
     flags = "ah"
-    rate_limit = 1
+    rate_limit = (1, 2)
 
     async def __call__(self, guild, channel, user, client, bot, perm, name, argv, flags, message, **void):
         auds = await forceJoin(guild, channel, user, client, bot)
@@ -2594,8 +2591,6 @@ class Dump(Command):
             f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
             create_task(sendFile(channel, "Queue data for **" + guild.name + "**:", f))
             return
-        if not bot.isTrusted(guild.id):
-            raise PermissionError("Must be in a trusted server to load audio data.")
         if not isAlone(auds, user) and perm < 1:
             raise self.permError(perm, 1, "to load new queue while other users are in voice")
         try:
@@ -2664,7 +2659,6 @@ class AudioSettings(Command):
         "NightCore": "resample",
         "Resample": "resample",
         "LoopQueue": "loop",
-        "LoopOne": "repeat",
         "Repeat": "repeat",
         "ShuffleQueue": "shuffle",
         "Quiet": "quiet",
@@ -2686,11 +2680,12 @@ class AudioSettings(Command):
         "CH": "chorus",
         "NC": "resample",
         "LQ": "loop",
+        "LoopOne": "repeat",
         "L1": "repeat",
         "SQ": "shuffle",
         "24/7": "stay",
     }
-    rate_limit = 0.5
+    rate_limit = (0.5, 3)
 
     def __init__(self, *args):
         self.alias = list(self.aliasMap) + list(self.aliasExt)[1:]
@@ -2787,9 +2782,9 @@ class AudioSettings(Command):
                 ops.append("volume")
         s = ""
         for op in ops:
-            if op not in "volume loop repeat shuffle quiet reset":
-                if not bot.isTrusted(guild.id):
-                    raise PermissionError("Must be in a trusted server for targeted audio setting.")
+            # if op not in "volume loop repeat shuffle quiet reset":
+            #     if not bot.isTrusted(guild.id):
+            #         raise PermissionError("Must be in a trusted server for targeted audio setting.")
             if type(op) is str and op in "loop repeat shuffle quiet stay" and not argv:
                 argv = str(not bot.database.playlists.audio[guild.id].stats[op])
             if disable:
@@ -2807,7 +2802,7 @@ class AudioSettings(Command):
                 orig = bool(orig)
             else:
                 origStats[op] = val
-            if auds.queue and op in "speed pitch pan bassboost reverb compressor chorus resample":
+            if auds.queue:# and op in "speed pitch pan bassboost reverb compressor chorus resample":
                 await create_future(auds.new, auds.file, auds.stats.position)
             s += (
                 "\nChanged audio {" + str(op)
@@ -3327,7 +3322,7 @@ class Lyrics(Command):
         ),
         flags=re.I,
     )
-    rate_limit = 2
+    rate_limit = (2, 3)
 
     async def __call__(self, bot, channel, message, argv, flags, user, **void):
         for a in message.attachments:
@@ -3353,7 +3348,7 @@ class Lyrics(Command):
             if not item:
                 item = search
         name, lyrics = await create_future(get_lyrics, item)
-        text = clrHighlight(lyrics.strip())
+        text = clrHighlight(lyrics.strip()).replace("#", "♯")
         msg = "Lyrics for **" + discord.utils.escape_markdown(name) + "**:"
         s = msg + "```ini\n" + text + "```"
         if "v" not in flags and len(s) <= 2000:
@@ -3411,7 +3406,7 @@ class Download(Command):
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
     usage = "<0:search_link{queue}> <-1:out_format[ogg]> <apply_settings(?a)> <verbose_search(?v)> <show_debug(?z)>"
     flags = "avz"
-    rate_limit = 7
+    rate_limit = (7, 12)
 
     async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
         if name in ("af", "audiofilter"):

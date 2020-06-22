@@ -149,7 +149,7 @@ class CreateEmoji(Command):
     usage = "<1:name> <0:url{attached_file}>"
     flags = "ae"
     no_parse = True
-    rate_limit = 3
+    rate_limit = (3, 4)
 
     async def __call__(self, bot, guild, message, args, argv, **void):
         if message.attachments:
@@ -251,7 +251,7 @@ class Saturate(Command):
     description = "Changes colour saturation of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
-    rate_limit = 3
+    rate_limit = (2, 3)
 
     async def __call__(self, bot, guild, message, args, argv, **void):
         name, value, url = await get_image(bot, message, args, argv)
@@ -267,7 +267,7 @@ class Contrast(Command):
     description = "Changes colour contrast of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
-    rate_limit = 3
+    rate_limit = (2, 3)
 
     async def __call__(self, bot, guild, message, args, argv, **void):
         name, value, url = await get_image(bot, message, args, argv)
@@ -283,7 +283,7 @@ class Brightness(Command):
     description = "Changes colour brightness of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
-    rate_limit = 3
+    rate_limit = (2, 3)
 
     async def __call__(self, bot, guild, message, args, argv, **void):
         name, value, url = await get_image(bot, message, args, argv)
@@ -299,7 +299,7 @@ class Sharpness(Command):
     description = "Changes colour sharpness of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
-    rate_limit = 3
+    rate_limit = (2, 3)
 
     async def __call__(self, bot, guild, message, args, argv, **void):
         name, value, url = await get_image(bot, message, args, argv)
@@ -315,7 +315,7 @@ class HueShift(Command):
     description = "Changes colour hue of supplied image."
     usage = "<0:url{attached_file}> <1:adjustment[0.5]>"
     no_parse = True
-    rate_limit = 3
+    rate_limit = (2, 3)
 
     async def __call__(self, bot, guild, message, args, argv, **void):
         name, value, url = await get_image(bot, message, args, argv)
@@ -331,7 +331,7 @@ class Colour(Command):
     description = "Creates a 128x128 image filled with the target colour."
     usage = "<Colour>"
     no_parse = True
-    rate_limit = 2
+    rate_limit = (1, 2)
     flags = "v"
     trans = {
         "hsv": hsv_to_rgb,
@@ -388,7 +388,7 @@ class Rainbow(Command):
     description = "Creates a .gif image from repeatedly hueshifting supplied image."
     usage = "<0:url{attached_file}> <1:duration[2]>"
     no_parse = True
-    rate_limit = 8
+    rate_limit = (5, 8)
     _timeout_ = 3
 
     async def __call__(self, bot, guild, message, args, argv, **void):
@@ -405,7 +405,7 @@ class CreateGIF(Command):
     description = "Combines multiple supplied images, and/or optionally a video, into an animated .gif image."
     usage = "<0*:urls{attached_files}> <-2:framerate_setting(?r)> <-1:framerate[16]>"
     no_parse = True
-    rate_limit = 12
+    rate_limit = (8, 12)
     _timeout_ = 5
     flags = "r"
 
@@ -445,77 +445,6 @@ class CreateGIF(Command):
             resp = await imageProc("create_gif", "$", ["video", video, delay], guild.id, timeout=64)
         else:
             resp = await imageProc("create_gif", "$", ["image", args, delay], guild.id, timeout=64)
-        fn = resp[0]
-        f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f, filename=fn)
-
-
-class Resize(Command):
-    name = ["ImageScale", "Scale", "Rescale", "ImageResize"]
-    min_level = 0
-    description = "Changes size of supplied image, using an optional scaling operation."
-    usage = "<0:url{attached_file}> <1:x_multiplier[0.5]> <2:y_multiplier[x]> <3:operation[auto](?l)>"
-    no_parse = True
-    rate_limit = 3
-    flags = "l"
-
-    async def __call__(self, bot, guild, message, flags, args, argv, **void):
-        if message.attachments:
-            args = [bestURL(a) for a in message.attachments] + args
-            argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
-        if not args:
-            if "l" in flags:
-                return (
-                    "```ini\nAvailable scaling operations: ["
-                    + "nearest, linear, hamming, cubic, lanczos, auto]```"
-                )
-            raise ArgumentError("Please input an image by URL or attachment.")
-        url = args.pop(0)
-        url = await bot.followURL(url, best=True)
-        if not isURL(url):
-            emojis = findEmojis(argv) + findEmojis(url)
-            if not emojis:
-                raise ArgumentError("Please input an image by URL or attachment.")
-            s = emojis[0]
-            value = argv[argv.index(s) + len(s):].strip()
-            s = s[2:]
-            i = s.index(":")
-            e_id = s[i + 1:s.rindex(">")]
-            url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
-        else:
-            value = " ".join(args).strip()
-        if not value:
-            x = y = 0.5
-            op = "auto"
-        else:
-            value = value.replace("x", " ").replace("X", " ").replace("*", " ").replace("×", " ")
-            try:
-                spl = shlex.split(value)
-            except ValueError:
-                spl = value.split()
-            x = await bot.evalMath(spl.pop(0), message.guild.id)
-            if spl:
-                y = await bot.evalMath(spl.pop(0), message.guild.id)
-            else:
-                y = x
-            for value in (x, y):
-                if not value >= -16 or not value <= 16:
-                    raise OverflowError("Maximum multiplier input is 16.")
-            if spl:
-                op = " ".join(spl)
-            else:
-                op = "auto"
-        try:
-            name = url[url.rindex("/") + 1:]
-            if not name:
-                raise ValueError
-            if "." in name:
-                name = name[:name.rindex(".")]
-        except ValueError:
-            name = "unknown"
-        if "." not in name:
-            name += ".png"
-        resp = await imageProc(url, "resize_mult", [x, y, op], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
         await sendFile(message.channel, "", f, filename=fn)
@@ -598,7 +527,7 @@ class Magik(Command):
     description = "Applies the Magik filter to an image."
     usage = "<0:url{attached_file}>"
     no_parse = True
-    rate_limit = 6
+    rate_limit = (4, 6)
     _timeout_ = 2
 
     async def __call__(self, bot, guild, channel, message, args, argv, **void):
@@ -655,7 +584,7 @@ class Blend(Command):
     description = "Combines the two supplied images, using an optional blend operation."
     usage = "<0:url1{attached_file}> <1:url2{attached_file}> <2:operation[replace](?l)> <3:opacity[1]>"
     no_parse = True
-    rate_limit = 4
+    rate_limit = (3, 5)
     flags = "l"
 
     async def __call__(self, bot, guild, message, flags, args, argv, **void):
@@ -755,7 +684,7 @@ class React(Command):
     usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
     flags = "aed"
     no_parse = True
-    rate_limit = 1
+    rate_limit = (1, 2)
 
     async def __call__(self, bot, flags, guild, message, argv, args, **void):
         update = self.data.reacts.update
@@ -1114,7 +1043,7 @@ class DeviantArt(Command):
                 except KeyError:
                     pass
                 return "```css\nSuccessfully removed all DeviantArt Gallery subscriptions from [#" + noHighlight(channel) + "].```"
-            return "```ini\nCurrently subscribed DeviantArt Galleries:\n" + strIter(assigned, key=lambda x: x["user"]) + "```"
+            return "Currently subscribed DeviantArt Galleries for [#" + noHighlight(channel) + "]:```ini" + strIter(assigned, key=lambda x: x["user"]) + "```"
         url = await bot.followURL(argv)
         if not isURL(url):
             raise ArgumentError("Please input a valid URL.")
@@ -1125,8 +1054,15 @@ class DeviantArt(Command):
         user = spl[0]
         if spl[1] != "gallery":
             raise ArgumentError("Please input a DeviantArt Gallery URL.")
-        content = int(spl[2].split("&")[0])
+        content = spl[2].split("&")[0]
         folder = noHighlight(spl[-1].split("&")[0])
+        try:
+            content = int(content)
+        except (ValueError, TypeError):
+            if content in (user, "all"):
+                content = user
+            else:
+                raise TypeError("Invalid Gallery type.")
         if content in self.data.get(channel.id, {}):
             raise KeyError("Already subscribed to " + user + ": " + folder)
         if "d" in flags:
@@ -1194,9 +1130,13 @@ class UpdateDeviantArt(Database):
         found = {}
         base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?limit=24&username="
         for content, user in conts.items():
+            if type(content) is str:
+                f_id = "&all_folder=true&mode=oldest"
+            else:
+                f_id = "&folderid=" + str(content)
             items = {}
             try:
-                url = base + user + "&folderid=" + str(content) + "&offset="
+                url = base + user + f_id + "&offset="
                 for i in range(0, 13824, 24):
                     req = url + str(i)
                     print(req)

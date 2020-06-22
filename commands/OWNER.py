@@ -134,13 +134,13 @@ class UpdateExec(Database):
     name = "exec"
     no_delete = True
 
-    def procFunc(self, proc, bot):
+    def procFunc(self, proc, channel, bot):
+        printc = dict(print=lambda *args, sep=" ", end="\n", prefix="", **void: create_task(channel.send(limStr("```py\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2000))))
         print(proc)
         try:
-            output = eval(proc, bot._globals)
+            output = eval(proc, bot._globals, printc)
         except SyntaxError:
-            exec(proc, bot._globals)
-            output = None
+            output = exec(proc, bot._globals, printc)
         return output
 
     async def sendDeleteID(self, c_id, delete_after=20, **kwargs):
@@ -176,7 +176,7 @@ class UpdateExec(Database):
                     return
                 output = None
                 try:
-                    output = await create_future(self.procFunc, proc, bot, priority=True)
+                    output = await create_future(self.procFunc, proc, channel, bot, priority=True)
                     if awaitable(output):
                         output = await output
                     await channel.send(limStr("```py\n" + str(output) + "```", 2000))
