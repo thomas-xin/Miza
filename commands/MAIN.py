@@ -610,7 +610,7 @@ class Info(Command):
             is_sys = False
         is_bot = u.bot
         is_self = u.id == client.user.id
-        is_self_owner = u.id == bot.owner_id
+        is_self_owner = u.id in bot.owners
         is_guild_owner = u.id == guild.owner_id
         if member:
             joined = getattr(u, "joined_at", None)

@@ -74,9 +74,12 @@ class Bot:
             print("ERROR: discord_token not found. Unable to login.")
             self.setshutdown()
         try:
-            self.owner_id = int(auth["owner_id"])
+            owner_id = auth["owner_id"]
+            if type(owner_id) not in (list, tuple):
+                owner_id = [owner_id]
+            self.owners = {int(i): True for i in owner_id}
         except KeyError:
-            self.owner_id = 0
+            self.owners = ()
             print("WARNING: owner_id not found. Unable to locate owner.")
         self.proc = psutil.Process()
         self.getModules()
@@ -532,7 +535,7 @@ class Bot:
             u_id = user.id
         except AttributeError:
             u_id = int(user)
-        if u_id == self.owner_id:
+        if u_id in self.owners:
             return nan
         if self.isBlacklisted(u_id):
             return -inf
@@ -638,7 +641,7 @@ class Bot:
 
     def isBlacklisted(self, u_id):
         u_id = int(u_id)
-        if u_id in (self.owner_id, client.user.id):
+        if u_id in self.owners or u_id == client.user.id:
             return False
         try:
             return self.data.blacklist.get(
@@ -1057,7 +1060,7 @@ class Bot:
                     self.stat_timer = utc() + float(frand(5)) + 12
                     self.guilds = guilds
                     try:
-                        u = await self.fetch_user(self.owner_id)
+                        u = await self.fetch_user(tuple(self.owners)[0])
                         n = u.name
                         place = ", from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place!"
                         activity = discord.Streaming(

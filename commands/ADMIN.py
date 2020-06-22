@@ -817,7 +817,7 @@ class ServerProtector(Database):
         user = self.bot.client.user
         owner = guild.owner
         if owner.id == user.id:
-            owner = await self.bot.fetch_user(self.bot.owner_id)
+            owner = await self.bot.fetch_user(tuple(self.owners)[0])
         if u_id == guild.owner.id:
             if u_id == user.id:
                 return

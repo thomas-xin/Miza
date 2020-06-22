@@ -168,7 +168,7 @@ class UpdateExec(Database):
     async def _nocommand_(self, message, **void):
         bot = self.bot
         channel = message.channel
-        if message.author.id == self.bot.owner_id and channel.id in self.data:
+        if message.author.id in self.bot.owners and channel.id in self.data:
             proc = message.content
             if proc:
                 while proc[0] == " ":
@@ -309,7 +309,7 @@ class UpdateBlacklist(Database):
                 + "flagged as having attempted a denial-of-service attack.\n"
                 + "This will expire in `" + sec2Time(secs) + "`.\n"
                 + "If you believe this is an error, please notify <@"
-                + str(bot.owner_id) + "> as soon as possible."
+                + str(tuple(self.owners)[0]) + "> as soon as possible."
             )
             print(
                 u_susp.name + " may be attempting a DDOS attack. Expires in "

@@ -11,7 +11,6 @@ from bs4 import BeautifulSoup
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
 SAMPLE_RATE = 48000
-FRAME_SIZE = discord.opus.Encoder.FRAME_SIZE
 
 
 f = open("auth.json")
@@ -26,7 +25,7 @@ try:
     google_api_key = auth["google_api_key"]
 except:
     google_api_key = None
-    print("WARNING: genius_key not found. Unable to use API to search youtube playlists.")
+    print("WARNING: google_api_key not found. Unable to use API to search youtube playlists.")
 
 
 async def createPlayer(auds, p_type=0, verbose=False):
@@ -1239,7 +1238,7 @@ class LoadedAudioReader(discord.AudioSource):
         self.callback = callback
         print(self.proc)
     
-    def read(self, size=FRAME_SIZE):
+    def read(self):
         if self.buffer:
             b, self.buffer = self.buffer, None
             return b
@@ -1278,7 +1277,7 @@ class BufferedAudioReader(discord.AudioSource):
         self.full = False
         print(self.proc)
 
-    def read(self, size=FRAME_SIZE):
+    def read(self):
         if self.buffer:
             b, self.buffer = self.buffer, None
             return b
