@@ -444,10 +444,11 @@ class Mimic(Command):
     name = ["RolePlay", "Plural", "RP", "RPCreate"]
     min_level = 0
     description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes."
-    usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)>"
-    flags = "aed"
+    usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)> <debug(?z)>"
+    flags = "aedfz"
     no_parse = True
-    rate_limit = 1
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    rate_limit = (1, 2)
     
     async def __call__(self, bot, message, user, perm, flags, args, argv, **void):
         update = self.data.mimics.update
@@ -457,26 +458,22 @@ class Mimic(Command):
         mimics = setDict(mimicdb, user.id, {})
         if not argv or (len(args) == 1 and "d" not in flags):
             if "d" in flags:
+                if "f" not in flags:
+                    response = uniStr(
+                        "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
+                        + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
+                    )
+                    return ("```asciidoc\n[" + response + "]```")
                 mimicdb.pop(user.id)
                 update()
                 return (
                     "```css\nSuccessfully removed all webhook mimics for ["
                     + noHighlight(user) + "].```"
                 )
-            for k in tuple(mimics):
-                if not mimics[k]:
-                    mimics.pop(k)
-                    update()
-            if not mimics:
-                return (
-                    "```ini\nNo webhook mimics currently enabled for ["
-                    + noHighlight(user) + "].```"
-                )
-            key = lambda x: limStr("⟨" + ", ".join(i + ": " + (str(noHighlight(mimicdb[i].name)), "[<@" + str(getattr(mimicdb[i], "auto", "None")) + ">]")[bool(getattr(mimicdb[i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
             return (
-                "Currently enabled webhook mimics for **"
-                + discord.utils.escape_markdown(str(user)) + "**: ```ini\n"
-                + strIter(mimics, key=key) + "```"
+                "```" + "\n" * ("z" in flags) + "callback-game-mimic-"
+                + str(user.id) + "_0"
+                + "-\nLoading Mimic database...```"
             )
         u_id = user.id
         prefix = args.pop(0)
@@ -593,6 +590,68 @@ class Mimic(Command):
             + (", bound to user [<" + "@" * (type(dop) is int) + str(dop) + ">]") * (dop is not None) + ".```"
         )
 
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, pos = [int(i) for i in vals.split("_")]
+        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        update = self.data.mimics.update
+        mimicdb = bot.data.mimics
+        user = await bot.fetch_user(u_id)
+        mimics = mimicdb.get(user.id, {})
+        for k in tuple(mimics):
+            if not mimics[k]:
+                mimics.pop(k)
+                update()
+        last = max(0, len(mimics) - 24)
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - 24)
+            elif i == 2:
+                new = min(last, pos + 24)
+            elif i == 3:
+                new = last
+            else:
+                new = pos
+            pos = new
+        content = message.content
+        if not content:
+            content = message.embeds[0].description
+        i = content.index("callback")
+        content = content[:i] + (
+            "callback-game-mimic-"
+            + str(u_id) + "_" + str(pos)
+            + "-\n"
+        )
+        if not mimics:
+            content += "No currently enabled webhook mimics for " + str(user).replace("`", "") + ".```"
+            msg = ""
+        else:
+            content += str(len(mimics)) + " currently enabled webhook mimics for " + str(user).replace("`", "") + ":```"
+            key = lambda x: limStr("⟨" + ", ".join(i + ": " + (str(noHighlight(mimicdb[i].name)), "[<@" + str(getattr(mimicdb[i], "auto", "None")) + ">]")[bool(getattr(mimicdb[i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
+            msg = "```ini\n" + strIter({k: mimics[k] for k in sorted(mimics)[pos:pos + 24]}, key=key) + "```"
+        emb = discord.Embed(
+            description=content + msg,
+            colour=randColour(),
+        )
+        url = bestURL(user)
+        emb.set_author(name=str(user), url=url, icon_url=url)
+        more = len(mimics) - pos - 24
+        if more > 0:
+            emb.set_footer(
+                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
+            )
+        create_task(message.edit(content=None, embed=emb))
+        if reaction is None:
+            for react in self.directions:
+                create_task(message.add_reaction(react.decode("utf-8")))
+                await asyncio.sleep(0.5)
+
 
 class MimicSend(Command):
     name = ["RPSend", "PluralSend"]
@@ -639,7 +698,7 @@ class MimicSend(Command):
             url = mimic.url
             try:
                 await waitOnNone(w.send(msg, username=name, avatar_url=url))
-            except discord.NotFound:
+            except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                 w = await bot.ensureWebhook(channel, force=True)
                 await waitOnNone(w.send(msg, username=name, avatar_url=url))
             mimic.count += 1
@@ -698,7 +757,7 @@ class UpdateMimics(Database):
                             msg = escape_everyone(k.msg)
                             try:
                                 await waitOnNone(w.send(msg, username=name, avatar_url=url))
-                            except discord.NotFound:
+                            except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                                 w = await bot.ensureWebhook(channel, force=True)
                                 await waitOnNone(w.send(msg, username=name, avatar_url=url))
                             mimic.count += 1
@@ -898,7 +957,7 @@ class UpdateMathTest(Database):
         x = "".join(str(xrand(10)) for _ in loop(xrand(2, 4)))
         s = "0." + "".join(x[i % len(x)] for i in range(28)) + "..."
         ans = "0.[" + x + "]"
-        s, ans
+        return s, ans
 
     def equation(self):
         a = xrand(1, 10)

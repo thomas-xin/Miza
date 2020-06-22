@@ -1094,13 +1094,14 @@ class Bot:
             self.cw_cache = freeClass()
         wlist = None
         if channel.id in self.cw_cache:
-            if utc() - self.cw_cache[channel.id].time > 300 or force:
+            if utc() - self.cw_cache[channel.id].time > 259200 or force:
                 self.cw_cache.pop(channel.id)
             else:
                 self.cw_cache[channel.id].time = utc()
                 wlist = [self.cw_cache[channel.id].webhook]
         if not wlist:
-            wlist = await channel.webhooks()
+            webs = await channel.webhooks()
+            wlist = [w for w in webs if w.token]
         if not wlist:
             w = await channel.create_webhook(name=bot.client.user.name)
         else:

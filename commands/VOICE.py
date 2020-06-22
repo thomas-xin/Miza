@@ -182,7 +182,7 @@ class CustomAudio(discord.AudioSource):
     # filt = signal.butter(1, 0.125, btype="low", output="sos")
     # #fff = numpy.abs(numpy.fft.fftfreq(SAMPLE_RATE / 50, 1/SAMPLE_RATE))[:ceil(SAMPLE_RATE / 100 + 1)]
     # static = lambda self, *args: numpy.random.rand(self.length) * 65536 - 32768
-    emptyopus = b"OggS\x00\x00\x80\xbb\x00\x00\x00\x00\x00\x00\x0f8Z4\x02\x00\x00\x00q\x0f\xc3\x8c2" + b"\x03" * 50 + b"\xfc\xff\xfe" * 50
+    emptyopus = b"\xfc\xff\xfe"
     defaults = {
         "volume": 1,
         "reverb": 0,
@@ -1899,7 +1899,7 @@ class Queue(Command):
     alias = name + ["LS"]
     min_level = 0
     description = "Shows the music queue, or plays a song in voice."
-    usage = "<search_link[]> <verbose(?v)> <hide(?h)> <force(?f)> <budge(?b)>"
+    usage = "<search_link[]> <verbose(?v)> <hide(?h)> <force(?f)> <budge(?b)> <debug(?z)>"
     flags = "hvfbz"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -1931,11 +1931,10 @@ class Queue(Command):
             if not len(q):
                 auds.preparing = False
                 create_future_ex(auds.update)
-                return "```ini\nQueue for [" + noHighlight(guild.name) + "] is currently empty. ```", 1
             return (
                 "```" + "\n" * ("z" in flags) + "callback-voice-queue-"
                 + str(user.id) + "_0_" + str(int(v))
-                + "-\nQueue for " + guild.name.replace("`", "") + ":```"
+                + "-\nLoading Queue...```"
             )
         future = wrap_future(create_task(forceJoin(guild, channel, user, client, bot, preparing=True)))
         if isURL(argv):
@@ -2016,6 +2015,7 @@ class Queue(Command):
             return
         if reaction not in self.directions and reaction is not None:
             return
+        user = await bot.fetch_user(u_id)
         guild = message.guild
         auds = await forceJoin(guild, message.channel, user, bot.client, bot)
         q = auds.queue
@@ -2044,11 +2044,13 @@ class Queue(Command):
         )
         elapsed = auds.stats.position
         startTime = 0
-        if auds.stats.loop or auds.stats.repeat:
+        if not q:
+            totalTime = 0
+        elif auds.stats.loop or auds.stats.repeat:
             totalTime = inf
         else:
-            if auds.reverse and len(auds.queue):
-                totalTime = elapsed - e_dur(auds.queue[0].duration)
+            if auds.reverse and q:
+                totalTime = elapsed - e_dur(q[0].duration)
             else:
                 totalTime = -elapsed
             i = 0
@@ -2064,12 +2066,21 @@ class Queue(Command):
             str(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
             + sec2Time(totalTime / auds.speed) + "```"
         )
-        duration = e_dur(q[0].duration)
+        if not q:
+            duration = 0
+        else:
+            duration = e_dur(q[0].duration)
         sym = "⬜⬛"
         barsize = 24
-        r = round(min(1, elapsed / duration) * barsize)
+        if not elapsed or not duration:
+            r = 0
+        else:
+            r = round(min(1, elapsed / duration) * barsize)
         bar = sym[0] * r + sym[1] * (barsize - r)
-        countstr = "Currently playing [" + discord.utils.escape_markdown(q[0].name) + "](" + q[0].url + ")\n"
+        if not q:
+            countstr = "Queue is currently empty.\n"
+        else:
+            countstr = "Currently playing [" + discord.utils.escape_markdown(q[0].name) + "](" + q[0].url + ")\n"
         countstr += (
             "`(" + uniStr(dhms(elapsed))
             + "/" + uniStr(dhms(duration)) + ") "
@@ -2079,7 +2090,6 @@ class Queue(Command):
             description=content + info + countstr,
             colour=randColour(),
         )
-        user = await bot.fetch_user(u_id)
         url = bestURL(user)
         emb.set_author(name=str(user), url=url, icon_url=url)
         if q:
@@ -2135,9 +2145,10 @@ class Queue(Command):
                 await asyncio.sleep(0.3)
             i += 1
         emb.description += embstr
-        if pos != last:
+        more = len(q) - i
+        if more > 0:
             emb.set_footer(
-                text=uniStr("And ", 1) + str(len(q) - i) + uniStr(" more...", 1),
+                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
             )
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
