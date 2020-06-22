@@ -142,7 +142,7 @@ class UpdateExec(Database):
         except SyntaxError:
             output = exec(proc, bot._globals, local)
         try:
-            local.pop(print)
+            local.pop("print")
         except KeyError:
             pass
         bot._globals.update(local)
