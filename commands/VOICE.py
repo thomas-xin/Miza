@@ -3350,7 +3350,7 @@ class Lyrics(Command):
         if isURL(argv):
             argv = await bot.followURL(argv)
             resp = await create_future(ytdl.search, argv)
-            search = resp[0]
+            search = resp[0].name
         else:
             search = argv
         search = search.translate(self.bot.mtrans)

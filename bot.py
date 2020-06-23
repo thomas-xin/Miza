@@ -87,6 +87,7 @@ class Bot:
         self.blocked = 0
         self.updated = False
         create_future_ex(self.clearcache, priority=True)
+        globals().update(self.cache)
 
     __call__ = lambda self: self
 
@@ -516,6 +517,11 @@ class Bot:
         for c in caches:
             while len(c) > limit:
                 c.pop(next(iter(c)))
+    
+    def updateClient(self):
+        self.cache.guilds.update(client._connection._guilds)
+        self.cache.guilds.update(client._connection._emojis)
+        self.cache.guilds.update(client._connection._users)
 
     def getPrefix(self, guild):
         try:
@@ -1533,6 +1539,7 @@ async def updateLoop():
             if utc() - autosave > 60:
                 autosave = utc()
                 bot.update()
+                create_future_ex(bot.updateClient)
             while bot.blocked > 0:
                 print("Update event blocked.")
                 bot.blocked -= 1
@@ -1555,6 +1562,7 @@ async def on_ready():
             else:
                 print("> " + guild.name)
         await bot.handleUpdate()
+        create_future_ex(bot.updateClient)
         if not hasattr(bot, "started"):
             bot.started = True
             create_task(updateLoop())

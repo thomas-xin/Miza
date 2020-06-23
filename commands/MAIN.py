@@ -768,9 +768,9 @@ class Status(Command):
         stats = bot.currState
         return (
             "```ini"
-            + "\nActive users: " + sbHighlight(len(client.users))
-            + ", Active servers: " + sbHighlight(bot.guilds)
-            + ", Active shards: " + sbHighlight(shards)
+            + "\nLoaded users: " + sbHighlight(max(len(client.users), len(bot.cache.users)))
+            + ", Loaded servers: " + sbHighlight(bot.guilds)
+            + ", Loaded shards: " + sbHighlight(shards)
             
             + ".\nActive processes: " + sbHighlight(active[0])
             + ", Active threads: " + sbHighlight(active[1])

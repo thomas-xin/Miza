@@ -134,8 +134,28 @@ class UpdateExec(Database):
     name = "exec"
     no_delete = True
 
+    qmap = {
+        "“": '"',
+        "”": '"',
+        "„": '"',
+        "‘": "'",
+        "’": "'",
+        "‚": "'",
+        "〝": '"',
+        "〞": '"',
+        "⸌": "'",
+        "⸍": "'",
+        "⸢": "'",
+        "⸣": "'",
+        "⸤": "'",
+        "⸥": "'",
+    }
+    qtrans = "".maketrans(qmap)
+
     def procFunc(self, proc, channel, bot):
-        local = dict(print=lambda *args, sep=" ", end="\n", prefix="", **void: create_task(channel.send(limStr("```py\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2000))))
+        if not proc:
+            return
+        local = dict(print=lambda *args, sep=" ", end="\n", prefix="", **void: create_task(channel.send(limStr("```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2000))))
         print(proc)
         try:
             output = eval(proc, bot._globals, local)
@@ -179,6 +199,7 @@ class UpdateExec(Database):
                     proc = proc.strip("`")
                 if not proc:
                     return
+                proc = proc.translate(self.qtrans)
                 output = None
                 try:
                     output = await create_future(self.procFunc, proc, channel, bot, priority=True)

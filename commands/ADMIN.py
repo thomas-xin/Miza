@@ -1050,12 +1050,13 @@ class UpdateMessageLogs(Database):
                         print(traceback.format_exc())
                     await asyncio.sleep(20 * (i ** 2 + 1))
                 returns[0] = messages
+            except (discord.Forbidden):
+                returns[0] = []
             except:
                 print(channel.name)
                 print(traceback.format_exc())
                 returns[0] = []
 
-        print(guild, "loading...")
         limit = ceil(lim / len(guild.text_channels))
         histories = deque()
         i = 1
@@ -1083,7 +1084,8 @@ class UpdateMessageLogs(Database):
                 if not i & 8191:
                     await asyncio.sleep(0.5)
                 i += 1
-        print(guild, "finished.")
+        create_future_ex(self.bot.updateClient)
+        # print(guild, "finished.")
 
     async def __call__(self):
         for h in tuple(self.dc):
