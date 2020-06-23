@@ -75,19 +75,21 @@ class Purge(Command):
         while len(delM):
             try:
                 if hasattr(channel, "delete_messages"):
-                    await channel.delete_messages(delM[:100])
-                    deleted += min(len(delM), 100)
-                    for _ in loop(min(len(delM), 100)):
+                    dels = delM[:100]
+                    bot.logDelete(dels[-1], -1)
+                    await channel.delete_messages(dels)
+                    deleted += len(dels)
+                    for _ in loop(len(dels)):
                         delM.popleft()
                 else:
-                    await bot.silentDelete(delM[0], exc=True)
+                    await bot.silentDelete(delM[0], no_log=-1, exc=True)
                     deleted += 1
                     delM.popleft()
             except:
                 print(traceback.format_exc())
                 for _ in loop(min(5, len(delM))):
                     m = delM.popleft()
-                    await bot.silentDelete(m, exc=True)
+                    await bot.silentDelete(m, no_log=-1, exc=True)
                     deleted += 1
         if not "h" in flags:
             return (
@@ -1132,7 +1134,7 @@ class UpdateMessageLogs(Database):
     async def _delete_(self, message, bulk=False, **void):
         cu_id = self.bot.client.user.id
         if bulk:
-            self.logDeleted(message)
+            # self.logDeleted(message)
             return
         guild = message.guild
         if guild.id in self.data:
@@ -1148,16 +1150,21 @@ class UpdateMessageLogs(Database):
             name = u.name
             name_id = name + bool(u.display_name) * ("#" + u.discriminator)
             url = bestURL(u)
-            action = (
-                discord.AuditLogAction.message_delete,
-                discord.AuditLogAction.message_bulk_delete,
-            )[bulk]
+            action = discord.AuditLogAction.message_delete
             try:
                 t = u
                 init = "<@" + str(t.id) + ">"
-                if self.bot.isDeleted(message):
+                d_level = self.bot.isDeleted(message)
+                if d_level:
+                    if d_level > 1:
+                        if d_level < 3:
+                            self.logDeleted(message)
+                        return
                     t = self.bot.client.user
+                    init = "<@" + str(t.id) + ">"
                 else:
+                    if not guild.get_member(cu_id).guild_permissions.view_audit_log:
+                        raise discord.Forbidden
                     al = await guild.audit_logs(
                         limit=5,
                         action=action,
@@ -1165,32 +1172,28 @@ class UpdateMessageLogs(Database):
                     for e in reversed(al):
                         # print(e, e.target, now - e.created_at)
                         try:
-                            cnt = e.extra.count - 1
+                            cnt = e.extra.count
                         except AttributeError:
-                            cnt = int(e.extra.get("count", 1)) - 1
+                            cnt = int(e.extra.get("count", 1))
                         h = e.created_at
                         cs = setDict(self.dc, h, 0)
                         c = cnt - cs
-                        if c > 0:
-                            self.dc[h] += 1
-                        s = (5, 3600)[c > 0]
-                        if not bulk:
-                            cid = e.extra.channel.id
-                            targ = e.target.id
-                        else:
-                            try:
-                                cid = e.target.id
-                            except AttributeError:
-                                cid = e._target_id
-                            targ = u.id
+                        if c >= 1:
+                            if self.dc[h] == 0:
+                                self.dc[h] = cnt
+                            else:
+                                self.dc[h] += cnt
+                        s = (5, 3600)[c >= 1]
+                        cid = e.extra.channel.id
+                        targ = e.target.id
                         if now - h < datetime.timedelta(seconds=s):
                             if targ == u.id and cid == message.channel.id:
                                 t = e.user
                                 init = "<@" + str(t.id) + ">"
                                 # print(t, e.target)
-                if t.bot or u.id == t.id == cu_id:
-                    self.logDeleted(message)
-                    return
+                # if t.bot or u.id == t.id == cu_id:
+                #     self.logDeleted(message)
+                #     return
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
             emb = discord.Embed(colour=colour2Raw([255, 0, 0]))
@@ -1201,6 +1204,84 @@ class UpdateMessageLogs(Database):
             )
             emb.description += strMessage(message, limit=2048 - len(emb.description))
             await channel.send(embed=emb)
+
+    async def _bulk_delete_(self, messages, **void):
+        cu = self.bot.client.user
+        cu_id = cu.id
+        guild = messages[0].guild
+        if guild.id in self.data:
+            c_id = self.data[guild.id]
+            try:
+                channel = await self.bot.fetch_channel(c_id)
+            except (EOFError, discord.NotFound):
+                self.data.pop(guild.id)
+                self.update()
+                return
+            now = datetime.datetime.utcnow()
+            action = discord.AuditLogAction.message_bulk_delete
+            try:
+                init = "[UNKNOWN USER]"
+                if self.bot.isDeleted(messages[-1]):
+                    t = self.bot.client.user
+                    init = "<@" + str(t.id) + ">"
+                else:
+                    if not guild.get_member(cu_id).guild_permissions.view_audit_log:
+                        raise discord.Forbidden
+                    al = await guild.audit_logs(
+                        limit=5,
+                        action=action,
+                    ).flatten()
+                    for e in reversed(al):
+                        # print(e, e.target, now - e.created_at)
+                        try:
+                            cnt = e.extra.count
+                        except AttributeError:
+                            cnt = int(e.extra.get("count", 1))
+                        h = e.created_at
+                        cs = setDict(self.dc, h, 0)
+                        c = cnt - cs
+                        if c >= len(messages):
+                            if self.dc[h] == 0:
+                                self.dc[h] = cnt
+                            else:
+                                self.dc[h] += cnt
+                        s = (5, 3600)[c >= len(messages)]
+                        if now - h < datetime.timedelta(seconds=s):
+                            if e.target is None or e.target.id == messages[-1].channel.id:
+                                t = e.user
+                                init = "<@" + str(t.id) + ">"
+            except (discord.Forbidden, discord.HTTPException):
+                init = "[UNKNOWN USER]"
+            m = guild.get_member(cu_id)
+            w = await self.bot.ensureWebhook(channel)
+            emb = discord.Embed(colour=colour2Raw([255, 0, 255]))
+            emb.description = (
+                init + " **deleted " + str(len(messages)) + " message" + "s" * (len(messages) != 1) + " from** <#"
+                + str(messages[-1].channel.id) + ">:"
+            )
+            embs = deque([emb])
+            for message in messages:
+                u = message.author
+                name = u.name
+                name_id = name + bool(u.display_name) * ("#" + u.discriminator)
+                url = bestURL(u)
+                emb = discord.Embed(colour=colour2Raw([127, 0, 127]))
+                emb.set_author(name=name_id, icon_url=url, url=url)
+                emb.description = strMessage(message, limit=2048)
+                if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
+                    try:
+                        await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+                    except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
+                        w = await self.bot.ensureWebhook(channel, force=True)
+                        await waitOnNone(w.send(msg, username=m.display_name, avatar_url=bestURL(m)))
+                    embs.clear()
+                embs.append(emb)
+            if embs:
+                try:
+                    await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+                except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
+                    w = await self.bot.ensureWebhook(channel, force=True)
+                    await waitOnNone(w.send(msg, username=m.display_name, avatar_url=bestURL(m)))
 
 
 class UpdateFileLogs(Database):
@@ -1256,8 +1337,8 @@ class UpdateFileLogs(Database):
     #             return
     #         await channel.send(msg, embed=emb, file=fil)
 
-    async def _delete_(self, message, bulk=False, **void):
-        if bulk or self.bot.isDeleted(message):
+    async def _delete_(self, message, **void):
+        if self.bot.isDeleted(message) > 1:
             return
         guild = message.guild
         if guild.id in self.data:

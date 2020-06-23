@@ -520,8 +520,8 @@ class Bot:
     
     def updateClient(self):
         self.cache.guilds.update(client._connection._guilds)
-        self.cache.guilds.update(client._connection._emojis)
-        self.cache.guilds.update(client._connection._users)
+        self.cache.emojis.update(client._connection._emojis)
+        self.cache.users.update(client._connection._users)
 
     def getPrefix(self, guild):
         try:
@@ -621,7 +621,7 @@ class Bot:
             m_id = int(message.id)
         except AttributeError:
             m_id = int(message)
-        self.cache.deleted[m_id] = no_log + 1
+        self.cache.deleted[m_id] = no_log + 2
         self.limitCache("deleted", limit=4096)
     
     async def silentDelete(self, message, exc=False, no_log=False, delay=None):
@@ -1830,7 +1830,7 @@ async def on_raw_message_delete(payload):
 async def on_raw_bulk_message_delete(payload):
     try:
         messages = payload.cached_messages
-        if messages is None:
+        if messages is None or len(messages) < len(payload.message_ids):
             raise LookupError
     except:
         messages = deque()
@@ -1851,6 +1851,14 @@ async def on_raw_bulk_message_delete(payload):
                 message.created_at = snowflake_time(message.id)
                 message.author = await bot.fetch_user(bot.deleted_user)
             messages.append(message)
+    messages = sorted(messages, key=lambda m: m.id)
+    for u in bot.database.values():
+        f = getattr(u, "_bulk_delete_", None)
+        if f is not None:
+            try:
+                await f(messages=messages)
+            except:
+                print(traceback.format_exc())
     for message in messages:
         guild = message.guild
         if guild:
