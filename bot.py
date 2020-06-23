@@ -1178,7 +1178,8 @@ class Bot:
             self.bot = False
             self.display_name = ""
 
-        __repr__ = lambda self: str(self.name) + "#" + str(self.discriminator)
+        __repr__ = lambda self: "<Ghost User id=" + str(self.id) + " name='" + str(self.name) + "' discriminator='" + str(self.discriminator) + "' bot=False>"
+        __str__ = lambda self: str(self.name) + "#" + str(self.discriminator)
         system = False
         history = lambda *void1, **void2: None
         dm_channel = None
