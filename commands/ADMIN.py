@@ -1304,13 +1304,11 @@ class UpdateRolegivers(Database):
             if ((k in text) if is_alphanumeric(k) else (k in message.content.lower())):
                 alist = assigned[k]
                 for r in alist[0]:
-                    role = guild.get_role(r)
-                    if role is None:
-                        roles = await guild.fetch_roles()
-                        for i in roles:
-                            if i.id == r:
-                                role = i
-                    if role is None:
+                    try:
+                        role = await bot.fetch_role(r, guild)
+                        if role is None:
+                            raise LookupError
+                    except LookupError:
                         alist[0].remove(r)
                         continue
                     await user.add_roles(

@@ -515,10 +515,10 @@ class Mimic(Command):
             raise OverflowError("Prefix must be 16 or fewer in length.")
         if " " in prefix:
             raise TypeError("Prefix must not contain spaces.")
-        if sum(len(i) for i in iter(mimics.values())) >= 256:
+        if sum(len(i) for i in iter(mimics.values())) >= 32768:
             raise OverflowError(
                 "Mimic list for " + str(user)
-                + " has reached the maximum of 256 items. "
+                + " has reached the maximum of 32768 items. "
                 + "Please remove an item to add another."
             )
         dop = None
