@@ -1374,8 +1374,9 @@ def strIter(it, key=None, limit=1728, offset=0, left="[", right="]"):
         if type(k) is not str:
             s += " " * (int(math.log10(len(it))) - int(math.log10(max(1, i))))
             if add is not None:
-                k += add
-            s += str(k)
+                s += str(k + add)
+            else:
+                s += str(k)
         else:
             s += k
         s += right + " "
