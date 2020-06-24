@@ -84,7 +84,8 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None):
     ts = round(time.time() * 1000)
     fn = "cache/" + str(ts)
     if direct:
-        data = requests.get(url, timeout=8).content
+        resp = requests.get(url, stream=True, timeout=8)
+        data = resp.raw.read()
         file = open(fn, "wb")
         try:
             file.write(data)
@@ -168,7 +169,8 @@ def create_gif(in_type, args, delay):
     maxsize = int(min(maxsize, 32768 / len(images) ** 0.5))
     imgs = []
     for url in images:
-        data = requests.get(url, timeout=8).content
+        resp = requests.get(url, stream=True, timeout=8)
+        data = resp.raw.read()
         try:
             img = get_image(data, None)
         except (PIL.UnidentifiedImageError, OverflowError):
@@ -479,7 +481,8 @@ def hue_shift(image, value):
 def get_image(url, out):
     if type(url) not in (bytes, bytearray, io.BytesIO):
         if isURL(url):
-            data = requests.get(url, timeout=8).content
+            resp = requests.get(url, stream=True, timeout=8)
+            data = resp.raw.read()
         else:
             if os.path.getsize(url) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")
