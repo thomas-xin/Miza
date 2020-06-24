@@ -1124,7 +1124,7 @@ class Bot:
         try:
             if not embeds:
                 return
-            guild = getattr(channel, "guild")
+            guild = getattr(channel, "guild", None)
             single = False
             if guild is None or hasattr(guild, "ghost") or len(embeds) == 1:
                 single = True
@@ -1160,7 +1160,7 @@ class Bot:
                     await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
         except Exception as ex:
             print(traceback.format_exc())
-            await channel.send("```py\n" + repr(ex) + "```")
+            await sendReact(channel, "```py\n" + repr(ex) + "```", reacts="❎")
 
     def embedSender(self, channel, embeds):
         if not issubclass(type(embeds), collections.abc.Sequence):
