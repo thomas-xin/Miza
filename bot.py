@@ -1131,7 +1131,7 @@ class Bot:
         m = guild.get_member(client.user.id)
         if m is None:
             m = client.user
-        embs = deque([embeds[0]])
+        embs = deque()
         for emb in embeds:
             if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
                 try:
