@@ -231,7 +231,9 @@ class Zalgo(Command):
         for i in (1, 2, 3, 4, 5, 6, 7, 8):
             emb.add_field(name="Level " + str(i), value="```" + "fix" * (i & 1) + "\n" + self.zalgo(argv, i) + "```")
         try:
-            await channel.send(embed=emb)
+            if len(emb) > 6000:
+                raise discord.HTTPException
+            self.bot.embedSender(channel, emb)
         except discord.HTTPException:
             return "\n\n".join(f.name + "\n" + noCodeBox(f.value) for f in emb.fields)
 

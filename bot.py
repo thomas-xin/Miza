@@ -86,6 +86,7 @@ class Bot:
         self.guilds = 0
         self.blocked = 0
         self.updated = False
+        self.embedSenders = {}
         create_future_ex(self.clearcache, priority=True)
         globals().update(self.cache)
 
@@ -717,6 +718,7 @@ class Bot:
         self.loaded = True
 
     def update(self):
+        create_task(self.updateEmbeds())
         saved = hlist()
         try:
             for i in self.database:
@@ -1119,34 +1121,80 @@ class Bot:
         return w
 
     async def sendEmbeds(self, channel, embeds):
-        if not embeds:
-            return
-        guild = getattr(channel, "guild")
-        if guild is None or len(embeds) == 1:
+        try:
+            if not embeds:
+                return
+            guild = getattr(channel, "guild")
+            single = False
+            if guild is None or hasattr(guild, "ghost") or len(embeds) == 1:
+                single = True
+            else:
+                m = guild.get_member(client.user.id)
+                if m is None:
+                    m = client.user
+                    single = True
+                else:
+                    if not m.guild_permissions.manage_webhooks:
+                        single = True
+            if single:
+                for emb in embeds:
+                    create_task(channel.send(embed=emb))
+                    await asyncio.sleep(0.5)
+                return
+            w = await self.bot.ensureWebhook(channel)
+            embs = deque()
             for emb in embeds:
-                create_task(channel.send(embed=emb))
-                await asyncio.sleep(0.5)
-            return
-        w = await self.bot.ensureWebhook(channel)
-        m = guild.get_member(client.user.id)
-        if m is None:
-            m = client.user
-        embs = deque()
-        for emb in embeds:
-            if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
+                if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
+                    try:
+                        await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+                    except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
+                        w = await self.bot.ensureWebhook(channel, force=True)
+                        await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+                    embs.clear()
+                embs.append(emb)
+            if embs:
                 try:
                     await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
                 except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                     w = await self.bot.ensureWebhook(channel, force=True)
                     await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
-                embs.clear()
-            embs.append(emb)
-        if embs:
-            try:
-                await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
-            except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
-                w = await self.bot.ensureWebhook(channel, force=True)
-                await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+        except Exception as ex:
+            print(traceback.format_exc())
+            await channel.send("```py\n" + repr(ex) + "```")
+
+    def embedSender(self, channel, embeds):
+        if not issubclass(type(embeds), collections.abc.Sequence):
+            embeds = (embeds,)
+        elif not embeds:
+            return
+        for e in embeds:
+            if len(e) > 6000:
+                print(e.to_dict())
+                raise OverflowError
+        try:
+            c_id = int(channel)
+        except (TypeError, ValueError):
+            c_id = channel.id
+        user = self.cache.users.get(c_id)
+        if user is not None:
+            create_task(self.sendEmbeds(user, embeds))
+        else:
+            embs = setDict(self.embedSenders, c_id, [])
+            embs.extend(embeds)
+
+    async def updateEmbeds(self):
+        for c_id, embs in tuple(self.embedSenders.items()):
+            if embs:
+                try:
+                    channel = await self.fetch_channel(c_id)
+                    await self.sendEmbeds(channel, embs)
+                except:
+                    try:
+                        user = await self.fetch_user(c_id)
+                        await self.sendEmbeds(user, embs)
+                    except:
+                        print(traceback.format_exc())
+        self.embedSenders.clear()
 
     class userGuild(discord.Object):
 
@@ -1559,7 +1607,16 @@ async def heartbeatLoop():
                     print(traceback.format_exc())
             await asyncio.sleep(0.5)
     except asyncio.CancelledError:
-        sys.exit(1)        
+        sys.exit(1)   
+
+
+async def embedLoop():
+    while True:
+        try:
+            await bot.updateEmbeds()
+        except:
+            print(traceback.format_exc())
+        await asyncio.sleep(1)
 
 
 async def updateLoop():
@@ -1584,6 +1641,7 @@ async def updateLoop():
 @client.event
 async def on_ready():
     print("Successfully connected as " + str(client.user))
+    create_task(heartbeatLoop())
     try:
         await bot.getState()
         print("Servers: ")
@@ -1597,7 +1655,7 @@ async def on_ready():
         if not hasattr(bot, "started"):
             bot.started = True
             create_task(updateLoop())
-            create_task(heartbeatLoop())
+            create_task(embedLoop())
             await bot.fetch_user(bot.deleted_user)
             if "init.tmp" not in os.listdir("misc"):
                 print("Setting bot avatar...")

@@ -3459,7 +3459,9 @@ class Lyrics(Command):
             else:
                 emb.description = "```ini\n" + curr.strip() + "```"
         try:
-            await channel.send(embed=emb)
+            if len(emb) > 6000:
+                raise discord.HTTPException
+            bot.embedSender(channel, emb)
         except discord.HTTPException:
             print(traceback.format_exc())
             return (title + "\n\n" + emb.description + "\n\n".join(noCodeBox(f.value) for f in emb.fields)).strip()

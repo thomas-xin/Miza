@@ -1090,10 +1090,7 @@ class UpdateReminders(Database):
             except KeyError:
                 u = x
             emb.set_author(name=u.name, url=bestURL(u), icon_url=bestURL(u))
-            try:
-                await ch.send(embed=emb)
-            except discord.Forbidden:
-                pass
+            self.bot.embedSender(ch, emb)
             self.update()
 
 

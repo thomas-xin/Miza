@@ -951,7 +951,7 @@ class UpdateUserLogs(Database):
                 colour[2] += 255
             if change:
                 emb.colour = colour2Raw(colour)
-                await channel.send(embed=emb)
+                self.bot.embedSender(channel, emb)
 
     async def _join_(self, user, **void):
         guild = getattr(user, "guild", None)
@@ -970,7 +970,7 @@ class UpdateUserLogs(Database):
                 "<@" + str(user.id)
                 + "> has joined the server."
             )
-            await channel.send(embed=emb)
+            self.bot.embedSender(channel, emb)
     
     async def _leave_(self, user, **void):
         guild = getattr(user, "guild", None)
@@ -1026,7 +1026,7 @@ class UpdateUserLogs(Database):
                     "<@" + str(user.id)
                     + "> has left the server."
                 )
-            await channel.send(embed=emb)
+            self.bot.embedSender(channel, emb)
 
 
 class UpdateMessageLogs(Database):
@@ -1122,7 +1122,7 @@ class UpdateMessageLogs(Database):
                 )
                 emb.add_field(name="Before", value=strMessage(before))
                 emb.add_field(name="After", value=strMessage(after))
-                await channel.send(embed=emb)
+                self.bot.embedSender(channel, emb)
 
     def logDeleted(self, message):
         if message.author.bot and message.author.id != self.bot.client.user.id:
@@ -1203,7 +1203,7 @@ class UpdateMessageLogs(Database):
                 + str(message.channel.id) + ">:\n"
             )
             emb.description += strMessage(message, limit=2048 - len(emb.description))
-            await channel.send(embed=emb)
+            self.bot.embedSender(channel, emb)
 
     async def _bulk_delete_(self, messages, **void):
         cu = self.bot.client.user
@@ -1267,7 +1267,7 @@ class UpdateMessageLogs(Database):
                 emb.set_author(name=name_id, icon_url=url, url=url)
                 emb.description = strMessage(message, limit=2048)
                 embs.append(emb)
-            await self.bot.sendEmbeds(channel, embs)
+            self.bot.embedSender(channel, embs)
 
 
 class UpdateFileLogs(Database):

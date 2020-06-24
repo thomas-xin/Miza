@@ -1241,7 +1241,7 @@ class UpdateDeviantArt(Database):
         except:
             print(traceback.format_exc())
         else:
-            await bot.sendEmbeds(channel, embs)
+            bot.embedSender(channel, embs)
 
     async def __call__(self):
         t = setDict(self.__dict__, "time", 0)
