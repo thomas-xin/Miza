@@ -1363,15 +1363,22 @@ def strIter(it, key=None, limit=1728, offset=0, left="[", right="]"):
         it = hlist(it)
     if issubclass(type(it), collections.abc.Mapping):
         keys = it.keys()
+        add = None
     else:
-        keys = range(offset, offset + len(it))
+        keys = range(len(it))
+        add = offset
     s = ""
     i = offset
     for k in keys:
         s += "\n" + left
         if type(k) is not str:
             s += " " * (int(math.log10(len(it))) - int(math.log10(max(1, i))))
-        s += str(k) + right + " "
+            if add is not None:
+                k += add
+            s += str(k)
+        else:
+            s += k
+        s += right + " "
         if key is None:
             s += str(it[k])
         else:
