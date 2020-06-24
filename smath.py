@@ -1364,7 +1364,7 @@ def strIter(it, key=None, limit=1728, offset=0, left="[", right="]"):
     if issubclass(type(it), collections.abc.Mapping):
         keys = it.keys()
     else:
-        keys = range(len(it))
+        keys = range(offset, offset + len(it))
     s = ""
     i = offset
     for k in keys:
