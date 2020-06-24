@@ -1118,6 +1118,36 @@ class Bot:
         self.cw_cache[channel.id] = freeClass(time=utc(), webhook=w)
         return w
 
+    async def sendEmbeds(self, channel, embeds):
+        if not embeds:
+            return
+        guild = getattr(channel, "guild")
+        if guild is None or len(embeds) == 1:
+            for emb in embeds:
+                create_task(channel.send(embed=emb))
+                await asyncio.sleep(0.5)
+            return
+        w = await self.bot.ensureWebhook(channel)
+        m = guild.get_member(client.user.id)
+        if m is None:
+            m = client.user
+        embs = deque([embeds[0]])
+        for emb in embeds:
+            if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
+                try:
+                    await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+                except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
+                    w = await self.bot.ensureWebhook(channel, force=True)
+                    await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+                embs.clear()
+            embs.append(emb)
+        if embs:
+            try:
+                await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+            except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
+                w = await self.bot.ensureWebhook(channel, force=True)
+                await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+
     class userGuild(discord.Object):
 
         class userChannel(discord.abc.PrivateChannel):

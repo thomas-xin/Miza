@@ -1210,7 +1210,10 @@ class UpdateDeviantArt(Database):
             self.data.pop(c_id)
             return
         try:
-            assigned = self.data[c_id]
+            assigned = self.data.get(c_id)
+            if assigned is None:
+                return
+            embs = deque()
             for content in assigned:
                 items = found[content]
                 entries = assigned[content]["entries"]
@@ -1230,13 +1233,15 @@ class UpdateDeviantArt(Database):
                                 colour=discord.Colour(1),
                                 description="🔔 New Deviation from " + items[i][2] + " 🔔\n" + items[i][0],
                             ).set_image(url=items[i][1]).set_author(name=items[i][2], url=home, icon_url=items[i][3])
-                            await channel.send(embed=emb)
+                            embs.append(emb)
                     for i in orig:
                         if i not in items:
                             entries.pop(i)
                             self.update()
         except:
             print(traceback.format_exc())
+        else:
+            await bot.sendEmbeds(channel, embs)
 
     async def __call__(self):
         t = setDict(self.__dict__, "time", 0)

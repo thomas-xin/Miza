@@ -1252,8 +1252,6 @@ class UpdateMessageLogs(Database):
                                 init = "<@" + str(t.id) + ">"
             except (discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
-            m = guild.get_member(cu_id)
-            w = await self.bot.ensureWebhook(channel)
             emb = discord.Embed(colour=colour2Raw([255, 0, 255]))
             emb.description = (
                 init + " **deleted " + str(len(messages)) + " message" + "s" * (len(messages) != 1) + " from** <#"
@@ -1268,20 +1266,8 @@ class UpdateMessageLogs(Database):
                 emb = discord.Embed(colour=colour2Raw([127, 0, 127]))
                 emb.set_author(name=name_id, icon_url=url, url=url)
                 emb.description = strMessage(message, limit=2048)
-                if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
-                    try:
-                        await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
-                    except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
-                        w = await self.bot.ensureWebhook(channel, force=True)
-                        await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
-                    embs.clear()
                 embs.append(emb)
-            if embs:
-                try:
-                    await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
-                except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
-                    w = await self.bot.ensureWebhook(channel, force=True)
-                    await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+            await self.bot.sendEmbeds(channel, embs)
 
 
 class UpdateFileLogs(Database):
