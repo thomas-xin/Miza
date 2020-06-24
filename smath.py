@@ -1353,7 +1353,7 @@ def strGetRem(s, arg):
         return s, False
 
 
-def strIter(it, key=None, limit=1728):
+def strIter(it, key=None, limit=1728, offset=0, left="[", right="]"):
     try:
         try:
             len(it)
@@ -1366,12 +1366,12 @@ def strIter(it, key=None, limit=1728):
     else:
         keys = range(len(it))
     s = ""
-    i = 0
+    i = offset
     for k in keys:
-        s += "\n["
+        s += "\n" + left
         if type(k) is not str:
             s += " " * (int(math.log10(len(it))) - int(math.log10(max(1, i))))
-        s += str(k) + "] "
+        s += str(k) + right + " "
         if key is None:
             s += str(it[k])
         else:

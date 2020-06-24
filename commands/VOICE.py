@@ -236,7 +236,7 @@ class CustomAudio(discord.AudioSource):
         classname = str(self.__class__).replace("'>", "")
         classname = classname[classname.index("'") + 1:]
         return (
-            "<" + classname + " object at " + hex(id(self)).upper() + ">: {"
+            "<" + classname + " object at " + hex(id(self)).upper().replace("X", "x") + ">: {"
             + "\"vc\": " + str(self.vc)
             + ", \"queue\": " + str(self.queue)
             + ", \"stats\": " + str(self.stats)
@@ -1066,7 +1066,7 @@ class PCMFile:
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
         classname = classname[classname.index("'") + 1:]
-        return "<" + classname + " object " + self.file + " at " + hex(id(self)).upper() + ">"
+        return "<" + classname + " object " + self.file + " at " + hex(id(self)).upper().replace("X", "x") + ">"
     
     def load(self, stream, check_fmt=False, force=False):
         if self.loading and not force:
@@ -2162,8 +2162,9 @@ class Playlist(Command):
     min_level = 0
     min_display = "0~2"
     description = "Shows, appends, or removes from the default playlist."
-    usage = "<search_link[]> <remove(?d)> <verbose(?v)>"
-    flags = "aedv"
+    usage = "<search_link[]> <remove(?d)> <debug(?z)>"
+    flags = "aedzf"
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = 0.5
 
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
@@ -2180,26 +2181,23 @@ class Playlist(Command):
         pl = setDict(bot.data.playlists, guild.id, [])
         if not argv:
             if "d" in flags:
-                pl[guild.id] = []
+                if "f" not in flags:
+                    response = uniStr(
+                        "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
+                        + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
+                    )
+                    return ("```asciidoc\n[" + response + "]```")
+                pl[guild.id].clear()
+                pl.pop(guild.id)
                 update()
                 return (
                     "```css\nRemoved all entries from the default playlist for "
                     + sbHighlight(guild) + ".```"
                 )
-            if not pl:
-                return (
-                    "```ini\nDefault playlist for " + sbHighlight(guild)
-                    + " is currently empty.```"
-                )
-            if "v" in flags:
-                key = lambda x: noHighlight(x)
-                s = strIter(pl, key=key).replace("'", '"')
-            else:
-                key = lambda x: limStr(noHighlight(x["name"]), 1900 / len(pl) - 10)
-                s = strIter(pl, key=key)
             return (
-                "Current default playlist for **" + discord.utils.escape_markdown(guild.name)
-                + "**: ```ini\n" + s + "```"
+                "```" + "\n" * ("z" in flags) + "callback-voice-playlist-"
+                + str(user.id) + "_0"
+                + "-\nLoading Playlist database...```"
             )
         if "d" in flags:
             i = await bot.evalMath(argv, guild.id)
@@ -2241,6 +2239,63 @@ class Playlist(Command):
             + " to the default playlist for "
             + sbHighlight(guild.name) + ".```"
         )
+    
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, pos = [int(i) for i in vals.split("_")]
+        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        user = await bot.fetch_user(u_id)
+        pl = bot.data.playlists.get(guild.id, [])
+        page = 12
+        last = max(0, len(pl) - page)
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - page)
+            elif i == 2:
+                new = min(last, pos + page)
+            elif i == 3:
+                new = last
+            else:
+                new = pos
+            pos = new
+        content = message.content
+        if not content:
+            content = message.embeds[0].description
+        i = content.index("callback")
+        content = content[:i] + (
+            "callback-voice-playlist-"
+            + str(u_id) + "_" + str(pos)
+            + "-\n"
+        )
+        if not pl:
+            content += "No currently enabled default playlist for " + str(guild).replace("`", "") + ".```"
+            msg = ""
+        else:
+            content += str(len(pl)) + " items in default playlist for " + str(guild).replace("`", "") + ":```"
+            key = lambda x: limStr(sbHighlight(x["name"]) + "(" + x["url"] + ")", 1900 / page)
+            msg = strIter(pl[pos:pos + page], key=key, offset=pos, left="`【", right="】`")
+        emb = discord.Embed(
+            description=content + msg,
+            colour=randColour(),
+        )
+        url = bestURL(user)
+        emb.set_author(name=str(user), url=url, icon_url=url)
+        more = len(pl) - pos - page
+        if more > 0:
+            emb.set_footer(
+                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
+            )
+        create_task(message.edit(content=None, embed=emb))
+        if reaction is None:
+            for react in self.directions:
+                create_task(message.add_reaction(react.decode("utf-8")))
+                await asyncio.sleep(0.5)
         
 
 class Connect(Command):

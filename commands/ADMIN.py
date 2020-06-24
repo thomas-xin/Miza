@@ -1273,7 +1273,7 @@ class UpdateMessageLogs(Database):
                         await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
                     except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                         w = await self.bot.ensureWebhook(channel, force=True)
-                        await waitOnNone(w.send(msg, username=m.display_name, avatar_url=bestURL(m)))
+                        await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
                     embs.clear()
                 embs.append(emb)
             if embs:
@@ -1281,7 +1281,7 @@ class UpdateMessageLogs(Database):
                     await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
                 except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                     w = await self.bot.ensureWebhook(channel, force=True)
-                    await waitOnNone(w.send(msg, username=m.display_name, avatar_url=bestURL(m)))
+                    await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
 
 
 class UpdateFileLogs(Database):

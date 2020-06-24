@@ -16,18 +16,22 @@ class DouClub:
     def __init__(self, c_id, c_sec):
         self.id = c_id
         self.secret = c_sec
+        self.time = 0
         self.pull()
 
     def pull(self):
         kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret)
-        self.data = [kn.data, utc()]
+        self.data = kn.data
+        self.time = utc()
+    
+    def update(self):
+        if utc() - self.time > 720:
+            create_future(self.pull)
 
     def search(self, query):
-        if utc() - self.data[1] > 720:
-            create_future(self.pull)
         output = []
         query = query.lower()
-        for l in self.data[0]:
+        for l in self.data:
             found = True
             qlist = query.split(" ")
             for q in qlist:
@@ -105,7 +109,12 @@ class SheetPull:
     
     def __init__(self, url):
         self.url = url
+        self.time = 0
         self.pull()
+
+    def update(self):
+        if utc() - self.time > 720:
+            create_future(self.pull)
 
     def pull(self):
         url = self.url
@@ -134,10 +143,9 @@ class SheetPull:
                 while len(sdata[0][line]) < columns:
                     sdata[0][line].append(" ")
         self.data = sdata
+        self.time = utc()
 
     def search(self, query, lim):
-        if utc() - self.data[1] > 60:
-            create_future(self.pull)
         output = []
         query = query.lower()
         try:
@@ -582,3 +590,12 @@ class CS_mod(Command):
             return response
         else:
             raise LookupError("No results found for " + argv + ".")
+
+
+class CSDatabase(Database):
+    name = "cs_database"
+    no_file = True
+
+    async def __call__(self, **void):
+        entity_list.update()
+        tsc_list.update()

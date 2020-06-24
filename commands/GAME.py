@@ -445,7 +445,7 @@ class Mimic(Command):
     min_level = 0
     description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes."
     usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)> <debug(?z)>"
-    flags = "aedfz"
+    flags = "aedzf"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = (1, 2)
@@ -592,7 +592,7 @@ class Mimic(Command):
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_")]
-        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm <= inf:
             return
         if reaction not in self.directions and reaction is not None:
             return
@@ -605,15 +605,16 @@ class Mimic(Command):
             if not mimics[k]:
                 mimics.pop(k)
                 update()
-        last = max(0, len(mimics) - 24)
+        page = 24
+        last = max(0, len(mimics) - page)
         if reaction is not None:
             i = self.directions.index(reaction)
             if i == 0:
                 new = 0
             elif i == 1:
-                new = max(0, pos - 24)
+                new = max(0, pos - page)
             elif i == 2:
-                new = min(last, pos + 24)
+                new = min(last, pos + page)
             elif i == 3:
                 new = last
             else:
@@ -634,14 +635,14 @@ class Mimic(Command):
         else:
             content += str(len(mimics)) + " currently enabled webhook mimics for " + str(user).replace("`", "") + ":```"
             key = lambda x: limStr("⟨" + ", ".join(i + ": " + (str(noHighlight(mimicdb[i].name)), "[<@" + str(getattr(mimicdb[i], "auto", "None")) + ">]")[bool(getattr(mimicdb[i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
-            msg = "```ini\n" + strIter({k: mimics[k] for k in sorted(mimics)[pos:pos + 24]}, key=key) + "```"
+            msg = "```ini\n" + strIter({k: mimics[k] for k in sorted(mimics)[pos:pos + page]}, key=key) + "```"
         emb = discord.Embed(
             description=content + msg,
             colour=randColour(),
         )
         url = bestURL(user)
         emb.set_author(name=str(user), url=url, icon_url=url)
-        more = len(mimics) - pos - 24
+        more = len(mimics) - pos - page
         if more > 0:
             emb.set_footer(
                 text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),

@@ -52,11 +52,12 @@ class IMG(Command):
     min_level = 0
     min_display = "0~2"
     description = "Sends an image in the current chat from a list."
-    usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <add(?a)> <delete(?d)> <hide(?h)>"
-    flags = "vraedh"
+    usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <add(?a)> <delete(?d)> <hide(?h)> <debug(?z)>"
+    flags = "vraedhzf"
     no_parse = True
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 
-    async def __call__(self, bot, flags, args, argv, guild, perm, **void):
+    async def __call__(self, bot, flags, args, argv, user, guild, perm, **void):
         update = self.data.images.update
         imglists = bot.data.images
         images = imglists.get(guild.id, {})
@@ -66,7 +67,7 @@ class IMG(Command):
                 reason = "to change image list for " + guild.name
                 raise self.permError(perm, req, reason)
             if "a" in flags or "e" in flags:
-                lim = 32 << bot.isTrusted(guild.id) * 2 + 1
+                lim = 64 << bot.isTrusted(guild.id) * 2 + 1
                 if len(images) > lim:
                     raise OverflowError(
                         "Image list for " + guild.name
@@ -74,13 +75,13 @@ class IMG(Command):
                         + "Please remove an item to add another."
                     )
                 key = " ".join(args[:-1]).lower()
-                if len(key) > 64:
+                if len(key) > 128:
                     raise ArgumentError("Image tag too long.")
                 url = await bot.followURL(verifyURL(args[-1]), best=True)
-                if len(url) > 256:
+                if len(url) > 1024:
                     raise ArgumentError("Image url too long.")
                 images[key] = url
-                sort(images)
+                images = {i: images[i] for i in sorted(images)}
                 imglists[guild.id] = images
                 update()
                 if not "h" in flags:
@@ -89,6 +90,12 @@ class IMG(Command):
                         + "] to the image list for [" + noHighlight(guild.name) + "].```"
                     )
             if not args:
+                if "f" not in flags:
+                    response = uniStr(
+                        "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
+                        + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
+                    )
+                    return ("```asciidoc\n[" + response + "]```")
                 imglists[guild.id] = {}
                 update()
                 return (
@@ -104,18 +111,10 @@ class IMG(Command):
                 + "] from the image list for [" + noHighlight(guild.name) + "].```"
             )
         if not argv and not "r" in flags:
-            if images:
-                if "v" in flags:
-                    key = lambda x: x
-                else:
-                    key = lambda x: limStr(x, 32)
-                return (
-                    "Available images in **" + guild.name
-                    + "**: ```ini\n" + strIter(images, key=key).replace("'", '"') + "```"
-                )
             return (
-                "```ini\nImage list for [" + noHighlight(guild.name)
-                + "] is currently empty.```"
+                "```" + "\n" * ("z" in flags) + "callback-image-img-"
+                + str(user.id) + "_0"
+                + "-\nLoading Image database...```"
             )
         sources = []
         for tag in args:
@@ -139,6 +138,190 @@ class IMG(Command):
         return {
             "embed": emb
         }
+
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, pos = [int(i) for i in vals.split("_")]
+        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        user = await bot.fetch_user(u_id)
+        imglists = bot.data.images
+        images = imglists.get(guild.id, {})
+        page = 12
+        last = max(0, len(images) - page)
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - page)
+            elif i == 2:
+                new = min(last, pos + page)
+            elif i == 3:
+                new = last
+            else:
+                new = pos
+            pos = new
+        content = message.content
+        if not content:
+            content = message.embeds[0].description
+        i = content.index("callback")
+        content = content[:i] + (
+            "callback-image-img-"
+            + str(u_id) + "_" + str(pos)
+            + "-\n"
+        )
+        if not images:
+            content += "Image list for " + str(guild).replace("`", "") + " is currently empty.```"
+            msg = ""
+        else:
+            content += str(len(images)) + " images currently assigned for " + str(guild).replace("`", "") + ":```"
+            msg = "```ini\n" + strIter({k: "\n" + images[k] for k in tuple(images)[pos:pos + page]}) + "```"
+        emb = discord.Embed(
+            description=content + msg,
+            colour=randColour(),
+        )
+        url = bestURL(user)
+        emb.set_author(name=str(user), url=url, icon_url=url)
+        more = len(images) - pos - page
+        if more > 0:
+            emb.set_footer(
+                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
+            )
+        create_task(message.edit(content=None, embed=emb))
+        if reaction is None:
+            for react in self.directions:
+                create_task(message.add_reaction(react.decode("utf-8")))
+                await asyncio.sleep(0.5)
+
+
+class React(Command):
+    server_only = True
+    name = ["AutoReact"]
+    min_level = 2
+    description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
+    usage = "<0:react_to[]> <1:react_data[]> <disable(?d)> <debug(?z)>"
+    flags = "aedzf"
+    no_parse = True
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    rate_limit = (1, 2)
+
+    async def __call__(self, bot, flags, guild, message, user, argv, args, **void):
+        update = self.data.reacts.update
+        following = bot.data.reacts
+        curr = setDict(following, guild.id, multiDict())
+        if type(curr) is not multiDict:
+            following[guild.id] = curr = multiDict(curr)
+        if not argv:
+            if "d" in flags:
+                if "f" not in flags:
+                    response = uniStr(
+                        "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
+                        + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
+                    )
+                    return ("```asciidoc\n[" + response + "]```")
+                if guild.id in following:
+                    following.pop(guild.id)
+                    update()
+                return "```css\nRemoved all auto reacts for [" + noHighlight(guild.name) + "].```"
+            return (
+                "```" + "\n" * ("z" in flags) + "callback-image-react-"
+                + str(user.id) + "_0"
+                + "-\nLoading React database...```"
+            )
+        if "d" in flags:
+            a = reconstitute(argv).lower()
+            if a in curr:
+                curr.pop(a)
+                update()
+                return (
+                    "```css\nRemoved [" + noHighlight(a) + "] from the auto react list for ["
+                    + noHighlight(guild.name) + "].```"
+                )
+            else:
+                raise LookupError(str(a) + " is not in the auto react list.")
+        lim = 64 << bot.isTrusted(guild.id) * 2 + 1
+        if curr.count() >= lim:
+            raise OverflowError(
+                "React list for " + guild.name
+                + " has reached the maximum of " + str(lim) + " items. "
+                + "Please remove an item to add another."
+            )
+        a = reconstitute(" ".join(args[:-1])).lower()[:64]
+        try:
+            e_id = int(args[-1])
+        except:
+            emoji = args[-1]
+        else:
+            emoji = await bot.fetch_emoji(e_id)
+        await message.add_reaction(emoji)
+        curr.append(a, str(emoji))
+        following[guild.id] = multiDict({i: curr[i] for i in sorted(curr)})
+        update()
+        return (
+            "```css\nAdded [" + noHighlight(a) + "] ➡️ [" + noHighlight(args[-1]) + "] to the auto react list for ["
+            + noHighlight(guild.name) + "].```"
+        )
+    
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, pos = [int(i) for i in vals.split("_")]
+        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        user = await bot.fetch_user(u_id)
+        following = bot.data.reacts
+        curr = following.get(guild.id, multiDict())
+        page = 16
+        last = max(0, len(curr) - page)
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - page)
+            elif i == 2:
+                new = min(last, pos + page)
+            elif i == 3:
+                new = last
+            else:
+                new = pos
+            pos = new
+        content = message.content
+        if not content:
+            content = message.embeds[0].description
+        i = content.index("callback")
+        content = content[:i] + (
+            "callback-image-react-"
+            + str(u_id) + "_" + str(pos)
+            + "-\n"
+        )
+        if not curr:
+            content += "No currently assigned auto reactions for " + str(guild).replace("`", "") + ".```"
+            msg = ""
+        else:
+            content += str(len(curr)) + " auto reactions currently assigned for " + str(guild).replace("`", "") + ":```"
+            key = lambda x: "\n" + ", ".join(x)
+            msg = "```ini\n" + strIter({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=key) + "```"
+        emb = discord.Embed(
+            description=content + msg,
+            colour=randColour(),
+        )
+        url = bestURL(user)
+        emb.set_author(name=str(user), url=url, icon_url=url)
+        more = len(curr) - pos - page
+        if more > 0:
+            emb.set_footer(
+                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
+            )
+        create_task(message.edit(content=None, embed=emb))
+        if reaction is None:
+            for react in self.directions:
+                create_task(message.add_reaction(react.decode("utf-8")))
+                await asyncio.sleep(0.5)
 
 
 class CreateEmoji(Command):
@@ -199,6 +382,119 @@ class CreateEmoji(Command):
            "```css\nSuccessfully created emoji [" + noHighlight(emoji) + "] in ["
             + noHighlight(guild.name) + "].```"
         )
+
+
+def _c2e(string, em1, em2):
+    chars = {
+        " ": [0, 0, 0, 0, 0],
+        "_": [0, 0, 0, 0, 7],
+        "!": [2, 2, 2, 0, 2],
+        '"': [5, 5, 0, 0, 0],
+        ":": [0, 2, 0, 2, 0],
+        ";": [0, 2, 0, 2, 4],
+        "~": [0, 5, 7, 2, 0],
+        "#": [10, 31, 10, 31, 10],
+        "$": [7, 10, 6, 5, 14],
+        "?": [6, 1, 2, 0, 2],
+        "%": [5, 1, 2, 4, 5],
+        "&": [4, 10, 4, 10, 7],
+        "'": [2, 2, 0, 0, 0],
+        "(": [2, 4, 4, 4, 2],
+        ")": [2, 1, 1, 1, 2],
+        "[": [6, 4, 4, 4, 6],
+        "]": [3, 1, 1, 1, 3],
+        "|": [2, 2, 2, 2, 2],
+        "*": [21, 14, 4, 14, 21],
+        "+": [0, 2, 7, 2, 0],
+        "=": [0, 7, 0, 7, 0],
+        ",": [0, 0, 3, 3, 4],
+        "-": [0, 0, 7, 0, 0],
+        ".": [0, 0, 3, 3, 0],
+        "/": [1, 1, 2, 4, 4],
+        "\\": [4, 4, 2, 1, 1],
+        "@": [14, 17, 17, 17, 14],
+        "0": [7, 5, 5, 5, 7],
+        "1": [3, 1, 1, 1, 1],
+        "2": [7, 1, 7, 4, 7],
+        "3": [7, 1, 7, 1, 7],
+        "4": [5, 5, 7, 1, 1],
+        "5": [7, 4, 7, 1, 7],
+        "6": [7, 4, 7, 5, 7],
+        "7": [7, 5, 1, 1, 1],
+        "8": [7, 5, 7, 5, 7],
+        "9": [7, 5, 7, 1, 7],
+        "A": [2, 5, 7, 5, 5],
+        "B": [6, 5, 7, 5, 6],
+        "C": [3, 4, 4, 4, 3],
+        "D": [6, 5, 5, 5, 6],
+        "E": [7, 4, 7, 4, 7],
+        "F": [7, 4, 7, 4, 4],
+        "G": [7, 4, 5, 5, 7],
+        "H": [5, 5, 7, 5, 5],
+        "I": [7, 2, 2, 2, 7],
+        "J": [7, 1, 1, 5, 7],
+        "K": [5, 5, 6, 5, 5],
+        "L": [4, 4, 4, 4, 7],
+        "M": [17, 27, 21, 17, 17],
+        "N": [9, 13, 15, 11, 9],
+        "O": [2, 5, 5, 5, 2],
+        "P": [7, 5, 7, 4, 4],
+        "Q": [4, 10, 10, 10, 5],
+        "R": [6, 5, 7, 6, 5],
+        "S": [3, 4, 7, 1, 6],
+        "T": [7, 2, 2, 2, 2],
+        "U": [5, 5, 5, 5, 7],
+        "V": [5, 5, 5, 5, 2],
+        "W": [17, 17, 21, 21, 10],
+        "X": [5, 5, 2, 5, 5],
+        "Y": [5, 5, 2, 2, 2],
+        "Z": [7, 1, 2, 4, 7],
+    }
+    printed = [""] * 7
+    string = string.upper()
+    for i in range(len(string)):
+        curr = string[i]
+        data = chars.get(curr, [15] * 5)
+        size = max(1, max(data))
+        lim = max(2, int(log(size, 2))) + 1
+        printed[0] += em2 * (lim + 1)
+        printed[6] += em2 * (lim + 1)
+        if len(data) == 5:
+            for y in range(5):
+                printed[y + 1] += em2
+                for p in range(lim):
+                    if data[y] & (1 << (lim - 1 - p)):
+                        printed[y + 1] += em1
+                    else:
+                        printed[y + 1] += em2
+        for x in range(len(printed)):
+            printed[x] += em2
+    output = "\n".join(printed)
+    print("[" + em1 + "]", "[" + em2 + "]")
+    if len(em1) + len(em2) > 2 and ":" in em1 + em2:
+        return output
+    return "```fix\n" + output + "```"
+
+
+class Char2Emoj(Command):
+    name = ["C2E"]
+    min_level = 0
+    description = "Makes emoji blocks using a string."
+    usage = "<0:string> <1:emoji_1> <2:emoji_2>"
+
+    async def __call__(self, args, **extra):
+        try:
+            if len(args) != 3:
+                raise IndexError
+            for i in range(1, 3):
+                if args[i][0] == ":" and args[i][-1] != ":":
+                    args[i] = "<" + args[i] + ">"
+            return await create_future(_c2e, *args[:3])
+        except IndexError:
+            raise ArgumentError(
+                "Exactly 3 arguments are required for this command.\n"
+                + "Place quotes around arguments containing spaces as required."
+            )
 
 
 async def get_image(bot, message, args, argv, ext="png"):
@@ -674,185 +970,6 @@ class Blend(Command):
         fn = resp[0]
         f = discord.File(fn, filename=name)
         await sendFile(message.channel, "", f, filename=fn)
-
-
-class React(Command):
-    server_only = True
-    name = ["AutoReact"]
-    min_level = 2
-    description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
-    usage = "<0:react_to[]> <1:react_data[]> <disable(?d)>"
-    flags = "aed"
-    no_parse = True
-    rate_limit = (1, 2)
-
-    async def __call__(self, bot, flags, guild, message, argv, args, **void):
-        update = self.data.reacts.update
-        following = bot.data.reacts
-        curr = setDict(following, guild.id, multiDict())
-        if type(curr) is not multiDict:
-            following[guild.id] = curr = multiDict(curr)
-        if not argv:
-            if "d" in flags:
-                if guild.id in following:
-                    following.pop(guild.id)
-                    update()
-                return "```css\nRemoved all auto reacts for [" + noHighlight(guild.name) + "].```"
-            else:
-                if not curr:
-                    return (
-                        "```ini\nNo currently active auto reacts for ["
-                        + noHighlight(guild.name) + "].```"
-                    )
-                return (
-                    "Currently active auto reacts for **" + discord.utils.escape_markdown(guild.name)
-                    + "**:\n```ini\n" + strIter(curr) + "```"
-                )
-        if "d" in flags:
-            a = reconstitute(argv).lower()
-            if a in curr:
-                curr.pop(a)
-                update()
-                return (
-                    "```css\nRemoved [" + noHighlight(a) + "] from the auto react list for ["
-                    + noHighlight(guild.name) + "].```"
-                )
-            else:
-                raise LookupError(str(a) + " is not in the auto react list.")
-        lim = 32 << bot.isTrusted(guild.id) * 2 + 1
-        if curr.count() >= lim:
-            raise OverflowError(
-                "React list for " + guild.name
-                + " has reached the maximum of " + str(lim) + " items. "
-                + "Please remove an item to add another."
-            )
-        a = reconstitute(" ".join(args[:-1])).lower()[:64]
-        try:
-            e_id = int(args[-1])
-        except:
-            emoji = args[-1]
-        else:
-            emoji = await bot.fetch_emoji(e_id)
-        await message.add_reaction(emoji)
-        curr.append(a, str(emoji))
-        update()
-        return (
-            "```css\nAdded [" + noHighlight(a) + "] ➡️ [" + noHighlight(args[-1]) + "] to the auto react list for ["
-            + noHighlight(guild.name) + "].```"
-        )
-
-
-def _c2e(string, em1, em2):
-    chars = {
-        " ": [0, 0, 0, 0, 0],
-        "_": [0, 0, 0, 0, 7],
-        "!": [2, 2, 2, 0, 2],
-        '"': [5, 5, 0, 0, 0],
-        ":": [0, 2, 0, 2, 0],
-        ";": [0, 2, 0, 2, 4],
-        "~": [0, 5, 7, 2, 0],
-        "#": [10, 31, 10, 31, 10],
-        "$": [7, 10, 6, 5, 14],
-        "?": [6, 1, 2, 0, 2],
-        "%": [5, 1, 2, 4, 5],
-        "&": [4, 10, 4, 10, 7],
-        "'": [2, 2, 0, 0, 0],
-        "(": [2, 4, 4, 4, 2],
-        ")": [2, 1, 1, 1, 2],
-        "[": [6, 4, 4, 4, 6],
-        "]": [3, 1, 1, 1, 3],
-        "|": [2, 2, 2, 2, 2],
-        "*": [21, 14, 4, 14, 21],
-        "+": [0, 2, 7, 2, 0],
-        "=": [0, 7, 0, 7, 0],
-        ",": [0, 0, 3, 3, 4],
-        "-": [0, 0, 7, 0, 0],
-        ".": [0, 0, 3, 3, 0],
-        "/": [1, 1, 2, 4, 4],
-        "\\": [4, 4, 2, 1, 1],
-        "@": [14, 17, 17, 17, 14],
-        "0": [7, 5, 5, 5, 7],
-        "1": [3, 1, 1, 1, 1],
-        "2": [7, 1, 7, 4, 7],
-        "3": [7, 1, 7, 1, 7],
-        "4": [5, 5, 7, 1, 1],
-        "5": [7, 4, 7, 1, 7],
-        "6": [7, 4, 7, 5, 7],
-        "7": [7, 5, 1, 1, 1],
-        "8": [7, 5, 7, 5, 7],
-        "9": [7, 5, 7, 1, 7],
-        "A": [2, 5, 7, 5, 5],
-        "B": [6, 5, 7, 5, 6],
-        "C": [3, 4, 4, 4, 3],
-        "D": [6, 5, 5, 5, 6],
-        "E": [7, 4, 7, 4, 7],
-        "F": [7, 4, 7, 4, 4],
-        "G": [7, 4, 5, 5, 7],
-        "H": [5, 5, 7, 5, 5],
-        "I": [7, 2, 2, 2, 7],
-        "J": [7, 1, 1, 5, 7],
-        "K": [5, 5, 6, 5, 5],
-        "L": [4, 4, 4, 4, 7],
-        "M": [17, 27, 21, 17, 17],
-        "N": [9, 13, 15, 11, 9],
-        "O": [2, 5, 5, 5, 2],
-        "P": [7, 5, 7, 4, 4],
-        "Q": [4, 10, 10, 10, 5],
-        "R": [6, 5, 7, 6, 5],
-        "S": [3, 4, 7, 1, 6],
-        "T": [7, 2, 2, 2, 2],
-        "U": [5, 5, 5, 5, 7],
-        "V": [5, 5, 5, 5, 2],
-        "W": [17, 17, 21, 21, 10],
-        "X": [5, 5, 2, 5, 5],
-        "Y": [5, 5, 2, 2, 2],
-        "Z": [7, 1, 2, 4, 7],
-    }
-    printed = [""] * 7
-    string = string.upper()
-    for i in range(len(string)):
-        curr = string[i]
-        data = chars.get(curr, [15] * 5)
-        size = max(1, max(data))
-        lim = max(2, int(log(size, 2))) + 1
-        printed[0] += em2 * (lim + 1)
-        printed[6] += em2 * (lim + 1)
-        if len(data) == 5:
-            for y in range(5):
-                printed[y + 1] += em2
-                for p in range(lim):
-                    if data[y] & (1 << (lim - 1 - p)):
-                        printed[y + 1] += em1
-                    else:
-                        printed[y + 1] += em2
-        for x in range(len(printed)):
-            printed[x] += em2
-    output = "\n".join(printed)
-    print("[" + em1 + "]", "[" + em2 + "]")
-    if len(em1) + len(em2) > 2 and ":" in em1 + em2:
-        return output
-    return "```fix\n" + output + "```"
-
-
-class Char2Emoj(Command):
-    name = ["C2E"]
-    min_level = 0
-    description = "Makes emoji blocks using a string."
-    usage = "<0:string> <1:emoji_1> <2:emoji_2>"
-
-    async def __call__(self, args, **extra):
-        try:
-            if len(args) != 3:
-                raise IndexError
-            for i in range(1,3):
-                if args[i][0] == ":" and args[i][-1] != ":":
-                    args[i] = "<" + args[i] + ">"
-            return _c2e(*args[:3])
-        except IndexError:
-            raise ArgumentError(
-                "Exactly 3 arguments are required for this command.\n"
-                + "Place <> around arguments containing spaces as required."
-            )
 
 
 f = open("auth.json")
