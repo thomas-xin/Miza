@@ -146,7 +146,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None):
             scale = int(size[0] * r)
             vf += "scale=" + str(scale) + ":-1:flags=lanczos,"
         vf += "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"
-        command += [vf, "-loop", "0", "-r", str(fps), out]
+        command.extend([vf, "-loop", "0", "-r", str(fps), out])
         subprocess.check_output(command)
         if direct:
             os.remove(fn)
@@ -187,7 +187,7 @@ def create_gif(in_type, args, delay):
                 img = img.convert("RGB")
             imgs.append(img)
     command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(1000 / delay), "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
-    command += ["-fs", str(8388608 - 131072), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out]
+    command.extend(["-fs", str(8388608 - 131072), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out])
     proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for img in imgs:
         b = numpy.array(img).tobytes()
@@ -213,7 +213,7 @@ def rainbow_gif(image, duration):
     if fps <= 0:
         raise ValueError("Invalid framerate value.")
     command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
-    command += ["-fs", str(8388608 - 131072), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out]
+    command.extend(["-fs", str(8388608 - 131072), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out])
     proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if str(image.mode) != "HSV":
         curr = image.convert("HSV")

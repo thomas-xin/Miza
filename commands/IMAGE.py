@@ -1280,7 +1280,8 @@ class UpdateDeviantArt(Database):
                         break
             except:
                 print(traceback.format_exc())
-            found[content] = items
+            else:
+                found[content] = items
         for c_id in tuple(self.data):
             create_task(self.processPart(found, c_id))
         self.time = utc()
