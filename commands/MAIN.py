@@ -6,6 +6,18 @@ except ModuleNotFoundError:
     from common import *
 
 
+f = open("auth.json")
+auth = ast.literal_eval(f.read())
+f.close()
+try:
+    discord_id = auth["discord_id"]
+    if not discord_id:
+        raise
+except:
+    discord_id = None
+    print("WARNING: discord_id not found. Unable to automatically generate bot invites.")
+
+
 default_commands = ["main", "string", "admin"]
 standard_commands = default_commands + ["voice", "image", "game"]
 
@@ -72,6 +84,15 @@ class Help(Command):
                 s = "```ini\n" + " ".join((sbHighlight(c) for c in standard_commands)) + "```"
                 emb.add_field(name="Command category list", value=s)
         return freeClass(embed=emb), 1
+
+
+class Hello(Command):
+    name = ["Hi", "👋", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
+    min_level = 0
+    description = "Sends a waving emoji. Useful for checking whether the bot is online."
+    
+    async def __call__(self, **void):
+        return "👋"
 
 
 class Perms(Command):
@@ -432,7 +453,7 @@ class Avatar(Command):
 
 
 class Info(Command):
-    name = ["UserInfo", "ServerInfo", "WhoIs"]
+    name = ["UserInfo", "ServerInfo", "WhoIs", "Profile"]
     min_level = 0
     description = "Shows information about the target user or server."
     usage = "<user> <verbose(?v)>"
@@ -740,16 +761,6 @@ class Info(Command):
         return {
             "embed": emb,
         }
-        
-
-class Hello(Command):
-    name = ["Hi", "👋", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
-    min_level = 0
-    description = "Sends a waving emoji. Useful for checking whether the bot is online."
-    
-    async def __call__(self, channel, bot, **void):
-        return "👋"
-
 
 
 class Status(Command):
@@ -1046,6 +1057,22 @@ class Announcement(Command):
             ),
             "embed": emb,
         }
+
+
+class Invite(Command):
+    name = ["OAuth", "InviteBot", "InviteLink"]
+    min_level = 0
+    description = "Sends a link to ⟨MIZA⟩'s homepage and invite code."
+    
+    async def __call__(self, **void):
+        if discord_id is None:
+            raise FileNotFoundError("Unable to locate bot's Client ID.")
+        emb = discord.Embed(colour=randColour())
+        user = self.bot.client.user
+        url = bestURL(user)
+        emb.set_author(name=str(user), icon_url=url, url=url)
+        emb.description = "[Homepage](" + self.bot.website + ")\n[Invite](https://discordapp.com/oauth2/authorize?permissions=8&client_id=" + str(discord_id) + "&scope=bot)"
+        return dict(embed=emb)
 
 
 class UpdateReminders(Database):

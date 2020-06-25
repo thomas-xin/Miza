@@ -18,11 +18,15 @@ auth = ast.literal_eval(f.read())
 f.close()
 try:
     genius_key = auth["genius_key"]
+    if not genius_key:
+        raise
 except:
     genius_key = None
     print("WARNING: genius_key not found. Unable to use API to search song lyrics.")
 try:
     google_api_key = auth["google_api_key"]
+    if not google_api_key:
+        raise
 except:
     google_api_key = None
     print("WARNING: google_api_key not found. Unable to use API to search youtube playlists.")

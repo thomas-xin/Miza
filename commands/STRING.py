@@ -53,6 +53,8 @@ except KeyError:
     print("WARNING: papago_id/papago_secret not found. Unable to use Papago Translate.")
 try:
     rapidapi_key = auth["rapidapi_key"]
+    if not rapidapi_key:
+        raise
 except:
     rapidapi_key = None
     print("WARNING: rapidapi_key not found. Unable to search Urban Dictionary.")
@@ -207,9 +209,7 @@ class Fancy(Command):
             emb.add_field(name="Font " + str(i + 1), value="```" + "fix" * (i & 1) + "\n" + s + "```")
         if len(emb) > 6000:
             return "\n\n".join(f.name + "\n" + noCodeBox(f.value) for f in emb.fields)
-        return {
-            "embed": emb
-        }
+        return dict(embed=emb)
 
 
 class Zalgo(Command):
@@ -231,9 +231,7 @@ class Zalgo(Command):
         for i in (1, 2, 3, 4, 5, 6, 7, 8):
             emb.add_field(name="Level " + str(i), value="```" + "fix" * (i & 1) + "\n" + self.zalgo(argv, i) + "```")
         try:
-            if len(emb) > 6000:
-                raise discord.HTTPException
-            self.bot.embedSender(channel, emb)
+            await channel.send(embed=emb)
         except discord.HTTPException:
             return "\n\n".join(f.name + "\n" + noCodeBox(f.value) for f in emb.fields)
 

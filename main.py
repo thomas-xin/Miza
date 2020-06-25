@@ -1,4 +1,29 @@
 from install_update import os, traceback, python
+
+
+if "auth.json" not in os.listdir():
+    print("Authentication file not found. Generating empty template...")
+    f = open("auth.json", "wb")
+    d = {
+        "discord_id": "",
+        "discord_token": "",
+        "owner_id": [],
+        "google_api_key": "",
+        "cat_api_key": "",
+        "rapidapi_key": "",
+        "genius_key": "",
+        "papago_id": "",
+        "papago_secret": "",
+        "knack_id": "",
+        "knack_secret": "",
+    }
+    s = "{\n" + repr(d).replace(" ", "").replace("'", '"').replace(",", ",\n")[1:-1] + "\n}"
+    f.write(s.encode("utf-8"))
+    f.close()
+    input("auth.json generated. Please fill in discord_token and restart bot when done.")
+    raise SystemExit
+
+
 import time, datetime, psutil
 
 try:
