@@ -79,13 +79,14 @@ from_colour = lambda colour, size=128, key=None: Image.fromarray(numpy.tile(nump
 
 sizecheck = re.compile("[1-9][0-9]*x[0-9]+")
 
-def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None):
+def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=None):
     direct = any((size is None, dur is None, orig_fps is None))
     ts = round(time.time() * 1000)
     fn = "cache/" + str(ts)
     if direct:
-        resp = requests.get(url, stream=True, timeout=8)
-        data = resp.raw.read()
+        if data is None:
+            resp = requests.get(url, stream=True, timeout=8)
+            data = resp.raw.read()
         file = open(fn, "wb")
         try:
             file.write(data)
@@ -175,7 +176,7 @@ def create_gif(in_type, args, delay):
             img = get_image(data, None)
         except (PIL.UnidentifiedImageError, OverflowError):
             if len(data) < 268435456:
-                video2img(data, maxsize, round(1000 / delay), out)
+                video2img(data, maxsize, round(1000 / delay), out, data=data)
                 return "$" + out
             else:
                 raise OverflowError("Max file size to load is 256MB.")

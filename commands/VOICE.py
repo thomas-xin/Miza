@@ -3498,7 +3498,7 @@ class Download(Command):
                     spl = shlex.split(argv)
                 except ValueError:
                     spl = argv.split(" ")
-                if len(spl) > 1:
+                if len(spl) >= 1:
                     fmt = spl[-1]
                     if fmt.startswith("."):
                         fmt = fmt[1:]
