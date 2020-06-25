@@ -1641,7 +1641,8 @@ async def updateLoop():
 @client.event
 async def on_ready():
     print("Successfully connected as " + str(client.user))
-    create_task(heartbeatLoop())
+    if not hasattr(bot, "started"):
+        create_task(heartbeatLoop())
     try:
         await bot.getState()
         print("Servers: ")
