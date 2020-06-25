@@ -82,6 +82,8 @@ class Bot:
             self.owners = ()
             print("WARNING: owner_id not found. Unable to locate owner.")
         self.proc = psutil.Process()
+        if not hasattr(self, "started"):
+            create_task(heartbeatLoop())
         self.getModules()
         self.guilds = 0
         self.blocked = 0
@@ -523,6 +525,13 @@ class Bot:
         self.cache.guilds.update(client._connection._guilds)
         self.cache.emojis.update(client._connection._emojis)
         self.cache.users.update(client._connection._users)
+        self.cache.channels.update(client._connection._private_channels)
+
+    def cacheChannels(self):
+        for i, guild in enumerate(client.guilds):
+            self.cache.channels.update(guild._channels)
+            if not 1 + i & 64:
+                time.sleep(1)
 
     def getPrefix(self, guild):
         try:
@@ -1641,8 +1650,6 @@ async def updateLoop():
 @client.event
 async def on_ready():
     print("Successfully connected as " + str(client.user))
-    if not hasattr(bot, "started"):
-        create_task(heartbeatLoop())
     try:
         await bot.getState()
         print("Servers: ")
@@ -1653,6 +1660,7 @@ async def on_ready():
                 print("> " + guild.name)
         await bot.handleUpdate()
         create_future_ex(bot.updateClient)
+        create_future_ex(bot.cacheChannels)
         if not hasattr(bot, "started"):
             bot.started = True
             create_task(updateLoop())
@@ -1959,6 +1967,11 @@ async def on_raw_bulk_message_delete(payload):
                     except:
                         print(traceback.format_exc())
         bot.deleteMessage(message)
+
+
+@client.event
+async def on_guild_channel_create(channel):
+    bot.cache.channels[channel.id] = channel
 
 
 @client.event
