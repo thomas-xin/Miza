@@ -57,11 +57,14 @@ class IMG(Command):
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 
-    async def __call__(self, bot, flags, args, argv, user, guild, perm, **void):
+    async def __call__(self, bot, flags, args, argv, user, message, guild, perm, **void):
         update = self.data.images.update
         imglists = bot.data.images
         images = imglists.get(guild.id, {})
         if "a" in flags or "e" in flags or "d" in flags:
+            if message.attachments:
+                args = [bestURL(a) for a in message.attachments] + args
+                argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
             req = 2
             if perm < req:
                 reason = "to change image list for " + guild.name
@@ -77,6 +80,8 @@ class IMG(Command):
                 key = " ".join(args[:-1]).lower()
                 if len(key) > 128:
                     raise ArgumentError("Image tag too long.")
+                elif not key:
+                    raise ArgumentError("Image tag must not be empty.")
                 url = await bot.followURL(verifyURL(args[-1]), best=True)
                 if len(url) > 1024:
                     raise ArgumentError("Image url too long.")

@@ -592,7 +592,7 @@ class CS_mod(Command):
             raise LookupError("No results found for " + argv + ".")
 
 
-class CSDatabase(Database):
+class CS_Database(Database):
     name = "cs_database"
     no_file = True
 

@@ -2158,7 +2158,7 @@ class Queue(Command):
 
 class Playlist(Command):
     server_only = True
-    name = ["Default_Playlist", "PL"]
+    name = ["DefaultPlaylist", "PL"]
     min_level = 0
     min_display = "0~2"
     description = "Shows, appends, or removes from the default playlist."
@@ -3002,8 +3002,9 @@ class VoiceNuke(Command):
     async def __call__(self, guild, flags, **void):
         for vc in guild.voice_channels:
             for user in vc.members:
-                if user.voice is not None:
-                    create_task(user.move_to(None))
+                if user.id != self.bot.client.user.id:
+                    if user.voice is not None:
+                        create_task(user.move_to(None))
         if "h" not in flags:
             return (
                 "```css\nSuccessfully removed all users in voice channels in ["
