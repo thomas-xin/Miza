@@ -967,7 +967,7 @@ class Reminder(Command):
                 msg = "[SAMPLE REMINDER]"
         elif len(msg) > 512:
             raise OverflowError("Input message too long (" + str(len(msg)) + "> 512).")
-        name = str(user)
+        username = str(user)
         url = bestURL(user)
         ts = utc()
         if keyed:
@@ -996,7 +996,7 @@ class Reminder(Command):
         # print(bot.database.reminders.listed)
         update()
         emb = discord.Embed(description=msg)
-        emb.set_author(name=name, url=url, icon_url=url)
+        emb.set_author(name=username, url=url, icon_url=url)
         if "announce" in name:
             out = "```css\nSuccessfully set announcement for " + sbHighlight(sendable)
         else:

@@ -1647,10 +1647,11 @@ async def fastLoop():
     while True:
         try:
             await bot.updateEmbeds()
-            create_task(bot.event("_call_"))
         except:
             print(traceback.format_exc())
-        await asyncio.sleep(1)
+        create_task(bot.event("_call_"))
+        await asyncio.sleep(0.5)
+        create_task(bot.event("_call_"))
 
 
 async def slowLoop():
