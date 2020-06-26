@@ -31,6 +31,7 @@ class DouClub:
     def update(self):
         if utc() - self.time > 720:
             create_future(self.pull)
+            self.time = utc()
 
     def search(self, query):
         output = []
@@ -119,6 +120,7 @@ class SheetPull:
     def update(self):
         if utc() - self.time > 720:
             create_future(self.pull)
+            self.time = utc()
 
     def pull(self):
         try:
