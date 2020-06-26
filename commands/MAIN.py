@@ -879,7 +879,7 @@ class Reminder(Command):
                     + noHighlight(sendable) + "].```"
                 )
             d = utc()
-            s = strIter(rems, key=lambda x: limStr(noHighlight(bot.get_user(x.get("user", None), replace=True).name + ": " + x["msg"]), 96) + " ➡️ " + ("<@" + str(x["u_id"]) + ">" if "u_id" in x else sec2Time(x["t"] - d)))
+            s = strIter(rems, key=lambda x: limStr(noHighlight(bot.get_user(x.get("user", -1), replace=True).name + ": " + x["msg"]), 96) + " ➡️ " + ("<@" + str(x["u_id"]) + ">" if "u_id" in x else sec2Time(x["t"] - d)))
             # s = strIter(rems, key=lambda x: limStr(noHighlight(x["msg"]), 64) + " ➡️ " + sec2Time(x["t"] - d))
             return (
                 "Current " + word + " set for **" + discord.utils.escape_markdown(str(sendable))

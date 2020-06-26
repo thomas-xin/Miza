@@ -1226,19 +1226,13 @@ class Bot:
         else:
             embs = setDict(self.embedSenders, c_id, [])
             embs.extend(embeds)
+    
+    async def sendEmbedsTo(self, s_id, embs):
+        sendable = await self.fetch_sendable(s_id)
+        await self.sendEmbeds(sendable, embs)
 
     async def updateEmbeds(self):
-        for c_id, embs in tuple(self.embedSenders.items()):
-            if embs:
-                try:
-                    channel = await self.fetch_channel(c_id)
-                    await self.sendEmbeds(channel, embs)
-                except:
-                    try:
-                        user = await self.fetch_user(c_id)
-                        await self.sendEmbeds(user, embs)
-                    except:
-                        print(traceback.format_exc())
+        [create_task(self.sendEmbedsTo(s_id, embs)) for s_id, embs in self.embedSenders.items() if embs]
         self.embedSenders.clear()
 
     class userGuild(discord.Object):
