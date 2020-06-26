@@ -1295,7 +1295,8 @@ class UpdateDeviantArt(Database):
                 print(traceback.format_exc())
             else:
                 found[content] = items
-        print(successes, "of", attempts, "DeviantArt requests executed successfully.")
+        if attempts:
+            print(successes, "of", attempts, "DeviantArt requests executed successfully.")
         for c_id in tuple(self.data):
             create_task(self.processPart(found, c_id))
         self.time = utc()
