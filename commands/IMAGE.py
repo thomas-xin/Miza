@@ -1256,6 +1256,7 @@ class UpdateDeviantArt(Database):
         conts = {i: a[i]["user"] for a in tuple(self.data.values()) for i in a}
         found = {}
         base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?limit=24&username="
+        attempts, successes = 0, 0
         for content, user in conts.items():
             if type(content) is str:
                 f_id = "&all_folder=true&mode=oldest"
@@ -1266,7 +1267,8 @@ class UpdateDeviantArt(Database):
                 url = base + user + f_id + "&offset="
                 for i in range(0, 13824, 24):
                     req = url + str(i)
-                    print(req)
+                    # print(req)
+                    attempts += 1
                     resp = await create_future(requests.get, req, timeout=8)
                     try:
                         d = json.loads(resp.content)
@@ -1286,12 +1288,14 @@ class UpdateDeviantArt(Database):
                                     break
                         image_url = orig + extra + token
                         items[deviation["deviationId"]] = (deviation["url"], image_url, deviation["author"]["username"], deviation["author"]["usericon"])
+                    successes += 1
                     if not d.get("hasMore", None):
                         break
             except:
                 print(traceback.format_exc())
             else:
                 found[content] = items
+        print(successes, "of", attempts, "DeviantArt requests executed successfully.")
         for c_id in tuple(self.data):
             create_task(self.processPart(found, c_id))
         self.time = utc()

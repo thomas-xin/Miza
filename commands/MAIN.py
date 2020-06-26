@@ -804,261 +804,6 @@ class Status(Command):
         )
 
 
-class Reminder(Command):
-    name = ["RemindMe", "Reminders", "Remind"]
-    min_level = 0
-    description = "Sets a reminder for a certain date and time."
-    usage = "<1:message> <0:time> <disable(?d)>"
-    flags = "aed"
-
-    async def __call__(self, argv, name, message, flags, bot, user, guild, **void):
-        msg = message.content
-        argv2 = argv
-        argv = msg[msg.lower().index(name) + len(name):].strip(" ").strip("\n")
-        try:
-            args = shlex.split(argv)
-        except ValueError:
-            args = argv.split(" ")
-        rems = bot.data.reminders.get(user.id, [])
-        update = bot.database.reminders.update
-        if "d" in flags:
-            if not len(rems):
-                return (
-                    "```ini\nNo reminders currently set for ["
-                    + noHighlight(user) + "].```"
-                )
-            if not argv:
-                i = 0
-            else:
-                print(argv)
-                i = await bot.evalMath(argv2, guild)
-            i %= len(rems)
-            x = rems.pop(i)
-            if i == 0:
-                try:
-                    bot.database.reminders.keyed.remove(user.id, key=lambda x: x[-1])
-                except IndexError:
-                    pass
-                if rems:
-                    bot.database.reminders.keyed.insort((rems[0]["t"], user.id), key=lambda x: x[0])
-            update()
-            return (
-                "```ini\nSuccessfully removed ["
-                + limStr(noHighlight(x["msg"]), 64) + "] from reminders list for ["
-                + noHighlight(user) + "].```"
-            )
-        if not argv:
-            if not len(rems):
-                return (
-                    "```ini\nNo reminders currently set for ["
-                    + noHighlight(user) + "].```"
-                )
-            d = utc()
-            s = strIter(rems, key=lambda x: limStr(noHighlight(x["msg"]), 64) + " ➡️ " + sec2Time(x["t"] - d))
-            return (
-                "Current reminders set for **" + discord.utils.escape_markdown(str(user))
-                + "**:```ini" + s + "```"
-            )
-        if len(rems) >= 64:
-            raise OverflowError("You have reached the maximum of 64 reminders. Please remove one to add another.")
-        while True:
-            if name == "remind" and argv.startswith("me "):
-                argv = argv[3:]
-            if argv.startswith("to "):
-                argv = argv[3:]
-            elif argv.startswith("that "):
-                argv = argv[3:]
-            spl = None
-            if "in" in argv:
-                if " in " in argv:
-                    spl = argv.split(" in ")
-                elif argv.startswith("in "):
-                    spl = [argv[3:]]
-                    msg = ""
-                if spl is not None:
-                    msg = " in ".join(spl[:-1])
-                    t = await bot.evalTime(spl[-1], guild)
-                    break
-            if "at" in argv:
-                if " at " in argv:
-                    spl = argv.split(" at ")
-                elif argv.startswith("at "):
-                    spl = [argv[3:]]
-                    msg = ""
-                if spl is not None:
-                    msg = " at ".join(spl[:-1])
-                    t = utc_ts(tparser.parse(spl[-1])) - utc()
-                    break
-            if "on" in argv:
-                if " on " in argv:
-                    spl = argv.split(" on ")
-                elif argv.startswith("on "):
-                    spl = [argv[3:]]
-                    msg = ""
-                if spl is not None:
-                    msg = " on ".join(spl[:-1])
-                    t = utc_ts(tparser.parse(spl[-1])) - utc()
-                    break
-            msg = " ".join(args[:-1])
-            t = await bot.evalTime(args[-1], guild)
-            break
-        msg = msg.strip(" ")
-        if not msg:
-            msg = "[SAMPLE REMINDER]"
-        elif len(msg) > 512:
-            raise OverflowError("Reminder message too long (" + str(len(msg)) + "> 512).")
-        name = str(user)
-        url = bestURL(user)
-        ts = utc()
-        rems.append(freeClass(
-            user=user.id,
-            msg=msg,
-            t=t + ts,
-            u=1
-        ))
-        bot.data.reminders[user.id] = sort(rems, key=lambda x: x["t"])
-        try:
-            bot.database.reminders.keyed.remove(user.id, key=lambda x: x[-1])
-        except IndexError:
-            pass
-        bot.database.reminders.keyed.insort((bot.data.reminders[user.id][0]["t"], user.id), key=lambda x: x[0])
-        print(rems)
-        print(bot.database.reminders.keyed)
-        update()
-        emb = discord.Embed(description=msg)
-        emb.set_author(name=name, url=url, icon_url=url)
-        return {
-            "content": ("```css\nSuccessfully set reminder for ["
-                + noHighlight(user) + "] in [" + noHighlight(sec2Time(t)) + "]:```"
-            ),
-            "embed": emb,
-        }
-
-
-class Announcement(Command):
-    name = ["Announce", "Announcements"]
-    min_level = 2
-    description = "Sets an announcement in the current channel for a certain date and time."
-    usage = "<1:message> <0:time> <disable(?d)>"
-    flags = "aed"
-
-    async def __call__(self, name, message, flags, bot, user, channel, guild, **void):
-        msg = message.content
-        argv = msg[msg.lower().index(name) + len(name):].strip(" ").strip("\n")
-        try:
-            args = shlex.split(argv)
-        except ValueError:
-            args = argv.split(" ")
-        rems = bot.data.reminders.get(channel.id, [])
-        update = bot.database.reminders.update
-        if "d" in flags:
-            if not len(rems):
-                return (
-                    "```ini\nNo announcements currently set for [#"
-                    + noHighlight(channel) + "].```"
-                )
-            if not argv:
-                i = 0
-            else:
-                i = await bot.evalMath(argv, guild)
-            i %= len(rems)
-            x = rems.pop(i)
-            if i == 0:
-                try:
-                    bot.database.reminders.keyed.remove(channel.id, key=lambda x: x[-1])
-                except IndexError:
-                    pass
-                if rems:
-                    bot.database.reminders.keyed.insort((rems[0]["t"], channel.id), key=lambda x: x[0])
-            update()
-            return (
-                "```ini\nSuccessfully removed ["
-                + limStr(noHighlight(bot.get_user(x.get("user", None), replace=True).name + ": " + x["msg"]), 128) + "] from announcements list for [#"
-                + noHighlight(channel) + "].```"
-            )
-        if not argv:
-            if not len(rems):
-                return (
-                    "```ini\nNo announcements currently set for [#"
-                    + noHighlight(channel) + "].```"
-                )
-            d = utc()
-            s = strIter(rems, key=lambda x: limStr(noHighlight(bot.get_user(x.get("user", None), replace=True).name + ": " + x["msg"]), 128) + " ➡️ " + sec2Time(x["t"] - d))
-            return (
-                "Current announcements set for <#" + str(channel.id)
-                + ">:```ini" + s + "```"
-            )
-        lim = 6 << bot.isTrusted(guild.id) * 2 + 1
-        if len(rems) >= lim:
-            raise OverflowError("Channel has reached the maximum of " + str(lim) + " announcements. Please remove one to add another.")
-        while True:
-            spl = None
-            if "in" in argv:
-                if " in " in argv:
-                    spl = argv.split(" in ")
-                elif argv.startswith("in "):
-                    spl = [argv[3:]]
-                    msg = ""
-                if spl is not None:
-                    msg = " in ".join(spl[:-1])
-                    t = await bot.evalTime(spl[-1], guild)
-                    break
-            if "at" in argv:
-                if " at " in argv:
-                    spl = argv.split(" at ")
-                elif argv.startswith("at "):
-                    spl = [argv[3:]]
-                    msg = ""
-                if spl is not None:
-                    msg = " at ".join(spl[:-1])
-                    t = utc_ts(tparser.parse(spl[-1])) - utc()
-                    break
-            if "on" in argv:
-                if " on " in argv:
-                    spl = argv.split(" on ")
-                elif argv.startswith("on "):
-                    spl = [argv[3:]]
-                    msg = ""
-                if spl is not None:
-                    msg = " on ".join(spl[:-1])
-                    t = utc_ts(tparser.parse(spl[-1])) - utc()
-                    break
-            msg = " ".join(args[:-1])
-            t = await bot.evalTime(args[-1], guild)
-            break
-        msg = msg.strip(" ")
-        if not msg:
-            msg = "[SAMPLE ANNOUNCEMENT]"
-        elif len(msg) > 512:
-            raise OverflowError("Announcement message too long (" + str(len(msg)) + "> 512).")
-        name = str(user)
-        url = bestURL(user)
-        ts = utc()
-        rems.append(freeClass(
-            user=user.id,
-            msg=msg,
-            t=t + ts,
-            u=0
-        ))
-        bot.data.reminders[channel.id] = sort(rems, key=lambda x: x["t"])
-        try:
-            bot.database.reminders.keyed.remove(channel.id, key=lambda x: x[-1])
-        except IndexError:
-            pass
-        bot.database.reminders.keyed.insort((bot.data.reminders[channel.id][0]["t"], channel.id), key=lambda x: x[0])
-        print(rems)
-        print(bot.database.reminders.keyed)
-        update()
-        emb = discord.Embed(description=msg)
-        emb.set_author(name=name, url=url, icon_url=url)
-        return {
-            "content": ("```css\nSuccessfully set announcement for [#"
-                + noHighlight(channel) + "] in [" + noHighlight(sec2Time(t)) + "]:```"
-            ),
-            "embed": emb,
-        }
-
-
 class Invite(Command):
     name = ["OAuth", "InviteBot", "InviteLink"]
     min_level = 0
@@ -1075,6 +820,195 @@ class Invite(Command):
         return dict(embed=emb)
 
 
+class Reminder(Command):
+    name = ["Announcement", "Announcements", "Announce", "RemindMe", "Reminders", "Remind"]
+    min_level = 0
+    description = "Sets a reminder for a certain date and time."
+    usage = "<1:message> <0:time> <disable(?d)>"
+    flags = "aed"
+
+    async def __call__(self, argv, name, message, flags, bot, user, guild, perm, **void):
+        msg = message.content
+        argv2 = argv
+        argv = msg[msg.lower().index(name) + len(name):].strip(" ").strip("\n")
+        try:
+            args = shlex.split(argv)
+        except ValueError:
+            args = argv.split(" ")
+        if "announce" in name:
+            req = 2
+            if req > perm:
+                raise self.permError(perm, req, "for command " + name)
+            sendable = message.channel
+            word = "announcements"
+        else:
+            sendable = user
+            word = "reminders"
+        rems = bot.data.reminders.get(sendable.id, [])
+        update = bot.database.reminders.update
+        if "d" in flags:
+            if not len(rems):
+                return (
+                    "```ini\nNo " + word + " currently set for ["
+                    + noHighlight(sendable) + "].```"
+                )
+            if not argv:
+                i = 0
+            else:
+                print(argv)
+                i = await bot.evalMath(argv2, guild)
+            i %= len(rems)
+            x = rems.pop(i)
+            if i == 0:
+                try:
+                    bot.database.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
+                except IndexError:
+                    pass
+                if rems:
+                    bot.database.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
+            update()
+            return (
+                "```ini\nSuccessfully removed ["
+                + limStr(noHighlight(x["msg"]), 128) + "] from " + word + " list for ["
+                + noHighlight(sendable) + "].```"
+            )
+        if not argv:
+            if not len(rems):
+                return (
+                    "```ini\nNo " + word + " currently set for ["
+                    + noHighlight(sendable) + "].```"
+                )
+            d = utc()
+            s = strIter(rems, key=lambda x: limStr(noHighlight(bot.get_user(x.get("user", None), replace=True).name + ": " + x["msg"]), 96) + " ➡️ " + ("<@" + str(x["u_id"]) + ">" if "u_id" in x else sec2Time(x["t"] - d)))
+            # s = strIter(rems, key=lambda x: limStr(noHighlight(x["msg"]), 64) + " ➡️ " + sec2Time(x["t"] - d))
+            return (
+                "Current " + word + " set for **" + discord.utils.escape_markdown(str(sendable))
+                + "**:```ini" + s + "```"
+            )
+        if len(rems) >= 64:
+            raise OverflowError("You have reached the maximum of 64 " + word + ". Please remove one to add another.")
+        keyed = False
+        while True:
+            if name == "remind" and argv.startswith("me "):
+                argv = argv[3:]
+            if argv.startswith("to "):
+                argv = argv[3:]
+            elif argv.startswith("that "):
+                argv = argv[5:]
+            spl = None
+            if "event" in argv:
+                if " event " in argv:
+                    spl = argv.split(" event ")
+                elif argv.startswith("event "):
+                    spl = [argv[6:]]
+                    msg = ""
+                if spl is not None:
+                    msg = " event ".join(spl[:-1])
+                    t = verifyID(spl[-1])
+                    keyed = True
+                    break
+            if "when" in argv:
+                if argv.endswith("is online"):
+                    argv = argv[:-9]
+                if " when " in argv:
+                    spl = argv.split(" when ")
+                elif argv.startswith("when "):
+                    spl = [argv[5:]]
+                    msg = ""
+                if spl is not None:
+                    msg = " when ".join(spl[:-1])
+                    t = verifyID(spl[-1])
+                    keyed = True
+                    break
+            if "in" in argv:
+                if " in " in argv:
+                    spl = argv.split(" in ")
+                elif argv.startswith("in "):
+                    spl = [argv[3:]]
+                    msg = ""
+                if spl is not None:
+                    msg = " in ".join(spl[:-1])
+                    t = await bot.evalTime(spl[-1], guild)
+                    break
+            if "at" in argv:
+                if " at " in argv:
+                    spl = argv.split(" at ")
+                elif argv.startswith("at "):
+                    spl = [argv[3:]]
+                    msg = ""
+                if spl is not None:
+                    msg = " at ".join(spl[:-1])
+                    t = utc_ts(tparser.parse(spl[-1])) - utc()
+                    break
+            if "on" in argv:
+                if " on " in argv:
+                    spl = argv.split(" on ")
+                elif argv.startswith("on "):
+                    spl = [argv[3:]]
+                    msg = ""
+                if spl is not None:
+                    msg = " on ".join(spl[:-1])
+                    t = utc_ts(tparser.parse(spl[-1])) - utc()
+                    break
+            msg = " ".join(args[:-1])
+            t = await bot.evalTime(args[-1], guild)
+            break
+        if keyed:
+            try:
+                u = await bot.fetch_user(t)
+            except (TypeError, discord.NotFound):
+                member = await bot.fetch_member_ex(t, guild)
+                t = member.id
+        msg = msg.strip(" ")
+        if not msg:
+            if "announce" in name:
+                msg = "[SAMPLE ANNOUNCEMENT]"
+            else:
+                msg = "[SAMPLE REMINDER]"
+        elif len(msg) > 512:
+            raise OverflowError("Input message too long (" + str(len(msg)) + "> 512).")
+        name = str(user)
+        url = bestURL(user)
+        ts = utc()
+        if keyed:
+            rems.append(freeClass(
+                user=user.id,
+                msg=msg,
+                u_id=t,
+                t=inf,
+            ))
+            s = "$" + str(t)
+            seq = setDict(bot.data.reminders, s, deque())
+            seq.append(sendable.id)
+        else:
+            rems.append(freeClass(
+                user=user.id,
+                msg=msg,
+                t=t + ts,
+            ))
+        bot.data.reminders[sendable.id] = sort(rems, key=lambda x: x["t"])
+        try:
+            bot.database.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
+        except IndexError:
+            pass
+        bot.database.reminders.listed.insort((bot.data.reminders[sendable.id][0]["t"], sendable.id), key=lambda x: x[0])
+        # print(rems)
+        # print(bot.database.reminders.listed)
+        update()
+        emb = discord.Embed(description=msg)
+        emb.set_author(name=name, url=url, icon_url=url)
+        if "announce" in name:
+            out = "```css\nSuccessfully set announcement for " + sbHighlight(sendable)
+        else:
+            out = "```css\nSuccessfully set reminder for " + sbHighlight(sendable)
+        if keyed:
+            out += " upon next event from " + sbHighlight("<@" + str(t) + ">")
+        else:
+            out += " in " + sbHighlight(sec2Time(t))
+        out += ":```"
+        return dict(content=out, embed=emb)
+
+
 class UpdateReminders(Database):
     name = "reminders"
     no_delete = True
@@ -1082,15 +1016,15 @@ class UpdateReminders(Database):
 
     def __load__(self):
         d = self.data
-        self.keyed = hlist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
+        self.listed = hlist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str), key=lambda x: x[0]))
 
-    async def __call__(self):
+    async def _call_(self):
         t = utc()
-        while self.keyed:
-            p = self.keyed[0]
+        while self.listed:
+            p = self.listed[0]
             if t < p[0]:
                 break
-            self.keyed.popleft()
+            self.listed.popleft()
             u_id = p[1]
             temp = self.data[u_id]
             if not temp:
@@ -1098,19 +1032,16 @@ class UpdateReminders(Database):
                 continue
             x = temp[0]
             if t < x["t"]:
-                self.keyed.insort((x["t"], u_id), key=lambda x: x[0])
-                print(self.keyed)
+                self.listed.insort((x["t"], u_id), key=lambda x: x[0])
+                print(self.listed)
                 continue
             x = freeClass(temp.pop(0))
             if not temp:
                 self.data.pop(u_id)
             else:
-                self.keyed.insort((temp[0]["t"], u_id), key=lambda x: x[0])
-            print(self.keyed)
-            if x.u:
-                ch = await self.bot.fetch_user(u_id)
-            else:
-                ch = await self.bot.fetch_channel(u_id)
+                self.listed.insort((temp[0]["t"], u_id), key=lambda x: x[0])
+            # print(self.listed)
+            ch = await self.bot.fetch_sendable(u_id)
             emb = discord.Embed(description=x.msg)
             try:
                 u = self.bot.get_user(x["user"], replace=True)
@@ -1119,6 +1050,44 @@ class UpdateReminders(Database):
             emb.set_author(name=u.name, url=bestURL(u), icon_url=bestURL(u))
             self.bot.embedSender(ch, emb)
             self.update()
+
+    async def _seen_(self, user, **void):
+        s = "$" + str(user.id)
+        if s in self.data:
+            assigned = self.data[s]
+            if not assigned:
+                self.data.pop(s)
+                return
+            try:
+                for u_id in assigned:
+                    ch = await self.bot.fetch_sendable(u_id)
+                    rems = setDict(self.data, u_id, [])
+                    pops = {}
+                    for i, x in enumerate(reversed(rems)):
+                        if x.get("u_id", None) == user.id:
+                            emb = discord.Embed(description=x["msg"])
+                            try:
+                                u = self.bot.get_user(x["user"], replace=True)
+                            except KeyError:
+                                u = freeClass(x)
+                            emb.set_author(name=u.name, url=bestURL(u), icon_url=bestURL(u))
+                            self.bot.embedSender(ch, emb)
+                            pops[len(rems) - i - 1] = True
+                        elif isValid(x["t"]):
+                            break
+                    it = [rems[i] for i in range(len(rems)) if i not in pops]
+                    rems.clear()
+                    rems.extend(it)
+                    # print(rems)
+                    if not rems:
+                        self.data.pop(u_id)
+            except:
+                print(traceback.format_exc())
+            try:
+                self.data.pop(s)
+                self.update()
+            except KeyError:
+                pass
 
 
 class UpdateMessageCount(Database):

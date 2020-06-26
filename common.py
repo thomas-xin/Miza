@@ -548,12 +548,16 @@ def funcSafe(func, *args, **kwargs):
         print(traceback.format_exc())
         raise
 
-
 async def safeCoro(coro):
     try:
         await coro
     except:
         print(traceback.format_exc())
+
+async def forceCoro(coro):
+    if awaitable(coro):
+        return await coro
+    return coro
 
 
 eloop = asyncio.new_event_loop()

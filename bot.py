@@ -46,6 +46,7 @@ class Bot:
             messages={},
             deleted={},
         )
+        self.events = multiDict()
         self.proc_call = {}
         print("Time: " + str(datetime.datetime.now()))
         print("Initializing...")
@@ -155,6 +156,24 @@ class Bot:
         obj.checking = False
         self.started = True
 
+    async def event(self, event, *args, **kwargs):
+        events = self.events.get(event, ())
+        if len(events) == 1:
+            try:
+                return await forceCoro(events[0](*args, **kwargs))
+            except:
+                print(traceback.format_exc())
+            return
+        futs = [create_task(forceCoro(func(*args, **kwargs))) for func in events]
+        out = deque()
+        for fut in futs:
+            try:
+                res = await fut
+                out.append(res)
+            except:
+                print(traceback.format_exc())
+        return out
+
     async def get_sendable(self, guild, member):
         if member is None:
             return guild.owner
@@ -171,7 +190,29 @@ class Bot:
                 if not found:
                     return guild.owner
         return channel
-                    
+
+    async def fetch_sendable(self, s_id):
+        try:
+            s_id = int(s_id)
+        except (ValueError, TypeError):
+            raise TypeError("Invalid user identifier: " + str(s_id))
+        try:
+            return self.get_user(s_id)
+        except KeyError:
+            try:
+                return self.cache.channels[s_id]
+            except KeyError:
+                try:
+                    user = await client.fetch_user(s_id)
+                except LookupError:
+                    channel = await client.fetch_channel(s_id)
+                    self.cache.channels[s_id] = channel
+                    self.limitCache("channels")
+                    return channel
+                self.cache.users[u_id] = user
+                self.limitCache("users")
+                return user
+
     async def fetch_user(self, u_id):
         try:
             return self.get_user(u_id)
@@ -347,12 +388,7 @@ class Bot:
             raise TypeError("Invalid channel identifier: " + str(c_id))
         if c_id in self.cache.channels:
             return self.cache.channels[c_id]
-        try:
-            channel = client.get_channel(c_id)
-            if channel is None:
-                raise EOFError
-        except:
-            channel = await client.fetch_channel(c_id)
+        channel = await client.fetch_channel(c_id)
         self.cache.channels[c_id] = channel
         self.limitCache("channels")
         return channel
@@ -720,10 +756,10 @@ class Bot:
         totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
         totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p))
         self.codeSize = totalsize
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(files))
+        self.modload = deque()
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(files))
         for f in files:
-            executor.submit(self.getModule, f)
-        executor.shutdown(wait=False)
+            self.modload.append(self.executor.submit(self.getModule, f))
         self.loaded = True
 
     def update(self):
@@ -1515,10 +1551,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
                             create_task(channel.trigger_typing())
-                        for u in bot.database.values():
-                            f = getattr(u, "_command_", None)
-                            if f is not None:
-                                await f(user, command)
+                        await bot.event("_command_", user=user, command=command)
                         timeout = getattr(command, "_timeout_", 1) * bot.timeout
                         if timeout >= inf:
                             timeout = None
@@ -1588,16 +1621,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         ))
     if not run and u_id != client.user.id and not u_perm <= -inf:
         temp = to_alphanumeric(cpy).lower()
-        for u in bot.database.values():
-            f = getattr(u, "_nocommand_", None)
-            if f is not None:
-                create_task(safeCoro(f(
-                    text=temp,
-                    edit=edit,
-                    orig=orig,
-                    message=message,
-                    perm=u_perm,
-                )))
+        await bot.event("_nocommand_", text=temp, edit=edit, orig=orig, message=message, perm=u_perm)
 
 
 async def heartbeatLoop():
@@ -1619,17 +1643,17 @@ async def heartbeatLoop():
         sys.exit(1)   
 
 
-async def embedLoop():
+async def fastLoop():
     while True:
         try:
             await bot.updateEmbeds()
+            create_task(bot.event("_call_"))
         except:
             print(traceback.format_exc())
         await asyncio.sleep(1)
 
 
-async def updateLoop():
-    print("Update loop initiated.")
+async def slowLoop():
     autosave = 0
     while True:
         try:
@@ -1663,8 +1687,9 @@ async def on_ready():
         create_future_ex(bot.cacheChannels)
         if not hasattr(bot, "started"):
             bot.started = True
-            create_task(updateLoop())
-            create_task(embedLoop())
+            print("Update loops initiated.")
+            create_task(slowLoop())
+            create_task(fastLoop())
             await bot.fetch_user(bot.deleted_user)
             if "init.tmp" not in os.listdir("misc"):
                 print("Setting bot avatar...")
@@ -1674,6 +1699,17 @@ async def on_ready():
                 await client.user.edit(avatar=b)
                 f = await create_future(open, "misc/init.tmp", "wb")
                 create_future_ex(f.close)
+            while bot.modload:
+                await create_future(bot.modload.popleft().result)
+            bot.executor.shutdown(wait=False)
+            for u in bot.database.values():
+                for f in dir(u):
+                    # print(f)
+                    if f.startswith("_") and f[-1] == "_" and f[1] != "_":
+                        func = getattr(u, f, None)
+                        if callable(func):
+                            bot.events.append(f, func)
+            print(bot.events)
             print("Initialization complete.")
     except:
         print(traceback.format_exc())
@@ -1718,14 +1754,7 @@ async def on_guild_join(guild):
     await channel.send(embed=emb)
 
     
-async def seen(user, delay=0):
-    for u in bot.database.values():
-        f = getattr(u, "_seen_", None)
-        if f is not None:
-            try:
-                await f(user=user, delay=delay)
-            except:
-                print(traceback.format_exc())
+seen = lambda user, delay=0: bot.event("_seen_", user=user, delay=delay)
 
 
 async def checkDelete(message, reaction, user):
@@ -1814,13 +1843,7 @@ async def handleMessage(message, edit=True):
 
 @client.event
 async def on_typing(channel, user, when):
-    for u in bot.database.values():
-        f = getattr(u, "_typing_", None)
-        if f is not None:
-            try:
-                await f(channel=channel, user=user)
-            except:
-                print(traceback.format_exc())
+    await bot.event("_typing_", channel=channel, user=user)
     create_task(seen(user, delay=10))
 
 
@@ -1829,13 +1852,7 @@ async def on_message(message):
     bot.cacheMessage(message)
     guild = message.guild
     if guild:
-        for u in bot.database.values():
-            f = getattr(u, "_send_", None)
-            if f is not None:
-                try:
-                    await f(message=message)
-                except:
-                    print(traceback.format_exc())
+        await bot.event("_send_", message=message)
     create_task(seen(message.author))
     await bot.reactCallback(message, None, message.author)
     await handleMessage(message, False)
@@ -1843,50 +1860,26 @@ async def on_message(message):
 
 @client.event
 async def on_user_update(before, after):
-    for u in bot.database.values():
-        f = getattr(u, "_user_update_", None)
-        if f is not None:
-            try:
-                await f(before=before, after=after)
-            except:
-                print(traceback.format_exc())
+    await bot.event("_user_update_", before=before, after=after)
     create_task(seen(after))
 
 
 @client.event
 async def on_member_update(before, after):
-    for u in bot.database.values():
-        f = getattr(u, "_member_update_", None)
-        if f is not None:
-            try:
-                await f(before=before, after=after)
-            except:
-                print(traceback.format_exc())
+    await bot.event("_member_update_", before=before, after=after)
     if str(before.status) != str(after.status) or str(before.activity) != str(after.activity):
         create_task(seen(after))
 
 
 @client.event
 async def on_member_join(member):
-    for u in bot.database.values():
-        f = getattr(u, "_join_", None)
-        if f is not None:
-            try:
-                await f(user=member, guild=member.guild)
-            except:
-                print(traceback.format_exc())
+    await bot.event("_join_", user=member, guild=member.guild)
     create_task(seen(member))
 
             
 @client.event
 async def on_member_remove(member):
-    for u in bot.database.values():
-        f = getattr(u, "_leave_", None)
-        if f is not None:
-            try:
-                await f(user=member, guild=member.guild)
-            except:
-                print(traceback.format_exc())
+    await bot.event("_leave_", user=member, guild=member.guild)
 
 
 @client.event
@@ -1913,13 +1906,7 @@ async def on_raw_message_delete(payload):
             message.author = await bot.fetch_user(bot.deleted_user)
     guild = message.guild
     if guild:
-        for u in bot.database.values():
-            f = getattr(u, "_delete_", None)
-            if f is not None:
-                try:
-                    await f(message=message)
-                except:
-                    print(traceback.format_exc())
+        await bot.event("_delete_", message=message)
     bot.deleteMessage(message)
 
 
@@ -1949,29 +1936,20 @@ async def on_raw_bulk_message_delete(payload):
                 message.author = await bot.fetch_user(bot.deleted_user)
             messages.append(message)
     messages = sorted(messages, key=lambda m: m.id)
-    for u in bot.database.values():
-        f = getattr(u, "_bulk_delete_", None)
-        if f is not None:
-            try:
-                await f(messages=messages)
-            except:
-                print(traceback.format_exc())
+    await bot.event("_bulk_delete_", messages=messages)
     for message in messages:
-        guild = message.guild
+        guild = getattr(message, "guild", None)
         if guild:
-            for u in bot.database.values():
-                f = getattr(u, "_delete_", None)
-                if f is not None:
-                    try:
-                        await f(message=message, bulk=True)
-                    except:
-                        print(traceback.format_exc())
+            await bot.event("_delete_", message=message)
         bot.deleteMessage(message)
 
 
 @client.event
 async def on_guild_channel_create(channel):
     bot.cache.channels[channel.id] = channel
+    guild = channel.guild
+    if guild:
+        await bot.event("_channel_create_", channel=channel, guild=guild)
 
 
 @client.event
@@ -1979,26 +1957,14 @@ async def on_guild_channel_delete(channel):
     print(channel, "was deleted from", channel.guild)
     guild = channel.guild
     if guild:
-        for u in bot.database.values():
-            f = getattr(u, "_channel_delete_", None)
-            if f is not None:
-                try:
-                    await f(channel=channel, guild=guild)
-                except:
-                    print(traceback.format_exc())
+        await bot.event("_channel_delete_", channel=channel, guild=guild)
 
 
 @client.event
 async def on_member_ban(guild, user):
     print(user, "was banned from", guild)
     if guild:
-        for u in bot.database.values():
-            f = getattr(u, "_ban_", None)
-            if f is not None:
-                try:
-                    await f(user=user, guild=guild)
-                except:
-                    print(traceback.format_exc())
+        await bot.event("_delete_", user=user, guild=guild)
 
 
 @client.event
@@ -2018,13 +1984,7 @@ async def updateEdit(before, after):
         before.created_at = snowflake_time(before.id)
     guild = after.guild
     if guild:
-        for u in bot.database.values():
-            f = getattr(u, "_edit_", None)
-            if f is not None:
-                try:
-                    await f(before=before, after=after)
-                except:
-                    print(traceback.format_exc())
+        await bot.event("_edit_", before=before, after=after)
     create_task(seen(after.author))
 
 

@@ -166,11 +166,11 @@ class Ban(Command):
                     banlist.pops(ind)["u"]
                     if 0 in ind:
                         try:
-                            bot.database.bans.keyed.remove(guild.id, key=lambda x: x[-1])
+                            bot.database.bans.listed.remove(guild.id, key=lambda x: x[-1])
                         except LookupError:
                             pass
                         if banlist:
-                            bot.database.bans.keyed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
+                            bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
                     update()
                 return (
                     "```ini\nSuccessfully unbanned [" + noHighlight(user)
@@ -254,14 +254,14 @@ class Ban(Command):
                     except IndexError:
                         pass
                     try:
-                        bot.database.bans.keyed.remove(guild.id, key=lambda x: x[-1])
+                        bot.database.bans.listed.remove(guild.id, key=lambda x: x[-1])
                     except LookupError:
                         pass
                     if length < inf:
                         banlist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": ban.get("r", None)}, key=lambda x: x["t"])
-                        bot.database.bans.keyed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
+                        bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
                     print(banlist)
-                    print(bot.database.bans.keyed)
+                    print(bot.database.bans.listed)
                     update()
                     await channel.send(
                         "```css\nUpdated ban for " + sbHighlight(user)
@@ -279,14 +279,14 @@ class Ban(Command):
             except IndexError:
                 pass
             try:
-                bot.database.bans.keyed.remove(guild.id, key=lambda x: x[-1])
+                bot.database.bans.listed.remove(guild.id, key=lambda x: x[-1])
             except LookupError:
                 pass
             if length < inf:
                 banlist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": reason}, key=lambda x: x["t"])
-                bot.database.bans.keyed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
+                bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
             print(banlist)
-            print(bot.database.bans.keyed)
+            print(bot.database.bans.listed)
             update()
             await channel.send(
                 "```css\n" + sbHighlight(user)
@@ -741,15 +741,15 @@ class UpdateBans(Database):
 
     def __load__(self):
         d = self.data
-        self.keyed = hlist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
+        self.listed = hlist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
 
-    async def __call__(self):
+    async def _call_(self):
         t = utc()
-        while self.keyed:
-            p = self.keyed[0]
+        while self.listed:
+            p = self.listed[0]
             if t < p[0]:
                 break
-            self.keyed.popleft()
+            self.listed.popleft()
             g_id = p[1]
             temp = self.data[g_id]
             if not temp:
@@ -757,16 +757,16 @@ class UpdateBans(Database):
                 continue
             x = temp[0]
             if t < x["t"]:
-                self.keyed.insort((x["t"], g_id), key=lambda x: x[0])
-                print(self.keyed)
+                self.listed.insort((x["t"], g_id), key=lambda x: x[0])
+                print(self.listed)
                 continue
             x = freeClass(temp.pop(0))
             if not temp:
                 self.data.pop(g_id)
             else:
                 z = temp[0]["t"]
-                self.keyed.insort((z, g_id), key=lambda x: x[0])
-            print(self.keyed)
+                self.listed.insort((z, g_id), key=lambda x: x[0])
+            print(self.listed)
             try:
                 guild = await self.bot.fetch_guild(g_id)
                 user = await self.bot.fetch_user(x.u)

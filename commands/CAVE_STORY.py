@@ -20,9 +20,13 @@ class DouClub:
         self.pull()
 
     def pull(self):
-        kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret)
-        self.data = kn.data
-        self.time = utc()
+        try:
+            print("Pulling Doukutsu Club...")
+            kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret)
+            self.data = kn.data
+            self.time = utc()
+        except:
+            print(traceback.format_exc())
     
     def update(self):
         if utc() - self.time > 720:
@@ -117,33 +121,37 @@ class SheetPull:
             create_future(self.pull)
 
     def pull(self):
-        url = self.url
-        text = requests.get(url).text
-        data = text.split("\r\n")
-        columns = 0
-        sdata = [[], utc()]
-        for i in range(len(data)):
-            line = data[i]
-            read = list(csv.reader(line))
-            reli = []
-            curr = ""
-            for j in read:
-                if len(j) >= 2 and j[0] == j[1] == "":
-                    if curr != "":
-                        reli.append(curr)
-                        curr = ""
-                else:
-                    curr += "".join(j)
-            if curr != "":
-                reli.append(curr)
-            if len(reli):
-                columns = max(columns, len(reli))
-                sdata[0].append(reli)
-            for line in range(len(sdata[0])):
-                while len(sdata[0][line]) < columns:
-                    sdata[0][line].append(" ")
-        self.data = sdata
-        self.time = utc()
+        try:
+            print("Pulling Entity List...")
+            url = self.url
+            text = requests.get(url).text
+            data = text.split("\r\n")
+            columns = 0
+            sdata = [[], utc()]
+            for i in range(len(data)):
+                line = data[i]
+                read = list(csv.reader(line))
+                reli = []
+                curr = ""
+                for j in read:
+                    if len(j) >= 2 and j[0] == j[1] == "":
+                        if curr != "":
+                            reli.append(curr)
+                            curr = ""
+                    else:
+                        curr += "".join(j)
+                if curr != "":
+                    reli.append(curr)
+                if len(reli):
+                    columns = max(columns, len(reli))
+                    sdata[0].append(reli)
+                for line in range(len(sdata[0])):
+                    while len(sdata[0][line]) < columns:
+                        sdata[0][line].append(" ")
+            self.data = sdata
+            self.time = utc()
+        except:
+            print(traceback.format_exc())
 
     def search(self, query, lim):
         output = []

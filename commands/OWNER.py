@@ -24,9 +24,7 @@ class Restart(Command):
             emb = discord.Embed(colour=discord.Colour(1))
             emb.set_author(name=str(client.user), url=bot.website, icon_url=bestURL(client.user))
             emb.description = "```ini\n[I will be " + ("restarting", "shutting down")[name == "shutdown"] + " in " + sec2Time(delay) + ", apologies for any inconvenience.]```"
-            for d in self.bot.database.values():
-                if hasattr(d, "_announce_"):
-                    d._announce_(embed=emb)
+            await bot.event("_announce_", embed=emb)
             if delay > 0:
                 await asyncio.sleep(delay)
         if name == "reload":
@@ -39,9 +37,7 @@ class Restart(Command):
         bot.closed = True
         print.close()
         t = time.time()
-        for d in self.bot.database.values():
-            if hasattr(d, "_destroy_"):
-                d._destroy_()
+        await bot.event("_destroy_")
         bot.update()
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
