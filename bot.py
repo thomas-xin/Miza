@@ -1652,6 +1652,7 @@ async def fastLoop():
         create_task(bot.event("_call_"))
         await asyncio.sleep(0.5)
         create_task(bot.event("_call_"))
+        await asyncio.sleep(0.5)
 
 
 async def slowLoop():
