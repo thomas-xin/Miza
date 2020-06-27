@@ -312,6 +312,7 @@ class CustomAudio(discord.AudioSource):
     announce = lambda self, *args, **kwargs: create_task(sendReact(self.channel, *args, reacts="❎", **kwargs))
 
     def kill(self, reason=""):
+        self.dead = True
         try:
             if not reason:
                 reason = (
