@@ -554,7 +554,7 @@ class Info(Command):
         if "v" in flags:
             emb.add_field(name="Gender", value=str(p.gender), inline=1)
             ctime = datetime.datetime.fromtimestamp(p.birthday)
-            age = (datetime.datetime.utcnow() - ctime).total_seconds() / TIMEUNITS["year"]
+            age = (utc_dt() - ctime).total_seconds() / TIMEUNITS["year"]
             emb.add_field(name="Birthday", value=str(ctime), inline=1)
             emb.add_field(name="Age", value=str(roundMin(round(age, 1))), inline=1)
         if pcnt:
@@ -938,7 +938,7 @@ class Reminder(Command):
                     msg = ""
                 if spl is not None:
                     msg = " at ".join(spl[:-1])
-                    t = utc_ts(tparser.parse(spl[-1])) - utc()
+                    t = utc_ts(tzparse(spl[-1])) - utc()
                     break
             if "on" in argv:
                 if " on " in argv:
@@ -948,7 +948,7 @@ class Reminder(Command):
                     msg = ""
                 if spl is not None:
                     msg = " on ".join(spl[:-1])
-                    t = utc_ts(tparser.parse(spl[-1])) - utc()
+                    t = utc_ts(tzparse(spl[-1])) - utc()
                     break
             msg = " ".join(args[:-1])
             t = await bot.evalTime(args[-1], guild)
@@ -1205,7 +1205,7 @@ class UpdateMessageCount(Database):
                 returns[0] = []
 
         year = datetime.timedelta(seconds=31556925.216)
-        oneyear = datetime.datetime.utcnow() - guild.created_at < year
+        oneyear = utc_dt() - guild.created_at < year
         if guild.member_count > 512 and not oneyear:
             self.data["guild.id"] = {"counts": {}, "totals": {}, 0: True}
             return
@@ -1260,7 +1260,7 @@ class UpdateMessageCount(Database):
         i = 1
         for guild in sorted(guilds, key=lambda g: g.member_count, reverse=True):
             if guild.id not in self.data:
-                oneyear = datetime.datetime.utcnow() - guild.created_at < year
+                oneyear = utc_dt() - guild.created_at < year
                 if guild.member_count < 512 or oneyear:
                     self.startCalculate(guild)
                 if not i & 63:

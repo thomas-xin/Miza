@@ -186,7 +186,7 @@ class Time2ID(Command):
     async def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        argv = tparser.parse(argv)
+        argv = tzparse(argv)
         return "```fix\n" + str(time_snowflake(argv)) + "```"
 
 
@@ -259,23 +259,36 @@ class OwOify(Command):
 
 
 class Time(Command):
-    name = ["UTC", "GMT"]
+    name = ["UTC", "GMT", "T"]
     min_level = 0
     description = "Shows the current time in a certain timezone."
     usage = "<offset_hours[0]>"
 
-    async def __call__(self, argv, guild, **void):
+    async def __call__(self, name, argv, args, guild, **void):
+        s = 0
+        if args and name in "time":
+            for a in (args[0], args[-1]):
+                tz = a.lower()
+                if tz in TIMEZONES:
+                    s = get_timezone(tz)
+                    argv = argv.replace(a, "")
+                    break
+        elif name in TIMEZONES:
+            s = TIMEZONES.get(name, 0)
+        t = utc_dt()
         if argv:
             h = await self.bot.evalMath(argv, guild)
         else:
             h = 0
-        hrs = datetime.timedelta(hours=h)
-        t = datetime.datetime.utcnow() + hrs
-        s = str(h)
-        if not s.startswith("-"):
-            s = "+" + s
+        if h or s:
+            t += datetime.timedelta(hours=h, seconds=s)
+        hrs = roundMin(h + s / 3600)
+        if hrs >= 0:
+            hrs = "+" + str(hrs)
+        else:
+            hrs = str(hrs)
         return (
-            "```ini\nCurrent time at UTC/GMT" + s 
+            "```ini\nCurrent time at UTC/GMT" + hrs
             + ": [" + str(t) + "].```"
         )
 

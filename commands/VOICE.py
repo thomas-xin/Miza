@@ -1808,7 +1808,7 @@ class AudioDownloader:
             entry["url"] = ""
     
     def download_file(self, url, fmt="ogg", auds=None, fl=8388608):
-        fn = "cache/&" + str(time_snowflake(datetime.datetime.utcnow())) + "." + fmt
+        fn = "cache/&" + str(time_snowflake(utc_dt())) + "." + fmt
         info = self.extract(url)[0]
         self.getStream(info, force=True, download=False)
         stream = info["stream"]

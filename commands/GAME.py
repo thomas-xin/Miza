@@ -393,7 +393,7 @@ class MimicConfig(Command):
                 + noHighlight(mimic.name) + "]: [" + noHighlight(mimic[setting]) + "].```"
             )
         if setting == "birthday":
-            new = utc_ts(tparser.parse(new))
+            new = utc_ts(tzparse(new))
         elif setting == "name":
             if len(new) > 80:
                 raise OverflowError("Prefix must be 80 or fewer in length.")
@@ -522,7 +522,7 @@ class Mimic(Command):
                 + "Please remove an item to add another."
             )
         dop = None
-        utcn = datetime.datetime.utcnow()
+        utcn = utc_dt()
         mid = discord.utils.time_snowflake(utcn)
         ctime = utc()
         m_id = "&" + str(mid)

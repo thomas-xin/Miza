@@ -11,7 +11,7 @@ sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
 
 client = discord.AutoShardedClient(
-    max_messages=4096,
+    max_messages=1024,
     heartbeat_timeout=30,
 )
 
@@ -939,6 +939,17 @@ class Bot:
         t = 0
         if expr:
             f = None
+            if " " in expr:
+                try:
+                    args = shlex.split(expr)
+                except ValueError:
+                    args = expr.split()
+                for a in (args[0], args[-1]):
+                    tz = a.lower()
+                    if tz in TIMEZONES:
+                        t = -get_timezone(tz)
+                        expr = expr.replace(a, "")
+                        break
             try:
                 if ":" in expr:
                     data = expr.split(":")
@@ -1936,7 +1947,7 @@ async def on_raw_bulk_message_delete(payload):
     for message in messages:
         guild = getattr(message, "guild", None)
         if guild:
-            await bot.event("_delete_", message=message)
+            await bot.event("_delete_", message=message, bulk=True)
         bot.deleteMessage(message)
 
 
@@ -1970,55 +1981,56 @@ async def on_guild_remove(guild):
     print(guild, "removed.")
 
 
-async def updateEdit(before, after):
-    if before.content == after.content:
-        before = bot.ghostMessage()
-        before.channel = after.channel
-        before.guild = after.guild
-        before.author = after.author
-        before.id = after.id
-        before.created_at = snowflake_time(before.id)
-    guild = after.guild
-    if guild:
-        await bot.event("_edit_", before=before, after=after)
-    create_task(seen(after.author))
-
-
-@client.event
-async def on_message_edit(before, after):
-    if before.content != after.content:
-        bot.cacheMessage(after)
-        await handleMessage(after)
-        await updateEdit(before, after)
-    elif after.author.id == client.user.id:
-        if isZeroEnc(after.content):
-            pass
-
-
 @client.event
 async def on_raw_message_edit(payload):
-    if payload.cached_message is not None:
-        return
-    try:
-        c_id = payload.data.get("channel_id", 0)
-        channel = await bot.fetch_channel(c_id)
-        before = await bot.fetch_message(payload.message_id, channel)
-        if before is None:
-            raise LookupError
-    except:
-        before = bot.ghostMessage()
-        before.channel = await bot.fetch_channel(c_id)
-        before.guild = channel.guild
-        before.id = payload.message_id
-        before.created_at = snowflake_time(before.id)
-    if before:
-        after = await before.channel.fetch_message(payload.message_id)
-        bot.cacheMessage(after)
-        if not hasattr(before, "ghost"):
-            if before.content == after.content:
+    data = payload.data
+    m_id = int(data["id"])
+    raw = False
+    if payload.cached_message:
+        before = payload.cached_message
+        after = await bot.fetch_message(m_id, payload.message_id)
+    else:
+        try:
+            before = messages[m_id]
+        except LookupError:
+            c_id = data.get("channel_id")
+            if not c_id:
                 return
+            before = bot.ghostMessage()
+            before.channel = channel = await bot.fetch_channel(c_id)
+            before.guild = guild = getattr(channel, "guild", None)
+            before.id = payload.message_id
+            before.created_at = snowflake_time(before.id)
+            try:
+                u_id = data["author"]["id"]
+            except KeyError:
+                u_id = None
+                before.author = None
+            else:
+                if guild is not None:
+                    user = guild.get_member(u_id)
+                else:
+                    user = None
+                if not user:
+                    user = await bot.fetch_user(u_id)
+                before.author = user
+            try:
+                after = await channel.fetch_message(before.id)
+            except LookupError:
+                after = copy.copy(before)
+                after._update(data)
+            else:
+                before.author = after.author
+            raw = True
+        else:
+            after = copy.copy(before)
+            after._update(data)
+    bot.cacheMessage(after)
+    if raw or before.content != after.content:
         await handleMessage(after)
-        await updateEdit(before, after)
+        if getattr(after, "guild", None):
+            await bot.event("_edit_", before=before, after=after)
+        await seen(after.author)
 
 
 if __name__ == "__main__":

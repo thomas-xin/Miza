@@ -30,7 +30,7 @@ class DouClub:
     
     def update(self):
         if utc() - self.time > 720:
-            create_future(self.pull)
+            create_future_ex(self.pull)
             self.time = utc()
 
     def search(self, query):
@@ -69,6 +69,7 @@ try:
 except KeyError:
     douclub = freeClass(
         search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to use Doukutsu Club.")'),
+        update=lambda: None
     )
     print("WARNING: knack_id/knack_secret not found. Unable to use Doukutsu Club.")
 
@@ -119,12 +120,12 @@ class SheetPull:
 
     def update(self):
         if utc() - self.time > 720:
-            create_future(self.pull)
+            create_future_ex(self.pull)
             self.time = utc()
 
     def pull(self):
         try:
-            print("Pulling Entity List...")
+            print("Pulling Spreadsheet...")
             url = self.url
             text = requests.get(url).text
             data = text.split("\r\n")
@@ -609,3 +610,4 @@ class CS_Database(Database):
     async def __call__(self, **void):
         entity_list.update()
         tsc_list.update()
+        douclub.update()

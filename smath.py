@@ -1406,6 +1406,7 @@ def intKey(d):
 
 
 utc = time.time
+utc_dt = datetime.datetime.utcnow
 ep = datetime.datetime(1970, 1, 1)
 utc_ts = lambda dt: (dt - ep).total_seconds()
 # utc_ts = lambda dt: dt.replace(tzinfo=datetime.timezone.utc).timestamp()

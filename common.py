@@ -1,4 +1,4 @@
-import os, sys, subprocess, psutil, asyncio, discord, json, requests, inspect, importlib
+import os, sys, subprocess, psutil, asyncio, discord, json, pytz, requests, inspect, importlib
 import urllib.request, urllib.parse, concurrent.futures
 
 
@@ -595,6 +595,50 @@ def create_task(fut, *args, loop=None, **kwargs):
         except RuntimeError:
             loop = eloop
     return asyncio.ensure_future(fut, *args, loop=loop, **kwargs)
+
+
+TIMEZONES = {}
+
+def load_timezones():
+    for line in requests.get("https://cdn.discordapp.com/attachments/725856367717646357/726280246978150430/message.txt").content.decode("utf-8", "replace").split("\n"):
+        info = line.split("\t")
+        abb = info[0].lower()
+        if len(abb) >= 3 and abb not in TIMEZONES:
+            temp = info[-1].replace("\\", "/")
+            curr = sorted([round((1 - (i[3] == "−") * 2) * (rdhms(i[4:]) if ":" in i else float(i[4:]) * 60) * 60) for i in temp.split("/") if i.startswith("UTC")])
+            if len(curr) == 1:
+                curr = curr[0]
+            TIMEZONES[abb] = curr
+
+def is_dst(dt=None, timezone="UTC"):
+    if dt is None:
+        dt = utc_dt()
+    timezone = pytz.timezone(timezone)
+    timezone_aware_date = timezone.localize(dt, is_dst=None)
+    return timezone_aware_date.tzinfo._dst.seconds != 0
+
+def get_timezone(tz):
+    s = TIMEZONES[tz]
+    if issubclass(type(s), collections.abc.Sequence):
+        return s[is_dst(timezone=tz.upper())]
+    return s
+
+create_future_ex(load_timezones)
+
+def tzparse(expr):
+    if " " in expr:
+        try:
+            args = shlex.split(expr)
+        except ValueError:
+            args = expr.split()
+        for a in (args[0], args[-1]):
+            tz = a.lower()
+            if tz in TIMEZONES:
+                t = get_timezone(tz)
+                expr = expr.replace(a, "")
+                break
+        return tparser.parse(expr) - datetime.timedelta(seconds=t)
+    return tparser.parse(expr)
 
 
 class Command:

@@ -1091,7 +1091,7 @@ class UpdateMessageLogs(Database):
 
     async def __call__(self):
         for h in tuple(self.dc):
-            if datetime.datetime.utcnow() - h > datetime.timedelta(seconds=3600):
+            if utc_dt() - h > datetime.timedelta(seconds=3600):
                 self.dc.pop(h)
         if not self.searched:
             self.searched = True
@@ -1145,7 +1145,7 @@ class UpdateMessageLogs(Database):
                 self.data.pop(guild.id)
                 self.update()
                 return
-            now = datetime.datetime.utcnow()
+            now = utc_dt()
             u = message.author
             name = u.name
             name_id = name + bool(u.display_name) * ("#" + u.discriminator)
@@ -1217,7 +1217,7 @@ class UpdateMessageLogs(Database):
                 self.data.pop(guild.id)
                 self.update()
                 return
-            now = datetime.datetime.utcnow()
+            now = utc_dt()
             action = discord.AuditLogAction.message_bulk_delete
             try:
                 init = "[UNKNOWN USER]"
