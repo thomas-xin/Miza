@@ -312,7 +312,15 @@ class CustomAudio(discord.AudioSource):
     announce = lambda self, *args, **kwargs: create_task(sendReact(self.channel, *args, reacts="❎", **kwargs))
 
     def kill(self, reason=""):
-        self.dead = True
+        self.dead = None
+        try:
+            self.bot.database.playlists.audio.pop(g)
+        except KeyError:
+            pass
+        try:
+            self.bot.database.playlists.connecting.pop(g)
+        except KeyError:
+            pass
         try:
             if not reason:
                 reason = (
@@ -329,17 +337,8 @@ class CustomAudio(discord.AudioSource):
         guild = vc.guild
         g = guild.id
         if hasattr(self, "dead"):
-            try:
-                self.bot.database.playlists.audio.pop(g)
-            except KeyError:
-                pass
-            try:
-                self.bot.database.playlists.connecting.pop(g)
-            except KeyError:
-                pass
             create_task(vc.disconnect())
             if self.dead is not None:
-                self.dead = None
                 self.kill()
             return
         if not hasattr(vc, "channel"):
