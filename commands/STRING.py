@@ -79,12 +79,13 @@ class Translate(Command):
     no_parse = True
     rate_limit = 2
 
-    async def __call__(self, args, flags, user, **void):
+    async def __call__(self, channel, args, flags, user, **void):
         if not args:
             raise ArgumentError("Input string is empty.")
         dest = args[0]
         string = " ".join(args[1:])
-        detected = translators["Google Translate"].detect(string)
+        fut = create_task(channel.trigger_typing())
+        detected = await create_future(translators["Google Translate"].detect, string)
         source = detected.lang
         trans = ["Google Translate", "Papago"]
         if "p" in flags:
@@ -111,6 +112,7 @@ class Translate(Command):
                 except:
                     if t == trans[-1] and i == count - 1:
                         raise
+        await fut
         return response + end    
 
 
@@ -306,11 +308,12 @@ class UrbanDictionary(Command):
     flags = "v"
     rate_limit = 2
 
-    async def __call__(self, argv, flags, **void):
+    async def __call__(self, channel, argv, flags, **void):
         url = (
             "https://mashape-community-urban-dictionary.p.rapidapi.com/define?term="
             + argv.replace(" ", "%20")
         )
+        fut = create_task(channel.trigger_typing())
         resp = await create_future(requests.get, url, returns, headers=self.header, timeout=8)
         s = resp.content
         resp.close()
@@ -320,6 +323,7 @@ class UrbanDictionary(Command):
             d = eval(s, {}, eval_const)
         l = d["list"]
         if not l:
+            await fut
             raise LookupError("No results for " + argv + ".")
         l.sort(
             key=lambda e: scaleRatio(e.get("thumbs_up", 0), e.get("thumbs_down", 0)),
@@ -342,4 +346,5 @@ class UrbanDictionary(Command):
                 "```ini\n[" + noHighlight(argv) + "]\n"
                 + l[0].get("definition", "") + "```"
             )
+        await fut
         return output

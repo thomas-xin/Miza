@@ -249,7 +249,10 @@ def max_size(w, h, maxsize):
 def resize_max(image, maxsize, resample=Image.LANCZOS, box=None, reducing_gap=None):
     w, h = max_size(image.width, image.height, maxsize)
     if w != image.width or h != image.height:
-        image = image.resize([w, h], resample, box, reducing_gap)
+        if type(resample) is str:
+            image = resize_to(image, w, h, resample)
+        else:
+            image = image.resize([w, h], resample, box, reducing_gap)
     return image
 
 resizers = {

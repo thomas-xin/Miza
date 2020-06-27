@@ -112,7 +112,13 @@ class Ban(Command):
         update = self.bot.database.bans.update
         ts = utc()
         banlist = bot.data.bans.get(guild.id, [])
-        bans, glob = await self.getBans(guild)
+        fut = create_task(channel.trigger_typing())
+        try:
+            bans, glob = await self.getBans(guild)
+        except:
+            await fut
+            raise
+        await fut
         if not args:
             if not bans:
                 return (
@@ -483,15 +489,18 @@ class AutoRole(Command):
         if new not in assigned:
             assigned.append(new)
             update()
-        if "x" in flags:
-            i = 1
-            for member in guild.members:
-                role = random.choice(roles)
-                if role not in member.roles:
-                    create_task(member.add_roles(role, reason="InstaRole", atomic=True))
-                    if not i % 5:
-                        await asyncio.sleep(5)
-                    i += 1
+        if "x" in flags or name == "instarole":
+            if roles:
+                fut = create_task(channel.trigger_typing())
+                i = 1
+                for member in guild.members:
+                    role = random.choice(roles)
+                    if role not in member.roles:
+                        create_task(member.add_roles(role, reason="InstaRole", atomic=True))
+                        if not i % 5:
+                            await asyncio.sleep(5)
+                        i += 1
+                await fut
         return (
             "```css\nAdded [" + noHighlight(", ".join(str(role) for role in roles))
             + "] to the autorole list for [" + noHighlight(guild) + "].```"
@@ -904,7 +913,7 @@ class UpdateUserLogs(Database):
             if str(before) != str(after):
                 emb.add_field(
                     name="Username",
-                    value=escape_markdown(str(before)) + " <:arrow:688320024586223620> " + escape_markdown(str(after)),
+                    value=escape_markdown(str(before)) + " <:a:688320024586223620> " + escape_markdown(str(after)),
                 )
                 change = True
                 colour[0] += 255
@@ -912,7 +921,7 @@ class UpdateUserLogs(Database):
                 if before.display_name != after.display_name:
                     emb.add_field(
                         name="Nickname",
-                        value=escape_markdown(before.display_name) + " <:arrow:688320024586223620> " + escape_markdown(after.display_name),
+                        value=escape_markdown(before.display_name) + " <:a:688320024586223620> " + escape_markdown(after.display_name),
                     )
                     change = True
                     colour[0] += 255
@@ -927,10 +936,10 @@ class UpdateUserLogs(Database):
                             add.append(r)
                     rchange = ""
                     if sub:
-                        rchange = "<:minus:688316020359823364> " + escape_markdown(", ".join(str(r) for r in sub))
+                        rchange = "<:m:688316020359823364> " + escape_markdown(", ".join(str(r) for r in sub))
                     if add:
                         rchange += (
-                            "\n" * bool(rchange) + "<:plus:688316007093370910> " 
+                            "\n" * bool(rchange) + "<:p:688316007093370910> " 
                             + escape_markdown(", ".join(str(r) for r in add))
                         )
                     if rchange:
@@ -942,7 +951,7 @@ class UpdateUserLogs(Database):
                     name="Avatar",
                     value=(
                         "[Before](" + str(b_url) 
-                        + ") <:arrow:688320024586223620> [After](" 
+                        + ") <:a:688320024586223620> [After](" 
                         + str(a_url) + ")"
                     ),
                 )

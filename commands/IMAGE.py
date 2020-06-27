@@ -339,12 +339,13 @@ class CreateEmoji(Command):
     no_parse = True
     rate_limit = (3, 4)
 
-    async def __call__(self, bot, guild, message, args, argv, **void):
+    async def __call__(self, bot, guild, channel, message, args, argv, **void):
         if message.attachments:
             args = [bestURL(a) for a in message.attachments] + args
             argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args:
             raise ArgumentError("Please enter URL, emoji, or attached file to add.")
+        fut = create_task(channel.trigger_typing())
         url = args.pop(-1)
         url = await bot.followURL(url, best=True)
         if not isURL(url):
@@ -352,6 +353,7 @@ class CreateEmoji(Command):
             if not emojis:
                 emojis = findEmojis(url)
                 if not emojis:
+                    await fut
                     raise ArgumentError("Please input an image by URL or attachment.")
                 s = emojis[0]
                 name = url[:url.index(s)].strip()
@@ -370,6 +372,7 @@ class CreateEmoji(Command):
         resp = await create_future(requests.get, url, headers={"user-agent": "Mozilla/5." + str(xrand(1, 10))}, timeout=8)
         image = resp.content
         if len(image) > 67108864:
+            await fut
             raise OverflowError("Max file size to load is 64MB.")
         if len(image) > 262144:
             path = "cache/" + str(guild.id) + ".png"
@@ -383,6 +386,7 @@ class CreateEmoji(Command):
             create_future_ex(f.close)
         emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
         await message.add_reaction(emoji)
+        await fut
         return (
            "```css\nSuccessfully created emoji [" + noHighlight(emoji) + "] in ["
             + noHighlight(guild.name) + "].```"
@@ -541,7 +545,7 @@ async def get_image(bot, message, args, argv, ext="png"):
             name = name[:name.rindex(".")]
     except ValueError:
         name = "unknown"
-    if "." not in name:
+    if not name.endswith("." + ext):
         name += "." + ext
     return name, value, url
 
@@ -554,11 +558,13 @@ class Saturate(Command):
     no_parse = True
     rate_limit = (2, 3)
 
-    async def __call__(self, bot, guild, message, args, argv, **void):
+    async def __call__(self, bot, guild, channel, message, args, argv, **void):
+        fut = create_task(channel.trigger_typing())
         name, value, url = await get_image(bot, message, args, argv)
         resp = await imageProc(url, "Enhance", ["Color", value], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
+        await fut
         await sendFile(message.channel, "", f, filename=fn)
 
 
@@ -570,11 +576,13 @@ class Contrast(Command):
     no_parse = True
     rate_limit = (2, 3)
 
-    async def __call__(self, bot, guild, message, args, argv, **void):
+    async def __call__(self, bot, guild, channel, message, args, argv, **void):
+        fut = create_task(channel.trigger_typing())
         name, value, url = await get_image(bot, message, args, argv)
         resp = await imageProc(url, "Enhance", ["Contrast", value], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
+        await fut
         await sendFile(message.channel, "", f, filename=fn)
 
 
@@ -586,11 +594,13 @@ class Brightness(Command):
     no_parse = True
     rate_limit = (2, 3)
 
-    async def __call__(self, bot, guild, message, args, argv, **void):
+    async def __call__(self, bot, guild, channel, message, args, argv, **void):
+        fut = create_task(channel.trigger_typing())
         name, value, url = await get_image(bot, message, args, argv)
         resp = await imageProc(url, "Enhance", ["Brightness", value], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
+        await fut
         await sendFile(message.channel, "", f, filename=fn)
 
 
@@ -602,11 +612,13 @@ class Sharpness(Command):
     no_parse = True
     rate_limit = (2, 3)
 
-    async def __call__(self, bot, guild, message, args, argv, **void):
+    async def __call__(self, bot, guild, channel, message, args, argv, **void):
+        fut = create_task(channel.trigger_typing())
         name, value, url = await get_image(bot, message, args, argv)
         resp = await imageProc(url, "Enhance", ["Sharpness", value], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
+        await fut
         await sendFile(message.channel, "", f, filename=fn)
 
 
@@ -618,11 +630,13 @@ class HueShift(Command):
     no_parse = True
     rate_limit = (2, 3)
 
-    async def __call__(self, bot, guild, message, args, argv, **void):
+    async def __call__(self, bot, guild, channel, message, args, argv, **void):
+        fut = create_task(channel.trigger_typing())
         name, value, url = await get_image(bot, message, args, argv)
         resp = await imageProc(url, "hue_shift", [value], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
+        await fut
         await sendFile(message.channel, "", f, filename=fn)
 
 
@@ -677,9 +691,11 @@ class Colour(Command):
             + "\nXYZ values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
             + "```"
         )
+        fut = create_task(channel.trigger_typing())
         resp = await imageProc("from_colour", "$", [channels], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename="colour.png")
+        await fut
         await sendFile(channel, msg, f, filename=fn, best=True)
 
 
@@ -692,11 +708,13 @@ class Rainbow(Command):
     rate_limit = (5, 8)
     _timeout_ = 3
 
-    async def __call__(self, bot, guild, message, args, argv, **void):
+    async def __call__(self, bot, guild, channel, message, args, argv, **void):
+        fut = create_task(channel.trigger_typing())
         name, value, url = await get_image(bot, message, args, argv, ext="gif")
         resp = await imageProc(url, "rainbow_gif", [value], guild.id, timeout=32)
         fn = resp[0]
         f = discord.File(fn, filename=name)
+        await fut
         await sendFile(message.channel, "", f, filename=fn)
 
 
@@ -710,7 +728,7 @@ class CreateGIF(Command):
     _timeout_ = 5
     flags = "r"
 
-    async def __call__(self, bot, guild, message, flags, args, **void):
+    async def __call__(self, bot, guild, channel, message, flags, args, **void):
         if not bot.isTrusted(guild.id):
             raise PermissionError("Must be in a trusted server to create GIF images.")
         if message.attachments:
@@ -729,8 +747,9 @@ class CreateGIF(Command):
         if delay <= 0:
             args = args[-1:]
             delay = 1000
-        if delay > 16777215:
+        if delay >= 16777216:
             raise OverflowError("GIF image framerate too low.")
+        fut = create_task(channel.trigger_typing())
         video = None
         for i, url in enumerate(args):
             url = await bot.followURL(url, best=True)
@@ -748,6 +767,7 @@ class CreateGIF(Command):
             resp = await imageProc("create_gif", "$", ["image", args, delay], guild.id, timeout=64)
         fn = resp[0]
         f = discord.File(fn, filename=name)
+        await fut
         await sendFile(message.channel, "", f, filename=fn)
 
 
@@ -760,7 +780,7 @@ class Resize(Command):
     rate_limit = 3
     flags = "l"
 
-    async def __call__(self, bot, guild, message, flags, args, argv, **void):
+    async def __call__(self, bot, guild, channel, message, flags, args, argv, **void):
         if message.attachments:
             args = [bestURL(a) for a in message.attachments] + args
             argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
@@ -771,6 +791,7 @@ class Resize(Command):
                     + "nearest, linear, hamming, bicubic, lanczos, auto]```"
                 )
             raise ArgumentError("Please input an image by URL or attachment.")
+        fut = create_task(channel.trigger_typing())
         url = args.pop(0)
         url = await bot.followURL(url, best=True)
         if not isURL(url):
@@ -801,6 +822,7 @@ class Resize(Command):
                 y = x
             for value in (x, y):
                 if not value >= -16 or not value <= 16:
+                    await fut
                     raise OverflowError("Maximum multiplier input is 16.")
             if spl:
                 op = " ".join(spl)
@@ -814,11 +836,12 @@ class Resize(Command):
                 name = name[:name.rindex(".")]
         except ValueError:
             name = "unknown"
-        if "." not in name:
+        if not name.endswith(".png"):
             name += ".png"
         resp = await imageProc(url, "resize_mult", [x, y, op], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
+        await fut
         await sendFile(message.channel, "", f, filename=fn)
 
 
@@ -856,10 +879,11 @@ class Magik(Command):
                 name = name[:name.rindex(".")]
         except ValueError:
             name = "unknown"
-        if "." not in name:
+        if not name.endswith(".png"):
             name += ".png"
+        fut = create_task(channel.trigger_typing())
         if "cdn.discord" not in url:
-            resp = await imageProc(url, "resize_to", [512, 512, "hamming"], guild.id)
+            resp = await imageProc(url, "resize_max", [512, "hamming"], guild.id)
             fn = resp[0]
             f = discord.File(fn, filename=name)
             msg = await channel.send(file=f)
@@ -876,6 +900,7 @@ class Magik(Command):
             create_task(bot.silentDelete(msg))
         b = resp.content
         f = discord.File(io.BytesIO(b), filename=name)
+        await fut
         await sendFile(message.channel, "", f)
 
 
@@ -888,7 +913,7 @@ class Blend(Command):
     rate_limit = (3, 5)
     flags = "l"
 
-    async def __call__(self, bot, guild, message, flags, args, argv, **void):
+    async def __call__(self, bot, guild, channel, message, flags, args, argv, **void):
         if message.attachments:
             args = [bestURL(a) for a in message.attachments] + args
             argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
@@ -901,6 +926,7 @@ class Blend(Command):
                     + "burn, linearburn, dodge, lineardodge, hue, sat, lum, extract, merge]```"
                 )
             raise ArgumentError("Please input an image by URL or attachment.")
+        fut = create_task(channel.trigger_typing())
         url1 = args.pop(0)
         url1 = await bot.followURL(url1, best=True)
         url2 = args.pop(0)
@@ -911,6 +937,7 @@ class Blend(Command):
             if not emojis:
                 emojis = findEmojis(url1)
                 if not emojis:
+                    await fut
                     raise ArgumentError("Please input an image by URL or attachment.")
                 s = emojis[0]
                 argv = url1[url1.index(s) + len(s):].strip()
@@ -927,6 +954,7 @@ class Blend(Command):
             if not emojis:
                 emojis = findEmojis(url2)
                 if not emojis:
+                    await fut
                     raise ArgumentError("Please input an image by URL or attachment.")
                 s = emojis[0]
                 argv = url2[url2.index(s) + len(s):].strip()
@@ -956,6 +984,7 @@ class Blend(Command):
             else:
                 opacity = 1
             if not opacity >= -16 or not opacity <= 16:
+                await fut
                 raise OverflowError("Maximum multiplier input is 16.")
             if spl:
                 operation += " ".join(spl)
@@ -969,11 +998,12 @@ class Blend(Command):
                 name = name[:name.rindex(".")]
         except ValueError:
             name = "unknown"
-        if "." not in name:
+        if not name.endswith(".png"):
             name += ".png"
         resp = await imageProc(url1, "blend_op", [url2, operation, opacity], guild.id)
         fn = resp[0]
         f = discord.File(fn, filename=name)
+        await fut
         await sendFile(message.channel, "", f, filename=fn)
 
 

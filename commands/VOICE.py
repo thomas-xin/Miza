@@ -622,7 +622,7 @@ class CustomAudio(discord.AudioSource):
                             if not found:
                                 self.lastEnd = utc()
                                 if not self.has_read or not self.queue:
-                                    print("{Stopped}")
+                                    # print("{Stopped}")
                                     if self.queue:
                                         self.queue[0].url = ""
                                     self.source.advanced = True
@@ -637,7 +637,7 @@ class CustomAudio(discord.AudioSource):
                                     #     self.refilling = 2
                                     #     self.seek(self.stats.position)
                                     # else:
-                                    print("{Finished}")
+                                    # print("{Finished}")
                                     self.source.advanced = True
                                     create_future_ex(self.queue.update_play)
                                     self.preparing = False
@@ -869,7 +869,7 @@ class AudioQueue(hlist):
         s = self.auds.stats
         if q and process:
             if q[0].get("played"):
-                print("Queue Advanced.")
+                # print("Queue Advanced.")
                 self.prev = q[0]["url"]
                 try:
                     q[0].pop("played")
@@ -931,7 +931,7 @@ class AudioQueue(hlist):
                             self.lastsent = utc()
                     self.loading = True
                     source = ytdl.getStream(q[0])
-                    print(q[0])
+                    # print(q[0])
                     try:
                         auds.new(source)
                         self.loading = False
@@ -1039,7 +1039,7 @@ def org2xm(org, dat=None):
     args = ["misc/org2xm.exe", r_org, r_dat]
     if compat:
         args.append("c")
-    print(args)
+    # print(args)
     subprocess.check_output(args)
     r_xm = "cache/" + str(ts) + ".xm"
     if str(ts) + ".xm" not in os.listdir("cache"):
@@ -1232,7 +1232,7 @@ class PCMFile:
 class LoadedAudioReader(discord.AudioSource):
 
     def __init__(self, file, args, callback=None):
-        print(args)
+        # print(args)
         self.closed = False
         self.advanced = False
         self.proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
@@ -1240,7 +1240,7 @@ class LoadedAudioReader(discord.AudioSource):
         self.file = file
         self.buffer = None
         self.callback = callback
-        print(self.proc)
+        # print(self.proc)
     
     def read(self):
         if self.buffer:
@@ -1269,7 +1269,7 @@ class LoadedAudioReader(discord.AudioSource):
 class BufferedAudioReader(discord.AudioSource):
 
     def __init__(self, file, args, callback=None):
-        print(args)
+        # print(args)
         self.closed = False
         self.advanced = False
         self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -1279,7 +1279,7 @@ class BufferedAudioReader(discord.AudioSource):
         self.buffer = None
         self.callback = callback
         self.full = False
-        print(self.proc)
+        # print(self.proc)
 
     def read(self):
         if self.buffer:
@@ -1907,7 +1907,7 @@ class Queue(Command):
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     _timeout_ = 2
-    rate_limit = (0.5, 1)
+    rate_limit = (0.5, 1.5)
 
     async def __call__(self, bot, client, user, perm, message, channel, guild, flags, name, argv, **void):
         if not argv:
@@ -1939,11 +1939,18 @@ class Queue(Command):
                 + str(user.id) + "_0_" + str(int(v))
                 + "-\nLoading Queue...```"
             )
-        future = wrap_future(create_task(forceJoin(guild, channel, user, client, bot, preparing=True)))
+        try:
+            auds = bot.database.playlists.audio[guild.id]
+            future = None
+        except KeyError:
+            future = wrap_future(create_task(forceJoin(guild, channel, user, client, bot, preparing=True)))
+        future2 = create_task(channel.trigger_typing())
         if isURL(argv):
             argv = await bot.followURL(argv)
         resp = await create_future(ytdl.search, argv)
-        auds = await future
+        if future is not None:
+            auds = await future
+        await future2
         if "f" in flags or "b" in flags:
             if not isAlone(auds, user) and perm < 1:
                 raise self.permError(perm, 1, "to force play while other users are in voice")
@@ -2379,7 +2386,6 @@ class Connect(Command):
                 connecting[guild.id] = 0
                 raise ConnectionError("Unable to connect to voice channel.")
         if guild.id not in bot.database.playlists.audio:
-            create_task(channel.trigger_typing())
             bot.database.playlists.audio[guild.id] = auds = CustomAudio(channel, vc, bot)
         try:
             joined = connecting.pop(guild.id)
@@ -2658,8 +2664,10 @@ class Dump(Command):
         if not argv and not len(message.attachments) or name == "save":
             if name == "load":
                 raise ArgumentError("Please input a file, URL or json data to load.")
+            fut = create_task(channel.trigger_typing())
             resp = await create_future(getDump, auds)
             f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
+            await fut
             create_task(sendFile(channel, "Queue data for **" + guild.name + "**:", f))
             return
         if not isAlone(auds, user) and perm < 1:
@@ -2677,7 +2685,8 @@ class Dump(Command):
         except:
             s = argv
             print(traceback.format_exc())
-        d = json.loads(s.strip("\n"))
+        d = json.loads(s.strip())
+        fut = create_task(channel.trigger_typing())
         q = d["queue"]
         for i in range(len(q)):
             e = q[i] = freeClass(q[i])
@@ -2696,6 +2705,7 @@ class Dump(Command):
                 d["stats"][k] = bool(d["stats"][k])
             else:
                 d["stats"][k] = float(d["stats"][k])
+        await fut
         if "a" not in flags:
             await create_future(auds.new)
             auds.preparing = True
@@ -3401,11 +3411,11 @@ class Lyrics(Command):
             argv = a.url + " " + argv
         if not argv:
             try:
-                auds = await forceJoin(channel.guild, channel, user, bot.client, bot)
+                auds = bot.database.playlists.audio[guild.id]
                 if not auds.queue:
-                    raise EOFError
+                    raise LookupError
                 argv = auds.queue[0].name
-            except:
+            except LookupError:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
         if isURL(argv):
             argv = await bot.followURL(argv)
@@ -3669,26 +3679,26 @@ class UpdateQueues(Database):
         auds.searching += 1
         searched = 0
         q = auds.queue
-        for i in q:
-            if searched >= 32:
+        for i, e in enumerate(q):
+            if searched >= 32 or i >= 128:
                 break
-            if "research" in i:
+            if "research" in e:
                 try:
-                    await create_future(ytdl.extractSingle, i)
+                    await create_future(ytdl.extractSingle, e)
                     try:
-                        i.pop("research")
+                        e.pop("research")
                     except KeyError:
                         pass
                     # print(i.name)
                     searched += 1
                 except:
                     try:
-                        i.pop("research")
+                        e.pop("research")
                     except KeyError:
                         pass
                     print(traceback.format_exc())
                     break
-            if random.random() > 0.99:
+            if not 1 + i & 7:
                 await asyncio.sleep(0.4)
         await asyncio.sleep(2)
         auds.searching = max(auds.searching - 1, 0)

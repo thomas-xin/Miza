@@ -596,6 +596,19 @@ def create_task(fut, *args, loop=None, **kwargs):
             loop = eloop
     return asyncio.ensure_future(fut, *args, loop=loop, **kwargs)
 
+async def retNone(*args, **kwargs):
+    return
+
+async def force_callback(fut, delay, func, *args, **kwargs):
+    await asyncio.sleep(delay)
+    try:
+        return fut.result()
+    except asyncio.exceptions.InvalidStateError:
+        res = func(*args, **kwargs)
+        if awaitable(res):
+            await res
+        return await fut
+
 
 TIMEZONES = {}
 

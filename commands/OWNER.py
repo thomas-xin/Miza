@@ -34,6 +34,7 @@ class Restart(Command):
             await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
+        fut = create_task(channel.trigger_typing())
         bot.closed = True
         print.close()
         t = time.time()

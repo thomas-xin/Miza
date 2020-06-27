@@ -1468,6 +1468,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                     run = True
                     print(str(getattr(guild, "id", 0)) + ": " + str(user) + " (" + str(u_id) + ") issued command " + msg)
                     req = command.min_level
+                    fut = None
                     try:
                         if u_perm is not nan:
                             if not u_perm >= req:
@@ -1555,12 +1556,12 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             channel = guild.channel
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
-                            create_task(channel.trigger_typing())
+                            fut = create_task(channel.trigger_typing())
                         await bot.event("_command_", user=user, command=command)
                         timeout = getattr(command, "_timeout_", 1) * bot.timeout
                         if timeout >= inf:
                             timeout = None
-                        response = await asyncio.wait_for(command(
+                        future = create_task(asyncio.wait_for(command(
                             client=client,          # for interfacing with discord
                             bot=bot,                # for interfacing with bot's database
                             argv=argv,              # raw text argument
@@ -1573,8 +1574,12 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             guild=guild,            # guild data
                             name=alias,             # alias the command was called as
                             callback=processMessage,# function that called the command
-                        ), timeout=timeout)
+                        ), timeout=timeout))
+                        create_task(force_callback(future, 1, channel.trigger_typing))
+                        response = await future
                         if response is not None:
+                            if fut is not None:
+                                await fut
                             if issubclass(type(response), Exception):
                                 raise response
                             elif bool(response) is not False:
@@ -1614,9 +1619,13 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                 if sent is not None:
                                     await sent.add_reaction(react)
                     except (TimeoutError, asyncio.exceptions.TimeoutError):
+                        if fut is not None:
+                            await fut
                         print(msg)
                         raise TimeoutError("Request timed out.")
                     except Exception as ex:
+                        if fut is not None:
+                            await fut
                         errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
                         print(traceback.format_exc())
                         create_task(sendReact(
