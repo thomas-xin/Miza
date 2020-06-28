@@ -1079,7 +1079,8 @@ class Cat(Command):
             create_future_ex(self.refill_buffer(amount << 1))
             if len(self.found) >= 4096:
                 return random.choice(tuple(self.found))
-            return nekos.cat()
+            if not self.buffer:
+                return nekos.cat()
         url = self.buffer.popleft()
         self.found[url] = True
         return url
@@ -1142,7 +1143,8 @@ class Dog(Command):
     def get_buffer(self, amount):
         if len(self.buffer) < amount + 1:
             create_future_ex(self.refill_buffer(amount << 1))
-            return random.choice(tuple(self.found))
+            if not self.buffer:
+                return random.choice(tuple(self.found))
         url = self.buffer.popleft()
         self.found[url] = True
         return url
