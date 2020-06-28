@@ -1490,10 +1490,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             if not u_perm >= req:
                                 raise command.permError(u_perm, req, "for command " + alias)
                             x = command.rate_limit
-                            delay += x
                             if x:
                                 if issubclass(type(x), collections.abc.Sequence):
                                     x = x[not bot.isTrusted(getattr(guild, "id", 0))]
+                                delay += x
                                 d = command.used
                                 t = d.get(u_id, -inf)
                                 wait = utc() - t - x
