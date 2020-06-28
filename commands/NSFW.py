@@ -358,7 +358,7 @@ class Neko(Command):
         )
         emb.set_image(url=url)
         print(url)
-        self.bot.embedSender(embed=emb)
+        self.bot.embedSender(channel, embed=emb)
 
 
 class Lewd(Command):
@@ -391,4 +391,4 @@ class Lewd(Command):
         )
         emb.set_image(url=url)
         print(url)
-        self.bot.embedSender(embed=emb)
+        self.bot.embedSender(channel, embed=emb)
