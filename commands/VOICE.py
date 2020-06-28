@@ -1028,7 +1028,7 @@ def org2xm(org, dat=None):
 
 class PCMFile:
     
-    def __init__(self, fn):
+    def __init__(self, bot, fn):
         self.file = fn
         self.proc = None
         self.loading = False
@@ -1044,7 +1044,7 @@ class PCMFile:
         classname = classname[classname.index("'") + 1:]
         return "<" + classname + " object " + self.file + " at " + hex(id(self)).upper().replace("X", "x") + ">"
     
-    def load(self, bot, stream, check_fmt=False, force=False):
+    def load(self, stream, check_fmt=False, force=False):
         if self.loading and not force:
             return
         self.stream = stream
@@ -1090,14 +1090,14 @@ class PCMFile:
                 except:
                     print(traceback.format_exc())
             raise
-        if bot is not None and "videoplayback" in stream:
+        if ytdl.bot is not None and "videoplayback" in stream:
             try:
                 i = stream.index("&ip=") + 4
             except ValueError:
                 pass
             else:
                 ip = stream[i:].split("&")[0]
-                bot.updateIP(ip)
+                ytdl.bot.updateIP(ip)
         return self
 
     ensure_time = lambda self: setattr(self, "time", utc())
@@ -1772,7 +1772,7 @@ class AudioDownloader:
                 f.ensure_time()
             return f
         try:
-            self.cache[fn] = f = PCMFile(self.bot, fn)
+            self.cache[fn] = f = PCMFile(fn)
             f.load(stream, check_fmt=entry.get("duration") is None)
             dur = entry.get("duration", None)
             f.assign.append(entry)
