@@ -23,16 +23,14 @@ class PapagoTrans:
             raise ValueError("Source language is the same as destination.")
         url = "https://openapi.naver.com/v1/papago/n2mt"
         enc = urllib.parse.quote(string)
-        data = "source=" + source + "&target=" + dest + "&text=" + enc
-        req = urllib.request.Request(url)
-        req.add_header("X-Naver-Client-Id", self.id)
-        req.add_header("X-Naver-Client-Secret", self.secret)
-        print(req, url, data)
-        resp = urllib.request.urlopen(req, data=data.encode("utf-8"))
-        if resp.getcode() != 200:
-            raise ConnectionError("Error " + str(resp.getcode()))
-        read = resp.read().decode("utf-8", "replace")
-        r = json.loads(read)
+        url += "?source=" + source + "&target=" + dest + "&text=" + enc
+        headers = {
+            "X-Naver-Client-Id": self.id,
+            "X-Naver-Client-Secret": self.secret,
+        }
+        print(url, headers)
+        resp = Request(url, headers=headers)
+        r = json.loads(resp)
         t = r["message"]["result"]["translatedText"]
         output = self.PapagoOutput(t)
         return output
@@ -314,9 +312,7 @@ class UrbanDictionary(Command):
             + argv.replace(" ", "%20")
         )
         fut = create_task(channel.trigger_typing())
-        resp = await create_future(requests.get, url, returns, headers=self.header, timeout=8)
-        s = resp.content
-        resp.close()
+        s = await create_future(Request, url, headers=self.header)
         try:
             d = json.loads(s)
         except:

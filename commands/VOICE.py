@@ -152,18 +152,6 @@ async def forceJoin(guild, channel, user, client, bot, preparing=False):
     return auds
 
 
-async def downloadTextFile(url, bot):
-
-    def fetch_text_file(url):
-        resp = urlOpen(url)
-        s = resp.read().decode("utf-8", "replace")
-        resp.close()
-        return s
-
-    url = await bot.followURL(url)
-    return create_future(fetch_text_file, url)
-
-
 def isAlone(auds, user):
     for m in auds.vc.channel.members:
         if m.id != user.id and not m.bot:
@@ -967,25 +955,6 @@ class AudioQueue(hlist):
         return self
 
 
-# def isORG(url):
-#     try:
-#         resp = requests.get(url, timeout=8, stream=True)
-#         it = resp.iter_content(4096)
-#         b = bytes()
-#         while len(b) < 4:
-#             b += next(it)
-#         if not b.startswith(b"Org-"):
-#             raise ValueError("Invalid file header.")
-#         resp.close()
-#     except:
-#         if resp is not None:
-#             try:
-#                 resp.close()
-#             except:
-#                 pass
-#         raise
-#     return True
-
 def org2xm(org, dat=None):
     print(org)
     if not org or type(org) is not bytes:
@@ -1027,7 +996,10 @@ def org2xm(org, dat=None):
     orig = False
     if dat is not None and isURL(dat):
         dat = verifyURL(dat)
-        urlBypass().retrieve(dat, r_dat)
+        f = open(r_dat, "wb")
+        dat = Request(dat)
+        f.write(dat)
+        f.close()
     else:
         if type(dat) is bytes and dat:
             f = open(r_dat, "wb")
@@ -1072,7 +1044,7 @@ class PCMFile:
         classname = classname[classname.index("'") + 1:]
         return "<" + classname + " object " + self.file + " at " + hex(id(self)).upper().replace("X", "x") + ">"
     
-    def load(self, stream, check_fmt=False, force=False):
+    def load(self, bot, stream, check_fmt=False, force=False):
         if self.loading and not force:
             return
         self.stream = stream
@@ -1118,6 +1090,14 @@ class PCMFile:
                 except:
                     print(traceback.format_exc())
             raise
+        if bot is not None and "videoplayback" in stream:
+            try:
+                i = stream.index("&ip=") + 4
+            except ValueError:
+                pass
+            else:
+                ip = stream[i:].split("&")[0]
+                bot.updateIP(ip)
         return self
 
     ensure_time = lambda self: setattr(self, "time", utc())
@@ -1328,7 +1308,6 @@ class BufferedAudioReader(discord.AudioSource):
     
 class AudioDownloader:
     
-    opener = urlBypass()
     _globals = globals()
     ydl_opts = {
         # "verbose": 1,
@@ -1345,6 +1324,7 @@ class AudioDownloader:
     }
 
     def __init__(self):
+        self.bot = None
         self.lastclear = 0
         self.downloading = {}
         self.cache = {}
@@ -1354,15 +1334,15 @@ class AudioDownloader:
         self.setup_pages()
 
     def setup_pages(self):
-        resp = requests.get("https://raw.githubusercontent.com/Quihico/handy.stuff/master/yt.pagetokens.x10")
-        page10 = resp.text.split("\n")
+        resp = Request("https://raw.githubusercontent.com/Quihico/handy.stuff/master/yt.pagetokens.x10", timeout=64, decode=True)
+        page10 = resp.split("\n")
         self.yt_pages = [page10[i] for i in range(0, len(page10), 5)]
 
     def update_dl(self):
         if utc() - self.lastclear > 720:
             self.lastclear = utc()
             self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
-            self.spotify_headers = deque({"authorization": "Bearer " + json.loads(requests.get("https://open.spotify.com/get_access_token").content[:512])["accessToken"]} for _ in loop(8))
+            self.spotify_headers = deque({"authorization": "Bearer " + json.loads(Request("https://open.spotify.com/get_access_token")[:512])["accessToken"]} for _ in loop(8))
 
     def from_pytube(self, url):
         url = verifyURL(url)
@@ -1419,11 +1399,11 @@ class AudioDownloader:
     def get_spotify_part(self, url):
         out = deque()
         self.spotify_headers.rotate()
-        resp = requests.get(url, headers=self.spotify_headers[0], timeout=8)
+        resp = Request(url, headers=self.spotify_headers[0])
         try:
-            d = json.loads(resp.content)
+            d = json.loads(resp)
         except:
-            d = eval(resp.content, {}, eval_const)
+            d = eval(resp, {}, eval_const)
         try:
             items = d["items"]
             total = d.get("total", 0)
@@ -1461,11 +1441,11 @@ class AudioDownloader:
     def get_youtube_part(self, url):
         print(url)
         out = deque()
-        resp = requests.get(url, timeout=8)
+        resp = Request(url)
         try:
-            d = json.loads(resp.content)
+            d = json.loads(resp)
         except:
-            d = eval(resp.content, {}, eval_const)
+            d = eval(resp, {}, eval_const)
         # print(d)
         try:
             items = d["items"]
@@ -1646,7 +1626,7 @@ class AudioDownloader:
                 if isURL(item):
                     url = verifyURL(item)
                     if url.endswith(".json") or url.endswith(".txt"):
-                        s = requests.get(url, timeout=8).content
+                        s = Request(url)
                         if len(s) > 8388608:
                             raise OverflowError("Playlist entity data too large.")
                         s = s[s.index(b"{"):s.rindex(b"}") + 1]
@@ -1792,7 +1772,7 @@ class AudioDownloader:
                 f.ensure_time()
             return f
         try:
-            self.cache[fn] = f = PCMFile(fn)
+            self.cache[fn] = f = PCMFile(self.bot, fn)
             f.load(stream, check_fmt=entry.get("duration") is None)
             dur = entry.get("duration", None)
             f.assign.append(entry)
@@ -2677,10 +2657,10 @@ class Dump(Command):
                 url = message.attachments[0].url
             else:
                 url = verifyURL(argv)
-            f = await downloadTextFile(url, bot)
-            s = await f
-            s = s[s.index("{"):]
-            if s[-4:] == "\n```":
+            url = await bot.followURL(url)
+            s = await create_future(Request, url)
+            s = s[s.index(b"{"):]
+            if s[-4:] == b"\n```":
                 s = s[:-4]
         except:
             s = argv
@@ -3341,14 +3321,14 @@ def extract_lyrics(s):
 def get_lyrics(item):
     url = "https://api.genius.com/search"
     for i in range(2):
-        header = {"user-agent": "Mozilla/5." + str(xrand(1, 10)), "Authorization": "Bearer " + genius_key}
+        header = {"Authorization": "Bearer " + genius_key}
         if i == 0:
             search = item
         else:
             search = "".join(shuffle(item.split()))
         data = {"q": search}
-        resp = requests.get(url, data=data, headers=header, timeout=8)
-        rdata = json.loads(resp.content)
+        resp = Request(url, data=data, headers=header)
+        rdata = json.loads(resp)
         hits = rdata["response"]["hits"]
         name = None
         path = None
@@ -3361,8 +3341,8 @@ def get_lyrics(item):
                 print(traceback.format_exc())
         if path and name:
             s = "https://genius.com" + path
-            page = requests.get(s, headers=header, timeout=8)
-            text = page.text
+            page = Request(s, headers=header, decode=True)
+            text = page
             html = BeautifulSoup(text, "html.parser")
             lyricobj = html.find('div', class_='lyrics')
             if lyricobj is not None:
@@ -3802,6 +3782,9 @@ class UpdateQueues(Database):
         for auds in self.audio.values():
             auds.announce(*args, **kwargs)
 
-    def _destroy_(self):
+    def _destroy_(self, **void):
         for auds in self.audio.values():
             auds.kill()
+
+    def _ready_(self, bot, **void):
+        ytdl.bot = bot

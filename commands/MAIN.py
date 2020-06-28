@@ -194,7 +194,7 @@ class EnabledCommands(Command):
                     + str(standard_commands) + "```"
                 )
             if "e" in flags or "a" in flags:
-                categories = list(standard_commands) #list(bot.categories)
+                categories = list(standard_commands)
                 enabled[channel.id] = categories
                 update()
                 if "h" in flags:
@@ -218,43 +218,44 @@ class EnabledCommands(Command):
                 + strIter(enabled.get(channel.id, default_commands)) + "```"
             )
         else:
+            enabled = setDict(enabled, channel.id, {})
+            if "e" in flags or "a" in flags:
+                if not catg in bot.categories:
+                    raise LookupError("Unknown command category " + argv + ".")
+                if catg in enabled:
+                    raise ValueError(
+                        "Command category " + catg
+                        + " is already enabled in " + channel.name + "."
+                    )
+                enabled.append(catg)
+                update()
+                if "h" in flags:
+                    return
+                return (
+                    "```css\nEnabled command category [" + noHighlight(catg)
+                    + "] in [" + noHighlight(channel.name) + "].```"
+                )
+            if "d" in flags:
+                if catg not in enabled:
+                    raise ValueError(
+                        "Command category " + catg
+                        + " is not currently enabled in " + channel.name + "."
+                    )
+                enabled.remove(catg)
+                update()
+                if "h" in flags:
+                    return
+                return (
+                    "```css\nDisabled command category [" + noHighlight(catg)
+                    + "] in [" + noHighlight(channel.name) + "].```"
+                )
             if not catg in bot.categories:
                 raise LookupError("Unknown command category " + argv + ".")
-            else:
-                enabled = setDict(enabled, channel.id, {})
-                if "e" in flags or "a" in flags:
-                    if catg in enabled:
-                        raise ValueError(
-                            "Command category " + catg
-                            + " is already enabled in " + channel.name + "."
-                        )
-                    enabled.append(catg)
-                    update()
-                    if "h" in flags:
-                        return
-                    return (
-                        "```css\nEnabled command category [" + noHighlight(catg)
-                        + "] in [" + noHighlight(channel.name) + "].```"
-                    )
-                if "d" in flags:
-                    if catg not in enabled:
-                        raise ValueError(
-                            "Command category " + catg
-                            + " is not currently enabled in " + channel.name + "."
-                        )
-                    enabled.remove(catg)
-                    update()
-                    if "h" in flags:
-                        return
-                    return (
-                        "```css\nDisabled command category [" + noHighlight(catg)
-                        + "] in [" + noHighlight(channel.name) + "].```"
-                    )
-                return (
-                    "```css\nCommand category [" + noHighlight(catg)
-                    + "] is currently" + " not" * (catg not in enabled)
-                    + "] enabled in [" + noHighlight(channel.name) + "].```"
-                )
+            return (
+                "```css\nCommand category [" + noHighlight(catg)
+                + "] is currently" + " not" * (catg not in enabled)
+                + "] enabled in [" + noHighlight(channel.name) + "].```"
+            )
 
 
 class Prefix(Command):
@@ -302,6 +303,7 @@ class Prefix(Command):
 
 class Loop(Command):
     time_consuming = 3
+    _timeout_ = 8
     name = ["For", "Rep", "While"]
     min_level = 1
     min_display = "1+"
@@ -315,8 +317,8 @@ class Loop(Command):
         num = await bot.evalMath(args[0], guild.id)
         iters = round(num)
         if not isnan(perm):
-            if iters > 5 and not bot.isTrusted(guild.id):
-                raise PermissionError("Must be in a trusted server to execute loop of more than 5 iterations.")
+            if iters > 32 and not bot.isTrusted(guild.id):
+                raise PermissionError("Must be in a trusted server to execute loop of more than 32 iterations.")
             scale = 3
             limit = perm * scale
             if iters > limit:
@@ -350,10 +352,9 @@ class Loop(Command):
         ))
         for i in range(iters):
             loop = i < iters - 1
-            create_task(callback(
-                message, func, cb_argv=func2, loop=loop,
-            ))
-            await asyncio.sleep(0.5)
+            delay = await callback(message, func, cb_argv=func2, loop=loop)
+            if delay > 0:
+                await asyncio.sleep(delay)
 
 
 class Avatar(Command):

@@ -369,7 +369,7 @@ class CreateEmoji(Command):
         if not name:
             name = "emoji_" + str(len(guild.emojis))
         print(name, url)
-        resp = await create_future(requests.get, url, headers={"user-agent": "Mozilla/5." + str(xrand(1, 10))}, timeout=8)
+        resp = await create_future(Request, url)
         image = resp.content
         if len(image) > 67108864:
             await fut
@@ -891,7 +891,7 @@ class Magik(Command):
         else:
             msg = None
         try:
-            resp = await create_future(requests.get, "https://api.alexflipnote.dev/filter/magik?image=" + url, timeout=8)
+            resp = await create_future(Request, "https://api.alexflipnote.dev/filter/magik?image=" + url)
         except:
             if msg is not None:
                 await bot.silentDelete(msg)
@@ -1018,7 +1018,6 @@ except:
 
 
 class Cat(Command):
-    is_command = True
     if cat_key:
         header = {"x-api-key": cat_key}
     else:
@@ -1031,7 +1030,7 @@ class Cat(Command):
 
     def __load__(self):
         self.buffer = deque()
-        create_future_ex(self.refill_buffer, 64)
+        create_future_ex(self.refill_buffer, 128)
     
     def fetch_one(self):
         if not self.header or random.random() > 2 / 3:
@@ -1039,15 +1038,11 @@ class Cat(Command):
                 url = nekos.cat()
             else:
                 for _ in loop(8):
-                    resp = requests.get(
-                        "https://api.alexflipnote.dev/cats",
-                        headers=self.header,
-                        timeout=8,
-                    )
+                    resp = Request("https://api.alexflipnote.dev/cats")
                     try:
-                        d = json.loads(resp.content)
+                        d = json.loads(resp)
                     except:
-                        d = eval(resp.content, {}, eval_const)
+                        d = eval(resp, {}, eval_const)
                     try:
                         if type(d) is list:
                             d = random.choice(d)
@@ -1055,18 +1050,13 @@ class Cat(Command):
                         break
                     except KeyError:
                         pass
-                time.sleep(0.25)
         else:
             for _ in loop(8):
-                resp = requests.get(
-                    "https://api.thecatapi.com/v1/images/search",
-                    headers=self.header,
-                    timeout=8,
-                )
+                resp = Request("https://api.thecatapi.com/v1/images/search")
                 try:
-                    d = json.loads(resp.content)
+                    d = json.loads(resp)
                 except:
-                    d = eval(resp.content, {}, eval_const)
+                    d = eval(resp, {}, eval_const)
                 try:
                     if type(d) is list:
                         d = random.choice(d)
@@ -1074,13 +1064,14 @@ class Cat(Command):
                     break
                 except KeyError:
                     pass
-            time.sleep(0.25)
         return url
 
     def refill_buffer(self, amount):
         while len(self.buffer) < amount + 1:
             url = self.fetch_one()
             self.buffer.append(url)
+            time.sleep(0.25)
+        print("CAT buffer refilled to " + str(len(self.buffer)))
 
     def get_buffer(self, amount):
         if len(self.buffer) < amount + 1:
@@ -1089,7 +1080,7 @@ class Cat(Command):
         return self.buffer.popleft()
 
     async def __call__(self, channel, flags, **void):
-        url = await create_future(self.get_buffer, 32)
+        url = await create_future(self.get_buffer, 64)
         if "v" in flags:
             text = "Pulled from " + url
             return text
@@ -1098,10 +1089,7 @@ class Cat(Command):
             colour=randColour(),
         )
         emb.set_image(url=url)
-        print(url)
-        return {
-            "embed": emb
-        }
+        self.bot.embedSender(channel, embed=emb)
 
 
 class Dog(Command):
@@ -1113,25 +1101,19 @@ class Dog(Command):
 
     def __load__(self):
         self.buffer = deque()
-        create_future_ex(self.refill_buffer, 64)
+        create_future_ex(self.refill_buffer, 128)
 
     def fetch_one(self):
         for _ in loop(8):
             x = random.random() > 2 / 3
             if x:
-                resp = requests.get(
-                    "https://api.alexflipnote.dev/dogs",
-                    timeout=8,
-                )
+                resp = Request("https://api.alexflipnote.dev/dogs")
             else:
-                resp = requests.get(
-                    "https://dog.ceo/api/breeds/image/random",
-                    timeout=8,
-                )
+                resp = Request("https://dog.ceo/api/breeds/image/random")
             try:
-                d = json.loads(resp.content)
+                d = json.loads(resp)
             except:
-                d = eval(resp.content, {}, eval_const)
+                d = eval(resp, {}, eval_const)
             try:
                 if type(d) is list:
                     d = random.choice(d)
@@ -1139,7 +1121,6 @@ class Dog(Command):
                 break
             except KeyError:
                 pass
-        time.sleep(0.25)
         url = url.replace("\\", "/")
         while "///" in url:
             url = url.replace("///", "//")
@@ -1149,6 +1130,8 @@ class Dog(Command):
         while len(self.buffer) < amount + 1:
             url = self.fetch_one()
             self.buffer.append(url)
+            time.sleep(0.25)
+        print("DOG buffer refilled to " + str(len(self.buffer)))
 
     def get_buffer(self, amount):
         if len(self.buffer) < amount + 1:
@@ -1157,7 +1140,7 @@ class Dog(Command):
         return self.buffer.popleft()
 
     async def __call__(self, channel, flags, **void):
-        url = await create_future(self.get_buffer, 32)
+        url = await create_future(self.get_buffer, 64)
         if "v" in flags:
             text = "Pulled from " + url
             return text
@@ -1166,170 +1149,21 @@ class Dog(Command):
             colour=randColour(),
         )
         emb.set_image(url=url)
-        print(url)
-        return {
-            "embed": emb
-        }
+        self.bot.embedSender(channel, embed=emb)
 
 
-class DeviantArt(Command):
-    server_only = True
-    min_level = 2
-    description = "Subscribes to a DeviantArt Gallery, reposting links to all new posts."
-    usage = "<reversed(?r)> <disable(?d)>"
-    flags = "raed"
-    rate_limit = 4
+class _8Ball(Command):
+    min_level = 0
+    description = "Pulls a random image from cdn.nekos.life/8ball, and embeds it."
 
-    async def __call__(self, argv, flags, channel, guild, bot, **void):
-        if not bot.isTrusted(guild.id):
-            raise PermissionError("Must be in a trusted server to subscribe to DeviantArt Galleries.")
-        data = bot.data.deviantart
-        update = bot.database.deviantart.update
-        if not argv:
-            assigned = data.get(channel.id, ())
-            if not assigned:
-                return "```ini\nNo currently subscribed DeviantArt Galleries for [#" + noHighlight(channel) + "].```"
-            if "d" in flags:
-                try:
-                    data.pop(channel.id)
-                except KeyError:
-                    pass
-                return "```css\nSuccessfully removed all DeviantArt Gallery subscriptions from [#" + noHighlight(channel) + "].```"
-            return "Currently subscribed DeviantArt Galleries for [#" + noHighlight(channel) + "]:```ini" + strIter(assigned, key=lambda x: x["user"]) + "```"
-        url = await bot.followURL(argv)
-        if not isURL(url):
-            raise ArgumentError("Please input a valid URL.")
-        if "deviantart.com" not in url:
-            raise ArgumentError("Please input a DeviantArt Gallery URL.")
-        url = url[url.index("deviantart.com") + 15:]
-        spl = url.split("/")
-        user = spl[0]
-        if spl[1] != "gallery":
-            raise ArgumentError("Please input a DeviantArt Gallery URL.")
-        content = spl[2].split("&")[0]
-        folder = noHighlight(spl[-1].split("&")[0])
-        try:
-            content = int(content)
-        except (ValueError, TypeError):
-            if content in (user, "all"):
-                content = user
-            else:
-                raise TypeError("Invalid Gallery type.")
-        if content in self.data.get(channel.id, {}):
-            raise KeyError("Already subscribed to " + user + ": " + folder)
-        if "d" in flags:
-            try:
-                data.get(channel.id).pop(content)
-            except KeyError:
-                raise KeyError("Not currently subscribed to " + user + ": " + folder)
-            else:
-                if channel.id in data and not data[channel.id]:
-                    data.pop(channel.id)
-                update()
-                return "```css\nSuccessfully unsubscribed from " + sbHighlight(user) + ": " + sbHighlight(folder) + ".```"
-        setDict(data, channel.id, {}).__setitem__(content, {"user": user, "type": "gallery", "reversed": ("r" in flags), "entries": {}})
-        update()
-        return "```css\nSuccessfully subscribed to " + sbHighlight(user) + ": " + sbHighlight(folder) + ", posting in reverse order" * ("r" in flags) + ".```"
-
-
-class UpdateDeviantArt(Database):
-    name = "deviantart"
-
-    async def processPart(self, found, c_id):
-        bot = self.bot
-        try:
-            channel = await bot.fetch_channel(c_id)
-            if not bot.isTrusted(channel.guild.id):
-                raise LookupError
-        except LookupError:
-            self.data.pop(c_id)
-            return
-        try:
-            assigned = self.data.get(c_id)
-            if assigned is None:
-                return
-            embs = deque()
-            for content in assigned:
-                items = found[content]
-                entries = assigned[content]["entries"]
-                new = tuple(items)
-                orig = tuple(entries)
-                if hash(tuple(sorted(new))) != hash(tuple(sorted(orig))):
-                    if assigned[content].get("reversed", False):
-                        it = reversed(new)
-                    else:
-                        it = new
-                    for i in it:
-                        if i not in entries:
-                            entries[i] = True
-                            self.update()
-                            home = "https://www.deviantart.com/" + items[i][2]
-                            emb = discord.Embed(
-                                colour=discord.Colour(1),
-                                description="🔔 New Deviation from " + items[i][2] + " 🔔\n" + items[i][0],
-                            ).set_image(url=items[i][1]).set_author(name=items[i][2], url=home, icon_url=items[i][3])
-                            embs.append(emb)
-                    for i in orig:
-                        if i not in items:
-                            entries.pop(i)
-                            self.update()
-        except:
-            print(traceback.format_exc())
-        else:
-            bot.embedSender(channel, embs)
-
-    async def __call__(self):
-        t = setDict(self.__dict__, "time", 0)
-        if utc() - t < 300:
-            return
-        self.time = inf
-        conts = {i: a[i]["user"] for a in tuple(self.data.values()) for i in a}
-        found = {}
-        base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?limit=24&username="
-        attempts, successes = 0, 0
-        for content, user in conts.items():
-            if type(content) is str:
-                f_id = "&all_folder=true&mode=oldest"
-            else:
-                f_id = "&folderid=" + str(content)
-            items = {}
-            try:
-                url = base + user + f_id + "&offset="
-                for i in range(0, 13824, 24):
-                    req = url + str(i)
-                    # print(req)
-                    attempts += 1
-                    resp = await create_future(requests.get, req, timeout=8)
-                    try:
-                        d = json.loads(resp.content)
-                    except:
-                        d = eval(resp.content, {}, eval_const)
-                    for res in d["results"]:
-                        deviation = res["deviation"]
-                        media = deviation["media"]
-                        prettyName = media["prettyName"]
-                        orig = media["baseUri"]
-                        extra = ""
-                        token = "?token=" + media["token"][0]
-                        for t in reversed(media["types"]):
-                            if t["t"].lower() == "fullview":
-                                if "c" in t:
-                                    extra = "/" + t["c"].replace("<prettyName>", prettyName)
-                                    break
-                        image_url = orig + extra + token
-                        items[deviation["deviationId"]] = (deviation["url"], image_url, deviation["author"]["username"], deviation["author"]["usericon"])
-                    successes += 1
-                    if not d.get("hasMore", None):
-                        break
-            except:
-                print(traceback.format_exc())
-            else:
-                found[content] = items
-        if attempts:
-            print(successes, "of", attempts, "DeviantArt requests executed successfully.")
-        for c_id in tuple(self.data):
-            create_task(self.processPart(found, c_id))
-        self.time = utc()
+    async def __call__(self, channel, **void):
+        url = await create_future(nekos.img, "8ball")
+        emb = discord.Embed(
+            url=url,
+            colour=randColour(),
+        )
+        emb.set_image(url=url)
+        self.bot.embedSender(channel, embed=emb)
 
 
 class UpdateImages(Database):

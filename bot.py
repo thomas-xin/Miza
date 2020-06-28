@@ -986,6 +986,16 @@ class Bot:
             t = float(t)
         return t
 
+    ipCheck = re.compile("^([0-9]{1,3}\\.){3}[0-9]{1,3}$")
+
+    def updateIP(self, ip):
+        if re.search(self.ipCheck, ip):
+            self.ip = ip
+
+    async def getIP(self):
+        resp = await create_future(Request, "https://api.ipify.org", decode=True)
+        self.updateIP(resp)
+
     def getActive(self):
         procs = 2 + sum(1 for c in self.proc.children(True))
         thrds = self.proc.num_threads()
@@ -1218,9 +1228,14 @@ class Bot:
             print(traceback.format_exc())
             await sendReact(channel, "```py\n" + repr(ex) + "```", reacts="❎")
 
-    def embedSender(self, channel, embeds):
-        if not issubclass(type(embeds), collections.abc.Sequence):
+    def embedSender(self, channel, embeds=None, embed=None):
+        if embeds is not None and not issubclass(type(embeds), collections.abc.Sequence):
             embeds = (embeds,)
+        if embed is not None:
+            if embeds is not None:
+                embeds += (embed,)
+            else:
+                embeds = (embed,)
         elif not embeds:
             return
         for e in embeds:
@@ -1443,6 +1458,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                 reacts="❎",
             ))
         return
+    delay = 0
     run = False
     if op:
         if len(comm) and comm[0] == "?":
@@ -1474,6 +1490,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             if not u_perm >= req:
                                 raise command.permError(u_perm, req, "for command " + alias)
                             x = command.rate_limit
+                            delay += x
                             if x:
                                 if issubclass(type(x), collections.abc.Sequence):
                                     x = x[not bot.isTrusted(getattr(guild, "id", 0))]
@@ -1593,17 +1610,12 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                 if type(response) is list:
                                     for r in response:
                                         create_task(channel.send(r))
+                                        await asyncio.sleep(0.5)
                                 elif type(response) is dict or isinstance(response, freeClass):
-                                    if react:
-                                        sent = await channel.send(**response)
-                                    else:
-                                        create_task(channel.send(**response))
+                                    sent = await channel.send(**response)
                                 else:
                                     if type(response) is str and len(response) <= 2000:
-                                        if react:
-                                            sent = await channel.send(response)
-                                        else:
-                                            create_task(channel.send(response))
+                                        sent = await channel.send(response)
                                     else:
                                         if type(response) is not bytes:
                                             response = bytes(str(response), "utf-8")
@@ -1613,7 +1625,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                         if len(response) <= guild.filesize_limit:
                                             b = io.BytesIO(response)
                                             f = discord.File(b, filename="message.txt")
-                                            create_task(sendFile(channel, filemsg, f))
+                                            await sendFile(channel, filemsg, f)
                                         else:
                                             raise OverflowError("Response too long for file upload.")
                                 if sent is not None:
@@ -1636,6 +1648,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
     if not run and u_id != client.user.id and not u_perm <= -inf:
         temp = to_alphanumeric(cpy).lower()
         await bot.event("_nocommand_", text=temp, edit=edit, orig=orig, message=message, perm=u_perm)
+    return delay
 
 
 async def heartbeatLoop():
@@ -1701,6 +1714,7 @@ async def on_ready():
         await bot.handleUpdate()
         create_future_ex(bot.updateClient)
         create_future_ex(bot.cacheChannels)
+        create_task(bot.getIP())
         if not hasattr(bot, "started"):
             bot.started = True
             print("Update loops initiated.")
@@ -1725,6 +1739,7 @@ async def on_ready():
                         func = getattr(u, f, None)
                         if callable(func):
                             bot.events.append(f, func)
+            await bot.event("_ready_", bot=bot)
             print(bot.events)
             print("Initialization complete.")
     except:

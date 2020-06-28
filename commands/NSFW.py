@@ -11,20 +11,16 @@ e_loop = asyncio.new_event_loop()
 asyncio.set_event_loop(e_loop)
 rule34_sync = rule34.Sync()
 booruSites = list(pybooru.resources.SITE_LIST.keys())
+LOG = False
 
 
 def pull_e621(argv, delay=5):
     try:
         v1, v2 = 1, 1
-        opener = urlBypass()
         items = argv.replace(" ", "%20").lower()
         baseurl = "https://e621.net/post/index/"
         url = baseurl + "1/" + items
-        resp = opener.open(url)
-        if resp.getcode() != 200:
-            raise ConnectionError("Error " + str(resp.getcode()))
-        s = resp.read().decode("utf-8", "replace")
-        resp.close()
+        s = Request(url, decode=True)
         try:
             ind = s.index('class="next_page" rel="next"')
             s = s[ind - 90:ind]
@@ -39,11 +35,7 @@ def pull_e621(argv, delay=5):
             v1 = xrand(1, int(u))
 
             url = baseurl + str(v1) + "/" + items
-            resp = opener.open(url)
-            if resp.getcode() != 200:
-                raise ConnectionError("Error " + str(resp.getcode()))
-            s = resp.read().decode("utf-8", "replace")
-            resp.close()
+            s = Request(url, decode=True)
         except ValueError:
             pass
 
@@ -73,11 +65,7 @@ def pull_e621(argv, delay=5):
             x = sources[v2]
             found = False
             url = "https://e621.net/post/show/" + str(x)
-            resp = opener.open(url)
-            if resp.getcode() != 200:
-                raise ConnectionError("Error " + str(resp.getcode()))
-            s = resp.read().decode("utf-8", "replace")
-            resp.close()
+            s = Request(url, decode=True)
             search = '<a href="https://static1.e621.net/data/'
             ind1 = s.index(search)
             s = s[ind1 + 9:]
@@ -90,7 +78,8 @@ def pull_e621(argv, delay=5):
                 x = None
         return [url, v1, v2 + 1]
     except:
-        return None
+        if LOG:
+            print(traceback.format_exc())
 
 
 def pull_booru(argv, delay=5):
@@ -100,10 +89,11 @@ def pull_booru(argv, delay=5):
         if not posts:
             raise EOFError
         choice = xrand(len(posts))
-        url = posts[0]["file_url"]
+        url = posts[choice]["file_url"]
         return [url, 1, choice + 1]
     except:
-        return None
+        if LOG:
+            print(traceback.format_exc())
 
 
 def pull_rule34_xxx(argv, delay=5):
@@ -136,7 +126,8 @@ def pull_rule34_xxx(argv, delay=5):
         else:
             raise EOFError
     except:
-        return None
+        if LOG:
+            print(traceback.format_exc())
 
 
 def pull_rule34_paheal(argv, delay=5):
@@ -153,12 +144,7 @@ def pull_rule34_paheal(argv, delay=5):
         rx = xrand(len(tagsearch))
         baseurl = "https://rule34.paheal.net/tags/alphabetic?starts_with="
         url = baseurl + tagsearch[rx] + "&mincount=1"
-        req = urllib.request.Request(url)
-        resp = urllib.request.urlopen(req, timeout=delay)
-        if resp.getcode() != 200:
-            raise ConnectionError("Error " + str(resp.getcode()))
-        s = resp.read().decode("utf-8", "replace")
-        resp.close()
+        s = Request(url, decode=True)
         tags = s.split("href='/post/list/")[1:]
         valid = []
         for i in range(len(tags)):
@@ -173,30 +159,16 @@ def pull_rule34_paheal(argv, delay=5):
 
         baseurl = "https://rule34.paheal.net/post/list/"
         try:
-            url = baseurl + items + "/1"
-            req = urllib.request.Request(url)
-            resp = urllib.request.urlopen(req, timeout=delay)
+            s = Request(baseurl + items + "/1", decode=True)
         except ConnectionError:
-            url = baseurl + items.upper() + "/1"
-            req = urllib.request.Request(url)
-            resp = urllib.request.urlopen(req, timeout=delay)
-        if resp.getcode() != 200:
-            raise ConnectionError("Error " + str(resp.getcode()))
-
-        s = resp.read().decode("utf-8", "replace")
-        resp.close()
+            s = Request(baseurl + items.upper() + "/1", decode=True)
         try:
             ind = s.index('">Last</a><br>')
             s = s[ind - 5:ind]
             v1 = xrand(1, int(s.split("/")[-1]))
             url = url[:-1] + str(v1)
 
-            req = urllib.request.Request(url)
-            resp = urllib.request.urlopen(req, timeout=delay)
-            if resp.getcode() != 200:
-                raise ConnectionError("Error " + str(resp.getcode()))
-            s = resp.read().decode("utf-8", "replace")
-            resp.close()
+            s = Request(url, decode=True)
         except ValueError:
             pass
         try:
@@ -228,7 +200,8 @@ def pull_rule34_paheal(argv, delay=5):
         url = sources[v2]
         return [url, v1, v2 + 1]
     except:
-        return None
+        if LOG:
+            print(traceback.format_exc())
 
 
 async def searchRandomNSFW(argv, delay=10):
@@ -385,9 +358,7 @@ class Neko(Command):
         )
         emb.set_image(url=url)
         print(url)
-        return {
-            "embed": emb
-        }
+        self.bot.embedSender(embed=emb)
 
 
 class Lewd(Command):
@@ -420,6 +391,4 @@ class Lewd(Command):
         )
         emb.set_image(url=url)
         print(url)
-        return {
-            "embed": emb
-        }
+        self.bot.embedSender(embed=emb)

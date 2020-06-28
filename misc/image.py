@@ -87,6 +87,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         if data is None:
             resp = requests.get(url, stream=True, timeout=8)
             data = resp.raw.read()
+            resp.close()
         file = open(fn, "wb")
         try:
             file.write(data)
@@ -172,6 +173,7 @@ def create_gif(in_type, args, delay):
     for url in images:
         resp = requests.get(url, stream=True, timeout=8)
         data = resp.raw.read()
+        resp.close()
         try:
             img = get_image(data, None)
         except (PIL.UnidentifiedImageError, OverflowError):
@@ -487,6 +489,7 @@ def get_image(url, out):
         if isURL(url):
             resp = requests.get(url, stream=True, timeout=8)
             data = resp.raw.read()
+            resp.close()
         else:
             if os.path.getsize(url) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")

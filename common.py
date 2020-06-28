@@ -357,22 +357,49 @@ IMAGE_FORMS = {
 
 def is_image(url):
     if "." in url:
-        url = url[url.rindex(".") + 1:]
+        url = url[url.rindex("."):]
     url = url.lower()
     return IMAGE_FORMS.get(url)
 
 
-class urlBypass(urllib.request.FancyURLopener):
-    version = "Mozilla/5." + str(xrand(1, 10))
+class AutoRequest:
 
-    __call__ = lambda self, url: self.open(url)
+    def __call__(self, url, headers={}, data=None, raw=False, timeout=8, bypass=True, decode=False):
+        if bypass and "user-agent" not in headers:
+            headers["user-agent"] = "Mozilla/5." + str(xrand(1, 10))
+        resp = requests.get(url, headers=headers, data=data, stream=True, timeout=8)
+        if resp.status_code >= 400:
+            raise ConnectionError("Error " + str(resp.status_code) + ": " + resp.text)
+        try:
+            if raw:
+                data = resp.raw.read()
+            else:
+                data = resp.content
+            resp.close()
+        except:
+            try:
+                resp.close()
+            except:
+                pass
+            raise
+        if decode:
+            data = data.decode("utf-8", "replace")
+        return data
 
-def urlOpen(url):
-    opener = urlBypass()
-    resp = opener(verifyURL(url))
-    if resp.getcode() != 200:
-        raise ConnectionError("Error " + str(resp.code))
-    return resp
+Request = AutoRequest()
+
+
+# class urlBypass(urllib.request.FancyURLopener):
+#     version = "Mozilla/5." + str(xrand(1, 10))
+
+#     __call__ = lambda self, url: self.open(url)
+
+# def urlOpen(url):
+#     opener = urlBypass()
+#     resp = opener(verifyURL(url))
+#     if resp.getcode() != 200:
+#         raise ConnectionError("Error " + str(resp.code))
+#     return resp
 
 
 SUBS = freeClass(math=freeClass(procs=hlist(), busy=freeClass()), image=freeClass(procs=hlist(), busy=freeClass()))
@@ -607,7 +634,10 @@ async def force_callback(fut, delay, func, *args, **kwargs):
         res = func(*args, **kwargs)
         if awaitable(res):
             await res
-        return await fut
+        try:
+            return await fut
+        except:
+            return
 
 
 TIMEZONES = {}
