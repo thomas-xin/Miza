@@ -1282,56 +1282,6 @@ class UpdateMessageLogs(Database):
 class UpdateFileLogs(Database):
     name = "logF"
 
-    # async def _user_update_(self, before, after, **void):
-    #     sending = {}
-    #     for guild in self.bot.client.guilds:
-    #         if guild.get_member(after.id) is None:
-    #             try:
-    #                 memb = await guild.fetch_member(after.id)
-    #                 if memb is None:
-    #                     raise EOFError
-    #             except:
-    #                 continue
-    #         sending[guild.id] = True
-    #     if not sending:
-    #         return
-    #     b_url = strURL(before.avatar_url)
-    #     a_url = strURL(after.avatar_url)
-    #     if b_url != a_url:
-    #         try:
-    #             obj = before.avatar_url_as(format="gif", static_format="png", size=4096)
-    #         except discord.InvalidArgument:
-    #             obj = before.avatar_url_as(format="png", static_format="png", size=4096)
-    #         if ".gif" in str(obj):
-    #             fmt = ".gif"
-    #         else:
-    #             fmt = ".png"
-    #         msg = None
-    #         try:
-    #             b = await obj.read()
-    #             fil = discord.File(io.BytesIO(b), filename=str(before.id) + fmt)
-    #         except:
-    #             msg = str(obj)
-    #             fil=None
-    #         emb = discord.Embed(colour=randColour())
-    #         emb.description = "File deleted from <@" + str(before.id) + ">"
-    #         for g_id in sending:
-    #             guild = self.bot.cache["guilds"].get(g_id, None)
-    #             create_task(self.send_avatars(msg, fil, emb, guild))
-
-    # async def send_avatars(self, msg, fil, emb, guild=None):
-    #     if guild is None:
-    #         return
-    #     if guild.id in self.data:
-    #         c_id = self.data[guild.id]
-    #         try:
-    #             channel = await self.bot.fetch_channel(c_id)
-    #         except (EOFError, discord.NotFound):
-    #             self.data.pop(guild.id)
-    #             self.update()
-    #             return
-    #         await channel.send(msg, embed=emb, file=fil)
-
     async def _delete_(self, message, **void):
         if self.bot.isDeleted(message) > 1:
             return

@@ -174,7 +174,7 @@ class EnabledCommands(Command):
     usage = "<command{all}> <add(?e)> <remove(?d)> <list(?l)> <hide(?h)>"
     flags = "aedlh"
 
-    async def __call__(self, argv, flags, user, channel, perm, **void):
+    async def __call__(self, argv, args, flags, user, channel, perm, **void):
         update = self.data.enabled.update
         bot = self.bot
         enabled = bot.data.enabled
@@ -186,8 +186,7 @@ class EnabledCommands(Command):
                     + channel.name
                 )
                 raise self.permError(perm, req, reason)
-        catg = argv.lower()
-        if not catg:
+        if not args:
             if "l" in flags:
                 return (
                     "```css\nStandard command categories:\n"
@@ -212,49 +211,53 @@ class EnabledCommands(Command):
                     "```css\nDisabled all command categories in ["
                     + noHighlight(channel.name) + "].```"
                 )
+            temp = enabled.get(channel.id, default_commands)
+            if not temp:
+                return (
+                    "```ini\nNo currently enabled commands in [#" + str(channel) + "].```"
+                )
             return (
                 "Currently enabled command categories in <#" + str(channel.id)
                 + ">:\n```ini\n"
-                + strIter(enabled.get(channel.id, default_commands)) + "```"
+                + strIter(temp) + "```"
             )
         else:
-            enabled = setDict(enabled, channel.id, {})
-            if "e" in flags or "a" in flags:
+            if "e" not in flags and "a" not in flags and "d" not in flags:
+                catg = argv.lower()
                 if not catg in bot.categories:
                     raise LookupError("Unknown command category " + argv + ".")
-                if catg in enabled:
-                    raise ValueError(
-                        "Command category " + catg
-                        + " is already enabled in " + channel.name + "."
-                    )
-                enabled.append(catg)
-                update()
-                if "h" in flags:
-                    return
                 return (
-                    "```css\nEnabled command category [" + noHighlight(catg)
+                    "```css\nCommand category [" + noHighlight(catg)
+                    + "] is currently" + " not" * (catg not in enabled)
+                    + "] enabled in [" + noHighlight(channel.name) + "].```"
+                )
+            args = [i.lower() for i in args]
+            for catg in args:
+                if not catg in bot.categories:
+                    raise LookupError("Unknown command category " + catg + ".")
+            curr = setDict(enabled, channel.id, list(default_commands))
+            for catg in args:
+                if "d" not in flags:
+                    if catg not in enabled:
+                        curr.append(catg)
+                        update()
+                if "d" in flags:
+                    if catg in enabled:
+                        curr.remove(catg)
+                        update()
+            if curr == default_commands:
+                enabled.pop(channel.id)
+                update()
+            if "h" in flags:
+                return
+            if "e" in flags:
+                return (
+                    "```css\nEnabled command category [" + noHighlight(", ".join(args))
                     + "] in [" + noHighlight(channel.name) + "].```"
                 )
-            if "d" in flags:
-                if catg not in enabled:
-                    raise ValueError(
-                        "Command category " + catg
-                        + " is not currently enabled in " + channel.name + "."
-                    )
-                enabled.remove(catg)
-                update()
-                if "h" in flags:
-                    return
-                return (
-                    "```css\nDisabled command category [" + noHighlight(catg)
-                    + "] in [" + noHighlight(channel.name) + "].```"
-                )
-            if not catg in bot.categories:
-                raise LookupError("Unknown command category " + argv + ".")
             return (
-                "```css\nCommand category [" + noHighlight(catg)
-                + "] is currently" + " not" * (catg not in enabled)
-                + "] enabled in [" + noHighlight(channel.name) + "].```"
+                "```css\nDisabled command category [" + noHighlight(", ".join(args))
+                + "] in [" + noHighlight(channel.name) + "].```"
             )
 
 

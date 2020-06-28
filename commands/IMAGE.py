@@ -1074,7 +1074,7 @@ class Cat(Command):
                 url = self.fetch_one()
                 self.buffer.append(url)
                 time.sleep(0.25)
-            print("CAT buffer refilled to " + str(len(self.buffer)))
+            # print("Cat buffer refilled to " + str(len(self.buffer)))
         except:
             self.refilling = False
             raise
@@ -1084,7 +1084,7 @@ class Cat(Command):
         if len(self.buffer) < amount + 1:
             if not self.refilling:
                 self.refilling = True
-                create_future_ex(self.refill_buffer(amount << 1))
+                create_future_ex(self.refill_buffer, amount << 1))
             if len(self.found) >= 4096:
                 return random.choice(tuple(self.found))
             if not self.buffer:
@@ -1148,7 +1148,7 @@ class Dog(Command):
                 url = self.fetch_one()
                 self.buffer.append(url)
                 time.sleep(0.25)
-            print("DOG buffer refilled to " + str(len(self.buffer)))
+            # print("Dog buffer refilled to " + str(len(self.buffer)))
         except:
             self.refilling = False
             raise
@@ -1158,7 +1158,7 @@ class Dog(Command):
         if len(self.buffer) < amount + 1:
             if not self.refilling:
                 self.refilling = True
-                create_future_ex(self.refill_buffer(amount << 1))
+                create_future_ex(self.refill_buffer, amount << 1))
             if not self.buffer:
                 return random.choice(tuple(self.found))
         url = self.buffer.popleft()
@@ -1182,8 +1182,39 @@ class _8Ball(Command):
     min_level = 0
     description = "Pulls a random image from cdn.nekos.life/8ball, and embeds it."
 
+    def __load__(self):
+        self.buffer = deque()
+        self.found = {}
+        self.refilling = False
+        create_future_ex(self.refill_buffer, 128)
+
+    fetch_one = lambda self: nekos.img("8ball")
+
+    def refill_buffer(self, amount):
+        try:
+            while len(self.buffer) < amount + 1:
+                url = self.fetch_one()
+                self.buffer.append(url)
+                time.sleep(0.25)
+            # print("8ball buffer refilled to " + str(len(self.buffer)))
+        except:
+            self.refilling = False
+            raise
+        self.refilling = False
+
+    def get_buffer(self, amount):
+        if len(self.buffer) < amount + 1:
+            if not self.refilling:
+                self.refilling = True
+                create_future_ex(self.refill_buffer, amount << 1))
+            if not self.buffer:
+                return random.choice(tuple(self.found))
+        url = self.buffer.popleft()
+        self.found[url] = True
+        return url
+
     async def __call__(self, channel, **void):
-        url = await create_future(nekos.img, "8ball")
+        url = await create_future(self.get_buffer, 64)
         emb = discord.Embed(
             url=url,
             colour=randColour(),

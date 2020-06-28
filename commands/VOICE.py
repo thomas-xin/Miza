@@ -42,21 +42,12 @@ async def createPlayer(auds, p_type=0, verbose=False):
     await auds.updatePlayer()
 
 
-# def gethash(entry):
-#     return entry.setdefault("hash", shash(entry.url))
-
-# def sethash(entry):
-#     entry.hash = shash(entry.url)
-#     return entry.hash
-
-
 e_dur = lambda d: float(d) if type(d) is str else (d if d is not None else 300)
 
 
 def getDuration(filename):
     command = ["ffprobe", "-hide_banner", filename]
     resp = None
-    print(command)
     for _ in loop(3):
         try:
             proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -262,7 +253,6 @@ class CustomAudio(discord.AudioSource):
             except OverflowError:
                 source = None
             else:
-                print(new_source)
                 self.preparing = False
                 self.is_playing = True
                 self.has_read = False
@@ -301,6 +291,7 @@ class CustomAudio(discord.AudioSource):
 
     def kill(self, reason=""):
         self.dead = None
+        g = self.vc.guild.id
         try:
             self.bot.database.playlists.audio.pop(g)
         except KeyError:
@@ -323,7 +314,6 @@ class CustomAudio(discord.AudioSource):
     def update(self, *void1, **void2):
         vc = self.vc
         guild = vc.guild
-        g = guild.id
         if hasattr(self, "dead"):
             create_task(vc.disconnect())
             if self.dead is not None:
@@ -381,7 +371,7 @@ class CustomAudio(discord.AudioSource):
         if m.voice is not None:
             if m.voice.deaf or m.voice.mute or m.voice.afk:
                 create_task(m.edit(mute=False, deafen=False))
-        if not (vc.is_connected() or self.bot.database.playlists.is_connecting(vc.guild.id)):
+        if not (vc.is_connected() or self.bot.database.playlists.is_connecting(vc.id)):
             create_task(self.reconnect())
         else:
             self.att = 0
@@ -558,7 +548,6 @@ class CustomAudio(discord.AudioSource):
             options.append("asoftclip=atan")
             args.append(("-af", "-filter_complex")[bool(reverb)])
             args.append(",".join(options))
-        # print(options, args)
         return args
 
     def read(self):
@@ -610,22 +599,12 @@ class CustomAudio(discord.AudioSource):
                             if not found:
                                 self.lastEnd = utc()
                                 if not self.has_read or not self.queue:
-                                    # print("{Stopped}")
                                     if self.queue:
                                         self.queue[0].url = ""
                                     self.source.advanced = True
                                     create_future_ex(self.queue.update_play)
                                     self.preparing = False
                                 else:
-                                    # self.stats.position = round(
-                                    #     self.stats.position + self.speed * resample / 6.25 * (self.reverse * -2 + 1),
-                                    #     4,
-                                    # )
-                                    # if not ended:
-                                    #     self.refilling = 2
-                                    #     self.seek(self.stats.position)
-                                    # else:
-                                    # print("{Finished}")
                                     self.source.advanced = True
                                     create_future_ex(self.queue.update_play)
                                     self.preparing = False
@@ -636,166 +615,11 @@ class CustomAudio(discord.AudioSource):
                     self.vc.stop()
             temp = self.emptyopus
             self.pausec = self.paused & 1
-            # print(traceback.format_exc())
         else:
             self.pausec = False
-            # if self.stats.volume != 1:
-            #     array = numpy.frombuffer(temp, dtype=numpy.int16).astype(numpy.float)
-            #     array *= self.stats.volume
-            #     numpy.clip(array, -32767, 32767, out=array)
-            #     temp = array.astype(numpy.int16).tobytes()
         return temp
 
-    # def read(self):
-    #     size = self.length >> 1
-    #     reverb = self.stats.reverb
-    #     bassboost = self.stats.bassboost
-    #     if self.stats.resample >= self.max_resample:
-    #         resample = 1
-    #     else:
-    #         resample = 2 ** (self.stats.resample / 12)
-    #     delay = 16
-    #     buflen = size
-    #     if resample != 1:
-    #         buflen = max(1, round_random(resample * buflen))
-    #     if self.refilling > 1 or self.queue.loading:
-    #         return self.emptybuff
-    #     if len(self.temp_buffer[0]) < buflen:
-    #         if not self.refilling:
-    #             self.refilling = 1
-    #             self.refill_buffer()
-    #         else:
-    #             return self.emptybuff
-    #     try:
-    #         self.reading = 1
-    #         if len(self.temp_buffer[0]) == len(self.temp_buffer[1]) == size:
-    #             lbuf, rbuf = self.temp_buffer
-    #             self.temp_buffer = [numpy.zeros(0, dtype=float) for _ in loop(2)]
-    #         else:
-    #             lbuf, self.temp_buffer[0] = numpy.hsplit(self.temp_buffer[0], [buflen])
-    #             rbuf, self.temp_buffer[1] = numpy.hsplit(self.temp_buffer[1], [buflen])
-    #         self.reading = 0
-    #         if resample != 1:
-    #             if self.bufadj is not None:
-    #                 ltemp = numpy.concatenate((self.bufadj[0], lbuf))
-    #                 rtemp = numpy.concatenate((self.bufadj[1], rbuf))
-    #                 try:
-    #                     left = samplerate.resample(ltemp, 2 * size / len(ltemp), converter_type="sinc_fastest")[-size - 24:-24]
-    #                     right = samplerate.resample(rtemp, 2 * size / len(rtemp), converter_type="sinc_fastest")[-size - 24:-24]
-    #                 except (ZeroDivisionError, samplerate.exceptions.ResamplingError):
-    #                     left, right = ltemp, rtemp
-    #             else:
-    #                 left, right = lbuf, rbuf
-    #             self.bufadj = [lbuf, rbuf]
-    #         else:
-    #             left, right = lbuf, rbuf
-    #         if not len(left) or not len(right):
-    #             left = numpy.zeros(size, dtype=float)
-    #             right = numpy.zeros(size, dtype=float)
-    #         elif len(left) != size or len(right) != size:
-    #             l1 = [i * len(left) / size for i in range(size)]
-    #             l2 = list(range(len(left)))
-    #             if len(left) != len(right):
-    #                 r1 = [i * len(right) / size for i in range(size)]
-    #                 r2 = list(range(len(right)))
-    #             else:
-    #                 r1, r2 = l1, l2
-    #             left = numpy.interp(l1, l2, left)
-    #             right = numpy.interp(r1, r2, right)
-    #         # if detune:
-    #         #     if self.cpitch != detune:
-    #         #         self.cpitch = detune
-    #         #         self.fftrans = numpy.clip(self.fff * 2 ** (detune / 12) / 50, 1, len(self.fff) - 1)
-    #         #         self.fftrans[0] = 0
-    #         #     lft, rft = numpy.fft.rfft(left), numpy.fft.rfft(right)
-    #         #     s = len(lft) + len(rft) >> 1
-    #         #     temp = numpy.zeros(s, dtype=complex)
-    #         #     lsh, rsh = temp, numpy.array(temp)
-    #         #     for i in range(s):
-    #         #         j = self.fftrans[i]
-    #         #         x = int(j)
-    #         #         y = min(x + 1, s - 1)
-    #         #         z = j % 1
-    #         #         lsh[x] += lft[i] * (1 - z)
-    #         #         lsh[y] += lft[i] * z
-    #         #         rsh[x] += rft[i] * (1 - z)
-    #         #         rsh[y] += rft[i] * z
-    #         #     left, right = numpy.fft.irfft(lsh), numpy.fft.irfft(rsh)
-    #         if bassboost:
-    #             try:
-    #                 lbass = numpy.array(left)
-    #                 rbass = numpy.array(right)
-    #                 if self.bassadj is not None:
-    #                     x = float(sqrt(abs(bassboost)))
-    #                     f = min(8, 2 + round(x))
-    #                     if bassboost > 0:
-    #                         g = max(1 / 128, (1 - x / 64) / 9)
-    #                         filt = signal.butter(f, g, btype="low", output="sos")
-    #                     else:
-    #                         g = min(127 / 128, (1 + x / 64) / 9)
-    #                         filt = signal.butter(f, g, btype="high", output="sos")
-    #                     left += signal.sosfilt(
-    #                         filt,
-    #                         numpy.concatenate((self.bassadj[0], left))
-    #                     )[-size - 24:-24] * bassboost
-    #                     right += signal.sosfilt(
-    #                         filt,
-    #                         numpy.concatenate((self.bassadj[1], right))
-    #                     )[-size - 24:-24] * bassboost
-    #                 self.bassadj = [lbass, rbass]
-    #             except:
-    #                 print(traceback.format_exc())
-    #         else:
-    #             self.bassadj = None
-    #         if reverb:
-    #             try:
-    #                 if not len(self.buffer):
-    #                     self.buffer = [[self.empty] * 2] * delay
-    #                 r = 18
-    #                 p1 = round(size * (0.5 - 2 / r))
-    #                 # p2 = round(size * (0.5 - 1 / r))
-    #                 p3 = round(size * 0.5)
-    #                 # p4 = round(size * (0.5 + 1 / r))
-    #                 p5 = round(size * (0.5 + 2 / r))
-    #                 lfeed = (
-    #                     + numpy.concatenate((self.buffer[0][0][p1:], self.buffer[1][0][:p1])) / 8
-    #                     # + numpy.concatenate((self.buffer[0][0][p2:], self.buffer[1][0][:p2])) / 12
-    #                     + numpy.concatenate((self.buffer[0][0][p3:], self.buffer[1][0][:p3])) * 0.75
-    #                     # + numpy.concatenate((self.buffer[0][0][p4:], self.buffer[1][0][:p4])) / 12
-    #                     + numpy.concatenate((self.buffer[0][0][p5:], self.buffer[1][0][:p5])) / 8
-    #                 ) * reverb
-    #                 rfeed = (
-    #                     + numpy.concatenate((self.buffer[0][1][p1:], self.buffer[1][1][:p1])) / 8
-    #                     # + numpy.concatenate((self.buffer[0][1][p2:], self.buffer[1][1][:p2])) / 12
-    #                     + numpy.concatenate((self.buffer[0][1][p3:], self.buffer[1][1][:p3])) * 0.75
-    #                     # + numpy.concatenate((self.buffer[0][1][p4:], self.buffer[1][1][:p4])) / 12
-    #                     + numpy.concatenate((self.buffer[0][1][p5:], self.buffer[1][1][:p5])) / 8
-    #                 ) * reverb
-    #                 if self.feedback is not None:
-    #                     left -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[0], lfeed)))[-size - 24:-24]
-    #                     right -= signal.sosfilt(self.filt, numpy.concatenate((self.feedback[1], rfeed)))[-size - 24:-24]
-    #                 self.feedback = (lfeed, rfeed)
-    #                 a = 1 / 16
-    #                 b = 1 - a
-    #                 self.buffer.append((left * a + right * b, left * b + right * a))
-    #             except:
-    #                 print(traceback.format_exc())
-    #             self.buffer = self.buffer[-delay:]
-    #         else:
-    #             self.buffer = []
-    #             self.feedback = None
-    #         array = numpy.stack((left, right), axis=-1).flatten()
-    #         numpy.clip(array, -32767, 32767, out=array)
-    #         temp = array.astype(numpy.int16).tobytes()
-    #         self.pausec = self.paused & 1 and not (numpy.max(temp) or numpy.min(temp))
-    #         if self.pausec:
-    #             self.vc.stop()
-    #     except:
-    #         self.reading = 0
-    #         print(traceback.format_exc())
-    #     return temp
-
-    is_opus = lambda self: True#None if self.source is None else self.source.is_opus()
+    is_opus = lambda self: True
     cleanup = lambda self: None
 
 
@@ -857,7 +681,6 @@ class AudioQueue(hlist):
         s = self.auds.stats
         if q and process:
             if q[0].get("played"):
-                # print("Queue Advanced.")
                 self.prev = q[0]["url"]
                 try:
                     q[0].pop("played")
@@ -919,7 +742,6 @@ class AudioQueue(hlist):
                             self.lastsent = utc()
                     self.loading = True
                     source = ytdl.getStream(q[0])
-                    # print(q[0])
                     try:
                         auds.new(source)
                         self.loading = False
@@ -956,7 +778,6 @@ class AudioQueue(hlist):
 
 
 def org2xm(org, dat=None):
-    print(org)
     if not org or type(org) is not bytes:
         if not isURL(org):
             raise TypeError("Invalid input URL.")
@@ -1011,7 +832,6 @@ def org2xm(org, dat=None):
     args = ["misc/org2xm.exe", r_org, r_dat]
     if compat:
         args.append("c")
-    # print(args)
     subprocess.check_output(args)
     r_xm = "cache/" + str(ts) + ".xm"
     if str(ts) + ".xm" not in os.listdir("cache"):
@@ -1028,7 +848,7 @@ def org2xm(org, dat=None):
 
 class PCMFile:
     
-    def __init__(self, bot, fn):
+    def __init__(self, fn):
         self.file = fn
         self.proc = None
         self.loading = False
@@ -1050,11 +870,9 @@ class PCMFile:
         self.stream = stream
         self.loading = True
         cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "2", "-bufsize", "65536", "cache/" + self.file]
-        print(cmd)
         self.proc = None
         try:
             self.proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-            print(self.proc)
             fl = 0
             while fl < 65536:
                 if not self.proc.is_running():
@@ -1108,7 +926,6 @@ class PCMFile:
             if dur is not None:
                 for e in self.assign:
                     e["duration"] = dur
-                    # print(e)
                 self.assign.clear()
         elif self.buffered and not self.proc.is_running():
             if not self.loaded:
@@ -1212,7 +1029,6 @@ class PCMFile:
 class LoadedAudioReader(discord.AudioSource):
 
     def __init__(self, file, args, callback=None):
-        # print(args)
         self.closed = False
         self.advanced = False
         self.proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
@@ -1220,7 +1036,6 @@ class LoadedAudioReader(discord.AudioSource):
         self.file = file
         self.buffer = None
         self.callback = callback
-        # print(self.proc)
     
     def read(self):
         if self.buffer:
@@ -1249,7 +1064,6 @@ class LoadedAudioReader(discord.AudioSource):
 class BufferedAudioReader(discord.AudioSource):
 
     def __init__(self, file, args, callback=None):
-        # print(args)
         self.closed = False
         self.advanced = False
         self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -1259,7 +1073,6 @@ class BufferedAudioReader(discord.AudioSource):
         self.buffer = None
         self.callback = callback
         self.full = False
-        # print(self.proc)
 
     def read(self):
         if self.buffer:
@@ -1351,7 +1164,6 @@ class AudioDownloader:
                 if isURL(url):
                     raise youtube_dl.DownloadError("Not a youtube link.")
                 url = "https://www.youtube.com/watch?v=" + url
-        # print(url)
         for _ in loop(3):
             try:
                 resp = pytube.YouTube(url)
@@ -1409,7 +1221,7 @@ class AudioDownloader:
             total = d.get("total", 0)
         except KeyError:
             if "type" in d:
-                items = [d]
+                items = (d,)
                 total = 1
             else:
                 items = []
@@ -1439,14 +1251,12 @@ class AudioDownloader:
         return out, total
 
     def get_youtube_part(self, url):
-        print(url)
         out = deque()
         resp = Request(url)
         try:
             d = json.loads(resp)
         except:
             d = eval(resp, {}, eval_const)
-        # print(d)
         try:
             items = d["items"]
             total = d.get("pageInfo", {}).get("totalResults", 0)
@@ -1487,34 +1297,25 @@ class AudioDownloader:
                     url = resp["id"]
         try:
             return self.downloader.extract_info(url, download=False, process=True)
-        except youtube_dl.DownloadError:
-            try:
-                return self.from_pytube(url)
-            except youtube_dl.DownloadError:
-                raise FileNotFoundError("Unable to fetch audio data.")
-    
-    def extract_from(self, url):
-        try:
-            return self.downloader.extract_info(url, download=False, process=False)
-        except youtube_dl.DownloadError:
-            if isURL(url):
+        except youtube_dl.DownloadError as ex:
+            if "429" in str(ex):
                 try:
                     return self.from_pytube(url)
                 except youtube_dl.DownloadError:
                     raise FileNotFoundError("Unable to fetch audio data.")
             raise
-        # pyt = create_future_ex(self.from_pytube, url)
-        # resp = self.extract_info(url, search=False)
-        # try:
-        #     res = pyt.result(timeout=10)
-        #     resp["formats"], resp["duration"] = res["formats"], res["duration"]
-        # except youtube_dl.DownloadError:
-        #     pass
-        # except:
-        #     print(traceback.format_exc())
-        # if issubclass(type(data), Exception):
-        #     raise data
-        # return resp
+    
+    def extract_from(self, url):
+        try:
+            return self.downloader.extract_info(url, download=False, process=False)
+        except youtube_dl.DownloadError as ex:
+            if "429" in str(ex):
+                if isURL(url):
+                    try:
+                        return self.from_pytube(url)
+                    except youtube_dl.DownloadError:
+                        raise FileNotFoundError("Unable to fetch audio data.")
+            raise
 
     def extract_info(self, item, count=1, search=False):
         if search and not item.startswith("ytsearch:") and not isURL(item):
@@ -1574,7 +1375,6 @@ class AudioDownloader:
                             time.sleep(0.03125)
                     while futs:
                         output += futs.popleft().result()[0]
-                    # print(output)
             if re.search(self.spotifyFind, item):
                 if "playlist" in item:
                     url = item[item.index("playlist"):]
@@ -1719,7 +1519,6 @@ class AudioDownloader:
             self.searched.pop(next(iter(self.searched)))
         try:
             self.requests += 1
-            # print(item)
             obj = freeClass(t=utc())
             obj.data = output = self.extract(item, force)
             self.searched[item] = obj
@@ -1754,7 +1553,6 @@ class AudioDownloader:
             data = self.extract(entry["url"], search=False)
             stream = setDict(data[0], "stream", data[0].url)
             icon = setDict(data[0], "icon", data[0].url)
-        # print(stream)
         h = shash(entry["url"])
         fn = h + ".pcm"
         if fn in self.cache or not download:
@@ -1800,7 +1598,6 @@ class AudioDownloader:
         else:
             dur = duration
         fs = fl - 131072
-        # print(br)
         args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-vn", "-i", stream]
         if auds is not None:
             args += auds.construct_options(full=True)
@@ -2000,7 +1797,6 @@ class Queue(Command):
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos, v = [int(i) for i in vals.split("_")]
-        # print(vals, reaction, message)
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
@@ -3505,7 +3301,6 @@ class Download(Command):
                     fmt = "ogg"
             else:
                 fmt = "ogg"
-            # print(argv, fmt)
             argv = verifySearch(argv)
             res = []
             if isURL(argv):
@@ -3669,7 +3464,6 @@ class UpdateQueues(Database):
                         e.pop("research")
                     except KeyError:
                         pass
-                    # print(i.name)
                     searched += 1
                 except:
                     try:
