@@ -370,7 +370,7 @@ class CreateEmoji(Command):
             name = "emoji_" + str(len(guild.emojis))
         print(name, url)
         resp = await create_future(Request, url)
-        image = resp.content
+        image = resp
         if len(image) > 67108864:
             await fut
             raise OverflowError("Max file size to load is 64MB.")
@@ -898,7 +898,7 @@ class Magik(Command):
             raise
         if msg is not None:
             create_task(bot.silentDelete(msg))
-        b = resp.content
+        b = resp
         f = discord.File(io.BytesIO(b), filename=name)
         await fut
         await sendFile(message.channel, "", f)
