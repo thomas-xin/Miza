@@ -626,7 +626,7 @@ def create_task(fut, *args, loop=None, **kwargs):
 async def retNone(*args, **kwargs):
     return
 
-async def force_callback(fut, delay, func, *args, **kwargs):
+async def force_callback(fut, delay, func, *args, exc=False, **kwargs):
     await asyncio.sleep(delay)
     try:
         return fut.result()
@@ -637,7 +637,11 @@ async def force_callback(fut, delay, func, *args, **kwargs):
         try:
             return await fut
         except:
-            return
+            if exc:
+                raise
+    except:
+        if exc:
+            raise
 
 
 TIMEZONES = {}
