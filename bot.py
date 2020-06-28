@@ -1628,7 +1628,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                             await sendFile(channel, filemsg, f)
                                         else:
                                             raise OverflowError("Response too long for file upload.")
-                                if sent is not None:
+                                if react and sent:
                                     await sent.add_reaction(react)
                     except (TimeoutError, asyncio.exceptions.TimeoutError):
                         if fut is not None:
