@@ -797,6 +797,7 @@ class Status(Command):
 
             + ".\nSystem time: " + sbHighlight(datetime.datetime.now())
             + ".\nPing latency: " + sbHighlight(latency)
+            + ".\nPublic IP address: " + sbHighlight(bot.ip)
             
             + ".\nCPU usage: " + sbHighlight(round(stats[0], 3)) + "%"
             + ", RAM usage: " + sbHighlight(round(stats[1] / 1048576, 3)) + " MB"
