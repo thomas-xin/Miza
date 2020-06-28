@@ -1030,6 +1030,7 @@ class Cat(Command):
 
     def __load__(self):
         self.buffer = deque()
+        self.found = {}
         create_future_ex(self.refill_buffer, 128)
     
     def fetch_one(self):
@@ -1076,8 +1077,12 @@ class Cat(Command):
     def get_buffer(self, amount):
         if len(self.buffer) < amount + 1:
             create_future_ex(self.refill_buffer(amount << 1))
-            return self.fetch_one()
-        return self.buffer.popleft()
+            if len(self.found) >= 4096:
+                return random.choice(tuple(self.found))
+            return nekos.cat()
+        url = self.buffer.popleft()
+        self.found[url] = True
+        return url
 
     async def __call__(self, channel, flags, **void):
         url = await create_future(self.get_buffer, 64)
@@ -1101,6 +1106,7 @@ class Dog(Command):
 
     def __load__(self):
         self.buffer = deque()
+        self.found = {}
         create_future_ex(self.refill_buffer, 128)
 
     def fetch_one(self):
@@ -1136,8 +1142,10 @@ class Dog(Command):
     def get_buffer(self, amount):
         if len(self.buffer) < amount + 1:
             create_future_ex(self.refill_buffer(amount << 1))
-            return self.fetch_one()
-        return self.buffer.popleft()
+            return random.choice(tuple(self.found))
+        url = self.buffer.popleft()
+        self.found[url] = True
+        return url
 
     async def __call__(self, channel, flags, **void):
         url = await create_future(self.get_buffer, 64)
