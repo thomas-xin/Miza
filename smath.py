@@ -552,7 +552,7 @@ def addDict(a, b, replace=True, insert=None):
         for k in b:
             try:
                 temp = a[k]
-            except LookupError:
+            except KeyError:
                 r[k] = b[k]
                 continue
             if type(temp) is dict or type(b[k]) is dict:
@@ -849,14 +849,6 @@ def bytes2Hex(b, space=True):
 
 hex2Bytes = lambda b: bytes.fromhex(b if type(b) is str else b.decode("utf-8", "replace"))
 
-# byteRE = re.compile("[A-F0-9]+", flags=re.I)
-# twoChar = re.compile(".{1,2}")
-
-# def hex2Bytes(b):
-#     if type(b) is bytes:
-#         b = b.decode("utf-8", "replace")
-#     return bytes(int(x, 16) for x in re.findall(twoChar, "".join(re.findall(byteRE, b))))
-
 def bytes2B64(b, alt_char_set=False):
     if type(b) is str:
         b = b.encode("utf-8")
@@ -876,6 +868,9 @@ def b642Bytes(b, alt_char_set=False):
 zeroEnc = "\xad\u061c\u180e\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\u2064\u2065\u2066\u2067\u2068\u2069\u206a\u206b\u206c\u206d\u206e\u206f\ufeff"
 
 isZeroEnc = lambda s: (s[0] in zeroEnc) if s else None
+
+shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).replace(b"/", b"-").decode("utf-8", "replace")
+hhash = lambda s: bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
 
 
 colourCalculation = lambda a, offset=0: adjColour(colorsys.hsv_to_rgb((a / 1536) % 1, 1, 1), offset, 255)

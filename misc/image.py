@@ -530,9 +530,12 @@ def evalImg(url, operation, args):
     return repr(str(new).encode("utf-8"))
 
 
+key = eval(sys.stdin.readline()).decode("utf-8", "replace").strip()
+
+
 while True:
     try:
-        args = eval(sys.stdin.readline()).decode("utf-8", "replace").replace("\n", "").split("`")
+        args = eval(sys.stdin.readline()).decode("utf-8", "replace").strip().split("`")
         resp = evalImg(*args)
         sys.stdout.write(repr(resp.encode("utf-8")) + "\n")
         sys.stdout.flush()

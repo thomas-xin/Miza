@@ -57,7 +57,7 @@ class IMG(Command):
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 
-    async def __call__(self, bot, flags, args, argv, user, message, guild, perm, **void):
+    async def __call__(self, bot, flags, args, argv, user, message, channel, guild, perm, **void):
         update = self.data.images.update
         imglists = bot.data.images
         images = imglists.get(guild.id, {})
@@ -140,9 +140,7 @@ class IMG(Command):
             colour=randColour(),
         )
         emb.set_image(url=url)
-        return {
-            "embed": emb
-        }
+        bot.embedSender(channel, embed=emb)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_")]
@@ -360,7 +358,7 @@ class CreateEmoji(Command):
             else:
                 s = emojis[0]
                 name = argv[:argv.index(s)].strip()
-            s = s[2:]
+            s = s[3:]
             i = s.index(":")
             e_id = s[i + 1:s.rindex(">")]
             url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
@@ -525,7 +523,7 @@ async def get_image(bot, message, args, argv, ext="png"):
         else:
             s = emojis[0]
             value = argv[argv.index(s) + len(s):].strip()
-        s = s[2:]
+        s = s[3:]
         i = s.index(":")
         e_id = s[i + 1:s.rindex(">")]
         url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
@@ -800,7 +798,7 @@ class Resize(Command):
                 raise ArgumentError("Please input an image by URL or attachment.")
             s = emojis[0]
             value = argv[argv.index(s) + len(s):].strip()
-            s = s[2:]
+            s = s[3:]
             i = s.index(":")
             e_id = s[i + 1:s.rindex(">")]
             url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
@@ -867,7 +865,7 @@ class Magik(Command):
             if not emojis:
                 raise ArgumentError("Please input an image by URL or attachment.")
             s = emojis[0]
-            s = s[2:]
+            s = s[3:]
             i = s.index(":")
             e_id = s[i + 1:s.rindex(">")]
             url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
@@ -944,7 +942,7 @@ class Blend(Command):
             else:
                 s = emojis[0]
                 argv = argv[argv.index(s) + len(s):].strip()
-            s = s[2:]
+            s = s[3:]
             i = s.index(":")
             e_id = s[i + 1:s.rindex(">")]
             url1 = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
@@ -961,7 +959,7 @@ class Blend(Command):
             else:
                 s = emojis[0]
                 argv = argv[argv.index(s) + len(s):].strip()
-            s = s[2:]
+            s = s[3:]
             i = s.index(":")
             e_id = s[i + 1:s.rindex(">")]
             url1 = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"

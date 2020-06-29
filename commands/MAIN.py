@@ -450,7 +450,6 @@ class Avatar(Command):
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
-        # print(emb.to_dict())
         return dict(embed=emb)
 
 
@@ -568,7 +567,7 @@ class Info(Command):
             "embed": emb,
         }
 
-    async def __call__(self, argv, name, guild, bot, client, user, flags, **void):
+    async def __call__(self, argv, name, guild, channel, bot, client, user, flags, **void):
         member = True
         g, guild = guild, None
         if argv:
@@ -759,10 +758,16 @@ class Info(Command):
             emb.add_field(name="Server rank", value=str(pos), inline=1)
         if role:
             emb.add_field(name="Roles", value=role, inline=0)
-        # print(emb.to_dict())
-        return {
-            "embed": emb,
-        }
+        if flags.get("v", 0) > 1:
+            fut = create_task(channel.send(embed=emb))
+            data = {i: bot.database.users.getEvents(u.id, i) for i in (None, "message", "typing", "command", "misc")}
+            resp = await bot.solveMath("eval(\"plt_special(" + repr(data) + ")\")", guild, 0, 1, authorize=True)
+            fn = resp["file"]
+            f = discord.File(fn)
+            await fut
+            await sendFile(channel, "", f, filename=fn, best=True)
+            return
+        return dict(embed=emb)
 
 
 class Status(Command):
@@ -829,6 +834,8 @@ class Reminder(Command):
     description = "Sets a reminder for a certain date and time."
     usage = "<1:message> <0:time> <disable(?d)>"
     flags = "aed"
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    rate_limit = 0.5
 
     async def __call__(self, argv, name, message, flags, bot, user, guild, perm, **void):
         msg = message.content
@@ -876,17 +883,10 @@ class Reminder(Command):
                 + noHighlight(sendable) + "].```"
             )
         if not argv:
-            if not len(rems):
-                return (
-                    "```ini\nNo " + word + " currently set for ["
-                    + noHighlight(sendable) + "].```"
-                )
-            d = utc()
-            s = strIter(rems, key=lambda x: limStr(noHighlight(bot.get_user(x.get("user", -1), replace=True).name + ": " + x["msg"]), 96) + " ➡️ " + ("<@" + str(x["u_id"]) + ">" if "u_id" in x else sec2Time(x["t"] - d)))
-            # s = strIter(rems, key=lambda x: limStr(noHighlight(x["msg"]), 64) + " ➡️ " + sec2Time(x["t"] - d))
             return (
-                "Current " + word + " set for **" + discord.utils.escape_markdown(str(sendable))
-                + "**:```ini" + s + "```"
+                "```" + "\n" * ("z" in flags) + "callback-main-reminder-"
+                + str(user.id) + "_0_" + str(sendable.id)
+                + "-\nLoading Reminder database...```"
             )
         if len(rems) >= 64:
             raise OverflowError("You have reached the maximum of 64 " + word + ". Please remove one to add another.")
@@ -899,7 +899,23 @@ class Reminder(Command):
             elif argv.startswith("that "):
                 argv = argv[5:]
             spl = None
-            if "event" in argv:
+            keywords = {
+                "on": None,
+                "at": None,
+                "in": None,
+                "when": None,
+                "event": None,
+            }
+            for k in tuple(keywords):
+                try:
+                    i = argv.index(k)
+                except ValueError:
+                    keywords.pop(k)
+                else:
+                    keywords[k] = i
+            indices = sorted(keywords, key=lambda k: -keywords[k])
+            foundkey = {indices[0]: True}
+            if foundkey.get("event"):
                 if " event " in argv:
                     spl = argv.split(" event ")
                 elif argv.startswith("event "):
@@ -910,7 +926,7 @@ class Reminder(Command):
                     t = verifyID(spl[-1])
                     keyed = True
                     break
-            if "when" in argv:
+            if foundkey.get("when"):
                 if argv.endswith("is online"):
                     argv = argv[:-9]
                 if " when " in argv:
@@ -923,7 +939,7 @@ class Reminder(Command):
                     t = verifyID(spl[-1])
                     keyed = True
                     break
-            if "in" in argv:
+            if foundkey.get("in"):
                 if " in " in argv:
                     spl = argv.split(" in ")
                 elif argv.startswith("in "):
@@ -933,7 +949,7 @@ class Reminder(Command):
                     msg = " in ".join(spl[:-1])
                     t = await bot.evalTime(spl[-1], guild)
                     break
-            if "at" in argv:
+            if foundkey.get("at"):
                 if " at " in argv:
                     spl = argv.split(" at ")
                 elif argv.startswith("at "):
@@ -943,7 +959,7 @@ class Reminder(Command):
                     msg = " at ".join(spl[:-1])
                     t = utc_ts(tzparse(spl[-1])) - utc()
                     break
-            if "on" in argv:
+            if foundkey.get("on"):
                 if " on " in argv:
                     spl = argv.split(" on ")
                 elif argv.startswith("on "):
@@ -995,8 +1011,6 @@ class Reminder(Command):
         except IndexError:
             pass
         bot.database.reminders.listed.insort((bot.data.reminders[sendable.id][0]["t"], sendable.id), key=lambda x: x[0])
-        # print(rems)
-        # print(bot.database.reminders.listed)
         update()
         emb = discord.Embed(description=msg)
         emb.set_author(name=username, url=url, icon_url=url)
@@ -1010,6 +1024,69 @@ class Reminder(Command):
             out += " in " + sbHighlight(sec2Time(t))
         out += ":```"
         return dict(content=out, embed=emb)
+
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, pos, s_id = [int(i) for i in vals.split("_")]
+        if reaction not in (None, self.directions[-1]) and u_id != user.id:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        user = await bot.fetch_user(u_id)
+        rems = bot.data.reminders.get(s_id, [])
+        sendable = await bot.fetch_sendable(s_id)
+        page = 16
+        last = max(0, len(rems) - page)
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - page)
+            elif i == 2:
+                new = min(last, pos + page)
+            elif i == 3:
+                new = last
+            else:
+                new = pos
+            pos = new
+        content = message.content
+        if not content:
+            content = message.embeds[0].description
+        i = content.index("callback")
+        content = content[:i] + (
+            "callback-image-img-"
+            + str(u_id) + "_" + str(pos) + "_" + str(s_id)
+            + "-\n"
+        )
+        if not rems:
+            content += "Schedule for " + str(sendable).replace("`", "") + " is currently empty.```"
+            msg = ""
+        else:
+            t = utc()
+            content += str(len(rems)) + " messages currently scheduled for " + str(sendable).replace("`", "") + ":```"
+            msg = strIter(
+                rems[pos:pos + page],
+                key=lambda x: limStr(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + noHighlight(x["msg"]), 96) + "` ➡️ " + ("<@" + str(x["u_id"]) + ">" if "u_id" in x else sec2Time(x["t"] - t)),
+                left="`[",
+                right="]`",
+            )
+        emb = discord.Embed(
+            description=content + msg,
+            colour=randColour(),
+        )
+        url = bestURL(user)
+        emb.set_author(name=str(user), url=url, icon_url=url)
+        more = len(rems) - pos - page
+        if more > 0:
+            emb.set_footer(
+                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
+            )
+        create_task(message.edit(content=None, embed=emb))
+        if reaction is None:
+            for react in self.directions:
+                create_task(message.add_reaction(react.decode("utf-8")))
+                await asyncio.sleep(0.5)
 
 
 class UpdateReminders(Database):
@@ -1081,7 +1158,6 @@ class UpdateReminders(Database):
                     it = [rems[i] for i in range(len(rems)) if i not in pops]
                     rems.clear()
                     rems.extend(it)
-                    # print(rems)
                     if not rems:
                         self.data.pop(u_id)
             except:
@@ -1305,11 +1381,46 @@ class UpdateUsers(Database):
     name = "users"
     suspected = "users.json"
     user = True
+    hours = 168
 
-    async def _seen_(self, user, delay, **void):
+    def clearEvents(self, data, minimum):
+        for hour in tuple(data):
+            if hour > minimum:
+                return
+            data.pop(hour)
+
+    def sendEvent(self, u_id, event):
+        data = setDict(self.data.get(u_id, {}), "recent", {})
+        hour = round(utc() // 3600)
+        if data:
+            self.clearEvents(data, hour - self.hours)
+        try:
+            data[hour][event] += 1
+        except KeyError:
+            try:
+                data[hour][event] = 1
+            except KeyError:
+                data[hour] = {event: 1}
+
+    def getEvents(self, u_id, event=None):
+        data = self.data.get(u_id, {}).get("recent")
+        if not data:
+            return [0] * self.hours
+        hour = round(utc() // 3600)
+        self.clearEvents(data, hour - self.hours)
+        start = hour - self.hours
+        if event is None:
+            out = [sum(data.get(i, {}).values()) for i in range(start, hour + 1)]
+        else:
+            out = [data.get(i, {}).get(event, 0) for i in range(start, hour + 1)]
+        return out
+
+    async def _seen_(self, user, delay, event, **void):
+        self.sendEvent(user.id, event)
         addDict(self.data, {user.id: {"last_seen": 0}})
         self.data[user.id]["last_seen"] = utc() + delay
 
     async def _command_(self, user, command, **void):
+        self.sendEvent(user.id, "command")
         addDict(self.data, {user.id: {"commands": {str(command): 1}}})
         self.update()

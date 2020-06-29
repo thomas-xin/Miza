@@ -172,7 +172,7 @@ async def sendFile(channel, msg, file, filename=None, best=False):
 bestURL = lambda obj: obj if type(obj) is str else (strURL(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if obj.proxy_url else obj.url))
 
 
-emojiFind = re.compile("<a?:[^<>]+:[0-9]+>")
+emojiFind = re.compile("<.?:[^<>:]+:[0-9]+>")
 findEmojis = lambda s: re.findall(emojiFind, s)
 
 def strMessage(message, limit=1024, username=False):
@@ -256,9 +256,6 @@ def strURL(url):
         url = url[:-10] + "?size=4096"
     return url.replace(".webp", ".png")
 
-shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).replace(b"/", b"-").decode("utf-8", "replace")
-
-hhash = lambda s: bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
 
 __imap = {
     "#": "",
@@ -321,12 +318,12 @@ def isURL(url):
     if type(url) is bytes:
         url = url.decode("utf-8", "replace")
     elif type(url) is not str:
-        return None
+        return
     url = url.strip()
     if url.startswith("<") and url[-1] == ">":
         url = url[1:-1]
     if not url:
-        return None
+        return
     try:
         result = urllib.parse.urlparse(url)
     except:
@@ -388,19 +385,6 @@ class AutoRequest:
 Request = AutoRequest()
 
 
-# class urlBypass(urllib.request.FancyURLopener):
-#     version = "Mozilla/5." + str(xrand(1, 10))
-
-#     __call__ = lambda self, url: self.open(url)
-
-# def urlOpen(url):
-#     opener = urlBypass()
-#     resp = opener(verifyURL(url))
-#     if resp.getcode() != 200:
-#         raise ConnectionError("Error " + str(resp.code))
-#     return resp
-
-
 SUBS = freeClass(math=freeClass(procs=hlist(), busy=freeClass()), image=freeClass(procs=hlist(), busy=freeClass()))
 
 subCount = lambda: sum(1 for ptype in SUBS.values() for proc in ptype.procs if proc.is_running())
@@ -438,6 +422,13 @@ def procUpdate():
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
+            else:
+                raise TypeError("Invalid subpool " + pname)
+            x = bytes(random.randint(0, 255) for _ in loop(32))
+            if random.randint(0, 1):
+                x = base64.b64encode(hashlib.sha256(x).digest())
+            proc.stdin.write(bytes(repr(x) + "\n", "utf-8"))
+            proc.key = x.decode("utf-8", "replace")
             proc.busy = False
             procs.append(proc)
         att = 0
@@ -504,7 +495,7 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
     output = evalEX(evalEX(resp))
     return output
 
-async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12):
+async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12, authorize=False):
     procs, busy = SUBS.math.procs, SUBS.math.busy
     while utc() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
@@ -521,7 +512,11 @@ async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12):
             await asyncio.sleep(0.5)
     except StopIteration:
         pass
-    d = repr(bytes("`".join(str(i) for i in (expr, prec, rat)), "utf-8")).encode("utf-8") + b"\n"
+    if authorize:
+        args = (expr, prec, rat, proc.key)
+    else:
+        args = (expr, prec, rat)
+    d = repr(bytes("`".join(i if type(i) is str else str(i) for i in args), "utf-8")).encode("utf-8") + b"\n"
     print(d)
     try:
         proc.busy = True
@@ -587,10 +582,23 @@ async def forceCoro(coro):
 
 
 eloop = asyncio.new_event_loop()
-__setloop = lambda: asyncio.set_event_loop(eloop)
-pthreads = concurrent.futures.ThreadPoolExecutor(max_workers=128, initializer=__setloop)
-athreads = concurrent.futures.ThreadPoolExecutor(max_workers=128, initializer=__setloop)
-__setloop()
+__setloop__ = lambda: asyncio.set_event_loop(eloop)
+
+class MultiThreadPool:
+
+    def __init__(self, thread_count):
+        multiplier = max(0, math.ceil(math.log2(thread_count >> 6)))
+        thread_count >>= multiplier
+        self.threadPools = [concurrent.futures.ThreadPoolExecutor(max_workers=thread_count, initializer=__setloop__) for _ in loop(1 << multiplier)]
+        self.position = -1
+
+    def submit(self, func, *args, **kwargs):
+        self.position = (self.position + 1) & len(self.threadPools) - 1
+        return self.threadPools[self.position].submit(func, *args, **kwargs)
+
+pthreads = concurrent.futures.ThreadPoolExecutor(max_workers=128, initializer=__setloop__)
+athreads = MultiThreadPool(192)
+__setloop__()
 
 def wrap_future(fut, loop=None):
     if loop is None:
@@ -794,7 +802,6 @@ class Database:
                 print(traceback.format_exc())
                 self.data.clear()
                 f()
-        # print(name, self.__name__)
 
     __hash__ = lambda self: hash(self.__name__)
     __str__ = lambda self: self.__name__

@@ -121,12 +121,12 @@ class Bot:
         sys.stdout.write(str(sep).join(str(i) for i in args) + end)
 
     async def verifyDelete(self, obj):
-        started = hasattr(self, "started")
-        if obj.checking:
-            return
         if hasattr(obj, "no_delete"):
             return
-        obj.checking = True
+        started = hasattr(self, "started")
+        if obj.checking > utc():
+            return
+        obj.checking = utc() + 30
         data = obj.data
         for key in tuple(data):
             if key != 0 and type(key) is not str:
@@ -152,12 +152,11 @@ class Bot:
                 obj.update()
             if random.random() > .99:
                 await asyncio.sleep(0.2)
-        await asyncio.sleep(10)
-        obj.checking = False
+        obj.checking = utc() + 10
         self.started = True
 
-    async def event(self, event, *args, **kwargs):
-        events = self.events.get(event, ())
+    async def event(self, ev, *args, **kwargs):
+        events = self.events.get(ev, ())
         if len(events) == 1:
             try:
                 return await forceCoro(events[0](*args, **kwargs))
@@ -174,7 +173,7 @@ class Bot:
                 print(traceback.format_exc())
         return out
 
-    async def get_sendable(self, guild, member):
+    async def get_first_sendable(self, guild, member):
         if member is None:
             return guild.owner
         channel = guild.system_channel
@@ -192,10 +191,11 @@ class Bot:
         return channel
 
     async def fetch_sendable(self, s_id):
-        try:
-            s_id = int(s_id)
-        except (ValueError, TypeError):
-            raise TypeError("Invalid user identifier: " + str(s_id))
+        if type(s_id) is not int:
+            try:
+                s_id = int(s_id)
+            except (ValueError, TypeError):
+                raise TypeError("Invalid user identifier: " + str(s_id))
         try:
             return self.get_user(s_id)
         except KeyError:
@@ -223,18 +223,22 @@ class Bot:
         return user
 
     def get_user(self, u_id, replace=False):
+        if type(u_id) is not int:
+            try:
+                u_id = int(u_id)
+            except (ValueError, TypeError):
+                raise TypeError("Invalid user identifier: " + str(u_id))
         try:
-            u_id = int(u_id)
-        except (ValueError, TypeError):
-            raise TypeError("Invalid user identifier: " + str(u_id))
-        if u_id in self.cache.users:
             return self.cache.users[u_id]
+        except KeyError:
+            pass
         if u_id == self.deleted_user:
             user = self.ghostUser()
             user.system = True
             user.name = "Deleted User"
             user.display_name = "Deleted User"
             user.id = u_id
+            user.mention = "<@" + str(u_id) + ">"
             user.avatar_url = self.discord_icon
             user.created_at = snowflake_time(u_id)
         else:
@@ -251,10 +255,11 @@ class Bot:
         return user
 
     async def fetch_member_ex(self, u_id, guild=None):
-        try:
-            u_id = int(u_id)
-        except:
-            pass
+        if type(u_id) is not int:
+            try:
+                u_id = int(u_id)
+            except (TypeError, ValueError):
+                pass
         member = None
         if type(u_id) is int:
             member = guild.get_member(u_id)
@@ -300,10 +305,11 @@ class Bot:
         return member
 
     async def fetch_member(self, u_id, guild=None, find_others=False):
-        try:
-            u_id = int(u_id)
-        except (ValueError, TypeError):
-            raise TypeError("Invalid user identifier: " + str(u_id))
+        if type(u_id) is not int:
+            try:
+                u_id = int(u_id)
+            except (ValueError, TypeError):
+                raise TypeError("Invalid user identifier: " + str(u_id))
         g = bot.cache.guilds
         if guild is None:
             guilds = list(bot.cache.guilds.values())
@@ -324,8 +330,10 @@ class Bot:
 
     async def fetch_whuser(self, u_id, guild=None):
         try:
-            if u_id in self.cache.users:
+            try:
                 return self.cache.users[u_id]
+            except KeyError:
+                pass
             try:
                 g_id = guild.id
             except AttributeError:
@@ -339,6 +347,7 @@ class Bot:
                 if w.id == u_id:
                     user = bot.ghostUser()
                     user.id = u_id
+                    user.mention = "<@" + str(u_id) + ">"
                     user.name = w.name
                     user.display_name = w.name
                     user.created_at = user.joined_at = w.created_at
@@ -355,33 +364,36 @@ class Bot:
         except EOFError:
             raise LookupError("No results for " + str(u_id))
 
-    async def fetch_guild(self, g_id):
-        try:
-            g_id = int(g_id)
-        except (ValueError, TypeError):
+    async def fetch_guild(self, g_id, follow_invites=True):
+        if type(g_id) is not int:
             try:
-                invite = await client.fetch_invite(verifyURL(g_id))
-                g = invite.guild
-                if not hasattr(g, "member_count"):
-                    guild = freeClass(member_count=invite.approximate_member_count)
-                    for at in g.__slots__:
-                        setattr(guild, at, getattr(g, at))
-                    guild.created_at = snowflake_time(guild.id)
-                    icon = str(guild.icon)
-                    guild.icon_url = (
-                        "https://cdn.discordapp.com/icons/"
-                        + str(guild.id) + "/" + icon
-                        + ".gif" * icon.startswith("a_")
-                    )
-                else:
-                    guild = g
-                return guild
-            except (discord.NotFound, discord.HTTPException) as ex:
-                raise LookupError(str(ex))
-            except:
+                g_id = int(g_id)
+            except (ValueError, TypeError):
+                if follow_invites:
+                    try:
+                        invite = await client.fetch_invite(verifyURL(g_id))
+                        g = invite.guild
+                        if not hasattr(g, "member_count"):
+                            guild = freeClass(member_count=invite.approximate_member_count)
+                            for at in g.__slots__:
+                                setattr(guild, at, getattr(g, at))
+                            guild.created_at = snowflake_time(guild.id)
+                            icon = str(guild.icon)
+                            guild.icon_url = (
+                                "https://cdn.discordapp.com/icons/"
+                                + str(guild.id) + "/" + icon
+                                + ".gif" * icon.startswith("a_")
+                            )
+                        else:
+                            guild = g
+                        return guild
+                    except (discord.NotFound, discord.HTTPException) as ex:
+                        raise LookupError(str(ex))
                 raise TypeError("Invalid server identifier: " + str(g_id))
-        if g_id in self.cache.guilds:
+        try:
             return self.cache.guilds[g_id]
+        except KeyError:
+            pass
         try:
             guild = client.get_guild(g_id)
             if guild is None:
@@ -393,24 +405,30 @@ class Bot:
         return guild
 
     async def fetch_channel(self, c_id):
+        if type(c_id) is not int:
+            try:
+                c_id = int(c_id)
+            except (ValueError, TypeError):
+                raise TypeError("Invalid channel identifier: " + str(c_id))
         try:
-            c_id = int(c_id)
-        except (ValueError, TypeError):
-            raise TypeError("Invalid channel identifier: " + str(c_id))
-        if c_id in self.cache.channels:
             return self.cache.channels[c_id]
+        except KeyError:
+            pass
         channel = await client.fetch_channel(c_id)
         self.cache.channels[c_id] = channel
         self.limitCache("channels")
         return channel
 
     async def fetch_message(self, m_id, channel=None):
+        if type(m_id) is not int:
+            try:
+                m_id = int(m_id)
+            except (ValueError, TypeError):
+                raise TypeError("Invalid message identifier: " + str(m_id))
         try:
-            m_id = int(m_id)
-        except (ValueError, TypeError):
-            raise TypeError("Invalid message identifier: " + str(m_id))
-        if m_id in self.cache.messages:
             return self.cache.messages[m_id]
+        except KeyError:
+            pass
         if channel is None:
             raise LookupError("Message data not found.")
         try:
@@ -425,12 +443,15 @@ class Bot:
         return message
 
     async def fetch_role(self, r_id, guild):
+        if type(r_id) is not int:
+            try:
+                r_id = int(r_id)
+            except (ValueError, TypeError):
+                raise TypeError("Invalid role identifier: " + str(r_id))
         try:
-            r_id = int(r_id)
-        except (ValueError, TypeError):
-            raise TypeError("Invalid role identifier: " + str(r_id))
-        if r_id in self.cache.roles:
             return self.cache.roles[r_id]
+        except KeyError:
+            pass
         try:
             role = guild.get_role(r_id)
             if role is None:
@@ -441,18 +462,21 @@ class Bot:
                 guild.roles = sorted(roles)
                 role = discord.utils.get(roles, id=r_id)
             if role is None:
-                raise discord.NotFound("Role not found.")
+                raise LookupError("Role not found.")
         self.cache.roles[r_id] = role
         self.limitCache("roles")
         return role
 
     async def fetch_emoji(self, e_id, guild=None):
+        if type(e_id) is not int:
+            try:
+                e_id = int(e_id)
+            except (ValueError, TypeError):
+                raise TypeError("Invalid emoji identifier: " + str(e_id))
         try:
-            e_id = int(e_id)
-        except (ValueError, TypeError):
-            raise TypeError("Invalid emoji identifier: " + str(e_id))
-        if e_id in self.cache.emojis:
             return self.cache.emojis[e_id]
+        except KeyError:
+            pass
         try:
             emoji = client.get_emoji(e_id)
             if emoji is None:
@@ -910,7 +934,7 @@ class Bot:
             pass
         return roundMin(float(x))
 
-    async def solveMath(self, f, guild, prec, r):
+    async def solveMath(self, f, guild, prec, r, authorize=False):
         f = f.strip()
         try:
             if guild is None or hasattr(guild, "ghost"):
@@ -919,7 +943,7 @@ class Bot:
                 g_id = guild.id
         except AttributeError:
             g_id = int(guild)
-        return await mathProc(f, int(prec), int(r), g_id)
+        return await mathProc(f, int(prec), int(r), g_id, authorize=authorize)
 
     timeChecks = {
         "galactic year": ("gy", "galactic year", "galactic years"),
@@ -1139,7 +1163,6 @@ class Bot:
             if not force:
                 create_task(self.getState())
             try:
-                #print("Sending update...")
                 guilds = len(client.guilds)
                 changed = guilds != self.guilds
                 if changed or utc() > self.stat_timer:
@@ -1627,7 +1650,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             name=alias,             # alias the command was called as
                             callback=processMessage,# function that called the command
                         ), timeout=timeout))
-                        create_task(force_callback(future, 1, channel.trigger_typing))
+                        create_task(force_callback(future, 0.5, channel.trigger_typing))
                         response = await future
                         if response is not None:
                             if fut is not None:
@@ -1704,7 +1727,6 @@ async def heartbeatLoop():
     except asyncio.CancelledError:
         sys.exit(1)   
 
-
 async def fastLoop():
     while True:
         try:
@@ -1715,7 +1737,6 @@ async def fastLoop():
         await asyncio.sleep(0.5)
         create_task(bot.event("_call_"))
         await asyncio.sleep(0.5)
-
 
 async def slowLoop():
     autosave = 0
@@ -1786,7 +1807,7 @@ async def on_guild_join(guild):
     print("New server: " + str(guild))
     g = await bot.fetch_guild(guild.id)
     m = guild.get_member(client.user.id)
-    channel = await bot.get_sendable(g, m)
+    channel = await bot.get_first_sendable(g, m)
     emb = discord.Embed(colour=discord.Colour(8364031))
     url = strURL(client.user.avatar_url)
     emb.set_author(name=client.user.name, url=url, icon_url=url)
@@ -1820,7 +1841,7 @@ async def on_guild_join(guild):
     await channel.send(embed=emb)
 
     
-seen = lambda user, delay=0: bot.event("_seen_", user=user, delay=delay)
+seen = lambda user, delay=0, event=None: bot.event("_seen_", user=user, delay=delay, event=event)
 
 
 async def checkDelete(message, reaction, user):
@@ -1857,7 +1878,7 @@ async def on_raw_reaction_add(payload):
         return
     if user.id != client.user.id:
         reaction = str(payload.emoji)
-        create_task(seen(user))
+        create_task(seen(user, event="misc"))
         await bot.reactCallback(message, reaction, user)
         create_task(checkDelete(message, reaction, user))
 
@@ -1872,7 +1893,7 @@ async def on_raw_reaction_remove(payload):
         return
     if user.id != client.user.id:
         reaction = str(payload.emoji)
-        create_task(seen(user))
+        create_task(seen(user, event="misc"))
         await bot.reactCallback(message, reaction, user)
         create_task(checkDelete(message, reaction, user))
 
@@ -1887,7 +1908,7 @@ async def on_voice_state_update(member, before, after):
                 await member.edit(mute=False, deafen=False)
             await bot.handleUpdate()
     if member.voice is not None and not member.voice.afk:
-        create_task(seen(member))
+        create_task(seen(member, event="misc"))
 
 
 async def handleMessage(message, edit=True):
@@ -1910,7 +1931,7 @@ async def handleMessage(message, edit=True):
 @client.event
 async def on_typing(channel, user, when):
     await bot.event("_typing_", channel=channel, user=user)
-    create_task(seen(user, delay=10))
+    create_task(seen(user, delay=10, event="typing"))
 
 
 @client.event
@@ -1918,8 +1939,8 @@ async def on_message(message):
     bot.cacheMessage(message)
     guild = message.guild
     if guild:
-        await bot.event("_send_", message=message)
-    create_task(seen(message.author))
+        create_task(bot.event("_send_", message=message))
+    create_task(seen(message.author, event="message"))
     await bot.reactCallback(message, None, message.author)
     await handleMessage(message, False)
 
@@ -1927,20 +1948,20 @@ async def on_message(message):
 @client.event
 async def on_user_update(before, after):
     await bot.event("_user_update_", before=before, after=after)
-    create_task(seen(after))
+    create_task(seen(after, event="misc"))
 
 
 @client.event
 async def on_member_update(before, after):
     await bot.event("_member_update_", before=before, after=after)
     if str(before.status) != str(after.status) or str(before.activity) != str(after.activity):
-        create_task(seen(after))
+        create_task(seen(after, event="misc"))
 
 
 @client.event
 async def on_member_join(member):
     await bot.event("_join_", user=member, guild=member.guild)
-    create_task(seen(member))
+    create_task(seen(member, event="misc"))
 
             
 @client.event
@@ -2090,8 +2111,8 @@ async def on_raw_message_edit(payload):
     if raw or before.content != after.content:
         await handleMessage(after)
         if getattr(after, "guild", None):
-            await bot.event("_edit_", before=before, after=after)
-        await seen(after.author)
+            create_task(bot.event("_edit_", before=before, after=after))
+        await seen(after.author, event="message")
 
 
 if __name__ == "__main__":

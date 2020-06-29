@@ -154,9 +154,14 @@ class UpdateExec(Database):
             return
         local = dict(print=lambda *args, sep=" ", end="\n", prefix="", **void: create_task(channel.send(limStr("```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2000))))
         print(proc)
+        succ = False
         try:
             output = eval(proc, bot._globals, local)
         except SyntaxError:
+            pass
+        else:
+            succ = True
+        if not succ:
             output = exec(proc, bot._globals, local)
         try:
             local.pop("print")

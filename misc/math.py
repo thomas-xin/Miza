@@ -3,6 +3,7 @@
 import sympy, time, sys, traceback, random, numpy
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
+import matplotlib.pyplot as plt
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
 
@@ -22,7 +23,6 @@ def logging(func):
     return call
 
 
-key = "0"
 BF_PREC = 256
 BF_ALPHA = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -76,137 +76,19 @@ class dice(sympy.Basic):
     __str__ = __repr__
 
 
-# class baseFloat(sympy.Float):
+special_colours = {
+    "message": "b-H",
+    "typing": "g-H",
+    "command": "r-H",
+    "misc": "m-H",
+}
 
-#     def __base__(self, b):
-#         self.base = b
-#         return self
-
-#     def __repr__(self):
-#         if not hasattr(self, "base"):
-#             self.base = 10
-#         return base(self.__add__(0).__str__(), self.base, sympy.ceiling(self._prec * sympy.log(2, 10)))
-
-#     @tryWrapper
-#     def evalf(self, prec):
-#         temp = baseFloat(self, prec * 1.25)
-#         temp.__base__(self.base)
-#         s = repr(temp)
-#         d = sympy.ceiling(prec / sympy.log(self.base, 10))
-#         try:
-#             d += s.index(".")
-#         except ValueError:
-#             pass
-#         if len(s) >= d:
-#             f = s.lower()
-#             up = f != s
-#             s = f
-#             x = s[d].lower()
-#             s = s[:d]
-#             if self.base != 64:
-#                 i = BF_ALPHA.index(x)
-#                 if i >= self.base / 2:
-#                     s = s[:-1] + BF_ALPHA[(1 + BF_ALPHA.index(s[-1])) % len(BF_ALPHA)]
-#             if up:
-#                 s = s.upper()
-#         return s
-
-#     def nsimplify(self, **void):
-#         return self
-    
-#     __str__ = __repr__
-
-
-# def base(x, b, p, alphabet=None, upper=True):
-#     """Converts a number from decimal to another base."""
-#     if not alphabet:
-#         alphabet = BF_ALPHA
-#     x = sympy.Float(str(x), dps=p)
-#     b = int(round(float(b)))
-#     if b == 64:
-#         alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-#     elif b > len(alphabet):
-#         raise ValueError("Invalid number base.")
-#     if b < 2:
-#         raise ValueError("Invalid number base.")
-#     if x <= 0:
-#         if x == 0:
-#             return alphabet[0]
-#         else:
-#             return  "-" + base(-x, b, p, alphabet)
-#     r = sympy.ceiling(p / sympy.log(b, 10))
-#     for i in range(r):
-#         if x == round(x):
-#             break
-#         x *= b
-#         i += 1
-#     x = int(round(x))
-#     dp = bool(i)
-#     s = ""
-#     for j in range(i):
-#         x, d = divmod(x, b)
-#         if not j and r >= b / 2:
-#             d += 1
-#         s = alphabet[d] + s
-#     s = "." * dp + s
-#     while x:
-#         x, d = divmod(x, b)
-#         s = alphabet[d] + s
-#     if upper:
-#         s = s.upper()
-#     return s
-
-# def debase(x, b=10):
-#     """Converts a number from a base to decimal."""
-#     b = int(round(float(b)))
-#     i = str(x).lower()
-#     try:
-#         i = str(sympy.Number(i).evalf(BF_PREC))
-#     except:
-#         pass
-#     print(i)
-#     try:
-#         ind = i.index(".")
-#         f = i[ind + 1:]
-#         i = i[:ind]
-#     except ValueError:
-#         f = ""
-#     temp = str(int(i, b)) + "."
-#     fp = sympy.Rational(0)
-#     m = 1
-#     while f:
-#         m *= b
-#         fp += sympy.Rational(int(f[0], b)) / m
-#         f = f[1:]
-#     s = temp + str(fp.evalf(BF_PREC)).replace("0.", "")
-#     print(s)
-#     return rounder(sympy.Rational(s))
-
-# def h2d(x):
-#     return debase(x, 16)
-
-# def o2d(x):
-#     return debase(x, 8)
-
-# def b2d(x):
-#     return debase(x, 2)
-
-# def arbFloat(x, b):
-#     f = baseFloat(x, BF_PREC)
-#     return f.__base__(b)
-
-# def hexFloat(x):
-#     f = baseFloat(x, BF_PREC)
-#     return f.__base__(16)
-
-# def octFloat(x):
-#     f = baseFloat(x, BF_PREC)
-#     return f.__base__(8)
-
-# def binFloat(x):
-#     f = baseFloat(x, BF_PREC)
-#     return f.__base__(2)
-
+def plt_special(d):
+    for k, v in d.items():
+        if k is None:
+            k = "all"
+        plt.plot(list(range(-len(v), 0)), v, special_colours.get(k, "k-H"), label=k)
+    return plt
 
 def plotArgs(args):
     if type(args[0]) in (tuple, list):
@@ -218,6 +100,8 @@ def plotArgs(args):
             args[0],
         )
     return args
+
+colours = [c + "-H" for c in "bgrymc"]
 
 def plot(*args, **kwargs):
     if "show" in kwargs:
@@ -233,6 +117,11 @@ def plot_implicit(*args, **kwargs):
     if "show" in kwargs:
         kwargs.pop("show")
     return plotter.plot_implicit(*plotArgs(args), show=False, **kwargs)
+
+def plot_array(*args, **kwargs):
+    for arr, c in zip(args, colours):
+        plt.plot(list(range(len(arr))), arr, c, **kwargs)
+    return plt
 
 def plot3d(*args, **kwargs):
     if "show" in kwargs:
@@ -279,32 +168,39 @@ def rounder(x):
         pass
     return x
 
+locked = True
+
+def _eval(func, glob=None, loc=None, key=None):
+    if glob is None:
+        glob = globals()
+    if locked:
+        raise PermissionError("Nice try, but this is locked behind a randomized SHA256 key :3")
+    try:
+        return eval(func, glob, loc)
+    except SyntaxError:
+        pass
+    return exec(func, glob, loc)
+
 
 _globals = dict(sympy.__dict__)
 plots = (
     "plot",
     "plot_parametric",
     "plot_implicit",
+    "plot_array",
     "plot3d",
     "plot3d_parametric_line",
     "plot3d_parametric_surface",
-    "lim",
 )
 for i in plots:
     _globals[i] = globals()[i]
 _globals.update({
+    "eval": _eval,
     "random": dice,
     "rand": dice,
     "dice": dice,
-    # "base": arbFloat,
-    # "h2d": h2d,
-    # "o2d": o2d,
-    # "b2d": b2d,
-    # "hex": hexFloat,
-    # "dec": debase,
-    # "oct": octFloat,
-    # "bin": binFloat,
     "plt": plot,
+    "lim": lim,
     "factors": sympy.factorint,
     "factorize": factorize,
     "factor": factorize,
@@ -454,16 +350,17 @@ def evalSym(f, prec=64, r=False):
         except:
             f = latex.parse_latex(f)
     for i in sympy.preorder_traversal(f):
-        try:
-            f = f.subs(i, rounder(i))
-        except:
-            pass
-        if hasattr(i, "doit"):
+        if issubclass(type(i), sympy.Number):
+            try:
+                f = f.subs(i, rounder(i))
+            except:
+                pass
+        elif hasattr(i, "doit"):
             try:
                 f = f.subs(i, i.doit())
             except:
                 pass
-    if isinstance(f, Plot):
+    if isinstance(f, Plot) or f == plt:
         return [f]
     try:
         f = sympy.simplify(f)
@@ -479,21 +376,6 @@ def evalSym(f, prec=64, r=False):
                 f = f.subs(i, i.doit())
             except:
                 pass
-    # try:
-    #     if issubclass(type(f), baseFloat):
-    #         a = str(f.evalf(prec))
-    #         try:
-    #             b = str(prettyAns(sympy.Rational(str(f.num))))
-    #         except:
-    #             b = str(prettyAns(sympy.Number(str(f.num))))
-    #         if b == a:
-    #             b = ""
-    #         return [a, b]
-    # except:
-    #     p = prettyAns(f)
-    #     if p == convAns(f):
-    #         p = ""
-    #     return [f, p]
     if prec:
         try:
             y = f.evalf(prec, chop=True)
@@ -522,9 +404,17 @@ def evalSym(f, prec=64, r=False):
         return [f, p]
 
 
+key = eval(sys.stdin.readline()).decode("utf-8", "replace").strip()
+
+
 while True:
     try:
-        args = eval(sys.stdin.readline()).decode("utf-8", "replace").replace("\n", "").split("`")
+        locked = True
+        args = eval(sys.stdin.readline()).decode("utf-8", "replace").strip().split("`")
+        if len(args) > 3:
+            args, key_in = args[:3], args[-1]
+            if key_in == key:
+                locked = False
         resp = evalSym(*args)
         if isinstance(resp[0], Plot):
             ts = round(time.time() * 1000)
@@ -533,7 +423,19 @@ while True:
             try:
                 resp[0].save(fn)
             except FileNotFoundError:
-                resp[0].save(name)
+                fn = name
+                resp[0].save(fn)
+            s = "{'file':'" + fn + "'}\n"
+        elif resp[0] == plt:
+            ts = round(time.time() * 1000)
+            name = str(ts) + ".png"
+            fn = "cache/" + name
+            try:
+                plt.savefig(fn)
+            except FileNotFoundError:
+                fn = name
+                plt.savefig(fn)
+            plt.clf()
             s = "{'file':'" + fn + "'}\n"
         else:
             s = repr([convAns(i) for i in resp])

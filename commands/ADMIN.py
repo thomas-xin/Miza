@@ -104,11 +104,18 @@ class Ban(Command):
     min_level = 3
     min_display = "3+"
     description = "Bans a user for a certain amount of time, with an optional reason."
-    usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)>"
-    flags = "h"
+    usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)> <debug(?z)>"
+    flags = "hz"
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = 2
 
-    async def __call__(self, bot, args, message, channel, guild, flags, perm, name, **void):
+    async def __call__(self, bot, args, message, channel, guild, flags, perm, user, name, **void):
+        if not args:
+            return (
+                "```" + "\n" * ("z" in flags) + "callback-admin-ban-"
+                + str(user.id) + "_0"
+                + "-\nLoading ban list...```"
+            )
         update = self.bot.database.bans.update
         ts = utc()
         banlist = bot.data.bans.get(guild.id, [])
@@ -119,29 +126,6 @@ class Ban(Command):
             await fut
             raise
         await fut
-        if not args:
-            if not bans:
-                return (
-                    "```ini\nNo currently banned users for ["
-                    + noHighlight(guild.name) + "].```"
-                )
-            emb = discord.Embed(colour=discord.Colour(1))
-            emb.description = "Currently banned users from **" + escape_markdown(guild.name) + "**:"
-            for i, ban in enumerate(sorted(bans.values(), key=lambda x: x["t"])):
-                if i >= 25:
-                    break
-                try:
-                    user = await bot.fetch_user(ban["u"])
-                    emb.add_field(
-                        name=str(user) + " (" + str(user.id) + ")",
-                        value=(
-                            "Duration: " + sec2Time(ban["t"] - ts) + "\n"
-                            + "Reason: " + escape_markdown(str(ban["r"]))
-                        )
-                    )
-                except:
-                    print(traceback.format_exc())
-            return dict(embed=emb)
         u_id = verifyID(args.pop(0))
         try:
             user = await bot.fetch_user(u_id)
@@ -245,7 +229,6 @@ class Ban(Command):
         return bans, glob
 
     async def createBan(self, guild, user, reason, length, channel, bans, glob):
-        # print(self, guild, user, reason, length, channel, bans, glob)
         ts = utc()
         bot = self.bot
         banlist = setDict(bot.data.bans, guild.id, hlist())
@@ -303,6 +286,73 @@ class Ban(Command):
         except Exception as ex:
             print(traceback.format_exc())
             await channel.send("```py\nError: " + repr(ex) + "```")
+
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, pos = [int(i) for i in vals.split("_")]
+        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        user = await bot.fetch_user(u_id)
+        update = self.bot.database.bans.update
+        ts = utc()
+        banlist = bot.data.bans.get(guild.id, [])
+        bans, glob = await self.getBans(guild)
+        page = 25
+        last = max(0, len(bans) - page)
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - page)
+            elif i == 2:
+                new = min(last, pos + page)
+            elif i == 3:
+                new = last
+            else:
+                new = pos
+            pos = new
+        content = message.content
+        if not content:
+            content = message.embeds[0].description
+        i = content.index("callback")
+        content = content[:i] + (
+            "callback-admin-ban-"
+            + str(u_id) + "_" + str(pos)
+            + "-\n"
+        )
+        if not bans:
+            content += "Ban list for " + str(guild).replace("`", "") + " is currently empty.```"
+        else:
+            content += str(len(bans)) + " users currently banned from " + str(guild).replace("`", "") + ":```"
+        emb = discord.Embed(colour=discord.Colour(1))
+        emb.description = content
+        for i, ban in enumerate(sorted(bans.values(), key=lambda x: x["t"])[pos:pos + page]):
+            try:
+                user = await bot.fetch_user(ban["u"])
+                emb.add_field(
+                    name=str(user) + " (" + str(user.id) + ")",
+                    value=(
+                        "Duration: " + sec2Time(ban["t"] - ts) + "\n"
+                        + "Reason: " + escape_markdown(str(ban["r"]))
+                    )
+                )
+            except:
+                print(traceback.format_exc())
+        url = bestURL(user)
+        emb.set_author(name=str(user), url=url, icon_url=url)
+        more = len(bans) - pos - page
+        if more > 0:
+            emb.set_footer(
+                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
+            )
+        create_task(message.edit(content=None, embed=emb))
+        if reaction is None:
+            for react in self.directions:
+                create_task(message.add_reaction(react.decode("utf-8")))
+                await asyncio.sleep(0.5)
 
 
 class RoleGiver(Command):
@@ -785,7 +835,7 @@ class UpdateBans(Database):
                     if not channel.permissions_for(m).send_messages:
                         raise discord.Forbidden
                 except (LookupError, discord.Forbidden, discord.NotFound):
-                    channel = await self.bot.get_sendable(guild, m)
+                    channel = await self.bot.get_first_sendable(guild, m)
                 try:
                     await guild.unban(user, reason="Temporary ban expired.")
                     text = (
@@ -913,7 +963,7 @@ class UpdateUserLogs(Database):
             if str(before) != str(after):
                 emb.add_field(
                     name="Username",
-                    value=escape_markdown(str(before)) + " <:a:688320024586223620> " + escape_markdown(str(after)),
+                    value=escape_markdown(str(before)) + " ➡️ " + escape_markdown(str(after)),
                 )
                 change = True
                 colour[0] += 255
@@ -921,7 +971,7 @@ class UpdateUserLogs(Database):
                 if before.display_name != after.display_name:
                     emb.add_field(
                         name="Nickname",
-                        value=escape_markdown(before.display_name) + " <:a:688320024586223620> " + escape_markdown(after.display_name),
+                        value=escape_markdown(before.display_name) + " ➡️ " + escape_markdown(after.display_name),
                     )
                     change = True
                     colour[0] += 255
@@ -936,11 +986,11 @@ class UpdateUserLogs(Database):
                             add.append(r)
                     rchange = ""
                     if sub:
-                        rchange = "<:m:688316020359823364> " + escape_markdown(", ".join(str(r) for r in sub))
+                        rchange = "❌ " + escape_markdown(", ".join("<@&" + str(r.id) + ">" for r in sub))
                     if add:
                         rchange += (
-                            "\n" * bool(rchange) + "<:p:688316007093370910> " 
-                            + escape_markdown(", ".join(str(r) for r in add))
+                            "\n" * bool(rchange) + "✅ " 
+                            + escape_markdown(", ".join("<@&" + str(r.id) + ">" for r in add))
                         )
                     if rchange:
                         emb.add_field(name="Roles", value=rchange)
@@ -951,7 +1001,7 @@ class UpdateUserLogs(Database):
                     name="Avatar",
                     value=(
                         "[Before](" + str(b_url) 
-                        + ") <:a:688320024586223620> [After](" 
+                        + ") ➡️ [After](" 
                         + str(a_url) + ")"
                     ),
                 )

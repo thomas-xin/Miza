@@ -89,8 +89,8 @@ def getBestIcon(entry):
         return entry["thumbnail"]
     except KeyError:
         try:
-            return entry["thumbnails"][0]["url"]
-        except LookupError:
+            thumbnails = entry["thumbnails"]
+        except KeyError:
             try:
                 url = entry["webpage_url"]
             except KeyError:
@@ -99,6 +99,7 @@ def getBestIcon(entry):
                 if not is_image(url):
                     return "https://cdn.discordapp.com/embed/avatars/0.png"
             return url
+        return sorted(thumbnails, key=lambda x: -float(x.get("width", x.get("preference", 0) * 4096)))[0]["url"]
 
 
 def getBestAudio(entry):
@@ -504,7 +505,7 @@ class CustomAudio(discord.AudioSource):
                     comp /= c
                 except ZeroDivisionError:
                     comp = 1
-                mult = str(round(c ** (2 / 3), 4))
+                mult = str(round(c ** (2 / 3) * math.sqrt(2), 4))
                 options.append(
                     "acompressor=mode=" + ("upward" if stats.compressor < 0 else "downward")
                     + ":ratio=" + str(c) + ":level_in=" + mult + ":threshold=0.0625:makeup=" + mult
@@ -519,7 +520,7 @@ class CustomAudio(discord.AudioSource):
             options.append(opt)
         if reverb:
             coeff = abs(reverb)
-            wet = min(2, coeff) / 2
+            wet = min(3, coeff) / 3
             if wet != 1:
                 options.append("asplit[2]")
             options.append("volume=1.2")
@@ -2087,7 +2088,8 @@ class Playlist(Command):
 
 class Connect(Command):
     server_only = True
-    name = ["Summon", "Join", "DC", "Disconnect", "FuckOff", "Move", "Reconnect"]
+    name = ["Summon", "Join", "DC", "Disconnect", "Leave", "Move", "Reconnect"]
+    alias = name + ["FuckOff"]
     min_level = 0
     description = "Summons the bot into a voice channel."
     usage = "<channel{curr}(0)>"
@@ -2096,7 +2098,7 @@ class Connect(Command):
     async def __call__(self, user, channel, name="join", argv="", **void):
         bot = self.bot
         client = bot.client
-        if name in ("dc", "disconnect", "fuckoff"):
+        if name in ("dc", "disconnect", "leave", "fuckoff"):
             vc_ = None
         elif argv or name == "move":
             c_id = verifyID(argv)
@@ -3182,7 +3184,7 @@ class Lyrics(Command):
     )
     rate_limit = (2, 3)
 
-    async def __call__(self, bot, channel, message, argv, flags, user, **void):
+    async def __call__(self, bot, guild, channel, message, argv, flags, user, **void):
         for a in message.attachments:
             argv = a.url + " " + argv
         if not argv:
