@@ -563,9 +563,10 @@ class Bot:
         self.cache.users.update(client._connection._users)
         self.cache.channels.update(client._connection._private_channels)
 
-    def cacheChannels(self):
+    def cacheFromGuilds(self):
         for i, guild in enumerate(client.guilds):
             self.cache.channels.update(guild._channels)
+            self.cache.roles.update(guild._roles)
             if not 1 + i & 64:
                 time.sleep(1)
 
@@ -993,7 +994,7 @@ class Bot:
             self.ip = ip
 
     async def getIP(self):
-        resp = await create_future(Request, "https://api.ipify.org", decode=True)
+        resp = await create_future(Request, "https://api.ipify.org", decode=True, priority=True)
         self.updateIP(resp)
 
     def getActive(self):
@@ -1659,10 +1660,10 @@ async def heartbeatLoop():
                 bot.client
             except NameError:
                 sys.exit()
-            d = await create_future(os.listdir)
+            d = await create_future(os.listdir, priority=True)
             if bot.heartbeat in d:
                 try:
-                    await create_future(os.remove, bot.heartbeat)
+                    await create_future(os.remove, bot.heartbeat, priority=True)
                 except:
                     print(traceback.format_exc())
             await asyncio.sleep(0.5)
@@ -1689,7 +1690,7 @@ async def slowLoop():
             if utc() - autosave > 60:
                 autosave = utc()
                 bot.update()
-                create_future_ex(bot.updateClient)
+                create_future_ex(bot.updateClient, priority=True)
             while bot.blocked > 0:
                 print("Update event blocked.")
                 bot.blocked -= 1
@@ -1712,8 +1713,8 @@ async def on_ready():
             else:
                 print("> " + guild.name)
         await bot.handleUpdate()
-        create_future_ex(bot.updateClient)
-        create_future_ex(bot.cacheChannels)
+        create_future_ex(bot.updateClient, priority=True)
+        create_future_ex(bot.cacheFromGuilds, priority=True)
         create_task(bot.getIP())
         if not hasattr(bot, "started"):
             bot.started = True
@@ -1723,14 +1724,14 @@ async def on_ready():
             await bot.fetch_user(bot.deleted_user)
             if "init.tmp" not in os.listdir("misc"):
                 print("Setting bot avatar...")
-                f = await create_future(open, "misc/avatar.png", "rb")
-                b = await create_future(f.read)
+                f = await create_future(open, "misc/avatar.png", "rb", priority=True)
+                b = await create_future(f.read, priority=True)
                 create_future_ex(f.close)
                 await client.user.edit(avatar=b)
-                f = await create_future(open, "misc/init.tmp", "wb")
+                f = await create_future(open, "misc/init.tmp", "wb", priority=True)
                 create_future_ex(f.close)
             while bot.modload:
-                await create_future(bot.modload.popleft().result)
+                await create_future(bot.modload.popleft().result, priority=True)
             bot.executor.shutdown(wait=False)
             for u in bot.database.values():
                 for f in dir(u):
@@ -2000,8 +2001,10 @@ async def on_member_ban(guild, user):
 
 @client.event
 async def on_guild_remove(guild):
-    if guild.id in bot.cache.guilds:
+    try:
         bot.cache.guilds.pop(guild.id)
+    except KeyError:
+        pass
     print(guild, "removed.")
 
 

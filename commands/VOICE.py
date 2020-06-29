@@ -504,7 +504,7 @@ class CustomAudio(discord.AudioSource):
                     comp /= c
                 except ZeroDivisionError:
                     comp = 1
-                mult = str(round(math.sqrt(c), 4))
+                mult = str(round(c ** (2 / 3), 4))
                 options.append(
                     "acompressor=mode=" + ("upward" if stats.compressor < 0 else "downward")
                     + ":ratio=" + str(c) + ":level_in=" + mult + ":threshold=0.0625:makeup=" + mult
@@ -1032,7 +1032,7 @@ class LoadedAudioReader(discord.AudioSource):
         self.closed = False
         self.advanced = False
         self.proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
-        self._packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
+        self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
         self.file = file
         self.buffer = None
         self.callback = callback
@@ -1041,7 +1041,7 @@ class LoadedAudioReader(discord.AudioSource):
         if self.buffer:
             b, self.buffer = self.buffer, None
             return b
-        return next(self._packet_iter)
+        return next(self.packet_iter)
     
     def start(self):
         self.buffer = None
@@ -1067,7 +1067,7 @@ class BufferedAudioReader(discord.AudioSource):
         self.closed = False
         self.advanced = False
         self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        self._packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
+        self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
         self.file = file
         self.stream = file.open()
         self.buffer = None
@@ -1078,7 +1078,7 @@ class BufferedAudioReader(discord.AudioSource):
         if self.buffer:
             b, self.buffer = self.buffer, None
             return b
-        return next(self._packet_iter)
+        return next(self.packet_iter)
 
     def run(self):
         while True:
@@ -1298,7 +1298,7 @@ class AudioDownloader:
         try:
             return self.downloader.extract_info(url, download=False, process=True)
         except youtube_dl.DownloadError as ex:
-            if "429" in str(ex):
+            if "403" in str(ex):
                 try:
                     return self.from_pytube(url)
                 except youtube_dl.DownloadError:
@@ -1309,7 +1309,7 @@ class AudioDownloader:
         try:
             return self.downloader.extract_info(url, download=False, process=False)
         except youtube_dl.DownloadError as ex:
-            if "429" in str(ex):
+            if "403" in str(ex):
                 if isURL(url):
                     try:
                         return self.from_pytube(url)
