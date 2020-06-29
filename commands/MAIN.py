@@ -430,7 +430,7 @@ class Avatar(Command):
                                                     u = bot.ghostUser()
                                                     u.id = u_id
                                             if u is None:
-                                                raise LookupError("Unable to find user or server from ID.")
+                                                raise LookupError("No results for " + argv)
                                     try:
                                         guild = channel.guild
                                     except NameError:
@@ -451,9 +451,7 @@ class Avatar(Command):
         emb.set_author(name=name, icon_url=url, url=url)
         emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
         # print(emb.to_dict())
-        return {
-            "embed": emb,
-        }
+        return dict(embed=emb)
 
 
 class Info(Command):
@@ -611,7 +609,7 @@ class Info(Command):
                                                     u = bot.ghostUser()
                                                     u.id = u_id
                                             if u is None:
-                                                raise LookupError("Unable to find user or server from ID.")
+                                                raise LookupError("No results for " + argv)
                                     try:
                                         guild = channel.guild
                                     except NameError:

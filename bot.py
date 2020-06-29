@@ -261,31 +261,42 @@ class Bot:
         if member is None:
             if type(u_id) is int:
                 try:
-                    member = await guild.fetch_member(u_id)
-                except discord.NotFound:
+                    member = await self.fetch_member(u_id, guild)
+                except LookupError:
                     pass
             if member is None:
                 members = guild.members
                 if not members:
                     members = guild.members = await guild.fetch_members(limit=None)
                     guild._members = {m.id: m for m in members}
+                if type(u_id) is not str:
+                    u_id = str(u_id)
                 try:
                     member = await strLookup(
                         members,
-                        str(u_id),
-                        qkey=lambda x: [str(x), reconstitute(x).lower()],
-                        ikey=lambda x: [str(x), reconstitute(x.name).lower(), reconstitute(x.display_name).lower()],
+                        u_id,
+                        qkey=userQuery1,
+                        ikey=userIter1,
+                        loose=False,
                     )
                 except LookupError:
                     try:
                         member = await strLookup(
-                            members,
-                            str(u_id),
-                            qkey=lambda x: [to_alphanumeric(x).replace(" ", "").lower()],
-                            ikey=lambda x: [to_alphanumeric(x).replace(" ", "").lower(), to_alphanumeric(x.display_name).replace(" ", "").lower()],
-                        )
+                        members,
+                        u_id,
+                        qkey=userQuery2,
+                        ikey=userIter2,
+                    )
                     except LookupError:
-                        raise LookupError("Unable to find member data.")
+                        try:
+                            member = await strLookup(
+                                members,
+                                u_id,
+                                qkey=userQuery3,
+                                ikey=userIter3,
+                            )
+                        except LookupError:
+                            raise LookupError("Unable to find member data.")
         return member
 
     async def fetch_member(self, u_id, guild=None, find_others=False):
@@ -342,7 +353,7 @@ class Bot:
             self.limitCache("users")
             return user
         except EOFError:
-            raise LookupError("Unable to find target from ID.")
+            raise LookupError("No results for " + str(u_id))
 
     async def fetch_guild(self, g_id):
         try:
@@ -1383,6 +1394,29 @@ class Bot:
         clear_reactions = delete
         ack = delete
         ghost = True
+
+
+def userQuery1(x):
+    yield x
+    
+def userIter1(x):
+    yield str(x)
+
+def userQuery2(x):
+    yield x
+    yield reconstitute(x).lower()
+
+def userIter2(x):
+    yield str(x)
+    yield reconstitute(x.name).lower()
+    yield reconstitute(x.display_name).lower()
+
+def userQuery3(x):
+    yield to_alphanumeric(x).replace(" ", "").lower()
+
+def userIter3(x):
+    yield to_alphanumeric(x).replace(" ", "").lower()
+    yield to_alphanumeric(x.display_name).replace(" ", "").lower()
 
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=False):

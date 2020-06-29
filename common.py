@@ -216,14 +216,13 @@ def noCodeBox(s):
     return s
 
 
-async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]):
+async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)], loose=True):
     queries = qkey(query)
     qlist = [q for q in queries if q]
     if not qlist:
         qlist = queries
     cache = [[[inf, None], [inf, None]] for _ in qlist]
-    x = 1
-    for i in shuffle(it):
+    for x, i in enumerate(shuffle(it)):
         for c in ikey(i):
             if not c and i:
                 continue
@@ -233,18 +232,18 @@ async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)])
                 elif b.startswith(qlist[a]):
                     if len(b) < cache[a][0][0]:
                         cache[a][0] = [len(b), i]
-                elif qlist[a] in b:
+                elif loose and qlist[a] in b:
                     if len(b) < cache[a][1][0]:
                         cache[a][1] = [len(b), i]
-        if not x & 1023:
+        if not 1 + x & 1023:
             await asyncio.sleep(0.1)
-        x += 1
     for c in cache:
         if c[0][0] < inf:
             return c[0][1]
-    for c in cache:
-        if c[1][0] < inf:
-            return c[1][1]
+    if loose:
+        for c in cache:
+            if c[1][0] < inf:
+                return c[1][1]
     raise LookupError("No results for " + str(query) + ".")
 
 
