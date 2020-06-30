@@ -1447,10 +1447,6 @@ try:
     TimeoutErrors.append(asyncio.exceptions.TimeoutError)
 except LookupError:
     pass
-try:
-    TimeoutErrors.append(concurrent.futures._base.TimeoutError)
-except LookupError:
-    pass
 
 
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=False):
