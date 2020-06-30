@@ -833,7 +833,7 @@ class UpdateBans(Database):
                 try:
                     channel = await self.bot.fetch_channel(x.c)
                     if not channel.permissions_for(m).send_messages:
-                        raise discord.Forbidden
+                        raise LookupError
                 except (LookupError, discord.Forbidden, discord.NotFound):
                     channel = await self.bot.get_first_sendable(guild, m)
                 try:
@@ -1223,7 +1223,7 @@ class UpdateMessageLogs(Database):
                     init = "<@" + str(t.id) + ">"
                 else:
                     if not guild.get_member(cu_id).guild_permissions.view_audit_log:
-                        raise discord.Forbidden
+                        raise PermissionError
                     al = await guild.audit_logs(
                         limit=5,
                         action=action,
@@ -1253,7 +1253,7 @@ class UpdateMessageLogs(Database):
                 # if t.bot or u.id == t.id == cu_id:
                 #     self.logDeleted(message)
                 #     return
-            except (discord.Forbidden, discord.HTTPException):
+            except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
             emb = discord.Embed(colour=colour2Raw([255, 0, 0]))
             emb.set_author(name=name_id, icon_url=url, url=url)
@@ -1285,7 +1285,7 @@ class UpdateMessageLogs(Database):
                     init = "<@" + str(t.id) + ">"
                 else:
                     if not guild.get_member(cu_id).guild_permissions.view_audit_log:
-                        raise discord.Forbidden
+                        raise PermissionError
                     al = await guild.audit_logs(
                         limit=5,
                         action=action,
@@ -1309,7 +1309,7 @@ class UpdateMessageLogs(Database):
                             if e.target is None or e.target.id == messages[-1].channel.id:
                                 t = e.user
                                 init = "<@" + str(t.id) + ">"
-            except (discord.Forbidden, discord.HTTPException):
+            except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
             emb = discord.Embed(colour=colour2Raw([255, 0, 255]))
             emb.description = (

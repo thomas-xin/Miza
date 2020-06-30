@@ -426,7 +426,8 @@ def procUpdate():
                 raise TypeError("Invalid subpool " + pname)
             x = bytes(random.randint(0, 255) for _ in loop(32))
             if random.randint(0, 1):
-                x = base64.b64encode(hashlib.sha256(x).digest())
+                x = hashlib.sha256(x).digest()
+            x = base64.b64encode(x)
             proc.stdin.write(bytes(repr(x) + "\n", "utf-8"))
             proc.key = x.decode("utf-8", "replace")
             proc.busy = False

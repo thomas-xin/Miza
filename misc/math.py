@@ -80,19 +80,11 @@ special_colours = {
     "message": "b",
     "typing": "g",
     "command": "r",
-    "misc": "m",
+    "misc": "k",
 }
 
 def plt_special(d):
-    # base = None
-    for k, v in d.items():
-        # if base is None:
-        #     base = numpy.array(v)
-        # else:
-        #     base += numpy.array(v)
-        if k is None:
-            k = "all"
-        plt.bar(list(range(-len(v), 0)), v, color=special_colours.get(k, "k"), label=k)
+    [plt.bar(list(range(-len(i[1]), 0)), i[1], color=special_colours.get(i[0], "k"), label=i[0]) for i in reversed(d.items())]
     return plt
 
 def plotArgs(args):
@@ -175,10 +167,10 @@ def rounder(x):
 
 locked = True
 
-def _eval(func, glob=None, loc=None, key=None):
+def _eval(func, glob=None, loc=None, key=None, **void):
     if glob is None:
         glob = globals()
-    if locked:
+    if locked and key != globals()["key"]:
         raise PermissionError("Nice try, but this is locked behind a randomized SHA256 key :3")
     try:
         return eval(func, glob, loc)
