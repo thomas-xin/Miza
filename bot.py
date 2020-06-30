@@ -1650,7 +1650,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             name=alias,             # alias the command was called as
                             callback=processMessage,# function that called the command
                         ), timeout=timeout))
-                        create_task(force_callback(future, 0.5, channel.trigger_typing))
+                        create_task(force_callback(future, 0.9, channel.trigger_typing))
                         response = await future
                         if response is not None:
                             if fut is not None:

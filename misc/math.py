@@ -77,17 +77,22 @@ class dice(sympy.Basic):
 
 
 special_colours = {
-    "message": "b-H",
-    "typing": "g-H",
-    "command": "r-H",
-    "misc": "m-H",
+    "message": "b",
+    "typing": "g",
+    "command": "r",
+    "misc": "m",
 }
 
 def plt_special(d):
+    # base = None
     for k, v in d.items():
+        # if base is None:
+        #     base = numpy.array(v)
+        # else:
+        #     base += numpy.array(v)
         if k is None:
             k = "all"
-        plt.plot(list(range(-len(v), 0)), v, special_colours.get(k, "k-H"), label=k)
+        plt.bar(list(range(-len(v), 0)), v, color=special_colours.get(k, "k"), label=k)
     return plt
 
 def plotArgs(args):

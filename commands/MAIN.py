@@ -760,7 +760,7 @@ class Info(Command):
             emb.add_field(name="Roles", value=role, inline=0)
         if flags.get("v", 0) > 1:
             fut = create_task(channel.send(embed=emb))
-            data = {i: bot.database.users.getEvents(u.id, i) for i in (None, "message", "typing", "command", "misc")}
+            data = {i: bot.database.users.getEvents(u.id, i) for i in ("message", "typing", "command", "misc")}
             resp = await bot.solveMath("eval(\"plt_special(" + repr(data) + ")\")", guild, 0, 1, authorize=True)
             fn = resp["file"]
             f = discord.File(fn)
