@@ -573,6 +573,27 @@ class Bot:
                 url = await self.followURL(url, it)
         return url
 
+    async def followImage(self, url):
+        if isURL(url):
+            return [url]
+        users = findUsers(url)
+        emojis = findEmojis(url)
+        out = deque()
+        if users:
+            futs = [create_task(self.fetch_user(verifyID(u))) for u in users]
+            for fut in futs:
+                try:
+                    res = await fut
+                    out.append(bestURL(res))
+                except LookupError:
+                    pass
+        for s in emojis:
+            s = s[3:]
+            i = s.index(":")
+            e_id = s[i + 1:s.rindex(">")]
+            out.append("https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1")
+        return out
+
     def cacheMessage(self, message):
         self.cache.messages[message.id] = message
         self.limitCache("messages")

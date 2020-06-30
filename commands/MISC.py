@@ -127,7 +127,7 @@ class SheetPull:
         try:
             print("Pulling Spreadsheet...")
             url = self.url
-            text = requests.get(url).text
+            text = Request(url, timeout=16, decode=True)
             data = text.split("\r\n")
             columns = 0
             sdata = [[], utc()]
@@ -910,7 +910,7 @@ class UpdateDeviantArt(Database):
                     req = url + str(i)
                     # print(req)
                     attempts += 1
-                    resp = await Request(req, aio=True)
+                    resp = await Request(req, timeout=12, aio=True)
                     try:
                         d = json.loads(resp)
                     except:

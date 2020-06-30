@@ -347,27 +347,18 @@ class CreateEmoji(Command):
         url = args.pop(-1)
         url = await bot.followURL(url, best=True)
         if not isURL(url):
-            emojis = findEmojis(argv)
-            if not emojis:
-                emojis = findEmojis(url)
-                if not emojis:
+            urls = await bot.followImage(argv)
+            if not urls:
+                urls = await bot.followImage(url)
+                if not urls:
                     await fut
                     raise ArgumentError("Please input an image by URL or attachment.")
-                s = emojis[0]
-                name = url[:url.index(s)].strip()
-            else:
-                s = emojis[0]
-                name = argv[:argv.index(s)].strip()
-            s = s[3:]
-            i = s.index(":")
-            e_id = s[i + 1:s.rindex(">")]
-            url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
-        else:
-            name = " ".join(args).strip()
+            url = urls[0]
+        name = " ".join(args).strip()
         if not name:
             name = "emoji_" + str(len(guild.emojis))
         print(name, url)
-        resp = await Request(url, aio=True)
+        resp = await Request(url, timeout=12, aio=True)
         image = resp
         if len(image) > 67108864:
             await fut
@@ -513,22 +504,14 @@ async def get_image(bot, message, args, argv, ext="png"):
     url = args.pop(0)
     url = await bot.followURL(url, best=True)
     if not isURL(url):
-        emojis = findEmojis(argv)
-        if not emojis:
-            emojis = findEmojis(url)
-            if not emojis:
+        urls = await bot.followImage(argv)
+        if not urls:
+            urls = await bot.followImage(url)
+            if not urls:
+                await fut
                 raise ArgumentError("Please input an image by URL or attachment.")
-            s = emojis[0]
-            value = url[url.index(s) + len(s):].strip()
-        else:
-            s = emojis[0]
-            value = argv[argv.index(s) + len(s):].strip()
-        s = s[3:]
-        i = s.index(":")
-        e_id = s[i + 1:s.rindex(">")]
-        url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
-    else:
-        value = " ".join(args).strip()
+        url = urls[0]
+    value = " ".join(args).strip()
     if not value:
         value = 2
     else:
@@ -793,17 +776,14 @@ class Resize(Command):
         url = args.pop(0)
         url = await bot.followURL(url, best=True)
         if not isURL(url):
-            emojis = findEmojis(argv) + findEmojis(url)
-            if not emojis:
-                raise ArgumentError("Please input an image by URL or attachment.")
-            s = emojis[0]
-            value = argv[argv.index(s) + len(s):].strip()
-            s = s[3:]
-            i = s.index(":")
-            e_id = s[i + 1:s.rindex(">")]
-            url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
-        else:
-            value = " ".join(args).strip()
+            urls = await bot.followImage(argv)
+            if not urls:
+                urls = await bot.followImage(url)
+                if not urls:
+                    await fut
+                    raise ArgumentError("Please input an image by URL or attachment.")
+            url = urls[0]
+        value = " ".join(args).strip()
         if not value:
             x = y = 0.5
             op = "auto"
@@ -861,14 +841,13 @@ class Magik(Command):
         url = args.pop(0)
         url = await bot.followURL(url)
         if not isURL(url):
-            emojis = findEmojis(argv) + findEmojis(url)
-            if not emojis:
-                raise ArgumentError("Please input an image by URL or attachment.")
-            s = emojis[0]
-            s = s[3:]
-            i = s.index(":")
-            e_id = s[i + 1:s.rindex(">")]
-            url = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
+            urls = await bot.followImage(argv)
+            if not urls:
+                urls = await bot.followImage(url)
+                if not urls:
+                    await fut
+                    raise ArgumentError("Please input an image by URL or attachment.")
+            url = urls[0]
         try:
             name = url[url.rindex("/") + 1:]
             if not name:
@@ -889,7 +868,7 @@ class Magik(Command):
         else:
             msg = None
         try:
-            resp = await Request("https://api.alexflipnote.dev/filter/magik?image=" + url, aio=True)
+            resp = await Request("https://api.alexflipnote.dev/filter/magik?image=" + url, timeout=32, aio=True)
         except:
             if msg is not None:
                 await bot.silentDelete(msg)
@@ -930,40 +909,17 @@ class Blend(Command):
         url2 = args.pop(0)
         url2 = await bot.followURL(url2, best=True)
         fromA = False
-        if not isURL(url1):
-            emojis = findEmojis(argv)
-            if not emojis:
-                emojis = findEmojis(url1)
-                if not emojis:
+        if not isURL(url1) or not isURL(url2):
+            urls = await bot.followImage(argv)
+            if not urls:
+                urls = await bot.followImage(url)
+                if not urls:
                     await fut
                     raise ArgumentError("Please input an image by URL or attachment.")
-                s = emojis[0]
-                argv = url1[url1.index(s) + len(s):].strip()
-            else:
-                s = emojis[0]
-                argv = argv[argv.index(s) + len(s):].strip()
-            s = s[3:]
-            i = s.index(":")
-            e_id = s[i + 1:s.rindex(">")]
-            url1 = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
-            fromA = True
-        if not isURL(url2):
-            emojis = findEmojis(argv)
-            if not emojis:
-                emojis = findEmojis(url2)
-                if not emojis:
-                    await fut
-                    raise ArgumentError("Please input an image by URL or attachment.")
-                s = emojis[0]
-                argv = url2[url2.index(s) + len(s):].strip()
-            else:
-                s = emojis[0]
-                argv = argv[argv.index(s) + len(s):].strip()
-            s = s[3:]
-            i = s.index(":")
-            e_id = s[i + 1:s.rindex(">")]
-            url1 = "https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1"
-            fromA = True
+            if not isURL(url1):
+                url1 = urls.pop(0)
+            if not isURL(url2):
+                url2 = urls.pop(0)
         if fromA:
             value = argv
         else:

@@ -187,7 +187,7 @@ class UpdateExec(Database):
             for c_id in self.data:
                 create_task(self.sendDeleteID(c_id, embed=emb))
 
-    def prepare_string(s):
+    def prepare_string(self, s):
         if type(s) is not str:
             s = str(s)
         if s:

@@ -174,6 +174,8 @@ bestURL = lambda obj: obj if type(obj) is str else (strURL(obj.avatar_url) if ge
 
 emojiFind = re.compile("<.?:[^<>:]+:[0-9]+>")
 findEmojis = lambda s: re.findall(emojiFind, s)
+userFind = re.compile("<@!?[0-9]+>")
+findUsers = lambda s: re.findall(userFind, s)
 
 def strMessage(message, limit=1024, username=False):
     c = message.content

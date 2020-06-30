@@ -160,11 +160,6 @@ def ensure_url(url):
 class CustomAudio(discord.AudioSource):
     
     length = round(SAMPLE_RATE / 25)
-    # empty = numpy.zeros(length >> 1, float)
-    # emptybuff = numpy.zeros(length, numpy.uint16).tobytes()
-    # filt = signal.butter(1, 0.125, btype="low", output="sos")
-    # #fff = numpy.abs(numpy.fft.fftfreq(SAMPLE_RATE / 50, 1/SAMPLE_RATE))[:ceil(SAMPLE_RATE / 100 + 1)]
-    # static = lambda self, *args: numpy.random.rand(self.length) * 65536 - 32768
     emptyopus = b"\xfc\xff\xfe"
     defaults = {
         "volume": 1,
@@ -847,7 +842,7 @@ def org2xm(org, dat=None):
     return r_xm
 
 
-class PCMFile:
+class AudioFile:
     
     def __init__(self, fn):
         self.file = fn
@@ -870,12 +865,12 @@ class PCMFile:
             return
         self.stream = stream
         self.loading = True
-        cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "2", "-bufsize", "65536", "cache/" + self.file]
+        cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
         self.proc = None
         try:
             self.proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             fl = 0
-            while fl < 65536:
+            while fl < 4096:
                 if not self.proc.is_running():
                     if check_fmt:
                         try:
@@ -953,7 +948,9 @@ class PCMFile:
                 fl = 0
                 if self.buffered:
                     self.time = -inf
-            ft = 9000 / (math.log2(fl / 134217728 + 1) + 1)
+            ft = 9000 / (math.log2(fl / 16777216 + 1) + 1)
+            if ft > 43200:
+                ft = 43200
             if utc() - self.time > ft:
                 self.destroy()
 
@@ -961,7 +958,16 @@ class PCMFile:
         self.ensure_time()
         if self.proc is None:
             raise ProcessLookupError
-        return open("cache/" + self.file, "rb")
+        f = open("cache/" + self.file, "rb")
+        it = discord.oggparse.OggStream(f).iter_packets()
+        reader = freeClass(file=f, read=lambda: next(it), closed=False, advanced=False, is_opus=lambda: True)
+
+        def close():
+            reader.closed = True
+            reader.file.close()
+
+        reader.close = reader.cleanup = close
+        return reader
 
     def destroy(self):
         self.expired = True
@@ -997,34 +1003,39 @@ class PCMFile:
             auds.paused &= -3
         stats.position = pos
         if not isValid(stats.pitch * stats.speed):
-            raise OverflowError
-        args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "2"]
-        if pos:
-            arg = "-to" if auds.reverse else "-ss"
-            args += [arg, str(pos)]
-        args.append("-i")
-        if self.loaded:
-            buff = False
-            args.insert(1, "-nostdin")
-            args.append("cache/" + self.file)
-        else:
-            buff = True
-            args.append("pipe:0")
+            raise OverflowError("Speed setting out of range.")
         options = auds.construct_options(full=False)
-        args.extend(options)
-        args.extend(("-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "-bufsize", "8192", "pipe:1"))
-        key = auds.vc.guild.id
-        self.readers[key] = True
-        callback = lambda: self.readers.pop(key) if key in self.readers else None
-        if buff:
-            player = BufferedAudioReader(self, args, callback=callback)
+        if options or auds.reverse or pos:
+            args = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
+            if pos:
+                arg = "-to" if auds.reverse else "-ss"
+                args += [arg, str(pos)]
+            args.append("-i")
+            if self.loaded:
+                buff = False
+                args.insert(1, "-nostdin")
+                args.append("cache/" + self.file)
+            else:
+                buff = True
+                args.append("pipe:0")
+            if options:
+                options.extend(("-f", "opus", "-c:a", "libopus", "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "-bufsize", "8192"))
+                args.extend(options)
+            else:
+                args.extend(("-f", "opus", "-c:a", "copy"))
+            args.append("pipe:1")
+            key = auds.vc.guild.id
+            self.readers[key] = True
+            callback = lambda: self.readers.pop(key) if key in self.readers else None
+            if buff:
+                player = BufferedAudioReader(self, args, callback=callback)
+            else:
+                player = LoadedAudioReader(self, args, callback=callback)
+            return player.start()
         else:
-            player = LoadedAudioReader(self, args, callback=callback)
-        return player.start()
-        create_future_ex(player.run)
-        return player
+            return self.open()
 
-    duration = lambda self: self.dur if getattr(self, "dur", None) is not None else setDict(self.__dict__, "dur", os.path.getsize("cache/" + self.file) / 48000 / 4 if self.loaded else getDuration(self.stream), ignore=True)
+    duration = lambda self: self.dur if getattr(self, "dur", None) is not None else setDict(self.__dict__, "dur", getDuration("cache/" + self.file) if self.loaded else getDuration(self.stream), ignore=True)
 
 
 class LoadedAudioReader(discord.AudioSource):
@@ -1470,7 +1481,6 @@ class AudioDownloader:
                                         dur = None
                                     url = entry.get("webpage_url", entry.get("url", entry["id"]))
                                     temp = {
-                                        # "hash": shash(entry["url"]),
                                         "name": title,
                                         "url": url,
                                         "duration": dur,
@@ -1489,15 +1499,12 @@ class AudioDownloader:
                     else:
                         dur = None
                     temp = {
-                        # "hash": shash(resp["webpage_url"]),
                         "name": resp["title"],
                         "url": resp["webpage_url"],
                         "duration": dur,
                         "stream": getBestAudio(resp),
                         "icon": getBestIcon(resp),
                     }
-                    # if dur is None:
-                    #     temp["duration"] = getDuration(temp["stream"])
                     output.append(freeClass(temp))
             return output
         except:
@@ -1554,7 +1561,7 @@ class AudioDownloader:
             stream = setDict(data[0], "stream", data[0].url)
             icon = setDict(data[0], "icon", data[0].url)
         h = shash(entry["url"])
-        fn = h + ".pcm"
+        fn = h + ".opus"
         if fn in self.cache or not download:
             entry["stream"] = stream
             entry["icon"] = icon
@@ -1570,7 +1577,7 @@ class AudioDownloader:
                 f.ensure_time()
             return f
         try:
-            self.cache[fn] = f = PCMFile(fn)
+            self.cache[fn] = f = AudioFile(fn)
             f.load(stream, check_fmt=entry.get("duration") is None)
             dur = entry.get("duration", None)
             f.assign.append(entry)
@@ -1605,7 +1612,7 @@ class AudioDownloader:
         if dur > 960:
             dur = 960
         br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
-        args += ["-ar", "48000", "-b:a", str(br), "-fs", str(fs), fn]
+        args.extend(("-ar", "48000", "-b:a", str(br), "-fs", str(fs), fn))
         try:
             subprocess.check_output(args)
         except subprocess.CalledProcessError:
@@ -1630,12 +1637,10 @@ class AudioDownloader:
             time.sleep(0.1)
         if item in self.searched:
             if utc() - self.searched[item].t < 18000:
-                # self.searched[item].t = utc()
                 it = self.searched[item].data[0]
                 i.name = it.name
                 i.duration = it.duration
                 i.url = it.url
-                # i.hash = gethash(it)
                 return True
             else:
                 self.searched.pop(item)
@@ -1662,7 +1667,6 @@ class AudioDownloader:
             i.name = it.name
             i.duration = it.get("duration")
             i.url = it.url
-            # sethash(i)
             self.requests = max(self.requests - 1, 0)
         except:
             self.requests = max(self.requests - 1, 0)
@@ -3294,7 +3298,7 @@ class Download(Command):
                     fmt = spl[-1]
                     if fmt.startswith("."):
                         fmt = fmt[1:]
-                    if fmt not in ("mp3", "ogg", "webm", "wav"):
+                    if fmt not in ("mp3", "ogg", "opus", "m4a", "webm", "wav"):
                         fmt = "ogg"
                     else:
                         argv = " ".join(spl[:-1])

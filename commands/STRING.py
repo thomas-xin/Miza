@@ -29,7 +29,7 @@ class PapagoTrans:
             "X-Naver-Client-Secret": self.secret,
         }
         print(url, headers)
-        resp = Request(url, headers=headers)
+        resp = Request(url, headers=headers, timeout=16)
         r = json.loads(resp)
         t = r["message"]["result"]["translatedText"]
         output = self.PapagoOutput(t)
@@ -312,7 +312,7 @@ class UrbanDictionary(Command):
             + argv.replace(" ", "%20")
         )
         fut = create_task(channel.trigger_typing())
-        s = await Request(url, headers=self.header, aio=True)
+        s = await Request(url, headers=self.header, timeout=16, aio=True)
         try:
             d = json.loads(s)
         except:
@@ -340,7 +340,7 @@ class UrbanDictionary(Command):
         else:
             output = (
                 "```ini\n[" + noHighlight(argv) + "]\n"
-                + l[0].get("definition", "") + "```"
+                + clrHighlight(l[0].get("definition", "")).replace("#", "♯") + "```"
             )
         await fut
         return output
