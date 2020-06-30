@@ -85,6 +85,9 @@ special_colours = {
 
 def plt_special(d):
     [plt.bar(list(range(-len(i[1]), 0)), i[1], color=special_colours.get(i[0], "k"), label=i[0]) for i in reversed(d.items())]
+    plt.title("Recent Discord Activity")
+    plt.xlabel("Time (Hours)")
+    plt.ylabel("Action Count")
     return plt
 
 def plotArgs(args):
