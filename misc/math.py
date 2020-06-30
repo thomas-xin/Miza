@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
 
+plt.rcParams["figure.figsize"] = (6.4, 4.8)
+
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
 
 
@@ -84,10 +86,12 @@ special_colours = {
 }
 
 def plt_special(d):
+    plt.rcParams["figure.figsize"] = (16, 5)
     [plt.bar(list(range(-len(i[1]), 0)), i[1], color=special_colours.get(i[0], "k"), label=i[0]) for i in reversed(d.items())]
     plt.title("Recent Discord Activity")
     plt.xlabel("Time (Hours)")
     plt.ylabel("Action Count")
+    plt.legend(loc="upper left")
     return plt
 
 def plotArgs(args):
@@ -119,6 +123,7 @@ def plot_implicit(*args, **kwargs):
     return plotter.plot_implicit(*plotArgs(args), show=False, **kwargs)
 
 def plot_array(*args, **kwargs):
+    plt.rcParams["figure.figsize"] = (6.4, 4.8)
     for arr, c in zip(args, colours):
         plt.plot(list(range(len(arr))), arr, c, **kwargs)
     return plt
@@ -417,6 +422,7 @@ while True:
                 locked = False
         resp = evalSym(*args)
         if isinstance(resp[0], Plot):
+            plt.rcParams["figure.figsize"] = (6.4, 4.8)
             ts = round(time.time() * 1000)
             name = str(ts) + ".png"
             fn = "cache/" + name
@@ -425,6 +431,7 @@ while True:
             except FileNotFoundError:
                 fn = name
                 resp[0].save(fn)
+            plt.clf()
             s = "{'file':'" + fn + "'}\n"
         elif resp[0] == plt:
             ts = round(time.time() * 1000)
@@ -436,6 +443,7 @@ while True:
                 fn = name
                 plt.savefig(fn)
             plt.clf()
+            plt.rcParams["figure.figsize"] = (6.4, 4.8)
             s = "{'file':'" + fn + "'}\n"
         else:
             s = repr([convAns(i) for i in resp])
