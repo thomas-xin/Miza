@@ -80,7 +80,7 @@ special_colours = {
     "message": "b",
     "typing": "g",
     "command": "r",
-    "misc": "k",
+    "misc": "m",
 }
 
 def plt_special(d):
