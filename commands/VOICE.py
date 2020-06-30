@@ -1512,7 +1512,6 @@ class AudioDownloader:
             time.sleep(0.1)
         if item in self.searched:
             if utc() - self.searched[item].t < 18000:
-                # self.searched[item].t = utc()
                 return self.searched[item].data
             else:
                 self.searched.pop(item)
@@ -2456,7 +2455,7 @@ class Dump(Command):
             else:
                 url = verifyURL(argv)
             url = await bot.followURL(url)
-            s = await create_future(Request, url)
+            s = await Request(url, aio=True)
             s = s[s.index(b"{"):]
             if s[-4:] == b"\n```":
                 s = s[:-4]
@@ -3116,7 +3115,7 @@ def extract_lyrics(s):
     return output
 
 
-def get_lyrics(item):
+async def get_lyrics(item):
     url = "https://api.genius.com/search"
     for i in range(2):
         header = {"Authorization": "Bearer " + genius_key}
@@ -3125,8 +3124,8 @@ def get_lyrics(item):
         else:
             search = "".join(shuffle(item.split()))
         data = {"q": search}
-        resp = Request(url, data=data, headers=header)
-        rdata = json.loads(resp)
+        resp = await Request(url, data=data, headers=header, aio=True)
+        rdata = await create_future(json.loads, resp)
         hits = rdata["response"]["hits"]
         name = None
         path = None
@@ -3139,9 +3138,9 @@ def get_lyrics(item):
                 print(traceback.format_exc())
         if path and name:
             s = "https://genius.com" + path
-            page = Request(s, headers=header, decode=True)
+            page = await Request(s, headers=header, decode=True, aio=True)
             text = page
-            html = BeautifulSoup(text, "html.parser")
+            html = await create_future(BeautifulSoup, text, "html.parser")
             lyricobj = html.find('div', class_='lyrics')
             if lyricobj is not None:
                 lyrics = lyricobj.get_text().strip()
@@ -3207,7 +3206,7 @@ class Lyrics(Command):
             item = verifySearch(to_alphanumeric(search))
             if not item:
                 item = search
-        name, lyrics = await create_future(get_lyrics, item)
+        name, lyrics = await get_lyrics(item)
         text = clrHighlight(lyrics.strip()).replace("#", "♯")
         msg = "Lyrics for **" + discord.utils.escape_markdown(name) + "**:"
         s = msg + "```ini\n" + text + "```"

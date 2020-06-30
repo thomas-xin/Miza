@@ -1,4 +1,4 @@
-import os, sys, subprocess, psutil, asyncio, discord, json, pytz, requests, inspect, importlib
+import os, sys, subprocess, psutil, asyncio, discord, json, pytz, requests, aiohttp, inspect, importlib
 import urllib.request, urllib.parse, concurrent.futures
 
 
@@ -358,33 +358,6 @@ def is_image(url):
     return IMAGE_FORMS.get(url)
 
 
-class AutoRequest:
-
-    def __call__(self, url, headers={}, data=None, raw=False, timeout=8, bypass=True, decode=False):
-        if bypass and "user-agent" not in headers:
-            headers["user-agent"] = "Mozilla/5." + str(xrand(1, 10))
-        resp = requests.get(url, headers=headers, data=data, stream=True, timeout=8)
-        if resp.status_code >= 400:
-            raise ConnectionError("Error " + str(resp.status_code) + ": " + resp.text)
-        try:
-            if raw:
-                data = resp.raw.read()
-            else:
-                data = resp.content
-            resp.close()
-        except:
-            try:
-                resp.close()
-            except:
-                pass
-            raise
-        if decode:
-            data = data.decode("utf-8", "replace")
-        return data
-
-Request = AutoRequest()
-
-
 SUBS = freeClass(math=freeClass(procs=hlist(), busy=freeClass()), image=freeClass(procs=hlist(), busy=freeClass()))
 
 subCount = lambda: sum(1 for ptype in SUBS.values() for proc in ptype.procs if proc.is_running())
@@ -650,6 +623,43 @@ async def force_callback(fut, delay, func, *args, exc=False, **kwargs):
     except:
         if exc:
             raise
+
+
+class AutoRequest:
+
+    async def _init_(self):
+        self.session = aiohttp.ClientSession()
+        self.semaphore = asyncio.Semaphore(512)
+
+    async def aio_call(self, url, headers, data, decode):
+        async with self.semaphore:
+            async with self.session.get(url, headers=headers, data=data) as resp:
+                if resp.status >= 400:
+                    text = await resp.read()
+                    raise ConnectionError("Error " + str(resp.status) + ": " + text.decode("utf-8", "replace"))
+                data = await resp.read()
+                if decode:
+                    data = data.decode("utf-8", "replace")
+                return data
+
+    def __call__(self, url, headers={}, data=None, raw=False, timeout=8, bypass=True, decode=False, aio=False):
+        if bypass and "user-agent" not in headers:
+            headers["user-agent"] = "Mozilla/5." + str(xrand(1, 10))
+        if aio:
+            return create_task(asyncio.wait_for(self.aio_call(url, headers, data, decode), timeout=timeout))
+        with requests.get(url, headers=headers, data=data, stream=True, timeout=8) as resp:
+            if resp.status_code >= 400:
+                raise ConnectionError("Error " + str(resp.status_code) + ": " + resp.text)
+            if raw:
+                data = resp.raw.read()
+            else:
+                data = resp.content
+            if decode:
+                data = data.decode("utf-8", "replace")
+            return data
+
+Request = AutoRequest()
+create_task(Request._init_())
 
 
 TIMEZONES = {}

@@ -187,6 +187,13 @@ class UpdateExec(Database):
             for c_id in self.data:
                 create_task(self.sendDeleteID(c_id, embed=emb))
 
+    def prepare_string(s):
+        if type(s) is not str:
+            s = str(s)
+        if s:
+            return limStr("```py\n" + s + "```", 2000)
+        return "``` ```"
+
     async def _nocommand_(self, message, **void):
         bot = self.bot
         channel = message.channel
@@ -207,13 +214,10 @@ class UpdateExec(Database):
                     output = await create_future(self.procFunc, proc, channel, bot, priority=True)
                     if awaitable(output):
                         output = await output
-                    await channel.send(limStr("```py\n" + str(output) + "```", 2000))
+                    await channel.send(self.prepare_string(output))
                 except:
                     print(traceback.format_exc())
-                    await sendReact(channel, limStr(
-                        "```py\n" + traceback.format_exc().replace("```", "") + "```",
-                        2000,
-                    ), reacts="❎")
+                    await sendReact(channel, self.prepare_string(output), reacts="❎")
                 if output is not None:
                     bot._globals["output"] = output
                     bot._globals["_"] = output

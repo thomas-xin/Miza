@@ -367,7 +367,7 @@ class CreateEmoji(Command):
         if not name:
             name = "emoji_" + str(len(guild.emojis))
         print(name, url)
-        resp = await create_future(Request, url)
+        resp = await Request(url, aio=True)
         image = resp
         if len(image) > 67108864:
             await fut
@@ -889,7 +889,7 @@ class Magik(Command):
         else:
             msg = None
         try:
-            resp = await create_future(Request, "https://api.alexflipnote.dev/filter/magik?image=" + url)
+            resp = await Request("https://api.alexflipnote.dev/filter/magik?image=" + url, aio=True)
         except:
             if msg is not None:
                 await bot.silentDelete(msg)
@@ -1030,69 +1030,64 @@ class Cat(Command):
         self.buffer = deque()
         self.found = {}
         self.refilling = False
-        create_future_ex(self.refill_buffer, 128)
+        create_task(self.refill_buffer(128))
     
-    def fetch_one(self):
+    async def fetch_one(self):
         if not self.header or random.random() > 2 / 3:
             if random.random() > 2 / 3:
-                url = nekos.cat()
+                x = 0
+                url = await create_future(nekos.cat)
             else:
-                for _ in loop(8):
-                    resp = Request("https://api.alexflipnote.dev/cats")
-                    try:
-                        d = json.loads(resp)
-                    except:
-                        d = eval(resp, {}, eval_const)
-                    try:
-                        if type(d) is list:
-                            d = random.choice(d)
-                        url = d["file"]
-                        break
-                    except KeyError:
-                        pass
+                x = 1
         else:
-            for _ in loop(8):
-                resp = Request("https://api.thecatapi.com/v1/images/search")
-                try:
-                    d = json.loads(resp)
-                except:
-                    d = eval(resp, {}, eval_const)
-                try:
-                    if type(d) is list:
-                        d = random.choice(d)
-                    url = d["url"]
-                    break
-                except KeyError:
-                    pass
+            x = 2
+        if x:
+            if x == 1:
+                resp = await Request("https://api.alexflipnote.dev/cats", aio=True)
+            else:
+                resp = await Request("https://api.thecatapi.com/v1/images/search", aio=True)
+            try:
+                d = json.loads(resp)
+            except:
+                d = eval(resp, {}, eval_const)
+            if type(d) is list:
+                d = random.choice(d)
+            url = d["file" if x == 1 else "url"]
         return url
 
-    def refill_buffer(self, amount):
+    async def refill_buffer(self, amount):
         try:
             while len(self.buffer) < amount + 1:
-                url = self.fetch_one()
-                self.buffer.append(url)
+                futs = [create_task(self.fetch_one()) for _ in loop(8)]
+                out = deque()
+                for fut in futs:
+                    try:
+                        res = await fut
+                        out.append(res)
+                    except:
+                        print(traceback.format_exc())
+                self.buffer.extend(out)
                 time.sleep(0.25)
-            # print("Cat buffer refilled to " + str(len(self.buffer)))
         except:
             self.refilling = False
             raise
         self.refilling = False
 
-    def get_buffer(self, amount):
+    async def get_buffer(self, amount):
         if len(self.buffer) < amount + 1:
             if not self.refilling:
                 self.refilling = True
-                create_future_ex(self.refill_buffer, amount << 1)
+                create_task(self.refill_buffer(amount << 1))
             if len(self.found) >= 4096:
                 return random.choice(tuple(self.found))
             if not self.buffer:
-                return nekos.cat()
+                return await create_future(nekos.cat)
         url = self.buffer.popleft()
         self.found[url] = True
         return url
 
     async def __call__(self, channel, flags, **void):
-        url = await create_future(self.get_buffer, 64)
+        url = await self.get_buffer(64)
         if "v" in flags:
             text = "Pulled from " + url
             return text
@@ -1115,48 +1110,49 @@ class Dog(Command):
         self.buffer = deque()
         self.found = {}
         self.refilling = False
-        create_future_ex(self.refill_buffer, 128)
+        create_task(self.refill_buffer(128))
 
-    def fetch_one(self):
-        for _ in loop(8):
-            x = random.random() > 2 / 3
-            if x:
-                resp = Request("https://api.alexflipnote.dev/dogs")
-            else:
-                resp = Request("https://dog.ceo/api/breeds/image/random")
-            try:
-                d = json.loads(resp)
-            except:
-                d = eval(resp, {}, eval_const)
-            try:
-                if type(d) is list:
-                    d = random.choice(d)
-                url = d["file" if x else "message"]
-                break
-            except KeyError:
-                pass
+    async def fetch_one(self):
+        x = random.random() > 2 / 3
+        if x:
+            resp = await Request("https://api.alexflipnote.dev/dogs", aio=True)
+        else:
+            resp = await Request("https://dog.ceo/api/breeds/image/random", aio=True)
+        try:
+            d = json.loads(resp)
+        except:
+            d = eval(resp, {}, eval_const)
+        if type(d) is list:
+            d = random.choice(d)
+        url = d["file" if x else "message"]
         url = url.replace("\\", "/")
         while "///" in url:
             url = url.replace("///", "//")
         return url
 
-    def refill_buffer(self, amount):
+    async def refill_buffer(self, amount):
         try:
             while len(self.buffer) < amount + 1:
-                url = self.fetch_one()
-                self.buffer.append(url)
+                futs = [create_task(self.fetch_one()) for _ in loop(8)]
+                out = deque()
+                for fut in futs:
+                    try:
+                        res = await fut
+                        out.append(res)
+                    except:
+                        print(traceback.format_exc())
+                self.buffer.extend(out)
                 time.sleep(0.25)
-            # print("Dog buffer refilled to " + str(len(self.buffer)))
         except:
             self.refilling = False
             raise
         self.refilling = False
 
-    def get_buffer(self, amount):
+    async def get_buffer(self, amount):
         if len(self.buffer) < amount + 1:
             if not self.refilling:
                 self.refilling = True
-                create_future_ex(self.refill_buffer, amount << 1)
+                create_task(self.refill_buffer(amount << 1))
             if not self.buffer:
                 return random.choice(tuple(self.found))
         url = self.buffer.popleft()
@@ -1164,7 +1160,7 @@ class Dog(Command):
         return url
 
     async def __call__(self, channel, flags, **void):
-        url = await create_future(self.get_buffer, 64)
+        url = await self.get_buffer(64)
         if "v" in flags:
             text = "Pulled from " + url
             return text
@@ -1194,7 +1190,6 @@ class _8Ball(Command):
                 url = self.fetch_one()
                 self.buffer.append(url)
                 time.sleep(0.25)
-            # print("8ball buffer refilled to " + str(len(self.buffer)))
         except:
             self.refilling = False
             raise
@@ -1212,7 +1207,7 @@ class _8Ball(Command):
         return url
 
     async def __call__(self, channel, **void):
-        url = await create_future(self.get_buffer, 64)
+        url = self.get_buffer(64)
         emb = discord.Embed(
             url=url,
             colour=randColour(),

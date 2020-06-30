@@ -910,7 +910,7 @@ class UpdateDeviantArt(Database):
                     req = url + str(i)
                     # print(req)
                     attempts += 1
-                    resp = await create_future(Request, req)
+                    resp = await Request(req, aio=True)
                     try:
                         d = json.loads(resp)
                     except:

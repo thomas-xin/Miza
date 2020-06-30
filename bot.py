@@ -1029,7 +1029,7 @@ class Bot:
             self.ip = ip
 
     async def getIP(self):
-        resp = await create_future(Request, "https://api.ipify.org", decode=True, priority=True)
+        resp = await Request("https://api.ipify.org", decode=True, aio=True)
         self.updateIP(resp)
 
     def getActive(self):

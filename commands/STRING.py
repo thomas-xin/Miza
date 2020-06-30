@@ -312,7 +312,7 @@ class UrbanDictionary(Command):
             + argv.replace(" ", "%20")
         )
         fut = create_task(channel.trigger_typing())
-        s = await create_future(Request, url, headers=self.header)
+        s = await Request(url, headers=self.header, aio=True)
         try:
             d = json.loads(s)
         except:

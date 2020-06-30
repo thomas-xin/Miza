@@ -80,7 +80,7 @@ def shuffle(it):
         random.shuffle(it)
         return it
     elif type(it) is dict:
-        ir = sorted(it, key=lambda x: random.random())
+        ir = shuffle(list(it))
         new = {}
         for i in ir:
             new[i] = it[i]
@@ -124,6 +124,7 @@ def reverse(it):
         temp = it.reverse()
         it.data = temp.data
         it.offs = temp.offs
+        it.chash = None
         del temp
         return it
     else:
@@ -152,6 +153,7 @@ def sort(it, key=None, reverse=False):
         return deque(it)
     elif isinstance(it, hlist):
         it.__init__(sorted(it, key=key, reverse=reverse))
+        it.chash = None
         return it
     else:
         try:
