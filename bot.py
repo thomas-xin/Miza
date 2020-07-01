@@ -1699,7 +1699,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                         await asyncio.sleep(0.5)
                                 elif type(response) is dict or isinstance(response, freeClass):
                                     if "file" in response:
-                                        sent = await sendFile(channel, **response)
+                                        sent = await sendFile(channel, response.get("content", ""), **response)
                                     else:
                                         sent = await channel.send(**response)
                                 else:

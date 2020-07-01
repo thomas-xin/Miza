@@ -764,7 +764,7 @@ class Activity(Command):
     usage = "<user>"
     rate_limit = 1
 
-    async def __call__(self, user, argv, bot, **void):
+    async def __call__(self, guild, user, argv, bot, **void):
         if argv:
             u_id = verifyID(argv)
             try:
@@ -774,7 +774,6 @@ class Activity(Command):
                     user = await bot.fetch_member_ex(u_id, guild)
                 except LookupError:
                     user = freeClass(id=u_id)
-        fut = create_task(channel.send(embed=emb))
         data = {i: bot.database.users.getEvents(user.id, i) for i in ("message", "typing", "command", "reaction", "misc")}
         resp = await bot.solveMath("eval(\"plt_special(" + repr(data) + ")\")", guild, 0, 1, authorize=True)
         fn = resp["file"]
