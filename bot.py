@@ -329,11 +329,11 @@ class Bot:
             else:
                 guilds = [guild]
         member = None
-        for i, guild in enumerate(guilds):
+        for i, guild in enumerate(guilds, 1):
             member = guild.get_member(u_id)
             if member is not None:
                 break
-            if not 1 + i & 8191:
+            if not i & 4095:
                 await asyncio.sleep(0.2)
         if member is None:
             raise LookupError("Unable to find member data.")
@@ -633,10 +633,10 @@ class Bot:
         self.cache.channels.update(client._connection._private_channels)
 
     def cacheFromGuilds(self):
-        for i, guild in enumerate(client.guilds):
+        for i, guild in enumerate(client.guilds, 1):
             self.cache.channels.update(guild._channels)
             self.cache.roles.update(guild._roles)
-            if not 1 + i & 64:
+            if not i & 64:
                 time.sleep(1)
 
     def getPrefix(self, guild):
@@ -1817,6 +1817,15 @@ async def on_ready():
         if not hasattr(bot, "started"):
             bot.started = True
             print("Update loops initiated.")
+            while bot.modload:
+                await create_future(bot.modload.popleft().result, priority=True)
+            bot.executor.shutdown(wait=False)
+            for u in bot.database.values():
+                for f in dir(u):
+                    if f.startswith("_") and f[-1] == "_" and f[1] != "_":
+                        func = getattr(u, f, None)
+                        if callable(func):
+                            bot.events.append(f, func)
             create_task(slowLoop())
             create_task(fastLoop())
             await bot.fetch_user(bot.deleted_user)
@@ -1829,16 +1838,6 @@ async def on_ready():
                 await seen(client.user, event="misc")
                 f = await create_future(open, "misc/init.tmp", "wb", priority=True)
                 create_future_ex(f.close)
-            while bot.modload:
-                await create_future(bot.modload.popleft().result, priority=True)
-            bot.executor.shutdown(wait=False)
-            for u in bot.database.values():
-                for f in dir(u):
-                    # print(f)
-                    if f.startswith("_") and f[-1] == "_" and f[1] != "_":
-                        func = getattr(u, f, None)
-                        if callable(func):
-                            bot.events.append(f, func)
             await bot.event("_ready_", bot=bot)
             print(bot.events)
             print("Initialization complete.")

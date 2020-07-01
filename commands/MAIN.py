@@ -650,12 +650,12 @@ class Info(Command):
             try:
                 if is_self:
                     c = {}
-                    for i, v in enumerate(tuple(bot.data.users.values())):
+                    for i, v in enumerate(tuple(bot.data.users.values()), 1):
                         try:
                             addDict(c, v["commands"])
                         except KeyError:
                             pass
-                        if not i + 1 & 8191:
+                        if not i & 8191:
                             await asyncio.sleep(0.2)
                 else:
                     c = bot.data.users[u.id]["commands"]
@@ -795,6 +795,7 @@ class Status(Command):
             shards = 1
         size = bot.codeSize
         stats = bot.currState
+        cache = await create_future(os.listdir, "cache/")
         return (
             "```ini"
             + "\nLoaded users: " + sbHighlight(max(len(client.users), len(bot.cache.users)))
@@ -807,7 +808,7 @@ class Status(Command):
             
             + ".\nConnected voice channels: " + sbHighlight(len(client.voice_clients))
             
-            + ".\nCached files: " + sbHighlight(len(os.listdir("cache/")))
+            + ".\nCached files: " + sbHighlight(len(cache))
             
             + ".\nCode size: " + sbHighlight(size[0]) + " bytes"
             + ", " + sbHighlight(size[1]) + " lines"
@@ -1154,7 +1155,7 @@ class UpdateReminders(Database):
                     ch = await self.bot.fetch_sendable(u_id)
                     rems = setDict(self.data, u_id, [])
                     pops = {}
-                    for i, x in enumerate(reversed(rems)):
+                    for i, x in enumerate(reversed(rems), 1):
                         if x.get("u_id", None) == user.id:
                             emb = discord.Embed(description=x["msg"])
                             try:
@@ -1163,7 +1164,7 @@ class UpdateReminders(Database):
                                 u = freeClass(x)
                             emb.set_author(name=u.name, url=bestURL(u), icon_url=bestURL(u))
                             self.bot.embedSender(ch, emb)
-                            pops[len(rems) - i - 1] = True
+                            pops[len(rems) - i] = True
                         elif isValid(x["t"]):
                             break
                     it = [rems[i] for i in range(len(rems)) if i not in pops]
@@ -1272,12 +1273,11 @@ class UpdateMessageCount(Database):
     async def getUserMessageCount(self, guild):
 
         async def getChannelHistory(channel, returns):
+            self.req += 1
             try:
                 messages = []
                 for i in range(16):
-                    history = channel.history(
-                        limit=None,
-                    )
+                    history = channel.history(limit=None)
                     print(history)
                     try:
                         messages = await history.flatten()
@@ -1293,6 +1293,7 @@ class UpdateMessageCount(Database):
                 print(channel.name)
                 print(traceback.format_exc())
                 returns[0] = []
+            self.req -= 1
 
         year = datetime.timedelta(seconds=31556925.216)
         oneyear = utc_dt() - guild.created_at < year
@@ -1340,6 +1341,7 @@ class UpdateMessageCount(Database):
 
     def __load__(self):
         self.scanned = False
+        self.req = 0
 
     async def __call__(self):
         if self.scanned:
@@ -1353,9 +1355,11 @@ class UpdateMessageCount(Database):
                 oneyear = utc_dt() - guild.created_at < year
                 if guild.member_count < 512 or oneyear:
                     self.startCalculate(guild)
-                if not i & 63:
-                    await asyncio.sleep(20)
-                i += 1
+                    while self.req > 32:
+                        await asyncio.sleep(5)
+                    if not i & 7:
+                        await asyncio.sleep(60)
+                    i += 1
         self.scanned = -1
 
     async def _send_(self, message, **void):
@@ -1403,7 +1407,7 @@ class UpdateUsers(Database):
             data.pop(hour)
 
     def sendEvent(self, u_id, event, count=1):
-        print(self.bot.cache.users.get(u_id), event, count)
+        # print(self.bot.cache.users.get(u_id), event, count)
         data = setDict(setDict(self.data, u_id, {}), "recent", {})
         hour = round(utc() // 3600)
         if data:

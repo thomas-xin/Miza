@@ -1155,8 +1155,10 @@ class UpdateMessageLogs(Database):
         if not self.searched:
             self.searched = True
             lim = floor(1048576 / len(self.bot.client.guilds))
-            for g in self.bot.client.guilds:
+            for i, g in enumerate(self.bot.client.guilds, 1):
                 create_task(self.cacheGuild(g, lim=lim))
+                if not i & 7:
+                    await asyncio.sleep(30)
 
     async def _edit_(self, before, after, **void):
         if not after.author.bot:

@@ -1173,7 +1173,14 @@ class AudioDownloader:
         if utc() - self.lastclear > 720:
             self.lastclear = utc()
             self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
-            self.spotify_headers = deque({"authorization": "Bearer " + json.loads(Request("https://open.spotify.com/get_access_token")[:512])["accessToken"]} for _ in loop(8))
+            self.spotify_headers = []
+            for _ in loop(8):
+                try:
+                    self.spotify_headers = deque({"authorization": "Bearer " + json.loads(Request("https://open.spotify.com/get_access_token")[:512])["accessToken"]} for _ in loop(8))
+                except:
+                    print(traceback.format_exc())
+                else:
+                    break
 
     def from_pytube(self, url):
         url = verifyURL(url)
@@ -3466,8 +3473,8 @@ class UpdateQueues(Database):
         auds.searching += 1
         searched = 0
         q = auds.queue
-        for i, e in enumerate(q):
-            if searched >= 32 or i >= 128:
+        for i, e in enumerate(q, 1):
+            if searched >= 32 or i > 128:
                 break
             if "research" in e:
                 try:
@@ -3484,7 +3491,7 @@ class UpdateQueues(Database):
                         pass
                     print(traceback.format_exc())
                     break
-            if not 1 + i & 7:
+            if not i & 7:
                 await asyncio.sleep(0.4)
         await asyncio.sleep(2)
         auds.searching = max(auds.searching - 1, 0)

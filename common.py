@@ -224,7 +224,7 @@ async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)],
     if not qlist:
         qlist = queries
     cache = [[[inf, None], [inf, None]] for _ in qlist]
-    for x, i in enumerate(shuffle(it)):
+    for x, i in enumerate(shuffle(it), 1):
         for c in ikey(i):
             if not c and i:
                 continue
@@ -237,7 +237,7 @@ async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)],
                 elif loose and qlist[a] in b:
                     if len(b) < cache[a][1][0]:
                         cache[a][1] = [len(b), i]
-        if not 1 + x & 1023:
+        if not x & 1023:
             await asyncio.sleep(0.1)
     for c in cache:
         if c[0][0] < inf:
@@ -790,6 +790,8 @@ class Database:
                     data = pickle.loads(s)
                 except pickle.UnpicklingError:
                     pass
+                if type(data) in (str, bytes):
+                    data = eval(data)
                 if data is None:
                     try:
                         data = eval(s)
@@ -830,14 +832,14 @@ class Database:
             if name:
                 if self.updated:
                     self.updated = False
-                    data = repr(self.data)
-                    if len(data) > 262144:
+                    s = repr(self.data)
+                    if len(s) > 262144:
                         print("Pickling " + name + "...")
-                        data = pickle.dumps(data)
+                        s = pickle.dumps(data)
                     else:
-                        data = data.encode("utf-8")
+                        s = s.encode("utf-8")
                     f = open(self.file, "wb")
-                    f.write(data)
+                    f.write(s)
                     f.close()
                     return True
         else:
