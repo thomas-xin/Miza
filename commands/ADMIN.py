@@ -329,6 +329,8 @@ class Ban(Command):
             content += str(len(bans)) + " users currently banned from " + str(guild).replace("`", "") + ":```"
         emb = discord.Embed(colour=discord.Colour(1))
         emb.description = content
+        url = bestURL(user)
+        emb.set_author(name=str(user), url=url, icon_url=url)
         for i, ban in enumerate(sorted(bans.values(), key=lambda x: x["t"])[pos:pos + page]):
             try:
                 user = await bot.fetch_user(ban["u"])
@@ -341,8 +343,6 @@ class Ban(Command):
                 )
             except:
                 print(traceback.format_exc())
-        url = bestURL(user)
-        emb.set_author(name=str(user), url=url, icon_url=url)
         more = len(bans) - pos - page
         if more > 0:
             emb.set_footer(
