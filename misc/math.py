@@ -81,12 +81,12 @@ class dice(sympy.Basic):
 special_colours = {
     "message": (0, 0, 1),
     "typing": (0, 1, 0),
-    "command": (1, 0, 0),
+    "command": (0, 1, 1),
     "reaction": (1, 1, 0),
-    "misc": (1, 0, 1),
+    "misc": (1, 0, 0),
 }
 
-def plt_special(d):
+def plt_special(d, user, **void):
     plt.rcParams["figure.figsize"] = (16, 5)
     temp = None
     for k, v in reversed(d.items()):
@@ -95,8 +95,8 @@ def plt_special(d):
         else:
             temp += numpy.array(v)
         plt.bar(list(range(-len(v) + 1, 1)), v, color=special_colours.get(k, "k"), label=k)
-    plt.bar(list(range(-len(temp) + 1, 1)), temp <= 0, color=(0, 0, 0))
-    plt.title("Recent Discord Activity")
+    plt.bar(list(range(-len(temp) + 1, 1)), (temp <= 0) * max(temp) / 512, color=(0, 0, 0))
+    plt.title("Recent Discord Activity for " + user)
     plt.xlabel("Time (Hours)")
     plt.ylabel("Action Count")
     plt.legend(loc="upper left")

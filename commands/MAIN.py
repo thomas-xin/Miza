@@ -749,7 +749,7 @@ class Info(Command):
         if flags.get("v", 0) > 1:
             fut = create_task(channel.send(embed=emb))
             data = {i: bot.database.users.getEvents(u.id, i) for i in ("message", "typing", "command", "reaction", "misc")}
-            resp = await bot.solveMath("eval(\"plt_special(" + repr(data) + ")\")", guild, 0, 1, authorize=True)
+            resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user=' + str(user) + ')\")", guild, 0, 1, authorize=True)
             fn = resp["file"]
             f = discord.File(fn)
             await fut
@@ -775,7 +775,7 @@ class Activity(Command):
                 except LookupError:
                     user = freeClass(id=u_id)
         data = {i: bot.database.users.getEvents(user.id, i) for i in ("message", "typing", "command", "reaction", "misc")}
-        resp = await bot.solveMath("eval(\"plt_special(" + repr(data) + ")\")", guild, 0, 1, authorize=True)
+        resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
         fn = resp["file"]
         f = discord.File(fn)
         return dict(file=f, filename=fn, best=True)
@@ -1400,18 +1400,18 @@ class UpdateUsers(Database):
                 return
             data.pop(hour)
 
-    def sendEvent(self, u_id, event):
+    def sendEvent(self, u_id, event, count=1):
         data = setDict(self.data.get(u_id, {}), "recent", {})
         hour = round(utc() // 3600)
         if data:
             self.clearEvents(data, hour - self.hours)
         try:
-            data[hour][event] += 1
+            data[hour][event] += count
         except KeyError:
             try:
-                data[hour][event] = 1
+                data[hour][event] = count
             except KeyError:
-                data[hour] = {event: 1}
+                data[hour] = {event: count}
 
     def getEvents(self, u_id, event=None):
         data = self.data.get(u_id, {}).get("recent")
@@ -1426,8 +1426,8 @@ class UpdateUsers(Database):
             out = [data.get(i, {}).get(event, 0) for i in range(start, hour + 1)]
         return out
 
-    async def _seen_(self, user, delay, event, **void):
-        self.sendEvent(user.id, event)
+    async def _seen_(self, user, delay, event, count=1, **void):
+        self.sendEvent(user.id, event, count=count)
         addDict(self.data, {user.id: {"last_seen": 0}})
         self.data[user.id]["last_seen"] = utc() + delay
 

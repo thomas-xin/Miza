@@ -1278,9 +1278,11 @@ class Bot:
             if embs:
                 try:
                     await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+                    create_task(seen(client.user, event="message", count=len(embs)))
                 except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                     w = await self.bot.ensureWebhook(channel, force=True)
                     await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+                    create_task(seen(client.user, event="message", count=len(embs)))
         except Exception as ex:
             print(traceback.format_exc())
             await sendReact(channel, "```py\n" + repr(ex) + "```", reacts="❎")
@@ -1873,7 +1875,7 @@ async def on_guild_join(guild):
     await channel.send(embed=emb)
 
     
-seen = lambda user, delay=0, event=None: bot.event("_seen_", user=user, delay=delay, event=event)
+seen = lambda user, delay=0, event=None, **kwargs: bot.event("_seen_", user=user, delay=delay, event=event, **kwargs)
 
 
 async def checkDelete(message, reaction, user):
