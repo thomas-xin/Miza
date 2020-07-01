@@ -45,6 +45,7 @@ class Bot:
             emojis={},
             messages={},
             deleted={},
+            members={},
         )
         self.events = multiDict()
         self.proc_call = {}
@@ -310,6 +311,14 @@ class Bot:
                 u_id = int(u_id)
             except (ValueError, TypeError):
                 raise TypeError("Invalid user identifier: " + str(u_id))
+        if find_others:
+            try:
+                member = self.cache.members[u_id].guild.get_member(u_id)
+                if member is None:
+                    raise LookupError
+                return member
+            except LookupError:
+                pass
         g = bot.cache.guilds
         if guild is None:
             guilds = list(bot.cache.guilds.values())
@@ -320,12 +329,16 @@ class Bot:
             else:
                 guilds = [guild]
         member = None
-        for guild in guilds:
+        for i, guild in enumerate(guilds):
             member = guild.get_member(u_id)
             if member is not None:
                 break
+            if not 1 + i & 8191:
+                await asyncio.sleep(0.2)
         if member is None:
             raise LookupError("Unable to find member data.")
+        self.cache.members[u_id] = member
+        self.limitCache("members")
         return member
 
     async def fetch_whuser(self, u_id, guild=None):
@@ -1206,7 +1219,7 @@ class Bot:
                         status = (discord.Status.online, discord.Status.dnd, discord.Status.idle)[self.status_iter]
                         try:
                             await client.change_presence(activity=activity, status=status)
-                            create_task(seen(client.user, event="misc"))
+                            await seen(client.user, event="misc")
                         except discord.HTTPException:
                             print(traceback.format_exc())
                             await asyncio.sleep(3)
@@ -1278,11 +1291,11 @@ class Bot:
             if embs:
                 try:
                     await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
-                    create_task(seen(client.user, event="message", count=len(embs)))
+                    await seen(client.user, event="message", count=len(embs))
                 except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                     w = await self.bot.ensureWebhook(channel, force=True)
                     await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
-                    create_task(seen(client.user, event="message", count=len(embs)))
+                    await seen(client.user, event="message", count=len(embs))
         except Exception as ex:
             print(traceback.format_exc())
             await sendReact(channel, "```py\n" + repr(ex) + "```", reacts="❎")
@@ -1443,9 +1456,7 @@ class Bot:
         ghost = True
 
 
-async def typing(channel):
-    await channel.trigger_typing()
-    create_task(seen(client.user, event="typing"))
+typing = lambda channel: create_task(channel.trigger_typing())
 
 
 def userQuery1(x):
@@ -1660,8 +1671,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             channel = guild.channel
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
-                            fut = create_task(typing(channel))
-                            create_task(seen(client.user, event="typing"))
+                            fut = typing(channel)
                         await bot.event("_command_", user=user, command=command)
                         timeout = getattr(command, "_timeout_", 1) * bot.timeout
                         if timeout >= inf:
@@ -1816,7 +1826,7 @@ async def on_ready():
                 b = await create_future(f.read, priority=True)
                 create_future_ex(f.close)
                 await client.user.edit(avatar=b)
-                create_task(seen(client.user, event="misc"))
+                await seen(client.user, event="misc")
                 f = await create_future(open, "misc/init.tmp", "wb", priority=True)
                 create_future_ex(f.close)
             while bot.modload:
@@ -1875,7 +1885,7 @@ async def on_guild_join(guild):
     await channel.send(embed=emb)
 
     
-seen = lambda user, delay=0, event=None, **kwargs: bot.event("_seen_", user=user, delay=delay, event=event, **kwargs)
+seen = lambda user, delay=0, event=None, **kwargs: create_task(bot.event("_seen_", user=user, delay=delay, event=event, **kwargs))
 
 
 async def checkDelete(message, reaction, user):
@@ -1910,7 +1920,7 @@ async def on_raw_reaction_add(payload):
         message = await bot.fetch_message(payload.message_id, channel=channel)
     except discord.NotFound:
         return
-    create_task(seen(user, event="reaction"))
+    await seen(user, event="reaction")
     if user.id != client.user.id:
         reaction = str(payload.emoji)
         await bot.reactCallback(message, reaction, user)
@@ -1925,7 +1935,7 @@ async def on_raw_reaction_remove(payload):
         message = await bot.fetch_message(payload.message_id, channel=channel)
     except discord.NotFound:
         return
-    create_task(seen(user, event="reaction"))
+    await seen(user, event="reaction")
     if user.id != client.user.id:
         reaction = str(payload.emoji)
         await bot.reactCallback(message, reaction, user)
@@ -1942,7 +1952,7 @@ async def on_voice_state_update(member, before, after):
                 await member.edit(mute=False, deafen=False)
             await bot.handleUpdate()
     if member.voice is not None and not member.voice.afk:
-        create_task(seen(member, event="misc"))
+        await seen(member, event="misc")
 
 
 async def handleMessage(message, edit=True):
@@ -1965,7 +1975,7 @@ async def handleMessage(message, edit=True):
 @client.event
 async def on_typing(channel, user, when):
     await bot.event("_typing_", channel=channel, user=user)
-    create_task(seen(user, delay=10, event="typing"))
+    await seen(user, delay=10, event="typing")
 
 
 @client.event
@@ -1974,7 +1984,7 @@ async def on_message(message):
     guild = message.guild
     if guild:
         create_task(bot.event("_send_", message=message))
-    create_task(seen(message.author, event="message"))
+    await seen(message.author, event="message")
     await bot.reactCallback(message, None, message.author)
     await handleMessage(message, False)
 
@@ -1982,20 +1992,22 @@ async def on_message(message):
 @client.event
 async def on_user_update(before, after):
     await bot.event("_user_update_", before=before, after=after)
-    create_task(seen(after, event="misc"))
+    await seen(after, event="misc")
 
 
 @client.event
 async def on_member_update(before, after):
     await bot.event("_member_update_", before=before, after=after)
     if str(before.status) != str(after.status) or str(before.activity) != str(after.activity):
-        create_task(seen(after, event="misc"))
+        member = await bot.fetch_member(after.id, find_others=True)
+        if member.guild == after.guild:
+            await seen(after, event="misc")
 
 
 @client.event
 async def on_member_join(member):
     await bot.event("_join_", user=member, guild=member.guild)
-    create_task(seen(member, event="misc"))
+    await seen(member, event="misc")
 
             
 @client.event

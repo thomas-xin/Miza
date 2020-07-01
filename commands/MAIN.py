@@ -1388,6 +1388,8 @@ class UpdateEnabled(Database):
     name = "enabled"
 
 
+EMPTY = {}
+
 class UpdateUsers(Database):
     name = "users"
     suspected = "users.json"
@@ -1401,7 +1403,8 @@ class UpdateUsers(Database):
             data.pop(hour)
 
     def sendEvent(self, u_id, event, count=1):
-        data = setDict(self.data.get(u_id, {}), "recent", {})
+        print(self.bot.cache.users.get(u_id), event, count)
+        data = setDict(setDict(self.data, u_id, {}), "recent", {})
         hour = round(utc() // 3600)
         if data:
             self.clearEvents(data, hour - self.hours)
@@ -1414,16 +1417,16 @@ class UpdateUsers(Database):
                 data[hour] = {event: count}
 
     def getEvents(self, u_id, event=None):
-        data = self.data.get(u_id, {}).get("recent")
+        data = self.data.get(u_id, EMPTY).get("recent")
         if not data:
-            return [0] * self.hours
+            return list(repeat(0, self.hours))
         hour = round(utc() // 3600)
         self.clearEvents(data, hour - self.hours)
         start = hour - self.hours
         if event is None:
-            out = [sum(data.get(i, {}).values()) for i in range(start, hour + 1)]
+            out = [sum(data.get(i, EMPTY).values()) for i in range(start, hour + 1)]
         else:
-            out = [data.get(i, {}).get(event, 0) for i in range(start, hour + 1)]
+            out = [data.get(i, EMPTY).get(event, 0) for i in range(start, hour + 1)]
         return out
 
     async def _seen_(self, user, delay, event, count=1, **void):
