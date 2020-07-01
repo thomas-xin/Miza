@@ -749,7 +749,7 @@ class Info(Command):
         if flags.get("v", 0) > 1:
             fut = create_task(channel.send(embed=emb))
             data = {i: bot.database.users.getEvents(u.id, i) for i in ("message", "typing", "command", "reaction", "misc")}
-            resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user=' + str(user) + ')\")", guild, 0, 1, authorize=True)
+            resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
             fn = resp["file"]
             f = discord.File(fn)
             await fut
