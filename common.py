@@ -835,7 +835,7 @@ class Database:
                     s = repr(self.data)
                     if len(s) > 262144:
                         print("Pickling " + name + "...")
-                        s = pickle.dumps(data)
+                        s = pickle.dumps(self.data)
                     else:
                         s = s.encode("utf-8")
                     f = open(self.file, "wb")
