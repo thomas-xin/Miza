@@ -649,7 +649,7 @@ class AutoRequest:
             headers["user-agent"] = "Mozilla/5." + str(xrand(1, 10))
         if aio:
             return create_task(asyncio.wait_for(self.aio_call(url, headers, data, decode), timeout=timeout))
-        with requests.get(url, headers=headers, data=data, stream=True, timeout=8) as resp:
+        with requests.get(url, headers=headers, data=data, stream=True, timeout=timeout) as resp:
             if resp.status_code >= 400:
                 raise ConnectionError("Error " + str(resp.status_code) + ": " + resp.text)
             if raw:

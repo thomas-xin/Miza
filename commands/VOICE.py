@@ -329,12 +329,14 @@ class CustomAudio(discord.AudioSource):
                     vc.play(self, after=self.update)
                 self.att = 0
             except:
-                print(traceback.format_exc())
                 if getattr(self, "att", 0) <= 0:
+                    print(traceback.format_exc())
+                    create_task(vc.disconnect())
                     self.att = utc()
                 elif utc() - self.att > 10:
                     self.dead = True
                     return
+                create_task(self.reconnect())
         if self.stats.stay:
             cnt = inf
         else:
@@ -737,8 +739,8 @@ class AudioQueue(hlist):
                             )
                             self.lastsent = utc()
                     self.loading = True
-                    source = ytdl.getStream(q[0])
                     try:
+                        source = ytdl.getStream(q[0])
                         auds.new(source)
                         self.loading = False
                         create_future_ex(auds.ensure_play)
@@ -960,7 +962,7 @@ class AudioFile:
             raise ProcessLookupError
         f = open("cache/" + self.file, "rb")
         it = discord.oggparse.OggStream(f).iter_packets()
-        reader = freeClass(file=f, read=lambda: next(it), closed=False, advanced=False, is_opus=lambda: True)
+        reader = freeClass(file=f, read=lambda: next(it), _read = f.read, closed=False, advanced=False, is_opus=lambda: True)
 
         def close():
             reader.closed = True
@@ -971,10 +973,11 @@ class AudioFile:
 
     def destroy(self):
         self.expired = True
-        try:
-            self.proc.kill()
-        except:
-            pass
+        if self.proc.is_running():
+            try:
+                self.proc.kill()
+            except:
+                pass
         for _ in loop(8):
             try:
                 os.remove("cache/" + self.file)
@@ -1028,12 +1031,13 @@ class AudioFile:
             self.readers[key] = True
             callback = lambda: self.readers.pop(key) if key in self.readers else None
             if buff:
+                while not self.buffered:
+                    time.sleep(0.1)
                 player = BufferedAudioReader(self, args, callback=callback)
             else:
                 player = LoadedAudioReader(self, args, callback=callback)
             return player.start()
-        else:
-            return self.open()
+        return self.open()
 
     duration = lambda self: self.dur if getattr(self, "dur", None) is not None else setDict(self.__dict__, "dur", getDuration("cache/" + self.file) if self.loaded else getDuration(self.stream), ignore=True)
 
@@ -1093,10 +1097,12 @@ class BufferedAudioReader(discord.AudioSource):
         return next(self.packet_iter)
 
     def run(self):
+        while not self.file.buffered:
+            time.sleep(0.1)
         while True:
             b = bytes()
             try:
-                b = self.stream.read(65536)
+                b = self.stream._read(65536)
                 if not b:
                     raise EOFError
                 self.proc.stdin.write(b)
@@ -2644,9 +2650,6 @@ class AudioSettings(Command):
                 ops.append("volume")
         s = ""
         for op in ops:
-            # if op not in "volume loop repeat shuffle quiet reset":
-            #     if not bot.isTrusted(guild.id):
-            #         raise PermissionError("Must be in a trusted server for targeted audio setting.")
             if type(op) is str and op in "loop repeat shuffle quiet stay" and not argv:
                 argv = str(not bot.database.playlists.audio[guild.id].stats[op])
             if disable:
@@ -2664,8 +2667,12 @@ class AudioSettings(Command):
                 orig = bool(orig)
             else:
                 origStats[op] = val
-            if auds.queue:# and op in "speed pitch pan bassboost reverb compressor chorus resample":
-                await create_future(auds.new, auds.file, auds.stats.position)
+            if auds.queue:
+                try:
+                    await asyncio.wait_for(create_future(auds.new, auds.file, auds.stats.position), timeout=12)
+                except (TimeoutError, asyncio.exceptions.TimeoutError, concurrent.futures._base.TimeoutError):
+                    await create_future(auds.stop)
+                    raise RuntimeError("Unable to adjust audio setting.")
             s += (
                 "\nChanged audio {" + str(op)
                 + "} setting from [" + str(orig)
@@ -3560,17 +3567,6 @@ class UpdateQueues(Database):
                 if not a & 15:
                     await asyncio.sleep(0.2)
                 a += 1
-            # t = utc()
-            # i = 1
-            # for path in os.listdir("cache"):
-            #     fn = "cache/" + path
-            #     if path.startswith("&"):
-            #         if t - os.path.getmtime(fn) > 3600:
-            #             os.remove(fn)
-            #     if not i & 1023:
-            #         await asyncio.sleep(0.2)
-            #         t = utc()
-            #     i += 1
             await asyncio.sleep(0.5)
             for item in tuple(ytdl.cache.values()):
                 await create_future(item.update)
@@ -3584,6 +3580,8 @@ class UpdateQueues(Database):
     def _destroy_(self, **void):
         for auds in self.audio.values():
             auds.kill()
+        for file in ytdl.cache.values():
+            file.destroy()
 
     def _ready_(self, bot, **void):
         ytdl.bot = bot

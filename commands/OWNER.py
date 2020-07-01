@@ -217,7 +217,7 @@ class UpdateExec(Database):
                     await channel.send(self.prepare_string(output))
                 except:
                     print(traceback.format_exc())
-                    await sendReact(channel, self.prepare_string(output), reacts="❎")
+                    await sendReact(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
                 if output is not None:
                     bot._globals["output"] = output
                     bot._globals["_"] = output

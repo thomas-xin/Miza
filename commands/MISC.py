@@ -68,19 +68,18 @@ try:
     douclub = DouClub(auth["knack_id"], auth["knack_secret"])
 except KeyError:
     douclub = freeClass(
-        search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to use Doukutsu Club.")'),
+        search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to search Doukutsu Club.")'),
         update=lambda: None
     )
-    print("WARNING: knack_id/knack_secret not found. Unable to use Doukutsu Club.")
+    print("WARNING: knack_id/knack_secret not found. Unable to search Doukutsu Club.")
 
 
-def searchForums(query):
-        
+async def searchForums(query):
     url = (
         "https://www.cavestory.org/forums/search/1/?q=" + query.replace(" ", "+")
         + "&t=post&c[child_nodes]=1&c[nodes][0]=33&o=date&g=1"
     )
-    s = urlOpen(url).read().decode("utf-8", "replace")
+    s = await Request(url, aio=True, timeout=16, decode=True)
     output = []
     i = 0
     while i < len(s):
@@ -127,7 +126,7 @@ class SheetPull:
         try:
             print("Pulling Spreadsheet...")
             url = self.url
-            text = Request(url, timeout=16, decode=True)
+            text = Request(url, timeout=32, decode=True)
             data = text.split("\r\n")
             columns = 0
             sdata = [[], utc()]
@@ -407,7 +406,7 @@ class CS_mod(Command):
 
     async def __call__(self, args, **void):
         argv = " ".join(args)
-        data = await create_future(searchForums, argv)
+        data = await searchForums(argv)
         data += await create_future(douclub.search, argv)
         if len(data):
             response = "Search results for **" + argv + "**:\n"
@@ -910,7 +909,7 @@ class UpdateDeviantArt(Database):
                     req = url + str(i)
                     # print(req)
                     attempts += 1
-                    resp = await Request(req, timeout=12, aio=True)
+                    resp = await Request(req, timeout=16, aio=True)
                     try:
                         d = json.loads(resp)
                     except:

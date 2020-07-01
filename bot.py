@@ -1206,6 +1206,7 @@ class Bot:
                         status = (discord.Status.online, discord.Status.dnd, discord.Status.idle)[self.status_iter]
                         try:
                             await client.change_presence(activity=activity, status=status)
+                            create_task(seen(client.user, event="misc"))
                         except discord.HTTPException:
                             print(traceback.format_exc())
                             await asyncio.sleep(3)
@@ -1329,7 +1330,7 @@ class Bot:
                 self.send = channel.send
                 self.history = channel.history
                 self.created_at = channel.created_at
-                self.trigger_typing = channel.trigger_typing
+                self.trigger_typing = lambda self: typing(self)
                 self.pins = channel.pins
 
             def fetch_message(self, id):
@@ -1438,6 +1439,11 @@ class Bot:
         clear_reactions = delete
         ack = delete
         ghost = True
+
+
+async def typing(channel):
+    await channel.trigger_typing()
+    create_task(seen(client.user, event="typing"))
 
 
 def userQuery1(x):
@@ -1652,7 +1658,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             channel = guild.channel
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
-                            fut = create_task(channel.trigger_typing())
+                            fut = create_task(typing(channel))
+                            create_task(seen(client.user, event="typing"))
                         await bot.event("_command_", user=user, command=command)
                         timeout = getattr(command, "_timeout_", 1) * bot.timeout
                         if timeout >= inf:
@@ -1671,7 +1678,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             name=alias,             # alias the command was called as
                             callback=processMessage,# function that called the command
                         ), timeout=timeout))
-                        create_task(force_callback(future, 0.9, channel.trigger_typing))
+                        create_task(force_callback(future, 0.9, typing, channel))
                         response = await future
                         if response is not None:
                             if fut is not None:
@@ -1691,7 +1698,10 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                         create_task(channel.send(r))
                                         await asyncio.sleep(0.5)
                                 elif type(response) is dict or isinstance(response, freeClass):
-                                    sent = await channel.send(**response)
+                                    if "file" in response:
+                                        sent = await sendFile(channel, **response)
+                                    else:
+                                        sent = await channel.send(**response)
                                 else:
                                     if type(response) is str and len(response) <= 2000:
                                         sent = await channel.send(response)
@@ -1704,7 +1714,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                         if len(response) <= guild.filesize_limit:
                                             b = io.BytesIO(response)
                                             f = discord.File(b, filename="message.txt")
-                                            await sendFile(channel, filemsg, f)
+                                            sent = await sendFile(channel, filemsg, f)
                                         else:
                                             raise OverflowError("Response too long for file upload.")
                                 if react and sent:
@@ -1804,6 +1814,7 @@ async def on_ready():
                 b = await create_future(f.read, priority=True)
                 create_future_ex(f.close)
                 await client.user.edit(avatar=b)
+                create_task(seen(client.user, event="misc"))
                 f = await create_future(open, "misc/init.tmp", "wb", priority=True)
                 create_future_ex(f.close)
             while bot.modload:
@@ -1897,9 +1908,9 @@ async def on_raw_reaction_add(payload):
         message = await bot.fetch_message(payload.message_id, channel=channel)
     except discord.NotFound:
         return
+    create_task(seen(user, event="reaction"))
     if user.id != client.user.id:
         reaction = str(payload.emoji)
-        create_task(seen(user, event="misc"))
         await bot.reactCallback(message, reaction, user)
         create_task(checkDelete(message, reaction, user))
 
@@ -1912,9 +1923,9 @@ async def on_raw_reaction_remove(payload):
         message = await bot.fetch_message(payload.message_id, channel=channel)
     except discord.NotFound:
         return
+    create_task(seen(user, event="reaction"))
     if user.id != client.user.id:
         reaction = str(payload.emoji)
-        create_task(seen(user, event="misc"))
         await bot.reactCallback(message, reaction, user)
         create_task(checkDelete(message, reaction, user))
 

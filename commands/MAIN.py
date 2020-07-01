@@ -374,10 +374,7 @@ class Avatar(Command):
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
-        # print(emb.to_dict())
-        return {
-            "embed": emb,
-        }
+        return dict(embed=emb)
 
     def getMimicData(self, p):
         url = strURL(p.url)
@@ -387,10 +384,7 @@ class Avatar(Command):
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
-        # print(emb.to_dict())
-        return {
-            "embed": emb,
-        }
+        return dict(embed=emb)
 
     async def __call__(self, argv, guild, bot, client, user, **void):
         g, guild = guild, None
@@ -522,10 +516,7 @@ class Info(Command):
                 emb.add_field(name="Average post length", value=str(round(pavg, 9)), inline=1)
         if top is not None:
             emb.add_field(name="Top users", value=top, inline=0)
-        # print(emb.to_dict())
-        return {
-            "embed": emb,
-        }
+        return dict(embed=emb)
 
     def getMimicData(self, p, flags={}):
         url = strURL(p.url)
@@ -562,10 +553,7 @@ class Info(Command):
             emb.add_field(name="Post count", value=str(pcnt), inline=1)
             if "v" in flags:
                 emb.add_field(name="Average post length", value=str(round(pavg, 9)), inline=1)
-        # print(emb.to_dict())
-        return {
-            "embed": emb,
-        }
+        return dict(embed=emb)
 
     async def __call__(self, argv, name, guild, channel, bot, client, user, flags, **void):
         member = True
@@ -760,14 +748,38 @@ class Info(Command):
             emb.add_field(name="Roles", value=role, inline=0)
         if flags.get("v", 0) > 1:
             fut = create_task(channel.send(embed=emb))
-            data = {i: bot.database.users.getEvents(u.id, i) for i in ("message", "typing", "command", "misc")}
+            data = {i: bot.database.users.getEvents(u.id, i) for i in ("message", "typing", "command", "reaction", "misc")}
             resp = await bot.solveMath("eval(\"plt_special(" + repr(data) + ")\")", guild, 0, 1, authorize=True)
             fn = resp["file"]
             f = discord.File(fn)
             await fut
-            await sendFile(channel, "", f, filename=fn, best=True)
-            return
+            return dict(file=f, filename=fn, best=True)
         return dict(embed=emb)
+
+
+class Activity(Command):
+    name = ["Recent", "Log"]
+    min_level = 0
+    description = "Shows recent Discord activity for the targeted user."
+    usage = "<user>"
+    rate_limit = 1
+
+    async def __call__(self, user, argv, bot, **void):
+        if argv:
+            u_id = verifyID(argv)
+            try:
+                user = await bot.fetch_user(u_id)
+            except (TypeError, discord.NotFound):
+                try:
+                    user = await bot.fetch_member_ex(u_id, guild)
+                except LookupError:
+                    user = freeClass(id=u_id)
+        fut = create_task(channel.send(embed=emb))
+        data = {i: bot.database.users.getEvents(user.id, i) for i in ("message", "typing", "command", "reaction", "misc")}
+        resp = await bot.solveMath("eval(\"plt_special(" + repr(data) + ")\")", guild, 0, 1, authorize=True)
+        fn = resp["file"]
+        f = discord.File(fn)
+        return dict(file=f, filename=fn, best=True)
 
 
 class Status(Command):
