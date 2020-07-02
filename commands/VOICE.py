@@ -369,7 +369,7 @@ class CustomAudio(discord.AudioSource):
         if m.voice is not None:
             if m.voice.deaf or m.voice.mute or m.voice.afk:
                 create_task(m.edit(mute=False, deafen=False))
-        if not (vc.is_connected() or self.bot.database.playlists.is_connecting(vc.id)):
+        if not (vc.is_connected() or self.bot.database.playlists.is_connecting(vc.guild.id)):
             create_task(self.reconnect())
         else:
             self.att = 0
@@ -464,10 +464,7 @@ class CustomAudio(discord.AudioSource):
                 options.append("aresample=" + str(SAMPLE_RATE))
             options.append("asetrate=" + str(SAMPLE_RATE * pitchscale))
         if chorus:
-            A = ""
-            B = ""
-            C = ""
-            D = ""
+            A = B = C = D = ""
             for i in range(ceil(chorus)):
                 neg = ((i & 1) << 1) - 1
                 i = 1 + i >> 1
@@ -487,11 +484,11 @@ class CustomAudio(discord.AudioSource):
                 D += str(round(depth, 3))
             b = 0.5 / sqrt(ceil(chorus + 1))
             options.append(
-                "\"chorus=0.5:" + str(round(b, 3)) + ":"
+                "chorus=0.5:" + str(round(b, 3)) + ":"
                 + A + ":"
                 + B + ":"
                 + C + ":"
-                + D + "\""
+                + D
             )
             options.append("volume=2")
         if stats.compressor:
@@ -2675,11 +2672,12 @@ class AudioSettings(Command):
             else:
                 origStats[op] = val
             if auds.queue:
-                try:
-                    await asyncio.wait_for(create_future(auds.new, auds.file, auds.stats.position), timeout=12)
-                except (TimeoutError, asyncio.exceptions.TimeoutError, concurrent.futures._base.TimeoutError):
-                    await create_future(auds.stop)
-                    raise RuntimeError("Unable to adjust audio setting.")
+                if type(op) is str and op not in "loop repeat shuffle quiet stay":
+                    try:
+                        await asyncio.wait_for(create_future(auds.new, auds.file, auds.stats.position), timeout=12)
+                    except (TimeoutError, asyncio.exceptions.TimeoutError, concurrent.futures._base.TimeoutError):
+                        await create_future(auds.stop)
+                        raise RuntimeError("Unable to adjust audio setting.")
             s += (
                 "\nChanged audio {" + str(op)
                 + "} setting from [" + str(orig)

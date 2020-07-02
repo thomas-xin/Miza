@@ -12,14 +12,17 @@ plt.rcParams["figure.figsize"] = (6.4, 4.8)
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
 
 
+def filePrint(*args, sep=" ", end="\n", prefix="", file="log.txt", **void):
+    f = open(file, "ab")
+    f.write((str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix)).encode("utf-8"))
+    f.close()
+
 def logging(func):
     def call(self, *args, file="log.txt", **kwargs):
         try:
             output = func(self, *args, **kwargs)
         except:
-            f = open(file, "ab")
-            f.write(traceback.format_exc().encode("utf-8"))
-            f.close()
+            filePrint(traceback.format_exc(), file=file)
             raise
         return output
     return call
@@ -87,15 +90,16 @@ special_colours = {
 }
 
 def plt_special(d, user, **void):
-    plt.rcParams["figure.figsize"] = (16, 5)
-    temp = None
-    for k, v in reversed(d.items()):
-        if temp is None:
-            temp = numpy.array(v)
-        else:
-            temp += numpy.array(v)
-        plt.bar(list(range(-len(v) + 1, 1)), v, color=special_colours.get(k, "k"), label=k)
-    plt.bar(list(range(-len(temp) + 1, 1)), (temp <= 0) * max(temp) / 512, color=(0, 0, 0))
+    plt.rcParams["figure.figsize"] = (24, 12)
+    temp = numpy.zeros(len(next(iter(d.values()))))
+    hours = 168
+    width = hours / len(temp)
+    domain = width * numpy.arange(-len(temp), 0)
+    for k, v in d.items():
+        # filePrint(k, v)
+        plt.bar(domain, v, bottom=temp, color=special_colours.get(k, "k"), edgecolor="black", width=width, label=k)
+        temp += numpy.array(v)
+    plt.bar(list(range(-hours, 0)), numpy.ones(hours) * max(temp) / 512, edgecolor="black", color="k")
     plt.title("Recent Discord Activity for " + user)
     plt.xlabel("Time (Hours)")
     plt.ylabel("Action Count")

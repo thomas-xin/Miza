@@ -8,14 +8,17 @@ from PIL import Image, ImageChops, ImageEnhance, ImageMath, ImageStat
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
 
+def filePrint(*args, sep=" ", end="\n", prefix="", file="log.txt", **void):
+    f = open(file, "ab")
+    f.write((str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix)).encode("utf-8"))
+    f.close()
+
 def logging(func):
     def call(self, *args, file="log.txt", **kwargs):
         try:
             output = func(self, *args, **kwargs)
         except:
-            f = open(file, "ab")
-            f.write(traceback.format_exc().encode("utf-8"))
-            f.close()
+            filePrint(traceback.format_exc(), file=file)
             raise
         return output
     return call

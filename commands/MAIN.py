@@ -748,7 +748,7 @@ class Info(Command):
             emb.add_field(name="Roles", value=role, inline=0)
         if flags.get("v", 0) > 1:
             fut = create_task(channel.send(embed=emb))
-            data = {i: bot.database.users.getEvents(u.id, i) for i in ("message", "typing", "command", "reaction", "misc")}
+            data = await create_future(bot.database.users.fetch_events, user.id, interval=3600)
             resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
             fn = resp["file"]
             f = discord.File(fn)
@@ -761,10 +761,11 @@ class Activity(Command):
     name = ["Recent", "Log"]
     min_level = 0
     description = "Shows recent Discord activity for the targeted user."
-    usage = "<user>"
+    usage = "<user> <verbose(?v)>"
+    flags="v"
     rate_limit = 1
 
-    async def __call__(self, guild, user, argv, bot, **void):
+    async def __call__(self, guild, user, argv, flags, bot, **void):
         if argv:
             u_id = verifyID(argv)
             try:
@@ -774,7 +775,7 @@ class Activity(Command):
                     user = await bot.fetch_member_ex(u_id, guild)
                 except LookupError:
                     user = freeClass(id=u_id)
-        data = {i: bot.database.users.getEvents(user.id, i) for i in ("message", "typing", "command", "reaction", "misc")}
+        data = await create_future(bot.database.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)))
         resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
         fn = resp["file"]
         f = discord.File(fn)
@@ -1399,19 +1400,21 @@ class UpdateUsers(Database):
     suspected = "users.json"
     user = True
     hours = 168
+    interval = 900
+    scale = 3600 // interval
 
-    def clearEvents(self, data, minimum):
+    def clear_events(self, data, minimum):
         for hour in tuple(data):
             if hour > minimum:
                 return
             data.pop(hour)
 
-    def sendEvent(self, u_id, event, count=1):
+    def send_event(self, u_id, event, count=1):
         # print(self.bot.cache.users.get(u_id), event, count)
         data = setDict(setDict(self.data, u_id, {}), "recent", {})
-        hour = round(utc() // 3600)
+        hour = roundMin(round(utc() // self.interval) / self.scale)
         if data:
-            self.clearEvents(data, hour - self.hours)
+            self.clear_events(data, hour - self.hours)
         try:
             data[hour][event] += count
         except KeyError:
@@ -1420,25 +1423,31 @@ class UpdateUsers(Database):
             except KeyError:
                 data[hour] = {event: count}
 
-    def getEvents(self, u_id, event=None):
+    fetch_events = lambda self, u_id, interval=3600: {i: self.get_events(u_id, interval=interval, event=i) for i in ("message", "typing", "command", "reaction", "misc")}
+
+    def get_events(self, u_id, interval=3600, event=None):
         data = self.data.get(u_id, EMPTY).get("recent")
         if not data:
-            return list(repeat(0, self.hours))
-        hour = round(utc() // 3600)
-        self.clearEvents(data, hour - self.hours)
+            return list(repeat(0, round(self.hours / self.interval * interval)))
+        hour = roundMin(round(utc() // self.interval) / self.scale)
+        print(hour)
+        self.clear_events(data, hour - self.hours)
         start = hour - self.hours
         if event is None:
-            out = [sum(data.get(i, EMPTY).values()) for i in range(start, hour + 1)]
+            out = [sum(data.get(i / self.scale + start, EMPTY).values()) for i in range(self.hours * self.scale)]
         else:
-            out = [data.get(i, EMPTY).get(event, 0) for i in range(start, hour + 1)]
+            out = [data.get(i / self.scale + start, EMPTY).get(event, 0) for i in range(self.hours * self.scale)]
+        if interval != self.interval:
+            factor = ceil(interval / self.interval)
+            out = [sum(out[i:i + factor]) for i in range(0, len(out), factor)]
         return out
 
     async def _seen_(self, user, delay, event, count=1, **void):
-        self.sendEvent(user.id, event, count=count)
+        self.send_event(user.id, event, count=count)
         addDict(self.data, {user.id: {"last_seen": 0}})
         self.data[user.id]["last_seen"] = utc() + delay
 
     async def _command_(self, user, command, **void):
-        self.sendEvent(user.id, "command")
+        self.send_event(user.id, "command")
         addDict(self.data, {user.id: {"commands": {str(command): 1}}})
         self.update()
