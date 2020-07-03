@@ -918,13 +918,13 @@ class Reminder(Command):
                 argv = argv[5:]
                 temp = argv.lower()
             spl = None
-            keywords = dict(self.keywords)
+            keywords = dict({k: None for k in self.keywords})
             for k in tuple(keywords):
                 try:
                     i = re.search(k, temp).end()
                     if not i:
                         raise ValueError
-                except ValueError:
+                except (ValueError, AttributeError):
                     keywords.pop(k)
                 else:
                     keywords[k] = i
