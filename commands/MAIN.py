@@ -355,7 +355,9 @@ class Loop(Command):
         ))
         for i in range(iters):
             loop = i < iters - 1
+            t = utc()
             delay = await callback(message, func, cb_argv=func2, loop=loop)
+            delay = delay + t - utc()
             if delay > 0:
                 await asyncio.sleep(delay)
 
