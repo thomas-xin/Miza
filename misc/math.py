@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sympy, time, sys, traceback, random, numpy
+import sympy, time, sys, traceback, random, numpy, collections
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
 import matplotlib.pyplot as plt
@@ -14,8 +14,10 @@ getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
 
 def filePrint(*args, sep=" ", end="\n", prefix="", file="log.txt", **void):
     f = open(file, "ab")
-    f.write((str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix)).encode("utf-8"))
+    s = (str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix)).encode("utf-8")
+    f.write(s)
     f.close()
+    return s
 
 def logging(func):
     def call(self, *args, file="log.txt", **kwargs):
@@ -38,6 +40,76 @@ def tryWrapper(func):
         except:
             print(traceback.format_exc())
     return __call__
+
+
+#!/usr/bin/python
+#
+# Brainfuck Interpreter
+# Copyright 2011 Sebastian Kaspari
+
+
+def evaluate(code):
+    out = collections.deque()
+    code = cleanup(list(code))
+    bracemap = buildbracemap(code)
+    cells, codeptr, cellptr = [0], 0, 0
+    while codeptr < len(code):
+        command = code[codeptr]
+        if command == ">":
+            cellptr += 1
+            while cellptr >= len(cells):
+                cells.append(0)
+        if command == "<":
+            cellptr = 0 if cellptr <= 0 else cellptr - 1
+        if command == "+":
+            cells[cellptr] = cells[cellptr] + 1 if cells[cellptr] < 255 else 0
+        if command == "-":
+            cells[cellptr] = cells[cellptr] - 1 if cells[cellptr] > 0 else 255
+        if command == "[" and cells[cellptr] == 0:
+            codeptr = bracemap[codeptr]
+        if command == "]" and cells[cellptr] != 0:
+            codeptr = bracemap[codeptr]
+        if command == ".":
+            out.append(chr(cells[cellptr]))
+        if command == ",":
+            cells[cellptr] = ord(getch.getch())
+        codeptr += 1
+    return "".join(out)
+
+cleanup = lambda code: "".join(filter(lambda x: x in ".,[]<>+-", code))
+
+def buildbracemap(code):
+    temp_bracestack, bracemap = collections.deque(), {}
+    for position, command in enumerate(code):
+        if command == "[": temp_bracestack.append(position)
+        if command == "]":
+            start = temp_bracestack.pop()
+            bracemap[start] = position
+            bracemap[position] = start
+    return bracemap
+
+
+BF_ALIAS = ("bf", "brainfuck")
+
+def bf_parse(s):
+    for a in BF_ALIAS:
+        try:
+            i = s.index(a) + len(a)
+        except ValueError:
+            continue
+        else:
+            while s[i] in " \n":
+                i += 1
+            if s[i] == "(":
+                i += 1
+                if s[i] not in "'\"":
+                    v, s = s[:i], s[i:]
+                    e = s.index(")")
+                    s = v + '"' + s[:e] + '"' + s[e:]
+    filePrint(s)
+    return s
+
+_bf = lambda s: evaluate(s)
 
 
 class dice(sympy.Basic):
@@ -96,7 +168,6 @@ def plt_special(d, user, **void):
     width = hours / len(temp)
     domain = width * numpy.arange(-len(temp), 0)
     for k, v in d.items():
-        # filePrint(k, v)
         plt.bar(domain, v, bottom=temp, color=special_colours.get(k, "k"), edgecolor="black", width=width, label=k)
         temp += numpy.array(v)
     plt.bar(list(range(-hours, 0)), numpy.ones(hours) * max(temp) / 512, edgecolor="black", color="k")
@@ -213,6 +284,8 @@ for i in plots:
     _globals[i] = globals()[i]
 _globals.update({
     "eval": _eval,
+    "bf": _bf,
+    "brainfuck": _bf,
     "random": dice,
     "rand": dice,
     "dice": dice,
@@ -355,7 +428,7 @@ def evalSym(f, prec=64, r=False):
         if "\\" in y:
             raise SyntaxError
         f = parser.parse_expr(
-            f,
+            bf_parse(f),
             local_dict=None,
             global_dict=_globals,
             transformations=sym_tr,
@@ -377,8 +450,8 @@ def evalSym(f, prec=64, r=False):
                 f = f.subs(i, i.doit())
             except:
                 pass
-    if isinstance(f, Plot) or f == plt:
-        return [f]
+    if isinstance(f, Plot) or f == plt or type(f) is str:
+        return (f,)
     try:
         f = sympy.simplify(f)
     except:
@@ -421,50 +494,51 @@ def evalSym(f, prec=64, r=False):
         return [f, p]
 
 
-key = eval(sys.stdin.readline()).decode("utf-8", "replace").strip()
-
-
-while True:
-    try:
-        locked = True
-        args = eval(sys.stdin.readline()).decode("utf-8", "replace").strip().split("`")
-        if len(args) > 3:
-            args, key_in = args[:3], args[-1]
-            if key_in == key:
-                locked = False
-        resp = evalSym(*args)
-        if isinstance(resp[0], Plot):
-            plt.rcParams["figure.figsize"] = (6.4, 4.8)
-            ts = round(time.time() * 1000)
-            name = str(ts) + ".png"
-            fn = "cache/" + name
-            try:
-                resp[0].save(fn)
-            except FileNotFoundError:
-                fn = name
-                resp[0].save(fn)
-            plt.clf()
-            s = "{'file':'" + fn + "'}\n"
-        elif resp[0] == plt:
-            ts = round(time.time() * 1000)
-            name = str(ts) + ".png"
-            fn = "cache/" + name
-            try:
-                plt.savefig(fn)
-            except FileNotFoundError:
-                fn = name
-                plt.savefig(fn)
-            plt.clf()
-            plt.rcParams["figure.figsize"] = (6.4, 4.8)
-            s = "{'file':'" + fn + "'}\n"
-        else:
-            s = repr([convAns(i) for i in resp])
-        b = s.encode("utf-8")
-        if len(b) > 8388608:
-            raise OverflowError("Output data too large.")
-        sys.stdout.write(repr(b) + "\n")
-        sys.stdout.flush()
-    except Exception as ex:
-        sys.stdout.write(repr(ex) + "\n")
-        sys.stdout.flush()
-    time.sleep(0.01)
+if __name__ == "__main__":
+    key = eval(sys.stdin.readline()).decode("utf-8", "replace").strip()
+    while True:
+        try:
+            locked = True
+            args = eval(sys.stdin.readline()).decode("utf-8", "replace").strip().split("`")
+            if len(args) > 3:
+                args, key_in = args[:3], args[-1]
+                if key_in == key:
+                    locked = False
+            resp = evalSym(*args)
+            if isinstance(resp[0], Plot):
+                plt.rcParams["figure.figsize"] = (6.4, 4.8)
+                ts = round(time.time() * 1000)
+                name = str(ts) + ".png"
+                fn = "cache/" + name
+                try:
+                    resp[0].save(fn)
+                except FileNotFoundError:
+                    fn = name
+                    resp[0].save(fn)
+                plt.clf()
+                s = "{'file':'" + fn + "'}\n"
+            elif resp[0] == plt:
+                ts = round(time.time() * 1000)
+                name = str(ts) + ".png"
+                fn = "cache/" + name
+                try:
+                    plt.savefig(fn)
+                except FileNotFoundError:
+                    fn = name
+                    plt.savefig(fn)
+                plt.clf()
+                plt.rcParams["figure.figsize"] = (6.4, 4.8)
+                s = "{'file':'" + fn + "'}\n"
+            elif type(resp) is tuple:
+                s = repr(list(resp))
+            else:
+                s = repr([convAns(i) for i in resp])
+            b = s.encode("utf-8")
+            if len(b) > 8388608:
+                raise OverflowError("Output data too large.")
+            sys.stdout.write(repr(b) + "\n")
+            sys.stdout.flush()
+        except Exception as ex:
+            sys.stdout.write(repr(ex) + "\n")
+            sys.stdout.flush()
+        time.sleep(0.01)

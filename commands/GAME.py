@@ -47,7 +47,6 @@ class Text2048(Command):
     rate_limit = (1, 2)
 
     def shiftTile(self, tiles, p1, p2):
-        # print(p1, p2)
         x1, y1 = p1
         x2, y2 = p2
         if tiles[x2][y2] <= 0:

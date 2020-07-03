@@ -1709,7 +1709,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                     for r in response:
                                         create_task(channel.send(r))
                                         await asyncio.sleep(0.5)
-                                elif type(response) is dict or isinstance(response, freeClass):
+                                elif issubclass(type(response), collections.abc.Mapping):
                                     if "file" in response:
                                         sent = await sendFile(channel, response.get("content", ""), **response)
                                     else:

@@ -1139,14 +1139,12 @@ class UpdateMessageLogs(Database):
         i = 1
         for h in histories:
             temp = h[0]
-            # print("[" + str(len(temp)) + "]")
             for message in temp:
                 self.bot.cacheMessage(message)
                 if not i & 8191:
                     await asyncio.sleep(0.5)
                 i += 1
         create_future_ex(self.bot.updateClient)
-        # print(guild, "finished.")
 
     async def __call__(self):
         for h in tuple(self.dc):

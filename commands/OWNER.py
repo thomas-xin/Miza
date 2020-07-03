@@ -75,61 +75,67 @@ class Execute(Command):
     name = ["Exec", "Eval"]
     min_level = nan
     description = "Causes all messages by the bot owner in the current channel to be executed as python code on ⟨MIZA⟩."
-    usage = "<enable(?e)> <disable(?d)>"
+    usage = "<type> <enable(?e)> <disable(?d)>"
     flags = "aed"
+    terminal_types = dedict({
+        "null": 0,
+        "main": 1,
+        "relay": 2,
+        "virtual": 4,
+        "log": 8,
+    })
 
-    async def __call__(self, bot, flags, message, channel, **void):
+    async def __call__(self, bot, flags, argv, message, channel, guild, **void):
         update = bot.database.exec.update
+        if not argv:
+            argv = 0
+        try:
+            num = int(argv)
+        except (TypeError, ValueError):
+            out = argv.lower()
+            num = self.terminal_types[out]
+        else:
+            out = self.terminal_types[num]
         if "e" in flags or "a" in flags:
-            create_task(message.add_reaction("❗"))
-            bot.data.exec[channel.id] = True
+            if num == 0:
+                num = 4
+                out = self.terminal_types[num]
+            try:
+                bot.data.exec[channel.id] |= num
+            except KeyError:
+                bot.data.exec[channel.id] = num
             update()
+            create_task(message.add_reaction("❗"))
             return (
-                "```css\nSuccessfully enabled code execution in [#"
+                "```css\nSuccessfully enabled [" + out + "] terminal in [#"
                 + noHighlight(channel.name) + "].```"
             )
         elif "d" in flags:
-            bot.data.exec.pop(channel.id)
+            try:
+                if num == 0:
+                    bot.data.exec.pop(channel.id)
+                    out = "global"
+                else:
+                    bot.data.exec[channel.id] &= -num - 1
+                    if not bot.data.exec[channel.id]:
+                        bot.data.exec.pop(channel.id)
+            except KeyError:
+                pass
             update()
             return (
-                "```fix\nSuccessfully removed code execution channel.```"
+                "```css\nSuccessfully removed [" + out + "] terminal.```"
             )
         return (
-            "```css\nCode execution channel is currently set to "
-            + noHighlight(list(bot.data.exec)) + ".```"
+            "```css\nTerminals currently set to "
+            + noHighlight(bot.data.exec) + ".```"
         )
-
-
-class Suspend(Command):
-    name = ["Block", "Blacklist"]
-    min_level = nan
-    description = "Prevents a user from accessing ⟨MIZA⟩'s commands. Overrides <perms>."
-    usage = "<0:user> <1:value[]>"
-
-    async def __call__(self, bot, user, guild, args, **void):
-        update = self.data.blacklist.update
-        if len(args) < 2:
-            if len(args) >= 1:
-                user = await bot.fetch_user(verifyID(args[0]))
-            susp = bot.data.blacklist.get(user.id, None)
-            return (
-                "```css\nCurrent blacklist status of [" + noHighlight(user.name) + "]: ["
-                + noHighlight(susp) + "].```"
-            )
-        else:
-            user = await bot.fetch_user(verifyID(args[0]))
-            change = await bot.evalTime(" ".join(args[1]), guild.id, bot.data.blacklist.get(user.id, utc()))
-            bot.data.blacklist[user.id] = change
-            update()
-            return (
-                "```css\nChanged blacklist status of [" + noHighlight(user.name) + "] to ["
-                + noHighlight(change) + "].```"
-            )
 
 
 class UpdateExec(Database):
     name = "exec"
     no_delete = True
+    virtuals = {}
+    listeners = {}
 
     qmap = {
         "“": '"',
@@ -149,25 +155,52 @@ class UpdateExec(Database):
     }
     qtrans = "".maketrans(qmap)
 
-    def procFunc(self, proc, channel, bot):
+    _print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: create_task(channel.send(limStr("```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2000)))
+    def _input(self, *args, channel=None, **kwargs):
+        self._print(*args, channel=channel, **kwargs)
+        self.listeners.__setitem__(channel.id, None)
+        while self.listeners[channel.id] is None:
+            time.sleep(0.5)
+        return self.listeners.pop(channel.id)
+
+    def procFunc(self, proc, channel, bot, term=0):
+        try:
+            if self.listeners[channel.id] is None:
+                self.listeners[channel.id] = proc
+                return
+        except KeyError:
+            pass
         if not proc:
             return
-        local = dict(print=lambda *args, sep=" ", end="\n", prefix="", **void: create_task(channel.send(limStr("```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2000))))
+        if term & 1:
+            glob = bot._globals
+        else:
+            try:
+                glob = self.virtuals[channel.id]
+            except KeyError:
+                glob = self.virtuals[channel.id] = dict(bot._globals)
+        local = dict(
+            print=lambda *args, **kwargs: self._print(*args, channel=channel, **kwargs),
+            input=lambda *args, **kwargs: self._input(*args, channel=channel, **kwargs),
+        )
         print(proc)
         succ = False
+        if "\n" not in proc:
+            if proc.startswith("await "):
+                proc = proc[6:]
         try:
-            output = eval(proc, bot._globals, local)
+            output = eval(proc, glob, local)
         except SyntaxError:
             pass
         else:
             succ = True
         if not succ:
-            output = exec(proc, bot._globals, local)
+            output = exec(proc, glob, local)
         try:
             local.pop("print")
         except KeyError:
             pass
-        bot._globals.update(local)
+        glob.update(local)
         return output
 
     async def sendDeleteID(self, c_id, delete_after=20, **kwargs):
@@ -184,8 +217,9 @@ class UpdateExec(Database):
             emb = discord.Embed()
             emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=bestURL(user))
             emb.description = "```ini\n[typing...]```"
-            for c_id in self.data:
-                create_task(self.sendDeleteID(c_id, embed=emb))
+            for c_id, flag in self.data.items():
+                if flag & 2:
+                    create_task(self.sendDeleteID(c_id, embed=emb))
 
     def prepare_string(self, s):
         if type(s) is not str:
@@ -198,36 +232,40 @@ class UpdateExec(Database):
         bot = self.bot
         channel = message.channel
         if message.author.id in self.bot.owners and channel.id in self.data:
-            proc = message.content
-            if proc:
-                while proc[0] == " ":
-                    proc = proc[1:]
-                if proc.startswith("//") or proc.startswith("||") or proc.startswith("\\") or proc.startswith("#"):
-                    return
-                if proc.startswith("`") and proc.endswith("`"):
-                    proc = proc.strip("`")
-                if not proc:
-                    return
-                proc = proc.translate(self.qtrans)
-                output = None
-                try:
-                    output = await create_future(self.procFunc, proc, channel, bot, priority=True)
-                    if awaitable(output):
-                        output = await output
-                    await channel.send(self.prepare_string(output))
-                except:
-                    print(traceback.format_exc())
-                    await sendReact(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
-                if output is not None:
-                    bot._globals["output"] = output
-                    bot._globals["_"] = output
+            flag = self.data[channel.id]
+            for f in (flag & 1, flag & 4):
+                if f:
+                    proc = message.content
+                    if proc:
+                        while proc[0] == " ":
+                            proc = proc[1:]
+                        if proc.startswith("//") or proc.startswith("||") or proc.startswith("\\") or proc.startswith("#"):
+                            return
+                        if proc.startswith("`") and proc.endswith("`"):
+                            proc = proc.strip("`")
+                        if not proc:
+                            return
+                        proc = proc.translate(self.qtrans)
+                        output = None
+                        try:
+                            output = await create_future(self.procFunc, proc, channel, bot, term=f, priority=True)
+                            if awaitable(output):
+                                output = await output
+                            await channel.send(self.prepare_string(output))
+                        except:
+                            print(traceback.format_exc())
+                            await sendReact(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
+                        if output is not None:
+                            bot._globals["output"] = output
+                            bot._globals["_"] = output
         elif message.guild is None:
             user = message.author
             emb = discord.Embed()
             emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=bestURL(user))
             emb.description = strMessage(message)
-            for c_id in self.data:
-                create_task(self.sendDeleteID(c_id, delete_after=inf, embed=emb))
+            for c_id, flag in self.data.items():
+                if flag & 2:
+                    create_task(self.sendDeleteID(c_id, delete_after=inf, embed=emb))
 
 
 class Trust(Command):
@@ -274,6 +312,33 @@ class Trust(Command):
 
 class UpdateTrusted(Database):
     name = "trusted"
+
+
+class Suspend(Command):
+    name = ["Block", "Blacklist"]
+    min_level = nan
+    description = "Prevents a user from accessing ⟨MIZA⟩'s commands. Overrides <perms>."
+    usage = "<0:user> <1:value[]>"
+
+    async def __call__(self, bot, user, guild, args, **void):
+        update = self.data.blacklist.update
+        if len(args) < 2:
+            if len(args) >= 1:
+                user = await bot.fetch_user(verifyID(args[0]))
+            susp = bot.data.blacklist.get(user.id, None)
+            return (
+                "```css\nCurrent blacklist status of [" + noHighlight(user.name) + "]: ["
+                + noHighlight(susp) + "].```"
+            )
+        else:
+            user = await bot.fetch_user(verifyID(args[0]))
+            change = await bot.evalTime(" ".join(args[1]), guild.id, bot.data.blacklist.get(user.id, utc()))
+            bot.data.blacklist[user.id] = change
+            update()
+            return (
+                "```css\nChanged blacklist status of [" + noHighlight(user.name) + "] to ["
+                + noHighlight(change) + "].```"
+            )
 
 
 class UpdateBlacklist(Database):

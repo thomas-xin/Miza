@@ -83,7 +83,7 @@ class Help(Command):
             if bot.categories:
                 s = "```ini\n" + " ".join((sbHighlight(c) for c in standard_commands)) + "```"
                 emb.add_field(name="Command category list", value=s)
-        return freeClass(embed=emb), 1
+        return dict(embed=emb), 1
 
 
 class Hello(Command):
@@ -849,6 +849,8 @@ class Reminder(Command):
     flags = "aed"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = 0.5
+    keywords = ["on", "at", "in", "when", "event"]
+    keydict = {re.compile("(^|[^a-z0-9])" + str(reversed(i)) + "([^a-z0-9]|$)", re.I): None for i in keywords}
 
     async def __call__(self, argv, name, message, flags, bot, user, guild, perm, **void):
         msg = message.content
@@ -905,33 +907,33 @@ class Reminder(Command):
             raise OverflowError("You have reached the maximum of 64 " + word + ". Please remove one to add another.")
         keyed = False
         while True:
-            if name == "remind" and argv.startswith("me "):
+            temp = argv.lower()
+            if name == "remind" and temp.startswith("me "):
                 argv = argv[3:]
-            if argv.startswith("to "):
+                temp = argv.lower()
+            if temp.startswith("to "):
                 argv = argv[3:]
-            elif argv.startswith("that "):
+                temp = argv.lower()
+            elif temp.startswith("that "):
                 argv = argv[5:]
+                temp = argv.lower()
             spl = None
-            keywords = {
-                "on": None,
-                "at": None,
-                "in": None,
-                "when": None,
-                "event": None,
-            }
+            keywords = dict(self.keywords)
             for k in tuple(keywords):
                 try:
-                    i = argv.index(k)
+                    i = re.search(k, temp).end()
+                    if not i:
+                        raise ValueError
                 except ValueError:
                     keywords.pop(k)
                 else:
                     keywords[k] = i
-            indices = sorted(keywords, key=lambda k: -keywords[k])
+            indices = sorted(keywords, key=lambda k: keywords[k])
             foundkey = {indices[0]: True}
             if foundkey.get("event"):
                 if " event " in argv:
                     spl = argv.split(" event ")
-                elif argv.startswith("event "):
+                elif temp.startswith("event "):
                     spl = [argv[6:]]
                     msg = ""
                 if spl is not None:
@@ -940,11 +942,11 @@ class Reminder(Command):
                     keyed = True
                     break
             if foundkey.get("when"):
-                if argv.endswith("is online"):
+                if temp.endswith("is online"):
                     argv = argv[:-9]
                 if " when " in argv:
                     spl = argv.split(" when ")
-                elif argv.startswith("when "):
+                elif temp.startswith("when "):
                     spl = [argv[5:]]
                     msg = ""
                 if spl is not None:
@@ -955,7 +957,7 @@ class Reminder(Command):
             if foundkey.get("in"):
                 if " in " in argv:
                     spl = argv.split(" in ")
-                elif argv.startswith("in "):
+                elif temp.startswith("in "):
                     spl = [argv[3:]]
                     msg = ""
                 if spl is not None:
@@ -965,7 +967,7 @@ class Reminder(Command):
             if foundkey.get("at"):
                 if " at " in argv:
                     spl = argv.split(" at ")
-                elif argv.startswith("at "):
+                elif temp.startswith("at "):
                     spl = [argv[3:]]
                     msg = ""
                 if spl is not None:
@@ -975,7 +977,7 @@ class Reminder(Command):
             if foundkey.get("on"):
                 if " on " in argv:
                     spl = argv.split(" on ")
-                elif argv.startswith("on "):
+                elif temp.startswith("on "):
                     spl = [argv[3:]]
                     msg = ""
                 if spl is not None:
@@ -997,8 +999,9 @@ class Reminder(Command):
                 msg = "[SAMPLE ANNOUNCEMENT]"
             else:
                 msg = "[SAMPLE REMINDER]"
-        elif len(msg) > 512:
-            raise OverflowError("Input message too long (" + str(len(msg)) + "> 512).")
+            msg = "```asciidoc\n" + msg + "```"
+        elif len(msg) > 1024:
+            raise OverflowError("Input message too long (" + str(len(msg)) + "> 1024).")
         username = str(user)
         url = bestURL(user)
         ts = utc()

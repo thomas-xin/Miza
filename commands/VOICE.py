@@ -537,7 +537,7 @@ class CustomAudio(discord.AudioSource):
                 v = 1 / max(1, round(math.sqrt(abs(p)), 4))
                 if v != 1:
                     options.append("volume=" + str(v))
-        if stats.volume != 1:# and full:
+        if stats.volume != 1:
             options.append("volume=" + str(round(stats.volume, 7)))
         if options:
             options.append("asoftclip=atan")

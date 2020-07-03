@@ -2406,16 +2406,17 @@ class freeClass(dict):
     __slots__ = ()
 
     __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
-    __repr__ = lambda self: "freeClass(" + super().__repr__() + ")"
+    __repr__ = lambda self: self.__class__.__name__ + "(" + super().__repr__() + ")"
     __str__ = lambda self: "【" + self.__repr__()[11:-2] + "】"
     __iter__ = lambda self: iter(tuple(super().__iter__()))
-    __setattr__ = lambda self, key, value: super().__setitem__(key, value)
+    __setattr__ = lambda self, k, v: super().__setitem__(k, v)
 
-    def __getattr__(self, key):
-        if key.startswith("__") and key.endswith("__"):
-            return freeClass.__getattribute__(self, key)
-        return super().__getitem__(key)
+    def __getattr__(self, k):
+        if k.startswith("__") and k.endswith("__"):
+            return freeClass.__getattribute__(self, k)
+        return super().__getitem__(k)
 
+    ___repr__ = lambda self: super().__repr__()
     to_dict = lambda self: dict(**self)
     to_list = lambda self: list(super().values())
 
@@ -2449,6 +2450,62 @@ class multiDict(freeClass):
                 self.extend(k, v)
         for k, v in kwargs:
             self.extend(k, v)
+
+
+class dedict(collections.abc.Mapping):
+
+    __slots__ = ("a", "b")
+
+    def __init__(self, *args, **kwargs):
+        self.a = freeClass(*args, **kwargs)
+        self.b = freeClass(reversed(t) for t in self.a.items())
+
+    def __getitem__(self, k):
+        try:
+            return self.a.__getitem__(k)
+        except KeyError:
+            return self.b.__getitem__(k)
+
+    def __delitem__(self, k):
+        try:
+            temp = self.a.pop(k)
+        except KeyError:
+            temp = self.b.pop(k)
+            if temp in self.a:
+                self.__delitem__(temp)
+        else:
+            if temp in self.b:
+                self.__delitem__(temp)
+        return self
+
+    def __setitem__(self, k, v):
+        if k not in self.a:
+            if v not in self.a:
+                self.a.__setitem__(k, v)
+                self.b.__setitem__(v, k)
+            else:
+                self.__delitem__(v)
+                self.__setitem__(k, v)
+        else:
+            self.__delitem__(k)
+            if v in self.a:
+                self.__delitem__(v)
+            self.__setitem__(k, v)
+        return self
+
+    def get(self, k, v=None):
+        try:
+            return self.__getitem__(k)
+        except KeyError:
+            return v
+
+    clear = lambda self: (self.a.clear(), self.b.clear())
+    __iter__ = lambda self: self.a.items()
+    __len__ = lambda self: self.b.__len__()
+    __str__ = lambda self: self.a.__str__()
+    __repr__ = lambda self: self.__class__.__name__ + "(" + self.a.___repr__() + ")"
+    __contains__ = lambda self, k: k in self.a or k in self.b
+    pop = __delitem__
 
 
 class pickled:
