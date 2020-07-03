@@ -850,7 +850,7 @@ class Reminder(Command):
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = 0.5
     keywords = ["on", "at", "in", "when", "event"]
-    keydict = {re.compile("(^|[^a-z0-9])" + str(reversed(i)) + "([^a-z0-9]|$)", re.I): None for i in keywords}
+    keydict = {re.compile("(^|[^a-z0-9])" + i[::-1] + "([^a-z0-9]|$)", re.I): None for i in keywords}
 
     async def __call__(self, argv, name, message, flags, bot, user, guild, perm, **void):
         msg = message.content
@@ -918,18 +918,22 @@ class Reminder(Command):
                 argv = argv[5:]
                 temp = argv.lower()
             spl = None
-            keywords = dict({k: None for k in self.keywords})
+            keywords = dict(self.keydict)
+            temp2 = temp[::-1]
             for k in tuple(keywords):
                 try:
-                    i = re.search(k, temp).end()
+                    i = re.search(k, temp2).end()
                     if not i:
-                        raise ValueError
+                        raise ValueError("substring not found")
                 except (ValueError, AttributeError):
                     keywords.pop(k)
                 else:
                     keywords[k] = i
             indices = sorted(keywords, key=lambda k: keywords[k])
-            foundkey = {indices[0]: True}
+            if indices:
+                foundkey = {self.keywords[tuple(self.keydict).index(indices[0])]: True}
+            else:
+                foundkey = freeClass(get=lambda *void: None)
             if foundkey.get("event"):
                 if " event " in argv:
                     spl = argv.split(" event ")
