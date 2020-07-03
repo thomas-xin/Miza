@@ -859,7 +859,7 @@ class Magik(Command):
         if not name.endswith(".png"):
             name += ".png"
         fut = create_task(channel.trigger_typing())
-        if "cdn.discord" not in url[:8]:
+        if "cdn.discord" not in url[:32]:
             resp = await imageProc(url, "resize_max", [512, "hamming"], guild.id)
             fn = resp[0]
             f = discord.File(fn, filename=name)
