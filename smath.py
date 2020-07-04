@@ -2255,6 +2255,8 @@ lookup time for all elements. Includes many array and numeric operations."""
                 pops.append(i)
         return self.pops(pops, force=True)
 
+    uniq = unique = removedups
+
     @waiting
     def index(self, value, key=None, sorted=False):
         return self.search(value, key, sorted, force=True)[0]

@@ -1736,9 +1736,22 @@ class Queue(Command):
         except KeyError:
             future = wrap_future(create_task(forceJoin(guild, channel, user, client, bot, preparing=True)))
         future2 = create_task(channel.trigger_typing())
-        if isURL(argv):
-            argv = await bot.followURL(argv)
-        resp = await create_future(ytdl.search, argv)
+        out = None
+        urls = await bot.followURL(argv, preserve=False, images=False)
+        if urls:
+            if len(urls) == 1:
+                argv = urls[0]
+            else:
+                out = [create_future(ytdl.search, url) for url in urls]
+                print(out)
+        if out is None:
+            resp = await create_future(ytdl.search, argv)
+        else:
+            resp = deque()
+            for fut in out:
+                temp = await fut
+                print(temp)
+                resp.extend(temp)
         if future is not None:
             auds = await future
         await future2
@@ -2017,8 +2030,9 @@ class Playlist(Command):
                 + " has reached the maximum of " + str(lim) + " items. "
                 + "Please remove an item to add another."
             )
-        if isURL(argv):
-            argv = await bot.followURL(argv)
+        urls = await bot.followURL(argv)
+        if urls:
+            argv = urls[0]
         resp = await create_future(ytdl.search, argv)
         if type(resp) is str:
             raise evalEX(resp)
@@ -2467,8 +2481,9 @@ class Dump(Command):
             if len(message.attachments):
                 url = message.attachments[0].url
             else:
-                url = verifyURL(argv)
-            url = await bot.followURL(url)
+                url = argv
+            urls = await bot.followURL(url)
+            url = urls[0]
             s = await Request(url, aio=True)
             s = s[s.index(b"{"):]
             if s[-4:] == b"\n```":
@@ -3210,9 +3225,9 @@ class Lyrics(Command):
                 argv = auds.queue[0].name
             except LookupError:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
-        if isURL(argv):
-            argv = await bot.followURL(argv)
-            resp = await create_future(ytdl.search, argv)
+        urls = await bot.followURL(argv)
+        if urls:
+            resp = await create_future(ytdl.search, urls[0])
             search = resp[0].name
         else:
             search = argv
@@ -3320,9 +3335,9 @@ class Download(Command):
                 fmt = "ogg"
             argv = verifySearch(argv)
             res = []
-            if isURL(argv):
-                argv = await bot.followURL(argv)
-                data = await create_future(ytdl.extract, argv)
+            urls = await bot.followURL(argv)
+            if urls:
+                res += await create_future(ytdl.extract, urls[0])
                 res += data
             if not res:
                 sc = min(4, flags.get("v", 0) + 1)

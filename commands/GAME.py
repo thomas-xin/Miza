@@ -317,6 +317,7 @@ class MimicConfig(Command):
             found = True
         mimic = mimicdb[m_id]
         opt = args.pop(0).lower()
+        args.extend(bestURL(a) for a in message.attachments)
         if args:
             new = " ".join(args)
         else:
@@ -356,7 +357,8 @@ class MimicConfig(Command):
             else:
                 mimics[new] = [m_id]
         elif setting == "url":
-            new = await bot.followURL(verifyURL(new), best=True)
+            urls = await bot.followURL(new, best=True)
+            new = urls[0]
         elif setting == "auto":
             if new.lower() in ("none", "null", "0", "false", "f"):
                 new = None
@@ -399,6 +401,7 @@ class Mimic(Command):
     async def __call__(self, bot, message, user, perm, flags, args, argv, **void):
         update = self.data.mimics.update
         mimicdb = bot.data.mimics
+        args.extend(bestURL(a) for a in reversed(message.attachments))
         if len(args) == 1 and "d" not in flags:
             user = await bot.fetch_user(verifyID(argv))
         mimics = setDict(mimicdb, user.id, {})
@@ -475,7 +478,8 @@ class Mimic(Command):
         mimic = None
         if len(args):
             if len(args) > 1:
-                url = await bot.followURL(verifyURL(args[-1]), best=True)
+                urls = await bot.followURL(args[-1], best=True)
+                url = urls[0]
                 name = " ".join(args[:-1])
             else:
                 mim = 0

@@ -281,66 +281,14 @@ def stripAcc(url):
         if isURL(s):
             return s
     return url
-
-__umap = {
-    "|": "",
-    "*": "",
-    " ": "%20",
-}
-__utrans = "".maketrans(__umap)
-
-def verifyURL(f):
-    if "file:" in f:
-        raise PermissionError("Not permitted open local file " + f + ".")
-    return stripAcc(f.strip().translate(__utrans))
-
-__smap = {
-    "|": "",
-    "*": "",
-}
+__smap = {"|": "", "*": ""}
 __strans = "".maketrans(__smap)
-
 verifySearch = lambda f: stripAcc(singleSpace(f.strip().translate(__strans)))
-
-DOMAIN_FORMAT = re.compile(
-    r"(?:^(\w{1,255}):(.{1,255})@|^)"
-    r"(?:(?:(?=\S{0,253}(?:$|:))"
-    r"((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
-    r"(?:[a-z0-9]{1,63})))"
-    r"|localhost)"
-    r"(:\d{1,5})?",
-    re.IGNORECASE
-)
-SCHEME_FORMAT = re.compile(
-    r"^(http|hxxp|ftp|fxp)s?$",
-    re.IGNORECASE
-)
-
-def isURL(url):
-    if type(url) is bytes:
-        url = url.decode("utf-8", "replace")
-    elif type(url) is not str:
-        return
-    url = url.strip()
-    if url.startswith("<") and url[-1] == ">":
-        url = url[1:-1]
-    if not url:
-        return
-    try:
-        result = urllib.parse.urlparse(url)
-    except:
-        return False
-    scheme = result.scheme
-    domain = result.netloc
-    if not scheme:
-        return False
-    if not re.fullmatch(SCHEME_FORMAT, scheme):
-        return False
-    if not domain:
-        return False
-    if not re.fullmatch(DOMAIN_FORMAT, domain):
-        return False
-    return True
+urlFind = re.compile("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+")
+urlIs = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
+findURLs = lambda url: re.findall(urlFind, url)
+isURL = lambda url: re.search(urlIs, url)
+verifyURL = lambda url: url if isURL(url) else urllib.parse.quote(url)
 
 
 IMAGE_FORMS = {

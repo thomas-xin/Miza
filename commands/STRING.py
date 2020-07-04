@@ -22,7 +22,7 @@ class PapagoTrans:
         if dest == source:
             raise ValueError("Source language is the same as destination.")
         url = "https://openapi.naver.com/v1/papago/n2mt"
-        enc = urllib.parse.quote(string)
+        enc = verifyURL(string)
         url += "?source=" + source + "&target=" + dest + "&text=" + enc
         headers = {
             "X-Naver-Client-Id": self.id,
@@ -291,6 +291,19 @@ class Time(Command):
             "```ini\nCurrent time at UTC/GMT" + hrs
             + ": [" + str(t) + "].```"
         )
+
+
+class Follow(Command):
+    name = ["FollowURL", "Redirect"]
+    min_level = 0
+    description = "Follows a discord message link and/or finds URLs in a string."
+    rate_limit = 0.125
+    
+    async def __call__(self, argv, **void):
+        urls = await self.bot.followURL(argv)
+        if not urls:
+            raise FileNotFoundError("No valid URLs detected.")
+        return "\n".join(urls)
 
 
 class UrbanDictionary(Command):

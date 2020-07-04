@@ -806,9 +806,10 @@ class DeviantArt(Command):
                     pass
                 return "```css\nSuccessfully removed all DeviantArt Gallery subscriptions from [#" + noHighlight(channel) + "].```"
             return "Currently subscribed DeviantArt Galleries for [#" + noHighlight(channel) + "]:```ini" + strIter(assigned, key=lambda x: x["user"]) + "```"
-        url = await bot.followURL(argv)
-        if not isURL(url):
+        urls = await bot.followURL(argv)
+        if not urls:
             raise ArgumentError("Please input a valid URL.")
+        url = urls[0]
         if "deviantart.com" not in url:
             raise ArgumentError("Please input a DeviantArt Gallery URL.")
         url = url[url.index("deviantart.com") + 15:]

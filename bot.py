@@ -384,7 +384,7 @@ class Bot:
             except (ValueError, TypeError):
                 if follow_invites:
                     try:
-                        invite = await client.fetch_invite(verifyURL(g_id))
+                        invite = await client.fetch_invite(g_id.strip("< >"))
                         g = invite.guild
                         if not hasattr(g, "member_count"):
                             guild = freeClass(member_count=invite.approximate_member_count)
@@ -533,62 +533,69 @@ class Bot:
             channel = await user.create_dm()
         return channel
 
-    async def followURL(self, url, it=None, best=False):
+    async def followURL(self, url, it=None, best=False, preserve=True, images=True, limit=None):
+        if limit is not None and limit <= 0:
+            return []
         if it is None:
-            url = stripAcc(url.strip().strip("`"))
+            urls = findURLs(url)
+            if not urls:
+                return []
             it = {}
-        if "channels/" in url and ("discord" in url or url.startswith("channels/")):
-            spl = url[url.index("channels/") + 9:].split("/")
-            c = await self.fetch_channel(spl[1])
-            m = await self.fetch_message(spl[2], c)
-            if m.attachments:
+        else:
+            urls = [url]
+        out = deque()
+        if preserve:
+            lost = deque()
+        if images:
+            medias = ("video", "image", "thumbnail")
+        else:
+            medias = "video"
+        for url in urls:
+            check = url[:64]
+            if "channels/" in check and "discord" in check:
+                found = deque()
+                spl = url[url.index("channels/") + 9:].replace("?", "/").split("/")
+                c = await self.fetch_channel(spl[1])
+                m = await self.fetch_message(spl[2], c)
                 if best:
-                    url = bestURL(m.attachments[0])
+                    found.extend(bestURL(a) for a in m.attachments)
                 else:
-                    url = m.attachments[0].url
-            else:
-                url = m.content
-                if " " in url or "\n" in url or not isURL(url):
-                    for i in url.replace("\n", " ").split(" "):
-                        u = verifyURL(i)
-                        if isURL(u):
-                            url = u
-                            break
-                url = verifyURL(url)
-                if not url:
-                    for e in m.embeds:
-                        if not url:
-                            for a in "video", "image", "thumbnail":
-                                obj = getattr(e, a, None)
-                                if obj:
-                                    if best:
-                                        url = bestURL(obj)
-                                    else:
-                                        url = obj.url
-                                    if url:
-                                        break
-                        else:
-                            break
-                    if not url:
-                        url = " ".join(e.description for e in m.embeds if type(e.description) is str)
-                        if url:
-                            if " " in url or "\n" in url or not isURL(url):
-                                for i in url.replace("\n", " ").replace("(", " ").replace(")", " ").split(" "):
-                                    u = verifyURL(i)
-                                    if isURL(u):
-                                        url = u
-                                        break
-                if url in it:
-                    return url
-                it[url] = True
-                if not len(it) & 255:
-                    await asyncio.sleep(0.2)
-                url = await self.followURL(url, it)
-        return url
+                    found.extend(a.url for a in m.attachments)
+                found.extend(findURLs(m.content))
+                for e in m.embeds:
+                    for a in medias:
+                        obj = getattr(e, a, None)
+                        if obj:
+                            if best:
+                                url = bestURL(obj)
+                            else:
+                                url = obj.url
+                            if url:
+                                found.append(url)
+                                break
+                [found.extend(findURLs(e.description)) for e in m.embeds if e.description]
+                for u in found:
+                    if u not in it:
+                        it[u] = True
+                        if not len(it) & 255:
+                            await asyncio.sleep(0.2)
+                        found2 = await self.followURL(u, it, best=best, preserve=preserve, images=images, limit=limit)
+                        if len(found2):
+                            out.extend(found2)
+                        elif preserve:
+                            lost.append(u)
+        if preserve:
+            out.extend(lost)
+        if not out:
+            return urls
+        if limit is not None:
+            return list(out)[:limit]
+        return out
 
     async def followImage(self, url):
-        if isURL(url):
-            return [url]
+        temp = findURLs(url)
+        if temp:
+            return temp
         users = findUsers(url)
         emojis = findEmojis(url)
         out = deque()

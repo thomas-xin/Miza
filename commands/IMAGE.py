@@ -82,7 +82,8 @@ class IMG(Command):
                     raise ArgumentError("Image tag too long.")
                 elif not key:
                     raise ArgumentError("Image tag must not be empty.")
-                url = await bot.followURL(verifyURL(args[-1]), best=True)
+                urls = await bot.followURL(args[-1], best=True, limit=1)
+                url = urls[0]
                 if len(url) > 1024:
                     raise ArgumentError("Image url too long.")
                 images[key] = url
@@ -345,15 +346,15 @@ class CreateEmoji(Command):
             raise ArgumentError("Please enter URL, emoji, or attached file to add.")
         fut = create_task(channel.trigger_typing())
         url = args.pop(-1)
-        url = await bot.followURL(url, best=True)
-        if not isURL(url):
+        urls = await bot.followURL(url, best=True, limit=1)
+        if not urls:
             urls = await bot.followImage(argv)
             if not urls:
                 urls = await bot.followImage(url)
                 if not urls:
                     await fut
                     raise ArgumentError("Please input an image by URL or attachment.")
-            url = urls[0]
+        url = urls[0]
         name = " ".join(args).strip()
         if not name:
             name = "emoji_" + str(len(guild.emojis))
@@ -502,15 +503,15 @@ async def get_image(bot, message, args, argv, ext="png"):
     if not args:
         raise ArgumentError("Please input an image by URL or attachment.")
     url = args.pop(0)
-    url = await bot.followURL(url, best=True)
-    if not isURL(url):
+    urls = await bot.followURL(url, best=True, limit=1)
+    if not urls:
         urls = await bot.followImage(argv)
         if not urls:
             urls = await bot.followImage(url)
             if not urls:
                 await fut
                 raise ArgumentError("Please input an image by URL or attachment.")
-        url = urls[0]
+    url = urls[0]
     value = " ".join(args).strip()
     if not value:
         value = 2
@@ -733,12 +734,13 @@ class CreateGIF(Command):
         fut = create_task(channel.trigger_typing())
         video = None
         for i, url in enumerate(args):
-            url = await bot.followURL(url, best=True)
+            urls = await bot.followURL(url, best=True, limit=1)
+            url = urls[0]
             if "discord" not in url and "channels" not in url:
                 url, size, dur, fps = await create_future(get_video, url, 16)
                 if size and dur and fps:
                     video = (url, size, dur, fps)
-            if not isURL(url):
+            if not url:
                 raise ArgumentError("Invalid URL detected: \"" + url + '"')
             args[i] = url
         name = "unknown.gif"
@@ -774,15 +776,14 @@ class Resize(Command):
             raise ArgumentError("Please input an image by URL or attachment.")
         fut = create_task(channel.trigger_typing())
         url = args.pop(0)
-        url = await bot.followURL(url, best=True)
-        if not isURL(url):
+        urls = await bot.followURL(url, best=True, limit=1)
+        if not urls:
             urls = await bot.followImage(argv)
             if not urls:
                 urls = await bot.followImage(url)
                 if not urls:
                     await fut
                     raise ArgumentError("Please input an image by URL or attachment.")
-            url = urls[0]
         value = " ".join(args).strip()
         if not value:
             x = y = 0.5
@@ -839,15 +840,15 @@ class Magik(Command):
         if not args:
             raise ArgumentError("Please input an image by URL or attachment.")
         url = args.pop(0)
-        url = await bot.followURL(url)
-        if not isURL(url):
+        urls = await bot.followURL(url, best=True, limit=1)
+        if not urls:
             urls = await bot.followImage(argv)
             if not urls:
                 urls = await bot.followImage(url)
                 if not urls:
                     await fut
                     raise ArgumentError("Please input an image by URL or attachment.")
-            url = urls[0]
+        url = urls[0]
         try:
             name = url[url.rindex("/") + 1:]
             if not name:
@@ -904,21 +905,27 @@ class Blend(Command):
                 )
             raise ArgumentError("Please input an image by URL or attachment.")
         fut = create_task(channel.trigger_typing())
-        url1 = args.pop(0)
-        url1 = await bot.followURL(url1, best=True)
-        url2 = args.pop(0)
-        url2 = await bot.followURL(url2, best=True)
+        urls = await bot.followURL(args.pop(0), best=True, limit=1)
+        if urls:
+            url1 = urls[0]
+        else:
+            url1 = None
+        urls = await bot.followURL(args.pop(0), best=True, limit=1)
+        if urls:
+            url2 = urls[0]
+        else:
+            url1 = None
         fromA = False
-        if not isURL(url1) or not isURL(url2):
+        if not url1 or not url2:
             urls = await bot.followImage(argv)
             if not urls:
                 urls = await bot.followImage(url)
                 if not urls:
                     await fut
                     raise ArgumentError("Please input an image by URL or attachment.")
-            if not isURL(url1):
+            if not url1:
                 url1 = urls.pop(0)
-            if not isURL(url2):
+            if not url2:
                 url2 = urls.pop(0)
         if fromA:
             value = argv

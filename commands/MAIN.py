@@ -850,7 +850,7 @@ class Reminder(Command):
     usage = "<1:message> <0:time> <disable(?d)>"
     flags = "aed"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-    rate_limit = 0.5
+    rate_limit = 1 / 3
     keywords = ["on", "at", "in", "when", "event"]
     keydict = {re.compile("(^|[^a-z0-9])" + i[::-1] + "([^a-z0-9]|$)", re.I): None for i in keywords}
 
