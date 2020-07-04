@@ -776,7 +776,7 @@ class Activity(Command):
                 try:
                     user = await bot.fetch_member_ex(u_id, guild)
                 except LookupError:
-                    user = freeClass(id=u_id)
+                    user = cdict(id=u_id)
         data = await create_future(bot.database.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)))
         resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
         fn = resp["file"]
@@ -935,7 +935,7 @@ class Reminder(Command):
             if indices:
                 foundkey = {self.keywords[tuple(self.keydict).index(indices[0])]: True}
             else:
-                foundkey = freeClass(get=lambda *void: None)
+                foundkey = cdict(get=lambda *void: None)
             if foundkey.get("event"):
                 if " event " in argv:
                     spl = argv.split(" event ")
@@ -1012,7 +1012,7 @@ class Reminder(Command):
         url = bestURL(user)
         ts = utc()
         if keyed:
-            rems.append(freeClass(
+            rems.append(cdict(
                 user=user.id,
                 msg=msg,
                 u_id=t,
@@ -1022,7 +1022,7 @@ class Reminder(Command):
             seq = setDict(bot.data.reminders, s, deque())
             seq.append(sendable.id)
         else:
-            rems.append(freeClass(
+            rems.append(cdict(
                 user=user.id,
                 msg=msg,
                 t=t + ts,
@@ -1137,7 +1137,7 @@ class UpdateReminders(Database):
                 self.listed.insort((x["t"], u_id), key=lambda x: x[0])
                 print(self.listed)
                 continue
-            x = freeClass(temp.pop(0))
+            x = cdict(temp.pop(0))
             if not temp:
                 self.data.pop(u_id)
             else:
@@ -1171,7 +1171,7 @@ class UpdateReminders(Database):
                             try:
                                 u = self.bot.get_user(x["user"], replace=True)
                             except KeyError:
-                                u = freeClass(x)
+                                u = cdict(x)
                             emb.set_author(name=u.name, url=bestURL(u), icon_url=bestURL(u))
                             self.bot.embedSender(ch, emb)
                             pops[len(rems) - i] = True

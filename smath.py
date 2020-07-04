@@ -2403,7 +2403,7 @@ hrange = lambda a, b=None, c=None, maxoff=__hlist_maxoff__: hlist(xrange(a, b, c
 hzero = lambda size, maxoff=__hlist_maxoff__: hlist((0 for i in range(size)), maxoff=maxoff)
 
 
-class freeClass(dict):
+class cdict(dict):
 
     __slots__ = ()
 
@@ -2415,7 +2415,7 @@ class freeClass(dict):
 
     def __getattr__(self, k):
         if k.startswith("__") and k.endswith("__"):
-            return freeClass.__getattribute__(self, k)
+            return self.__class__.__getattribute__(self, k)
         return super().__getitem__(k)
 
     ___repr__ = lambda self: super().__repr__()
@@ -2423,7 +2423,7 @@ class freeClass(dict):
     to_list = lambda self: list(super().values())
 
 
-class multiDict(freeClass):
+class multiDict(cdict):
 
     __slots__ = ()
 
@@ -2459,8 +2459,8 @@ class dedict(collections.abc.Mapping):
     __slots__ = ("a", "b")
 
     def __init__(self, *args, **kwargs):
-        self.a = freeClass(*args, **kwargs)
-        self.b = freeClass(reversed(t) for t in self.a.items())
+        self.a = cdict(*args, **kwargs)
+        self.b = cdict(reversed(t) for t in self.a.items())
 
     def __getitem__(self, k):
         try:

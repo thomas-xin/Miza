@@ -1,11 +1,6 @@
 #!/usr/bin/python3
 
-try:
-    from common import *
-except ModuleNotFoundError:
-    import os
-    os.chdir("..")
-    from common import *
+from common import *
 
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
@@ -37,7 +32,7 @@ class Bot:
         self.bot = self
         self.closed = False
         self.loaded = False
-        self.cache = freeClass(
+        self.cache = cdict(
             guilds={},
             channels={},
             users={},
@@ -387,7 +382,7 @@ class Bot:
                         invite = await client.fetch_invite(g_id.strip("< >"))
                         g = invite.guild
                         if not hasattr(g, "member_count"):
-                            guild = freeClass(member_count=invite.approximate_member_count)
+                            guild = cdict(member_count=invite.approximate_member_count)
                             for at in g.__slots__:
                                 setattr(guild, at, getattr(g, at))
                             guild.created_at = snowflake_time(guild.id)
@@ -827,10 +822,10 @@ class Bot:
         if reload:
             subKill()
         files = [i for i in os.listdir("commands") if iscode(i)]
-        self.categories = freeClass()
-        self.commands = freeClass()
-        self.database = freeClass()
-        self.data = freeClass()
+        self.categories = cdict()
+        self.commands = cdict()
+        self.database = cdict()
+        self.data = cdict()
         totalsize = [0, 0]
         totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
         totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p))
@@ -1247,7 +1242,7 @@ class Bot:
 
     async def ensureWebhook(self, channel, force=False):
         if not hasattr(self, "cw_cache"):
-            self.cw_cache = freeClass()
+            self.cw_cache = cdict()
         wlist = None
         if channel.id in self.cw_cache:
             if utc() - self.cw_cache[channel.id].time > 259200 or force:
@@ -1262,7 +1257,7 @@ class Bot:
             w = await channel.create_webhook(name=bot.client.user.name)
         else:
             w = random.choice(wlist)
-        self.cw_cache[channel.id] = freeClass(time=utc(), webhook=w)
+        self.cw_cache[channel.id] = cdict(time=utc(), webhook=w)
         return w
 
     async def sendEmbeds(self, channel, embeds):

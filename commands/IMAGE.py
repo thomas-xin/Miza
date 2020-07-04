@@ -784,6 +784,7 @@ class Resize(Command):
                 if not urls:
                     await fut
                     raise ArgumentError("Please input an image by URL or attachment.")
+        url = urls[0]
         value = " ".join(args).strip()
         if not value:
             x = y = 0.5
@@ -840,7 +841,7 @@ class Magik(Command):
         if not args:
             raise ArgumentError("Please input an image by URL or attachment.")
         url = args.pop(0)
-        urls = await bot.followURL(url, best=True, limit=1)
+        urls = await bot.followURL(url, best=False, limit=1)
         if not urls:
             urls = await bot.followImage(argv)
             if not urls:

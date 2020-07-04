@@ -41,7 +41,7 @@ class Purge(Command):
                     try:
                         t_user = await bot.fetch_member_ex(u_id, guild)
                     except LookupError:
-                        t_user = freeClass(id=u_id)
+                        t_user = cdict(id=u_id)
         if count <= 0:
             raise ValueError("Please enter a valid amount of messages to delete.")
         if not count < inf:
@@ -819,7 +819,7 @@ class UpdateBans(Database):
                 self.listed.insort((x["t"], g_id), key=lambda x: x[0])
                 print(self.listed)
                 continue
-            x = freeClass(temp.pop(0))
+            x = cdict(temp.pop(0))
             if not temp:
                 self.data.pop(g_id)
             else:
@@ -1053,12 +1053,12 @@ class UpdateUserLogs(Database):
                 for log in bans:
                     if ts - utc_ts(log.created_at) < 3:
                         if log.target.id == user.id:
-                            ban = freeClass(id=log.user.id, reason=log.reason)
+                            ban = cdict(id=log.user.id, reason=log.reason)
                             raise StopIteration
                 for log in kicks:
                     if ts - utc_ts(log.created_at) < 3:
                         if log.target.id == user.id:
-                            kick = freeClass(id=log.user.id, reason=log.reason)
+                            kick = cdict(id=log.user.id, reason=log.reason)
                             raise StopIteration
             except StopIteration:
                 pass

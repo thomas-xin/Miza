@@ -514,7 +514,7 @@ class Mimic(Command):
             mid += 1
             m_id = "&" + str(mid)
         if mimic is None:
-            mimic = freeClass(
+            mimic = cdict(
                 id=m_id,
                 u_id=u_id,
                 prefix=prefix,
@@ -691,7 +691,7 @@ class UpdateMimics(Database):
                                 if mimics:
                                     line = line[i + 1:].strip(" ")
                                     for m in mimics:
-                                        sending.append(freeClass(m_id=m, msg=line))
+                                        sending.append(cdict(m_id=m, msg=line))
                                     found = True
                         if not sending:
                             break

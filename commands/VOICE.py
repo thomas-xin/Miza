@@ -182,7 +182,7 @@ class CustomAudio(discord.AudioSource):
     def __init__(self, channel, vc, bot):
         try:
             self.paused = False
-            self.stats = freeClass(**self.defaults)
+            self.stats = cdict(**self.defaults)
             self.source = None
             self.channel = channel
             self.vc = vc
@@ -710,7 +710,7 @@ class AudioQueue(hlist):
                         "research": True,
                     }
                     break
-                q.append(freeClass(d))
+                q.append(cdict(d))
                 if self.auds.player:
                     self.auds.player.time = 1 + utc()
         self.update_play()
@@ -959,7 +959,7 @@ class AudioFile:
             raise ProcessLookupError
         f = open("cache/" + self.file, "rb")
         it = discord.oggparse.OggStream(f).iter_packets()
-        reader = freeClass(file=f, read=lambda: next(it), _read = f.read, closed=False, advanced=False, is_opus=lambda: True)
+        reader = cdict(file=f, read=lambda: next(it), _read = f.read, closed=False, advanced=False, is_opus=lambda: True)
 
         def close():
             reader.closed = True
@@ -1263,7 +1263,7 @@ class AudioDownloader:
             dur = track.get("duration_ms")
             if dur:
                 dur /= 1000
-            temp = freeClass(
+            temp = cdict(
                 name=name,
                 url="ytsearch:" + (name + " ~ " + artists).replace(":", "-"),
                 duration=dur,
@@ -1292,7 +1292,7 @@ class AudioDownloader:
                 continue
             name = snip.get("title", v_id)
             url = "https://www.youtube.com/watch?v=" + v_id
-            temp = freeClass(
+            temp = cdict(
                 name=name,
                 url=url,
                 duration=None,
@@ -1454,7 +1454,7 @@ class AudioDownloader:
                         s = s[s.index(b"{"):s.rindex(b"}") + 1]
                         d = json.loads(s)
                         q = d["queue"]
-                        return [freeClass(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
+                        return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
                 resp = self.extract_info(item, count, search=search)
                 if resp.get("_type", None) == "url":
                     resp = self.extract_from(resp["url"])
@@ -1472,7 +1472,7 @@ class AudioDownloader:
                                 "stream": getBestAudio(resp),
                                 "icon": getBestIcon(resp),
                             }
-                            output.append(freeClass(temp))
+                            output.append(cdict(temp))
                     else:
                         for i, entry in enumerate(entries):
                             if not i:
@@ -1501,7 +1501,7 @@ class AudioDownloader:
                                     temp["research"] = True
                                 except:
                                     print(traceback.format_exc())
-                            output.append(freeClass(temp))
+                            output.append(cdict(temp))
                 else:
                     found = "duration" in resp
                     if found:
@@ -1515,7 +1515,7 @@ class AudioDownloader:
                         "stream": getBestAudio(resp),
                         "icon": getBestIcon(resp),
                     }
-                    output.append(freeClass(temp))
+                    output.append(cdict(temp))
             return output
         except:
             if force != "spotify":
@@ -1536,7 +1536,7 @@ class AudioDownloader:
             self.searched.pop(next(iter(self.searched)))
         try:
             self.requests += 1
-            obj = freeClass(t=utc())
+            obj = cdict(t=utc())
             obj.data = output = self.extract(item, force)
             self.searched[item] = obj
             self.requests = max(self.requests - 1, 0)
@@ -1661,8 +1661,8 @@ class AudioDownloader:
             data = self.extract_true(item)
             if "entries" in data:
                 data = data["entries"][0]
-            obj = freeClass(t=utc())
-            obj.data = out = [freeClass(
+            obj = cdict(t=utc())
+            obj.data = out = [cdict(
                 name=data["title"],
                 url=data["webpage_url"],
                 stream=getBestAudio(data),
@@ -1779,7 +1779,7 @@ class Queue(Command):
             }
             if "research" in e:
                 temp["research"] = True
-            added.append(freeClass(temp))
+            added.append(cdict(temp))
             names.append(noHighlight(name))
         if "b" not in flags:
             total_duration = 0
@@ -2175,7 +2175,7 @@ class Connect(Command):
                 break
         if not joined:
             connecting[guild.id] = utc()
-            vc = freeClass(is_connected = lambda: False)
+            vc = cdict(is_connected = lambda: False)
             t = utc()
             while not vc.is_connected() and utc() - t < 8:
                 try:
@@ -2187,7 +2187,7 @@ class Connect(Command):
                 except discord.ClientException:
                     print(traceback.format_exc())
                     await asyncio.sleep(1)
-            if isinstance(vc, freeClass):
+            if isinstance(vc, cdict):
                 connecting[guild.id] = 0
                 raise ConnectionError("Unable to connect to voice channel.")
         if guild.id not in bot.database.playlists.audio:
@@ -2495,7 +2495,7 @@ class Dump(Command):
         fut = create_task(channel.trigger_typing())
         q = d["queue"]
         for i in range(len(q)):
-            e = q[i] = freeClass(q[i])
+            e = q[i] = cdict(q[i])
             e.u_id = user.id
             e.skips = []
             if not 1 + i & 2047:
@@ -2658,7 +2658,7 @@ class AudioSettings(Command):
                     if k != "volume" and auds.stats.get(k) != v:
                         res = True
                         break
-                auds.stats = freeClass(auds.defaults)
+                auds.stats = cdict(auds.defaults)
                 if auds.queue and res:
                     await create_future(auds.new, auds.file, pos)
                 return (
@@ -2960,7 +2960,7 @@ class Player(Command):
             return
         auds = bot.database.playlists.audio[guild.id]
         if reaction is None:
-            auds.player = freeClass(
+            auds.player = cdict(
                 time=inf,
                 message=message,
                 type=int(vals),
@@ -3052,7 +3052,7 @@ class Player(Command):
                     await create_future(auds.new, auds.file, auds.stats.position)
                 elif i == 13:
                     pos = auds.stats.position
-                    auds.stats = freeClass(auds.defaults)
+                    auds.stats = cdict(auds.defaults)
                     await create_future(auds.new, auds.file, pos)
                 elif i == 14:
                     auds.dead = True
@@ -3471,7 +3471,7 @@ class UpdateQueues(Database):
             for i in range(len(pl[g])):
                 e = pl[g][i]
                 if type(e) is dict:
-                    pl[g][i] = freeClass(e)
+                    pl[g][i] = cdict(e)
 
     def is_connecting(self, g):
         if g in self.connecting:

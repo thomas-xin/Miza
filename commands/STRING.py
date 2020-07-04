@@ -45,7 +45,7 @@ f.close()
 try:
     translators["Papago"] = PapagoTrans(auth["papago_id"], auth["papago_secret"])
 except KeyError:
-    translators["Papago"] = freeClass(
+    translators["Papago"] = cdict(
         translate=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to use Papago Translate.")'),
     )
     print("WARNING: papago_id/papago_secret not found. Unable to use Papago Translate.")

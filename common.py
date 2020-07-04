@@ -308,7 +308,7 @@ def is_image(url):
     return IMAGE_FORMS.get(url)
 
 
-SUBS = freeClass(math=freeClass(procs=hlist(), busy=freeClass()), image=freeClass(procs=hlist(), busy=freeClass()))
+SUBS = cdict(math=cdict(procs=hlist(), busy=cdict()), image=cdict(procs=hlist(), busy=cdict()))
 
 subCount = lambda: sum(1 for ptype in SUBS.values() for proc in ptype.procs if proc.is_running())
 
@@ -676,7 +676,7 @@ class Command:
     def __init__(self, bot, catg):
         self.used = {}
         if not hasattr(self, "data"):
-            self.data = freeClass()
+            self.data = cdict()
         if not hasattr(self, "name"):
             self.name = []
         self.__name__ = self.__class__.__name__

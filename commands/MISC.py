@@ -67,7 +67,7 @@ f.close()
 try:
     douclub = DouClub(auth["knack_id"], auth["knack_secret"])
 except KeyError:
-    douclub = freeClass(
+    douclub = cdict(
         search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to search Doukutsu Club.")'),
         update=lambda: None
     )
@@ -529,7 +529,7 @@ class MathQuiz(Command):
             argv = "easy"
         elif argv not in ("easy", "hard"):
             raise TypeError("Invalid quiz mode.")
-        mathdb.data[channel.id] = freeClass(mode=argv, answer=None)
+        mathdb.data[channel.id] = cdict(mode=argv, answer=None)
         return "```css\nEnabled " + argv + " math quiz for " + sbHighlight(channel.name) + ".```"
 
 
