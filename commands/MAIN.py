@@ -123,13 +123,13 @@ class Perms(Command):
                     except LookupError:
                         t_user = await bot.fetch_whuser(u_id, guild)
         print(t_user)
-        t_perm = bot.getPerms(t_user.id, guild)
+        t_perm = roundMin(bot.getPerms(t_user.id, guild))
         if len(args) > 1:
             name = str(t_user)
             orig = t_perm
             expr = " ".join(args[1:])
             num = await bot.evalMath(expr, guild, orig)
-            c_perm = num
+            c_perm = roundMin(num)
             if t_perm is nan or isnan(c_perm):
                 m_perm = nan
             else:
