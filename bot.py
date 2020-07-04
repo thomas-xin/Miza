@@ -584,6 +584,8 @@ class Bot:
                             out.extend(found2)
                         elif preserve:
                             lost.append(u)
+            else:
+                out.append(url)
         if preserve:
             out.extend(lost)
         if not out:

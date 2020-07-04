@@ -1743,15 +1743,15 @@ class Queue(Command):
                 argv = urls[0]
             else:
                 out = [create_future(ytdl.search, url) for url in urls]
-                print(out)
         if out is None:
             resp = await create_future(ytdl.search, argv)
         else:
             resp = deque()
             for fut in out:
                 temp = await fut
-                print(temp)
-                resp.extend(temp)
+                # print(temp)
+                if type(temp) not in (str, bytes):
+                    resp.extend(temp)
         if future is not None:
             auds = await future
         await future2
