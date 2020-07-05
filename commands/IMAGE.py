@@ -215,9 +215,9 @@ class React(Command):
     async def __call__(self, bot, flags, guild, message, user, argv, args, **void):
         update = self.data.reacts.update
         following = bot.data.reacts
-        curr = setDict(following, guild.id, multiDict())
-        if type(curr) is not multiDict:
-            following[guild.id] = curr = multiDict(curr)
+        curr = setDict(following, guild.id, mdict())
+        if type(curr) is not mdict:
+            following[guild.id] = curr = mdict(curr)
         if not argv:
             if "d" in flags:
                 if "f" not in flags:
@@ -262,7 +262,7 @@ class React(Command):
             emoji = await bot.fetch_emoji(e_id)
         await message.add_reaction(emoji)
         curr.append(a, str(emoji))
-        following[guild.id] = multiDict({i: curr[i] for i in sorted(curr)})
+        following[guild.id] = mdict({i: curr[i] for i in sorted(curr)})
         update()
         return (
             "```css\nAdded [" + noHighlight(a) + "] ➡️ [" + noHighlight(args[-1]) + "] to the auto react list for ["
@@ -278,7 +278,7 @@ class React(Command):
         guild = message.guild
         user = await bot.fetch_user(u_id)
         following = bot.data.reacts
-        curr = following.get(guild.id, multiDict())
+        curr = following.get(guild.id, mdict())
         page = 16
         last = max(0, len(curr) - page)
         if reaction is not None:
@@ -1195,8 +1195,8 @@ class UpdateReacts(Database):
         if g_id in data:
             try:
                 following = self.data[g_id]
-                if type(following) != multiDict:
-                    following = self.data[g_id] = multiDict(following)
+                if type(following) != mdict:
+                    following = self.data[g_id] = mdict(following)
                 reacting = {}
                 for k in following:
                     if is_alphanumeric(k) and " " not in k:

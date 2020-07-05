@@ -42,7 +42,7 @@ class Bot:
             deleted={},
             members={},
         )
-        self.events = multiDict()
+        self.events = mdict()
         self.proc_call = {}
         print("Time: " + str(datetime.datetime.now()))
         print("Initializing...")

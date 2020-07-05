@@ -77,7 +77,7 @@ class Execute(Command):
     description = "Causes all messages by the bot owner in the current channel to be executed as python code on ⟨MIZA⟩."
     usage = "<type> <enable(?e)> <disable(?d)>"
     flags = "aed"
-    terminal_types = dedict({
+    terminal_types = demap({
         "null": 0,
         "main": 1,
         "relay": 2,

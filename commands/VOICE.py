@@ -3338,7 +3338,6 @@ class Download(Command):
             urls = await bot.followURL(argv)
             if urls:
                 res += await create_future(ytdl.extract, urls[0])
-                res += data
             if not res:
                 sc = min(4, flags.get("v", 0) + 1)
                 yt = min(6, sc << 1)

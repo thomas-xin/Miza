@@ -2409,7 +2409,7 @@ class cdict(dict):
 
     __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
     __repr__ = lambda self: self.__class__.__name__ + "(" + super().__repr__() + ")"
-    __str__ = lambda self: "【" + self.__repr__()[11:-2] + "】"
+    __str__ = lambda self: "<" + super().__repr__()[1:-1] + ">"
     __iter__ = lambda self: iter(tuple(super().__iter__()))
     __setattr__ = lambda self, k, v: super().__setitem__(k, v)
 
@@ -2423,7 +2423,7 @@ class cdict(dict):
     to_list = lambda self: list(super().values())
 
 
-class multiDict(cdict):
+class mdict(cdict):
 
     __slots__ = ()
 
@@ -2454,7 +2454,7 @@ class multiDict(cdict):
             self.extend(k, v)
 
 
-class dedict(collections.abc.Mapping):
+class demap(collections.abc.Mapping):
 
     __slots__ = ("a", "b")
 
