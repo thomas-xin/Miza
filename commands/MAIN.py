@@ -674,16 +674,22 @@ class Info(Command):
             try:
                 ts = utc()
                 ls = bot.data.users[u.id]["last_seen"]
+                la = bot.data.users[u.id].get("last_action")
                 if type(ls) is str:
                     seen = ls
                 else:
                     seen = sec2Time(max(0, ts - ls)) + " ago"
+                if la:
+                    seen = la + ", " + seen
             except LookupError:
                 pass
             try:
                 gmsg = bot.database.counts.getUserGlobalMessageCount(u)
                 msgs = await bot.database.counts.getUserMessages(u, guild)
                 avgs = await bot.database.counts.getUserAverage(u, guild)
+                old = bot.data.counts.get(guild.id, {})["oldest"].get(u.id)
+                if old:
+                    old = snowflake_time(old)
                 if guild.owner.id != client.user.id:
                     us = await bot.database.counts.getGuildMessages(guild)
                     if type(us) is str:
@@ -726,8 +732,10 @@ class Info(Command):
         emb.description = d
         emb.add_field(name="User ID", value=str(u.id), inline=0)
         emb.add_field(name="Creation time", value=str(created), inline=1)
-        if joined is not None:
+        if joined:
             emb.add_field(name="Join time", value=str(joined), inline=1)
+        if old:
+            emb.add_field(name="Oldest post time", value=str(old), inline=1)
         if status:
             emb.add_field(name="Status", value=str(status), inline=1)
         if seen:
@@ -1198,7 +1206,7 @@ class UpdateMessageCount(Database):
         return len(message.system_content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
 
     def startCalculate(self, guild):
-        self.data[guild.id] = {"counts": {}, "totals": {}}
+        self.data[guild.id] = {"counts": {}, "totals": {}, "oldest": {}}
         create_task(self.getUserMessageCount(guild))
 
     async def getUserMessages(self, user, guild):
@@ -1308,11 +1316,12 @@ class UpdateMessageCount(Database):
         year = datetime.timedelta(seconds=31556925.216)
         oneyear = utc_dt() - guild.created_at < year
         if guild.member_count > 512 and not oneyear:
-            self.data["guild.id"] = {"counts": {}, "totals": {}, 0: True}
+            addDict(self.data[guild.id], {0: True})
             return
         print(guild)
         data = {}
         avgs = {}
+        oldest = self.data[guild.id]["oldest"]
         histories = deque()
         i = 1
         for channel in reversed(guild.text_channels):
@@ -1331,19 +1340,20 @@ class UpdateMessageCount(Database):
         while [] in histories:
             histories = histories.remove([])
         for messages in histories:
-            i = 1
-            for message in messages[0]:
+            for i, message in enumerate(messages[0], 1):
                 u = message.author.id
+                orig_id = oldest.get(u)
+                if not orig_id or message.id < orig_id:
+                    oldest[u] = message.id
                 length = self.getMessageLength(message)
-                if u in data:
+                try:
                     data[u] += 1
                     avgs[u] += length
-                else:
+                except KeyError:
                     data[u] = 1
                     avgs[u] = length
                 if not i & 8191:
                     await asyncio.sleep(0.5)
-                i += 1
         addDict(self.data[guild.id], {"counts": data, "totals": avgs, 0: True})
         self.update()
         print(guild)
@@ -1380,6 +1390,8 @@ class UpdateMessageCount(Database):
                 d = self.data[guild.id]
                 if type(d) is str:
                     return
+                if user.id not in d["oldest"]:
+                    d["oldest"][user.id] = message.id
                 count = d["counts"].get(user.id, 0) + 1
                 total = d["totals"].get(user.id, 0) + self.getMessageLength(message)
                 d["totals"][user.id] = total
@@ -1451,10 +1463,11 @@ class UpdateUsers(Database):
             out = [sum(out[i:i + factor]) for i in range(0, len(out), factor)]
         return out
 
-    async def _seen_(self, user, delay, event, count=1, **void):
+    async def _seen_(self, user, delay, event, count=1, raw=None, **void):
         self.send_event(user.id, event, count=count)
         addDict(self.data, {user.id: {"last_seen": 0}})
         self.data[user.id]["last_seen"] = utc() + delay
+        self.data[user.id]["last_action"] = raw
 
     async def _command_(self, user, command, **void):
         self.send_event(user.id, "command")

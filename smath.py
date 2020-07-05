@@ -775,6 +775,8 @@ def romanNumerals(num, order=0):
 
 
 def limStr(s, maxlen=10):
+    if maxlen is None:
+        return s
     if type(s) is not str:
         s = str(s)
     over = (len(s) - maxlen) / 2
