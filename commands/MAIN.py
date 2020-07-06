@@ -645,7 +645,7 @@ class Info(Command):
             role = ", ".join("<@&" + str(i.id) + ">" for i in getattr(u, "roles", ()) if not i.is_default())
         else:
             role = None
-        coms = seen = msgs = avgs = gmsg = 0
+        coms = seen = msgs = avgs = gmsg = old = 0
         fav = None
         pos = None
         if "v" in flags:
