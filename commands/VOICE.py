@@ -438,7 +438,7 @@ class CustomAudio(discord.AudioSource):
             args = ["-i", "misc/SNB3,0all.wav"]
         else:
             args = []
-        options = []
+        options = deque()
         if self.reverse:
             options.append("areverse")
         if pitchscale != 1 or stats.speed != 1:
@@ -493,13 +493,15 @@ class CustomAudio(discord.AudioSource):
             options.append("volume=2")
         if stats.compressor:
             comp = min(8000, abs(stats.compressor + sgn(stats.compressor)))
+            if not isValid(stats.compressor):
+                options.extend(("anoisesrc=a=.001953125:c=brown", "amerge"))
             while abs(comp) > 1:
                 c = min(20, comp)
                 try:
                     comp /= c
                 except ZeroDivisionError:
                     comp = 1
-                mult = str(round(c ** (2 / 3) * math.sqrt(2), 4))
+                mult = str(round(c ** 0.6 * math.sqrt(2), 4))
                 options.append(
                     "acompressor=mode=" + ("upward" if stats.compressor < 0 else "downward")
                     + ":ratio=" + str(c) + ":level_in=" + mult + ":threshold=0.0625:makeup=" + mult
@@ -543,6 +545,7 @@ class CustomAudio(discord.AudioSource):
             options.append("asoftclip=atan")
             args.append(("-af", "-filter_complex")[bool(reverb)])
             args.append(",".join(options))
+        # print(args)
         return args
 
     def read(self):
@@ -878,6 +881,7 @@ class AudioFile:
                             pass
                         else:
                             return self.load(xm, check_fmt=False, force=True)
+                    print(self.proc.args)
                     err = self.proc.stderr.read().decode("utf-8", "replace")
                     if err:
                         ex = RuntimeError(err)

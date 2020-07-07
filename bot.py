@@ -46,10 +46,8 @@ class Bot:
         self.proc_call = {}
         print("Time: " + str(datetime.datetime.now()))
         print("Initializing...")
-        if not os.path.exists("cache/"):
-            os.mkdir("cache")
-        if not os.path.exists("saves/"):
-            os.mkdir("saves")
+        directory = dict.fromkeys(os.listdir())
+        [os.mkdir(folder) for folder in ("cache", "saves", "deleted") if folder not in directory]
         try:
             f = open(self.authdata)
         except FileNotFoundError:
@@ -620,6 +618,10 @@ class Bot:
             self.cache.messages.pop(message.id)
         except KeyError:
             pass
+        if not message.author.bot:
+            s = strMessage(message, username=True)
+            ch = "deleted/" + str(message.channel.id) + ".txt"
+            print(s, file=ch)
 
     def limitCache(self, cache=None, limit=1048576):
         if cache is not None:
@@ -1460,7 +1462,7 @@ class Bot:
         ghost = True
 
 
-typing = lambda channel: create_task(channel.trigger_typing())
+typing = lambda self: create_task(self.trigger_typing())
 
 
 def userQuery1(x):

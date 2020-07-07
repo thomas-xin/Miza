@@ -76,7 +76,7 @@ class Purge(Command):
             try:
                 if hasattr(channel, "delete_messages"):
                     dels = delM[:100]
-                    bot.logDelete(dels[-1], -1)
+                    # bot.logDelete(dels[-1], -1)
                     await channel.delete_messages(dels)
                     deleted += len(dels)
                     for _ in loop(len(dels)):
@@ -1183,17 +1183,9 @@ class UpdateMessageLogs(Database):
                 emb.add_field(name="After", value=strMessage(after))
                 self.bot.embedSender(channel, emb)
 
-    def logDeleted(self, message):
-        if message.author.bot and message.author.id != self.bot.client.user.id:
-            return
-        if self.bot.isDeleted(message) < 2:
-            s = strMessage(message, username=True)
-            print(s, file="deleted.txt")
-
     async def _delete_(self, message, bulk=False, **void):
         cu_id = self.bot.client.user.id
         if bulk:
-            # self.logDeleted(message)
             return
         guild = message.guild
         if guild.id in self.data:
@@ -1217,7 +1209,8 @@ class UpdateMessageLogs(Database):
                 if d_level:
                     if d_level > 1:
                         if d_level < 3:
-                            self.logDeleted(message)
+                            pass
+                            # self.logDeleted(message)
                         return
                     t = self.bot.client.user
                     init = "<@" + str(t.id) + ">"
@@ -1249,10 +1242,6 @@ class UpdateMessageLogs(Database):
                             if targ == u.id and cid == message.channel.id:
                                 t = e.user
                                 init = "<@" + str(t.id) + ">"
-                                # print(t, e.target)
-                # if t.bot or u.id == t.id == cu_id:
-                #     self.logDeleted(message)
-                #     return
             except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
             emb = discord.Embed(colour=colour2Raw([255, 0, 0]))
