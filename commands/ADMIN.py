@@ -1376,6 +1376,8 @@ class UpdateRolegivers(Database):
                     except LookupError:
                         alist[0].remove(r)
                         continue
+                    if role in user.roles:
+                        continue
                     await user.add_roles(
                         role,
                         reason="Keyword \"" + k + "\" found in message \"" + message.content + "\".",

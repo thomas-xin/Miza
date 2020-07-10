@@ -115,25 +115,29 @@ async def parasync(coro, rets):
 
 async def recursiveCoro(item):
     rets = hlist()
-    for i in range(len(item)):
+    try:
+        len(item)
+    except TypeError:
+        item = hlist(item)
+    for i, obj in enumerate(item):
         try:
-            if type(item[i]) in (str, bytes):
+            if type(obj) in (str, bytes):
                 raise TypeError
-            if issubclass(type(item[i]), collections.abc.Mapping) or issubclass(type(item[i]), io.IOBase):
+            if issubclass(type(obj), collections.abc.Mapping) or issubclass(type(obj), io.IOBase):
                 raise TypeError
-            if awaitable(item[i]):
+            if awaitable(obj):
                 raise TypeError
-            item[i] = tuple(item[i])
+            obj = tuple(obj)
         except TypeError:
             pass
-        if type(item[i]) is tuple:
+        if type(obj) is tuple:
             rets.append(returns())
-            create_task(parasync(recursiveCoro(item[i]), rets[-1]))
-        elif awaitable(item[i]):
+            create_task(parasync(recursiveCoro(obj), rets[-1]))
+        elif awaitable(obj):
             rets.append(returns())
-            create_task(parasync(item[i], rets[-1]))
+            create_task(parasync(obj, rets[-1]))
         else:
-            rets.append(returns(item[i]))
+            rets.append(returns(obj))
     full = False
     while not full:
         full = True

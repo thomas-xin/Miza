@@ -99,22 +99,21 @@ class Execute(Command):
         if "e" in flags or "a" in flags:
             if num == 0:
                 num = 4
-                out = self.terminal_types[num]
             try:
                 bot.data.exec[channel.id] |= num
             except KeyError:
                 bot.data.exec[channel.id] = num
             update()
+            out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec[channel.id]))
             create_task(message.add_reaction("❗"))
             return (
-                "```css\nSuccessfully enabled [" + out + "] terminal in [#"
+                "```css\n[" + out + "] terminal now enabled in [#"
                 + noHighlight(channel.name) + "].```"
             )
         elif "d" in flags:
             try:
                 if num == 0:
-                    bot.data.exec.pop(channel.id)
-                    out = "global"
+                    out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec.pop(channel.id)))
                 else:
                     bot.data.exec[channel.id] &= -num - 1
                     if not bot.data.exec[channel.id]:

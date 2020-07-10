@@ -6,286 +6,323 @@ except ModuleNotFoundError:
     from common import *
 
 
+class GameOverError(OverflowError):
+    pass
+
+
+class ND2048(collections.abc.MutableSequence):
+
+    digit_ratio = 1 / math.log2(10)
+    spl = b"_"
+    __slots__ = ("data", "history", "shape", "flags")
+
+    @classmethod
+    def load(cls, data):
+        spl = data.split(cls.spl)
+        i = spl.index(b"")
+        shape = [int(x) for x in spl[:i - 1]]
+        flags = int(spl[i - 1])
+        spl = spl[i + 1:]
+        self = cls(flags=flags)
+        self.data = np.frombuffer(b642Bytes(spl.pop(0), 1), dtype=np.int8).reshape(shape)
+        if not self.data.flags.writeable:
+            self.data = self.data.copy()
+        if self.flags & 1:
+            self.history = deque(maxlen=max(1, int(800 / np.prod(self.data.size) - 1)))
+            while spl:
+                self.history.append(np.frombuffer(b642Bytes(spl.pop(0), 1), dtype=np.int8).reshape(shape))
+        return self
+
+    def serialize(self):
+        s = (self.spl.join(str(i).encode("utf-8") for i in self.data.shape)) + self.spl + str(self.flags).encode("utf-8") + self.spl * 2 + bytes2B64(self.data.tobytes(), 1)
+        if self.flags & 1 and self.history:
+            s += self.spl + self.spl.join(bytes2B64(b.tobytes(), 1) for b in self.history)
+        return s
+
+    def __init__(self, *size, flags=0):
+        if not size:
+            self.data = None
+            self.flags = flags
+            return
+        elif len(size) <= 1:
+            try:
+                size = int(size)
+            except (ValueError, TypeError):
+                size = list(reversed(size))
+            else:
+                size = [size, size]
+        self.data = np.tile(np.int8(0), size)
+        if flags & 1:
+            self.history = deque(maxlen=max(1, int(800 / np.prod(size) - 1)))
+        self.flags = flags
+        self.spawn(max(2, self.data.size // 6), flag_override=0)
+
+    __repr__ = lambda self: self.__class__.__name__ + ".load(" + repr(self.serialize()) + ")"
+
+    def __str__(self):
+        m = 64
+        a = self.data
+        nd = max(3, 1 + int(self.digit_ratio * np.max(a)), 2 + int(-self.digit_ratio * np.min(a)))
+        w = len(a) * (nd + 1) - 1
+        shape = list(a.shape)
+        if a.ndim <= 2:
+            if a.ndim == 1:
+                a = [a]
+            else:
+                a = np.moveaxis(a, 0, 1)
+            return "+" + ("-" * nd + "+") * shape[0] + "\n" + "\n".join("|" + "|".join(self.display(x, nd) for x in i) + "|\n+" + ("-" * nd + "+") * shape[0] for i in a)
+        curr = 3
+        horiz = 1
+        while a.ndim >= curr:
+            w2 = shape[a.ndim - curr - 1]
+            c = (w + 1) * w2 - 1
+            if c <= m:
+                w = c
+                horiz += 1
+            curr += 2
+        if a.ndim <= 4:
+            dim = len(a)
+            if a.ndim == 3:
+                a = np.swapaxes(np.expand_dims(np.rollaxis(a, 0, 3), 2), 0, 1)
+                shape.insert(2, 1)
+            else:
+                a = np.swapaxes(a, 0, 3)
+            horiz = 2
+            if horiz > 1:
+                return "\n".join("\n".join((("+" + ("-" * nd + "+") * shape[0] + " ") * shape[2])[:-1] + "\n" + " ".join("|" + "|".join(self.display(x, nd) for x in i) + "|" for i in j) for j in k) + "\n" + (("+" + ("-" * nd + "+") * shape[0] + " ") * shape[2])[:-1] for k in a)
+            return str(horiz)
+        return self.data.__str__()
+
+    score = lambda self: np.sum([(g - 1) * 2 ** g for g in [self.data[self.data > 1].astype(np.uint64)]])
+
+    def spawn(self, count=1, flag_override=None):
+        try:
+            flags = flag_override if flag_override is not None else self.flags
+            if 0 not in self:
+                raise IndexError
+            if flags & 4:
+                high = max(4, numpy.max(self.data)) - 1
+                choices = [np.min(self.data[self.data > 0])] + [max(1, i) for i in range(high - 4, high)]
+            else:
+                choices = [1] * 9 + [2]
+            if flags & 2:
+                neg = max(1, numpy.max(self.data))
+                neg = 1 if neg <= 1 else random.randint(1, neg)
+                neg = -1 if neg <= 1 else -random.randint(1, neg)
+                for i in range(len(choices) >> 2):
+                    if neg >= 0:
+                        break
+                    choices[i + 1] = neg
+                    neg += 1
+            spawned = deque(random.choice(choices) for i in range(count))
+            fi = self.data.flat
+            empty = [i for i in range(self.data.size) if not fi[i]]
+            random.shuffle(empty)
+            empty = deque(empty)
+            while spawned:
+                i = empty.popleft()
+                if not fi[i]:
+                    fi[i] = spawned.popleft()
+        except IndexError:
+            raise RuntimeError("Unable to spawn tile.")
+        return self
+
+    def recurse(self, it):
+        if it.ndim > 1:
+            return any([self.recurse(i) for i in it])
+        done = modified = False
+        while not done:
+            done = True
+            for i in range(len(it) - 1):
+                if it[i + 1]:
+                    if not it[i]:
+                        it[i] = it[i + 1]
+                        it[i + 1] = 0
+                        done = False
+                    elif it[i] == it[i + 1] or (it[i + 1] < 0 and it[i]):
+                        it[i] += (1 if it[i] >= 0 else -1) * (1 if it[i + 1] >= 0 else -it[i + 1])
+                        it[i + 1] = 0
+                        done = False
+                    elif it[i] < 0:
+                        it[i] = it[i + 1] - it[i]
+                        it[i + 1] = 0
+                        done = False
+                if not done:
+                    modified = True
+        return modified
+
+    def move(self, dim=0, rev=False, count=1):
+        if self.flags & 1:
+            temp = copy.deepcopy(self.data)
+        moved = False
+        for i in range(count):
+            if dim < 0:
+                dim = xrand(self.data.ndim)
+                rev = xrand(2)
+            it = np.moveaxis(self.data, dim, -1)
+            if rev:
+                it = np.flip(it)
+            m = self.recurse(it)
+            if m:
+                self.spawn()
+            moved |= m
+        if moved:
+            if self.flags & 1:
+                self.history.append(temp)
+            if 0 not in self.data:
+                valid = False
+                for dim in range(self.data.ndim):
+                    temp = np.moveaxis(copy.deepcopy(self.data), dim, -1)
+                    if self.recurse(temp):
+                        valid = True
+                if not valid:
+                    raise GameOverError("Game Over.")
+        return moved
+
+    def undo(self):
+        if self.flags & 1 and self.history:
+            self.data = self.history.pop()
+            return True
+
+    def display(self, num, length):
+        if num > 0:
+            numlength = 1 + int(num * self.digit_ratio)
+            out = str(1 << int(num))
+        elif num < 0:
+            numlength = 2 - int(num * self.digit_ratio)
+            out = "×" + str(1 << int(-num))
+        else:
+            return " " * length
+        x = length - numlength
+        return " " * (1 + x >> 1) + out + " " * (x >> 1)
+
+    __len__ = lambda self: self.data.__len__()
+    __iter__ = lambda self: self.data.flat
+    __reversed__ = lambda self: np.flip(self.data).flat
+    __contains__ = lambda self, *args: self.data.__contains__(*args)
+    __getitem__ = lambda self, *args: self.data.__getitem__(*args)
+    __setitem__ = lambda self, *args: self.data.__setitem__(*args)
+    __delitem__ = lambda self, *args: self.data.__delitem__(*args)
+    insert = lambda self, *args: self.data.insert(*args)
+    render = lambda self: self.__str__()
+
+
 class Text2048(Command):
     time_consuming = True
-    directions = {
-        b'\xe2\xac\x85': [0, 0],
-        b'\xe2\xac\x86': [0, 1],
-        b'\xe2\x9e\xa1': [0, 2],
-        b'\xe2\xac\x87': [0, 3],
-        b'\xe2\x86\xa9': [1, 4],
-        b'\xe2\x86\x96': [16, 5],
-        b'\xe2\x86\x97': [16, 6],
-        b'\xe2\x86\x98': [16, 7],
-        b'\xe2\x86\x99': [16, 8],
-        b'\xe2\x86\x94': [16, 9],
-        b'\xe2\x86\x95': [16, 10],
-        b'\xf0\x9f\x94\x84': [16, 11],
-        b'\xf0\x9f\x92\xa0': [16, 12],
-        b'\xf0\x9f\x92\xaf': [16, 13],
-    }
-    multis = {
-        5: [0, 1],
-        6: [1, 2],
-        7: [2, 3],
-        8: [3, 0],
-        9: [0, 2],
-        10: [1, 3],
-        11: [0,1,2,3],
-        12: [i for i in range(16)],
-        13: [i for i in range(100)],
-    }
-    numScore = lambda y, x=0: x * 2 ** (x + 1)
     name = ["2048", "Text_2048"]
     min_level = 0
     description = "Plays a game of 2048 using reactions."
-    usage = (
-        "<board_size[4]>  <show_debug(?z)> <special_tiles(?s)> <public(?p)> "
-        + "<insanity_mode(?i)> <special_controls(?c)> <easy_mode(?e)>"
-    )
-    flags = "zspice"
-    rate_limit = (1, 2)
-
-    def shiftTile(self, tiles, p1, p2):
-        x1, y1 = p1
-        x2, y2 = p2
-        if tiles[x2][y2] <= 0:
-            tiles[x2][y2] = tiles[x1][y1]
-        elif type(tiles[x1][y1]) is float:
-            if type(tiles[x2][y2]) is int:
-                tiles[x2][y2] += round(tiles[x1][y1] * 10)
-            else:
-                tiles[x2][y2] += tiles[x1][y1]
-        elif type(tiles[x2][y2]) is float:
-            tiles[x2][y2] = round(tiles[x2][y2] * 10) + tiles[x1][y1]
-        elif tiles[x2][y2] == tiles[x1][y1]:
-            tiles[x2][y2] += 1
-        else:
-            return False
-        tiles[x1][y1] = 0
-        return True
-
-    def moveTiles(self, gamestate, direction):
-        tiles = gamestate[0]
-        width = len(tiles)
-        i = direction & 3
-        if i & 2:
-            r = range(width - 1, -1, -1)
-            d = -1
-        else:
-            r = range(width)
-            d = 1
-        # print(direction, i, list(r), d)
-        a = 1
-        for _ in loop(width - 1):
-            changed = False
-            if not i & 1:
-                for x in r:
-                    z = x - d
-                    if z in r:
-                        for y in r:
-                            if tiles[x][y] > 0:
-                                changed |= self.shiftTile(tiles, (x, y), (z, y))
-            else:
-                for y in r:
-                    z = y - d
-                    if z in r:
-                        for x in r:
-                            if tiles[x][y] > 0:
-                                changed |= self.shiftTile(tiles, (x, y), (x, z))
-            if not changed:
-                break
-            a = 0
-        return tiles, a
-
-    def randomSpam(self, gamestate, mode, pool):
-        gamestate[1] = gamestate[0]
-        a = i = 1
-        moved = {}
-        shuffle(pool)
-        while pool:
-            move = pool[0]
-            if not move in moved:
-                gamestate[0], b = self.moveTiles(gamestate, move)
-                self.spawn(gamestate[0], mode, 1)
-                a &= b
-                if b:
-                    moved[pool[0]] = True
-                    if len(moved) >= 4:
-                        break
-                else:
-                    moved = {}
-            pool = pool[1:]
-            if not i % 20:
-                time.sleep(0.01)
-            i += 1
-        return gamestate, a
-                                        
-    async def nextIter(self, message, gamestate, username, direction, mode):
-        width = len(gamestate[-1])
-        i = direction
-        for z in range(len(gamestate)):
-            for x in range(width):
-                for y in range(width):
-                    if gamestate[z][x][y] < 0:
-                        gamestate[z][x][y] = 0
-        if i == 4:
-            a = gamestate[0] == gamestate[1]
-            gamestate = gamestate[::-1]
-        elif i is None:
-            a = 0
-        else:
-            if i < 4:
-                gamestate[1] = gamestate[0]
-                gamestate[0], a = self.moveTiles(gamestate, i)
-                self.spawn(gamestate[0], mode, 1)
-            else:
-                pool = list(self.multis[i])
-                self.gamestate, a = await create_future(self.randomSpam, gamestate, mode, pool)
-        if not a:
-            gsr = str(gamestate).replace("[", "A").replace("]", "B").replace(",", "C").replace("-", "D").replace(" ", "")
-            orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]).split("-")
-            last = "-".join(orig[:-1])
-            text = last + "-" + gsr + "\n"
-            score = 0
-            largest = numpy.max(gamestate[0])
-            size = max(3, int(1 + math.log10(2 ** largest)))
-            for y in range(width):
-                text += ("+" + "-" * size) * width + "+\n"
-                for x in range(width):
-                    n = gamestate[0][x][y]
-                    if type(n) is int and n > 0:
-                        score += self.numScore(n - 1)
-                    if n <= 0:
-                        num = ""
-                    elif type(n) is float:
-                        num = "×" + str(1 << round(n * 10))
-                    else:
-                        num = str(1 << n)
-                    empty = size - len(num)
-                    text += "|" + " " * (empty + 1 >> 1) + num + " " * (empty >> 1)
-                text += "|\n"
-            text += (
-                ("+" + "-" * size) * width + "+" + "\nPlayer: "
-                + username + "\nScore: " + str(score) + "```"
-            )
-            # print(text)
-            await message.edit(content=text)
-        elif not mode & 1:
-            count = 0
-            for x in range(width):
-                for y in range(width):
-                    if gamestate[0][x][y] > 0:
-                        count += 1
-            if count >= width ** 2:
-                gamecopy = list(gamestate)
-                gamecopy[0] = [list(l) for l in gamestate[0]]
-                a = 1
-                for i in range(4):
-                    try:
-                        gamecopy, b = self.moveTiles(gamecopy, i)
-                        a &= b
-                    except TypeError:
-                        pass
-                if a:
-                    try:
-                        await message.clear_reactions()
-                    except discord.Forbidden:
-                        pass
-                    gameover = ["🇬","🇦","🇲","🇪","⬛","🇴","🇻","3️⃣","🇷"]
-                    for g in gameover:
-                        create_task(message.add_reaction(g))
-                        await asyncio.sleep(0.5)
-
-    def spawn(self, gamestate, mode, count=1):
-        width = len(gamestate)
-        if count <= 0:
-            return
-        count *= width ** 2 / 16
-        if count != int(count):
-            count = int(count) + round(frand(count - int(count)))
-        count = max(count, 1)
-        largest = numpy.max(gamestate[0])
-        attempts = 0
-        i = 0
-        while i < count and attempts < 256:
-            attempts += 1
-            v = (not xrand(4)) + 1
-            if mode & 4:
-                v += max(0, xrand(largest) - 1)
-            if mode & 2 and not xrand(16):
-                v = int(sqrt(max(1, v))) / 10
-            x = xrand(width)
-            y = xrand(width)
-            if gamestate[x][y] <= 0:
-                gamestate[x][y] = v
-                i += 1
+    usage = "<0*:dimension_sizes[4x4]> <1:dimension_count[2]> <special_tiles(?s)> <public(?p)> <insanity_mode(?i)> <easy_mode(?e)>"
+    flags = "pies"
+    rate_limit = (1, 3)
+    reacts = ("⬅️", "➡️", "⬆️", "⬇️", "⏪", "⏩", "⏫", "⏬", "◀️", "▶️", "🔼", "🔽", "👈", "👉", "👆", "👇")
+    directions = demap((r.encode("utf-8"), i) for i, r in enumerate(reacts))
+    directions[b'\xf0\x9f\x92\xa0'] = -2
+    directions[b'\xe2\x86\xa9\xef\xb8\x8f'] = -1
 
     async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
         # print(user, message, reaction, argv)
         u_id, mode = [int(x) for x in vals.split("_")]
         if reaction is not None and u_id != user.id and u_id != 0 and perm < 3:
             return
-        gamestate = ast.literal_eval(argv.replace("A", "[").replace("B", "]").replace("C", ",").replace("D", "-"))
-        if reaction is not None:
+        spl = argv.split("-")
+        size = [int(x) for x in spl.pop(0).split("_")]
+        data = None
+        if reaction is None:
+            for react in self.directions.a:
+                r = self.directions.a[react]
+                if r == -2 or (r == -1 and mode & 1) or r >= 0 and r >> 1 < len(size):
+                    create_task(message.add_reaction(react.decode("utf-8")))
+            g = ND2048(*size, flags=mode)
+            data = g.serialize()
+        else:
+            data = "-".join(spl).encode("utf-8")
             reac = reaction
-            if not reac in self.directions:
+            if reac not in self.directions:
                 return
             r = self.directions[reac]
-            if not (r[0] & mode or not r[0]):
-                return
-            reaction = r[1]
-        else:
-            for react in self.directions:
-                rval = self.directions[react][0]
-                if rval & mode or not rval:
-                    create_task(message.add_reaction(react.decode("utf-8")))
-            self.spawn(gamestate[0], mode, 1)
-        if u_id == 0:
-            username = "＠everyone"
-        else:
-            if user.id != u_id:
-                u = await bot.fetch_user(u_id)
-                username = u.name
+            try:
+                if r == -1:
+                    if not mode & 1:
+                        return
+                    g = ND2048.load(data)
+                    if not g.undo():
+                        return
+                    data = g.serialize()
+                elif r == -2:
+                    g = ND2048.load(data)
+                    if not g.move(-1, count=16):
+                        return
+                    data = g.serialize()
+                elif r >> 1 < len(size):
+                    g = ND2048.load(data)
+                    if not g.move(r >> 1, r & 1):
+                        return
+                    data = g.serialize()
+            except GameOverError:
+                await message.edit(content="```\n2048: GAME OVER```")
+                if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
+                    await message.clear_reactions()
+                else:
+                    for reaction in message.reactions:
+                        if reaction.me:
+                            await message.remove_reaction(reaction.emoji, bot.client.user if message.guild is None else message.guild.get_member(bot.client.user.id))
+                for c in ("🇬", "🇦", "🇲", "🇪", "⬛", "🇴", "🇻", "3️⃣", "🇷"):
+                    create_task(message.add_reaction(c))
+                    await asyncio.sleep(0.5)
+        if data is not None:
+            if u_id == 0:
+                u = None
+            elif user.id == u_id:
+                u = user
             else:
-                username = user.name
-        await self.nextIter(message, gamestate, username, reaction, mode)
+                u = bot.get_user(u_id, replace=True)
+            emb = discord.Embed(colour=randColour())
+            if u is None:
+                emb.set_author(name="@everyone", icon_url=bot.discord_icon)
+            else:
+                emb.set_author(name=str(u), icon_url=bestURL(u))
+            content = "```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + data.decode("utf-8") + "\nPlaying 2048...```"
+            emb.description = ("```fix\n" if mode & 6 else "```\n") + g.render() + "```"
+            emb.set_footer(text="Score: " + str(g.score()))
+            await message.edit(content=content, embed=emb)
 
-    async def __call__(self, bot, argv, user, flags, guild, **void):
-        try:
-            if not len(argv.replace(" ", "")):
-                size = 4
+    async def __call__(self, bot, argv, args, user, flags, guild, **void):
+        if not len(argv.replace(" ", "")):
+            size = [4, 4]
+        else:
+            if "x" in argv:
+                size = await recursiveCoro(bot.evalMath(i, guild) for i in argv.split("x"))
             else:
-                ans = await bot.evalMath(argv, guild)
-                size = int(ans)
-                if not size > 1:
-                    raise IndexError
-        except:
-            raise ValueError("Invalid board size.")
-        if size > 11:
+                if len(args) > 1:
+                    dims = args.pop(-1)
+                    dims = await bot.evalMath(dims, guild)
+                else:
+                    dims = 2
+                if dims <= 0:
+                    raise ValueError("Invalid amount of dimensions specified.")
+                width = await bot.evalMath(" ".join(args), guild)
+                size = list(repeat(width, dims))
+        if len(size) > 8:
             raise OverflowError("Board size too large.")
+        items = 1
+        for x in size:
+            items *= x
+            if items > 256:
+                raise OverflowError("Board size too large.")
+        mode = 0
         if "p" in flags:
             u_id = 0
+            mode |= 8
         else:
             u_id = user.id
-        mode = 0
-        if "c" in flags:
-            mode |= 16
-        if "z" in flags:
-            mode |= 8
         if "i" in flags:
             mode |= 4
         if "s" in flags:
             mode |= 2
         if "e" in flags:
             mode |= 1
-        gamestate = [[[0 for y in range(size)] for x in range(size)]] * 2
-        gsr = str(gamestate).replace("[", "A").replace("]", "B").replace(",", "C").replace("-", "D").replace(" ", "")
-        text = (
-            "```" + "\n" * (mode & 8 != 0) + "callback-game-text2048-"
-            + str(u_id) + "_" + str(mode) + "-" + gsr + "\nStarting Game...```"
-        )
-        return text
+        return "```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "\nStarting Game...```"
 
 
 class MimicConfig(Command):

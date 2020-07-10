@@ -1208,7 +1208,11 @@ class UpdateReacts(Database):
                         reacting[words.index(k) / len(words)] = emojis
                 for r in sorted(list(reacting)):
                     for react in reacting[r]:
-                        await message.add_reaction(react)
+                        try:
+                            await message.add_reaction(react)
+                        except discord.HTTPException as ex:
+                            if "10014" in repr(ex):
+                                emojis.remove(react)
             except ZeroDivisionError:
                 pass
             except:

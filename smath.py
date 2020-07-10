@@ -223,6 +223,9 @@ ln = mpmath.ln
 frac = sympy.frac
 
 
+bits = lambda x: (i for i in range((x if type(x) is int else int(x)).bit_length()) if x & (1 << i))
+
+
 def isqrt(x):
     x = int(x)
     y = (x << 2) // 3
@@ -844,38 +847,6 @@ def verifyString(string):
             string = str(string)
         return string
 
-def bytes2Hex(b, space=True):
-    if type(b) is str:
-        b = b.encode("utf-8")
-    if space:
-        return b.hex(" ").upper()
-    return b.hex().upper()
-
-hex2Bytes = lambda b: bytes.fromhex(b if type(b) is str else b.decode("utf-8", "replace"))
-
-def bytes2B64(b, alt_char_set=False):
-    if type(b) is str:
-        b = b.encode("utf-8")
-    b = base64.b64encode(b)
-    if alt_char_set:
-        b = b.replace(b"=", b"-").replace(b"/", b".")
-    return b
-
-def b642Bytes(b, alt_char_set=False):
-    if type(b) is str:
-        b = b.encode("utf-8")
-    if alt_char_set:
-        b = b.replace(b"-", b"=").replace(b".", b"/")
-    b = base64.b64decode(b)
-    return b
-
-zeroEnc = "\xad\u061c\u180e\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\u2064\u2065\u2066\u2067\u2068\u2069\u206a\u206b\u206c\u206d\u206e\u206f\ufeff"
-
-isZeroEnc = lambda s: (s[0] in zeroEnc) if s else None
-
-shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).replace(b"/", b"-").decode("utf-8", "replace")
-hhash = lambda s: bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
-
 
 colourCalculation = lambda a, offset=0: adjColour(colorsys.hsv_to_rgb((a / 1536) % 1, 1, 1), offset, 255)
 
@@ -1055,7 +1026,6 @@ def product(*nums):
     for i in nums:
         p *= i
     return p
-
 
 def dotProduct(*vects):
     if len(vects) > 1:
@@ -2504,12 +2474,51 @@ class demap(collections.abc.Mapping):
             return v
 
     clear = lambda self: (self.a.clear(), self.b.clear())
-    __iter__ = lambda self: self.a.items()
+    __iter__ = lambda self: iter(self.a.items())
+    __reversed__ = lambda self: reversed(self.a.items())
     __len__ = lambda self: self.b.__len__()
     __str__ = lambda self: self.a.__str__()
     __repr__ = lambda self: self.__class__.__name__ + "(" + self.a.___repr__() + ")"
     __contains__ = lambda self, k: k in self.a or k in self.b
     pop = __delitem__
+
+
+def bytes2Hex(b, space=True):
+    if type(b) is str:
+        b = b.encode("utf-8")
+    if space:
+        return b.hex(" ").upper()
+    return b.hex().upper()
+
+hex2Bytes = lambda b: bytes.fromhex(b if type(b) is str else b.decode("utf-8", "replace"))
+
+def bytes2B64(b, alt_char_set=False):
+    if type(b) is str:
+        b = b.encode("utf-8")
+    b = base64.b64encode(b)
+    if alt_char_set:
+        b = b.replace(b"=", b"-").replace(b"/", b".")
+    return b
+
+def b642Bytes(b, alt_char_set=False):
+    if type(b) is str:
+        b = b.encode("utf-8")
+    if alt_char_set:
+        b = b.replace(b"-", b"=").replace(b".", b"/")
+    b = base64.b64decode(b)
+    return b
+
+zeroEnc = "\xad\u061c\u180e\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\u2064\u2065\u2066\u2067\u2068\u2069\u206a\u206b\u206c\u206d\u206e\u206f\ufeff\x0c"
+zeroEncoder = demap({chr(i + 97): c for i, c in enumerate(zeroEnc)})
+zeroEncode = "".maketrans(dict(zeroEncoder.a))
+zeroDecode = "".maketrans(dict(zeroEncoder.b))
+isZeroEnc = lambda s: (s[0] in zeroEnc) if s else None
+zwencode = lambda s: (s if type(s) is str else str(s)).lower().translate(zeroEncode)
+zwdecode = lambda s: (s if type(s) is str else str(s)).lower().translate(zeroDecode)
+
+
+shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).replace(b"/", b"-").decode("utf-8", "replace")
+hhash = lambda s: bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
 
 
 class pickled:

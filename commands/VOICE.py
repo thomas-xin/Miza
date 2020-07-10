@@ -1888,7 +1888,7 @@ class Queue(Command):
         else:
             duration = e_dur(q[0].duration)
         sym = "⬜⬛"
-        barsize = 24
+        barsize = 23
         if not elapsed or not duration:
             r = 0
         else:

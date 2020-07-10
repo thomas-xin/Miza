@@ -1390,7 +1390,7 @@ class UpdateMessageCount(Database):
                 d = self.data[guild.id]
                 if type(d) is str:
                     return
-                if user.id not in d["oldest"]:
+                if user.id not in setDict(d, "oldest", {}):
                     d["oldest"][user.id] = message.id
                 count = d["counts"].get(user.id, 0) + 1
                 total = d["totals"].get(user.id, 0) + self.getMessageLength(message)

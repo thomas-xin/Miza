@@ -1108,6 +1108,8 @@ class Bot:
         self.currState = stats
         return stats
 
+    zwCallback = zwencode("callback")
+
     async def reactCallback(self, message, reaction, user):
         if message.author.id == client.user.id:
             if self.closed:
@@ -1116,76 +1118,97 @@ class Bot:
             if u_perm <= -inf:
                 return
             msg = message.content
-            if not msg:
+            if not msg and message.embeds:
                 msg = message.embeds[0].description
             if msg[:3] != "```" or len(msg) <= 3:
-                return
-            msg = msg[3:]
-            while msg.startswith("\n"):
-                msg = msg[1:]
-            check = "callback-"
-            try:
-                msg = msg[:msg.index("\n")]
-            except ValueError:
-                pass
-            if msg.startswith(check):
-                while len(self.proc_call) > 65536:
-                    self.proc_call.pop(next(iter(self.proc_call)))
-                while utc() - self.proc_call.get(message.id, 0) < 30:
-                    await asyncio.sleep(0.2)
-                if reaction is not None:
-                    reacode = str(reaction).encode("utf-8")
-                else:
-                    reacode = None
-                msg = message.content
+                msg = None
+                if message.embeds:
+                    s = message.embeds[0].footer.text
+                    if isZeroEnc(s):
+                        msg = s
                 if not msg:
-                    msg = message.embeds[0].description
-                if msg[:3] != "```" or len(msg) <= 3:
                     return
+            else:
+                msg = msg[3:]
+                while msg.startswith("\n"):
+                    msg = msg[1:]
+                check = "callback-"
+                try:
+                    msg = msg[:msg.index("\n")]
+                except ValueError:
+                    pass
+                if not msg.startswith(check):
+                    return
+            while len(self.proc_call) > 65536:
+                self.proc_call.pop(next(iter(self.proc_call)))
+            while utc() - self.proc_call.get(message.id, 0) < 30:
+                await asyncio.sleep(0.2)
+            if reaction is not None:
+                reacode = str(reaction).encode("utf-8")
+            else:
+                reacode = None
+            msg = message.content
+            if not msg and message.embeds:
+                msg = message.embeds[0].description
+            if msg[:3] != "```" or len(msg) <= 3:
+                msg = None
+                if message.embeds:
+                    s = message.embeds[0].footer.text
+                    if isZeroEnc(s):
+                        msg = s
+                if not msg:
+                    return
+                try:
+                    msg = msg[msg.index(self.zwCallback) + len(self.zwCallback):]
+                except ValueError:
+                    return
+                msg = zwdecode(msg)
+                args = msg.split("q")
+            else:
                 msg = msg[3:]
                 while msg[0] == "\n":
                     msg = msg[1:]
                 check = "callback-"
                 msg = msg.split("\n")[0]
-                self.proc_call[message.id] = utc()
                 msg = msg[len(check):]
                 args = msg.split("-")
-                catn, func, vals = args[:3]
-                func = func.lower()
-                argv = "-".join(args[3:])
-                catg = self.categories[catn]
-                for f in catg:
-                    if f.__name__.lower() == func:
-                        try:
-                            timeout = getattr(f, "_timeout_", 1) * self.timeout
-                            if timeout >= inf:
-                                timeout = None
-                            await asyncio.wait_for(
-                                f._callback_(
-                                    client=client,
-                                    message=message,
-                                    channel=message.channel,
-                                    guild=message.guild,
-                                    reaction=reacode,
-                                    user=user,
-                                    perm=u_perm,
-                                    vals=vals,
-                                    argv=argv,
-                                    bot=self,
-                                ),
-                                timeout=timeout)
-                            break
-                        except Exception as ex:
-                            print(traceback.format_exc())
-                            create_task(sendReact(
-                                message.channel,
-                                "```py\nError: " + repr(ex).replace("`", "") + "\n```",
-                                reacts="❎",
-                            ))
-                try:
-                    self.proc_call.pop(message.id)
-                except KeyError:
-                    pass
+            catn, func, vals = args[:3]
+            func = func.lower()
+            argv = "-".join(args[3:])
+            catg = self.categories[catn]
+            self.proc_call[message.id] = utc()
+            for f in catg:
+                if f.__name__.lower() == func:
+                    try:
+                        timeout = getattr(f, "_timeout_", 1) * self.timeout
+                        if timeout >= inf:
+                            timeout = None
+                        await asyncio.wait_for(
+                            f._callback_(
+                                client=client,
+                                message=message,
+                                channel=message.channel,
+                                guild=message.guild,
+                                reaction=reacode,
+                                user=user,
+                                perm=u_perm,
+                                vals=vals,
+                                argv=argv,
+                                bot=self,
+                            ),
+                            timeout=timeout)
+                        break
+                    except Exception as ex:
+                        print(traceback.format_exc())
+                        create_task(sendReact(
+                            message.channel,
+                            "```py\nError: " + repr(ex).replace("`", "") + "\n```",
+                            reacts="❎",
+                        ))
+            try:
+                self.proc_call.pop(message.id)
+            except KeyError:
+                pass
 
     async def handleUpdate(self, force=False):
         if not hasattr(self, "stat_timer"):
