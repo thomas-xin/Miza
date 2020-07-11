@@ -1451,7 +1451,7 @@ class UpdateUsers(Database):
         if not data:
             return list(repeat(0, round(self.hours / self.interval * interval)))
         hour = roundMin(round(utc() // self.interval) / self.scale)
-        print(hour)
+        # print(hour)
         self.clear_events(data, hour - self.hours)
         start = hour - self.hours
         if event is None:

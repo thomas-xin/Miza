@@ -1503,16 +1503,14 @@ def reconstitute(s):
     return s.translate(__trans)
 
 
-__hlist_maxoff__ = (1 << 31) - 1
-
 class hlist(collections.abc.MutableSequence):
 
     """
-custom list-like data structure that incorporates the functionality of dicts in \
-order to have average O(1) constant time insertion on both sides as well as O(1) \
-lookup time for all elements. Includes many array and numeric operations."""
+custom list-like data structure that incorporates the functionality of numpy arrays but allocates more space on the ends in order to have faster insertion."""
 
-    __slots__ = ("chash", "block", "maxoff", "offs", "data")
+    maxoff = (1 << 24) - 1
+    minsize = 256
+    __slots__ = ("chash", "block", "offs", "size", "data")
 
     def waiting(func):
         def call(self, *args, force=False, **kwargs):
@@ -1544,7 +1542,8 @@ lookup time for all elements. Includes many array and numeric operations."""
             return output
         return call
 
-    def __init__(self, *args, maxoff=__hlist_maxoff__, **void):
+    def __init__(self, *args, **void):
+        self.block = True
         if not args:
             iterable = ()
         elif len(args) == 1:
@@ -1552,23 +1551,36 @@ lookup time for all elements. Includes many array and numeric operations."""
         else:
             iterable = args
         self.chash = None
-        self.block = True
-        self.maxoff = maxoff
-        if isinstance(iterable, hlist) and len(iterable):
+        if isinstance(iterable, self.__class__) and iterable:
             self.offs = iterable.offs
+            self.size = iterable.size
             self.data = iterable.data.copy()
         else:
             self.offs = 0
             try:
-                it = iter(iterable)
+                size = len(iterable)
+            except:
+                size = -1
+            try:
+                iter(iterable)
             except TypeError:
-                self.data = {0: iterable}
+                self.data = np.empty(self.minsize, dtype=object)
+                self.offs = 3 * self.minsize >> 3
+                self.data[self.offs] = iterable
+                self.size = 1
             else:
-                self.data = {i[0]: i[1] for i in enumerate(it)}
+                if size < 0:
+                    iterable = list(iterable)
+                    self.size = len(iterable)
+                else:
+                    self.size = size
+                size = max(self.minsize, size * 3)
+                self.offs = size // 3
+                self.data = np.empty(size, dtype=object)
+                self.view()[:] = iterable
         self.block = False
 
-    def __delattr__(self, *void1, **void2):
-        raise AttributeError("Deleting attributes is not permitted.")
+    view = lambda self: self.data[self.offs:self.offs + self.size]
 
     @waiting
     def __call__(self, arg=1, *void1, **void2):
@@ -1578,154 +1590,115 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     def __hash__(self):
         if self.chash is None:
-            self.chash = hash(tuple(self))
+            self.chash = hash(self.view().tobytes())
         return self.chash
 
     __str__ = lambda self: "⟨" + ", ".join(repr(i) for i in iter(self)) + "⟩"
     __repr__ = lambda self: "hlist(" + str(tuple(self)) + ")"
-    __bool__ = lambda self: bool(len(self.data))
+    __bool__ = lambda self: bool(self.size)
 
     @blocking
     def __iadd__(self, other):
-        d = self.data
         iterable = self.createIterator(other)
-        for i in d:
-            d[i] += next(iterable)
+        arr = self.view()
+        np.add(arr, iterable, out=arr)
         return self
 
     @blocking
     def __isub__(self, other):
-        d = self.data
         iterable = self.createIterator(other)
-        for i in d:
-            d[i] -= next(iterable)
+        arr = self.view()
+        np.subtract(arr, iterable, out=arr)
         return self
 
     @blocking
     def __imul__(self, other):
-        d = self.data
         iterable = self.createIterator(other)
-        for i in d:
-            d[i] *= next(iterable)
+        arr = self.view()
+        np.multiply(arr, iterable, out=arr)
         return self
 
     @blocking
     def __imatmul__(self, other):
-        temp1 = numpy.array(tuple(self))
-        temp2 = numpy.array(self.forceTuple(other))
-        result = temp1 @ temp2
-        self.__init__(result)
+        iterable = self.createIterator(other)
+        arr = self.view()
+        temp = np.matmul(arr, iterable)
+        self.size = len(temp)
+        arr[:self.size] = temp
         return self
 
     @blocking
     def __itruediv__(self, other):
-        d = self.data
         iterable = self.createIterator(other)
-        for i in d:
-            try:
-                d[i] /= next(iterable)
-            except ZeroDivisionError:
-                d[i] = inf * sgn(d[i])
+        arr = self.view()
+        np.true_divide(arr, iterable, out=arr)
         return self
 
     @blocking
     def __ifloordiv__(self, other):
-        d = self.data
         iterable = self.createIterator(other)
-        for i in d:
-            try:
-                d[i] //= next(iterable)
-            except ZeroDivisionError:
-                d[i] = 0
+        arr = self.view()
+        np.floor_divide(arr, iterable, out=arr)
         return self
 
     @blocking
     def __imod__(self, other):
-        d = self.data
         iterable = self.createIterator(other)
-        for i in d:
-            try:
-                d[i] %= next(iterable)
-            except ZeroDivisionError:
-                d[i] = 0
+        arr = self.view()
+        np.mod(arr, iterable, out=arr)
         return self
 
     @blocking
     def __ipow__(self, other):
-        d = self.data
         iterable = self.createIterator(other)
-        for i in d:
-            d[i] **= next(iterable)
+        arr = self.view()
+        np.power(arr, iterable, out=arr)
         return self
 
     @blocking
     def __ilshift__(self, other):
-        d = self.data
         iterable = self.createIterator(other)
-        for i in d:
-            r = next(iterable)
-            try:
-                d[i] <<= r
-            except ValueError:
-                d[i] >>= -r
-            except TypeError:
-                d[i] *= 2 ** r
+        arr = self.view()
+        try:
+            np.left_shift(arr, iterable, out=arr)
+        except (TypeError, ValueError):
+            np.multiply(arr, np.power(2, iterable), out=arr)
         return self
 
     @blocking
     def __irshift__(self, other):
-        d = self.data
         iterable = self.createIterator(other)
-        for i in d:
-            r = next(iterable)
-            try:
-                d[i] >>= r
-            except ValueError:
-                d[i] <<= -r
-            except TypeError:
-                d[i] //= 2 ** r
+        arr = self.view()
+        try:
+            np.right_shift(arr, iterable, out=arr)
+        except (TypeError, ValueError):
+            np.divide(arr, np.power(2, iterable), out=arr)
         return self
 
     @blocking
     def __iand__(self, other):
-        d = self.data
         iterable = self.createIterator(other)
-        for i in d:
-            r = next(iterable)
-            try:
-                d[i] &= r
-            except TypeError:
-                d[i] = int(d[i]) & int(r)
+        arr = self.view()
+        np.logical_and(arr, iterable, out=arr)
         return self
 
     @blocking
     def __ixor__(self, other):
-        d = self.data
         iterable = self.createIterator(other)
-        for i in d:
-            r = next(iterable)
-            try:
-                d[i] ^= r
-            except TypeError:
-                d[i] = int(d[i]) ^ int(r)
+        arr = self.view()
+        np.logical_xor(arr, iterable, out=arr)
         return self
 
     @blocking
     def __ior__(self, other):
-        d = self.data
         iterable = self.createIterator(other)
-        for i in d:
-            r = next(iterable)
-            try:
-                d[i] |= r
-            except TypeError:
-                d[i] = int(d[i]) | int(r)
+        arr = self.view()
+        np.logical_or(arr, iterable, out=arr)
         return self
 
     @waiting
     def __neg__(self):
-        d = self.data
-        return hlist(-d[i] for i in d)
+        return self.__class__(-self.view())
 
     @waiting
     def __pos__(self):
@@ -1734,12 +1707,11 @@ lookup time for all elements. Includes many array and numeric operations."""
     @waiting
     def __abs__(self):
         d = self.data
-        return hlist(abs(d[i]) for i in d)
+        return self.__class__(np.abs(self.view()))
 
     @waiting
     def __invert__(self):
-        d = self.data
-        return hlist(~d[i] for i in d)
+        return self.__class__(np.invert(self.view()))
 
     @waiting
     def __add__(self, other):
@@ -1761,10 +1733,10 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @waiting
     def __matmul__(self, other):
-        temp1 = numpy.array(tuple(self))
-        temp2 = numpy.array(self.forceTuple(other))
+        temp1 = self.view()
+        temp2 = self.forceTuple(other)
         result = temp1 @ temp2
-        return hlist(result)
+        return self.__class__(result)
 
     @waiting
     def __truediv__(self, other):
@@ -1822,29 +1794,25 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @waiting
     def __round__(self, prec=0):
-        temp = numpy.array(tuple(self))
-        temp = numpy.round(temp, prec)
-        if prec <= 0:
-            temp = temp.astype(int)
-        return hlist(temp)
+        temp = numpy.round(self.view(), prec)
+        return self.__class__(temp)
 
     @waiting
     def __trunc__(self):
-        temp = numpy.array(tuple(self))
-        return hlist(numpy.trunc(temp).astype(int))
+        temp = numpy.trunc(self.view())
+        return self.__class__(temp)
 
     @waiting
     def __floor__(self):
-        temp = numpy.array(tuple(self))
-        return hlist(numpy.floor(temp).astype(int))
+        temp = numpy.floor(self.view())
+        return self.__class__(temp)
 
     @waiting
     def __ceil__(self):
-        temp = numpy.array(tuple(self))
-        return hlist(numpy.ceil(temp).astype(int))
+        temp = numpy.ceil(self.view())
+        return self.__class__(temp)
 
-    __index__ = lambda self: round(numpy.sum(tuple(self)))
-    
+    __index__ = lambda self: self.view()
     __radd__ = __add__
     __rsub__ = lambda self, other: -self + other
     __rmul__ = __mul__
@@ -1852,78 +1820,56 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @waiting
     def __rtruediv__(self, other):
-        temp = self.copy()
-        d = temp.data
+        temp = self.__class__(self.data)
         iterable = self.createIterator(other)
-        for i in d:
-            r = next(iterable)
-            try:
-                d[i] = r / d[i]
-            except ZeroDivisionError:
-                d[i] = inf * sgn(r)
+        arr = temp.view()
+        np.true_divide(iterable, arr, out=arr)
         return temp
 
     @waiting
     def __rfloordiv__(self, other):
-        temp = self.copy()
-        d = temp.data
+        temp = self.__class__(self.data)
         iterable = self.createIterator(other)
-        for i in d:
-            try:
-                d[i] = next(iterable) // d[i]
-            except ZeroDivisionError:
-                d[i] = 0
+        arr = temp.view()
+        np.floor_divide(iterable, arr, out=arr)
         return temp
 
     @waiting
     def __rmod__(self, other):
-        temp = self.copy()
-        d = temp.data
+        temp = self.__class__(self.data)
         iterable = self.createIterator(other)
-        for i in d:
-            try:
-                d[i] = next(iterable) % d[i]
-            except ZeroDivisionError:
-                d[i] = 0
+        arr = temp.view()
+        np.mod(iterable, arr, out=arr)
         return temp
 
     @waiting
     def __rpow__(self, other):
-        temp = self.copy()
-        d = temp.data
+        temp = self.__class__(self.data)
         iterable = self.createIterator(other)
-        for i in d:
-            d[i] = next(iterable) ** d[i]
+        arr = temp.view()
+        np.power(iterable, arr, out=arr)
         return temp
 
     @waiting
     def __rlshift__(self, other):
-        temp = self.copy()
-        d = temp.data
+        temp = self.__class__(self.data)
         iterable = self.createIterator(other)
-        for i in d:
-            r = next(iterable)
-            try:
-                d[i] = r << d[i]
-            except ValueError:
-                d[i] = r >> -d[i]
-            except TypeError:
-                d[i] = r * 2 ** d[i]
+        arr = temp.view()
+        try:
+            np.left_shift(iterable, arr, out=arr)
+        except (TypeError, ValueError):
+            np.multiply(iterable, np.power(2, arr), out=arr)
         return temp
 
     @waiting
     def __rrshift__(self, other):
-        temp = self.copy()
-        d = temp.data
+        temp = self.__class__(self.data)
         iterable = self.createIterator(other)
-        for i in d:
-            r = next(iterable)
-            try:
-                d[i] = r >> d[i]
-            except ValueError:
-                d[i] = r << -d[i]
-            except TypeError:
-                d[i] = r // 2 ** d[i]
+        arr = temp.view()
+        try:
+            np.right_shift(iterable, arr, out=arr)
+        except (TypeError, ValueError):
+            np.divide(iterable, np.power(2, arr), out=arr)
         return temp
     
     __rand__ = __and__
@@ -1932,99 +1878,77 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @waiting
     def __lt__(self, other):
-        d = self.data
         it = self.createIterator(other)
-        return hlist(d[i] < next(it) for i in d)
+        return self.view() < other
 
     @waiting
     def __le__(self, other):
-        d = self.data
         it = self.createIterator(other)
-        return hlist(d[i] <= next(it) for i in d)
+        return self.view() <= other
 
     @waiting
     def __eq__(self, other):
-        d = self.data
-        try:
-            it = self.createIterator(other)
-        except IndexError:
-            return False
-        return hlist(d[i] == next(it) for i in d)
+        it = self.createIterator(other)
+        return self.view() == other
 
     @waiting
     def __ne__(self, other):
-        d = self.data
-        try:
-            it = self.createIterator(other)
-        except IndexError:
-            return True
-        return hlist(d[i] != next(it) for i in d)
+        it = self.createIterator(other)
+        return self.view() != other
 
     @waiting
     def __gt__(self, other):
-        d = self.data
         it = self.createIterator(other)
-        return hlist(d[i] > next(it) for i in d)
+        return self.view() > other
 
     @waiting
     def __ge__(self, other):
-        d = self.data
         it = self.createIterator(other)
-        return hlist(d[i] >= next(it) for i in d)
+        return self.view() >= other
 
     @waiting
-    def __getitem__(self, key):
-        if type(key) is slice:
-            s = key.indices(len(self.data))
-            return hlist(self.data[i + self.offs] for i in xrange(*s))
-        elif type(key) is not int:
-            key = complex(key)
-            return get(self, key, 1)
-        try:
-            index = self.offs + key % len(self.data)
-        except ZeroDivisionError:
-            raise IndexError("Attempted read from empty Hashed List.")
-        return self.data[index]
+    def __getitem__(self, *args):
+        if len(args) == 1:
+            key = args[0]
+            if type(key) in (float, complex):
+                return get(self.view(), key, 1)
+            if type(key) is int:
+                key = key % self.size
+                return self.view().__getitem__(key)
+            return self.__class__(self.view().__getitem__(key))
+        return self.__class__(self.view().__getitem__(*args))
 
     @blocking
-    def __setitem__(self, key, value):
-        if type(key) is slice:
-            s = key.indices(len(self.data))
-            it = self.createIterator(value, True)
-            [self.data.__setitem__(i + self.offs, next(it)) for i in xrange(*s)]
-            return value
-        elif type(key) is str:
-            key = int(key)
-        index = self.offs + key % len(self.data)
-        self.data[index] = value
-        return value
+    def __setitem__(self, *args):
+        if len(args) == 2:
+            key = args[0]
+            if type(key) is int:
+                key = key % self.size
+            return self.view().__setitem__(key, args[1])
+        return self.view().__setitem__(*args)
 
     @blocking
     def __delitem__(self, key):
         if type(key) is slice:
-            s = key.indices(len(self.data))
+            s = key.indices(self.size)
             return self.pops(xrange(*s))
-        return self.pop(key, force=True)
+        try:
+            len(key)
+        except TypeError:
+            return self.pop(key, force=True)
+        return self.pops(key)
 
-    __len__ = lambda self: len(self.data)
+    __len__ = lambda self: self.size
     __length_hint__ = __len__
-    __iter__ = lambda self: self.iterator()
-    __reversed__ = lambda self: self.iterator(True)
+    __iter__ = lambda self: iter(self.view())
+    __reversed__ = lambda self: iter(np.flip(self.view()))
 
     @waiting
     def __bytes__(self):
-        return bytes(round(i) & 255 for i in self)
+        return bytes(round(i) & 255 for i in self.view())
 
     def __contains__(self, item):
-        for i in self:
-            if type(item) is hlist:
-                cond = i == item
-                if type(cond) is bool:
-                    return cond
-                return all(cond)
-            if i == item:
-                return True
-        return False
+        return item in self.view()
 
     __copy__ = lambda self: self.copy()
 
@@ -2034,68 +1958,56 @@ lookup time for all elements. Includes many array and numeric operations."""
         except TypeError:
             return (value,)
 
-    def iterator(self, reverse=False):
-        if reverse:
-            r = xrange(len(self.data) - 1, -1)
-        else:
-            r = range(len(self.data))
-        for i in r:
-            if not i + self.offs in self.data:
-                break
-            yield self.data[self.offs + i]
-        return
-
     def constantIterator(self, other):
         while True:
             yield other
 
     def createIterator(self, other, force=False):
-        d = self.data
         try:
-            iterable = iter(other)
-            if len(other) != len(d) and not force:
-                raise IndexError(
-                    "Unable to perform operation on objects with size "
-                    + str(len(d)) + " and " + str(len(other)) + "."
-                )
-            return iterable
+            len(other)
         except TypeError:
-            return self.constantIterator(other)
+            try:
+                other = list(other)
+            except TypeError:
+                other = [other]
+        if len(other) not in (1, self.size) and not force:
+            raise IndexError(
+                "Unable to perform operation on objects with size "
+                + str(self.size) + " and " + str(len(other)) + "."
+            )
+        return other
 
     @blocking
     def clear(self):
-        self.data.clear()
+        self.size = 0
+        self.offs = self.size >> 1
         return self
 
     @waiting
     def copy(self):
-        return hlist(self)
+        return self.__class__(self.view())
 
     @waiting
     def sort(self, *args, **kwargs):
-        return hlist(sorted(self, *args, **kwargs))
+        return self.__class__(sorted(self.view(), *args, **kwargs))
 
     @waiting
-    def shuffle(self):
-        temp = list(self)
-        return hlist(shuffle(temp))
+    def shuffle(self, *args, **kwargs):
+        return self.__class__(shuffle(self.view(), *args, **kwargs))
 
     @waiting
     def reverse(self):
-        return hlist(reversed(self))
+        return self.__class__(np.flip(self.view()))
 
     @blocking
     def rotate(self, steps):
-        s = len(self.data)
+        s = self.size
         if not s:
             return self
-        steps = -steps % s
+        steps %= s
         if steps > s / 2:
             steps -= s
-        if steps < 0:
-            [self.appendleft(self.popright(force=True), force=True) for _ in loop(-steps)]
-        else:
-            [self.append(self.popleft(force=True), force=True) for _ in loop(steps)]
+        self.view()[:] = np.roll(self.view(), steps)
         return self
 
     @blocking
@@ -2106,46 +2018,32 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @blocking
     def isempty(self):
-        s = len(self.data)
-        if s:
-            if abs(self.offs) > self.maxoff:
-                self.reconstitute(force=True)
-            elif s == 1 and self.offs:
-                temp = self.data
-                self.data = {0: self.data[self.offs]}
-                self.offs = 0
-                temp.clear()
+        if self.size:
+            if abs(len(self.data) // 3 - self.offs) > self.maxoff:
+                self.__init__(self.view())
             return False
-        self.offs = 0
+        self.offs = self.size // 3
         return True
 
     @waiting
     def get(self, key, default=None):
-        if type(key) is slice:
-            s = key.indices(len(self.data))
-            return hlist(self.data[i + self.offs] for i in xrange(*s))
-        elif type(key) is not int:
-            key = complex(key)
-            return get(self, key, 1)
         try:
-            index = self.offs + key % len(self.data)
-        except ZeroDivisionError:
+            return self[key]
+        except LookupError:
             return default
-        return self.data[index]
 
     @blocking
     def popleft(self):
-        key = self.offs
-        temp = self.data.pop(key)
+        temp = self.data[self.offs]
         self.offs += 1
+        self.size -= 1
         self.isempty(force=True)
         return temp
 
     @blocking
     def popright(self):
-        key = self.offs + len(self.data) - 1
-        temp = self.data[key]
-        self.data.pop(key)
+        temp = self.data[self.offs + self.size - 1]
+        self.size -= 1
         self.isempty(force=True)
         return temp
 
@@ -2157,15 +2055,13 @@ lookup time for all elements. Includes many array and numeric operations."""
             return self.popright(force=True)
         elif index == 0:
             return self.popleft(force=True)
-        index %= len(self.data)
+        index %= self.size
         temp = self.data[index + self.offs]
-        if index < len(self.data) / 2:
-            [self.data.__setitem__(i, self.data[i - 1]) for i in range(self.offs + index, self.offs, -1)]
-            self.popleft(force=True)
+        if index > self.size >> 1:
+            self.view()[index:-1] = self.data[self.offs + index + 1:self.offs + self.size]
         else:
-            [self.data.__setitem__(i, self.data[i + 1]) for i in range(self.offs + index, self.offs + len(self.data) - 1)]
-            self.popright(force=True)
-        self.isempty(force=True)
+            self.view()[1:index + 1] = self.data[self.offs:self.offs + self.size]
+        self.size -= 1
         return temp
 
     @blocking
@@ -2174,28 +2070,28 @@ lookup time for all elements. Includes many array and numeric operations."""
             return self.append(value, force=True)
         elif index == 0:
             return self.appendleft(value, force=True)
-        index %= len(self.data)
-        if index < len(self.data) / 2:
-            [self.data.__setitem__(i - 1, self.data[i]) for i in range(self.offs, self.offs + index)]
-            self.offs -= 1
-            self.data[index + self.offs] = value
-        else:
-            [self.data.__setitem__(i + 1, self.data[i]) for i in range(self.offs + len(self.data) - 1, self.offs + index - 1, -1)]
-            self.data[index + self.offs] = value
+        index %= self.size
+        if self.size + self.offs + 1 >= len(self.data):
+            self.reconstitute(force=True)
+        self.size += 1
+        self.view()[index + 1:] = self.view()[index:-1]
+        self.view()[index] = value
         return self
 
     @blocking
     def insort(self, value, key=None, sorted=True):
         if not sorted:
             self.__init__(sorted(self, key=key))
-        v = value if key is None else key(value)
-        x = len(self.data)
+        if key is None:
+            return self.insert(np.searchsorted(self.view(), value), value, force=True)
+        v = key(value)
+        x = self.size
         index = (x >> 1) + self.offs
         gap = 3 + x >> 2
         seen = {}
         d = self.data
         while index not in seen and index in d:
-            check = d[index] if key is None else key(d[index])
+            check = key(d[index])
             if check < v:
                 seen[index] = True
                 index += gap
@@ -2217,15 +2113,10 @@ lookup time for all elements. Includes many array and numeric operations."""
 
     @blocking
     def removedups(self):
-        found = {}
-        pops = deque()
-        for i in range(len(self)):
-            x = self.data[self.offs + i]
-            if x not in found:
-                found[x] = True
-            else:
-                pops.append(i)
-        return self.pops(pops, force=True)
+        temp = np.unique(self.view())
+        self.size = len(temp)
+        self.view()[:] = temp
+        return self
 
     uniq = unique = removedups
 
@@ -2239,16 +2130,29 @@ lookup time for all elements. Includes many array and numeric operations."""
     
     @waiting
     def search(self, value, key=None, sorted=False):
+        if key is None:
+            i = np.searchsorted(self.view(), value)
+            if self.view()[i] != value:
+                raise IndexError(str(value) + " not found.")
+            pops = self.__class__()
+            pops.append(i)
+            for x in range(i + self.offs, -1, -1):
+                if self.data[x] == value:
+                    pops.appendleft(x)
+            for x in range(i + self.offs + 1, self.offs + self.size):
+                if self.data[x] == value:
+                    pops.append(x)
+            return pops
         v = value
         d = self.data
         if sorted:
-            pops = hlist()
+            pops = self.__class__()
             x = len(d)
             index = (x >> 1) + self.offs
             gap = x >> 2
             seen = {}
             while index not in seen and index in d:
-                check = d[index] if key is None else key(d[index])
+                check = key(d[index])
                 if check < v:
                     seen[index] = True
                     index += gap
@@ -2258,8 +2162,6 @@ lookup time for all elements. Includes many array and numeric operations."""
                     seen[index] = False
                     index -= gap
                 gap = 1 + gap >> 1
-            if key is None:
-                key = lambda x: x
             i = index + seen.get(index, 0)
             while i in d and key(d[i]) == v:
                 pops.append(i - self.offs)
@@ -2269,10 +2171,7 @@ lookup time for all elements. Includes many array and numeric operations."""
                 pops.append(i - self.offs)
                 i -= 1
         else:
-            if key is not None:
-                pops = [i - self.offs for i in d if key(d[i]) == v]
-            else:
-                pops = [i - self.offs for i in d if d[i] == v]
+            pops = self.__class__(i - self.offs for i in d if key(d[i]) == v)
         if not pops:
             raise IndexError(str(value) + " not found.")
         return pops
@@ -2282,42 +2181,55 @@ lookup time for all elements. Includes many array and numeric operations."""
     @waiting
     def count(self, value, key=None):
         if key is None:
-            return sum(1 for i in self if i == value)
+            return len(self.view() == value)
         return sum(1 for i in self if key(i) == value)
 
-    concat = lambda self, value: hlist(tuple(self) + tuple(value))
+    concat = lambda self, value: self.__class__(np.concatenate([self.view(), value]))
 
     @blocking
     def appendleft(self, value):
+        if self.offs <= 0:
+            self.reconstitute()
         self.offs -= 1
+        self.size += 1
         self.data[self.offs] = value
         return self
 
     @blocking
     def append(self, value):
-        self.data[self.offs + len(self.data)] = value
+        if self.offs + self.size >= len(self.data):
+            self.reconstitute()
+        self.data[self.offs + self.size] = value
+        self.size += 1
         return self
 
     appendright = append
 
     @blocking
     def extendleft(self, value):
-        value = reversed(self.forceTuple(value))
-        [self.appendleft(i, force=True) for i in value]
+        value = self.createIterator(reversed(value), force=True)
+        if self.offs >= len(value):
+            self.data[self.offs - len(value):self.offs] = value
+            self.size += len(value)
+            return self
+        self.__init__(np.concatenate([value, self.view()]))
         return self
 
     @blocking
     def extend(self, value):
-        value = self.forceTuple(value)
-        [self.append(i, force=True) for i in value]
+        value = self.createIterator(value, force=True)
+        if len(self.data) - self.offs - self.size >= len(value):
+            self.data[self.offs + self.size:self.offs + self.size + len(value)] = value
+            self.size += len(value)
+            return self
+        self.__init__(np.concatenate([self.view(), value]))
         return self
 
     extendright = extend
 
     @blocking
     def fill(self, value):
-        data = (value,) * len(self.data)
-        self.__init__(data)
+        self.view()[:] = value
 
     keys = lambda self: range(len(self))
     values = lambda self: iter(self)
@@ -2327,52 +2239,52 @@ lookup time for all elements. Includes many array and numeric operations."""
     def clip(self, a, b=None):
         if b is None:
             b = -a
-        a, b = sorted(a, b)
-        d = self.data
-        [self.data.__setitem__(i, max(min(d[i], b), a)) for i in d]
+        if a > b:
+            a, b = b, a
+        arr = self.view()
+        np.clip(arr, a, b, out=arr)
         return self
 
     @waiting
     def real(self):
-        return hlist(i.real for i in self.data.values())
+        return self.__class__(np.real(self.view()))
 
     @waiting
     def imag(self):
-        return hlist(i.imag for i in self.data.values())
+        return self.__class__(np.imag(self.view()))
     
     @waiting
     def float(self):
-        return hlist(float(i.real) for i in self.data.values())
+        return self.__class__(float(i.real) for i in self.view())
 
     @waiting
     def complex(self):
-        return hlist(complex(i) for i in self.data.values())
+        return self.__class__(complex(i) for i in self.view())
 
     @waiting
     def mpf(self):
-        return hlist(mpf(i) for i in self.data.values())
+        return self.__class__(mpf(i.real) for i in self.view())
 
     @blocking
     def reconstitute(self, data=None):
-        if data is None:
-            data = self.data
-        l = sorted(data)
-        self.__init__(data[i] for i in l)
+        self.__init__(self.view())
+        return self
 
     @blocking
     def delitems(self, iterable):
         if len(iterable) == 1:
             return self.pop(iterable[0], force=True)
-        popped = len([self.data.pop(i + self.offs) for i in iterable])
-        if popped:
-            self.reconstitute(force=True)
+        remains = np.arange(self.size) != iterable
+        temp = self.view()[remains]
+        self.size = len(temp)
+        self.view()[:] = temp
         return self
 
     pops = delitems
 
-hrange = lambda a, b=None, c=None, maxoff=__hlist_maxoff__: hlist(xrange(a, b, c), maxoff=maxoff)
+hrange = lambda a, b=None, c=None: hlist(xrange(a, b, c))
 
-hzero = lambda size, maxoff=__hlist_maxoff__: hlist((0 for i in range(size)), maxoff=maxoff)
+hzero = lambda size: hlist((0 for i in range(size)))
 
 
 class cdict(dict):

@@ -93,7 +93,7 @@ class ND2048(collections.abc.MutableSequence):
             return str(horiz)
         return self.data.__str__()
 
-    score = lambda self: np.sum([(g - 1) * 2 ** g for g in [self.data[self.data > 1].astype(np.uint64)]])
+    score = lambda self: np.sum([(g - 1) * (1 << g) for g in [self.data[self.data > 1].astype(object)]])
 
     def spawn(self, count=1, flag_override=None):
         try:

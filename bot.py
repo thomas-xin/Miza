@@ -1374,7 +1374,7 @@ class Bot:
                 self.send = channel.send
                 self.history = channel.history
                 self.created_at = channel.created_at
-                self.trigger_typing = lambda self: typing(self)
+                self.trigger_typing = lambda self: channel.trigger_typing()
                 self.pins = channel.pins
 
             def fetch_message(self, id):
@@ -1700,7 +1700,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             channel = guild.channel
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
-                            fut = typing(channel)
+                            fut = channel.trigger_typing()
                         await bot.event("_command_", user=user, command=command)
                         timeout = getattr(command, "_timeout_", 1) * bot.timeout
                         if timeout >= inf:

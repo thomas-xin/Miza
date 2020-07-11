@@ -178,7 +178,7 @@ class UpdateExec(Database):
                 glob = self.virtuals[channel.id]
             except KeyError:
                 glob = self.virtuals[channel.id] = dict(bot._globals)
-        local = dict(
+        loc = dict(
             print=lambda *args, **kwargs: self._print(*args, channel=channel, **kwargs),
             input=lambda *args, **kwargs: self._input(*args, channel=channel, **kwargs),
         )
@@ -188,18 +188,21 @@ class UpdateExec(Database):
             if proc.startswith("await "):
                 proc = proc[6:]
         try:
-            output = eval(proc, glob, local)
+            output = eval(proc, glob, loc)
         except SyntaxError:
             pass
         else:
             succ = True
         if not succ:
-            output = exec(proc, glob, local)
-        try:
-            local.pop("print")
-        except KeyError:
-            pass
-        glob.update(local)
+            output = exec(proc, glob, loc)
+        if term & 1:
+            try:
+                loc.pop("print")
+            except KeyError:
+                pass
+        if output is not None:
+            loc["_"] = output 
+        glob.update(loc)
         return output
 
     async def sendDeleteID(self, c_id, delete_after=20, **kwargs):
@@ -254,9 +257,6 @@ class UpdateExec(Database):
                         except:
                             print(traceback.format_exc())
                             await sendReact(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
-                        if output is not None:
-                            bot._globals["output"] = output
-                            bot._globals["_"] = output
         elif message.guild is None:
             user = message.author
             emb = discord.Embed()
@@ -265,6 +265,15 @@ class UpdateExec(Database):
             for c_id, flag in self.data.items():
                 if flag & 2:
                     create_task(self.sendDeleteID(c_id, delete_after=inf, embed=emb))
+
+    async def _log_(self, msg, **void):
+        for c_id, flag in self.data.items():
+            if flag & 8:
+                channel = await self.bot.fetch_channel(c_id)
+                await channel.send(self.prepare_string(msg))
+
+    def __load__(self):
+        print.funcs.append(lambda *args: create_task(self._log_(*args)))
 
 
 class Trust(Command):

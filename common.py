@@ -801,6 +801,8 @@ class Database:
 
 class __logPrinter:
 
+    funcs = hlist()
+
     def filePrint(self, fn, b):
         try:
             if type(b) in (bytes, bytearray):
@@ -831,6 +833,8 @@ class __logPrinter:
                     out = limStr(self.data[f], 8192)
                     self.data[f] = ""
                     data = enc(out)
+                    if self.funcs:
+                        [func(data) for func in self.funcs]
                     if f == self.file:
                         outfunc(data)
                     else:

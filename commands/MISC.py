@@ -21,7 +21,7 @@ class DouClub:
 
     def pull(self):
         try:
-            print("Pulling Doukutsu Club...")
+            # print("Pulling Doukutsu Club...")
             kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret)
             self.data = kn.data
             self.time = utc()
@@ -124,7 +124,7 @@ class SheetPull:
 
     def pull(self):
         try:
-            print("Pulling Spreadsheet...")
+            # print("Pulling Spreadsheet...")
             url = self.url
             text = Request(url, timeout=32, decode=True)
             data = text.split("\r\n")
@@ -936,8 +936,8 @@ class UpdateDeviantArt(Database):
                 print(traceback.format_exc())
             else:
                 found[content] = items
-        if attempts:
-            print(successes, "of", attempts, "DeviantArt requests executed successfully.")
+        # if attempts:
+        #     print(successes, "of", attempts, "DeviantArt requests executed successfully.")
         for c_id in tuple(self.data):
             create_task(self.processPart(found, c_id))
         self.time = utc()
