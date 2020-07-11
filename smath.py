@@ -2071,10 +2071,17 @@ custom list-like data structure that incorporates the functionality of numpy arr
         elif index == 0:
             return self.appendleft(value, force=True)
         index %= self.size
-        if self.size + self.offs + 1 >= len(self.data):
-            self.reconstitute(force=True)
-        self.size += 1
-        self.view()[index + 1:] = self.view()[index:-1]
+        if index > self.size >> 1:
+            if self.size + self.offs + 1 >= len(self.data):
+                self.reconstitute(force=True)
+            self.size += 1
+            self.view()[index + 1:] = self.view()[index:-1]
+        else:
+            if self.offs < 1:
+                self.reconstitute(force=True)
+            self.size += 1
+            self.offs -= 1
+            self.view()[:index] = self.view()[1:index + 1]
         self.view()[index] = value
         return self
 
@@ -2090,7 +2097,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         gap = 3 + x >> 2
         seen = {}
         d = self.data
-        while index not in seen and index in d:
+        while index not in seen and index >= self.offs and index < self.offs + self.size:
             check = key(d[index])
             if check < v:
                 seen[index] = True
@@ -2131,27 +2138,34 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @waiting
     def search(self, value, key=None, sorted=False):
         if key is None:
-            i = np.searchsorted(self.view(), value)
-            if self.view()[i] != value:
-                raise IndexError(str(value) + " not found.")
-            pops = self.__class__()
-            pops.append(i)
-            for x in range(i + self.offs, -1, -1):
-                if self.data[x] == value:
-                    pops.appendleft(x)
-            for x in range(i + self.offs + 1, self.offs + self.size):
-                if self.data[x] == value:
-                    pops.append(x)
-            return pops
-        v = value
-        d = self.data
+            if sorted and self.size > self.minsize:
+                i = np.searchsorted(self.view(), value)
+                if self.view()[i] != value:
+                    raise IndexError(str(value) + " not found.")
+                pops = self.__class__()
+                pops.append(i)
+                for x in range(i + self.offs - 1, -1, -1):
+                    if self.data[x] == value:
+                        pops.appendleft(x - self.offs)
+                    else:
+                        break
+                for x in range(i + self.offs + 1, self.offs + self.size):
+                    if self.data[x] == value:
+                        pops.append(x - self.offs)
+                    else:
+                        break
+                return pops
+            else:
+                return self.__class__(np.arange(self.size, dtype=np.uint32)[self.view() == value])
         if sorted:
+            v = value
+            d = self.data
             pops = self.__class__()
             x = len(d)
             index = (x >> 1) + self.offs
             gap = x >> 2
             seen = {}
-            while index not in seen and index in d:
+            while index not in seen and index >= self.offs and index < self.offs + self.size:
                 check = key(d[index])
                 if check < v:
                     seen[index] = True
@@ -2171,7 +2185,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
                 pops.append(i - self.offs)
                 i -= 1
         else:
-            pops = self.__class__(i - self.offs for i in d if key(d[i]) == v)
+            pops = self.__class__(i for i, x in enumerate(self.view()) if key(x) == value)
         if not pops:
             raise IndexError(str(value) + " not found.")
         return pops
@@ -2210,6 +2224,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         value = self.createIterator(reversed(value), force=True)
         if self.offs >= len(value):
             self.data[self.offs - len(value):self.offs] = value
+            self.offs -= len(value)
             self.size += len(value)
             return self
         self.__init__(np.concatenate([value, self.view()]))
@@ -2272,10 +2287,10 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     @blocking
     def delitems(self, iterable):
+        iterable = self.createIterator(iterable, force=True)
         if len(iterable) == 1:
             return self.pop(iterable[0], force=True)
-        remains = np.arange(self.size) != iterable
-        temp = self.view()[remains]
+        temp = np.delete(self.view(), iterable)
         self.size = len(temp)
         self.view()[:] = temp
         return self

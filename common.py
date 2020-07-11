@@ -801,7 +801,13 @@ class Database:
 
 class __logPrinter:
 
-    funcs = hlist()
+    def __init__(self, file=None):
+        self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.data = {}
+        self.funcs = hlist()
+        self.file = file
+        self.future = self.exec.submit(self.updatePrint)
+        self.closed = False
 
     def filePrint(self, fn, b):
         try:
@@ -814,7 +820,7 @@ class __logPrinter:
             f.write(b)
             f.close()
         except:
-            traceback.print_exc()
+            sys.__stdout__.write(traceback.format_exc())
     
     def updatePrint(self):
         if self.file is None:
@@ -834,7 +840,7 @@ class __logPrinter:
                     self.data[f] = ""
                     data = enc(out)
                     if self.funcs:
-                        [func(data) for func in self.funcs]
+                        [func(out) for func in self.funcs]
                     if f == self.file:
                         outfunc(data)
                     else:
@@ -858,12 +864,6 @@ class __logPrinter:
     close = lambda self: self.__setattr__("closed", True)
     isatty = lambda self: False
 
-    def __init__(self, file=None):
-        self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.data = {}
-        self.file = file
-        self.future = self.exec.submit(self.updatePrint)
-        self.closed = False
 
 print = __p = __logPrinter("log.txt")
 sys.stdout = sys.stderr = print

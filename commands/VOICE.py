@@ -80,7 +80,7 @@ def getDuration(filename):
     except:
         print(s)
         print(traceback.format_exc())
-        return "300"
+        return
     return dur
 
 
