@@ -95,6 +95,7 @@ def shuffle(it):
         temp = it.shuffle()
         it.data = temp.data
         it.offs = temp.offs
+        it.size = temp.size
         del temp
         return it
     else:

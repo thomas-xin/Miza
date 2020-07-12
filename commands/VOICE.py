@@ -206,7 +206,8 @@ class CustomAudio(discord.AudioSource):
             self.curr_timeout = 0
             self.bot = bot
             self.new(update=False)
-            self.queue = AudioQueue(auds=self)
+            self.queue = AudioQueue()
+            self.queue._init_(auds=self)
             bot.database.playlists.audio[vc.guild.id] = self
         except:
             print(traceback.format_exc())
@@ -622,13 +623,11 @@ class CustomAudio(discord.AudioSource):
 
 
 class AudioQueue(hlist):
-
-    def __init__(self, *args, auds=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        if auds is not None or not hasattr(self, "auds"):
-            self.auds = auds
-            self.bot = auds.bot
-            self.vc = auds.vc
+        
+    def _init_(self, auds):
+        self.auds = auds
+        self.bot = auds.bot
+        self.vc = auds.vc
         self.prev = ""
         self.lastsent = 0
         self.loading = False

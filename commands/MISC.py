@@ -8,7 +8,7 @@ except ModuleNotFoundError:
 import csv, knackpy
 from prettytable import PrettyTable as ptable
 
-getattr(knackpy, "__builtins__", {})["print"] = lambda *args, **kwargs: None
+knackpy.__builtins__["print"] = lambda *args, **kwargs: None
 
 
 class DouClub:
@@ -432,6 +432,9 @@ class CS_mod(Command):
             return response
         else:
             raise LookupError("No results found for " + argv + ".")
+
+    async def _ready_(self, **void):
+        knackpy.__builtins__["print"] = lambda *args, **kwargs: None
 
 
 class CS_Database(Database):
