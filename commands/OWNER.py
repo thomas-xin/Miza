@@ -182,7 +182,7 @@ class UpdateExec(Database):
             print=lambda *args, **kwargs: self._print(*args, channel=channel, **kwargs),
             input=lambda *args, **kwargs: self._input(*args, channel=channel, **kwargs),
         )
-        print(proc)
+        # print(proc)
         succ = False
         if "\n" not in proc:
             if proc.startswith("await "):
@@ -255,7 +255,7 @@ class UpdateExec(Database):
                                 output = await output
                             await channel.send(self.prepare_string(output))
                         except:
-                            print(traceback.format_exc())
+                            # print(traceback.format_exc())
                             await sendReact(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
         elif message.guild is None:
             user = message.author

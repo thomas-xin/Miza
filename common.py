@@ -394,7 +394,7 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
     except StopIteration:
         pass
     d = repr(bytes("`".join(str(i) for i in (image, operation, args)), "utf-8")).encode("utf-8") + b"\n"
-    print(d)
+    # print(d)
     try:
         proc.busy = True
         busy[key] = utc()
@@ -445,7 +445,7 @@ async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12, authorize=False
     else:
         args = (expr, prec, rat)
     d = repr(bytes("`".join(i if type(i) is str else str(i) for i in args), "utf-8")).encode("utf-8") + b"\n"
-    print(d)
+    # print(d)
     try:
         proc.busy = True
         busy[key] = utc()
@@ -480,7 +480,12 @@ def evalEX(exc):
     except NameError:
         if type(exc) is bytes:
             exc = exc.decode("utf-8", "replace")
-        ex = RuntimeError(exc[exc.index("(") + 1:exc.index(")")].strip("'"))
+        s = exc[exc.index("(") + 1:exc.index(")")]
+        try:
+            s = ast.literal_eval(s)
+        except:
+            pass
+        ex = RuntimeError(s)
     except:
         print(exc)
         raise

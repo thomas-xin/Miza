@@ -8,7 +8,7 @@ except ModuleNotFoundError:
 import csv, knackpy
 from prettytable import PrettyTable as ptable
 
-getattr(knackpy, "__builtins__", {})["print"] = print
+getattr(knackpy, "__builtins__", {})["print"] = lambda *args, **kwargs: None
 
 
 class DouClub:

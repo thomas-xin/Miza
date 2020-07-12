@@ -15,7 +15,7 @@ from colormath import color_objects, color_conversions
 loop = lambda x: repeat(None, x)
 
 np = numpy
-array = numpy.array
+array = np.array
 deque = collections.deque
 
 random.seed(random.random() + time.time() % 1)
@@ -661,7 +661,7 @@ def lcmRange(x):
     return y
 
 
-mean = lambda *nums: roundMin(numpy.mean(numpy.array(nums)))
+mean = lambda *nums: roundMin(np.mean(np.array(nums)))
 
 
 def pwr(x, power=2):
@@ -986,24 +986,24 @@ def resizeVector(v, length, mode=5):
     if new == size:
         resized = v
     elif mode == 0:
-        resized = numpy.array([v[round(i / new * size) % size] for i in range(new)])
+        resized = np.array([v[round(i / new * size) % size] for i in range(new)])
     elif mode <= 5 and mode == int(mode):
-        spl = interpolate.splrep(numpy.arange(1 + size), numpy.append(v, v[0]), k=int(min(size, mode)))
-        resized = numpy.array([interpolate.splev((i / new * size) % size, spl) for i in range(new)])
+        spl = interpolate.splrep(np.arange(1 + size), np.append(v, v[0]), k=int(min(size, mode)))
+        resized = np.array([interpolate.splev((i / new * size) % size, spl) for i in range(new)])
     elif mode <= 5:
         if math.floor(mode) == 0:
             resized1 = resizeVector(v, new, 0)
         else:
-            spl1 = interpolate.splrep(numpy.arange(1 + size), numpy.append(v, v[0]), k=floor(min(size, mode)))
-            resized1 = numpy.array([interpolate.splev((i / new * size) % size, spl1) for i in range(new)])
-        spl2 = interpolate.splrep(numpy.arange(1 + size), numpy.append(v, v[0]), k=ceil(min(size, mode)))
-        resized2 = numpy.array([interpolate.splev((i / new * size) % size, spl2) for i in range(new)])
+            spl1 = interpolate.splrep(np.arange(1 + size), np.append(v, v[0]), k=floor(min(size, mode)))
+            resized1 = np.array([interpolate.splev((i / new * size) % size, spl1) for i in range(new)])
+        spl2 = interpolate.splrep(np.arange(1 + size), np.append(v, v[0]), k=ceil(min(size, mode)))
+        resized2 = np.array([interpolate.splev((i / new * size) % size, spl2) for i in range(new)])
         resized = resized1 * (1 - mode % 1) + (mode % 1) * resized2
     else:
         resizing = []
         for i in range(1, floor(mode)):
             resizing.append(resizeVector(v, new, i / floor(mode) * 5))
-        resized = numpy.mean(resizing, 0)
+        resized = np.mean(resizing, 0)
     return resized
 
 def get(v, i, mode=5):
@@ -1016,7 +1016,7 @@ def get(v, i, mode=5):
     elif mode == 1:
         return v[floor(i) % size] * (1 - i % 1) + v[ceil(i) % size] * (i % 1)
     elif mode == int(mode):
-        return roundMin(interpolate.splev(i, interpolate.splrep(numpy.arange(1 + size), numpy.append(v, v[0]), k=int(min(size, mode)))))
+        return roundMin(interpolate.splev(i, interpolate.splrep(np.arange(1 + size), np.append(v, v[0]), k=int(min(size, mode)))))
     else:
         return get(v, i, floor(mode)) * (1 - mode % 1) + (mode % 1) * get(v, i, ceil(mode))
 
@@ -1266,31 +1266,31 @@ def intervalsIntersect(line1, line2):
 def func2Array(func, size=4096):
     function = eval("lambda x: " + str(func))
     period = 2 * pi
-    array = function(numpy.arange(0, period, 1 / (size + 1) * period))
+    array = function(np.arange(0, period, 1 / (size + 1) * period))
     return array
 
 def array2Harmonics(data, precision=1024):
     output = []
     T = len(data)
-    t = numpy.arange(T)
+    t = np.arange(T)
     for n in range(precision + 1):
         if n > T / 2 + 1:
-            output.append(numpy.array((0, 0)))
+            output.append(np.array((0, 0)))
         else:
-            bn = 2 / T * (data * numpy.cos(2 * pi * n * t / T)).sum()
-            an = 2 / T * (data * numpy.sin(2 * pi * n * t / T)).sum()
-            R = numpy.sqrt(an ** 2 + bn ** 2)
-            p = numpy.arctan2(bn, an)
+            bn = 2 / T * (data * np.cos(2 * pi * n * t / T)).sum()
+            an = 2 / T * (data * np.sin(2 * pi * n * t / T)).sum()
+            R = np.sqrt(an ** 2 + bn ** 2)
+            p = np.arctan2(bn, an)
             if R == 0:
                 p = 0
-            output.append(numpy.array((R, p)))
-    return numpy.array(output[1 : precision + 1])
+            output.append(np.array((R, p)))
+    return np.array(output[1 : precision + 1])
 
 def harmonics2Array(period, harmonics, func="sin(x)"):
     expression = func
     function = eval("lambda x: " + expression)
     result = 0
-    t = numpy.arange(period)
+    t = np.arange(period)
     for n, (a, b) in enumerate(harmonics):
         result += a * function((n + 1) * t * 2 * pi / period + b)
     return result
@@ -1506,7 +1506,7 @@ def reconstitute(s):
 class hlist(collections.abc.MutableSequence):
 
     """
-custom list-like data structure that incorporates the functionality of numpy arrays but allocates more space on the ends in order to have faster insertion."""
+custom list-like data structure that incorporates the functionality of np arrays but allocates more space on the ends in order to have faster insertion."""
 
     maxoff = (1 << 24) - 1
     minsize = 256
@@ -1551,33 +1551,21 @@ custom list-like data structure that incorporates the functionality of numpy arr
         else:
             iterable = args
         self.chash = None
-        if isinstance(iterable, self.__class__) and iterable:
+        if issubclass(type(iterable), self.__class__) and iterable:
             self.offs = iterable.offs
             self.size = iterable.size
             self.data = iterable.data.copy()
         else:
-            self.offs = 0
-            try:
-                size = len(iterable)
-            except:
-                size = -1
-            try:
-                iter(iterable)
-            except TypeError:
-                self.data = np.empty(self.minsize, dtype=object)
-                self.offs = 3 * self.minsize >> 3
-                self.data[self.offs] = iterable
-                self.size = 1
-            else:
-                if size < 0:
-                    iterable = list(iterable)
-                    self.size = len(iterable)
-                else:
-                    self.size = size
-                size = max(self.minsize, size * 3)
-                self.offs = size // 3
-                self.data = np.empty(size, dtype=object)
-                self.view()[:] = iterable
+            if not issubclass(type(iterable), collections.abc.Sequence):
+                try:
+                    iterable = deque(iterable)
+                except TypeError:
+                    iterable = [iterable]
+            self.size = len(iterable)
+            size = max(self.minsize, self.size * 3)
+            self.offs = size // 3
+            self.data = np.empty(size, dtype=object)
+            self.view()[:] = iterable
         self.block = False
 
     view = lambda self: self.data[self.offs:self.offs + self.size]
@@ -1794,22 +1782,22 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     @waiting
     def __round__(self, prec=0):
-        temp = numpy.round(self.view(), prec)
+        temp = np.round(self.view(), prec)
         return self.__class__(temp)
 
     @waiting
     def __trunc__(self):
-        temp = numpy.trunc(self.view())
+        temp = np.trunc(self.view())
         return self.__class__(temp)
 
     @waiting
     def __floor__(self):
-        temp = numpy.floor(self.view())
+        temp = np.floor(self.view())
         return self.__class__(temp)
 
     @waiting
     def __ceil__(self):
-        temp = numpy.ceil(self.view())
+        temp = np.ceil(self.view())
         return self.__class__(temp)
 
     __index__ = lambda self: self.view()
@@ -2007,6 +1995,14 @@ custom list-like data structure that incorporates the functionality of numpy arr
         steps %= s
         if steps > s / 2:
             steps -= s
+        if abs(steps) < self.minsize:
+            while steps > 0:
+                self.appendleft(self.popright(force=True), force=True)
+                steps -= 1
+            while steps < 0:
+                self.appendright(self.popleft(force=True), force=True)
+                steps += 1
+            return self
         self.view()[:] = np.roll(self.view(), steps)
         return self
 
@@ -2020,7 +2016,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     def isempty(self):
         if self.size:
             if abs(len(self.data) // 3 - self.offs) > self.maxoff:
-                self.__init__(self.view())
+                self.reconstitute(force=True)
             return False
         self.offs = self.size // 3
         return True
@@ -2203,7 +2199,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @blocking
     def appendleft(self, value):
         if self.offs <= 0:
-            self.reconstitute()
+            self.reconstitute(force=True)
         self.offs -= 1
         self.size += 1
         self.data[self.offs] = value
@@ -2212,7 +2208,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @blocking
     def append(self, value):
         if self.offs + self.size >= len(self.data):
-            self.reconstitute()
+            self.reconstitute(force=True)
         self.data[self.offs + self.size] = value
         self.size += 1
         return self

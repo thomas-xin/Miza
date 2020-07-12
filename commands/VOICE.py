@@ -666,11 +666,7 @@ class AudioQueue(hlist):
                         )
                     dels.append(i)
                     continue
-            if len(dels) > 2:
-                q.pops(dels)
-            elif dels:
-                while dels:
-                    q.pop(dels.popleft())
+            q.pops(dels)
             self.advance(process=False)
         create_task(self.auds.updatePlayer())
 

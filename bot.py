@@ -42,6 +42,7 @@ class Bot:
             deleted={},
             members={},
         )
+        self.cw_cache = cdict()
         self.events = mdict()
         self.proc_call = {}
         print("Time: " + str(datetime.datetime.now()))
@@ -117,7 +118,6 @@ class Bot:
     async def verifyDelete(self, obj):
         if hasattr(obj, "no_delete"):
             return
-        started = hasattr(self, "started")
         if obj.checking > utc():
             return
         obj.checking = utc() + 30
@@ -333,42 +333,6 @@ class Bot:
         self.cache.members[u_id] = member
         self.limitCache("members")
         return member
-
-    async def fetch_whuser(self, u_id, guild=None):
-        try:
-            try:
-                return self.cache.users[u_id]
-            except KeyError:
-                pass
-            try:
-                g_id = guild.id
-            except AttributeError:
-                g_id = guild
-            guild = await self.fetch_guild(g_id)
-            try:
-                webhooks = await guild.webhooks()
-            except AttributeError:
-                raise EOFError
-            for w in webhooks:
-                if w.id == u_id:
-                    user = bot.ghostUser()
-                    user.id = u_id
-                    user.mention = "<@" + str(u_id) + ">"
-                    user.name = w.name
-                    user.display_name = w.name
-                    user.created_at = user.joined_at = w.created_at
-                    user.avatar = w.avatar
-                    user.avatar_url = w.avatar_url
-                    user.bot = True
-                    user.webhook = w
-                    raise StopIteration
-            raise EOFError
-        except StopIteration:
-            self.cache.users[u_id] = user
-            self.limitCache("users")
-            return user
-        except EOFError:
-            raise LookupError("No results for " + str(u_id))
 
     async def fetch_guild(self, g_id, follow_invites=True):
         if type(g_id) is not int:
@@ -1265,24 +1229,69 @@ class Bot:
                     create_task(self.verifyDelete(u))
             self.busy = False
 
+    def add_webhook(self, w):
+        user = bot.ghostUser()
+        user.id = w.id
+        user.mention = "<@" + str(w.id) + ">"
+        user.name = w.name
+        user.display_name = w.name
+        user.created_at = user.joined_at = w.created_at
+        user.avatar = w.avatar
+        user.avatar_url = w.avatar_url
+        user.bot = True
+        user.send = w.send
+        user.dm_channel = w.channel
+        user.webhook = w
+        self.cache.users[w.id] = user
+        self.limitCache("users")
+        if w.token:
+            webhooks = setDict(self.cw_cache, w.channel.id, cdict())
+            webhooks[w.id] = w
+        return user
+
+    async def load_webhooks(self, guild):
+        try:
+            webhooks = await guild.webhooks()
+        except discord.Forbidden:
+            webhooks = deque()
+            futs = [channel.webhooks() for channel in guild.text_channels]
+            for fut in futs:
+                try:
+                    temp = await fut
+                except discord.Forbidden:
+                    pass
+                except discord.HTTPException:
+                    print(traceback.format_exc())
+                    await asyncio.sleep(5)
+                    temp = await fut
+                except:
+                    print(traceback.format_exc())
+                else:
+                    webhooks.extend(temp)
+        except discord.HTTPException:
+            print(traceback.format_exc())
+            await asyncio.sleep(10)
+            for _ in loop(5):
+                try:
+                    webhooks = await guild.webhooks()
+                    break
+                except discord.HTTPException:
+                    print(traceback.format_exc())
+                    await asyncio.sleep(15)
+        return deque(self.add_webhook(w) for w in webhooks)
+
     async def ensureWebhook(self, channel, force=False):
-        if not hasattr(self, "cw_cache"):
-            self.cw_cache = cdict()
         wlist = None
         if channel.id in self.cw_cache:
-            if utc() - self.cw_cache[channel.id].time > 259200 or force:
+            if force:
                 self.cw_cache.pop(channel.id)
             else:
-                self.cw_cache[channel.id].time = utc()
-                wlist = [self.cw_cache[channel.id].webhook]
+                wlist = list(self.cw_cache[channel.id].values())
         if not wlist:
-            webs = await channel.webhooks()
-            wlist = [w for w in webs if w.token]
-        if not wlist:
-            w = await channel.create_webhook(name=bot.client.user.name)
+            w = await channel.create_webhook(name=bot.client.user.name, reason="Auto Webhook")
+            self.add_webhook(w)
         else:
             w = random.choice(wlist)
-        self.cw_cache[channel.id] = cdict(time=utc(), webhook=w)
         return w
 
     async def sendEmbeds(self, channel, embeds):
@@ -1700,7 +1709,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             channel = guild.channel
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
-                            fut = channel.trigger_typing()
+                            fut = create_task(channel.trigger_typing())
                         await bot.event("_command_", user=user, command=command)
                         timeout = getattr(command, "_timeout_", 1) * bot.timeout
                         if timeout >= inf:
@@ -1868,6 +1877,7 @@ async def on_ready():
                 f = await create_future(open, "misc/init.tmp", "wb", priority=True)
                 create_future_ex(f.close)
             await bot.event("_ready_", bot=bot)
+            [create_task(bot.load_webhooks(guild)) for guild in bot.cache.guilds.values()]
             print(bot.events)
             print("Initialization complete.")
     except:
@@ -2119,6 +2129,13 @@ async def on_guild_channel_delete(channel):
     guild = channel.guild
     if guild:
         await bot.event("_channel_delete_", channel=channel, guild=guild)
+
+
+@client.event
+async def on_webhooks_update(channel):
+    webhooks = await channel.webhooks()
+    for w in webhooks:
+        bot.add_webhooks(w)
 
 
 @client.event

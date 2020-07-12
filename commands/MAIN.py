@@ -116,12 +116,9 @@ class Perms(Command):
                 try:
                     t_user = await bot.fetch_member_ex(u_id, guild)
                 except LookupError:
-                    try:
-                        t_user = guild.get_role(u_id)
-                        if t_user is None:
-                            raise LookupError
-                    except LookupError:
-                        t_user = await bot.fetch_whuser(u_id, guild)
+                    t_user = guild.get_role(u_id)
+                    if t_user is None:
+                        raise LookupError("No results for " + str(u_id))
         print(t_user)
         t_perm = roundMin(bot.getPerms(t_user.id, guild))
         if len(args) > 1:
@@ -417,16 +414,13 @@ class Avatar(Command):
                                     try:
                                         channel = await bot.fetch_channel(u_id)
                                     except:
-                                        try:
-                                            u = await bot.fetch_whuser(u_id, g)
-                                        except EOFError:
-                                            u = None
-                                            if g.id in bot.data.counts:
-                                                if u_id in bot.data.counts[g.id]["counts"]:
-                                                    u = bot.ghostUser()
-                                                    u.id = u_id
-                                            if u is None:
-                                                raise LookupError("No results for " + argv)
+                                        u = None
+                                        if g.id in bot.data.counts:
+                                            if u_id in bot.data.counts[g.id]["counts"]:
+                                                u = bot.ghostUser()
+                                                u.id = u_id
+                                        if u is None:
+                                            raise LookupError("No results for " + argv)
                                     try:
                                         guild = channel.guild
                                     except NameError:
@@ -589,16 +583,13 @@ class Info(Command):
                                     try:
                                         channel = await bot.fetch_channel(u_id)
                                     except:
-                                        try:
-                                            u = await bot.fetch_whuser(u_id, g)
-                                        except EOFError:
-                                            u = None
-                                            if g.id in bot.data.counts:
-                                                if u_id in bot.data.counts[g.id]["counts"]:
-                                                    u = bot.ghostUser()
-                                                    u.id = u_id
-                                            if u is None:
-                                                raise LookupError("No results for " + argv)
+                                        u = None
+                                        if g.id in bot.data.counts:
+                                            if u_id in bot.data.counts[g.id]["counts"]:
+                                                u = bot.ghostUser()
+                                                u.id = u_id
+                                        if u is None:
+                                            raise LookupError("No results for " + argv)
                                     try:
                                         guild = channel.guild
                                     except NameError:
@@ -890,7 +881,6 @@ class Reminder(Command):
             if not argv:
                 i = 0
             else:
-                print(argv)
                 i = await bot.evalMath(argv2, guild)
             i %= len(rems)
             x = rems.pop(i)
