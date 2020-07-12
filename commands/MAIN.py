@@ -772,10 +772,7 @@ class Activity(Command):
             try:
                 user = await bot.fetch_user(u_id)
             except (TypeError, discord.NotFound):
-                try:
-                    user = await bot.fetch_member_ex(u_id, guild)
-                except LookupError:
-                    user = cdict(id=u_id)
+                user = await bot.fetch_member_ex(u_id, guild)
         data = await create_future(bot.database.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)))
         resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
         fn = resp["file"]

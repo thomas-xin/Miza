@@ -162,7 +162,7 @@ class UpdateExec(Database):
             time.sleep(0.5)
         return self.listeners.pop(channel.id)
 
-    def procFunc(self, proc, channel, bot, term=0):
+    async def procFunc(self, proc, channel, bot, term=0):
         try:
             if self.listeners[channel.id] is None:
                 self.listeners[channel.id] = proc
@@ -188,13 +188,15 @@ class UpdateExec(Database):
             if proc.startswith("await "):
                 proc = proc[6:]
         try:
-            output = eval(proc, glob, loc)
+            output = await create_future(eval, proc, glob, loc, priority=True)
         except SyntaxError:
             pass
         else:
             succ = True
         if not succ:
-            output = exec(proc, glob, loc)
+            output = await create_future(exec, proc, glob, loc, priority=True)
+        if awaitable(output):
+            output = await output
         if term & 1:
             try:
                 loc.pop("print")
@@ -250,9 +252,7 @@ class UpdateExec(Database):
                         proc = proc.translate(self.qtrans)
                         output = None
                         try:
-                            output = await create_future(self.procFunc, proc, channel, bot, term=f, priority=True)
-                            if awaitable(output):
-                                output = await output
+                            output = await self.procFunc(proc, channel, bot, term=f)
                             await channel.send(self.prepare_string(output, fmt=""))
                         except:
                             # print(traceback.format_exc())

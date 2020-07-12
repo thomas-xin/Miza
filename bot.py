@@ -1386,7 +1386,7 @@ class Bot:
                 self.send = channel.send
                 self.history = channel.history
                 self.created_at = channel.created_at
-                self.trigger_typing = lambda self: channel.trigger_typing()
+                self.trigger_typing = lambda *args: channel.trigger_typing()
                 self.pins = channel.pins
 
             def fetch_message(self, id):

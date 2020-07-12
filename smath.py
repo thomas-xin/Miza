@@ -2056,7 +2056,8 @@ custom list-like data structure that incorporates the functionality of np arrays
         if index > self.size >> 1:
             self.view()[index:-1] = self.data[self.offs + index + 1:self.offs + self.size]
         else:
-            self.view()[1:index + 1] = self.data[self.offs:self.offs + self.size]
+            self.view()[1:index + 1] = self.data[self.offs:self.offs + index]
+            self.offs += 1
         self.size -= 1
         return temp
 
