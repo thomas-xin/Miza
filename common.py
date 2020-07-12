@@ -791,7 +791,7 @@ class Database:
                     self.updated = False
                     s = repr(self.data)
                     if len(s) > 262144:
-                        print("Pickling " + name + "...")
+                        # print("Pickling " + name + "...")
                         s = pickle.dumps(self.data)
                     else:
                         s = s.encode("utf-8")

@@ -813,8 +813,8 @@ class Bot:
                         saved.append(i)
         except:
             print(traceback.format_exc())
-        if saved:
-            print("Autosaved " + str(saved) + ".")
+        # if saved:
+        #     print("Autosaved " + str(saved) + ".")
     
     mmap = {
         "“": '"',
@@ -1303,7 +1303,10 @@ class Bot:
             if guild is None or hasattr(guild, "ghost") or len(embeds) == 1:
                 single = True
             else:
-                m = guild.get_member(client.user.id)
+                try:
+                    m = guild.get_member(client.user.id)
+                except (AttributeError, LookupError):
+                    m = None
                 if m is None:
                     m = client.user
                     single = True
@@ -2037,8 +2040,11 @@ async def on_user_update(before, after):
 async def on_member_update(before, after):
     await bot.event("_member_update_", before=before, after=after)
     if str(before.status) != str(after.status) or str(before.activity) != str(after.activity):
-        member = await bot.fetch_member(after.id, find_others=True)
-        if member.guild == after.guild:
+        try:
+            member = await bot.fetch_member(after.id, find_others=True)
+        except LookupError:
+            member = None
+        if member is None or member.guild == after.guild:
             await seen(after, event="misc", raw="Changing their status")
 
 

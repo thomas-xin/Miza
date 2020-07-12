@@ -216,18 +216,18 @@ class UpdateExec(Database):
         if user.id == bot.client.user.id:
             return
         if not hasattr(channel, "guild") or channel.guild is None:
-            emb = discord.Embed()
+            emb = discord.Embed(colour=randColour())
             emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=bestURL(user))
             emb.description = "```ini\n[typing...]```"
             for c_id, flag in self.data.items():
                 if flag & 2:
                     create_task(self.sendDeleteID(c_id, embed=emb))
 
-    def prepare_string(self, s):
+    def prepare_string(self, s, lim=2000, fmt="py"):
         if type(s) is not str:
             s = str(s)
         if s:
-            return limStr("```py\n" + s + "```", 2000)
+            return limStr("```" + fmt + "\n" + s + "```", lim)
         return "``` ```"
 
     async def _nocommand_(self, message, **void):
@@ -253,24 +253,35 @@ class UpdateExec(Database):
                             output = await create_future(self.procFunc, proc, channel, bot, term=f, priority=True)
                             if awaitable(output):
                                 output = await output
-                            await channel.send(self.prepare_string(output))
+                            await channel.send(self.prepare_string(output, fmt=""))
                         except:
                             # print(traceback.format_exc())
                             await sendReact(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
         elif message.guild is None:
             user = message.author
-            emb = discord.Embed()
+            emb = discord.Embed(colour=discord.Colour(16777214))
             emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=bestURL(user))
             emb.description = strMessage(message)
             for c_id, flag in self.data.items():
                 if flag & 2:
-                    create_task(self.sendDeleteID(c_id, delete_after=inf, embed=emb))
+                    channel = await self.bot.fetch_channel(c_id)
+                    self.bot.embedSender(channel, embed=emb)
 
     async def _log_(self, msg, **void):
-        for c_id, flag in self.data.items():
-            if flag & 8:
-                channel = await self.bot.fetch_channel(c_id)
-                await channel.send(self.prepare_string(msg))
+        if msg:
+            msg = limStr(msg, 6000)
+            if len(msg) > 2000:
+                msgs = [msg[:2000], msg[2000:4000], msg[4000:]]
+            else:
+                msgs = [msg]
+            embs = deque()
+            for msg in msgs:
+                if msg:
+                    embs.append(discord.Embed(colour=discord.Colour(1), description=self.prepare_string(msg, lim=2048, fmt="")))
+            for c_id, flag in self.data.items():
+                if flag & 8:
+                    channel = await self.bot.fetch_channel(c_id)
+                    self.bot.embedSender(channel, embeds=embs)
 
     def __load__(self):
         print.funcs.append(lambda *args: create_task(self._log_(*args)))
