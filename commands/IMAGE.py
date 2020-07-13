@@ -540,7 +540,7 @@ class Saturate(Command):
     rate_limit = (2, 3)
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
-        name, value, url = await get_image(bot, message, args, argv)
+        name, value, url = await get_image(bot, user, message, args, argv)
         fut = create_task(channel.trigger_typing())
         resp = await imageProc(url, "Enhance", ["Color", value], user)
         fn = resp[0]
@@ -558,7 +558,7 @@ class Contrast(Command):
     rate_limit = (2, 3)
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
-        name, value, url = await get_image(bot, message, args, argv)
+        name, value, url = await get_image(bot, user, message, args, argv)
         fut = create_task(channel.trigger_typing())
         resp = await imageProc(url, "Enhance", ["Contrast", value], user)
         fn = resp[0]
@@ -576,7 +576,7 @@ class Brightness(Command):
     rate_limit = (2, 3)
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
-        name, value, url = await get_image(bot, message, args, argv)
+        name, value, url = await get_image(bot, user, message, args, argv)
         fut = create_task(channel.trigger_typing())
         resp = await imageProc(url, "Enhance", ["Brightness", value], user)
         fn = resp[0]
@@ -594,7 +594,7 @@ class Sharpness(Command):
     rate_limit = (2, 3)
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
-        name, value, url = await get_image(bot, message, args, argv)
+        name, value, url = await get_image(bot, user, message, args, argv)
         fut = create_task(channel.trigger_typing())
         resp = await imageProc(url, "Enhance", ["Sharpness", value], user)
         fn = resp[0]
@@ -612,7 +612,7 @@ class HueShift(Command):
     rate_limit = (2, 3)
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
-        name, value, url = await get_image(bot, message, args, argv)
+        name, value, url = await get_image(bot, user, message, args, argv)
         fut = create_task(channel.trigger_typing())
         resp = await imageProc(url, "hue_shift", [value], user)
         fn = resp[0]
@@ -690,7 +690,7 @@ class Rainbow(Command):
     _timeout_ = 3
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
-        name, value, url = await get_image(bot, message, args, argv, ext="gif")
+        name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
         fut = create_task(channel.trigger_typing())
         resp = await imageProc(url, "rainbow_gif", [value], user, timeout=32)
         fn = resp[0]
