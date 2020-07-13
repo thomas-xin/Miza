@@ -1393,7 +1393,12 @@ class UpdateAutoRoles(Database):
 
     async def _join_(self, user, guild, **void):
         if guild.id in self.data:
-            roles = []
+            try:
+                if user.id in self.bot.data.rolepreservers[guild.id]:
+                    return
+            except KeyError:
+                pass
+            roles = deque()
             assigned = self.data[guild.id]
             for rolelist in assigned:
                 try:
@@ -1401,7 +1406,7 @@ class UpdateAutoRoles(Database):
                     roles.append(role)
                 except:
                     print(traceback.format_exc())
-            print(roles)
+            print("AutoRole", user, roles)
             try:
                 await user.add_roles(*roles, reason="AutoRole", atomic=False)
             except discord.Forbidden:
@@ -1410,11 +1415,12 @@ class UpdateAutoRoles(Database):
 
 class UpdateRolePreservers(Database):
     name = "rolepreservers"
+    no_delete = True
 
     async def _join_(self, user, guild, **void):
         if guild.id in self.data:
             if user.id in self.data[guild.id]:
-                roles = []
+                roles = deque()
                 assigned = self.data[guild.id][user.id]
                 for r_id in assigned:
                     try:
@@ -1422,7 +1428,7 @@ class UpdateRolePreservers(Database):
                         roles.append(role)
                     except:
                         print(traceback.format_exc())
-                print(user, roles)
+                print("RolePreserver", user, roles)
                 try:
                     await user.edit(roles=roles, reason="RolePreserver")
                 except discord.Forbidden:
