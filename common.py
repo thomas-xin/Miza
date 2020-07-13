@@ -88,7 +88,7 @@ def getLineCount(fn):
 
 iscode = lambda fn: str(fn).endswith(".py") or str(fn).endswith(".pyw")
 
-awaitable = lambda obj: issubclass(type(obj), asyncio.Future) or issubclass(type(obj), asyncio.Task) or inspect.isawaitable(obj)
+awaitable = lambda obj: hasattr(obj, "__await__") or issubclass(type(obj), asyncio.Future) or issubclass(type(obj), asyncio.Task) or inspect.isawaitable(obj)
 
 async def waitOnNone(coro, seconds=0.5):
     resp = await coro
@@ -517,20 +517,46 @@ async def forceCoro(coro):
 eloop = asyncio.new_event_loop()
 __setloop__ = lambda: asyncio.set_event_loop(eloop)
 
-class MultiThreadPool:
+class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 
-    def __init__(self, thread_count):
-        multiplier = max(0, math.ceil(math.log2(thread_count >> 6)))
-        thread_count >>= multiplier
-        self.threadPools = [concurrent.futures.ThreadPoolExecutor(max_workers=thread_count, initializer=__setloop__) for _ in loop(1 << multiplier)]
+    def __init__(self, pool_count=3, thread_count=64, initializer=None):
+        self.pools = hlist()
+        self.pool_count = max(1, pool_count)
+        self.thread_count = max(1, thread_count)
+        self.initializer = initializer
         self.position = -1
+        self.update()
+
+    __len__ = lambda self: sum(len(pool._threads) for pool in self.pools)
+
+    def _update(self):
+        if self.pool_count != len(self.pools):
+            self.pool_count = max(1, self.pool_count)
+            self.thread_count = max(1, self.thread_count)
+            while self.pool_count > len(self.pools):
+                self.pools.append(concurrent.futures.ThreadPoolExecutor(max_workers=self.thread_count, initializer=self.initializer))
+            while self.pool_count < len(self.pools):
+                func = self.pools.popright().shutdown
+                self.pools[-1].submit(func, wait=True)
+
+    def update(self):
+        if not self.pools:
+            self._update()
+        self.position = (self.position + 1) & len(self.pools) - 1
+        random.choice(self.pools).submit(self._update)
+
+    def map(self, func, *args, **kwargs):
+        self.update()
+        return self.pools[self.position].map(func, *args, **kwargs)
 
     def submit(self, func, *args, **kwargs):
-        self.position = (self.position + 1) & len(self.threadPools) - 1
-        return self.threadPools[self.position].submit(func, *args, **kwargs)
+        self.update()
+        return self.pools[self.position].submit(func, *args, **kwargs)
 
-pthreads = concurrent.futures.ThreadPoolExecutor(max_workers=128, initializer=__setloop__)
-athreads = MultiThreadPool(192)
+    shutdown = lambda self, wait=True: [exc.shutdown(wait) for exc in self.pools].extend(self.pools.clear())
+
+pthreads = MultiThreadPool(thread_count=48, initializer=__setloop__)
+athreads = MultiThreadPool(initializer=__setloop__)
 __setloop__()
 
 def wrap_future(fut, loop=None):
@@ -665,7 +691,7 @@ def tzparse(expr):
     return tparser.parse(expr)
 
 
-class Command:
+class Command(collections.abc.Hashable, collections.abc.Callable):
     min_level = -inf
     rate_limit = 0
     description = ""
@@ -724,7 +750,7 @@ class Command:
         pass
 
 
-class Database:
+class Database(collections.abc.Hashable, collections.abc.Callable):
     bot = None
     rate_limit = 3
     name = "data"

@@ -1504,7 +1504,7 @@ def reconstitute(s):
     return s.translate(__trans)
 
 
-class hlist(collections.abc.MutableSequence):
+class hlist(collections.abc.MutableSequence, collections.abc.Callable):
 
     """
 custom list-like data structure that incorporates the functionality of np arrays but allocates more space on the ends in order to have faster insertion."""
@@ -1994,7 +1994,7 @@ custom list-like data structure that incorporates the functionality of np arrays
         if not s:
             return self
         steps %= s
-        if steps > s / 2:
+        if steps > s >> 1:
             steps -= s
         if abs(steps) < self.minsize:
             while steps > 0:
@@ -2446,7 +2446,7 @@ shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).r
 hhash = lambda s: bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
 
 
-class pickled:
+class pickled(collections.abc.Callable):
 
     def __init__(self, obj=None, ignore=()):
         self.data = obj

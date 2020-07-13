@@ -450,7 +450,7 @@ class AutoRole(Command):
     flags = "aedx"
     rate_limit = 1
 
-    async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
+    async def __call__(self, argv, args, name, user, channel, guild, perm, flags, **void):
         update = self.bot.database.autoroles.update
         bot = self.bot
         data = bot.data.autoroles

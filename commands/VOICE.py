@@ -1395,7 +1395,7 @@ class AudioDownloader:
                         else:
                             time.sleep(0.03125)
                     while futs:
-                        output += futs.popleft().result()[0]
+                        output.extend(futs.popleft().result()[0])
             if re.search(self.spotifyFind, item):
                 if "playlist" in item:
                     url = item[item.index("playlist"):]
@@ -1418,7 +1418,7 @@ class AudioDownloader:
                 else:
                     raise TypeError("Unsupported Spotify URL.")
                 if page == 1:
-                    output += self.get_spotify_part(url)
+                    output.extend(self.get_spotify_part(url)[0])
                 else:
                     futs = deque()
                     maxitems = 10000
@@ -1442,7 +1442,7 @@ class AudioDownloader:
                         else:
                             time.sleep(0.125)
                     while futs:
-                        output += futs.popleft().result()[0]
+                        output.extend(futs.popleft().result()[0])
             if not len(output):
                 if isURL(item):
                     url = verifyURL(item)
@@ -2135,8 +2135,19 @@ class Connect(Command):
         else:
             voice = user.voice
             if voice is None:
-                raise LookupError("Unable to find voice channel.")
-            vc_ = voice.channel
+                catg = channel.category
+                if catg is not None:
+                    channels = catg.voice_channels
+                else:
+                    channels = None
+                if not channels:
+                    channels = channel.guild.voice_channels
+                if channels:
+                    vc_ = channels[0]
+                else:
+                    raise LookupError("Unable to find voice channel.")
+            else:
+                vc_ = voice.channel
         connecting = bot.database.playlists.connecting
         if vc_ is None:
             guild = channel.guild

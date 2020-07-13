@@ -35,7 +35,7 @@ Brayconn (https://github.com/Brayconn)
 -Help with finding APIs for functions
 -Help with testing
 
-smudgedpasta (https://www.deviantart.com/smudgedpasta)
+smudgedpasta (https://github.com/smudgedpasta)
 -Created art for the bot's profile picture
 -Help with testing
 

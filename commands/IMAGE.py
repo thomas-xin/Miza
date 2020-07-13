@@ -840,6 +840,7 @@ class Magik(Command):
             argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
         if not args:
             raise ArgumentError("Please input an image by URL or attachment.")
+        fut = create_task(channel.trigger_typing())
         url = args.pop(0)
         urls = await bot.followURL(url, best=False, limit=1)
         if not urls:
@@ -860,7 +861,6 @@ class Magik(Command):
             name = "unknown"
         if not name.endswith(".png"):
             name += ".png"
-        fut = create_task(channel.trigger_typing())
         if "cdn.discord" not in url[:32]:
             resp = await imageProc(url, "resize_max", [512, "hamming"], guild.id)
             fn = resp[0]

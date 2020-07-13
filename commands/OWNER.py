@@ -178,33 +178,26 @@ class UpdateExec(Database):
                 glob = self.virtuals[channel.id]
             except KeyError:
                 glob = self.virtuals[channel.id] = dict(bot._globals)
-        loc = dict(
-            print=lambda *args, **kwargs: self._print(*args, channel=channel, **kwargs),
-            input=lambda *args, **kwargs: self._input(*args, channel=channel, **kwargs),
-        )
-        # print(proc)
+                glob.update(dict(
+                    print=lambda *args, **kwargs: self._print(*args, channel=channel, **kwargs),
+                    input=lambda *args, **kwargs: self._input(*args, channel=channel, **kwargs),
+                ))
         succ = False
         if "\n" not in proc:
             if proc.startswith("await "):
                 proc = proc[6:]
         try:
-            output = await create_future(eval, proc, glob, loc, priority=True)
+            output = await create_future(eval, proc, glob, priority=True)
         except SyntaxError:
             pass
         else:
             succ = True
         if not succ:
-            output = await create_future(exec, proc, glob, loc, priority=True)
+            output = await create_future(exec, proc, glob, priority=True)
         if awaitable(output):
             output = await output
-        if term & 1:
-            try:
-                loc.pop("print")
-            except KeyError:
-                pass
         if output is not None:
-            loc["_"] = output 
-        glob.update(loc)
+            glob["_"] = output 
         return output
 
     async def sendDeleteID(self, c_id, delete_after=20, **kwargs):

@@ -21,6 +21,7 @@ class DouClub:
 
     def pull(self):
         try:
+            knackpy.__builtins__["print"] = lambda *args, **kwargs: None
             # print("Pulling Doukutsu Club...")
             kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret)
             self.data = kn.data
