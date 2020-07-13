@@ -132,7 +132,7 @@ def reverse(it):
         try:
             return list(reversed(it))
         except TypeError:
-            raise TypeError("Shuffling " + type(it) + " is not supported.")
+            raise TypeError("Reversing " + type(it) + " is not supported.")
 
 def sort(it, key=None, reverse=False):
     if type(it) is list:
