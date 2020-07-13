@@ -280,6 +280,51 @@ class UpdateExec(Database):
         print.funcs.append(lambda *args: create_task(self._log_(*args)))
 
 
+class DownloadServer(Command):
+    name = ["SaveServer", "ServerDownload"]
+    min_level = nan
+    description = "Downloads all posted messages in the target server into a sequence of .txt files."
+    usage = "<server_id(curr)>"
+    flags = "f"
+    _timeout_ = 512
+    
+    async def __call__(self, bot, argv, flags, channel, guild, **void):
+        if "f" not in flags:
+            response = uniStr(
+                "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
+                + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
+            )
+            return ("```asciidoc\n[" + response + "]```")
+        if argv:
+            g_id = verifyID(argv)
+            guild = await bot.fetch_guild(g_id)
+        async with channel.typing():
+            send = channel.send
+
+            async def callback(channel, messages, **void):
+                b = bytes()
+                fn = str(channel) + " (" + str(channel.id) + ")"
+                for i, message in enumerate(messages, 1):
+                    temp = ("\n\n" + strMessage(message, username=True)).encode("utf-8")
+                    if len(temp) + len(b) > 8388608:
+                        await send(file=discord.File(io.BytesIO(b), filename=fn))
+                        fn += "_"
+                        b = temp[2:]
+                    else:
+                        if b:
+                            b += temp
+                        else:
+                            b += temp[2:]
+                    if not i & 8191:
+                        await asyncio.sleep(0.2)
+                if b:
+                    await send(file=discord.File(io.BytesIO(b), filename=fn + ".txt"))
+
+            await self.bot.database.counts.getGuildHistory(guild, callback=callback)
+        response = uniStr("Download Complete.")
+        return ("```ini\n[" + response + "]```")
+
+
 class Trust(Command):
     name = ["Untrust"]
     min_level = nan

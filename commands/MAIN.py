@@ -1284,31 +1284,47 @@ class UpdateMessageCount(Database):
             create_task(self.getUserMessageCount(guild))
         return "Calculating..."
 
-    async def getUserMessageCount(self, guild):
-
-        async def getChannelHistory(channel, returns):
-            self.req += 1
-            try:
-                messages = []
-                for i in range(16):
-                    history = channel.history(limit=None)
-                    print(history)
-                    try:
-                        messages = await history.flatten()
-                        break
-                    except discord.Forbidden:
-                        raise
-                    except:
-                        print(traceback.format_exc())
-                    await asyncio.sleep(20 * (i ** 2 + 1))
-                print(len(messages))
-                returns[0] = messages
-            except:
-                print(channel.name)
-                print(traceback.format_exc())
-                returns[0] = []
+    async def getChannelHistory(self, channel, limit=None, callback=None):
+        while self.req > 32:
+            await asyncio.sleep(4)
+        self.req += 1
+        try:
+            messages = []
+            for i in range(16):
+                history = channel.history(limit=limit, oldest_first=(limit is None))
+                try:
+                    messages = await history.flatten()
+                except discord.Forbidden:
+                    break
+                except discord.HTTPException as ex:
+                    if "429" in str(ex):
+                        await asyncio.sleep(20 * (i ** 2 + 1))
+                    else:
+                        await asyncio.sleep(10)
+                except:
+                    print(traceback.format_exc())
+                    await asyncio.sleep(5)
+                else:
+                    break
+        except:
             self.req -= 1
+            raise
+        self.req -= 1
+        if callback:
+            fut = callback(channel=channel, messages=messages)
+            if awaitable(fut):
+                return await fut
+            return fut
+        return messages
 
+    async def getGuildHistory(self, guild, limit=None, callback=None):
+        lim = None if limit is None else ceil(limit / min(128, len(guild.text_channels)))
+        output = cdict({channel.id: create_task(self.getChannelHistory(channel, limit=lim, callback=callback)) for channel in guild.text_channels})
+        for k, v in output.items():
+            output[k] = await v
+        return output
+
+    async def getUserMessageCount(self, guild):
         year = datetime.timedelta(seconds=31556925.216)
         oneyear = utc_dt() - guild.created_at < year
         if guild.member_count > 512 and not oneyear:
@@ -1318,25 +1334,9 @@ class UpdateMessageCount(Database):
         data = {}
         avgs = {}
         oldest = self.data[guild.id]["oldest"]
-        histories = deque()
-        i = 1
-        for channel in reversed(guild.text_channels):
-            returns = [None]
-            histories.append(returns)
-            if not i % 5:
-                await asyncio.sleep(5 + random.random() * 10)
-            create_task(getChannelHistory(
-                channel,
-                histories[-1],
-            ))
-            i += 1
-        while [None] in histories:
-            await asyncio.sleep(2)
-        print("Counting...")
-        while [] in histories:
-            histories = histories.remove([])
-        for messages in histories:
-            for i, message in enumerate(messages[0], 1):
+        histories = await self.getGuildHistory(guild)
+        for messages in histories.values():
+            for i, message in enumerate(messages, 1):
                 u = message.author.id
                 orig_id = oldest.get(u)
                 if not orig_id or message.id < orig_id:

@@ -1095,57 +1095,6 @@ class UpdateMessageLogs(Database):
         self.searched = False
         self.dc = {}
 
-    async def cacheGuild(self, guild, lim=65536):
-
-        async def getChannelHistory(channel, returns, lim=2048):
-            try:
-                messages = []
-                for i in range(16):
-                    history = channel.history(limit=lim)
-                    try:
-                        messages = await history.flatten()
-                        break
-                    except discord.Forbidden:
-                        raise
-                    except:
-                        print(traceback.format_exc())
-                    await asyncio.sleep(20 * (i ** 2 + 1))
-                returns[0] = messages
-            except (discord.Forbidden):
-                returns[0] = []
-            except:
-                print(channel.name)
-                print(traceback.format_exc())
-                returns[0] = []
-
-        limit = ceil(lim / len(guild.text_channels))
-        histories = deque()
-        i = 1
-        for channel in reversed(guild.text_channels):
-            returns = [None]
-            histories.append(returns)
-            if not i % 5:
-                await asyncio.sleep(5 + random.random() * 10)
-            create_task(getChannelHistory(
-                channel,
-                histories[-1],
-                lim=limit,
-            ))
-            i += 1
-        while [None] in histories:
-            await asyncio.sleep(2)
-        while [] in histories:
-            histories = histories.remove([])
-        i = 1
-        for h in histories:
-            temp = h[0]
-            for message in temp:
-                self.bot.cacheMessage(message)
-                if not i & 8191:
-                    await asyncio.sleep(0.5)
-                i += 1
-        create_future_ex(self.bot.updateClient)
-
     async def __call__(self):
         for h in tuple(self.dc):
             if utc_dt() - h > datetime.timedelta(seconds=3600):
@@ -1153,10 +1102,12 @@ class UpdateMessageLogs(Database):
         if not self.searched:
             self.searched = True
             lim = floor(1048576 / len(self.bot.client.guilds))
-            for i, g in enumerate(self.bot.client.guilds, 1):
-                create_task(self.cacheGuild(g, lim=lim))
-                if not i & 7:
-                    await asyncio.sleep(30)
+            return [create_task(self.bot.database.counts.getGuildHistory(guild, 65536, callback=self.callback)) for guild in self.bot.cache.guilds.values()]
+    
+    def callback(self, messages, **void):
+        messages = [self.bot.cacheMessage(message) for message in messages]
+        create_future_ex(self.bot.updateClient)
+        return messages
 
     async def _edit_(self, before, after, **void):
         if not after.author.bot:

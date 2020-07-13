@@ -576,6 +576,7 @@ class Bot:
     def cacheMessage(self, message):
         self.cache.messages[message.id] = message
         self.limitCache("messages")
+        return message
 
     def deleteMessage(self, message):
         try:
