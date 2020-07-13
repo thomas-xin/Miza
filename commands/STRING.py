@@ -122,14 +122,16 @@ class Math(Command):
     usage = "<function> <verbose(?v)> <rationalize(?r)>"
     flags = "rv"
     rate_limit = 0.5
+    typing = True
 
-    async def __call__(self, bot, argv, channel, flags, guild, **void):
+    async def __call__(self, bot, argv, channel, flags, user, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         r = "r" in flags
         p = flags.get("v", 0) * 2 + 1 << 6
-        resp = await bot.solveMath(argv, guild, p, r)
+        resp = await bot.solveMath(argv, user, p, r)
         if type(resp) is dict and "file" in resp:
+            await channel.trigger_typing()
             fn = resp["file"]
             f = discord.File(fn)
             await sendFile(channel, "", f, filename=fn, best=True)
@@ -264,7 +266,7 @@ class Time(Command):
     description = "Shows the current time in a certain timezone."
     usage = "<offset_hours[0]>"
 
-    async def __call__(self, name, argv, args, guild, **void):
+    async def __call__(self, name, argv, args, user, **void):
         s = 0
         if args and name in "time":
             for a in (args[0], args[-1]):
@@ -277,7 +279,7 @@ class Time(Command):
             s = TIMEZONES.get(name, 0)
         t = utc_dt()
         if argv:
-            h = await self.bot.evalMath(argv, guild)
+            h = await self.bot.evalMath(argv, user)
         else:
             h = 0
         if h or s:

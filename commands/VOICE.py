@@ -2256,10 +2256,10 @@ class Skip(Command):
             if len(l) > 3:
                 raise ArgumentError("Too many arguments for range input.")
             elif len(l) > 2:
-                num = await bot.evalMath(l[0], guild.id)
+                num = await bot.evalMath(l[0], user)
                 it = int(round(float(num)))
             if l[0]:
-                num = await bot.evalMath(l[0], guild.id)
+                num = await bot.evalMath(l[0], user)
                 if num > count:
                     num = count
                 else:
@@ -2268,7 +2268,7 @@ class Skip(Command):
             else:
                 left = 0
             if l[1]:
-                num = await bot.evalMath(l[1], guild.id)
+                num = await bot.evalMath(l[1], user)
                 if num > count:
                     num = count
                 else:
@@ -2280,7 +2280,7 @@ class Skip(Command):
         else:
             elems = [0] * len(args)
             for i in range(len(args)):
-                elems[i] = await bot.evalMath(args[i], guild.id)
+                elems[i] = await bot.evalMath(args[i], user)
         if not "f" in flags:
             valid = True
             for e in elems:
@@ -2689,7 +2689,7 @@ class AudioSettings(Command):
                 argv = str(val)
             origStats = bot.database.playlists.audio[guild.id].stats
             orig = round(origStats[op] * 100, 9)
-            num = await bot.evalMath(argv, guild.id, orig)
+            num = await bot.evalMath(argv, user, orig)
             val = roundMin(float(num / 100))
             new = round(num, 9)
             if op in "loop repeat shuffle quiet stay":
@@ -2725,7 +2725,7 @@ class Rotate(Command):
 
     async def __call__(self, perm, argv, flags, guild, channel, user, client, bot, **void):
         auds = await forceJoin(guild, channel, user, client, bot)
-        amount = await bot.evalMath(argv, guild.id)
+        amount = await bot.evalMath(argv, user)
         if len(auds.queue) > 1 and amount:
             if not isAlone(auds, user) and perm < 1:
                 raise self.permError(perm, 1, "to rotate queue while other users are in voice")

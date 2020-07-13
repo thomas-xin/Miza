@@ -242,10 +242,10 @@ class CS_mem2flag(Command):
     usage = "<0:address> <1:value[1]>"
     rate_limit = 1
 
-    async def __call__(self, bot, args, guild, **void):
+    async def __call__(self, bot, args, user, **void):
         if len(args) < 2:
             return "```css\n" + _m2f(args[0], 1) + "```"
-        num = await bot.evalMath(" ".join(args[1:]), guild.id)
+        num = await bot.evalMath(" ".join(args[1:]), user)
         return "```css\n" + _m2f(args[0], num) + "```"
 
 
@@ -702,7 +702,7 @@ class UpdateMathTest(Database):
             if st and i[0] not in "+-":
                 st += "+"
             st += i
-        ans = await self.bot.solveMath(st, -1, 0, 1)
+        ans = await self.bot.solveMath(st, xrand(2147483648), 0, 1)
         a = ans[0]
         q = self.eqtrans(a)
         if xrand(2):
@@ -765,7 +765,7 @@ class UpdateMathTest(Database):
                 if msg.startswith("#") or msg.startswith("//") or msg.startswith("\\"):
                     return
                 try:
-                    x = await bot.solveMath(msg, getattr(channel, "guild", None), 0, 1)
+                    x = await bot.solveMath(msg, message.author, 0, 1)
                     x = await create_future(sympy.sympify, x[0])
                 except:
                     return

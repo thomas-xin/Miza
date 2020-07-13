@@ -292,16 +292,16 @@ class Text2048(Command):
             size = [4, 4]
         else:
             if "x" in argv:
-                size = await recursiveCoro(bot.evalMath(i, guild) for i in argv.split("x"))
+                size = await recursiveCoro(bot.evalMath(i, user) for i in argv.split("x"))
             else:
                 if len(args) > 1:
                     dims = args.pop(-1)
-                    dims = await bot.evalMath(dims, guild)
+                    dims = await bot.evalMath(dims, user)
                 else:
                     dims = 2
                 if dims <= 0:
                     raise ValueError("Invalid amount of dimensions specified.")
-                width = await bot.evalMath(" ".join(args), guild)
+                width = await bot.evalMath(" ".join(args), user)
                 size = list(repeat(width, dims))
         if len(size) > 8:
             raise OverflowError("Board size too large.")

@@ -899,14 +899,14 @@ class Bot:
         "%=": "__mod__",
     }
 
-    async def evalMath(self, expr, guild, default=0, op=True):
+    async def evalMath(self, expr, obj, default=0, op=True):
         if op:
             _op = None
             for op, at in self.op.items():
                 if expr.startswith(op):
                     expr = expr[len(op):].strip()
                     _op = at
-            num = await self.evalMath(expr, guild, op=False)
+            num = await self.evalMath(expr, obj, op=False)
             if _op is not None:
                 num = getattr(float(default), _op)(num)
             return num
@@ -927,7 +927,7 @@ class Bot:
             else:
                 r = [ast.literal_eval(f)]
         except (ValueError, TypeError, SyntaxError):
-            r = await self.solveMath(f, guild, 16, 0)
+            r = await self.solveMath(f, obj, 16, 0)
         x = r[0]
         try:
             while True:
@@ -938,16 +938,16 @@ class Bot:
             pass
         return roundMin(float(x))
 
-    async def solveMath(self, f, guild, prec, r, authorize=False):
+    async def solveMath(self, f, obj, prec, r, authorize=False):
         f = f.strip()
         try:
-            if guild is None or hasattr(guild, "ghost"):
-                g_id = self.deleted_user
+            if obj is None or hasattr(obj, "ghost"):
+                key = self.deleted_user
             else:
-                g_id = guild.id
+                key = obj.id
         except AttributeError:
-            g_id = int(guild)
-        return await mathProc(f, int(prec), int(r), g_id, authorize=authorize)
+            key = int(obj)
+        return await mathProc(f, int(prec), int(r), key, authorize=authorize)
 
     timeChecks = {
         "galactic year": ("gy", "galactic year", "galactic years"),
@@ -965,14 +965,14 @@ class Bot:
     andcheck = re.compile("[^a-z](and)[^a-z]", re.I)
     alphabet = "abcdefghijklmnopqrstuvwxyz"
 
-    async def evalTime(self, expr, guild, default=0, op=True):
+    async def evalTime(self, expr, obj, default=0, op=True):
         if op:
             _op = None
             for op, at in self.op.items():
                 if expr.startswith(op):
                     expr = expr[len(op):].strip(" ")
                     _op = at
-            num = await self.evalTime(expr, guild, op=False)
+            num = await self.evalTime(expr, obj, op=False)
             if _op is not None:
                 num = getattr(float(default), _op)(num)
             return num
@@ -995,7 +995,7 @@ class Bot:
                     data = expr.split(":")
                     mult = 1
                     while len(data):
-                        t += await self.evalMath(data[-1], guild.id) * mult
+                        t += await self.evalMath(data[-1], obj) * mult
                         data = data[:-1]
                         if mult <= 60:
                             mult *= 60
@@ -1012,14 +1012,14 @@ class Bot:
                                 isnt = i + len(check) < len(f) and f[i + len(check)] in self.alphabet
                                 if not i or f[i - 1] in self.alphabet or isnt:
                                     continue
-                                n = await self.evalMath(f[:i], guild.id)
+                                n = await self.evalMath(f[:i], obj)
                                 s = TIMEUNITS[tc]
                                 if type(s) is list:
                                     s = s[0]
                                 t += s * n
                                 f = f[i + len(check):]
                     if f.strip():
-                        t += await self.evalMath(f, guild.id)
+                        t += await self.evalMath(f, obj)
             except:
                 t = utc_ts(tparser.parse(f if f is not None else expr)) - utc_ts(tparser.parse("0s"))
         if type(t) is not float:
@@ -1731,7 +1731,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             name=alias,             # alias the command was called as
                             callback=processMessage,# function that called the command
                         ), timeout=timeout))
-                        create_task(force_callback(future, 0.9, typing, channel))
+                        if fut is None and not hasattr(command, "typing"):
+                            create_task(delayed_callback(future, 2, typing, channel))
                         response = await future
                         if response is not None:
                             if fut is not None:

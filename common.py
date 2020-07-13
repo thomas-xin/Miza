@@ -377,6 +377,11 @@ def procUpdate():
 procUpdate()
 
 async def imageProc(image, operation, args, key=-1, timeout=12):
+    if type(key) is not int:
+        try:
+            key = int(key)
+        except (TypeError, ValueError):
+            key = key.id
     procs, busy = SUBS.image.procs, SUBS.image.busy
     while utc() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
@@ -424,6 +429,11 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
     return output
 
 async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12, authorize=False):
+    if type(key) is not int:
+        try:
+            key = int(key)
+        except (TypeError, ValueError):
+            key = key.id
     procs, busy = SUBS.math.procs, SUBS.math.busy
     while utc() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
@@ -592,7 +602,7 @@ def create_task(fut, *args, loop=None, **kwargs):
 async def retNone(*args, **kwargs):
     return
 
-async def force_callback(fut, delay, func, *args, exc=False, **kwargs):
+async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
     await asyncio.sleep(delay)
     try:
         return fut.result()

@@ -125,7 +125,7 @@ class Perms(Command):
             name = str(t_user)
             orig = t_perm
             expr = " ".join(args[1:])
-            num = await bot.evalMath(expr, guild, orig)
+            num = await bot.evalMath(expr, user, orig)
             c_perm = roundMin(num)
             if t_perm is nan or isnan(c_perm):
                 m_perm = nan
@@ -311,10 +311,10 @@ class Loop(Command):
     usage = "<0:iterations> <1:command>"
     rate_limit = 3
 
-    async def __call__(self, args, argv, message, channel, callback, bot, perm, guild, **void):
+    async def __call__(self, args, argv, message, channel, callback, bot, perm, user, guild, **void):
         if not args:
             raise ArgumentError("Please input loop iterations and target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioSettings command.")
-        num = await bot.evalMath(args[0], guild.id)
+        num = await bot.evalMath(args[0], user)
         iters = round(num)
         if not isnan(perm):
             if iters > 32 and not bot.isTrusted(guild.id):
@@ -748,11 +748,13 @@ class Info(Command):
         if role:
             emb.add_field(name="Roles", value=role, inline=0)
         if flags.get("v", 0) > 1:
-            fut = create_task(channel.send(embed=emb))
+            fut = create_task(channel.trigger_typing())
+            fut2 = create_task(channel.send(embed=emb))
             data = await create_future(bot.database.users.fetch_events, user.id, interval=3600)
             resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
             fn = resp["file"]
             f = discord.File(fn)
+            await fut2
             await fut
             return dict(file=f, filename=fn, best=True)
         return dict(embed=emb)
@@ -765,8 +767,9 @@ class Activity(Command):
     usage = "<user> <verbose(?v)>"
     flags="v"
     rate_limit = 1
+    typing = True
 
-    async def __call__(self, guild, user, argv, flags, bot, **void):
+    async def __call__(self, guild, user, argv, flags, channel, bot, **void):
         if argv:
             u_id = verifyID(argv)
             try:
@@ -774,9 +777,15 @@ class Activity(Command):
             except (TypeError, discord.NotFound):
                 user = await bot.fetch_member_ex(u_id, guild)
         data = await create_future(bot.database.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)))
-        resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
+        fut = channel.trigger_typing()
+        try:
+            resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
+        except:
+            await fut
+            raise
         fn = resp["file"]
         f = discord.File(fn)
+        await fut
         return dict(file=f, filename=fn, best=True)
 
 
@@ -878,7 +887,7 @@ class Reminder(Command):
             if not argv:
                 i = 0
             else:
-                i = await bot.evalMath(argv2, guild)
+                i = await bot.evalMath(argv2, user)
             i %= len(rems)
             x = rems.pop(i)
             if i == 0:
