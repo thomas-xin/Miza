@@ -2142,7 +2142,7 @@ class Connect(Command):
                     channels = None
                 if not channels:
                     pos = 0 if channel.category is None else channel.category.position
-                    channels = sorted(channel.guild.voice_channels, key=lambda channel: (abs(pos - channel.position if channel.category is None else channel.category.position), abs(channel.position)))
+                    channels = sorted(channel.guild.voice_channels, key=lambda channel: (abs(pos - (channel.position if channel.category is None else channel.category.position)), abs(channel.position)))
                 if channels:
                     vc_ = channels[0]
                 else:
