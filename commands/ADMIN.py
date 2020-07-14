@@ -459,7 +459,7 @@ class AutoRole(Command):
             if argv and assigned:
                 i = await bot.evalMath(argv, guild)
                 roles = assigned.pop(i)
-                removed = []
+                removed = deque()
                 for r in roles:
                     try:
                         role = await bot.fetch_role(r, guild)
@@ -484,7 +484,7 @@ class AutoRole(Command):
                 update()
                 return "```css\nRemoved " + sbHighlight(", ".join(str(role) for role in removed)) + " from the autorole list for " + sbHighlight(guild) + ".```"
             if guild.id in data:
-                data.pop(channel.id)
+                data.pop(guild.id)
                 update()
             return "```css\nRemoved all items from the autorole list for " + sbHighlight(guild) + ".```"
         assigned = setDict(data, guild.id, hlist())

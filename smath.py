@@ -1877,13 +1877,19 @@ custom list-like data structure that incorporates the functionality of np arrays
 
     @waiting
     def __eq__(self, other):
-        it = self.createIterator(other)
-        return self.view() == other
+        try:
+            it = self.createIterator(other)
+            return self.view() == other
+        except (TypeError, IndexError):
+            return
 
     @waiting
     def __ne__(self, other):
-        it = self.createIterator(other)
-        return self.view() != other
+        try:
+            it = self.createIterator(other)
+            return self.view() != other
+        except (TypeError, IndexError):
+            return
 
     @waiting
     def __gt__(self, other):

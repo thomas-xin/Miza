@@ -307,7 +307,7 @@ class DownloadServer(Command):
                 for i, message in enumerate(messages, 1):
                     temp = ("\n\n" + strMessage(message, username=True)).encode("utf-8")
                     if len(temp) + len(b) > 8388608:
-                        await send(file=discord.File(io.BytesIO(b), filename=fn))
+                        await send(file=discord.File(io.BytesIO(b), filename=fn + ".txt"))
                         fn += "_"
                         b = temp[2:]
                     else:
