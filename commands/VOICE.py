@@ -2702,7 +2702,8 @@ class AudioSettings(Command):
                     try:
                         await asyncio.wait_for(create_future(auds.new, auds.file, auds.stats.position), timeout=12)
                     except (TimeoutError, asyncio.exceptions.TimeoutError, concurrent.futures._base.TimeoutError):
-                        print(auds.proc.args)
+                        if auds.source:
+                            print(auds.source.proc.args)
                         await create_future(auds.stop)
                         raise RuntimeError("Unable to adjust audio setting.")
             s += (
