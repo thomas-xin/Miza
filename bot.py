@@ -1524,6 +1524,23 @@ def userIter3(x):
     yield to_alphanumeric(x.display_name).replace(" ", "").lower()
 
 
+T0 = TimeoutError
+try:
+    T1 = asyncio.exceptions.TimeoutError
+except AttributeError:
+    try:
+        T1 = asyncio.TimeoutError
+    except AttributeError:
+        T1 = TimeoutError
+try:
+    T2 = concurrent.futures._base.TimeoutError
+except AttributeError:
+    try:
+        T2 = concurrent.futures.TimeoutError
+    except AttributeError:
+        T2 = TimeoutError
+
+
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=False):
     if bot.closed:
         return
@@ -1774,7 +1791,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                             raise OverflowError("Response too long for file upload.")
                                 if react and sent:
                                     await sent.add_reaction(react)
-                    except (TimeoutError, asyncio.exceptions.TimeoutError, concurrent.futures._base.TimeoutError):
+                    except (T0, T1, T2):
                         if fut is not None:
                             await fut
                         print(msg)
