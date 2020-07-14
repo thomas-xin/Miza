@@ -1570,7 +1570,6 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         except KeyError:
             try:
                 enabled = bot.data.enabled[c_id] = ["main", "string", "admin"]
-                bot.update()
             except KeyError:
                 enabled = ["main", "admin"]
     else:
@@ -1847,7 +1846,7 @@ async def slowLoop():
         try:
             if utc() - autosave > 60:
                 autosave = utc()
-                bot.update()
+                create_future_ex(bot.update)
                 create_future_ex(bot.updateClient, priority=True)
             while bot.blocked > 0:
                 print("Update event blocked.")

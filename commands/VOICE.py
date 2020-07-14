@@ -130,19 +130,21 @@ def getBestAudio(entry):
     return url
 
 
-async def forceJoin(guild, channel, user, client, bot, preparing=False):
-    if guild.id not in bot.database.playlists.audio:
+async def forceJoin(guild, channel, user, client, bot, preparing=False, vc=None):
+    if type(channel) in (str, int):
+        channel = await bot.fetch_channel(channel)
+    if guild.id not in bot.database.audio.players:
         for func in bot.commands.connect:
             try:
-                await func(user=user, channel=channel)
+                await func(user=user, channel=channel, vc=vc)
             except (discord.ClientException, AttributeError):
                 pass
     try:
-        auds = bot.database.playlists.audio[guild.id]
-        auds.channel = channel
-        auds.preparing = preparing
+        auds = bot.database.audio.players[guild.id]
     except KeyError:
         raise LookupError("Unable to find voice channel.")
+    auds.channel = channel
+    auds.preparing = preparing
     return auds
 
 
@@ -210,7 +212,7 @@ class CustomAudio(discord.AudioSource):
             self.new(update=False)
             self.queue = AudioQueue()
             self.queue._init_(auds=self)
-            bot.database.playlists.audio[vc.guild.id] = self
+            bot.database.audio.players[vc.guild.id] = self
         except:
             print(traceback.format_exc())
 
@@ -292,11 +294,11 @@ class CustomAudio(discord.AudioSource):
         self.dead = None
         g = self.vc.guild.id
         try:
-            self.bot.database.playlists.audio.pop(g)
+            self.bot.database.audio.players.pop(g)
         except KeyError:
             pass
         try:
-            self.bot.database.playlists.connecting.pop(g)
+            self.bot.database.audio.connecting.pop(g)
         except KeyError:
             pass
         try:
@@ -372,7 +374,7 @@ class CustomAudio(discord.AudioSource):
         if m.voice is not None:
             if m.voice.deaf or m.voice.mute or m.voice.afk:
                 create_task(m.edit(mute=False, deafen=False))
-        if not (vc.is_connected() or self.bot.database.playlists.is_connecting(vc.guild.id)):
+        if not (vc.is_connected() or self.bot.database.audio.is_connecting(vc.guild.id)):
             create_task(self.reconnect())
         else:
             self.att = 0
@@ -386,7 +388,7 @@ class CustomAudio(discord.AudioSource):
         try:
             if hasattr(self, "dead") or self.vc.is_connected():
                 return
-            self.bot.database.playlists.connecting[self.vc.guild.id] = True
+            self.bot.database.audio.connecting[self.vc.guild.id] = True
             if getattr(self, "att", 0) <= 0:
                 self.att = utc()
             self.vc = await self.vc.channel.connect(timeout=30, reconnect=False)
@@ -405,7 +407,7 @@ class CustomAudio(discord.AudioSource):
             if getattr(self, "att", 0) > 0 and utc() - self.att > 10:
                 self.dead = True
         try:
-            self.bot.database.playlists.connecting.pop(self.vc.guild.id)
+            self.bot.database.audio.connecting.pop(self.vc.guild.id)
         except:
             pass
 
@@ -1738,7 +1740,7 @@ class Queue(Command):
                 + "-\nLoading Queue...```"
             )
         try:
-            auds = bot.database.playlists.audio[guild.id]
+            auds = bot.database.audio.players[guild.id]
             future = None
         except KeyError:
             future = wrap_future(create_task(forceJoin(guild, channel, user, client, bot, preparing=True)))
@@ -2129,7 +2131,7 @@ class Connect(Command):
     usage = "<channel{curr}(0)>"
     rate_limit = 3
 
-    async def __call__(self, user, channel, name="join", argv="", **void):
+    async def __call__(self, user, channel, name="join", argv="", vc=None, **void):
         bot = self.bot
         client = bot.client
         if name in ("dc", "disconnect", "leave", "fuckoff"):
@@ -2141,23 +2143,26 @@ class Connect(Command):
             else:
                 vc_ = await bot.fetch_channel(c_id)
         else:
-            voice = user.voice
-            if voice is None:
-                catg = channel.category
-                if catg is not None:
-                    channels = catg.voice_channels
-                else:
-                    channels = None
-                if not channels:
-                    pos = 0 if channel.category is None else channel.category.position
-                    channels = sorted(channel.guild.voice_channels, key=lambda channel: (abs(pos - (channel.position if channel.category is None else channel.category.position)), abs(channel.position)))
-                if channels:
-                    vc_ = channels[0]
-                else:
-                    raise LookupError("Unable to find voice channel.")
+            if vc is not None:
+                vc_ = vc
             else:
-                vc_ = voice.channel
-        connecting = bot.database.playlists.connecting
+                voice = user.voice
+                if voice is None:
+                    catg = channel.category
+                    if catg is not None:
+                        channels = catg.voice_channels
+                    else:
+                        channels = None
+                    if not channels:
+                        pos = 0 if channel.category is None else channel.category.position
+                        channels = sorted(channel.guild.voice_channels, key=lambda channel: (abs(pos - (channel.position if channel.category is None else channel.category.position)), abs(channel.position)))
+                    if channels:
+                        vc_ = channels[0]
+                    else:
+                        raise LookupError("Unable to find voice channel.")
+                else:
+                    vc_ = voice.channel
+        connecting = bot.database.audio.connecting
         if vc_ is None:
             guild = channel.guild
         else:
@@ -2167,7 +2172,7 @@ class Connect(Command):
             raise self.permError(perm, 0, "for command " + self.name + " in " + str(guild))
         if vc_ is None:
             try:
-                auds = bot.database.playlists.audio[guild.id]
+                auds = bot.database.audio.players[guild.id]
             except KeyError:
                 raise LookupError("Unable to find voice channel.")
             if not isAlone(auds, user) and perm < 1:
@@ -2177,7 +2182,7 @@ class Connect(Command):
                 connecting.pop(guild.id)
             except KeyError:
                 pass
-            await bot.database.playlists(guild=guild)
+            await bot.database.audio(guild=guild)
             return
         joined = False
         for vc in client.voice_clients:
@@ -2209,8 +2214,8 @@ class Connect(Command):
             if isinstance(vc, cdict):
                 connecting[guild.id] = 0
                 raise ConnectionError("Unable to connect to voice channel.")
-        if guild.id not in bot.database.playlists.audio:
-            bot.database.playlists.audio[guild.id] = auds = CustomAudio(channel, vc, bot)
+        if guild.id not in bot.database.audio.players:
+            bot.database.audio.players[guild.id] = auds = CustomAudio(channel, vc, bot)
         try:
             joined = connecting.pop(guild.id)
         except KeyError:
@@ -2223,7 +2228,7 @@ class Connect(Command):
                 create_task(user.edit(mute=False, deafen=False))
                 break
         if joined:
-            create_task(bot.database.playlists(guild=guild))
+            create_task(bot.database.audio(guild=guild))
             return (
                 "```css\n🎵 Successfully connected to [#" + noHighlight(vc_.name)
                 + "] in [" + noHighlight(guild.name) + "]. 🎵```", 1
@@ -2241,9 +2246,9 @@ class Skip(Command):
     rate_limit = (0.5, 1.5)
 
     async def __call__(self, client, user, perm, bot, name, args, argv, guild, flags, message, **void):
-        if guild.id not in bot.database.playlists.audio:
+        if guild.id not in bot.database.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
-        auds = bot.database.playlists.audio[guild.id]
+        auds = bot.database.audio.players[guild.id]
         if name.startswith("c"):
             argv = "inf"
             args = [argv]
@@ -2412,7 +2417,7 @@ class Pause(Command):
             create_future_ex(auds.ensure_play)
         if auds.player is not None:
             auds.player.time = 1 + utc()
-        await bot.database.playlists(guild=guild)
+        await bot.database.audio(guild=guild)
         if "h" not in flags:
             past = name + "pe" * (name == "stop") + "d"
             return (
@@ -2451,10 +2456,9 @@ class Seek(Command):
             )
 
 
-def getDump(auds):
+copyDict = lambda item: {"name": item.name, "url": item.url, "duration": item.duration}
 
-    copyDict = lambda item: {"name": item.name, "url": item.url, "duration": item.duration}
-
+def getDump(auds, position, json=False):
     lim = 32768
     if len(auds.queue) > lim:
         raise OverflowError(
@@ -2467,8 +2471,11 @@ def getDump(auds):
         "stats": s,
         "queue": q,
     }
-    d["stats"].pop("position")
-    return json.dumps(d)
+    if not position:
+        d["stats"].pop("position")
+    if json:
+        return json.dumps(d)
+    return d
 
 
 class Dump(Command):
@@ -2479,42 +2486,46 @@ class Dump(Command):
     min_level = 0
     min_display = "0~1"
     description = "Saves or loads the currently playing audio queue state."
-    usage = "<data{attached_file}> <append(?a)> <hide(?h)>"
-    flags = "ah"
+    usage = "<data{attached_file}> <song_positions(?x)> <append(?a)> <hide(?h)>"
+    flags = "ahx"
     rate_limit = (1, 2)
 
-    async def __call__(self, guild, channel, user, client, bot, perm, name, argv, flags, message, **void):
-        auds = await forceJoin(guild, channel, user, client, bot)
-        if not argv and not len(message.attachments) or name == "save":
+    async def __call__(self, guild, channel, user, client, bot, perm, name, argv, flags, message, vc=None, **void):
+        auds = await forceJoin(guild, channel, user, client, bot, vc=vc)
+        if argv == "" and not message.attachments or name == "save":
             if name == "load":
                 raise ArgumentError("Please input a file, URL or json data to load.")
             fut = create_task(channel.trigger_typing())
-            resp = await create_future(getDump, auds)
+            resp = await create_future(getDump, auds, "x" in flags, json=True)
             f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
             await fut
             create_task(sendFile(channel, "Queue data for **" + guild.name + "**:", f))
             return
         if not isAlone(auds, user) and perm < 1:
             raise self.permError(perm, 1, "to load new queue while other users are in voice")
-        try:
-            if len(message.attachments):
-                url = message.attachments[0].url
-            else:
-                url = argv
-            urls = await bot.followURL(url)
-            url = urls[0]
-            s = await Request(url, aio=True)
-            s = s[s.index(b"{"):]
-            if s[-4:] == b"\n```":
-                s = s[:-4]
-        except:
-            s = argv
-            print(traceback.format_exc())
-        d = json.loads(s.strip())
-        fut = create_task(channel.trigger_typing())
+        if type(argv) is str:
+            try:
+                if message.attachments:
+                    url = message.attachments[0].url
+                else:
+                    url = argv
+                urls = await bot.followURL(url)
+                url = urls[0]
+                s = await Request(url, aio=True)
+                s = s[s.index(b"{"):]
+                if s[-4:] == b"\n```":
+                    s = s[:-4]
+            except:
+                s = argv
+                print(traceback.format_exc())
+            d = json.loads(s.strip())
+        else:
+            d = argv
         q = d["queue"]
-        for i in range(len(q)):
-            e = q[i] = cdict(q[i])
+        fut = create_task(channel.trigger_typing())
+        for i, e in enumerate(q):
+            if type(e) is not cdict:
+                e = q[i] = cdict(e)
             e.u_id = user.id
             e.skips = deque()
             if not 1 + i & 2047:
@@ -2526,7 +2537,7 @@ class Dump(Command):
         for k in d["stats"]:
             if k not in auds.stats:
                 d["stats"].pop(k)
-            if k in "loop shuffle quiet":
+            if k in "loop repeat shuffle quiet stay":
                 d["stats"][k] = bool(d["stats"][k])
             else:
                 d["stats"][k] = float(d["stats"][k])
@@ -2660,7 +2671,7 @@ class AudioSettings(Command):
                     "Current audio settings for **" + discord.utils.escape_markdown(guild.name) + "**:\n```ini\n"
                     + strIter(d, key=key) + "```"
                 )
-            orig = bot.database.playlists.audio[guild.id].stats[op]
+            orig = bot.database.audio.players[guild.id].stats[op]
             num = round(100 * orig, 9)
             return (
                 "```css\nCurrent audio " + op
@@ -2689,13 +2700,13 @@ class AudioSettings(Command):
         s = ""
         for op in ops:
             if type(op) is str and op in "loop repeat shuffle quiet stay" and not argv:
-                argv = str(not bot.database.playlists.audio[guild.id].stats[op])
+                argv = str(not bot.database.audio.players[guild.id].stats[op])
             if disable:
                 val = auds.defaults[op]
                 if type(val) is not bool:
                     val *= 100
                 argv = str(val)
-            origStats = bot.database.playlists.audio[guild.id].stats
+            origStats = bot.database.audio.players[guild.id].stats
             orig = round(origStats[op] * 100, 9)
             num = await bot.evalMath(argv, user, orig)
             val = roundMin(float(num / 100))
@@ -2973,13 +2984,13 @@ class Player(Command):
     async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, **void):
         if message is None:
             return
-        if not guild.id in bot.database.playlists.audio:
+        if not guild.id in bot.database.audio.players:
             try:
                 await message.clear_reactions()
             except (discord.NotFound, discord.Forbidden):
                 pass
             return
-        auds = bot.database.playlists.audio[guild.id]
+        auds = bot.database.audio.players[guild.id]
         if reaction is None:
             auds.player = cdict(
                 time=inf,
@@ -3240,7 +3251,7 @@ class Lyrics(Command):
             argv = a.url + " " + argv
         if not argv:
             try:
-                auds = bot.database.playlists.audio[guild.id]
+                auds = bot.database.audio.players[guild.id]
                 if not auds.queue:
                     raise LookupError
                 argv = auds.queue[0].name
@@ -3449,7 +3460,7 @@ class Download(Command):
                     ))
                     try:
                         if int(spl[3]):
-                            auds = bot.database.playlists.audio[guild.id]
+                            auds = bot.database.audio.players[guild.id]
                         else:
                             auds = None
                     except LookupError:
@@ -3479,19 +3490,13 @@ class Download(Command):
                     create_task(bot.silentDelete(message, no_log=True))
 
 
-class UpdateQueues(Database):
-    name = "playlists"
+class UpdateAudio(Database):
+    name = "audio"
 
     def __load__(self):
-        self.audio = {}
+        self.players = {}
         self.audiocache = {}
         self.connecting = {}
-        pl = self.data
-        for g in pl:
-            for i in range(len(pl[g])):
-                e = pl[g][i]
-                if type(e) is dict:
-                    pl[g][i] = cdict(e)
 
     def is_connecting(self, g):
         if g in self.connecting:
@@ -3532,16 +3537,16 @@ class UpdateQueues(Database):
     async def _typing_(self, channel, user, **void):
         if not hasattr(channel, "guild") or channel.guild is None:
             return
-        if channel.guild.id in self.audio and user.id != self.bot.client.user.id:
-            auds = self.audio[channel.guild.id]
+        if channel.guild.id in self.players and user.id != self.bot.client.user.id:
+            auds = self.players[channel.guild.id]
             if auds.player is not None and channel.id == auds.channel.id:
-                t = utc() + 10
+                t = utc() + 15
                 if auds.player.time < t:
                     auds.player.time = t
 
     async def _send_(self, message, **void):
-        if message.guild.id in self.audio and message.author.id != self.bot.client.user.id:
-            auds = self.audio[message.guild.id]
+        if message.guild.id in self.players and message.author.id != self.bot.client.user.id:
+            auds = self.players[message.guild.id]
             if auds.player is not None and message.channel.id == auds.channel.id:
                 t = utc() + 10
                 if auds.player.time < t:
@@ -3564,7 +3569,7 @@ class UpdateQueues(Database):
         try:
             if guild is not None:
                 g = guild
-                if not self.is_connecting(g.id) and g.id not in self.audio:
+                if not self.is_connecting(g.id) and g.id not in self.players:
                     for c in g.voice_channels:
                         for m in c.members:
                             if m.id == client.user.id:
@@ -3576,10 +3581,10 @@ class UpdateQueues(Database):
                             create_task(m.edit(mute=False, deafen=False))
             else:
                 for vc in client.voice_clients:
-                    if not self.is_connecting(vc.guild.id) and vc.guild.id not in self.audio:
+                    if not self.is_connecting(vc.guild.id) and vc.guild.id not in self.players:
                         create_task(vc.disconnect(force=True))
                 for g in client.guilds:
-                    if not self.is_connecting(g.id) and g.id not in self.audio:
+                    if not self.is_connecting(g.id) and g.id not in self.players:
                         for c in g.voice_channels:
                             for m in c.members:
                                 if m.id == client.user.id:
@@ -3592,14 +3597,14 @@ class UpdateQueues(Database):
         except:
             print(traceback.format_exc())
         if guild is not None:
-            if guild.id in self.audio:
-                auds = self.audio[guild.id]
+            if guild.id in self.players:
+                auds = self.players[guild.id]
                 create_future_ex(auds.update)
         else:
             a = 1
-            for g in tuple(self.audio):
+            for g in tuple(self.players):
                 try:
-                    auds = self.audio[g]
+                    auds = self.players[g]
                     create_future_ex(auds.update)
                     create_task(self.research(auds))
                 except:
@@ -3614,14 +3619,49 @@ class UpdateQueues(Database):
         self.busy = max(0, self.busy - 1)
 
     def _announce_(self, *args, **kwargs):
-        for auds in self.audio.values():
+        for auds in self.players.values():
             auds.announce(*args, **kwargs)
 
-    def _destroy_(self, **void):
-        for auds in self.audio.values():
-            auds.kill()
-        for file in ytdl.cache.values():
-            file.destroy()
+    async def _destroy_(self, **void):
+        for auds in tuple(self.players.values()):
+            d = await create_future(getDump, auds, True)
+            self.data[auds.vc.channel.id] = {"dump": d, "channel": auds.channel.id}
+            await create_future(auds.kill)
+        for file in tuple(ytdl.cache.values()):
+            await create_future(file.destroy)
+        self.update()
+        await create_future(self.update, True)
 
-    def _ready_(self, bot, **void):
+    async def _ready_(self, bot, **void):
         ytdl.bot = bot
+        for k, v in self.data.items():
+            try:
+                vc = await bot.fetch_channel(k)
+                channel = await bot.fetch_channel(v["channel"])
+                guild = channel.guild
+                client = bot.client
+                user = client.user
+                perm = inf
+                name = "dump"
+                argv = v["dump"]
+                # print(type(argv), argv)
+                flags = "h"
+                message = cdict(attachments=None)
+                for dump in bot.commands.dump:
+                    await dump(guild, channel, user, client, bot, perm, name, argv, flags, message, vc=vc)
+            except:
+                print(traceback.format_exc())
+        self.data.clear()
+        self.update()
+
+
+class UpdatePlaylists(Database):
+    name = "playlists"
+
+    def __load__(self):
+        pl = self.data
+        for g in pl:
+            for i in range(len(pl[g])):
+                e = pl[g][i]
+                if type(e) is dict:
+                    pl[g][i] = cdict(e)

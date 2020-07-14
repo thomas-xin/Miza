@@ -39,7 +39,7 @@ class Restart(Command):
         print.close()
         t = time.time()
         await bot.event("_destroy_")
-        bot.update()
+        await create_future(bot.update)
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
         for _ in loop(5):
