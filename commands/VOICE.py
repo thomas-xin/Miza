@@ -77,6 +77,8 @@ def getDuration(filename):
                 if x < i:
                     i = x
         dur = rdhms(d[:i])
+    except ValueError:
+        return
     except:
         print(s)
         print(traceback.format_exc())
@@ -511,8 +513,8 @@ class CustomAudio(discord.AudioSource):
             opt = "anequalizer="
             width = 4096
             x = round(sqrt(1 + abs(stats.bassboost)), 5)
-            coeff = width * max(0.03125, (0.25 / x))
-            ch = " f=" + str(coeff if stats.bassboost > 0 else width - coeff) + " w=" + str(coeff / 2) + " g=" + str(max(0.5, min(48, 2 * math.log2(x * 5))))
+            coeff = width * max(0.0625, (0.25 / x))
+            ch = " f=" + str(coeff if stats.bassboost > 0 else width - coeff) + " w=" + str(coeff / 2) + " g=" + str(max(0.5, min(48, 4 * math.log2(x * 5))))
             opt += "c0" + ch + "|c1" + ch
             options.append(opt)
         if reverb:
@@ -1616,7 +1618,7 @@ class AudioDownloader:
         fs = fl - 131072
         args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-vn", "-i", stream]
         if auds is not None:
-            args += auds.construct_options(full=True)
+            args.extend(auds.construct_options(full=True))
             dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
         if dur > 960:
             dur = 960
@@ -1631,6 +1633,12 @@ class AudioDownloader:
                 pass
             else:
                 args[8] = xm
+                dur = getDuration(xm)
+                if dur:
+                    if auds:
+                        dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
+                    br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
+                    args[-4] = str(br)
                 subprocess.check_output(args)
                 try:
                     os.remove(xm)
@@ -1774,7 +1782,7 @@ class Queue(Command):
                 "url": url,
                 "duration": e.get("duration"),
                 "u_id": user.id,
-                "skips": [],
+                "skips": deque(),
             }
             if "research" in e:
                 temp["research"] = True
@@ -2308,13 +2316,13 @@ class Skip(Command):
             except LookupError:
                 response += "\n" + repr(IndexError("Entry " + str(pos) + " is out of range."))
                 continue
-            if type(curr.skips) is list:
+            if issubclass(type(curr.skips), collections.abc.MutableSequence):
                 if "f" in flags or user.id == curr["u_id"] and not "v" in flags:
                     curr.skips = None
                 elif user.id not in curr.skips:
                     curr.skips.append(user.id)
             elif "v" in flags:
-                curr.skips = [user.id]
+                curr.skips = deque([user.id])
             else:
                 curr.skips = None
             if curr.skips is not None:
@@ -2508,7 +2516,7 @@ class Dump(Command):
         for i in range(len(q)):
             e = q[i] = cdict(q[i])
             e.u_id = user.id
-            e.skips = []
+            e.skips = deque()
             if not 1 + i & 2047:
                 await asyncio.sleep(0.2)
         if auds.player is not None:
