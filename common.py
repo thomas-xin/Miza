@@ -687,6 +687,7 @@ create_future_ex(load_timezones)
 
 def tzparse(expr):
     if " " in expr:
+        t = 0
         try:
             args = shlex.split(expr)
         except ValueError:
@@ -794,9 +795,11 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                         raise FileNotFoundError
                 bot.data[name] = self.data = data
             except FileNotFoundError:
-                bot.data[name] = self.data = {}
+                data = None
         else:
-            bot.data[name] = self.data = {}
+            data = None
+        if not data:
+            bot.data[name] = self.data = cdict()
         bot.database[name] = self
         self.catg = catg
         self.bot = bot
@@ -825,7 +828,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
             if name:
                 if self.updated:
                     self.updated = False
-                    s = repr(self.data)
+                    s = str(self.data)
                     if len(s) > 262144:
                         # print("Pickling " + name + "...")
                         s = pickle.dumps(self.data)

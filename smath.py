@@ -567,6 +567,14 @@ def addDict(a, b, replace=True, insert=None):
             r[k] = b[k] + temp
     return r
 
+def incDict(d, **kwargs):
+    for k, v in kwargs.values():
+        try:
+            d[k] += v
+        except KeyError:
+            d[k] = v
+    return d
+
 def subDict(d, key):
     output = dict(d)
     try:
@@ -1582,8 +1590,8 @@ custom list-like data structure that incorporates the functionality of np arrays
             self.chash = hash(self.view().tobytes())
         return self.chash
 
-    __str__ = lambda self: "⟨" + ", ".join(repr(i) for i in iter(self)) + "⟩"
-    __repr__ = lambda self: "hlist(" + str(tuple(self)) + ")"
+    __str__ = lambda self: "[" + ", ".join(repr(i) for i in iter(self)) + "]"
+    __repr__ = lambda self: self.__class__.__name__ + "(" + str(tuple(self)) + ")"
     __bool__ = lambda self: bool(self.size)
 
     @blocking
@@ -2303,7 +2311,7 @@ custom list-like data structure that incorporates the functionality of np arrays
 
 hrange = lambda a, b=None, c=None: hlist(xrange(a, b, c))
 
-hzero = lambda size: hlist((0 for i in range(size)))
+hzero = lambda size: hlist(repeat(0, size))
 
 
 class cdict(dict):
@@ -2312,7 +2320,7 @@ class cdict(dict):
 
     __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
     __repr__ = lambda self: self.__class__.__name__ + "(" + super().__repr__() + ")"
-    __str__ = lambda self: "<" + super().__repr__()[1:-1] + ">"
+    __str__ = lambda self: super().__repr__()
     __iter__ = lambda self: iter(tuple(super().__iter__()))
     __setattr__ = lambda self, k, v: super().__setitem__(k, v)
 

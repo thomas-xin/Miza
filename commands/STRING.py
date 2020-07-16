@@ -36,9 +36,7 @@ class PapagoTrans:
         return output
 
 
-translators = {
-    "Google Translate": Translator(["translate.google.com"]),
-}
+translators = {"Google Translate": Translator(["translate.google.com"])}
 f = open("auth.json")
 auth = ast.literal_eval(f.read())
 f.close()
@@ -302,7 +300,7 @@ class Follow(Command):
     rate_limit = 0.125
     
     async def __call__(self, argv, **void):
-        urls = await self.bot.followURL(argv)
+        urls = await self.bot.followURL(argv, allow=True)
         if not urls:
             raise FileNotFoundError("No valid URLs detected.")
         return "\n".join(urls)

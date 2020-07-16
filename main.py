@@ -46,23 +46,24 @@ rs = "restart.json"
 hb = "heartbeat.json"
 
 delete(sd)
-delete(rs)
-delete(hb)
 
 att = 0
-while not sd in os.listdir():
+while not os.path.exists(sd):
     delete(rs)
     delete(hb)
     proc = psutil.Popen([python, "bot.py"], shell=True)
     start = time.time()
     print("Bot started with PID \033[1;34;40m" + str(proc.pid) + "\033[1;37;40m.")
     time.sleep(8)
+    if not proc.is_running():
+        print("\033[1;31;40mBot closed without shutdown signal, restarting...\033[1;37;40m")
+        continue
     try:
         print("\033[1;32;40mHeartbeat started\033[1;37;40m.")
         alive = True
         while alive:
-            f = open(hb, "wb")
-            f.close()
+            with open(hb, "wb"):
+                pass
             print(
                 "\033[1;36;40m Heartbeat at "
                 + str(datetime.datetime.now())
@@ -74,7 +75,7 @@ while not sd in os.listdir():
                 if rs in ld or sd in ld:
                     alive = False
                     break
-            if not alive or hb in os.listdir():
+            if not alive or os.path.exists(hb):
                 alive = False
                 break
         found = True
@@ -91,7 +92,7 @@ while not sd in os.listdir():
                 proc.kill()
             except psutil.NoSuchProcess:
                 break
-        if sd in os.listdir():
+        if os.path.exists(sd):
             break
         if time.time() - start < 30:
             att += 1

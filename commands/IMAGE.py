@@ -82,7 +82,7 @@ class IMG(Command):
                     raise ArgumentError("Image tag too long.")
                 elif not key:
                     raise ArgumentError("Image tag must not be empty.")
-                urls = await bot.followURL(args[-1], best=True, limit=1)
+                urls = await bot.followURL(args[-1], best=True, allow=True, limit=1)
                 url = urls[0]
                 if len(url) > 1024:
                     raise ArgumentError("Image url too long.")
@@ -346,7 +346,7 @@ class CreateEmoji(Command):
             raise ArgumentError("Please enter URL, emoji, or attached file to add.")
         fut = create_task(channel.trigger_typing())
         url = args.pop(-1)
-        urls = await bot.followURL(url, best=True, limit=1)
+        urls = await bot.followURL(url, best=True, allow=True, limit=1)
         if not urls:
             urls = await bot.followImage(argv)
             if not urls:
@@ -503,7 +503,7 @@ async def get_image(bot, user, message, args, argv, ext="png"):
     if not args:
         raise ArgumentError("Please input an image by URL or attachment.")
     url = args.pop(0)
-    urls = await bot.followURL(url, best=True, limit=1)
+    urls = await bot.followURL(url, best=True, allow=True, limit=1)
     if not urls:
         urls = await bot.followImage(argv)
         if not urls:
@@ -733,7 +733,7 @@ class CreateGIF(Command):
         fut = create_task(channel.trigger_typing())
         video = None
         for i, url in enumerate(args):
-            urls = await bot.followURL(url, best=True, limit=1)
+            urls = await bot.followURL(url, best=True, allow=True, limit=1)
             url = urls[0]
             if "discord" not in url and "channels" not in url:
                 url, size, dur, fps = await create_future(get_video, url, 16)
@@ -775,7 +775,7 @@ class Resize(Command):
             raise ArgumentError("Please input an image by URL or attachment.")
         fut = create_task(channel.trigger_typing())
         url = args.pop(0)
-        urls = await bot.followURL(url, best=True, limit=1)
+        urls = await bot.followURL(url, best=True, allow=True, limit=1)
         if not urls:
             urls = await bot.followImage(argv)
             if not urls:
@@ -841,7 +841,7 @@ class Magik(Command):
             raise ArgumentError("Please input an image by URL or attachment.")
         fut = create_task(channel.trigger_typing())
         url = args.pop(0)
-        urls = await bot.followURL(url, best=False, limit=1)
+        urls = await bot.followURL(url, best=False, allow=True, limit=1)
         if not urls:
             urls = await bot.followImage(argv)
             if not urls:
@@ -905,12 +905,12 @@ class Blend(Command):
                 )
             raise ArgumentError("Please input an image by URL or attachment.")
         fut = create_task(channel.trigger_typing())
-        urls = await bot.followURL(args.pop(0), best=True, limit=1)
+        urls = await bot.followURL(args.pop(0), best=True, allow=True, limit=1)
         if urls:
             url1 = urls[0]
         else:
             url1 = None
-        urls = await bot.followURL(args.pop(0), best=True, limit=1)
+        urls = await bot.followURL(args.pop(0), best=True, allow=True, limit=1)
         if urls:
             url2 = urls[0]
         else:
@@ -991,7 +991,7 @@ class Cat(Command):
 
     def __load__(self):
         self.buffer = deque()
-        self.found = {}
+        self.found = cdict()
         self.refilling = False
         create_task(self.refill_buffer(128))
     
@@ -1071,7 +1071,7 @@ class Dog(Command):
 
     def __load__(self):
         self.buffer = deque()
-        self.found = {}
+        self.found = cdict()
         self.refilling = False
         create_task(self.refill_buffer(128))
 
@@ -1141,7 +1141,7 @@ class _8Ball(Command):
 
     def __load__(self):
         self.buffer = deque()
-        self.found = {}
+        self.found = cdict()
         self.refilling = False
         create_future_ex(self.refill_buffer, 128)
 

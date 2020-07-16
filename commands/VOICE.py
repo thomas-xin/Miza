@@ -852,7 +852,7 @@ class AudioFile:
         self.expired = False
         self.buffered = False
         self.loaded = False
-        self.readers = {}
+        self.readers = cdict()
         self.assign = deque()
         self.ensure_time()
 
@@ -1157,9 +1157,9 @@ class AudioDownloader:
     def __init__(self):
         self.bot = None
         self.lastclear = 0
-        self.downloading = {}
-        self.cache = {}
-        self.searched = {}
+        self.downloading = cdict()
+        self.cache = cdict()
+        self.searched = cdict()
         self.requests = 0
         self.update_dl()
         self.setup_pages()
@@ -1746,7 +1746,7 @@ class Queue(Command):
             future = wrap_future(create_task(forceJoin(guild, channel, user, client, bot, preparing=True)))
         future2 = create_task(channel.trigger_typing())
         out = None
-        urls = await bot.followURL(argv, preserve=False, images=False)
+        urls = await bot.followURL(argv, allow=True, images=False)
         if urls:
             if len(urls) == 1:
                 argv = urls[0]
@@ -2039,7 +2039,7 @@ class Playlist(Command):
                 + " has reached the maximum of " + str(lim) + " items. "
                 + "Please remove an item to add another."
             )
-        urls = await bot.followURL(argv)
+        urls = await bot.followURL(argv, allow=True, images=False)
         if urls:
             argv = urls[0]
         resp = await create_future(ytdl.search, argv)
@@ -2509,7 +2509,7 @@ class Dump(Command):
                     url = message.attachments[0].url
                 else:
                     url = argv
-                urls = await bot.followURL(url)
+                urls = await bot.followURL(argv, allow=True, images=False)
                 url = urls[0]
                 s = await Request(url, aio=True)
                 s = s[s.index(b"{"):]
@@ -3257,7 +3257,7 @@ class Lyrics(Command):
                 argv = auds.queue[0].name
             except LookupError:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
-        urls = await bot.followURL(argv)
+        urls = await bot.followURL(argv, allow=True, images=False)
         if urls:
             resp = await create_future(ytdl.search, urls[0])
             search = resp[0].name
@@ -3367,9 +3367,10 @@ class Download(Command):
                 fmt = "ogg"
             argv = verifySearch(argv)
             res = []
-            urls = await bot.followURL(argv)
+            urls = await bot.followURL(argv, allow=True, images=False)
             if urls:
-                res += await create_future(ytdl.extract, urls[0])
+                temp = await create_future(ytdl.extract, urls[0])
+                res.extend(temp)
             if not res:
                 sc = min(4, flags.get("v", 0) + 1)
                 yt = min(6, sc << 1)
@@ -3494,9 +3495,9 @@ class UpdateAudio(Database):
     name = "audio"
 
     def __load__(self):
-        self.players = {}
-        self.audiocache = {}
-        self.connecting = {}
+        self.players = cdict()
+        self.audiocache = cdict()
+        self.connecting = cdict()
 
     def is_connecting(self, g):
         if g in self.connecting:

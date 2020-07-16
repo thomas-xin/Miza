@@ -12,13 +12,13 @@ class Purge(Command):
     name = ["Del", "Delete"]
     min_level = 3
     description = "Deletes a number of messages from a certain user in current channel."
-    usage = "<1:user{bot}(?a)> <0:count[1]> <hide(?h)>"
-    flags = "ah"
+    usage = "<1:user{bot}> <everyone(?a)> <0:count[1]> <hide(?h)>"
+    flags = "aeh"
     rate_limit = 2
 
     async def __call__(self, client, bot, argv, args, channel, name, flags, perm, guild, **void):
         t_user = -1
-        if "a" in flags or "everyone" in argv or "here" in argv:
+        if "a" in flags or "e" in flags or "@" in argv and ("everyone" in argv or "here" in argv):
             t_user = None
         if len(args) < 2:
             if t_user == -1:
@@ -44,13 +44,6 @@ class Purge(Command):
                         t_user = cdict(id=u_id)
         if count <= 0:
             raise ValueError("Please enter a valid amount of messages to delete.")
-        if not count < inf:
-            try:
-                await channel.clone(reason="Purged.")
-                await channel.delete(reason="Purged.")
-                count = 0
-            except (AttributeError, discord.Forbidden):
-                pass
         dt = None
         delD = {}
         deleted = 0
@@ -899,6 +892,8 @@ class ServerProtector(Database):
             await self.kickWarn(u_id, guild, owner, msg)
 
     async def _channel_delete_(self, channel, guild, **void):
+        if channel.id in self.bot.cache.deleted:
+            return
         if self.bot.isTrusted(guild.id):
             audits = await guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete).flatten()
             ts = utc()
@@ -1048,8 +1043,9 @@ class UpdateUserLogs(Database):
             ban = None
             try:
                 ts = utc()
-                bans = await guild.audit_logs(limit=4, action=discord.AuditLogAction.ban).flatten()
-                kicks = await guild.audit_logs(limit=4, action=discord.AuditLogAction.kick).flatten()
+                futs = [create_task(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)).flatten()) for action in ("ban", "kick")]
+                ban = await futs[0]
+                kick = await futs[1]
                 for log in bans:
                     if ts - utc_ts(log.created_at) < 3:
                         if log.target.id == user.id:

@@ -133,8 +133,8 @@ class Execute(Command):
 class UpdateExec(Database):
     name = "exec"
     no_delete = True
-    virtuals = {}
-    listeners = {}
+    virtuals = cdict()
+    listeners = cdict()
 
     qmap = {
         "“": '"',

@@ -23,6 +23,7 @@ class Bot:
     suspected = "suspected.json"
     savedata = "data.json"
     authdata = "auth.json"
+    caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "deleted")
     client = client
     prefix = "~"
     deleted_user = 456226577798135808
@@ -32,19 +33,10 @@ class Bot:
         self.bot = self
         self.closed = False
         self.loaded = False
-        self.cache = cdict(
-            guilds={},
-            channels={},
-            users={},
-            roles={},
-            emojis={},
-            messages={},
-            deleted={},
-            members={},
-        )
+        self.cache = cdict({c: cdict() for c in self.caches})
         self.cw_cache = cdict()
         self.events = mdict()
-        self.proc_call = {}
+        self.proc_call = cdict()
         print("Time: " + str(datetime.datetime.now()))
         print("Initializing...")
         directory = dict.fromkeys(os.listdir())
@@ -73,18 +65,18 @@ class Bot:
             owner_id = auth["owner_id"]
             if type(owner_id) not in (list, tuple):
                 owner_id = [owner_id]
-            self.owners = {int(i): True for i in owner_id}
+            self.owners = cdict({int(i): True for i in owner_id})
         except KeyError:
             self.owners = ()
             print("WARNING: owner_id not found. Unable to locate owner.")
         self.proc = psutil.Process()
-        if not hasattr(self, "started"):
-            create_task(heartbeatLoop())
+        create_task(heartbeatLoop())
         self.getModules()
         self.guilds = 0
         self.blocked = 0
         self.updated = False
-        self.embedSenders = {}
+        self.started = False
+        self.embedSenders = cdict()
         create_future_ex(self.clearcache, priority=True)
         globals().update(self.cache)
 
@@ -490,7 +482,7 @@ class Bot:
             channel = await user.create_dm()
         return channel
 
-    async def followURL(self, url, it=None, best=False, preserve=True, images=True, limit=None):
+    async def followURL(self, url, it=None, best=False, preserve=True, images=True, allow=False, limit=None):
         if limit is not None and limit <= 0:
             return []
         if it is None:
@@ -501,8 +493,10 @@ class Bot:
         else:
             urls = [url]
         out = deque()
-        if preserve:
+        if preserve or allow:
             lost = deque()
+        else:
+            lost = None
         if images:
             medias = ("video", "image", "thumbnail")
         else:
@@ -536,14 +530,16 @@ class Bot:
                         it[u] = True
                         if not len(it) & 255:
                             await asyncio.sleep(0.2)
-                        found2 = await self.followURL(u, it, best=best, preserve=preserve, images=images, limit=limit)
+                        found2 = await self.followURL(u, it, best=best, preserve=preserve, images=images, allow=allow, limit=limit)
                         if len(found2):
                             out.extend(found2)
+                        elif allow and m.content:
+                            lost.append(m.content)
                         elif preserve:
                             lost.append(u)
             else:
                 out.append(url)
-        if preserve:
+        if lost:
             out.extend(lost)
         if not out:
             return urls
@@ -607,7 +603,7 @@ class Bot:
         for i, guild in enumerate(client.guilds, 1):
             self.cache.channels.update(guild._channels)
             self.cache.roles.update(guild._roles)
-            if not i & 64:
+            if not i & 63:
                 time.sleep(1)
 
     def getPrefix(self, guild):
@@ -1107,6 +1103,8 @@ class Bot:
             while len(self.proc_call) > 65536:
                 self.proc_call.pop(next(iter(self.proc_call)))
             while utc() - self.proc_call.get(message.id, 0) < 30:
+                if self.proc_call.get(message.id, 0) - utc() > 1:
+                    return
                 await asyncio.sleep(0.2)
             if reaction is not None:
                 reacode = str(reaction).encode("utf-8")
@@ -1141,7 +1139,7 @@ class Bot:
             func = func.lower()
             argv = "-".join(args[3:])
             catg = self.categories[catn]
-            self.proc_call[message.id] = utc()
+            self.proc_call[message.id] = max(utc(), self.proc_call.get(message.id, 0) + 1)
             for f in catg:
                 if f.__name__.lower() == func:
                     try:
@@ -1324,19 +1322,19 @@ class Bot:
             for emb in embeds:
                 if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
                     try:
-                        await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+                        await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)), seconds=1)
                     except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                         w = await self.bot.ensureWebhook(channel, force=True)
-                        await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+                        await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)), seconds=1)
                     embs.clear()
                 embs.append(emb)
             if embs:
                 try:
-                    await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+                    await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)), seconds=1)
                     await seen(client.user, event="message", count=len(embs), raw="Sending a message")
                 except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                     w = await self.bot.ensureWebhook(channel, force=True)
-                    await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)))
+                    await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)), seconds=1)
                     await seen(client.user, event="message", count=len(embs), raw="Sending a message")
         except Exception as ex:
             print(traceback.format_exc())
@@ -1372,8 +1370,9 @@ class Bot:
         await self.sendEmbeds(sendable, embs)
 
     async def updateEmbeds(self):
-        [create_task(self.sendEmbedsTo(s_id, embs)) for s_id, embs in self.embedSenders.items() if embs]
+        sent = [create_task(self.sendEmbedsTo(s_id, embs)) for s_id, embs in self.embedSenders.items() if embs]
         self.embedSenders.clear()
+        return sent
 
     class userGuild(discord.Object):
 
@@ -1667,7 +1666,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         if cb_argv is not None:
                             argv = cb_argv
                             if loop:
-                                addDict(flags, {"h": 1})
+                                incDict(flags, h=1)
                         if argv:
                             if not hasattr(command, "no_parse"):
                                 argv = reconstitute(argv)
@@ -1819,8 +1818,8 @@ async def heartbeatLoop():
                 bot.client
             except NameError:
                 sys.exit()
-            d = await create_future(os.listdir, priority=True)
-            if bot.heartbeat in d:
+            d = await create_future(os.path.exists, bot.heartbeat, priority=True)
+            if d:
                 try:
                     await create_future(os.remove, bot.heartbeat, priority=True)
                 except:
@@ -1830,15 +1829,16 @@ async def heartbeatLoop():
         sys.exit(1)   
 
 async def fastLoop():
+    sent = 0
     while True:
         try:
-            await bot.updateEmbeds()
+            sent = await bot.updateEmbeds()
         except:
             print(traceback.format_exc())
-        create_task(bot.event("_call_"))
-        await asyncio.sleep(0.5)
-        create_task(bot.event("_call_"))
-        await asyncio.sleep(0.5)
+        x = 3 if sent else 1
+        for i in range(x):
+            create_task(bot.event("_call_"))
+            await asyncio.sleep(1 / 3)
 
 async def slowLoop():
     autosave = 0
@@ -1856,13 +1856,14 @@ async def slowLoop():
             await asyncio.sleep(frand(2) + 2)
         except:
             print(traceback.format_exc())
-        
+
 
 @client.event
 async def on_ready():
     print("Successfully connected as " + str(client.user))
     try:
-        await bot.getState()
+        futs = deque()
+        futs.append(create_task(bot.getState()))
         print("Servers: ")
         for guild in client.guilds:
             if guild.unavailable:
@@ -1870,25 +1871,26 @@ async def on_ready():
             else:
                 print("> " + guild.name)
         await bot.handleUpdate()
-        create_future_ex(bot.updateClient, priority=True)
-        create_future_ex(bot.cacheFromGuilds, priority=True)
+        futs.append(create_future(bot.updateClient, priority=True))
+        futs.append(create_future(bot.cacheFromGuilds, priority=True))
         create_task(bot.getIP())
-        if not hasattr(bot, "started"):
+        if not bot.started:
             bot.started = True
             print("Update loops initiated.")
             while bot.modload:
                 await create_future(bot.modload.popleft().result, priority=True)
-            bot.executor.shutdown(wait=False)
+            create_future_ex(bot.executor.shutdown, wait=False, priority=True)
             for u in bot.database.values():
                 for f in dir(u):
                     if f.startswith("_") and f[-1] == "_" and f[1] != "_":
                         func = getattr(u, f, None)
                         if callable(func):
                             bot.events.append(f, func)
-            create_task(slowLoop())
-            create_task(fastLoop())
+            print(bot.events)
+            for fut in futs:
+                await fut
             await bot.fetch_user(bot.deleted_user)
-            if "init.tmp" not in os.listdir("misc"):
+            if not os.path.exists("misc/init.tmp"):
                 print("Setting bot avatar...")
                 f = await create_future(open, "misc/avatar.png", "rb", priority=True)
                 b = await create_future(f.read, priority=True)
@@ -1897,10 +1899,18 @@ async def on_ready():
                 await seen(client.user, event="misc", raw="Editing their profile")
                 f = await create_future(open, "misc/init.tmp", "wb", priority=True)
                 create_future_ex(f.close)
+            create_task(slowLoop())
+            create_task(fastLoop())
+            futs = [create_task(bot.load_webhooks(guild)) for guild in bot.cache.guilds.values()]
+            print("Ready.")
             await bot.event("_ready_", bot=bot)
-            [create_task(bot.load_webhooks(guild)) for guild in bot.cache.guilds.values()]
-            print(bot.events)
+            for fut in futs:
+                await fut
             print("Initialization complete.")
+        else:
+            for fut in futs:
+                await fut
+            print("Reinitialized.")
     except:
         print(traceback.format_exc())
 
@@ -2028,7 +2038,6 @@ async def handleMessage(message, edit=True):
             errmsg,
             reacts="❎",
         ))
-    return
 
 
 @client.event
@@ -2159,7 +2168,7 @@ async def on_guild_channel_delete(channel):
 async def on_webhooks_update(channel):
     webhooks = await channel.webhooks()
     for w in webhooks:
-        bot.add_webhooks(w)
+        bot.add_webhook(w)
 
 
 @client.event

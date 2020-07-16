@@ -481,7 +481,7 @@ class UpdateDogpiles(Database):
     name = "dogpiles"
 
     def __load__(self):
-        self.msgFollow = {}
+        self.msgFollow = cdict()
 
     async def _nocommand_(self, text, edit, orig, message, **void):
         if message.guild is None or not orig:
@@ -810,7 +810,7 @@ class DeviantArt(Command):
                     pass
                 return "```css\nSuccessfully removed all DeviantArt Gallery subscriptions from [#" + noHighlight(channel) + "].```"
             return "Currently subscribed DeviantArt Galleries for [#" + noHighlight(channel) + "]:```ini" + strIter(assigned, key=lambda x: x["user"]) + "```"
-        urls = await bot.followURL(argv)
+        urls = await bot.followURL(argv, allow=True)
         if not urls:
             raise ArgumentError("Please input a valid URL.")
         url = urls[0]
