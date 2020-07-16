@@ -777,7 +777,7 @@ class Activity(Command):
             except (TypeError, discord.NotFound):
                 user = await bot.fetch_member_ex(u_id, guild)
         data = await create_future(bot.database.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)))
-        fut = channel.trigger_typing()
+        fut = create_task(channel.trigger_typing())
         try:
             resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
         except:
@@ -1378,7 +1378,7 @@ class UpdateMessageCount(Database):
                     i += 1
         self.scanned = -1
 
-    async def _send_(self, message, **void):
+    def _send_(self, message, **void):
         if self.scanned == -1:
             user = message.author
             guild = message.guild
@@ -1459,13 +1459,13 @@ class UpdateUsers(Database):
             out = [sum(out[i:i + factor]) for i in range(0, len(out), factor)]
         return out
 
-    async def _seen_(self, user, delay, event, count=1, raw=None, **void):
+    def _seen_(self, user, delay, event, count=1, raw=None, **void):
         self.send_event(user.id, event, count=count)
         addDict(self.data, {user.id: {"last_seen": 0}})
         self.data[user.id]["last_seen"] = utc() + delay
         self.data[user.id]["last_action"] = raw
 
-    async def _command_(self, user, command, **void):
+    def _command_(self, user, command, **void):
         self.send_event(user.id, "command")
         addDict(self.data, {user.id: {"commands": {str(command): 1}}})
         self.update()

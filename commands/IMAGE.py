@@ -337,6 +337,7 @@ class CreateEmoji(Command):
     flags = "ae"
     no_parse = True
     rate_limit = (3, 4)
+    typing = True
 
     async def __call__(self, bot, user, guild, channel, message, args, argv, **void):
         if message.attachments:
@@ -538,6 +539,7 @@ class Saturate(Command):
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
     rate_limit = (2, 3)
+    typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
@@ -556,6 +558,7 @@ class Contrast(Command):
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
     rate_limit = (2, 3)
+    typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
@@ -574,6 +577,7 @@ class Brightness(Command):
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
     rate_limit = (2, 3)
+    typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
@@ -592,6 +596,7 @@ class Sharpness(Command):
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
     rate_limit = (2, 3)
+    typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
@@ -610,6 +615,7 @@ class HueShift(Command):
     usage = "<0:url{attached_file}> <1:adjustment[0.5]>"
     no_parse = True
     rate_limit = (2, 3)
+    typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
@@ -636,6 +642,7 @@ class Colour(Command):
         "luv": luv_to_rgb,
         "xyz": xyz_to_rgb,
     }
+    typing = True
 
     async def __call__(self, bot, user, channel, name, argv, **void):
         argv = argv.replace("#", "").replace(",", " ").strip()
@@ -688,6 +695,7 @@ class Rainbow(Command):
     no_parse = True
     rate_limit = (5, 8)
     _timeout_ = 3
+    typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
@@ -708,6 +716,7 @@ class CreateGIF(Command):
     rate_limit = (8, 12)
     _timeout_ = 5
     flags = "r"
+    typing = True
 
     async def __call__(self, bot, user, guild, channel, message, flags, args, **void):
         if not bot.isTrusted(guild.id):
@@ -761,6 +770,7 @@ class Resize(Command):
     no_parse = True
     rate_limit = 3
     flags = "l"
+    typing = True
 
     async def __call__(self, bot, user, guild, channel, message, flags, args, argv, **void):
         if message.attachments:
@@ -832,6 +842,7 @@ class Magik(Command):
     no_parse = True
     rate_limit = (4, 6)
     _timeout_ = 2
+    typing = True
 
     async def __call__(self, bot, user, guild, channel, message, args, argv, **void):
         if message.attachments:
@@ -890,6 +901,7 @@ class Blend(Command):
     no_parse = True
     rate_limit = (3, 5)
     flags = "l"
+    typing = True
 
     async def __call__(self, bot, user, guild, channel, message, flags, args, argv, **void):
         if message.attachments:

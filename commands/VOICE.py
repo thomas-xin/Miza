@@ -1625,7 +1625,7 @@ class AudioDownloader:
         if dur > 960:
             dur = 960
         br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
-        args.extend(("-ar", "48000", "-b:a", str(br), "-fs", str(fs), fn))
+        args.extend(("-ar", str(SAMPLE_RATE), "-b:a", str(br), "-fs", str(fs), fn))
         try:
             subprocess.check_output(args)
         except subprocess.CalledProcessError:
@@ -1708,6 +1708,7 @@ class Queue(Command):
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     _timeout_ = 2
     rate_limit = (0.5, 1.5)
+    typing = True
 
     async def __call__(self, bot, client, user, perm, message, channel, guild, flags, name, argv, **void):
         if not argv:
@@ -1989,6 +1990,7 @@ class Playlist(Command):
     flags = "aedzf"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = 0.5
+    typing = True
 
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
         update = self.bot.database.playlists.update
@@ -2042,7 +2044,13 @@ class Playlist(Command):
         urls = await bot.followURL(argv, allow=True, images=False)
         if urls:
             argv = urls[0]
-        resp = await create_future(ytdl.search, argv)
+        fut = create_task(channel.trigger_typing())
+        try:
+            resp = await create_future(ytdl.search, argv)
+        except:
+            await fut
+            raise
+        await fut
         if type(resp) is str:
             raise evalEX(resp)
         names = []
@@ -2372,7 +2380,8 @@ class Skip(Command):
                 auds.preparing = False
                 if auds.source is not None:
                     auds.source.advanced = True
-                auds.queue.advance()
+                await create_future(auds.stop)
+                create_future_ex(auds.queue.advance)
                 if count < 4:
                     response += (
                         "[" + noHighlight(song.name)
@@ -2458,7 +2467,7 @@ class Seek(Command):
 
 copyDict = lambda item: {"name": item.name, "url": item.url, "duration": item.duration}
 
-def getDump(auds, position, json=False):
+def getDump(auds, position, js=False):
     lim = 32768
     if len(auds.queue) > lim:
         raise OverflowError(
@@ -2473,7 +2482,7 @@ def getDump(auds, position, json=False):
     }
     if not position:
         d["stats"].pop("position")
-    if json:
+    if js:
         return json.dumps(d)
     return d
 
@@ -2496,7 +2505,7 @@ class Dump(Command):
             if name == "load":
                 raise ArgumentError("Please input a file, URL or json data to load.")
             fut = create_task(channel.trigger_typing())
-            resp = await create_future(getDump, auds, "x" in flags, json=True)
+            resp = await create_future(getDump, auds, "x" in flags, js=True)
             f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
             await fut
             create_task(sendFile(channel, "Queue data for **" + guild.name + "**:", f))
@@ -2543,11 +2552,17 @@ class Dump(Command):
                 d["stats"][k] = float(d["stats"][k])
         await fut
         if "a" not in flags:
-            await create_future(auds.new)
-            auds.preparing = True
-            auds.queue.clear()
+            if auds.queue:
+                auds.preparing = True
+                await create_future(auds.stop)
+                auds.queue.clear()
             auds.stats.update(d["stats"])
+            if "position" not in d["stats"]:
+                auds.stats.position = 0
             auds.queue.enqueue(q, -1)
+            await create_future(auds.update)
+            await create_future(auds.queue.update_play)
+            await create_future(auds.new, auds.file, auds.stats.position)
             if "h" not in flags:
                 return (
                     "```css\nSuccessfully loaded audio queue data for [" 
@@ -3245,6 +3260,7 @@ class Lyrics(Command):
         flags=re.I,
     )
     rate_limit = (2, 3)
+    typing = True
 
     async def __call__(self, bot, guild, channel, message, argv, flags, user, **void):
         for a in message.attachments:
@@ -3269,7 +3285,13 @@ class Lyrics(Command):
             item = verifySearch(to_alphanumeric(search))
             if not item:
                 item = search
-        name, lyrics = await get_lyrics(item)
+        fut = create_task(channel.trigger_typing())
+        try:
+            name, lyrics = await get_lyrics(item)
+        except:
+            await fut
+            raise
+        await fut
         text = clrHighlight(lyrics.strip()).replace("#", "♯")
         msg = "Lyrics for **" + discord.utils.escape_markdown(name) + "**:"
         s = msg + "```ini\n" + text + "```"
@@ -3331,6 +3353,7 @@ class Download(Command):
     usage = "<0:search_link{queue}> <-1:out_format[ogg]> <apply_settings(?a)> <verbose_search(?v)> <show_debug(?z)>"
     flags = "avz"
     rate_limit = (7, 12)
+    typing = True
 
     async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
         if name in ("af", "audiofilter"):

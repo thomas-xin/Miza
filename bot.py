@@ -37,6 +37,7 @@ class Bot:
         self.cw_cache = cdict()
         self.events = mdict()
         self.proc_call = cdict()
+        self.mention = ()
         print("Time: " + str(datetime.datetime.now()))
         print("Initializing...")
         directory = dict.fromkeys(os.listdir())
@@ -1548,12 +1549,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         msg = msg[2:]
     elif msg[:2] == "||" and msg[-2:] == "||":
         msg = msg[2:-2]
-    msg = msg.replace("`", "")
-    while len(msg):
-        if msg[0] in (" ", "\n", "\t", "\r"):
-            msg = msg[1:]
-        else:
-            break
+    msg = msg.replace("`", "").strip()
     user = message.author
     guild = message.guild
     u_id = user.id
@@ -1568,30 +1564,24 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
             enabled = bot.data.enabled[c_id]
         except KeyError:
             try:
-                enabled = bot.data.enabled[c_id] = ["main", "string", "admin"]
+                enabled = ["main", "string", "admin"]
             except KeyError:
                 enabled = ["main", "admin"]
     else:
         enabled = list(bot.categories)
     u_perm = bot.getPerms(u_id, guild)
     admin = not inf > u_perm
-    mention = (
-        "<@" + str(client.user.id) + ">",
-        "<@!" + str(client.user.id) + ">",
-    )
     if u_id == client.user.id:
         prefix = bot.prefix
     else:
         prefix = bot.getPrefix(guild)
     op = False
     comm = msg
-    for check in (prefix, *mention):
+    for check in (*bot.mention, prefix):
         if comm.startswith(check):
-            comm = comm[len(check):]
+            comm = comm[len(check):].strip()
             op = True
-        while len(comm) and comm[0] == " ":
-            comm = comm[1:]
-    if (u_perm <= -inf and op) or msg.replace(" ", "") in mention:
+    if (u_perm <= -inf and op) or msg in bot.mention:
         if not u_perm < 0 and not u_perm <= -inf:
             create_task(sendReact(
                 channel,
@@ -1604,7 +1594,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         else:
             print(
                 "Ignoring command from blacklisted user "
-                + user.name + " (" + str(u_id) + "): "
+                + str(user) + " (" + str(u_id) + "): "
                 + limStr(message.content, 256)
             )
             create_task(sendReact(
@@ -1860,6 +1850,10 @@ async def slowLoop():
 
 @client.event
 async def on_ready():
+    bot.mention = (
+        "<@" + str(client.user.id) + ">",
+        "<@!" + str(client.user.id) + ">",
+    )
     print("Successfully connected as " + str(client.user))
     try:
         futs = deque()
