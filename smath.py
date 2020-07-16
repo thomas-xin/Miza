@@ -568,7 +568,7 @@ def addDict(a, b, replace=True, insert=None):
     return r
 
 def incDict(d, **kwargs):
-    for k, v in kwargs.values():
+    for k, v in kwargs.items():
         try:
             d[k] += v
         except KeyError:
