@@ -1044,8 +1044,8 @@ class UpdateUserLogs(Database):
             try:
                 ts = utc()
                 futs = [create_task(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)).flatten()) for action in ("ban", "kick")]
-                ban = await futs[0]
-                kick = await futs[1]
+                bans = await futs[0]
+                kicks = await futs[1]
                 for log in bans:
                     if ts - utc_ts(log.created_at) < 3:
                         if log.target.id == user.id:
