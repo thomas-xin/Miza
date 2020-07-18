@@ -270,7 +270,7 @@ class UpdateExec(Database):
                             await sendReact(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
         # Relay DM messages
         elif message.guild is None:
-            if bot.isBlacklisted(message.author):
+            if bot.isBlacklisted(message.author.id):
                 return await sendReact(channel,
                     "Your message could not be delivered because you don't share a server with the recipient or you disabled direct messages on your shared server, "
                     + "recipient is only accepting direct messages from friends, or you were blocked by the recipient.",
@@ -421,7 +421,7 @@ class Suspend(Command):
             update()
             return (
                 "```css\nChanged blacklist status of [" + noHighlight(user.name) + "] to ["
-                + noHighlight(change) + "].```"
+                + noHighlight(new) + "].```"
             )
 
 
