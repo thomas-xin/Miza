@@ -17,6 +17,7 @@ class Restart(Command):
         client = bot.client
         await message.add_reaction("❗")
         if argv:
+            # Restart announcements for when a time input is specified
             if "in" in argv:
                 argv = argv[argv.rindex("in") + 2:]
             delay = await bot.evalTime(argv, guild)
@@ -38,29 +39,33 @@ class Restart(Command):
         bot.closed = True
         print.close()
         t = time.time()
+        # Call _destroy_ bot event to indicate to all databases the imminent shutdown
         await bot.event("_destroy_")
+        # Save any database that has not already been autosaved
         await create_future(bot.update)
+        # Disconnect as many voice clients as possible
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
-        for _ in loop(5):
-            try:
-                f = open(bot.restart, "wb")
-                f.close()
-                break
-            except:
-                print(traceback.format_exc())
-                time.sleep(0.1)
+        if name.lower() == "shutdown":
+            with open(bot.shutdown, "wb") as f:
+                pass
+        else:
+            for _ in loop(5):
+                try:
+                    with open(bot.restart, "wb") as f:
+                        pass
+                    break
+                except:
+                    print(traceback.format_exc())
+                    time.sleep(0.1)
         for _ in loop(8):
             try:
-                if "log.txt" in os.listdir():
+                if os.path.exists("log.txt"):
                     os.remove("log.txt")
                 break
             except:
                 print(traceback.format_exc())
                 time.sleep(0.1)
-        if name.lower() == "shutdown":
-            f = open(bot.shutdown, "wb")
-            f.close()
         if time.time() - t < 1:
             await asyncio.sleep(1)
         try:
@@ -77,6 +82,7 @@ class Execute(Command):
     description = "Causes all messages by the bot owner in the current channel to be executed as python code on ⟨MIZA⟩."
     usage = "<type> <enable(?e)> <disable(?d)>"
     flags = "aed"
+    # Different types of terminals for different purposes
     terminal_types = demap({
         "null": 0,
         "main": 1,
@@ -104,6 +110,7 @@ class Execute(Command):
             except KeyError:
                 bot.data.exec[channel.id] = num
             update()
+            # Test bitwise flags for enabled terminals
             out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec[channel.id]))
             create_task(message.add_reaction("❗"))
             return (
@@ -113,6 +120,7 @@ class Execute(Command):
         elif "d" in flags:
             try:
                 if num == 0:
+                    # Test bitwise flags for enabled terminals
                     out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec.pop(channel.id)))
                 else:
                     bot.data.exec[channel.id] &= -num - 1
@@ -154,7 +162,8 @@ class UpdateExec(Database):
     }
     qtrans = "".maketrans(qmap)
 
-    _print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: create_task(channel.send(limStr("```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2000)))
+    # Custom print function to send a message instead
+    _print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: self.bot.embedSender(channel, embed=discord.Embed(colour=discord.Colour(1), description=limStr("```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2048)))
     def _input(self, *args, channel=None, **kwargs):
         self._print(*args, channel=channel, **kwargs)
         self.listeners.__setitem__(channel.id, None)
@@ -162,8 +171,10 @@ class UpdateExec(Database):
             time.sleep(0.5)
         return self.listeners.pop(channel.id)
 
+    # Asynchronously evaluates Python code
     async def procFunc(self, proc, channel, bot, term=0):
         try:
+            # Write to input() listener if required
             if self.listeners[channel.id] is None:
                 self.listeners[channel.id] = proc
                 return
@@ -171,6 +182,7 @@ class UpdateExec(Database):
             pass
         if not proc:
             return
+        # Main terminal uses bot's global variables, virtual one uses a shallow copy per channel
         if term & 1:
             glob = bot._globals
         else:
@@ -186,6 +198,8 @@ class UpdateExec(Database):
         if "\n" not in proc:
             if proc.startswith("await "):
                 proc = proc[6:]
+        # Run concurrently to avoid blocking bot itself
+        # Attempt eval first, then exec
         try:
             output = await create_future(eval, proc, glob, priority=True)
         except SyntaxError:
@@ -193,20 +207,23 @@ class UpdateExec(Database):
         else:
             succ = True
         if not succ:
-            output = await create_future(exec, proc, glob, priority=True)
+            output = create_future(exec, proc, glob, priority=True)
         if awaitable(output):
             output = await output
+        # Output sent to "_" variable if used
         if output is not None:
             glob["_"] = output 
         return output
 
     async def sendDeleteID(self, c_id, delete_after=20, **kwargs):
+        # Autodeletes after a delay
         channel = await self.bot.fetch_channel(c_id)
         message = await channel.send(**kwargs)
         if isValid(delete_after):
             create_task(self.bot.silentDelete(message, no_log=True, delay=delete_after))
 
     async def _typing_(self, user, channel, **void):
+        # Typing indicator for DM channels
         bot = self.bot
         if user.id == bot.client.user.id:
             return
@@ -225,17 +242,18 @@ class UpdateExec(Database):
             return limStr("```" + fmt + "\n" + s + "```", lim)
         return "``` ```"
 
+    # Only process messages that were not treated as commands
     async def _nocommand_(self, message, **void):
         bot = self.bot
         channel = message.channel
         if message.author.id in self.bot.owners and channel.id in self.data:
             flag = self.data[channel.id]
+            # Both main and virtual terminals may be active simultaneously
             for f in (flag & 1, flag & 4):
                 if f:
-                    proc = message.content
+                    proc = message.content.strip()
                     if proc:
-                        while proc[0] == " ":
-                            proc = proc[1:]
+                        # Ignore commented messages
                         if proc.startswith("//") or proc.startswith("||") or proc.startswith("\\") or proc.startswith("#"):
                             return
                         if proc.startswith("`") and proc.endswith("`"):
@@ -250,7 +268,14 @@ class UpdateExec(Database):
                         except:
                             # print(traceback.format_exc())
                             await sendReact(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
+        # Relay DM messages
         elif message.guild is None:
+            if bot.isBlacklisted(message.author):
+                return await sendReact(channel,
+                    "Your message could not be delivered because you don't share a server with the recipient or you disabled direct messages on your shared server, "
+                    + "recipient is only accepting direct messages from friends, or you were blocked by the recipient.",
+                    reacts="❎"
+                )
             user = message.author
             emb = discord.Embed(colour=discord.Colour(16777214))
             emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=bestURL(user))
@@ -261,6 +286,7 @@ class UpdateExec(Database):
                     self.bot.embedSender(channel, embed=emb)
 
     async def _log_(self, msg, **void):
+        # Up to 3 embeds per log entry, rougly split up into 3 sections of 2000 characters
         if msg:
             msg = limStr(msg, 6000)
             if len(msg) > 2000:
@@ -270,7 +296,7 @@ class UpdateExec(Database):
             embs = deque()
             for msg in msgs:
                 if msg:
-                    embs.append(discord.Embed(colour=discord.Colour(1), description=self.prepare_string(msg, lim=2048, fmt="")))
+                    embs.append(discord.Embed(colour=discord.Colour(16711680), description=self.prepare_string(msg, lim=2048, fmt="")))
             for c_id, flag in self.data.items():
                 if flag & 8:
                     channel = await self.bot.fetch_channel(c_id)
@@ -301,6 +327,7 @@ class DownloadServer(Command):
         async with channel.typing():
             send = channel.send
 
+            # Create callback function to send all results of the guild download.
             async def callback(channel, messages, **void):
                 b = bytes()
                 fn = str(channel) + " (" + str(channel.id) + ")"
@@ -388,9 +415,9 @@ class Suspend(Command):
                 + noHighlight(susp) + "].```"
             )
         else:
-            user = await bot.fetch_user(verifyID(args[0]))
-            change = await bot.evalTime(" ".join(args[1]), guild.id, bot.data.blacklist.get(user.id, utc()))
-            bot.data.blacklist[user.id] = change
+            user = await bot.fetch_user(verifyID(args.pop(0)))
+            new = await bot.evalMath(" ".join(args), user.id, bot.data.blacklist.get(user.id, 0))
+            bot.data.blacklist[user.id] = new
             update()
             return (
                 "```css\nChanged blacklist status of [" + noHighlight(user.name) + "] to ["
@@ -400,68 +427,4 @@ class Suspend(Command):
 
 class UpdateBlacklist(Database):
     name = "blacklist"
-    suspected = "blacklist.json"
     user = True
-
-    def __load__(self):
-        self.suspclear = inf
-        try:
-            self.lastsusp = None
-            f = open(self.suspected, "r")
-            susp = f.read()
-            f.close()
-            os.remove(self.suspected)
-            if susp:
-                u_id = int(susp)
-                udata = self.data.get(u_id, 0)
-                days = max(0, (udata - utc()) / 86400)
-                try:
-                    days **= 4
-                except (OverflowError, ValueError, TypeError):
-                    days = inf
-                days += 1.125
-                udata = utc() + days * 86400
-                self.data[u_id] = udata
-                if days >= self.bot.min_suspend - 1:
-                    self.lastsusp = u_id
-                self.update()
-                self.update(True)
-            print(self.lastsusp)
-        except FileNotFoundError:
-            pass
-
-    async def _command_(self, user, command, **void):
-        pass
-        # if user.id not in (self.bot.client.user.id, self.bot.owner_id):
-        #     tc = getattr(command, "time_consuming", 0)
-        #     self.suspclear = utc() + 10 + (tc * 2) ** 2
-        #     f = open(self.suspected, "w")
-        #     f.write(str(user.id))
-        #     f.close()
-
-    async def __call__(self, **void):
-        if utc() - self.suspclear:
-            self.suspclear = inf
-            try:
-                if self.suspected in os.listdir():
-                    os.remove(self.suspected)
-            except:
-                print(traceback.format_exc())
-        bot = self.bot
-        if self.lastsusp is not None:
-            u_susp = await bot.fetch_user(self.lastsusp)
-            self.lastsusp = None
-            channel = await bot.getDM(u_susp)
-            secs = self.data.get(u_susp.id, 0) - utc()
-            msg = (
-                "Apologies for the inconvenience, but your account has been "
-                + "flagged as having attempted a denial-of-service attack.\n"
-                + "This will expire in `" + sec2Time(secs) + "`.\n"
-                + "If you believe this is an error, please notify <@"
-                + str(tuple(self.owners)[0]) + "> as soon as possible."
-            )
-            print(
-                u_susp.name + " may be attempting a DDOS attack. Expires in "
-                + sec2Time(secs) + "."
-            )
-            await channel.send(msg)

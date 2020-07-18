@@ -35,6 +35,7 @@ class DouClub:
             self.time = utc()
 
     def search(self, query):
+        # This string search algorithm could be better
         output = []
         query = query.lower()
         for l in self.data:
@@ -62,9 +63,8 @@ class DouClub:
                 })
         return output
 
-f = open("auth.json")
-auth = ast.literal_eval(f.read())
-f.close()
+with open("auth.json") as f:
+    auth = ast.literal_eval(f.read())
 try:
     douclub = DouClub(auth["knack_id"], auth["knack_secret"])
 except KeyError:
@@ -84,6 +84,7 @@ async def searchForums(query):
     output = []
     i = 0
     while i < len(s):
+        # HTML is a mess
         try:
             search = '<li class="block-row block-row--separated  js-inlineModContainer" data-author="'
             s = s[s.index(search) + len(search):]
@@ -131,6 +132,7 @@ class SheetPull:
             data = text.split("\r\n")
             columns = 0
             sdata = [[], utc()]
+            # Splits rows and colums into cells
             for i in range(len(data)):
                 line = data[i]
                 read = list(csv.reader(line))
@@ -185,6 +187,7 @@ class SheetPull:
         return output
 
 
+# URLs of Google Sheets .csv download links
 entity_list = SheetPull(
     "https://docs.google.com/spreadsheets/d/12iC9uRGNZ2MnrhpS4s_KvIRYHhC56mPXCnCcsDjxit0\
 /export?format=csv&id=12iC9uRGNZ2MnrhpS4s_KvIRYHhC56mPXCnCcsDjxit0&gid=0"
@@ -194,6 +197,8 @@ tsc_list = SheetPull(
 /export?format=csv&id=11LL7T_jDPcWuhkJycsEoBGa9i-rjRjgMW04Gdz9EO6U&gid=0"
 )
 
+
+# Flag calculation algorithms
 
 def _n2f(n):
     flag = int(n)
@@ -213,7 +218,6 @@ def _n2f(n):
         return chr(char) + output[::-1]
     except ValueError:
         return "(0x" + hex((char + 256) & 255).upper()[2:] + ")" + output[::-1]
-
 
 def _m2f(mem, val):
     val1 = mem
@@ -255,12 +259,13 @@ class CS_hex2xml(Command):
     min_level = 0
     description = "Converts a given Cave Story hex patch to an xml file readable by Booster's Lab."
     usage = "<hex_data>"
-    rate_limit = 3
+    rate_limit = (3, 5)
 
     async def __call__(self, client, argv, channel, **void):
         hacks = {}
         hack = argv.replace(" ", "").replace("`", "").strip("\n")
         while len(hack):
+            # hack XML parser
             try:
                 i = hack.index("0x")
             except ValueError:
@@ -283,6 +288,7 @@ class CS_hex2xml(Command):
                 hacks[offs] = curr + hacks[offs][len(curr):]
             else:
                 hacks[offs] = curr
+        # Generate hack template
         output = (
             '<?xml version="1.0" encoding="UTF-8"?>\n<hack name="HEX PATCH">\n'
             + '\t<panel>\n'
@@ -311,6 +317,7 @@ class CS_hex2xml(Command):
             + '\t</panel>\n'
             + '</hack>'
         )
+        # This probably doesn't need to run concurrently
         data = await create_future(bytes, output, "utf-8")
         b = io.BytesIO(data)
         f = discord.File(b, filename="patch.xml")
@@ -330,6 +337,7 @@ class CS_npc(Command):
         lim = ("c" not in flags) * 40 + 20
         argv = " ".join(args)
         data = await create_future(entity_list.search, argv, lim)
+        # Sends multiple messages up to 20000 characters total
         if len(data):
             head = entity_list.data[0][1]
             for i in range(len(head)):
@@ -369,6 +377,7 @@ class CS_tsc(Command):
         lim = ("c" not in flags) * 40 + 20
         argv = " ".join(args)
         data = await create_future(tsc_list.search, argv, lim)
+        # Sends multiple messages up to 20000 characters total
         if len(data):
             head = tsc_list.data[0][0]
             for i in range(len(head)):
@@ -403,12 +412,13 @@ class CS_mod(Command):
     description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
     usage = "<query>"
     no_parse = True
-    rate_limit = 3
+    rate_limit = (3, 7)
 
     async def __call__(self, args, **void):
         argv = " ".join(args)
         data = await searchForums(argv)
         data += await create_future(douclub.search, argv)
+        # Sends multiple messages up to 20000 characters total
         if len(data):
             response = "Search results for **" + argv + "**:\n"
             for l in data:
@@ -498,6 +508,7 @@ class UpdateDogpiles(Database):
                     if curr is None:
                         curr = [checker, 1, 0]
                         self.msgFollow[c_id] = curr
+                    # Must not imitate same user spamming
                     elif checker == curr[0] and u_id != curr[2]:
                         curr[1] += 1
                         if curr[1] >= 3:
@@ -505,12 +516,12 @@ class UpdateDogpiles(Database):
                             if len(checker):
                                 create_task(message.channel.send(checker))
                     else:
-                        if len(checker) > 100:
+                        # Don't imitate messages longer than 128 characters to prevent spam
+                        if len(checker) > 128:
                             checker = ""
                         curr[0] = checker
                         curr[1] = xrand(-1, 2)
                     curr[2] = u_id
-                    #print(curr)
 
 
 class MathQuiz(Command):
@@ -523,7 +534,7 @@ class MathQuiz(Command):
 
     async def __call__(self, channel, guild, flags, argv, **void):
         if not self.bot.isTrusted(guild.id):
-            raise PermissionError("Must be in a trusted server for this command.")
+            raise PermissionError("Must be in a trusted server to perform this command.")
         mathdb = self.bot.database.mathtest
         if "d" in flags:
             if channel.id in mathdb.data:
@@ -557,45 +568,52 @@ class UpdateMathTest(Database):
 
     def eqtrans(self, eq):
         return str(eq).replace("**", "^").replace("exp", "e^").replace("*", "∙")
-    
+
+    # Addition of 2 numbers less than 10000
     def addition(self):
-        x = xrand(100, 10000)
-        y = xrand(100, 10000)
+        x = xrand(10000)
+        y = xrand(10000)
         s = self.format(x, y, "+")
         return s, x + y
-    
+
+    # Subtraction of 2 numbers, result must be greater than or equal to 0
     def subtraction(self):
-        x = xrand(100, 12000)
-        y = xrand(100, 8000)
+        x = xrand(12000)
+        y = xrand(8000)
         if x < y:
             x, y = y, x
         s = self.format(x, y, "-")
         return s, x - y
 
+    # Addition of 2 numbers 2~20
     def multiplication(self):
         x = xrand(2, 20)
         y = xrand(2, 20)
         s = self.format(x, y, "×")
         return s, x * y
 
+    # Addition of 2 numbers 13~99
     def multiplication2(self):
         x = xrand(13, 100)
         y = xrand(13, 100)
         s = self.format(x, y, "×")
         return s, x * y
 
+    # Division result between 2 and 13
     def division(self):
         y = xrand(2, 20)
         x = xrand(2, 14) * y
         s = self.format(x, y, "/")
         return s, x // y
 
+    # Power of 2
     def exponentiation(self):
         x = xrand(2, 20)
         y = xrand(2, max(3, 14 / x))
         s = str(x) + "^" + str(y)
         return s, x ** y
 
+    # Power of 2 or 3
     def exponentiation2(self):
         x = xrand(2, 4)
         if x == 2:
@@ -604,26 +622,30 @@ class UpdateMathTest(Database):
             y = xrand(5, 11)
         s = str(x) + "^" + str(y)
         return s, x ** y
-        
+
+    # Square root result between 2 and 19
     def square_root(self):
         x = xrand(2, 20)
         y = x ** 2
         s = "√" + str(y)
         return s, x
 
+    # Square root result between 21 and 99
     def square_root2(self):
         x = xrand(21, 1000)
         y = x ** 2
         s = "√" + str(y)
         return s, x
-        
+
+    # Scientific number form, exponent between -3 and 5
     def scientific(self):
         x = xrand(100, 10000)
         x /= 10 ** int(math.log10(x))
         y = xrand(-3, 6)
         s = str(x) + "×10^" + str(y)
         return s, round(x * 10 ** y, 9)
-        
+
+    # Like division but may result in a finite decimal
     def fraction(self):
         y = random.choice([2, 4, 5, 10])
         x = xrand(3, 20)
@@ -633,12 +655,14 @@ class UpdateMathTest(Database):
         s = self.format(x, y, "/")
         return s, round(x / y, 9)
 
+    # An infinite recurring decimal number of up to 3 digits
     def recurring(self):
         x = "".join(str(xrand(10)) for _ in loop(xrand(2, 4)))
         s = "0." + "".join(x[i % len(x)] for i in range(28)) + "..."
         ans = "0.[" + x + "]"
         return s, ans
 
+    # Quadratic equation with a = 1
     def equation(self):
         a = xrand(1, 10)
         b = xrand(1, 10)
@@ -654,6 +678,7 @@ class UpdateMathTest(Database):
         s += ("+", "-")[cx < 0] + " " + str(abs(cx)) + " = 0"
         return s, [a, b]
 
+    # Quadratic equation with all values up to 13
     async def equation2(self):
         a = xrand(1, 14)
         b = xrand(1, 14)
@@ -673,6 +698,7 @@ class UpdateMathTest(Database):
         q = self.eqtrans(q).replace("∙", "") + " = 0"
         return q, a
 
+    # A derivative or integral
     async def calculus(self):
         amount = xrand(2, 5)
         s = []
@@ -714,6 +740,7 @@ class UpdateMathTest(Database):
         a = await create_future(op, a)
         return q, a
 
+    # Selects a random math question based on difficulty.
     async def generateMathQuestion(self, mode):
         easy = (
             self.addition,
@@ -762,6 +789,7 @@ class UpdateMathTest(Database):
                 msg = message.content.strip("|").strip("`")
                 if not msg or msg.lower() != msg:
                     return
+                # Ignore commented messages
                 if msg.startswith("#") or msg.startswith("//") or msg.startswith("\\"):
                     return
                 try:
@@ -796,7 +824,7 @@ class DeviantArt(Command):
 
     async def __call__(self, argv, flags, channel, guild, bot, **void):
         if not bot.isTrusted(guild.id):
-            raise PermissionError("Must be in a trusted server to subscribe to DeviantArt Galleries.")
+            raise PermissionError("Must be in a trusted server to perform this command.")
         data = bot.data.deviantart
         update = bot.database.deviantart.update
         if not argv:
@@ -816,6 +844,7 @@ class DeviantArt(Command):
         url = urls[0]
         if "deviantart.com" not in url:
             raise ArgumentError("Please input a DeviantArt Gallery URL.")
+        # Parse DeviantArt gallery URls
         url = url[url.index("deviantart.com") + 15:]
         spl = url.split("/")
         user = spl[0]
@@ -823,6 +852,7 @@ class DeviantArt(Command):
             raise ArgumentError("Please input a DeviantArt Gallery URL.")
         content = spl[2].split("&")[0]
         folder = noHighlight(spl[-1].split("&")[0])
+        # Gallery may be an ID or "all"
         try:
             content = int(content)
         except (ValueError, TypeError):
@@ -869,6 +899,7 @@ class UpdateDeviantArt(Database):
                 entries = assigned[content]["entries"]
                 new = tuple(items)
                 orig = tuple(entries)
+                # O(n) comparison
                 if hash(tuple(sorted(new))) != hash(tuple(sorted(orig))):
                     if assigned[content].get("reversed", False):
                         it = reversed(new)
@@ -895,6 +926,7 @@ class UpdateDeviantArt(Database):
 
     async def __call__(self):
         t = setDict(self.__dict__, "time", 0)
+        # Fetches once every 5 minutes
         if utc() - t < 300:
             return
         self.time = inf
@@ -903,6 +935,7 @@ class UpdateDeviantArt(Database):
         base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?limit=24&username="
         attempts, successes = 0, 0
         for content, user in conts.items():
+            # "all" galleries require different URL options
             if type(content) is str:
                 f_id = "&all_folder=true&mode=oldest"
             else:
@@ -919,6 +952,7 @@ class UpdateDeviantArt(Database):
                         d = json.loads(resp)
                     except:
                         d = eval(resp, {}, eval_const)
+                    # Parse output from DA API
                     for res in d["results"]:
                         deviation = res["deviation"]
                         media = deviation["media"]
@@ -926,6 +960,7 @@ class UpdateDeviantArt(Database):
                         orig = media["baseUri"]
                         extra = ""
                         token = "?token=" + media["token"][0]
+                        # Attempt to find largest available format for media
                         for t in reversed(media["types"]):
                             if t["t"].lower() == "fullview":
                                 if "c" in t:

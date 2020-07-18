@@ -36,6 +36,7 @@ def get_video(url, fps):
         q = fmt.get("width", 0)
         if type(q) is not int:
             q = 0
+        # Attempt to get as close to width 512 as possible for download
         if abs(q - 512) < abs(best - 512):
             best = q
             url = fmt["url"]
@@ -78,13 +79,13 @@ class IMG(Command):
                         + "Please remove an item to add another."
                     )
                 key = " ".join(args[:-1]).lower()
-                if len(key) > 128:
+                if len(key) > 2000:
                     raise ArgumentError("Image tag too long.")
                 elif not key:
                     raise ArgumentError("Image tag must not be empty.")
                 urls = await bot.followURL(args[-1], best=True, allow=True, limit=1)
                 url = urls[0]
-                if len(url) > 1024:
+                if len(url) > 2000:
                     raise ArgumentError("Image url too long.")
                 images[key] = url
                 images = {i: images[i] for i in sorted(images)}
@@ -96,6 +97,7 @@ class IMG(Command):
                         + "] to the image list for [" + noHighlight(guild.name) + "].```"
                     )
             if not args:
+                # This deletes all images for the current guild
                 if "f" not in flags:
                     response = uniStr(
                         "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
@@ -117,23 +119,23 @@ class IMG(Command):
                 + "] from the image list for [" + noHighlight(guild.name) + "].```"
             )
         if not argv and not "r" in flags:
+            # Set callback message for scrollable list
             return (
                 "```" + "\n" * ("z" in flags) + "callback-image-img-"
                 + str(user.id) + "_0"
                 + "-\nLoading Image database...```"
             )
-        sources = []
+        sources = hlist()
         for tag in args:
             t = tag.lower()
             if t in images:
                 sources.append(images[t])
         r = flags.get("r", 0)
         for _ in loop(r):
-            sources.append(images[tuple(images)[xrand(len(images))]])
+            sources.append(random.choice(tuple(images)))
         if not len(sources):
             raise LookupError("Target image " + argv + " not found. Use img for list.")
-        v = xrand(len(sources))
-        url = sources[v]
+        url = random.choice(sources)
         if "v" in flags:
             return url
         emb = discord.Embed(
@@ -220,6 +222,7 @@ class React(Command):
             following[guild.id] = curr = mdict(curr)
         if not argv:
             if "d" in flags:
+                # This deletes all auto reacts for the current guild
                 if "f" not in flags:
                     response = uniStr(
                         "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
@@ -230,6 +233,7 @@ class React(Command):
                     following.pop(guild.id)
                     update()
                 return "```css\nRemoved all auto reacts for [" + noHighlight(guild.name) + "].```"
+            # Set callback message for scrollable list
             return (
                 "```" + "\n" * ("z" in flags) + "callback-image-react-"
                 + str(user.id) + "_0"
@@ -253,6 +257,7 @@ class React(Command):
                 + " has reached the maximum of " + str(lim) + " items. "
                 + "Please remove an item to add another."
             )
+        # Limit substring length to 64
         a = reconstitute(" ".join(args[:-1])).lower()[:64]
         try:
             e_id = int(args[-1])
@@ -260,6 +265,7 @@ class React(Command):
             emoji = args[-1]
         else:
             emoji = await bot.fetch_emoji(e_id)
+        # This reaction indicates that the emoji was valid
         await message.add_reaction(emoji)
         curr.append(a, str(emoji))
         following[guild.id] = mdict({i: curr[i] for i in sorted(curr)})
@@ -340,6 +346,7 @@ class CreateEmoji(Command):
     typing = True
 
     async def __call__(self, bot, user, guild, channel, message, args, argv, **void):
+        # Take input from any attachments, or otherwise the message contents
         if message.attachments:
             args = [bestURL(a) for a in message.attachments] + args
             argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
@@ -376,6 +383,7 @@ class CreateEmoji(Command):
             image = await create_future(f.read)
             create_future_ex(f.close)
         emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
+        # This reaction indicates the emoji was created successfully
         await message.add_reaction(emoji)
         await fut
         return (
@@ -384,6 +392,7 @@ class CreateEmoji(Command):
         )
 
 
+# Char2Emoj, a simple script to convert a string into a block of text
 def _c2e(string, em1, em2):
     chars = {
         " ": [0, 0, 0, 0, 0],
@@ -450,6 +459,7 @@ def _c2e(string, em1, em2):
         "Y": [5, 5, 2, 2, 2],
         "Z": [7, 1, 2, 4, 7],
     }
+    # I don't quite remember how this algorithm worked lol
     printed = [""] * 7
     string = string.upper()
     for i in range(len(string)):
@@ -498,6 +508,7 @@ class Char2Emoj(Command):
 
 
 async def get_image(bot, user, message, args, argv, ext="png"):
+    # Take input from any attachments, or otherwise the message contents
     if message.attachments:
         args = [bestURL(a) for a in message.attachments] + args
         argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
@@ -517,8 +528,9 @@ async def get_image(bot, user, message, args, argv, ext="png"):
         value = 2
     else:
         value = await bot.evalMath(value, user)
-        if not value >= -16 or not value <= 16:
+        if not abs(value) <= 16:
             raise OverflowError("Maximum multiplier input is 16.")
+    # Try and find a good name for the output image
     try:
         name = url[url.rindex("/") + 1:]
         if not name:
@@ -645,12 +657,14 @@ class Colour(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, name, argv, **void):
-        argv = argv.replace("#", "").replace(",", " ").strip()
+        argv = singleSpace(argv.replace("#", "").replace(",", " ")).strip()
+        # Try to parse as colour tuple first
         if " " in argv:
-            channels = [min(255, max(0, int(round(float(i.strip()))))) for i in argv.split(" ")[:5] if i.strip()]
+            channels = [min(255, max(0, int(round(float(i.strip()))))) for i in argv.split(" ")[:5] if i]
             if len(channels) not in (3, 4):
                 raise ArgumentError("Please input 3 or 4 channels for colour input.")
         else:
+            # Try to parse as hex colour value
             try:
                 raw = int(argv, 16)
                 if len(argv) <= 6:
@@ -668,6 +682,7 @@ class Colour(Command):
                 adj = [x / 255 for x in channels]
             channels = [round(x * 255) for x in self.trans[name](adj)]
         adj = [x / 255 for x in channels]
+        # Any exceptions encountered during colour transformations will immediately terminate the command
         msg = (
             "```ini\nHEX colour code: " + sbHighlight(bytes(channels).hex().upper())
             + "\nDEC colour code: " + sbHighlight(colour2Raw(channels))
@@ -713,14 +728,13 @@ class CreateGIF(Command):
     description = "Combines multiple supplied images, and/or optionally a video, into an animated .gif image."
     usage = "<0*:urls{attached_files}> <-2:framerate_setting(?r)> <-1:framerate[16]>"
     no_parse = True
-    rate_limit = (8, 12)
+    rate_limit = (8, 24)
     _timeout_ = 5
     flags = "r"
     typing = True
 
     async def __call__(self, bot, user, guild, channel, message, flags, args, **void):
-        if not bot.isTrusted(guild.id):
-            raise PermissionError("Must be in a trusted server to create GIF images.")
+        # Take input from any attachments, or otherwise the message contents
         if message.attachments:
             args += [bestURL(a) for a in message.attachments]
         if not args:
@@ -730,6 +744,7 @@ class CreateGIF(Command):
             rate = await bot.evalMath(fr, user)
         else:
             rate = 16
+        # Validate framerate values to prevent issues further down the line
         if rate <= 0:
             args = args[:1]
             rate = 1
@@ -773,6 +788,7 @@ class Resize(Command):
     typing = True
 
     async def __call__(self, bot, user, guild, channel, message, flags, args, argv, **void):
+        # Take input from any attachments, or otherwise the message contents
         if message.attachments:
             args = [bestURL(a) for a in message.attachments] + args
             argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
@@ -799,6 +815,7 @@ class Resize(Command):
             x = y = 0.5
             op = "auto"
         else:
+            # Parse width and height multipliers
             value = value.replace("x", " ").replace("X", " ").replace("*", " ").replace("×", " ")
             try:
                 spl = shlex.split(value)
@@ -817,6 +834,7 @@ class Resize(Command):
                 op = " ".join(spl)
             else:
                 op = "auto"
+        # Try and find a good name for the output image
         try:
             name = url[url.rindex("/") + 1:]
             if not name:
@@ -845,6 +863,7 @@ class Magik(Command):
     typing = True
 
     async def __call__(self, bot, user, guild, channel, message, args, argv, **void):
+        # Take input from any attachments, or otherwise the message contents
         if message.attachments:
             args = [a.url for a in message.attachments] + args
             argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
@@ -861,6 +880,7 @@ class Magik(Command):
                     await fut
                     raise ArgumentError("Please input an image by URL or attachment.")
         url = urls[0]
+        # Try and find a good name for the output image
         try:
             name = url[url.rindex("/") + 1:]
             if not name:
@@ -871,6 +891,7 @@ class Magik(Command):
             name = "unknown"
         if not name.endswith(".png"):
             name += ".png"
+        # Site only allows cdn.discord URLs, reupload images to discord temporarily for all other image links
         if "cdn.discord" not in url[:32]:
             resp = await imageProc(url, "resize_max", [512, "hamming"], user)
             fn = resp[0]
@@ -904,6 +925,7 @@ class Blend(Command):
     typing = True
 
     async def __call__(self, bot, user, guild, channel, message, flags, args, argv, **void):
+        # Take input from any attachments, or otherwise the message contents
         if message.attachments:
             args = [bestURL(a) for a in message.attachments] + args
             argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
@@ -963,6 +985,7 @@ class Blend(Command):
                 operation += " ".join(spl)
             if not operation:
                 operation = "replace"
+        # Try and find a good name for the output image
         try:
             name = url1[url1.rindex("/") + 1:]
             if not name:
@@ -980,9 +1003,8 @@ class Blend(Command):
         await sendFile(message.channel, "", f, filename=fn)
 
 
-f = open("auth.json")
-auth = ast.literal_eval(f.read())
-f.close()
+with open("auth.json") as f:
+    auth = ast.literal_eval(f.read())
 try:
     cat_key = auth["cat_api_key"]
 except:
@@ -1006,7 +1028,8 @@ class Cat(Command):
         self.found = cdict()
         self.refilling = False
         create_task(self.refill_buffer(128))
-    
+
+    # Fetches one image from random pool
     async def fetch_one(self):
         if not self.header or random.random() > 2 / 3:
             if random.random() > 2 / 3:
@@ -1030,6 +1053,7 @@ class Cat(Command):
             url = d["file" if x == 1 else "url"]
         return url
 
+    # Refills image buffer to a certain amount
     async def refill_buffer(self, amount):
         try:
             while len(self.buffer) < amount + 1:
@@ -1048,6 +1072,7 @@ class Cat(Command):
             raise
         self.refilling = False
 
+    # Grabs next image from buffer, allocating when necessary
     async def get_buffer(self, amount):
         if len(self.buffer) < amount + 1:
             if not self.refilling:
@@ -1087,6 +1112,7 @@ class Dog(Command):
         self.refilling = False
         create_task(self.refill_buffer(128))
 
+    # Fetches one image from random pool
     async def fetch_one(self):
         x = random.random() > 2 / 3
         if x:
@@ -1105,6 +1131,7 @@ class Dog(Command):
             url = url.replace("///", "//")
         return url
 
+    # Refills image buffer to a certain amount
     async def refill_buffer(self, amount):
         try:
             while len(self.buffer) < amount + 1:
@@ -1123,6 +1150,7 @@ class Dog(Command):
             raise
         self.refilling = False
 
+    # Grabs next image from buffer, allocating when necessary
     async def get_buffer(self, amount):
         if len(self.buffer) < amount + 1:
             if not self.refilling:
@@ -1157,8 +1185,10 @@ class _8Ball(Command):
         self.refilling = False
         create_future_ex(self.refill_buffer, 128)
 
+    # Fetches one image from random pool
     fetch_one = lambda self: nekos.img("8ball")
 
+    # Refills image buffer to a certain amount
     def refill_buffer(self, amount):
         try:
             while len(self.buffer) < amount + 1:
@@ -1170,6 +1200,7 @@ class _8Ball(Command):
             raise
         self.refilling = False
 
+    # Grabs next image from buffer, allocating when necessary
     def get_buffer(self, amount):
         if len(self.buffer) < amount + 1:
             if not self.refilling:
@@ -1216,7 +1247,9 @@ class UpdateReacts(Database):
                         words = message.content.lower()
                     if k in words:
                         emojis = following[k]
+                        # Store position for each keyword found
                         reacting[words.index(k) / len(words)] = emojis
+                # Reactions sorted by their order of appearance in the message
                 for r in sorted(list(reacting)):
                     for react in reacting[r]:
                         try:

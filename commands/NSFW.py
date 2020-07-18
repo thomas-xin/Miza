@@ -7,6 +7,7 @@ except ModuleNotFoundError:
 
 import nekos, rule34, pybooru
 
+# This entire module is a mess, I honestly don't care for it much
 e_loop = asyncio.new_event_loop()
 asyncio.set_event_loop(e_loop)
 rule34_sync = rule34.Sync()

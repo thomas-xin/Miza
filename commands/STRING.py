@@ -8,11 +8,8 @@ except ModuleNotFoundError:
 from googletrans import Translator
 
 
+# This is a bit of a mess
 class PapagoTrans:
-
-    class PapagoOutput:
-        def __init__(self, text):
-            self.text = text
 
     def __init__(self, c_id, c_sec):
         self.id = c_id
@@ -32,14 +29,13 @@ class PapagoTrans:
         resp = Request(url, headers=headers, timeout=16)
         r = json.loads(resp)
         t = r["message"]["result"]["translatedText"]
-        output = self.PapagoOutput(t)
+        output = cdict(text=t)
         return output
 
 
 translators = {"Google Translate": Translator(["translate.google.com"])}
-f = open("auth.json")
-auth = ast.literal_eval(f.read())
-f.close()
+with open("auth.json") as f:
+    auth = ast.literal_eval(f.read())
 try:
     translators["Papago"] = PapagoTrans(auth["papago_id"], auth["papago_secret"])
 except KeyError:
@@ -94,6 +90,7 @@ class Translate(Command):
             end = ""
         response = "**" + str(user) + "**:"
         print(string, dest, source)
+        # Attempt to use all available translators if possible
         for i in range(count):
             for t in trans:
                 try:
@@ -128,6 +125,7 @@ class Math(Command):
         r = "r" in flags
         p = flags.get("v", 0) * 2 + 1 << 6
         resp = await bot.solveMath(argv, user, p, r)
+        # Determine whether output is a direct answer or a file
         if type(resp) is dict and "file" in resp:
             await channel.trigger_typing()
             fn = resp["file"]
@@ -207,6 +205,7 @@ class Fancy(Command):
             if i == len(UNIFMTS) - 2:
                 s = s[::-1]
             emb.add_field(name="Font " + str(i + 1), value="```" + "fix" * (i & 1) + "\n" + s + "```")
+        # Only return embed if it can be sent
         if len(emb) > 6000:
             return "\n\n".join(f.name + "\n" + noCodeBox(f.value) for f in emb.fields)
         return dict(embed=emb)
@@ -218,6 +217,7 @@ class Zalgo(Command):
     description = "Generates random accent symbols between characters in a text string."
     usage = "<string>"
     no_parse = True
+    # This is a bit unintuitive with the character IDs
     nums = numpy.concatenate([numpy.arange(11) + 7616, numpy.arange(4) + 65056, numpy.arange(112) + 768])
     chrs = [chr(n) for n in nums]
     randz = lambda self: random.choice(self.chrs)
@@ -230,6 +230,7 @@ class Zalgo(Command):
         emb.set_author(name=argv)
         for i in (1, 2, 3, 4, 5, 6, 7, 8):
             emb.add_field(name="Level " + str(i), value="```" + "fix" * (i & 1) + "\n" + self.zalgo(argv, i) + "```")
+        # Discord often removes combining characters past a limit, so messages longer than 6000 characters may be sent, test this by attempting to send
         try:
             await channel.send(embed=emb)
         except discord.HTTPException:
@@ -266,6 +267,7 @@ class Time(Command):
 
     async def __call__(self, name, argv, args, user, **void):
         s = 0
+        # Only check for timezones if the command was called with alias "t" or "time"
         if args and name in "time":
             for a in (args[0], args[-1]):
                 tz = a.lower()
@@ -318,6 +320,7 @@ class UrbanDictionary(Command):
     usage = "<string> <verbose(?v)>"
     flags = "v"
     rate_limit = 2
+    typing = True
 
     async def __call__(self, channel, argv, flags, **void):
         url = (
@@ -326,6 +329,7 @@ class UrbanDictionary(Command):
         )
         fut = create_task(channel.trigger_typing())
         s = await Request(url, headers=self.header, timeout=16, aio=True)
+        # eval is often better at json decoding than json.loads for some reason, this usage isn't 100% safe though
         try:
             d = json.loads(s)
         except:

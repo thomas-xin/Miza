@@ -10,12 +10,14 @@ class GameOverError(OverflowError):
     pass
 
 
+# Represents and manages an N-dimensional game of 2048, with many optional settings.
 class ND2048(collections.abc.MutableSequence):
 
     digit_ratio = 1 / math.log2(10)
     spl = b"_"
     __slots__ = ("data", "history", "shape", "flags")
 
+    # Loads a new instance from serialized data
     @classmethod
     def load(cls, data):
         spl = data.split(cls.spl)
@@ -33,12 +35,14 @@ class ND2048(collections.abc.MutableSequence):
                 self.history.append(np.frombuffer(b642Bytes(spl.pop(0), 1), dtype=np.int8).reshape(shape))
         return self
 
+    # Serializes gamestate data to base64
     def serialize(self):
         s = (self.spl.join(str(i).encode("utf-8") for i in self.data.shape)) + self.spl + str(self.flags).encode("utf-8") + self.spl * 2 + bytes2B64(self.data.tobytes(), 1)
         if self.flags & 1 and self.history:
             s += self.spl + self.spl.join(bytes2B64(b.tobytes(), 1) for b in self.history)
         return s
 
+    # Initializes new game
     def __init__(self, *size, flags=0):
         if not size:
             self.data = None
@@ -53,12 +57,14 @@ class ND2048(collections.abc.MutableSequence):
                 size = [size, size]
         self.data = np.tile(np.int8(0), size)
         if flags & 1:
+            # Maximum undo steps based on the size of the game board
             self.history = deque(maxlen=max(1, int(800 / np.prod(size) - 1)))
         self.flags = flags
         self.spawn(max(2, self.data.size // 6), flag_override=0)
 
     __repr__ = lambda self: self.__class__.__name__ + ".load(" + repr(self.serialize()) + ")"
 
+    # Displays game board for dimensions N <= 4
     def __str__(self):
         m = 64
         a = self.data
@@ -83,8 +89,8 @@ class ND2048(collections.abc.MutableSequence):
         if a.ndim <= 4:
             dim = len(a)
             if a.ndim == 3:
-                a = np.swapaxes(np.expand_dims(np.rollaxis(a, 0, 3), 2), 0, 1)
-                shape.insert(2, 1)
+                a = np.expand_dims(np.rollaxis(a, 0, 3), 0)
+                shape.insert(3, 1)
             else:
                 a = np.swapaxes(a, 0, 3)
             horiz = 2
@@ -93,19 +99,24 @@ class ND2048(collections.abc.MutableSequence):
             return str(horiz)
         return self.data.__str__()
 
+    # Calulates effective total score (value of a tile 2 ^ x is (2 ^ x)(x - 1)
     score = lambda self: np.sum([(g - 1) * (1 << g) for g in [self.data[self.data > 1].astype(object)]])
 
+    # Randomly spawns tiles on a board, based on the game's settings. May be overridden by the flag_override argument.
     def spawn(self, count=1, flag_override=None):
         try:
             flags = flag_override if flag_override is not None else self.flags
             if 0 not in self:
                 raise IndexError
             if flags & 4:
+                # Scale possible number spawns to highest number on board
                 high = max(4, numpy.max(self.data)) - 1
                 choices = [np.min(self.data[self.data > 0])] + [max(1, i) for i in range(high - 4, high)]
             else:
+                # Default 2048 probabilities: 90% ==> 2, 10% ==> 4
                 choices = [1] * 9 + [2]
             if flags & 2:
+                # May spawn negative numbers if special tiles mode is on
                 neg = max(1, numpy.max(self.data))
                 neg = 1 if neg <= 1 else random.randint(1, neg)
                 neg = -1 if neg <= 1 else -random.randint(1, neg)
@@ -114,6 +125,7 @@ class ND2048(collections.abc.MutableSequence):
                         break
                     choices[i + 1] = neg
                     neg += 1
+            # Select a list from possible spawns and distribute them into random empty locations on the game board
             spawned = deque(random.choice(choices) for i in range(count))
             fi = self.data.flat
             empty = [i for i in range(self.data.size) if not fi[i]]
@@ -127,6 +139,7 @@ class ND2048(collections.abc.MutableSequence):
             raise RuntimeError("Unable to spawn tile.")
         return self
 
+    # Recursively splits the game board across dimensions, then performs a move across each column, returns True if game board was modified
     def recurse(self, it):
         if it.ndim > 1:
             return any([self.recurse(i) for i in it])
@@ -135,10 +148,12 @@ class ND2048(collections.abc.MutableSequence):
             done = True
             for i in range(len(it) - 1):
                 if it[i + 1]:
+                    # If current tile is empty, move next tile into current position
                     if not it[i]:
                         it[i] = it[i + 1]
                         it[i + 1] = 0
                         done = False
+                    # If current tile can combine with adjacent tile, add them
                     elif it[i] == it[i + 1] or (it[i + 1] < 0 and it[i]):
                         it[i] += (1 if it[i] >= 0 else -1) * (1 if it[i + 1] >= 0 else -it[i + 1])
                         it[i + 1] = 0
@@ -151,14 +166,18 @@ class ND2048(collections.abc.MutableSequence):
                     modified = True
         return modified
 
+    # Performs a single move across a single dimension.
     def move(self, dim=0, rev=False, count=1):
+        # Creates backup copy of game data if easy mode is on
         if self.flags & 1:
             temp = copy.deepcopy(self.data)
         moved = False
         for i in range(count):
+            # Random move selector
             if dim < 0:
                 dim = xrand(self.data.ndim)
                 rev = xrand(2)
+            # Selects a dimension to move against
             it = np.moveaxis(self.data, dim, -1)
             if rev:
                 it = np.flip(it)
@@ -169,21 +188,24 @@ class ND2048(collections.abc.MutableSequence):
         if moved:
             if self.flags & 1:
                 self.history.append(temp)
+            # If board is full, attempt a move in both directions of every dimension, and announce game over if none are possible
             if 0 not in self.data:
                 valid = False
                 for dim in range(self.data.ndim):
                     temp = np.moveaxis(copy.deepcopy(self.data), dim, -1)
-                    if self.recurse(temp):
+                    if self.recurse(temp) or self.recurse(np.flip(temp)):
                         valid = True
                 if not valid:
                     raise GameOverError("Game Over.")
         return moved
 
+    # Attempt to perform an undo
     def undo(self):
         if self.flags & 1 and self.history:
             self.data = self.history.pop()
             return True
 
+    # Creates a display of a single number in a text box of a fixed length, align centre then right
     def display(self, num, length):
         if num > 0:
             numlength = 1 + int(num * self.digit_ratio)
@@ -229,6 +251,7 @@ class Text2048(Command):
         size = [int(x) for x in spl.pop(0).split("_")]
         data = None
         if reaction is None:
+            # If game has not been started, add reactions and create new game
             for react in self.directions.a:
                 r = self.directions.a[react]
                 if r == -2 or (r == -1 and mode & 1) or r >= 0 and r >> 1 < len(size):
@@ -236,12 +259,14 @@ class Text2048(Command):
             g = ND2048(*size, flags=mode)
             data = g.serialize()
         else:
+            # Get direction of movement
             data = "-".join(spl).encode("utf-8")
             reac = reaction
             if reac not in self.directions:
                 return
             r = self.directions[reac]
             try:
+                # Undo action only works in easy mode
                 if r == -1:
                     if not mode & 1:
                         return
@@ -249,17 +274,20 @@ class Text2048(Command):
                     if not g.undo():
                         return
                     data = g.serialize()
+                # Random moves
                 elif r == -2:
                     g = ND2048.load(data)
                     if not g.move(-1, count=16):
                         return
                     data = g.serialize()
+                # Regular moves; each dimension has 2 possible moves
                 elif r >> 1 < len(size):
                     g = ND2048.load(data)
                     if not g.move(r >> 1, r & 1):
                         return
                     data = g.serialize()
             except GameOverError:
+                # Clear reactions and announce game over message
                 await message.edit(content="```\n2048: GAME OVER```")
                 if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
                     await message.clear_reactions()
@@ -271,6 +299,7 @@ class Text2048(Command):
                     create_task(message.add_reaction(c))
                     await asyncio.sleep(0.5)
         if data is not None:
+            # Update message if gamestate has been changed
             if u_id == 0:
                 u = None
             elif user.id == u_id:
@@ -288,6 +317,7 @@ class Text2048(Command):
             await message.edit(content=content, embed=emb)
 
     async def __call__(self, bot, argv, args, user, flags, guild, **void):
+        # Input may be nothing, a single value representing board size, a size and dimension count input, or a sequence of numbers representing size along an arbitrary amount of dimensions
         if not len(argv.replace(" ", "")):
             size = [4, 4]
         else:
@@ -310,6 +340,7 @@ class Text2048(Command):
             items *= x
             if items > 256:
                 raise OverflowError("Board size too large.")
+        # Prepare game settings, send callback message to schedule game start
         mode = 0
         if "p" in flags:
             u_id = 0
@@ -342,6 +373,7 @@ class MimicConfig(Command):
         m_id = "&" + str(verifyID(args.pop(0)))
         if m_id not in mimicdb:
             raise LookupError("Target mimic ID not found.")
+        # Users are not allowed to modify mimics they do not control
         if not isnan(perm):
             mimics = setDict(mimicdb, user.id, {})
             found = 0
@@ -378,12 +410,14 @@ class MimicConfig(Command):
             )
         if setting == "birthday":
             new = utc_ts(tzparse(new))
+        # This limit is actually to comply with webhook usernames
         elif setting == "name":
             if len(new) > 80:
-                raise OverflowError("Prefix must be 80 or fewer in length.")
+                raise OverflowError("Name must be 80 or fewer in length.")
+        # Prefixes must not be too long
         elif setting == "prefix":
             if len(new) > 16:
-                raise OverflowError("Must be 16 or fewer in length.")
+                raise OverflowError("Prefix must be 16 or fewer in length.")
             for prefix in mimics:
                 try:
                     mimics[prefix].remove(m_id)
@@ -396,6 +430,7 @@ class MimicConfig(Command):
         elif setting == "url":
             urls = await bot.followURL(new, best=True)
             new = urls[0]
+        # May assign a user to the mimic
         elif setting == "auto":
             if new.lower() in ("none", "null", "0", "false", "f"):
                 new = None
@@ -414,8 +449,8 @@ class MimicConfig(Command):
                     except:
                         raise LookupError("Target user or mimic ID not found.")
         elif setting != "description":
-            if len(new) > 256:
-                raise OverflowError("Must be 256 or fewer in length.")
+            if len(new) > 512:
+                raise OverflowError("Must be 512 or fewer in length.")
         name = mimic.name
         mimic[setting] = new
         update()
@@ -444,6 +479,7 @@ class Mimic(Command):
         mimics = setDict(mimicdb, user.id, {})
         if not argv or (len(args) == 1 and "d" not in flags):
             if "d" in flags:
+                # This deletes all mimics for the current user
                 if "f" not in flags:
                     response = uniStr(
                         "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
@@ -456,6 +492,7 @@ class Mimic(Command):
                     "```css\nSuccessfully removed all webhook mimics for ["
                     + noHighlight(user) + "].```"
                 )
+            # Set callback message for scrollable list
             return (
                 "```" + "\n" * ("z" in flags) + "callback-game-mimic-"
                 + str(user.id) + "_0"
@@ -478,6 +515,7 @@ class Mimic(Command):
                 if not mlist:
                     mimics.pop(prefix)
             except KeyError:
+                # Users are not allowed to delete mimics that do not belong to them
                 mimic = bot.get_mimic(prefix, user)
                 if not isnan(perm) and mimic.u_id != user.id:
                     raise PermissionError("Target mimic does not belong to you.")
@@ -501,6 +539,7 @@ class Mimic(Command):
             raise OverflowError("Prefix must be 16 or fewer in length.")
         if " " in prefix:
             raise TypeError("Prefix must not contain spaces.")
+        # This limit is ridiculous. I like it.
         if sum(len(i) for i in iter(mimics.values())) >= 32768:
             raise OverflowError(
                 "Mimic list for " + str(user)
@@ -513,6 +552,7 @@ class Mimic(Command):
         ctime = utc()
         m_id = "&" + str(mid)
         mimic = None
+        # Attempt to create a new mimic, a mimic from a user, or a copy of an existing mimic.
         if len(args):
             if len(args) > 1:
                 urls = await bot.followURL(args[-1], best=True)
@@ -545,8 +585,9 @@ class Mimic(Command):
         else:
             name = user.name
             url = bestURL(user)
+        # This limit is actually to comply with webhook usernames
         if len(name) > 80:
-            raise OverflowError("Prefix must be 80 or fewer in length.")
+            raise OverflowError("Name must be 80 or fewer in length.")
         while m_id in mimics:
             mid += 1
             m_id = "&" + str(mid)
@@ -669,14 +710,13 @@ class MimicSend(Command):
             m = [bot.get_mimic(verifyID(p)) for p in mlist]
         except KeyError:
             mimic = bot.get_mimic(verifyID(prefix))
-            if not isnan(perm) and mimic.u_id != user.id:
-                raise PermissionError("Target mimic does not belong to you.")
             m = [mimic]
         admin = not inf > perm
         try:
             enabled = bot.data.enabled[channel.id]
         except KeyError:
             enabled = ()
+        # Because this command operates across channels and servers, we need to make sure these cannot be sent to channels without this command enabled
         if not admin and "game" not in enabled:
             raise PermissionError("Not permitted to send into target channel.")
         msg = escape_everyone(msg)
@@ -712,14 +752,17 @@ class UpdateMimics(Database):
                     enabled = ()
             else:
                 enabled = list(bot.categories)
+            # User must have permission to use ~mimicsend in order to invoke by prefix
             if admin or "game" in enabled:
                 database = self.data[user.id]
                 msg = message.content
                 try:
+                    # Stack multiple messages to send, may be separated by newlines
                     sending = hlist()
                     channel = message.channel
                     for line in msg.split("\n"):
                         found = False
+                        # O(1) time complexity per line regardless of how many mimics a user is assigned
                         if len(line) > 2 and " " in line:
                             i = line.index(" ")
                             prefix = line[:i]
@@ -772,6 +815,7 @@ class UpdateMimics(Database):
                     mimi = bot.get_mimic(mim)
                     if it is None:
                         it = {}
+                    # If we find the same mimic twice, there is an infinite loop
                     elif mim in it:
                         raise RecursionError("Infinite recursive loop detected.")
                     it[mim] = True
@@ -788,6 +832,7 @@ class UpdateMimics(Database):
         if self.busy:
             return
         self.busy = True
+        # Garbage collector for unassigned mimics
         try:
             i = 1
             for m_id in tuple(self.data):

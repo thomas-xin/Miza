@@ -8,10 +8,10 @@ from PIL import Image, ImageChops, ImageEnhance, ImageMath, ImageStat
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
 
+# For debugging only
 def filePrint(*args, sep=" ", end="\n", prefix="", file="log.txt", **void):
-    f = open(file, "ab")
-    f.write((str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix)).encode("utf-8"))
-    f.close()
+    with open(file, "ab") as f:
+        f.write((str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix)).encode("utf-8"))
 
 def logging(func):
     def call(self, *args, file="log.txt", **kwargs):
@@ -24,6 +24,7 @@ def logging(func):
     return call
 
 
+# Time input detector, used to read FFprobe output
 def rdhms(ts):
     data = ts.split(":")
     t = 0
@@ -39,7 +40,7 @@ def rdhms(ts):
             raise TypeError("Too many time arguments.")
     return t
 
-
+#  URL detector, this should probably be replaced by the one used in the main bot
 DOMAIN_FORMAT = re.compile(
     r"(?:^(\w{1,255}):(.{1,255})@|^)"
     r"(?:(?:(?=\S{0,253}(?:$|:))"
@@ -102,6 +103,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         if direct:
             command = ["ffprobe", "-hide_banner", fn]
             resp = bytes()
+            # Up to 3 attempts to get video duration
             for _ in range(3):
                 try:
                     proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -140,6 +142,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
                 sfind = re.finditer(sizecheck, d)
                 sizestr = next(sfind).group()
                 size = [int(i) for i in sizestr.split("x")]
+        # Adjust FPS if duration is too long
         fps = min(fps, 256 / dur)
         fn2 = fn + ".gif"
         f_in = fn if direct else url
@@ -172,6 +175,7 @@ def create_gif(in_type, args, delay):
         return "$" + out
     images = args
     maxsize = int(min(maxsize, 32768 / len(images) ** 0.5))
+    # Detect if an image sequence or video is being inputted
     imgs = []
     for url in images:
         resp = requests.get(url, stream=True, timeout=8)
@@ -204,6 +208,7 @@ def create_gif(in_type, args, delay):
     return "$" + out
 
 def rainbow_gif(image, duration):
+    # filePrint(image, duration)
     ts = round(time.time() * 1000)
     out = "cache/" + str(ts) + ".gif"
     image = resize_max(image, 512, resample=Image.HAMMING)
@@ -218,9 +223,11 @@ def rainbow_gif(image, duration):
         rate <<= 1
     if fps <= 0:
         raise ValueError("Invalid framerate value.")
+    # filePrint(fps)
     command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
     command.extend(["-fs", str(8388608 - 131072), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out])
     proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # Make sure image is in RGB/HSV format
     if str(image.mode) != "HSV":
         curr = image.convert("HSV")
         if str(image.mode) != "RGB":
@@ -230,6 +237,8 @@ def rainbow_gif(image, duration):
     channels = list(curr.split())
     if duration < 0:
         rate = -rate
+    # filePrint(rate)
+    # Repeatedly hueshift image and pass to FFmpeg
     func = lambda x: (x + rate) & 255
     for i in range(0, 256, abs(rate)):
         if i:
@@ -243,6 +252,7 @@ def rainbow_gif(image, duration):
     return "$" + out
 
 
+# Autodetect max image size, keeping aspect ratio
 def max_size(w, h, maxsize):
     s = max(w, h)
     if s > maxsize:
@@ -288,6 +298,7 @@ def resize_to(image, w, h, operation="auto"):
     if op in resizers:
         filt = resizers[op]
     elif op == "auto":
+        # Choose resampling algorithm based on source/destination image sizes
         m = min(abs(w), abs(h))
         n = min(image.width, image.height)
         if n > m:
@@ -307,6 +318,7 @@ def resize_to(image, w, h, operation="auto"):
     return image.resize([w, h], filt)
 
 
+# Image blend operations (this is a bit of a mess)
 blenders = {
     "normal": "blend",
     "blt": "blend",
@@ -396,8 +408,10 @@ def blend_op(image, url, operation, amount):
         imgB = numpy.array(image2).astype(float)
         out = Image.fromarray(numpy.uint8(filt(imgA, imgB, amount)))
     else:
+        # Basic blend, use second image
         if filt == "blend":
             out = image2
+        # Image operation, use ImageMath.eval
         elif filt.startswith("OP_"):
             f = filt[3:]
             if str(image.mode) != str(image2.mode):
@@ -413,6 +427,7 @@ def blend_op(image, url, operation, amount):
             if c > 3:
                 ch3.append(ImageMath.eval("max(X,Y)", dict(X=ch1[-1], Y=ch2[-1])).convert("L"))
             out = Image.merge(mode, ch3)
+        # Special operation, use HSV channels
         elif filt.startswith("SP_"):
             f = filt[3:]
             if str(image.mode) == "RGBA":
@@ -446,6 +461,7 @@ def blend_op(image, url, operation, amount):
                 else:
                     A = ImageMath.eval("max(X,Y)", dict(X=A1, Y=A2)).convert("L")
                 spl[-1] = A
+        # Otherwise attempt to find as ImageChops filter
         else:
             if str(image.mode) != str(image2.mode):
                 if str(image.mode) != "RGBA":
@@ -459,6 +475,7 @@ def blend_op(image, url, operation, amount):
                 image = image.convert("RGBA")
             if str(out.mode) != "RGBA":
                 out = out.convert("RGBA")
+        # Blend two images
         out = ImageChops.blend(image, out, amount)
     return out
 
@@ -467,6 +484,7 @@ def blend_op(image, url, operation, amount):
 
 Enhance = lambda image, operation, value: getattr(ImageEnhance, operation)(image).enhance(value)
 
+# Hueshift image using HSV channels
 def hue_shift(image, value):
     if str(image.mode) == "RGBA":
         A = image.split()[-1]
@@ -496,9 +514,8 @@ def get_image(url, out):
         else:
             if os.path.getsize(url) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")
-            f = open(url, "rb")
-            data = f.read()
-            f.close()
+            with open(url, "rb") as f:
+                data = f.read()
             if out != url and out:
                 try:
                     os.remove(url)
@@ -511,6 +528,7 @@ def get_image(url, out):
     return Image.open(io.BytesIO(data))
 
 
+# Main image operation function
 @logging
 def evalImg(url, operation, args):
     ts = round(time.time() * 1000)
@@ -534,6 +552,7 @@ def evalImg(url, operation, args):
 
 
 if __name__ == "__main__":
+    # SHA256 key always taken on startup
     key = eval(sys.stdin.readline()).decode("utf-8", "replace").strip()
     while True:
         try:
@@ -542,6 +561,7 @@ if __name__ == "__main__":
             sys.stdout.write(repr(resp.encode("utf-8")) + "\n")
             sys.stdout.flush()
         except Exception as ex:
+            # Exceptions are evaluated and handled by main process
             sys.stdout.write(repr(ex) + "\n")
             sys.stdout.flush()
         time.sleep(0.01)

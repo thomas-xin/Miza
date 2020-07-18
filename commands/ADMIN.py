@@ -47,6 +47,7 @@ class Purge(Command):
         dt = None
         delD = {}
         deleted = 0
+        # Keep going until finding required amount of messages or reaching the end of the channel
         while count > 0:
             lim = count * 2 + 16
             if not lim < inf:
@@ -64,6 +65,7 @@ class Purge(Command):
                     dt = m.created_at
             if lim is None or not hist:
                 break
+        # attempt to bulk delete up to 100 at a time, otherwise delete 1 at a time
         delM = hlist(delD.values())
         while len(delM):
             try:
@@ -104,6 +106,7 @@ class Ban(Command):
 
     async def __call__(self, bot, args, message, channel, guild, flags, perm, user, name, **void):
         if not args:
+            # Set callback message for scrollable list
             return (
                 "```" + "\n" * ("z" in flags) + "callback-admin-ban-"
                 + str(user.id) + "_0"
@@ -164,6 +167,7 @@ class Ban(Command):
                 + "] from [" + noHighlight(guild) + "]: ["
                 + sec2Time(ban["t"] - ts) + "].```"
             )
+        # This parser is a mess too
         bantype = " ".join(args)
         if bantype.startswith("for "):
             bantype = bantype[4:]
@@ -214,6 +218,7 @@ class Ban(Command):
 
     async def getBans(self, guild):
         loc = self.bot.data.bans.get(guild.id)
+        # This API call could potentially be replaced with a single init call and a well maintained cache of banned users
         glob = await guild.bans()
         bans = {ban.user.id: {"u": ban.user.id, "r": ban.reason, "t": inf} for ban in glob}
         if loc:
@@ -235,6 +240,7 @@ class Ban(Command):
             if user.id == u.id:
                 try:
                     ban = bans[u.id]
+                    # Remove from global schedule, then sort and re-add
                     try:
                         banlist.remove(user.id, key=lambda x: x["u"])
                     except IndexError:
@@ -391,10 +397,10 @@ class RoleGiver(Command):
                 "Currently active rolegivers in <#" + str(channel.id)
                 + ">:\n```ini\n" + strIter(assigned, key=key) + "```"
             )
-        if sum(len(alist[0]) for alist in assigned) >= 16:
+        if sum(len(alist[0]) for alist in assigned) >= 8:
             raise OverflowError(
                 "Rolegiver list for #" + channel.name
-                + " has reached the maximum of 16 items. "
+                + " has reached the maximum of 8 items. "
                 + "Please remove an item to add another."
             )
         react = args[0].lower()
@@ -416,6 +422,7 @@ class RoleGiver(Command):
                 r,
                 qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
             )
+        # Must ensure that the user does not assign roles higher than their own
         if inf > perm:
             memb = await self.bot.fetch_member_ex(user.id, guild)
             if memb is None:
@@ -464,6 +471,7 @@ class AutoRole(Command):
                         print(traceback.format_exc())
                         continue
                     removed.append(role)
+                # Update all users by removing roles
                 if "x" in flags:
                     i = 1
                     for member in guild.members:
@@ -525,6 +533,7 @@ class AutoRole(Command):
                     r,
                     qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
                 )
+            # Must ensure that the user does not assign roles higher than their own
             if not inf > perm:
                 memb = await self.bot.fetch_member_ex(user.id, guild)
                 if memb is None:
@@ -536,6 +545,7 @@ class AutoRole(Command):
         if new not in assigned:
             assigned.append(new)
             update()
+        # Update all users by adding roles
         if "x" in flags or name == "instarole":
             if roles:
                 fut = create_task(channel.trigger_typing())
@@ -567,6 +577,7 @@ class RolePreserver(Command):
         update = self.bot.database.rolepreservers.update
         bot = self.bot
         following = bot.data.rolepreservers
+        # Empty dictionary is enough to represent an active role preserver here
         curr = following.get(guild.id)
         if "d" in flags:
             if guild.id in following:
@@ -779,6 +790,7 @@ class FileLog(Command):
         )
 
 
+# TODO: Stop being lazy and finish this damn command
 # class Welcomer(Command):
 #     server_only = True
 #     name = ["Welcome", "JoinMessage"]
@@ -792,6 +804,7 @@ class FileLog(Command):
 #         pass
 
 
+# Just like the reminders database, the ban database needs to be this way to keep O(1) time complexity when idle.
 class UpdateBans(Database):
     name = "bans"
 
@@ -850,6 +863,7 @@ class UpdateBans(Database):
             self.update()
 
 
+# Triggers upon 3 channel deletions in 2 minutes or 6 bans in 10 seconds
 class ServerProtector(Database):
     name = "prot"
     no_file = True
@@ -925,6 +939,7 @@ class ServerProtector(Database):
 class UpdateUserLogs(Database):
     name = "logU"
 
+    # Send a member update globally for all user updates
     async def _user_update_(self, before, after, **void):
         for guild in self.bot.client.guilds:
             create_task(self._member_update_(before, after, guild))
@@ -932,6 +947,7 @@ class UpdateUserLogs(Database):
     async def _member_update_(self, before, after, guild=None):
         if guild is None:
             guild = after.guild
+        # Make sure user is in guild
         try:
             memb = guild.get_member(after.id)
             if memb is None:
@@ -958,6 +974,7 @@ class UpdateUserLogs(Database):
                 + "> has been updated:"
             )
             colour = [0] * 3
+            # Add fields for every update to the member data
             change = False
             if str(before) != str(after):
                 emb.add_field(
@@ -1021,6 +1038,7 @@ class UpdateUserLogs(Database):
                 self.data.pop(guild.id)
                 self.update()
                 return
+            # Colour: White
             emb = discord.Embed(colour=16777214)
             url = bestURL(user)
             emb.set_author(name=str(user), icon_url=url, url=url)
@@ -1040,9 +1058,11 @@ class UpdateUserLogs(Database):
                 self.data.pop(guild.id)
                 self.update()
                 return
+            # Colour: Black
             emb = discord.Embed(colour=1)
             url = bestURL(user)
             emb.set_author(name=str(user), icon_url=url, url=url)
+            # Check audit log to find whether user left or was kicked/banned
             kick = None
             ban = None
             try:
@@ -1101,14 +1121,15 @@ class UpdateMessageLogs(Database):
                 self.dc.pop(h)
         if not self.searched:
             self.searched = True
-            lim = floor(1048576 / len(self.bot.client.guilds))
-            return [create_task(self.bot.database.counts.getGuildHistory(guild, 65536, callback=self.callback)) for guild in self.bot.cache.guilds.values()]
+            lim = floor(2097152 / len(self.bot.client.guilds))
+            return [create_task(self.bot.database.counts.getGuildHistory(guild, lim, callback=self.callback)) for guild in self.bot.cache.guilds.values()]
     
     def callback(self, messages, **void):
         messages = [self.bot.cacheMessage(message) for message in messages]
         create_future_ex(self.bot.updateClient)
         return messages
 
+    # Edit events are rather straightforward to log
     async def _edit_(self, before, after, **void):
         if not after.author.bot:
             guild = before.guild
@@ -1124,7 +1145,7 @@ class UpdateMessageLogs(Database):
                 name = u.name
                 name_id = name + bool(u.display_name) * ("#" + u.discriminator)
                 url = bestURL(u)
-                emb = discord.Embed(colour=colour2Raw([0, 0, 255]))
+                emb = discord.Embed(colour=colour2Raw(0, 0, 255))
                 emb.set_author(name=name_id, icon_url=url, url=url)
                 emb.description = (
                     "**Message edited in** <#"
@@ -1134,6 +1155,7 @@ class UpdateMessageLogs(Database):
                 emb.add_field(name="After", value=strMessage(after))
                 self.bot.embedSender(channel, emb)
 
+    # Delete events must attempt to find the user who deleted the message
     async def _delete_(self, message, bulk=False, **void):
         cu_id = self.bot.client.user.id
         if bulk:
@@ -1166,6 +1188,7 @@ class UpdateMessageLogs(Database):
                     t = self.bot.client.user
                     init = "<@" + str(t.id) + ">"
                 else:
+                    # Attempt to find who deleted the message
                     if not guild.get_member(cu_id).guild_permissions.view_audit_log:
                         raise PermissionError
                     al = await guild.audit_logs(
@@ -1174,6 +1197,7 @@ class UpdateMessageLogs(Database):
                     ).flatten()
                     for e in reversed(al):
                         # print(e, e.target, now - e.created_at)
+                        # This is because message delete events stack
                         try:
                             cnt = e.extra.count
                         except AttributeError:
@@ -1195,7 +1219,7 @@ class UpdateMessageLogs(Database):
                                 init = "<@" + str(t.id) + ">"
             except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
-            emb = discord.Embed(colour=colour2Raw([255, 0, 0]))
+            emb = discord.Embed(colour=colour2Raw(255, 0, 0))
             emb.set_author(name=name_id, icon_url=url, url=url)
             emb.description = (
                 init + " **deleted message from** <#"
@@ -1204,6 +1228,7 @@ class UpdateMessageLogs(Database):
             emb.description += strMessage(message, limit=2048 - len(emb.description))
             self.bot.embedSender(channel, emb)
 
+    # Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
     async def _bulk_delete_(self, messages, **void):
         cu = self.bot.client.user
         cu_id = cu.id
@@ -1224,6 +1249,7 @@ class UpdateMessageLogs(Database):
                     t = self.bot.client.user
                     init = "<@" + str(t.id) + ">"
                 else:
+                    # Attempt to find who deleted the messages
                     if not guild.get_member(cu_id).guild_permissions.view_audit_log:
                         raise PermissionError
                     al = await guild.audit_logs(
@@ -1232,6 +1258,7 @@ class UpdateMessageLogs(Database):
                     ).flatten()
                     for e in reversed(al):
                         # print(e, e.target, now - e.created_at)
+                        # For some reason bulk message delete events stack too
                         try:
                             cnt = e.extra.count
                         except AttributeError:
@@ -1251,7 +1278,7 @@ class UpdateMessageLogs(Database):
                                 init = "<@" + str(t.id) + ">"
             except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
-            emb = discord.Embed(colour=colour2Raw([255, 0, 255]))
+            emb = discord.Embed(colour=colour2Raw(255, 0, 255))
             emb.description = (
                 init + " **deleted " + str(len(messages)) + " message" + "s" * (len(messages) != 1) + " from** <#"
                 + str(messages[-1].channel.id) + ">:"
@@ -1262,7 +1289,7 @@ class UpdateMessageLogs(Database):
                 name = u.name
                 name_id = name + bool(u.display_name) * ("#" + u.discriminator)
                 url = bestURL(u)
-                emb = discord.Embed(colour=colour2Raw([127, 0, 127]))
+                emb = discord.Embed(colour=colour2Raw(127, 0, 127))
                 emb.set_author(name=name_id, icon_url=url, url=url)
                 emb.description = strMessage(message, limit=2048)
                 embs.append(emb)
@@ -1287,6 +1314,7 @@ class UpdateFileLogs(Database):
                     self.data.pop(guild.id)
                     self.update()
                     return
+                # Attempt to recover files from their proxy URLs, otherwise send the proxy URLs
                 msg = ""
                 fils = []
                 for a in message.attachments:
@@ -1344,6 +1372,7 @@ class UpdateAutoRoles(Database):
 
     async def _join_(self, user, guild, **void):
         if guild.id in self.data:
+            # Do not apply autorole to users who have roles from role preservers
             try:
                 if user.id in self.bot.data.rolepreservers[guild.id]:
                     return
@@ -1358,6 +1387,7 @@ class UpdateAutoRoles(Database):
                 except:
                     print(traceback.format_exc())
             print("AutoRole", user, roles)
+            # Attempt to add all roles in one API call
             try:
                 await user.add_roles(*roles, reason="AutoRole", atomic=False)
             except discord.Forbidden:
@@ -1380,6 +1410,7 @@ class UpdateRolePreservers(Database):
                     except:
                         print(traceback.format_exc())
                 print("RolePreserver", user, roles)
+                # Attempt to add all roles in one API call
                 try:
                     await user.edit(roles=roles, reason="RolePreserver")
                 except discord.Forbidden:
@@ -1391,6 +1422,7 @@ class UpdateRolePreservers(Database):
 
     async def _leave_(self, user, guild, **void):
         if guild.id in self.data:
+            # roles[0] is always @everyone
             roles = user.roles[1:]
             if roles:
                 assigned = [role.id for role in roles]

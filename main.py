@@ -1,7 +1,9 @@
+# Loads the install_update module, which makes sure all required libraries are installed to their required versions.
 from install_update import os, traceback, python
 
 
-if "auth.json" not in os.listdir():
+# Makes sure an authentication file exists.
+if not os.path.exists("auth.json"):
     print("Authentication file not found. Generating empty template...")
     f = open("auth.json", "wb")
     d = {
@@ -26,14 +28,16 @@ if "auth.json" not in os.listdir():
 
 import time, datetime, psutil
 
+# Required on Windows to display terminal colour codes? 🤔
 try:
     os.system("color")
 except:
     traceback.print_exc()
 
 
+# Repeatedly attempts to delete a file, waiting 1 second between attempts.
 def delete(f):
-    while f in os.listdir():
+    while os.path.exists(f):
         try:
             os.remove(f)
             break
@@ -41,12 +45,14 @@ def delete(f):
             traceback.print_exc()
         time.sleep(1)
 
-sd = "shutdown.json"
-rs = "restart.json"
-hb = "heartbeat.json"
+sd = "shutdown.tmp"
+rs = "restart.tmp"
+hb = "heartbeat.tmp"
 
 delete(sd)
 
+
+# Main watchdog loop.
 att = 0
 while not os.path.exists(sd):
     delete(rs)

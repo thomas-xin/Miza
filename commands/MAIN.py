@@ -6,9 +6,8 @@ except ModuleNotFoundError:
     from common import *
 
 
-f = open("auth.json")
-auth = ast.literal_eval(f.read())
-f.close()
+with open("auth.json") as f:
+    auth = ast.literal_eval(f.read())
 try:
     discord_id = auth["discord_id"]
     if not discord_id:
@@ -18,6 +17,7 @@ except:
     print("WARNING: discord_id not found. Unable to automatically generate bot invites.")
 
 
+# Default and standard command categories to enable.
 default_commands = ["main", "string", "admin"]
 standard_commands = default_commands + ["voice", "image", "game"]
 
@@ -33,11 +33,11 @@ class Help(Command):
         enabled = bot.data.enabled
         g_id = guild.id
         prefix = bot.getPrefix(g_id)
-        enabled = enabled.get(channel.id, list(default_commands))
         v = "v" in flags
         emb = discord.Embed(colour=randColour())
         emb.set_author(name="❓ Help ❓")
         found = {}
+        # Get help on categories, then commands
         for a in args:
             a = a.lower()
             if a in bot.categories:
@@ -52,6 +52,7 @@ class Help(Command):
                 else:
                     found[com.__name__] = hlist([com])
         if found:
+            # Display list of found commands in an embed
             i = 0
             for k in found:
                 if i >= 25:
@@ -76,6 +77,7 @@ class Help(Command):
                     )
                 i += 1
         else:
+            # Display main help page in an embed
             emb.description = (
                 "Please enter a command category to display usable commands,\nor see "
                 + "[Commands](https://github.com/thomas-xin/Miza/wiki/Commands) for full command list."
@@ -92,6 +94,7 @@ class Hello(Command):
     description = "Sends a waving emoji. Useful for checking whether the bot is online."
     
     async def __call__(self, **void):
+        # yay
         return "👋"
 
 
@@ -103,6 +106,7 @@ class Perms(Command):
     flags = "fh"
 
     async def __call__(self, bot, args, user, perm, guild, flags, **void):
+        # Get target user from first argument
         if len(args) < 1:
             t_user = user
         else:
@@ -121,6 +125,7 @@ class Perms(Command):
                         raise LookupError("No results for " + str(u_id))
         print(t_user)
         t_perm = roundMin(bot.getPerms(t_user.id, guild))
+        # If permission level is given, attempt to change permission level, otherwise get current permission level
         if len(args) > 1:
             name = str(t_user)
             orig = t_perm
@@ -130,7 +135,8 @@ class Perms(Command):
             if t_perm is nan or isnan(c_perm):
                 m_perm = nan
             else:
-                m_perm = max(t_perm, abs(c_perm), 1) + 1
+                # Required permission to change is absolute level + 1, with a minimum of 3
+                m_perm = max(abs(t_perm), abs(c_perm), 2) + 1
             if not perm < m_perm and not isnan(m_perm):
                 if not m_perm < inf and guild.owner_id != user.id and not isnan(perm):
                     raise PermissionError("Must be server owner to assign non-finite permission level.")
@@ -175,6 +181,7 @@ class EnabledCommands(Command):
         update = self.data.enabled.update
         bot = self.bot
         enabled = bot.data.enabled
+        # Flags to change enabled commands list
         if "a" in flags or "e" in flags or "d" in flags:
             req = 3
             if perm < req:
@@ -290,6 +297,7 @@ class Prefix(Command):
             )
             raise self.permError(perm, req, reason)
         prefix = argv
+        # Backslash is not allowed, it is used to escape commands normally
         if prefix.startswith("\\"):
             raise TypeError("Prefix must not begin with backslash.")
         pref[guild.id] = prefix
@@ -313,12 +321,15 @@ class Loop(Command):
 
     async def __call__(self, args, argv, message, channel, callback, bot, perm, user, guild, **void):
         if not args:
+            # Ah yes, I made this error specifically for people trying to use this command to loop songs 🙃
             raise ArgumentError("Please input loop iterations and target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioSettings command.")
         num = await bot.evalMath(args[0], user)
         iters = round(num)
+        # Bot owner bypasses restrictions
         if not isnan(perm):
             if iters > 32 and not bot.isTrusted(guild.id):
                 raise PermissionError("Must be in a trusted server to execute loop of more than 32 iterations.")
+            # Required level is 1/3 the amount of loops required, rounded up
             scale = 3
             limit = perm * scale
             if iters > limit:
@@ -334,6 +345,7 @@ class Loop(Command):
             while func[0] == " ":
                 func = func[1:]
         if not isnan(perm):
+            # Detects when an attempt is made to loop the loop command
             for n in self.name:
                 if (
                     (bot.getPrefix(guild) + n).upper() in func.replace(" ", "").upper()
@@ -353,7 +365,9 @@ class Loop(Command):
         for i in range(iters):
             loop = i < iters - 1
             t = utc()
+            # Calls processMessage with the argument containing the looped command.
             delay = await callback(message, func, cb_argv=func2, loop=loop)
+            # Must abide by command rate limit rules
             delay = delay + t - utc()
             if delay > 0:
                 await asyncio.sleep(delay)
@@ -366,6 +380,7 @@ class Avatar(Command):
     usage = "<user>"
 
     async def getGuildData(self, g):
+        # Gets icon display of a server and returns as an embed.
         url = strURL(g.icon_url)
         name = g.name
         emb = discord.Embed(colour=randColour())
@@ -376,6 +391,7 @@ class Avatar(Command):
         return dict(embed=emb)
 
     def getMimicData(self, p):
+        # Gets icon display of a mimic and returns as an embed.
         url = strURL(p.url)
         name = p.name
         emb = discord.Embed(colour=randColour())
@@ -387,6 +403,7 @@ class Avatar(Command):
 
     async def __call__(self, argv, guild, bot, client, user, **void):
         g, guild = guild, None
+        # This is a mess 🙃
         if argv:
             try:
                 u_id = verifyID(argv)
@@ -477,6 +494,7 @@ class Info(Command):
             pcount = 0
         try:
             if "v" in flags:
+                # Top users by message counts
                 pavg = await bot.database.counts.getUserAverage(None, g)
                 users = deque()
                 us = await bot.database.counts.getGuildMessages(g)
@@ -554,6 +572,7 @@ class Info(Command):
     async def __call__(self, argv, name, guild, channel, bot, client, user, flags, **void):
         member = True
         g, guild = guild, None
+        # This is a mess 🙃
         if argv:
             try:
                 u_id = verifyID(argv)
@@ -642,6 +661,7 @@ class Info(Command):
         if "v" in flags:
             try:
                 if is_self:
+                    # Count total commands used by all users
                     c = {}
                     for i, v in enumerate(tuple(bot.data.users.values()), 1):
                         try:
@@ -747,6 +767,7 @@ class Info(Command):
             emb.add_field(name="Server rank", value=str(pos), inline=1)
         if role:
             emb.add_field(name="Roles", value=role, inline=0)
+        # Double verbose option sends an activity graph
         if flags.get("v", 0) > 1:
             fut = create_task(channel.trigger_typing())
             fut2 = create_task(channel.send(embed=emb))
@@ -904,6 +925,7 @@ class Reminder(Command):
                 + noHighlight(sendable) + "].```"
             )
         if not argv:
+            # Set callback message for scrollable list
             return (
                 "```" + "\n" * ("z" in flags) + "callback-main-reminder-"
                 + str(user.id) + "_0_" + str(sendable.id)
@@ -911,6 +933,7 @@ class Reminder(Command):
             )
         if len(rems) >= 64:
             raise OverflowError("You have reached the maximum of 64 " + word + ". Please remove one to add another.")
+        # This parser is so unnecessarily long for what it does...
         keyed = False
         while True:
             temp = argv.lower()
@@ -925,16 +948,18 @@ class Reminder(Command):
                 temp = argv.lower()
             spl = None
             keywords = dict(self.keydict)
+            # Reversed regex search
             temp2 = temp[::-1]
             for k in tuple(keywords):
                 try:
                     i = re.search(k, temp2).end()
                     if not i:
-                        raise ValueError("substring not found")
+                        raise ValueError
                 except (ValueError, AttributeError):
                     keywords.pop(k)
                 else:
                     keywords[k] = i
+            # Sort found keywords by position
             indices = sorted(keywords, key=lambda k: keywords[k])
             if indices:
                 foundkey = {self.keywords[tuple(self.keydict).index(indices[0])]: True}
@@ -1016,6 +1041,7 @@ class Reminder(Command):
         url = bestURL(user)
         ts = utc()
         if keyed:
+            # Schedule for an event from a user
             rems.append(cdict(
                 user=user.id,
                 msg=msg,
@@ -1026,16 +1052,20 @@ class Reminder(Command):
             seq = setDict(bot.data.reminders, s, deque())
             seq.append(sendable.id)
         else:
+            # Schedule for an event at a certain time
             rems.append(cdict(
                 user=user.id,
                 msg=msg,
                 t=t + ts,
             ))
+        # Sort list of reminders
         bot.data.reminders[sendable.id] = sort(rems, key=lambda x: x["t"])
         try:
+            # Remove existing schedule
             bot.database.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
         except IndexError:
             pass
+        # Insert back into bot schedule
         bot.database.reminders.listed.insort((bot.data.reminders[sendable.id][0]["t"], sendable.id), key=lambda x: x[0])
         update()
         emb = discord.Embed(description=msg)
@@ -1115,6 +1145,7 @@ class Reminder(Command):
                 await asyncio.sleep(0.5)
 
 
+# This database is such a hassle to manage, it has to be able to persist between bot restarts, and has to be able to update with O(1) time complexity when idle
 class UpdateReminders(Database):
     name = "reminders"
     no_delete = True
@@ -1122,31 +1153,40 @@ class UpdateReminders(Database):
 
     def __load__(self):
         d = self.data
+        # This exists so that checking next scheduled item is O(1)
         self.listed = hlist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str), key=lambda x: x[0]))
 
+    # Fast call: runs 7 times per second
     async def _call_(self):
         t = utc()
         while self.listed:
             p = self.listed[0]
+            # Only check first item in the schedule
             if t < p[0]:
                 break
+            # Grab expired item
             self.listed.popleft()
             u_id = p[1]
             temp = self.data[u_id]
             if not temp:
                 self.data.pop(u_id)
                 continue
+            # Check next item in schedule
             x = temp[0]
             if t < x["t"]:
+                # Insert back into schedule if not expired
                 self.listed.insort((x["t"], u_id), key=lambda x: x[0])
                 print(self.listed)
                 continue
+            # Grab target from database
             x = cdict(temp.pop(0))
             if not temp:
                 self.data.pop(u_id)
             else:
+                # Insert next listed item into schedule
                 self.listed.insort((temp[0]["t"], u_id), key=lambda x: x[0])
             # print(self.listed)
+            # Send reminder to target user/channel
             ch = await self.bot.fetch_sendable(u_id)
             emb = discord.Embed(description=x.msg)
             try:
@@ -1157,15 +1197,18 @@ class UpdateReminders(Database):
             self.bot.embedSender(ch, emb)
             self.update()
 
+    # Seen event: runs when users perform discord actions
     async def _seen_(self, user, **void):
         s = "$" + str(user.id)
         if s in self.data:
             assigned = self.data[s]
+            # Ignore user events without assigned triggers
             if not assigned:
                 self.data.pop(s)
                 return
             try:
                 for u_id in assigned:
+                    # Send reminder to all targeted users/channels
                     ch = await self.bot.fetch_sendable(u_id)
                     rems = setDict(self.data, u_id, [])
                     pops = {}
@@ -1195,6 +1238,7 @@ class UpdateReminders(Database):
                 pass
 
 
+# This database has caused so many rate limit issues
 class UpdateMessageCount(Database):
     name = "counts"
 
@@ -1284,19 +1328,24 @@ class UpdateMessageCount(Database):
             create_task(self.getUserMessageCount(guild))
         return "Calculating..."
 
+    # What are the rate limits for the message history calls?
     async def getChannelHistory(self, channel, limit=None, callback=None):
+        # Semaphore of 32, idk if this is enough
         while self.req > 32:
             await asyncio.sleep(4)
         self.req += 1
         try:
             messages = []
+            # 16 attempts to download channel
             for i in range(16):
                 history = channel.history(limit=limit, oldest_first=(limit is None))
                 try:
                     messages = await history.flatten()
                 except discord.Forbidden:
+                    # Don't attempt any more if the response was forbidden
                     break
                 except discord.HTTPException as ex:
+                    # Wait longer between attempts if the error was a rate limit
                     if "429" in str(ex):
                         await asyncio.sleep(20 * (i ** 2 + 1))
                     else:
@@ -1378,6 +1427,7 @@ class UpdateMessageCount(Database):
                     i += 1
         self.scanned = -1
 
+    # Add new messages to the post count database
     def _send_(self, message, **void):
         if self.scanned == -1:
             user = message.author
@@ -1400,10 +1450,12 @@ class UpdateMessageCount(Database):
 class UpdatePrefix(Database):
     name = "prefixes"
 
+    # This is O(n) so it's on the lazy loop
     async def __call__(self):
         for g in tuple(self.data):
             if self.data[g] == self.bot.prefix:
                 self.data.pop(g)
+                self.update()
 
 
 class UpdateEnabled(Database):
@@ -1412,6 +1464,7 @@ class UpdateEnabled(Database):
 
 EMPTY = {}
 
+# This database takes up a lot of space, storing so many events from users
 class UpdateUsers(Database):
     name = "users"
     suspected = "users.json"
@@ -1442,6 +1495,7 @@ class UpdateUsers(Database):
 
     fetch_events = lambda self, u_id, interval=3600: {i: self.get_events(u_id, interval=interval, event=i) for i in ("message", "typing", "command", "reaction", "misc")}
 
+    # Get all events of a certain type from a certain user, with specified intervals.
     def get_events(self, u_id, interval=3600, event=None):
         data = self.data.get(u_id, EMPTY).get("recent")
         if not data:
@@ -1459,12 +1513,14 @@ class UpdateUsers(Database):
             out = [sum(out[i:i + factor]) for i in range(0, len(out), factor)]
         return out
 
+    # User seen, add event to activity database
     def _seen_(self, user, delay, event, count=1, raw=None, **void):
         self.send_event(user.id, event, count=count)
         addDict(self.data, {user.id: {"last_seen": 0}})
         self.data[user.id]["last_seen"] = utc() + delay
         self.data[user.id]["last_action"] = raw
 
+    # User executed command, add to activity database
     def _command_(self, user, command, **void):
         self.send_event(user.id, "command")
         addDict(self.data, {user.id: {"commands": {str(command): 1}}})

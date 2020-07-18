@@ -12,12 +12,10 @@ plt.rcParams["figure.figsize"] = (6.4, 4.8)
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
 
 
+# For debugging only
 def filePrint(*args, sep=" ", end="\n", prefix="", file="log.txt", **void):
-    f = open(file, "ab")
-    s = (str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix)).encode("utf-8")
-    f.write(s)
-    f.close()
-    return s
+    with open(file, "ab") as f:
+        f.write((str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix)).encode("utf-8"))
 
 def logging(func):
     def call(self, *args, file="log.txt", **kwargs):
@@ -41,12 +39,12 @@ def tryWrapper(func):
             print(traceback.format_exc())
     return __call__
 
+# Brainfuck parser below borrowed from:
 
 #!/usr/bin/python
 #
 # Brainfuck Interpreter
 # Copyright 2011 Sebastian Kaspari
-
 
 def evaluate(code):
     out = collections.deque()
@@ -91,6 +89,7 @@ def buildbracemap(code):
 
 BF_ALIAS = ("bf", "brainfuck")
 
+# Enclose in string if possible
 def bf_parse(s):
     for a in BF_ALIAS:
         try:
@@ -106,12 +105,12 @@ def bf_parse(s):
                     v, s = s[:i], s[i:]
                     e = s.index(")")
                     s = v + '"' + s[:e] + '"' + s[e:]
-    filePrint(s)
     return s
 
 _bf = lambda s: evaluate(s)
 
 
+# Randomizer
 class dice(sympy.Basic):
 
     def __init__(self, a=None, b=None):
@@ -161,6 +160,7 @@ special_colours = {
     "misc": (1, 0, 0),
 }
 
+# For the ~activity command.
 def plt_special(d, user, **void):
     plt.rcParams["figure.figsize"] = (24, 12)
     temp = numpy.zeros(len(next(iter(d.values()))))
@@ -177,6 +177,8 @@ def plt_special(d, user, **void):
     plt.legend(loc="upper left")
     return plt
 
+
+# Sympy plotting functions
 def plotArgs(args):
     if type(args[0]) in (tuple, list):
         args = list(args)
@@ -226,17 +228,20 @@ def plot3d_parametric_surface(*args, **kwargs):
         kwargs.pop("show")
     return plotter.plot3d_parametric_surface(*plotArgs(args), show=False, **kwargs)
 
+# Multiple variable limit
 def lim(f, **kwargs):
     for i in kwargs:
         f = sympy.limit(f, i, kwargs[i])
     return f
 
+# May integrate a spline
 def integrate(*args, **kwargs):
     try:
         return sympy.integrate(*args, **kwargs)
     except ValueError:
         return sympy.integrate(*plotArgs(args), sympy.Symbol("x"))
 
+# TODO: Implement a SIQS or ECM factorization algorithm, SymPy's one can be rather slow
 def factorize(*args, **kwargs):
     temp = sympy.factorint(*args, **kwargs)
     output = []
@@ -247,7 +252,7 @@ def factorize(*args, **kwargs):
 
 def rounder(x):
     try:
-        if x == int(x):
+        if type(x) is int or x == int(x):
             return int(x)
         f = int(round(x))
         if x == f:
@@ -258,6 +263,7 @@ def rounder(x):
 
 locked = True
 
+# eval is dangerous to use when taking arbitrary input from users, but they won't guess the SHA256 key, will they? :3
 def _eval(func, glob=None, loc=None, key=None, **void):
     if glob is None:
         glob = globals()
@@ -270,6 +276,7 @@ def _eval(func, glob=None, loc=None, key=None, **void):
     return exec(func, glob, loc)
 
 
+# Allowed functions for ~math
 _globals = dict(sympy.__dict__)
 plots = (
     "plot",
@@ -342,6 +349,7 @@ sym_tr += (
     parser.rationalize,
 )
 
+# Mathematical symbols
 translators = {
     "√": "sqrt ",
     "°": " deg",
@@ -403,6 +411,8 @@ replacers = {
 ftrans = "".maketrans(translators)
 
 
+# Use more conventional names for non-finite outputs
+
 def convAns(f):
     return str(f).replace("zoo", "nan").replace("oo", "inf")
 
@@ -415,6 +425,7 @@ def prettyAns(f):
     ).replace("zoo", "ℂ∞").replace("nan", "NaN").replace("⋅", "∙")
 
 
+# Main math equation solver
 @logging
 def evalSym(f, prec=64, r=False):
     global BF_PREC
@@ -424,6 +435,7 @@ def evalSym(f, prec=64, r=False):
     f, y = f.translate(ftrans), f
     for i in replacers:
         f = f.replace(i, replacers[i])
+    # Attempt to parse as SymPy expression, then as LaTeX if possible
     try:
         if "\\" in y:
             raise SyntaxError
@@ -439,6 +451,7 @@ def evalSym(f, prec=64, r=False):
             f = latex.parse_latex(y)
         except:
             f = latex.parse_latex(f)
+    # Solve any sums and round off floats when possible
     for i in sympy.preorder_traversal(f):
         if issubclass(type(i), sympy.Number):
             try:
@@ -450,12 +463,14 @@ def evalSym(f, prec=64, r=False):
                 f = f.subs(i, i.doit())
             except:
                 pass
+    # If the requested expression evaluates to a plot, return it
     if isinstance(f, Plot) or f == plt or type(f) is str:
         return (f,)
     try:
         f = sympy.simplify(f)
     except:
         pass
+    # Solve any sums and round off floats when possible
     for i in sympy.preorder_traversal(f):
         try:
             f = f.subs(i, rounder(i))
@@ -466,6 +481,7 @@ def evalSym(f, prec=64, r=False):
                 f = f.subs(i, i.doit())
             except:
                 pass
+    # Select list of answers to return based on the desired float precision level
     if prec:
         try:
             y = f.evalf(prec, chop=True)
@@ -495,6 +511,7 @@ def evalSym(f, prec=64, r=False):
 
 
 if __name__ == "__main__":
+    # SHA256 key always taken on startup
     key = eval(sys.stdin.readline()).decode("utf-8", "replace").strip()
     while True:
         try:
@@ -505,6 +522,7 @@ if __name__ == "__main__":
                 if key_in == key:
                     locked = False
             resp = evalSym(*args)
+            # Return file path if necessary
             if isinstance(resp[0], Plot):
                 plt.rcParams["figure.figsize"] = (6.4, 4.8)
                 ts = round(time.time() * 1000)
@@ -539,6 +557,7 @@ if __name__ == "__main__":
             sys.stdout.write(repr(b) + "\n")
             sys.stdout.flush()
         except Exception as ex:
+            # Exceptions are evaluated and handled by main process
             sys.stdout.write(repr(ex) + "\n")
             sys.stdout.flush()
         time.sleep(0.01)

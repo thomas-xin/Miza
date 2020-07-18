@@ -44,7 +44,7 @@ eval_const = {
 }
 null = None
 i = I = j = J = 1j
-pi = mp.pi
+π = pi = mp.pi
 E = e = mp.e
 c = 299792458
 lP = 1.61625518e-35
@@ -71,6 +71,7 @@ true, false = True, False
 nop = lambda *void1, **void2: None
 
 
+# Shuffles an iterable, in-place if possible, returning it.
 def shuffle(it):
     if type(it) is list:
         random.shuffle(it)
@@ -106,6 +107,7 @@ def shuffle(it):
         except TypeError:
             raise TypeError("Shuffling " + type(it) + " is not supported.")
 
+# Reverses an iterable, in-place if possible, returning it.
 def reverse(it):
     if type(it) is list:
         return list(reversed(it))
@@ -134,6 +136,7 @@ def reverse(it):
         except TypeError:
             raise TypeError("Reversing " + type(it) + " is not supported.")
 
+# Sorts an iterable with an optional key, in-place if possible, returning it.
 def sort(it, key=None, reverse=False):
     if type(it) is list:
         it.sort(key=key, reverse=reverse)
@@ -224,11 +227,13 @@ ln = mpmath.ln
 frac = sympy.frac
 
 
+# Returns a generator iterating through bits and their respective positions in an int.
 bits = lambda x: (i for i in range((x if type(x) is int else int(x)).bit_length()) if x & (1 << i))
 
 
+# Returns the integer floor square root of a number.
 def isqrt(x):
-    x = int(x)
+    x = x if type(x) is int else int(x)
     y = (x << 2) // 3
     b = y.bit_length()
     a = b >> 1
@@ -247,6 +252,7 @@ def isqrt(x):
     return c
 
 
+# Rounds a number to a certain amount of decimal places.
 def round(x, y=None):
     try:
         if isValid(x):
@@ -268,14 +274,17 @@ def round(x, y=None):
     except:
         return x
 
+# Rounds a number to the nearest integer, with a probability determined by the fractional part.
 def round_random(x):
-    if x == round(x):
-        return round(x)
+    y = roundMin(x)
+    if type(y) is int:
+        return y
     x, y = divmod(x, 1)
     if random.random() <= y:
         x += 1
     return int(x)
 
+# Returns integer ceiling value of x, for all complex x.
 def ceil(x):
     try:
         return math.ceil(x)
@@ -287,6 +296,7 @@ def ceil(x):
     except:
         return x
 
+# Returns integer floor value of x, for all complex x.
 def floor(x):
     try:
         return math.floor(x)
@@ -298,6 +308,7 @@ def floor(x):
     except:
         return x
 
+# Returns integer truncated value of x, for all complex x.
 def trunc(x):
     try:
         return math.trunc(x)
@@ -310,27 +321,35 @@ def trunc(x):
         return x
 
 
+# Square wave function with period 2π.
 sqr = lambda x: ((sin(x) >= 0) << 1) - 1
 
+# Saw wave function with period 2π.
 saw = lambda x: (x / pi + 1) % 2 - 1
 
+# Triangle wave function with period 2π.
 tri = lambda x: (abs((0.5 - x / pi) % 2 - 1)) * 2 - 1
 
-sgn = lambda x: (((x > 0) << 1) - 1) * (x != 0)
 
+# Sign function of a number.
+sgn = lambda x: 1 if x > 0 else (-1 if x < 0 else 0)
 
+# Floating point random function.
 frand = lambda x=1, y=0: (random.random() * max(x, y) / mpf(random.random())) % x + y
 
+# Integer random function.
 def xrand(x, y=None, z=0):
-    if y == None:
+    if y is None:
         y = 0
     if x == y:
         return x
     return random.randint(floor(min(x, y)), ceil(max(x, y)) - 1) + z
 
+# Returns a floating point number reduced to a power.
 rrand = lambda x=1, y=0: frand(x) ** (1 - y)
 
 
+# Computes modular inverse of two integers.
 def modularInv(a, b):
     if b == 0:
         return (1, a)
@@ -344,6 +363,7 @@ def modularInv(a, b):
     return (x, 1)
 
 
+# Computes Pisano period of an integer.
 def pisanoPeriod(x):
     a, b = 0, 1
     for i in range(0, x * x):
@@ -352,6 +372,7 @@ def pisanoPeriod(x):
             return i + 1
 
 
+# Computes Jacobi value of two numbers.
 def jacobi(a, n):
     if a == 0 or n < 0:
         return 0
@@ -382,6 +403,7 @@ def jacobi(a, n):
     return 0
 
 
+# Generator that iterates through numbers 6n±1
 def next6np(start=0):
     if start <= 2:
         yield 2
@@ -396,6 +418,7 @@ def next6np(start=0):
         x += 6
 
 
+# Checks if a number is prime using multiple probability tests limited to O(log^2(n)) iterations.
 def isPrime(n):
     
     def divisibility(n):
@@ -480,6 +503,7 @@ def isPrime(n):
         return True
     return None
 
+# Generates a number of prime numbers between a and b.
 def generatePrimes(a=2, b=inf, c=1):
     primes = hlist()
     a = round(a)
@@ -500,6 +524,7 @@ def generatePrimes(a=2, b=inf, c=1):
     return primes
 
 
+# Returns the sum of an iterable, using the values rather than keys for dictionaries.
 def iterSum(it):
     if issubclass(type(it), collections.abc.Mapping):
         return sum(tuple(it.values()))
@@ -508,6 +533,7 @@ def iterSum(it):
     except TypeError:
         return it
 
+# Returns the maximum value of an iterable, using the values rather than keys for dictionaries.
 def iterMax(it):
     if issubclass(type(it), collections.abc.Mapping):
         keys, values = tuple(it.keys()), tuple(it.values())
@@ -520,6 +546,7 @@ def iterMax(it):
     except TypeError:
         return it
 
+# This is faster than dict.setdefault apparently
 def setDict(d, k, v, ignore=False):
     try:
         v = d.__getitem__(k)
@@ -529,6 +556,7 @@ def setDict(d, k, v, ignore=False):
         d.__setitem__(k, v)
     return v
 
+# Adds two dictionaries similar to dict.update, but adds conflicting values rather than replacing.
 def addDict(a, b, replace=True, insert=None):
     if type(a) is not dict:
         if replace:
@@ -567,6 +595,7 @@ def addDict(a, b, replace=True, insert=None):
             r[k] = b[k] + temp
     return r
 
+# Increments a key value pair in a dictionary, replacing if nonexistent.
 def incDict(d, **kwargs):
     for k, v in kwargs.items():
         try:
@@ -575,6 +604,7 @@ def incDict(d, **kwargs):
             d[k] = v
     return d
 
+# Subtracts a list of keys from a dictionary.
 def subDict(d, key):
     output = dict(d)
     try:
@@ -589,20 +619,24 @@ def subDict(d, key):
     return output
 
 
+# Casts a number to integers if the conversion would not alter the value.
 def roundMin(x):
+    if type(x) is int:
+        return x
     if type(x) is not complex:
-        if isValid(x) and x == int(x):
-            return int(x)
-        else:
-            return x
+        if isValid(x):
+            y = math.round(x)
+            if x == y:
+                return int(y)
+        return x
     else:
-        x = complex(x)
         if x.imag == 0:
             return roundMin(x.real)
         else:
             return roundMin(complex(x).real) + roundMin(complex(x).imag) * (1j)
 
 
+# Rounds a number to various fractional positions if possible.
 def closeRound(n):
     rounds = [0.125, 0.375, 0.625, 0.875, 0.25, 0.5, 0.75, 1 / 3, 2 / 3]
     a = math.floor(n)
@@ -614,6 +648,7 @@ def closeRound(n):
     return mpf(a + c)
 
 
+# Converts a float to a fraction represented by a numerator/denominator pair.
 def toFrac(num, limit=2147483647):
     if num >= limit:
         return [limit, 1]
@@ -627,6 +662,7 @@ def toFrac(num, limit=2147483647):
     return frac
 
 
+# Computes the greatest common denominator of two numbers.
 def gcd(x, y=1):
     if y != 1:
         while y > 0:
@@ -634,6 +670,7 @@ def gcd(x, y=1):
         return x
     return x
 
+# Computes the lowest common multiple of two numbers.
 def lcm2(x, y=1):
     if x != y:
         x = abs(x)
@@ -651,6 +688,7 @@ def lcm2(x, y=1):
             return toFrac(x / y)[0]
     return x
 
+# Computes the lowest common multiple of numbers in an arbitrary amount of inputs.
 def lcm(*x):
     try:
         while True:
@@ -670,9 +708,11 @@ def lcmRange(x):
     return y
 
 
-mean = lambda *nums: roundMin(np.mean(np.array(nums)))
+# Computes the mean of all numbers in an iterable.
+mean = lambda *nums: roundMin(np.mean(nums))
 
 
+# Raises a number to a power, keeping sign.
 def pwr(x, power=2):
     if x.real >= 0:
         return roundMin(x ** power)
@@ -680,6 +720,7 @@ def pwr(x, power=2):
         return roundMin(-((-x) ** power))
 
 
+# Alters the pulse width of an array representing domain values for a function with period 2π.
 def pulse(x, y=0.5):
     p = y * tau
     x *= 0.5 / len(x) * (x < p) + 0.5 / (1 - len(x)) * (x >= p)
@@ -689,17 +730,19 @@ def pulse(x, y=0.5):
 isnan = cmath.isnan
 
 
+# Checks if a number is finite in value.
 def isValid(x):
+    if type(x) is int:
+        return True
     if type(x) is complex:
         return not (cmath.isinf(x) or cmath.isnan(x))
     try:
-        if type(x) is int:
-            return True
         return x.is_finite()
     except:
         return math.isfinite(x)
 
 
+# Inverse exponential function to approach a destination smoothly.
 def approach(x, y, z, threshold=0.125):
     if z <= 1:
         x = y
@@ -710,6 +753,7 @@ def approach(x, y, z, threshold=0.125):
     return x
 
 
+# I forgot what this was for oops
 def scaleRatio(x, y):
     try:
         return x * (x - y) / (x + y)
@@ -717,20 +761,22 @@ def scaleRatio(x, y):
         return 0
 
 
+# Returns a python range object but automatically reversing if the direction is not specified.
 def xrange(a, b=None, c=None):
     if b == None:
-        b = ceil(a.real)
+        b = round(a)
         a = 0
     if c == None:
         if a > b:
             c = -1
         else:
             c = 1
-    return range(floor(a.real), ceil(b.real), c)
+    return range(floor(a), ceil(b), c)
 
 
+# Returns the Roman Numeral representation of an integer.
 def romanNumerals(num, order=0):
-    num = int(num)
+    num = num if type(num) is int else int(num)
     carry = 0
     over = ""
     sym = ""
@@ -786,6 +832,7 @@ def romanNumerals(num, order=0):
     return over + output + sym
 
 
+# Limits a string to a maximum length, cutting from the middle and replacing with ".." when possible.
 def limStr(s, maxlen=10):
     if maxlen is None:
         return s
@@ -798,6 +845,7 @@ def limStr(s, maxlen=10):
     return s
 
 
+# Returns a string representation of a number with a limited amount of characters, using scientific notation when required.
 def expNum(num, maxlen=10, decimals=0):
     if not isValid(num):
         if num.real > 0:
@@ -835,6 +883,7 @@ def expNum(num, maxlen=10, decimals=0):
         return n + s + "e+" + str(numlen)
 
 
+# Rounds a number to a certain amount of decimal places, appending 0s if the number is too short.
 def roundX(num, prec):
     if prec > 0:
         s = str(round(num.real, round(prec)))
@@ -848,29 +897,36 @@ def roundX(num, prec):
         return str(round(num.real))
 
 
-def verifyString(string):
-    if type(string) is list or type(string) is tuple:
-        return "".join(str(c) for c in string)
-    else:
-        if type(string) is not str:
-            string = str(string)
-        return string
+# Attempts to convert an iterable to a string if it isn't already
+def verifyString(s):
+    if type(s) is str:
+        return s
+    try:
+        return "".join(s)
+    except:
+        return str(s)
 
 
+# A hue to colour conversion function with maximum saturation and lightness.
 colourCalculation = lambda a, offset=0: adjColour(colorsys.hsv_to_rgb((a / 1536) % 1, 1, 1), offset, 255)
 
-def colour2Raw(c):
+# Converts a colour tuple to a single integer.
+def colour2Raw(*c):
+    while len(c) == 1:
+        c = c[0]
     if len(c) == 3:
         return (c[0] << 16) + (c[1] << 8) + c[2]
     else:
         return (c[0] << 16) + (c[1] << 8) + c[2] + (c[3] << 24)
 
+# Converts an integer to a colour tuple.
 def raw2Colour(x):
     if x > 1 << 24:
         return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255, (x >> 24) & 255))
     else:
         return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255))
 
+# Colour space conversion functions
 rgb_to_hsv = lambda c: list(colorsys.rgb_to_hsv(*c[:3])) + c[3:]
 hsv_to_rgb = lambda c: list(colorsys.hsv_to_rgb(*c[:3])) + c[3:]
 rgb_to_cmy = lambda c: [1 - x for x in c[:3]] + c[3:]
@@ -882,30 +938,37 @@ luv_to_rgb = lambda c: list(color_conversions.convert_color(color_objects.LuvCol
 rgb_to_xyz = lambda c: list(color_conversions.convert_color(color_objects.sRGBColor(*c[:3]), color_objects.XYZColor).get_value_tuple()) + c[3:]
 xyz_to_rgb = lambda c: list(color_conversions.convert_color(color_objects.XYZColor(*c[:3]), color_objects.sRGBColor).get_value_tuple()) + c[3:]
 
+# Converts hex to an colour.
 hex2Colour = lambda h: verifyColour(hex2Bytes(h))
 
+# Computes luma (observed brightness) of a colour.
 luma = lambda c: 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
 
+# Verifies a colour is valid.
 def verifyColour(c):
-    c = list(c)
+    if type(c) is not list:
+        c = list(c)
     for i in range(len(c)):
         if c[i] > 255:
             c[i] = 255
         elif c[i] < 0:
             c[i] = 0
-        c[i] = int(abs(c[i]))
+        else:
+            c[i] = int(abs(c[i]))
     return c
 
+# Generates a 3 colour tuple filled with a single value.
 def fillColour(a):
     if type(a) is complex:
         a = a.real
+    a = round(a)
     if a > 255:
         a = 255
     elif a < 0:
         a = 0
-    a = round(a)
-    return verifyColour([a, a, a])
+    return [a, a, a]
 
+# Returns a black or white background for a certain colour, using the luma value to determine which one to use.
 def negColour(c, t=127):
     i = luma(c)
     if i > t:
@@ -913,8 +976,10 @@ def negColour(c, t=127):
     else:
         return fillColour(255)
 
+# Inverts a colour.
 invColour = lambda c: [255 - i for i in c]
 
+# Adjusts a colour with optional settings.
 def adjColour(colour, brightness=0, intensity=1, hue=0, bits=0, scale=False):
     if hue != 0:
         h = list(colorsys.rgb_to_hsv(*(array(colour) / 255)))
@@ -934,6 +999,7 @@ def adjColour(colour, brightness=0, intensity=1, hue=0, bits=0, scale=False):
     return verifyColour(c)
 
 
+# Reduces a number's bit precision.
 def bitCrush(dest, b=0, f=round):
     try:
         a = 1 << b
@@ -952,8 +1018,9 @@ def bitCrush(dest, b=0, f=round):
     return dest
 
 
+# Returns the permutations of values in a list.
 def listPermutation(dest):
-    order = [0 for i in range(len(dest))]
+    order = np.zeros(len(dest))
     for i in range(len(dest)):
         for j in range(i, len(dest)):
             if dest[i] > dest[j]:
@@ -963,6 +1030,7 @@ def listPermutation(dest):
     return order
 
 
+# Evaluates an operation on multiple vectors or scalars.
 def multiVectorScalarOp(dest, operator):
     expression = "a" + operator + "b"
     function = eval("lambda a,b: " + expression)
@@ -974,6 +1042,7 @@ def multiVectorScalarOp(dest, operator):
         output.append(s)
     return output
 
+# Evaluates an operation on two vectors.
 def vectorVectorOp(dest, source, operator):
     expression = "dest[i]" + operator + "source[i]"
     function = eval("lambda dest,source,i: " + expression)
@@ -981,6 +1050,7 @@ def vectorVectorOp(dest, source, operator):
         dest[i] = function(dest, source, i)
     return dest
 
+# Evaluates an operation on a vector and a scalar.
 def vectorScalarOp(dest, source, operator):
     expression = "dest[i]" + operator + str(source)
     function = eval("lambda dest,i: " + expression)
@@ -989,6 +1059,7 @@ def vectorScalarOp(dest, source, operator):
     return dest
 
 
+# Interpolates a 1 dimensional iterable using an optional interpolation mode.
 def resizeVector(v, length, mode=5):
     size = len(v)
     new = round(length)
@@ -1015,6 +1086,7 @@ def resizeVector(v, length, mode=5):
         resized = np.mean(resizing, 0)
     return resized
 
+# Uses an optional interpolation mode to get a certain position in an iterable.
 def get(v, i, mode=5):
     size = len(v)
     i = i.real + i.imag * size
@@ -1030,12 +1102,14 @@ def get(v, i, mode=5):
         return get(v, i, floor(mode)) * (1 - mode % 1) + (mode % 1) * get(v, i, ceil(mode))
 
 
+# Computes product of values in an iterable.
 def product(*nums):
     p = 1
     for i in nums:
         p *= i
     return p
 
+# Compues dot product of one or multiple 1 dimensional values.
 def dotProduct(*vects):
     if len(vects) > 1:
         return sum(product(*(array(v) for v in vects)))
@@ -1043,6 +1117,7 @@ def dotProduct(*vects):
         return sum((i ** 2 for i in vects[-1]))
 
 
+# Clips the values in the source iterable to the values in the destination value.
 def limitList(source, dest, direction=False):
     for i in range(len(source)):
         if direction:
@@ -1054,14 +1129,17 @@ def limitList(source, dest, direction=False):
     return source
 
 
+# Generates a random polar coordinate on a circle of radius x.
 randomPolarCoord = lambda x=1: polarCoords(frand(x), frand(tau))
 
+# Converts polar coordinates to cartesian coordinates.
 def polarCoords(dist, angle, pos=None):
     p = dist * array([math.cos(angle), math.sin(angle)])
     if pos is None:
         return p
     return p + pos
 
+# Converts cartesian coordinates to polar coordinates.
 def cartesianCoords(x, y, pos=None):
     if pos is None:
         d = array(x, y)
@@ -1070,6 +1148,7 @@ def cartesianCoords(x, y, pos=None):
     return array([hypot(*d), atan2(*reversed(d))])
 
 
+# Computes a rect object using another, with an offset from each side.
 def convertRect(rect, edge=0):
     dest_rect = [rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3]]
     if dest_rect[0] > dest_rect[2]:
@@ -1082,6 +1161,7 @@ def convertRect(rect, edge=0):
     dest_rect[3] -= edge
     return dest_rect
 
+# Checks whether a point is within a rect.
 def inRect(pos, rect, edge=0):
     dest_rect = convertRect(rect, edge)
     if pos[0] - dest_rect[0] <= 0:
@@ -1094,6 +1174,7 @@ def inRect(pos, rect, edge=0):
         return False
     return True
 
+# Moves a position into a rect based on the position it should be in.
 def toRect(pos, rect, edge=0):
     p = list(pos)
     if not all(isValid(i) for i in pos):
@@ -1123,6 +1204,7 @@ def toRect(pos, rect, edge=0):
             continue
     return p, lr, ud
 
+# Moves a position into a circle around the centre of a rect if it is outside.
 def rdRect(pos, rect, edge=0):
     dest_rect = convertRect(rect, edge)
     if not inRect(pos, rect, edge):
@@ -1137,12 +1219,14 @@ def rdRect(pos, rect, edge=0):
     return pos
 
 
+# Returns the predicted position of an object with given velocity and decay at a certain time.
 def diffExpD(r, s, t):
     if r == 1:
         return s * t
     else:
         return log(s * (r ** t - 1), r)
 
+# Returns the predicted time taken for an object with given velocity and decay to reach a certain position.
 def diffExpT(r, s, d):
     coeff = d * log(r) / s + 1
     if coeff < 0:
@@ -1150,6 +1234,7 @@ def diffExpT(r, s, d):
     else:
         return log(coeff, r)
 
+# Computes approximate intercept angle for a particle, with speed and optional decay values.
 def predictTrajectory(src, dest, vel, spd, dec=1, boundary=None, edge=0):
     pos = array(dest)
     dist = hypot(*(src - dest))
@@ -1166,6 +1251,7 @@ def predictTrajectory(src, dest, vel, spd, dec=1, boundary=None, edge=0):
     return pos
 
 
+# A elastic circle collision function that takes into account masses and radii.
 def collisionCheck(pos1, pos2, vel1, vel2, mass1, mass2, radius1, radius2):
     diff = pos1 - pos2
     dist = frameDistance(pos1, pos2, -vel1, -vel2)
@@ -1202,6 +1288,7 @@ def collisionCheck(pos1, pos2, vel1, vel2, mass1, mass2, radius1, radius2):
     return hit, pos1, pos2, vel1, vel2
 
 
+# Returns the difference between two angles.
 def angleDifference(angle1, angle2, unit=tau):
     angle1 %= unit
     angle2 %= unit
@@ -1211,6 +1298,7 @@ def angleDifference(angle1, angle2, unit=tau):
     b = abs(angle2 - unit - angle1)
     return min(a, b)
 
+# Returns the distance between two angles.
 def angleDistance(angle1, angle2, unit=tau):
     angle1 %= unit
     angle2 %= unit
@@ -1220,11 +1308,13 @@ def angleDistance(angle1, angle2, unit=tau):
     return sorted((a, b, c), key=lambda x: abs(x))[0]
 
 
+# Returns the closest approach distance between two objects with constant velocity, over a certain time interval.
 def frameDistance(pos1, pos2, vel1, vel2):
     line1 = [pos1 - vel1, pos1]
     line2 = [pos2 - vel2, pos2]
     return intervalIntervalDist(line1, line2)
 
+# Returns the distance between two intervals.
 def intervalIntervalDist(line1, line2):
     if intervalsIntersect(line1, line2):
         return 0
@@ -1235,6 +1325,7 @@ def intervalIntervalDist(line1, line2):
         pointIntervalDist(line2[1], line1)]
     return min(distances)
 
+# Returns the distance between a point and an interval.
 def pointIntervalDist(point, line):
     px, py = point
     x1, x2 = line[0][0], line[1][0]
@@ -1255,6 +1346,7 @@ def pointIntervalDist(point, line):
         dy = py - y1 - t * dy
     return hypot(dx, dy)
 
+# Checks if two intervals intersect at a point.
 def intervalsIntersect(line1, line2):
     x11, y11 = line1[0]
     x12, y12 = line1[1]
@@ -1272,12 +1364,14 @@ def intervalsIntersect(line1, line2):
     return (0 <= s <= 1) and (0 <= t <= 1)
 
 
+# Evaluates an expression along a domain of input values.
 def func2Array(func, size=4096):
     function = eval("lambda x: " + str(func))
     period = 2 * pi
     array = function(np.arange(0, period, 1 / (size + 1) * period))
     return array
 
+# Computes harmonics (Fourier Transform) of an array.
 def array2Harmonics(data, precision=1024):
     output = []
     T = len(data)
@@ -1295,6 +1389,7 @@ def array2Harmonics(data, precision=1024):
             output.append(np.array((R, p)))
     return np.array(output[1 : precision + 1])
 
+# Computes an array (Inverse Fourier Transform) of an array.
 def harmonics2Array(period, harmonics, func="sin(x)"):
     expression = func
     function = eval("lambda x: " + expression)
@@ -1305,6 +1400,7 @@ def harmonics2Array(period, harmonics, func="sin(x)"):
     return result
 
 
+# Limits a string to an amount of lines.
 def limLine(s, lim):
     curr = s
     if len(curr) > lim:
@@ -1320,6 +1416,7 @@ def limLine(s, lim):
     return s
 
 
+# Removes an argument from a string, separated by spaces.
 def strGetRem(s, arg):
     if arg + " " in s:
         s = s.replace(arg + " ", "")
@@ -1331,6 +1428,7 @@ def strGetRem(s, arg):
         return s, False
 
 
+# Returns a string representation of an iterable, with options.
 def strIter(it, key=None, limit=1728, offset=0, left="[", right="]"):
     try:
         try:
@@ -1366,8 +1464,9 @@ def strIter(it, key=None, limit=1728, offset=0, left="[", right="]"):
     return limStr(s, limit)
 
 
+# Returns a copy of a mapping object, with keys cast to integers where possible.
 def intKey(d):
-    c = {}
+    c = d.__class__(d)
     for k in tuple(d):
         try:
             t = d[k]
@@ -1383,12 +1482,14 @@ def intKey(d):
     return c
 
 
+# Time functions
 utc = time.time
 utc_dt = datetime.datetime.utcnow
 ep = datetime.datetime(1970, 1, 1)
 utc_ts = lambda dt: (dt - ep).total_seconds()
 # utc_ts = lambda dt: dt.replace(tzinfo=datetime.timezone.utc).timestamp()
 
+# Values in seconds of various time intervals.
 TIMEUNITS = {
     "galactic year": 7157540528801820.28133333333333,
     "millenium": [31556925216., "millenia"],
@@ -1403,6 +1504,7 @@ TIMEUNITS = {
     "second": 1,
 }
 
+# Converts a time input in seconds to a list of time intervals.
 def timeConv(s):
     if not isValid(s):
         high = "galactic years"
@@ -1431,10 +1533,11 @@ def timeConv(s):
         return [str(roundMin(s)) + " seconds"]
     return taken
 
+# Returns the string representation of a time value in seconds, in word form.
 sec2Time = lambda s: " ".join(timeConv(s))
 
+# Returns a representation of a time interval using days:hours:minutes:seconds.
 def dhms(s):
-    s = float(s)
     if not isValid(s):
         return str(s)
     s = round(s)
@@ -1457,7 +1560,7 @@ def dhms(s):
         output = "0:" + output
     return output
 
-
+# Converts a time interval represented using days:hours:minutes:seconds, to a value in seconds.
 def rdhms(ts):
     data = ts.split(":")
     t = 0
@@ -1474,6 +1577,7 @@ def rdhms(ts):
     return t
 
 
+# Unicode fonts for alphanumeric characters.
 UNIFMTS = [
     "𝟎𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙",
     "𝟢𝟣𝟤𝟥𝟦𝟧𝟨𝟩𝟪𝟫𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩",
@@ -1501,11 +1605,13 @@ for c in tuple(__map):
 __trans = "".maketrans(__map)
 __unitrans = ["".maketrans({UNIFMTS[-1][x]: UNIFMTS[i][x] for x in range(len(UNIFMTS[-1]))}) for i in range(len(UNIFMTS) - 1)]
 
+# Translates all alphanumeric characters in a string to their corresponding character in the desired font.
 def uniStr(s, fmt=0):
     if type(s) is not str:
         s = str(s)
     return s.translate(__unitrans[fmt])
 
+# Translates all alphanumeric characters in unicode fonts to their respective ascii counterparts.
 def reconstitute(s):
     if type(s) is not str:
         s = str(s)
@@ -1521,6 +1627,7 @@ custom list-like data structure that incorporates the functionality of np arrays
     minsize = 256
     __slots__ = ("chash", "block", "offs", "size", "data")
 
+    # For thread-safety: Waits until the list is not busy performing an operation.
     def waiting(func):
         def call(self, *args, force=False, **kwargs):
             if not force:
@@ -1532,6 +1639,7 @@ custom list-like data structure that incorporates the functionality of np arrays
             return func(self, *args, **kwargs)
         return call
 
+    # For thread-safety: Blocks the list until the operation is complete.
     def blocking(func):
         def call(self, *args, force=False, **kwargs):
             if not force:
@@ -1551,6 +1659,7 @@ custom list-like data structure that incorporates the functionality of np arrays
             return output
         return call
 
+    # Init takes arguments and casts to a deque if possible, else generates as a single value. Allocates space equal to 3 times the length of the input iterable.
     def __init__(self, *args, **void):
         self.block = True
         if not args:
@@ -1577,6 +1686,7 @@ custom list-like data structure that incorporates the functionality of np arrays
             self.view()[:] = iterable
         self.block = False
 
+    # Returns a numpy array representing the items currently "in" the list.
     view = lambda self: self.data[self.offs:self.offs + self.size]
 
     @waiting
@@ -1585,14 +1695,18 @@ custom list-like data structure that incorporates the functionality of np arrays
             return self.copy()
         return self * arg
 
+    # Returns the hash value of the data in the list.
     def __hash__(self):
         if self.chash is None:
             self.chash = hash(self.view().tobytes())
         return self.chash
 
+    # Basic functions
     __str__ = lambda self: "[" + ", ".join(repr(i) for i in iter(self)) + "]"
     __repr__ = lambda self: self.__class__.__name__ + "(" + str(tuple(self)) + ")"
     __bool__ = lambda self: bool(self.size)
+
+    # Arithmetic functions
 
     @blocking
     def __iadd__(self, other):
@@ -1873,6 +1987,8 @@ custom list-like data structure that incorporates the functionality of np arrays
     __rxor__ = __xor__
     __ror__ = __or__
 
+    # Comparison operations
+
     @waiting
     def __lt__(self, other):
         it = self.createIterator(other)
@@ -1909,6 +2025,7 @@ custom list-like data structure that incorporates the functionality of np arrays
         it = self.createIterator(other)
         return self.view() >= other
 
+    # Takes ints, floats, slices and iterables for indexing
     @waiting
     def __getitem__(self, *args):
         if len(args) == 1:
@@ -1921,6 +2038,7 @@ custom list-like data structure that incorporates the functionality of np arrays
             return self.__class__(self.view().__getitem__(key))
         return self.__class__(self.view().__getitem__(*args))
 
+    # Takes ints, slices and iterables for indexing
     @blocking
     def __setitem__(self, *args):
         if len(args) == 2:
@@ -1930,6 +2048,7 @@ custom list-like data structure that incorporates the functionality of np arrays
             return self.view().__setitem__(key, args[1])
         return self.view().__setitem__(*args)
 
+    # Takes ints and slices for indexing
     @blocking
     def __delitem__(self, key):
         if type(key) is slice:
@@ -1941,6 +2060,7 @@ custom list-like data structure that incorporates the functionality of np arrays
             return self.pop(key, force=True)
         return self.pops(key)
 
+    # Basic sequence functions
     __len__ = lambda self: self.size
     __length_hint__ = __len__
     __iter__ = lambda self: iter(self.view())
@@ -1955,16 +2075,19 @@ custom list-like data structure that incorporates the functionality of np arrays
 
     __copy__ = lambda self: self.copy()
 
+    # Converts the target value to a tuple, casting to a 1-tuple if necessary.
     def forceTuple(self, value):
         try:
             return tuple(value)
         except TypeError:
             return (value,)
 
+    # Returns a generator containing an infinite amount of the input value.
     def constantIterator(self, other):
         while True:
             yield other
 
+    # Creates an iterable from an iterator, making sure the shape matches.
     def createIterator(self, other, force=False):
         try:
             len(other)
@@ -2002,6 +2125,7 @@ custom list-like data structure that incorporates the functionality of np arrays
     def reverse(self):
         return self.__class__(np.flip(self.view()))
 
+    # Rotates the list a certain amount of steps, using np.roll for large rotate operations.
     @blocking
     def rotate(self, steps):
         s = self.size
@@ -2027,6 +2151,7 @@ custom list-like data structure that incorporates the functionality of np arrays
 
     rotateright = rotate
 
+    # Re-initializes the list if the positional offsets are too large or if the list is empty.
     @blocking
     def isempty(self):
         if self.size:
@@ -2036,6 +2161,7 @@ custom list-like data structure that incorporates the functionality of np arrays
         self.offs = self.size // 3
         return True
 
+    # For compatibility with dict.get
     @waiting
     def get(self, key, default=None):
         try:
@@ -2058,6 +2184,7 @@ custom list-like data structure that incorporates the functionality of np arrays
         self.isempty(force=True)
         return temp
 
+    # Removes an item from the list. O(n) time complexity.
     @blocking
     def pop(self, index=None):
         if index is None:
@@ -2076,6 +2203,7 @@ custom list-like data structure that incorporates the functionality of np arrays
         self.size -= 1
         return temp
 
+    # Inserts an item into the list. O(n) time complexity.
     @blocking
     def insert(self, index, value):
         if index >= len(self.data):
@@ -2097,6 +2225,7 @@ custom list-like data structure that incorporates the functionality of np arrays
         self.view()[index] = value
         return self
 
+    # Insertion sort using a binary search to find target position. O(n) time complexity.
     @blocking
     def insort(self, value, key=None, sorted=True):
         if not sorted:
@@ -2123,6 +2252,7 @@ custom list-like data structure that incorporates the functionality of np arrays
             return self.appendleft(value, force=True)
         return self.insert(index, value, force=True)
 
+    # Removes all instances of a certain value from the list.
     @blocking
     def remove(self, value, key=None, sorted=False):
         pops = self.search(value, key, sorted, force=True)
@@ -2130,6 +2260,7 @@ custom list-like data structure that incorporates the functionality of np arrays
             self.pops(pops, force=True)
         return self
 
+    # Removes all duplicate values from the list.
     @blocking
     def removedups(self):
         temp = np.unique(self.view())
@@ -2139,14 +2270,17 @@ custom list-like data structure that incorporates the functionality of np arrays
 
     uniq = unique = removedups
 
+    # Returns first matching value in list.
     @waiting
     def index(self, value, key=None, sorted=False):
         return self.search(value, key, sorted, force=True)[0]
 
+    # Returns last matching value in list.
     @waiting
     def rindex(self, value, key=None, sorted=False):
         return self.search(value, key, sorted, force=True)[-1]
     
+    # Returns indices representing positions for all instances of the target found in list, using binary search when applicable.
     @waiting
     def search(self, value, key=None, sorted=False):
         if key is None:
@@ -2204,14 +2338,16 @@ custom list-like data structure that incorporates the functionality of np arrays
     
     find = findall = search
 
+    # Counts the amount of instances of the target within the list.
     @waiting
     def count(self, value, key=None):
         if key is None:
-            return len(self.view() == value)
+            return sum(self.view() == value)
         return sum(1 for i in self if key(i) == value)
 
     concat = lambda self, value: self.__class__(np.concatenate([self.view(), value]))
 
+    # Appends item at the start of the list, reallocating when necessary.
     @blocking
     def appendleft(self, value):
         if self.offs <= 0:
@@ -2221,6 +2357,7 @@ custom list-like data structure that incorporates the functionality of np arrays
         self.data[self.offs] = value
         return self
 
+    # Appends item at the end of the list, reallocating when necessary.
     @blocking
     def append(self, value):
         if self.offs + self.size >= len(self.data):
@@ -2231,6 +2368,7 @@ custom list-like data structure that incorporates the functionality of np arrays
 
     appendright = append
 
+    # Appends iterable at the start of the list, reallocating when necessary.
     @blocking
     def extendleft(self, value):
         value = self.createIterator(reversed(value), force=True)
@@ -2242,6 +2380,7 @@ custom list-like data structure that incorporates the functionality of np arrays
         self.__init__(np.concatenate([value, self.view()]))
         return self
 
+    # Appends iterable at the end of the list, reallocating when necessary.
     @blocking
     def extend(self, value):
         value = self.createIterator(value, force=True)
@@ -2254,14 +2393,17 @@ custom list-like data structure that incorporates the functionality of np arrays
 
     extendright = extend
 
+    # Fills list with value(s).
     @blocking
     def fill(self, value):
         self.view()[:] = value
 
+    # For compatibility with dict attributes.
     keys = lambda self: range(len(self))
     values = lambda self: iter(self)
     items = lambda self: enumerate(self)
 
+    # Clips all values in list to input boundaries.
     @blocking
     def clip(self, a, b=None):
         if b is None:
@@ -2271,6 +2413,8 @@ custom list-like data structure that incorporates the functionality of np arrays
         arr = self.view()
         np.clip(arr, a, b, out=arr)
         return self
+
+    # Casting values to various types.
 
     @waiting
     def real(self):
@@ -2291,12 +2435,14 @@ custom list-like data structure that incorporates the functionality of np arrays
     @waiting
     def mpf(self):
         return self.__class__(mpf(i.real) for i in self.view())
-
+        
+    # Reallocates list.
     @blocking
     def reconstitute(self, data=None):
         self.__init__(self.view())
         return self
 
+    # Removes items according to an array of indices.
     @blocking
     def delitems(self, iterable):
         iterable = self.createIterator(iterable, force=True)
@@ -2314,6 +2460,7 @@ hrange = lambda a, b=None, c=None: hlist(xrange(a, b, c))
 hzero = lambda size: hlist(repeat(0, size))
 
 
+# Class-operated dictionary, with attributes corresponding to keys.
 class cdict(dict):
 
     __slots__ = ()
@@ -2334,6 +2481,7 @@ class cdict(dict):
     to_list = lambda self: list(super().values())
 
 
+# Dictionary with multiple assignable values per key.
 class mdict(cdict):
 
     __slots__ = ()
@@ -2365,6 +2513,7 @@ class mdict(cdict):
             self.extend(k, v)
 
 
+# Double ended mapping, indexable from both sides.
 class demap(collections.abc.Mapping):
 
     __slots__ = ("a", "b")
@@ -2422,6 +2571,7 @@ class demap(collections.abc.Mapping):
     pop = __delitem__
 
 
+# Converts a bytes object to a hex string.
 def bytes2Hex(b, space=True):
     if type(b) is str:
         b = b.encode("utf-8")
@@ -2429,8 +2579,10 @@ def bytes2Hex(b, space=True):
         return b.hex(" ").upper()
     return b.hex().upper()
 
+# Converts a hex string to a bytes object.
 hex2Bytes = lambda b: bytes.fromhex(b if type(b) is str else b.decode("utf-8", "replace"))
 
+# Converts a bytes object to a base64 string.
 def bytes2B64(b, alt_char_set=False):
     if type(b) is str:
         b = b.encode("utf-8")
@@ -2439,6 +2591,7 @@ def bytes2B64(b, alt_char_set=False):
         b = b.replace(b"=", b"-").replace(b"/", b".")
     return b
 
+# Converts a base 64 string to a bytes object.
 def b642Bytes(b, alt_char_set=False):
     if type(b) is str:
         b = b.encode("utf-8")
@@ -2447,6 +2600,8 @@ def b642Bytes(b, alt_char_set=False):
     b = base64.b64decode(b)
     return b
 
+
+# Experimental invisible Zero-Width character encoder.
 zeroEnc = "\xad\u061c\u180e\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\u2064\u2065\u2066\u2067\u2068\u2069\u206a\u206b\u206c\u206d\u206e\u206f\ufeff\x0c"
 zeroEncoder = demap({chr(i + 97): c for i, c in enumerate(zeroEnc)})
 zeroEncode = "".maketrans(dict(zeroEncoder.a))
@@ -2456,10 +2611,12 @@ zwencode = lambda s: (s if type(s) is str else str(s)).lower().translate(zeroEnc
 zwdecode = lambda s: (s if type(s) is str else str(s)).lower().translate(zeroDecode)
 
 
+# SHA256 operations: base64 and base16.
 shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).replace(b"/", b"-").decode("utf-8", "replace")
 hhash = lambda s: bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
 
 
+# Manages a dict object and uses pickle to save and load it.
 class pickled(collections.abc.Callable):
 
     def __init__(self, obj=None, ignore=()):

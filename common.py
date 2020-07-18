@@ -18,6 +18,7 @@ class TooManyRequests(PermissionError):
     pass
 
 
+# Decodes HTML encoded characters in a string.
 def htmlDecode(s):
     while len(s) > 7:
         try:
@@ -45,6 +46,8 @@ def htmlDecode(s):
     return s.replace("&quot;", '"').replace("&apos;", "'")
 
 
+# Escapes syntax in code highlighting markdown.
+
 ESCAPE_T = {
     "[": "⦍",
     "]": "⦎",
@@ -70,33 +73,37 @@ sbHighlight = lambda s: "[" + noHighlight(s) + "]"
 singleSpace = lambda s: re.sub(__sptrans, " ", s)
 
 
+# Counts the number of lines in a file.
 def getLineCount(fn):
-    f = open(fn, "rb")
-    count = 1
-    size = 0
-    while True:
-        try:
-            i = f.read(1024)
-            if not i:
-                raise EOFError
-            size += len(i)
-            count += i.count(b"\n")
-        except EOFError:
-            f.close()
-            return hlist((size, count))
+    with open(fn, "rb") as f:
+        count = 1
+        size = 0
+        while True:
+            try:
+                i = f.read(8192)
+                if not i:
+                    raise EOFError
+                size += len(i)
+                count += i.count(b"\n")
+            except EOFError:
+                return hlist((size, count))
 
 
+# Checks if a file is a python code file using its filename extension.
 iscode = lambda fn: str(fn).endswith(".py") or str(fn).endswith(".pyw")
 
+
+# Checks if an object can be used in "await" operations.
 awaitable = lambda obj: hasattr(obj, "__await__") or issubclass(type(obj), asyncio.Future) or issubclass(type(obj), asyncio.Task) or inspect.isawaitable(obj)
 
+# Async function that waits for a given time interval if the result of the input coroutine is None.
 async def waitOnNone(coro, seconds=0.5):
     resp = await coro
     if resp is None:
         await asyncio.sleep(seconds)
     return resp
 
-
+# Mutable object storing return values of a function.
 class returns:
 
     def __init__(self, data=None):
@@ -113,6 +120,7 @@ async def parasync(coro, rets):
         rets.data = repr(ex)
     return returns()
 
+# Recursively iterates through an iterable finding coroutines and executing them.
 async def recursiveCoro(item):
     rets = hlist()
     try:
@@ -152,6 +160,8 @@ async def recursiveCoro(item):
         output.append(i)
     return output
 
+
+# Sends a message to a channel, then adds reactions accordingly.
 async def sendReact(channel, *args, reacts=(), **kwargs):
     try:
         sent = await channel.send(*args, **kwargs)
@@ -160,6 +170,7 @@ async def sendReact(channel, *args, reacts=(), **kwargs):
     except:
         print(traceback.format_exc())
 
+# Sends a message to a channel, then edits to add links to all attached files.
 async def sendFile(channel, msg, file, filename=None, best=False):
     try:
         message = await channel.send(msg, file=file)
@@ -173,17 +184,21 @@ async def sendFile(channel, msg, file, filename=None, best=False):
         await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + bestURL(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
 
 
+# Finds the best URL for a discord object's icon.
 bestURL = lambda obj: obj if type(obj) is str else (strURL(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if obj.proxy_url else obj.url))
 
 
+# Finds emojis and user mentions in a string.
 emojiFind = re.compile("<.?:[^<>:]+:[0-9]+>")
 findEmojis = lambda s: re.findall(emojiFind, s)
 userFind = re.compile("<@!?[0-9]+>")
 findUsers = lambda s: re.findall(userFind, s)
 
+
+# Returns a string representation of a message object.
 def strMessage(message, limit=1024, username=False):
     c = message.content
-    s = getattr(message, "system_content", "")
+    s = getattr(message, "system_content", None)
     if s and len(s) > len(c):
         c = s
     if username:
@@ -206,22 +221,28 @@ def strMessage(message, limit=1024, username=False):
         data = "```css\n" + uniStr("[EMPTY MESSAGE]") + "```"
     return limStr(data, limit)
 
+# Returns a string representation of an activity object.
 def strActivity(activity):
     if hasattr(activity, "type") and activity.type != discord.ActivityType.custom:
         t = activity.type.name
         return t[0].upper() + t[1:] + " " + activity.name
     return str(activity)
 
+
+# Alphanumeric string regular expression.
 atrans = re.compile("[^a-z 0-9]", re.I)
 is_alphanumeric = lambda string: not re.search(atrans, string)
 to_alphanumeric = lambda string: singleSpace(re.sub(atrans, " ", reconstitute(string)))
 
+
+# Strips code box from the start and end of a message.
 def noCodeBox(s):
     if s.startswith("```") and s.endswith("```"):
         s = s[s.index("\n") + 1:-3]
     return s
 
 
+# A string lookup operation with an iterable, multiple attempts, and sorts by priority.
 async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)], loose=True):
     queries = qkey(query)
     qlist = [q for q in queries if q]
@@ -253,8 +274,11 @@ async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)],
     raise LookupError("No results for " + str(query) + ".")
 
 
+# Generates a random colour across the spectrum, in intervals of 128.
 randColour = lambda: colour2Raw(colourCalculation(xrand(12) * 128))
 
+
+# Gets the string representation of a url object with the maximum allowed image size for discord, replacing webp with png format when possible.
 def strURL(url):
     if type(url) is not str:
         url = str(url)
@@ -263,6 +287,7 @@ def strURL(url):
     return url.replace(".webp", ".png")
 
 
+# A translator to stip all characters from mentions.
 __imap = {
     "#": "",
     "<": "",
@@ -279,6 +304,8 @@ def verifyID(value):
     except ValueError:
         return value
 
+
+# Strips <> characters from URLs.
 def stripAcc(url):
     if url.startswith("<") and url[-1] == ">":
         s = url[1:-1]
@@ -295,6 +322,7 @@ isURL = lambda url: re.search(urlIs, url)
 verifyURL = lambda url: url if isURL(url) else urllib.parse.quote(url)
 
 
+# Checks if a URL contains a valid image extension, and removes it if possible.
 IMAGE_FORMS = {
     ".gif": True,
     ".png": True,
@@ -304,7 +332,6 @@ IMAGE_FORMS = {
     ".tiff": False,
     ".webp": True,
 }
-
 def is_image(url):
     if "." in url:
         url = url[url.rindex("."):]
@@ -312,10 +339,13 @@ def is_image(url):
     return IMAGE_FORMS.get(url)
 
 
+# Subprocess pool for resource-consuming operations.
 SUBS = cdict(math=cdict(procs=hlist(), busy=cdict()), image=cdict(procs=hlist(), busy=cdict()))
 
+# Gets amount of processes running in pool.
 subCount = lambda: sum(1 for ptype in SUBS.values() for proc in ptype.procs if proc.is_running())
 
+# Kills all subprocesses in the pool, then restarts it.
 def subKill():
     for ptype in SUBS.values():
         for sub in ptype.procs:
@@ -327,6 +357,7 @@ def subKill():
         ptype.busy.clear()
     procUpdate()
 
+# Updates process pool by killing off processes when not necessary, and spawning new ones when required.
 def procUpdate():
     for pname, ptype in SUBS.items():
         procs = ptype.procs
@@ -340,14 +371,14 @@ def procUpdate():
                     [python, "misc/math.py"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
                 )
             elif pname == "image":
                 proc = psutil.Popen(
                     [python, "misc/image.py"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
                 )
             else:
                 raise TypeError("Invalid subpool " + pname)
@@ -358,6 +389,7 @@ def procUpdate():
             proc.stdin.write(bytes(repr(x) + "\n", "utf-8"))
             proc.key = x.decode("utf-8", "replace")
             proc.busy = False
+            print(proc, "initialized with key", proc.key)
             procs.append(proc)
         att = 0
         while count > b + 2:
@@ -374,8 +406,7 @@ def procUpdate():
             if att >= 16:
                 break
 
-procUpdate()
-
+# Sends an operation to the image subprocess pool.
 async def imageProc(image, operation, args, key=-1, timeout=12):
     if type(key) is not int:
         try:
@@ -424,10 +455,10 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
         busy.pop(key)
     except KeyError:
         pass
-    print(resp)
     output = evalEX(evalEX(resp))
     return output
 
+# Sends an operation to the math subprocess pool.
 async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12, authorize=False):
     if type(key) is not int:
         try:
@@ -484,6 +515,7 @@ async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12, authorize=False
     return output
 
 
+# Evaluates an an expression, raising it if it is an exception.
 def evalEX(exc):
     try:
         ex = eval(exc)
@@ -504,6 +536,7 @@ def evalEX(exc):
     return ex
 
 
+# Calls a function, but printing exceptions when they occur.
 def funcSafe(func, *args, **kwargs):
     try:
         return func(*args, **kwargs)
@@ -512,21 +545,26 @@ def funcSafe(func, *args, **kwargs):
         print(traceback.format_exc())
         raise
 
+# Awaits a coroutine, but does not raise exceptions that occur.
 async def safeCoro(coro):
     try:
-        await coro
+        return await coro
     except:
         print(traceback.format_exc())
 
+# Forces the operation to be a coroutine regardless of whether it is or not.
 async def forceCoro(coro):
     if awaitable(coro):
         return await coro
     return coro
 
 
+# Main event loop for all asyncio operations.
 eloop = asyncio.new_event_loop()
 __setloop__ = lambda: asyncio.set_event_loop(eloop)
 
+
+# Thread pool manager for multithreaded operations.
 class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 
     def __init__(self, pool_count=3, thread_count=64, initializer=None):
@@ -539,6 +577,7 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 
     __len__ = lambda self: sum(len(pool._threads) for pool in self.pools)
 
+    # Adjusts pool count if necessary
     def _update(self):
         if self.pool_count != len(self.pools):
             self.pool_count = max(1, self.pool_count)
@@ -566,9 +605,10 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
     shutdown = lambda self, wait=True: [exc.shutdown(wait) for exc in self.pools].extend(self.pools.clear())
 
 pthreads = MultiThreadPool(thread_count=48, initializer=__setloop__)
-athreads = MultiThreadPool(initializer=__setloop__)
+athreads = MultiThreadPool(thread_count=64, initializer=__setloop__)
 __setloop__()
 
+# Creates an asyncio Future that waits on a multithreaded one.
 def wrap_future(fut, loop=None):
     if loop is None:
         try:
@@ -588,9 +628,11 @@ def wrap_future(fut, loop=None):
     fut.add_done_callback(on_done)
     return new_fut
 
+# Runs a function call in a parallel thread, returning a future object waiting on the output.
 create_future = lambda func, *args, loop=None, priority=False, **kwargs: wrap_future((athreads, pthreads)[priority].submit(func, *args, **kwargs), loop=loop)
 create_future_ex = lambda func, *args, priority=False, **kwargs: (athreads, pthreads)[priority].submit(func, *args, **kwargs)
 
+# Creates an asyncio Task object from an awaitable object.
 def create_task(fut, *args, loop=None, **kwargs):
     if loop is None:
         try:
@@ -599,9 +641,11 @@ def create_task(fut, *args, loop=None, **kwargs):
             loop = eloop
     return asyncio.ensure_future(fut, *args, loop=loop, **kwargs)
 
+# A dummy coroutine that returns None.
 async def retNone(*args, **kwargs):
     return
 
+# A function that takes a coroutine, and calls a second function if it takes longer than the specified delay.
 async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
     await asyncio.sleep(delay)
     try:
@@ -620,6 +664,10 @@ async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
             raise
 
 
+create_future_ex(procUpdate, priority=True)
+
+
+# Manages both sync and async get requests.
 class AutoRequest:
 
     async def _init_(self):
@@ -657,18 +705,21 @@ Request = AutoRequest()
 create_task(Request._init_())
 
 
-TIMEZONES = {}
+# Stores and manages timezones information.
+TIMEZONES = cdict()
 
 def load_timezones():
-    for line in requests.get("https://cdn.discordapp.com/attachments/725856367717646357/726280246978150430/message.txt").content.decode("utf-8", "replace").split("\n"):
-        info = line.split("\t")
-        abb = info[0].lower()
-        if len(abb) >= 3 and abb not in TIMEZONES:
-            temp = info[-1].replace("\\", "/")
-            curr = sorted([round((1 - (i[3] == "−") * 2) * (rdhms(i[4:]) if ":" in i else float(i[4:]) * 60) * 60) for i in temp.split("/") if i.startswith("UTC")])
-            if len(curr) == 1:
-                curr = curr[0]
-            TIMEZONES[abb] = curr
+    with open("misc/timezones.txt", "rb") as f:
+        data = f.read().decode("utf-8", "replace")
+        for line in data.split("\n"):
+            info = line.split("\t")
+            abb = info[0].lower()
+            if len(abb) >= 3 and abb not in TIMEZONES:
+                temp = info[-1].replace("\\", "/")
+                curr = sorted([round((1 - (i[3] == "−") * 2) * (rdhms(i[4:]) if ":" in i else float(i[4:]) * 60) * 60) for i in temp.split("/") if i.startswith("UTC")])
+                if len(curr) == 1:
+                    curr = curr[0]
+                TIMEZONES[abb] = curr
 
 def is_dst(dt=None, timezone="UTC"):
     if dt is None:
@@ -685,6 +736,7 @@ def get_timezone(tz):
 
 create_future_ex(load_timezones)
 
+# Parses a time expression, with an optional timezone input at the end.
 def tzparse(expr):
     if " " in expr:
         t = 0
@@ -702,6 +754,7 @@ def tzparse(expr):
     return tparser.parse(expr)
 
 
+# Basic inheritable class for all bot commands.
 class Command(collections.abc.Hashable, collections.abc.Callable):
     min_level = -inf
     rate_limit = 0
@@ -761,6 +814,7 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
         pass
 
 
+# Basic inheritable class for all bot databases.
 class Database(collections.abc.Hashable, collections.abc.Callable):
     bot = None
     rate_limit = 3
@@ -843,6 +897,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
         return False
 
 
+# Redirects all print operations to target files, limiting the amount of operations that can occur in any given amount of time for efficiency.
 class __logPrinter:
 
     def __init__(self, file=None):
@@ -855,6 +910,8 @@ class __logPrinter:
 
     def filePrint(self, fn, b):
         try:
+            if type(fn) not in (str, bytes):
+                f = fn
             if type(b) in (bytes, bytearray):
                 f = open(fn, "ab")
             elif type(b) is str:
@@ -909,6 +966,7 @@ class __logPrinter:
     isatty = lambda self: False
 
 
+# Sets all instances of print to the custom print implementation.
 print = __p = __logPrinter("log.txt")
 sys.stdout = sys.stderr = print
 getattr(discord, "__builtins__", {})["print"] = print

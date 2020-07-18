@@ -1,16 +1,17 @@
 print("Loading and checking modules...")
 
-f = open("requirements.txt", "rb")
-modlist = f.read().decode("utf-8", "replace").replace("\r", "\n").split("\n")
-f.close()
+with open("requirements.txt", "rb") as f:
+    modlist = f.read().decode("utf-8", "replace").replace("\r", "\n").split("\n")
 
 import os, subprocess, traceback, pkg_resources
 
+# Required to open python on different operating systems
 python = ("python3", "python")[os.name == "nt"]
 
 installing = []
 install = lambda m: installing.append(subprocess.Popen(["python", "-m", "pip", "install", "--upgrade", m, "--user"]))
 
+# Parse requirements.txt
 for mod in modlist:
     if mod:
         try:
@@ -24,12 +25,14 @@ for mod in modlist:
             if version is not None:
                 assert eval(repr(v) + op + repr(version), {}, {})
         except:
+            # Modules may require an older version, replace current version if necessary
             traceback.print_exc()
             inst = name
             if op in ("==", "<="):
                 inst += "==" + version
             install(inst)
 
+# Run pip on any modules that need installing
 if installing:
     print("Installing missing or outdated modules, please wait...")
     subprocess.Popen([python, "-m", "pip", "install", "--upgrade", "pip", "--user"]).wait()
