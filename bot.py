@@ -81,6 +81,7 @@ class Bot:
         self.blocked = 0
         self.updated = False
         self.started = False
+        self.ready = False
         self.embedSenders = cdict()
         create_future_ex(self.clearcache, priority=True)
         # Assign bot cache to global variables for convenience
@@ -1357,6 +1358,8 @@ class Bot:
 
     # Gets a valid webhook for the target channel, creating a new one when necessary.
     async def ensureWebhook(self, channel, force=False):
+        while not self.ready:
+            await asyncio.sleep(2)
         wlist = None
         if channel.id in self.cw_cache:
             if force:
@@ -1452,6 +1455,8 @@ class Bot:
 
     # Updates all embed senders.
     async def updateEmbeds(self):
+        if not self.ready:
+            return
         sent = [create_task(self.sendEmbedsTo(s_id, embs)) for s_id, embs in self.embedSenders.items() if embs]
         self.embedSenders.clear()
         return sent
@@ -2056,6 +2061,7 @@ async def on_ready():
             await bot.event("_ready_", bot=bot)
             for fut in futs:
                 await fut
+            bot.ready = True
             print("Initialization complete.")
         else:
             for fut in futs:
