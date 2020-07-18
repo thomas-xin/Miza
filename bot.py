@@ -2184,8 +2184,11 @@ async def on_voice_state_update(member, before, after):
                 await member.edit(mute=False, deafen=False)
             await bot.handleUpdate()
     # Check for users with a voice state.
-    if member.voice is not None and not member.voice.afk:
-        await seen(member, event="misc", raw="Joining a voice channel")
+    if after is not None and not after.afk:
+        if before is None:
+            await seen(member, event="misc", raw="Joining a voice channel")
+        elif (before.self_mute, before.self_deaf, before.self_stream, before.self_video) != (after.self_mute, after.self_deaf, after.self_stream, after.self_video):
+            await seen(member, event="misc", raw="Updating their voice settings")
 
 
 # Handles a new sent message, calls processMessage and sends an error if an exception occurs.

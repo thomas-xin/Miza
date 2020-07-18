@@ -213,6 +213,7 @@ class CustomAudio(discord.AudioSource):
             self.pausec = False
             self.curr_timeout = 0
             self.bot = bot
+            self.args = []
             self.new(update=False)
             self.queue = AudioQueue()
             self.queue._init_(auds=self)
@@ -1118,8 +1119,10 @@ class AudioFile:
             else:
                 # Select loaded reader for loaded files requiring FFmpeg options
                 player = LoadedAudioReader(self, args, callback=callback)
+            auds.args = args
             return player.start()
         # Select raw file stream for direct audio playback
+        auds.args.clear()
         return self.open()
 
     # Audio duration estimation: Get values from file if possible, otherwise URL
@@ -2937,7 +2940,7 @@ class AudioSettings(Command):
                         await asyncio.wait_for(create_future(auds.new, auds.file, auds.stats.position), timeout=12)
                     except (TimeoutError, asyncio.exceptions.TimeoutError, concurrent.futures._base.TimeoutError):
                         if auds.source:
-                            print(auds.source.proc.args)
+                            print(auds.args)
                         await create_future(auds.stop)
                         raise RuntimeError("Unable to adjust audio setting.")
             s += (
@@ -3515,6 +3518,7 @@ class Lyrics(Command):
         emb = discord.Embed(colour=randColour())
         emb.set_author(name=title)
         # Separate lyrics into paragraphs and attempt to add them one at a time, adding extra embed fields when necessary
+        iterations = 0
         curr = ""
         paragraphs = [p + "\n\n" for p in text.split("\n\n")]
         while paragraphs:
@@ -3543,6 +3547,9 @@ class Lyrics(Command):
                     paragraphs = p + paragraphs
             else:
                 curr += para
+            iterations += 1
+            if iterations > 256:
+                break
         if curr:
             if emb.description:
                 emb.add_field(name="Page " + str(len(emb.fields) + 2), value="```ini\n" + curr.strip() + "```", inline=False)

@@ -231,7 +231,7 @@ class ND2048(collections.abc.MutableSequence):
 
 class Text2048(Command):
     time_consuming = True
-    name = ["2048", "Text_2048"]
+    name = ["2048"]
     min_level = 0
     description = "Plays a game of 2048 using reactions."
     usage = "<0*:dimension_sizes[4x4]> <1:dimension_count[2]> <special_tiles(?s)> <public(?p)> <insanity_mode(?i)> <easy_mode(?e)>"
