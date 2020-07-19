@@ -719,18 +719,20 @@ class MimicSend(Command):
         # Because this command operates across channels and servers, we need to make sure these cannot be sent to channels without this command enabled
         if not admin and "game" not in enabled:
             raise PermissionError("Not permitted to send into target channel.")
-        msg = escape_everyone(msg)
-        for mimic in m:
-            await bot.database.mimics.updateMimic(mimic, guild)
-            name = mimic.name
-            url = mimic.url
-            try:
-                await waitOnNone(w.send(msg, username=name, avatar_url=url))
-            except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
-                w = await bot.ensureWebhook(channel, force=True)
-                await waitOnNone(w.send(msg, username=name, avatar_url=url))
-            mimic.count += 1
-            mimic.total += len(msg)
+        if m:
+            msg = escape_everyone(msg)
+            for mimic in m:
+                await bot.database.mimics.updateMimic(mimic, guild)
+                name = mimic.name
+                url = mimic.url
+                try:
+                    await waitOnNone(w.send(msg, username=name, avatar_url=url))
+                except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
+                    w = await bot.ensureWebhook(channel, force=True)
+                    await waitOnNone(w.send(msg, username=name, avatar_url=url))
+                mimic.count += 1
+                mimic.total += len(msg)
+            create_task(message.add_reaction("👀"))
 
 
 class UpdateMimics(Database):

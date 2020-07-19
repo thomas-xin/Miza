@@ -167,21 +167,13 @@ class UpdateExec(Database):
     def _input(self, *args, channel=None, **kwargs):
         self._print(*args, channel=channel, **kwargs)
         self.listeners.__setitem__(channel.id, None)
-        while self.listeners[channel.id] is None:
+        t = utc()
+        while self.listeners[channel.id] is None and utc() - t < 86400:
             time.sleep(0.5)
         return self.listeners.pop(channel.id)
 
     # Asynchronously evaluates Python code
     async def procFunc(self, proc, channel, bot, term=0):
-        try:
-            # Write to input() listener if required
-            if self.listeners[channel.id] is None:
-                self.listeners[channel.id] = proc
-                return
-        except KeyError:
-            pass
-        if not proc:
-            return
         # Main terminal uses bot's global variables, virtual one uses a shallow copy per channel
         if term & 1:
             glob = bot._globals
@@ -260,9 +252,20 @@ class UpdateExec(Database):
                             proc = proc.strip("`")
                         if not proc:
                             return
+                        try:
+                            # Write to input() listener if required
+                            if self.listeners[channel.id] is None:
+                                create_task(message.add_reaction("👀"))
+                                self.listeners[channel.id] = proc
+                                return
+                        except KeyError:
+                            pass
+                        if not proc:
+                            return
                         proc = proc.translate(self.qtrans)
                         output = None
                         try:
+                            create_task(message.add_reaction("❗"))
                             output = await self.procFunc(proc, channel, bot, term=f)
                             await channel.send(self.prepare_string(output, fmt=""))
                         except:
