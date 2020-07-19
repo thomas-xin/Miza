@@ -606,7 +606,7 @@ def get_image(url, out):
     else:
         if len(url) > 67108864:
             raise OverflowError("Max file size to load is 64MB.")
-        Image.open(io.BytesIO(url))
+        image = Image.open(io.BytesIO(url))
     return image
 
 
