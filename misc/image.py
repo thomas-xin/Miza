@@ -1,11 +1,14 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, re, traceback, requests, urllib, numpy, blend_modes, subprocess, psutil
+import os, sys, io, time, re, traceback, requests, urllib, numpy, blend_modes, subprocess, psutil, collections
 import PIL, concurrent.futures
 from PIL import Image, ImageChops, ImageEnhance, ImageMath, ImageStat
 
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+start = time.time()
+CACHE = {}
+ANIM = False
 
 
 # For debugging only
@@ -89,9 +92,8 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
     fn = "cache/" + str(ts)
     if direct:
         if data is None:
-            resp = requests.get(url, stream=True, timeout=8)
-            data = resp.raw.read()
-            resp.close()
+            with requests.get(url, stream=True, timeout=8) as resp:
+                data = resp.content
         file = open(fn, "wb")
         try:
             file.write(data)
@@ -146,13 +148,11 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         fps = min(fps, 256 / dur)
         fn2 = fn + ".gif"
         f_in = fn if direct else url
-        command = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-fs", str(8388608 - 131072), "-an", "-vf"]
+        command = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-fs", str(8388608 - 262144), "-an", "-vf"]
+        w, h = max_size(*size, maxsize)
         vf = ""
-        s = max(size)
-        if s > maxsize:
-            r = maxsize / s
-            scale = int(size[0] * r)
-            vf += "scale=" + str(scale) + ":-1:flags=lanczos,"
+        if w != size[0]:
+            vf += "scale=" + str(w) + ":-1:flags=lanczos,"
         vf += "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"
         command.extend([vf, "-loop", "0", "-r", str(fps), out])
         subprocess.check_output(command)
@@ -176,43 +176,84 @@ def create_gif(in_type, args, delay):
     images = args
     maxsize = int(min(maxsize, 32768 / len(images) ** 0.5))
     # Detect if an image sequence or video is being inputted
-    imgs = []
+    imgs = collections.deque()
     for url in images:
-        resp = requests.get(url, stream=True, timeout=8)
-        data = resp.raw.read()
-        resp.close()
+        with requests.get(url, stream=True, timeout=8) as resp:
+            data = resp.content
         try:
             img = get_image(data, None)
         except (PIL.UnidentifiedImageError, OverflowError):
             if len(data) < 268435456:
                 video2img(data, maxsize, round(1000 / delay), out, data=data)
+                # $ symbol indicates to return directly
                 return "$" + out
             else:
                 raise OverflowError("Max file size to load is 256MB.")
         else:
-            if not imgs:
-                size = max_size(img.width, img.height, maxsize)
-            img = resize_to(img, *size, operation="hamming")
-            if str(img.mode) != "RGB":
-                img = img.convert("RGB")
-            imgs.append(img)
-    command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(1000 / delay), "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
-    command.extend(["-fs", str(8388608 - 131072), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out])
-    proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    for img in imgs:
-        b = numpy.array(img).tobytes()
-        proc.stdin.write(b)
-        time.sleep(0.02)
-    proc.stdin.close()
-    proc.wait()
-    return "$" + out
+            for f in range(2147483648):
+                try:
+                    img.seek(f)
+                except EOFError:
+                    break
+                if not imgs:
+                    size = max_size(img.width, img.height, maxsize)
+                img = resize_to(img, *size, operation="hamming")
+                if str(img.mode) != "RGB":
+                    img = img.convert("RGB")
+                imgs.append(img)
+    return dict(duration=delay * len(imgs), frames=imgs)
+
+def rainbow_gif2(image, duration):
+    ts = round(time.time() * 1000)
+    out = collections.deque()
+    total = 0
+    for f in range(2147483648):
+        try:
+            image.seek(f)
+        except EOFError:
+            break
+        total += image.info.get("duration", 1 / 60)
+    length = f
+    loops = total / duration / 1000
+    scale = 1
+    while abs(loops * scale) < 1:
+        scale *= 2
+        if length * scale >= 64:
+            loops = 1 if loops >= 0 else -1
+            break
+    loops = round(loops * scale) / scale
+    if not loops:
+        loops = 1 if loops >= 0 else -1
+    maxsize = int(min(512, 32768 / (length * scale ** 0.5) ** 0.5))
+    size = list(max_size(*image.size, maxsize))
+    for f in range(length * scale):
+        filePrint(f, f / length * loops, length, scale)
+        image.seek(f % length)
+        if str(image.mode) != "RGBA":
+            temp = image.convert("RGBA")
+        else:
+            temp = image
+        if temp.size[0] != size[0] or temp.size[1] != size[1]:
+            temp = temp.resize(size, Image.HAMMING)
+        alpha = temp.split()[-1]
+        channels = list(temp.convert("HSV").split())
+        channels[0] = channels[0].point(lambda x: int(((f / length * loops + x / 256) % 1) * 256))
+        channels = list(Image.merge("HSV", channels).convert("RGB").split())
+        channels.append(alpha)
+        temp = Image.merge("RGBA", channels)
+        out.append(temp)
+    return dict(duration=total, frames=out)
 
 def rainbow_gif(image, duration):
-    # filePrint(image, duration)
+    try:
+        image.seek(1)
+    except EOFError:
+        image.seek(0)
+    else:
+        return rainbow_gif2(image, duration)
     ts = round(time.time() * 1000)
-    out = "cache/" + str(ts) + ".gif"
     image = resize_max(image, 512, resample=Image.HAMMING)
-    size = [image.width, image.height]
+    size = list(image.size)
     if duration == 0:
         fps = 0
     else:
@@ -223,40 +264,45 @@ def rainbow_gif(image, duration):
         rate <<= 1
     if fps <= 0:
         raise ValueError("Invalid framerate value.")
-    # filePrint(fps)
-    command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
-    command.extend(["-fs", str(8388608 - 131072), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out])
-    proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     # Make sure image is in RGB/HSV format
     if str(image.mode) != "HSV":
         curr = image.convert("HSV")
-        if str(image.mode) != "RGB":
-            image = image.convert("RGB")
+        rgb = str(image.mode) == "RGB"
+        if str(image.mode) != "RGBA":
+            image = image.convert("RGBA")
+        if rgb:
+            alpha = None
+        else:
+            alpha = image.split()[-1]
     else:
-        curr, image = image, image.convert("RGB")
+        curr, image = image, image.convert("RGBA")
+        alpha = None
     channels = list(curr.split())
     if duration < 0:
         rate = -rate
-    # filePrint(rate)
+    out = collections.deque()
     # Repeatedly hueshift image and pass to FFmpeg
     func = lambda x: (x + rate) & 255
     for i in range(0, 256, abs(rate)):
         if i:
             channels[0] = channels[0].point(func)
-            image = Image.merge("HSV", channels).convert("RGB")
-        b = numpy.array(image).tobytes()
-        proc.stdin.write(b)
-        time.sleep(0.02)
-    proc.stdin.close()
-    proc.wait()
-    return "$" + out
+            merged = Image.merge("HSV", channels)
+            if alpha is None:
+                image = merged.convert("RGBA")
+            else:
+                out = list(merged.convert("RGB").split())
+                out.append(alpha)
+                image = Image.merge("RGBA", alpha)
+        out.append(image)
+    return dict(duration=1000 / fps * len(out), frames=out)
 
 
 # Autodetect max image size, keeping aspect ratio
 def max_size(w, h, maxsize):
-    s = max(w, h)
-    if s > maxsize:
-        r = maxsize / s
+    s = w * h
+    m = (maxsize * maxsize << 1) / 3
+    if s > m:
+        r = m / s
         w = int(w * r)
         h = int(h * r)
     return w, h
@@ -388,7 +434,7 @@ blenders = {
     "luminosity": "SP_LUM",
 }
 
-def blend_op(image, url, operation, amount):
+def blend_op(image, url, operation, amount, recursive=True):
     op = operation.lower().replace(" ", "").replace("_", "")
     if op in blenders:
         filt = blenders[op]
@@ -397,6 +443,36 @@ def blend_op(image, url, operation, amount):
     else:
         raise TypeError("Invalid image operation: \"" + op + '"')
     image2 = get_image(url, url)
+    if recursive:
+        if not globals()["ANIM"]:
+            try:
+                image2.seek(1)
+            except EOFError:
+                image2.seek(0)
+            else:
+                out = deque()
+                for f in range(2147483648):
+                    try:
+                        image2.seek(f)
+                    except EOFError:
+                        break
+                    if str(image.mode) != "RGBA":
+                        temp = image.convert("RGBA")
+                    else:
+                        temp = image
+                    out.append(blend_op(temp, image2, operation, amount, recursive=False))
+                return out
+        try:
+            n_frames = 1
+            for f in range(CURRENT_FRAME + 1):
+                try:
+                    image2.seek(f)
+                except EOFError:
+                    break
+                n_frames += 1
+            image2.seek(CURRENT_FRAME % n_frames)
+        except EOFError:
+            image2.seek(0)
     if image2.width != image.width or image2.height != image.height:
         image2 = resize_to(image2, image.width, image.height, "auto")
     if type(filt) is not str:
@@ -506,11 +582,16 @@ def hue_shift(image, value):
 
 
 def get_image(url, out):
+    if issubclass(type(url), Image.Image):
+        return url
     if type(url) not in (bytes, bytearray, io.BytesIO):
+        if url in CACHE:
+            return CACHE[url]
         if isURL(url):
-            resp = requests.get(url, stream=True, timeout=8)
-            data = resp.raw.read()
-            resp.close()
+            with requests.get(url, stream=True, timeout=8) as resp:
+                data = resp.content
+            if len(data) > 67108864:
+                raise OverflowError("Max file size to load is 64MB.")
         else:
             if os.path.getsize(url) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")
@@ -521,28 +602,88 @@ def get_image(url, out):
                     os.remove(url)
                 except:
                     pass
+        image = Image.open(io.BytesIO(data))
+        CACHE[url] = image
     else:
-        data = url
-    if len(data) > 67108864:
-        raise OverflowError("Max file size to load is 64MB.")
-    return Image.open(io.BytesIO(data))
+        if len(url) > 67108864:
+            raise OverflowError("Max file size to load is 64MB.")
+        Image.open(io.BytesIO(url))
+    return image
 
 
 # Main image operation function
 @logging
 def evalImg(url, operation, args):
+    globals()["CURRENT_FRAME"] = 0
     ts = round(time.time() * 1000)
     out = "cache/" + str(ts) + ".png"
     args = eval(args)
     if operation != "$":
         image = get_image(url, out)
-        f = getattr(image, operation, None)
-        if f is None:
-            new = eval(operation)(image, *args)
+        # $%GIF%$ is a special case where the output is always a .gif image
+        if args[-1] == "$%GIF%$":
+            new = eval(operation)(image, *args[:-1])
         else:
-            new = f(*args)
+            try:
+                image.seek(1)
+            except EOFError:
+                new = None
+                globals()["ANIM"] = False
+            else:
+                new = dict(frames=collections.deque(), duration=0)
+                globals()["ANIM"] = True
+            # Attempt to perform operation on all individual frames of .gif images
+            for f in range(2147483648):
+                globals()["CURRENT_FRAME"] = f
+                try:
+                    image.seek(f)
+                except EOFError:
+                    break
+                if str(image.mode) != "RGBA":
+                    temp = image.convert("RGBA")
+                else:
+                    temp = image
+                new["duration"] += temp.info.get("duration", 1 / 60)
+                func = getattr(temp, operation, None)
+                if func is None:
+                    res = eval(operation)(temp, *args)
+                else:
+                    res = func(*args)
+                if new is None:
+                    new = res
+                    break
+                elif issubclass(type(res), Image.Image):
+                    new["frames"].append(res)
+                else:
+                    new["frames"].extend(res)
     else:
         new = eval(url)(*args)
+    if type(new) is dict:
+        duration = new["duration"]
+        new = new["frames"]
+        if not new:
+            raise EOFError("No image output detected.")
+        elif len(new) == 1:
+            new = new[0]
+        else:
+            size = new[0].size
+            out = "cache/" + str(ts) + ".gif"
+            command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(1000 * len(new) / duration), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
+            command.extend(["-fs", str(8388608 - 262144), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out])
+            proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            for frame in new:
+                if frame.size != size:
+                    frame = frame.resize(size)
+                if str(frame.mode) != "RGBA":
+                    arr = numpy.array(frame.convert("RGBA"))
+                else:
+                    arr = numpy.array(frame)
+                b = arr.tobytes()
+                proc.stdin.write(b)
+                time.sleep(0.02)
+            proc.stdin.close()
+            proc.wait()
+            return repr([out])
     if issubclass(type(new), Image.Image):
         new.save(out, "png")
         return repr([out])
@@ -565,3 +706,8 @@ if __name__ == "__main__":
             sys.stdout.write(repr(ex) + "\n")
             sys.stdout.flush()
         time.sleep(0.01)
+        if time.time() - start > 3600:
+            start = time.time()
+            for img in CACHE.values():
+                img.close()
+            CACHE.clear()

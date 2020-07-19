@@ -732,7 +732,7 @@ class Bot:
         except AttributeError:
             u_id = user
         g_perm = setDict(perms, guild.id, {})
-        g_perm.update({u_id: roundmin(value)})
+        g_perm.update({u_id: roundMin(value)})
         self.database.perms.update()
 
     # Checks if a message has been flagged as deleted by the deleted cache.
@@ -1970,9 +1970,9 @@ async def heartbeatLoop():
     except asyncio.CancelledError:
         sys.exit(1)   
 
-# The fast update loop that runs 7 events per second. Used for events where timing is important.
+# The fast update loop that runs 24 times per second. Used for events where timing is important.
 async def fastLoop():
-    freq = 7
+    freq = 24
     sent = 0
     while True:
         try:

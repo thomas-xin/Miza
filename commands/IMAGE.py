@@ -343,6 +343,7 @@ class CreateEmoji(Command):
     flags = "ae"
     no_parse = True
     rate_limit = (3, 4)
+    _timeout_ = 3
     typing = True
 
     async def __call__(self, bot, user, guild, channel, message, args, argv, **void):
@@ -373,11 +374,11 @@ class CreateEmoji(Command):
             await fut
             raise OverflowError("Max file size to load is 64MB.")
         if len(image) > 262144:
-            path = "cache/" + str(guild.id) + ".png"
+            path = "cache/" + str(guild.id)
             f = await create_future(open, path, "wb")
             await create_future(f.write, image)
             await create_future(f.close)
-            resp = await imageProc(path, "resize_max", [128], user)
+            resp = await imageProc(path, "resize_max", [128], user, timeout=32)
             fn = resp[0]
             f = await create_future(open, fn, "rb")
             image = await create_future(f.read)
@@ -551,13 +552,19 @@ class Saturate(Command):
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
     rate_limit = (2, 3)
+    _timeout_ = 3
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
         fut = create_task(channel.trigger_typing())
-        resp = await imageProc(url, "Enhance", ["Color", value], user)
+        resp = await imageProc(url, "Enhance", ["Color", value], user, timeout=28)
         fn = resp[0]
+        if fn.endswith(".gif"):
+            if not name.endswith(".gif"):
+                if "." in name:
+                    name = name[:name.rindex(".")]
+                name += ".gif"
         f = discord.File(fn, filename=name)
         await fut
         await sendFile(message.channel, "", f, filename=fn)
@@ -570,13 +577,19 @@ class Contrast(Command):
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
     rate_limit = (2, 3)
+    _timeout_ = 3
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
         fut = create_task(channel.trigger_typing())
-        resp = await imageProc(url, "Enhance", ["Contrast", value], user)
+        resp = await imageProc(url, "Enhance", ["Contrast", value], user, timeout=28)
         fn = resp[0]
+        if fn.endswith(".gif"):
+            if not name.endswith(".gif"):
+                if "." in name:
+                    name = name[:name.rindex(".")]
+                name += ".gif"
         f = discord.File(fn, filename=name)
         await fut
         await sendFile(message.channel, "", f, filename=fn)
@@ -589,13 +602,19 @@ class Brightness(Command):
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
     rate_limit = (2, 3)
+    _timeout_ = 3
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
         fut = create_task(channel.trigger_typing())
-        resp = await imageProc(url, "Enhance", ["Brightness", value], user)
+        resp = await imageProc(url, "Enhance", ["Brightness", value], user, timeout=28)
         fn = resp[0]
+        if fn.endswith(".gif"):
+            if not name.endswith(".gif"):
+                if "." in name:
+                    name = name[:name.rindex(".")]
+                name += ".gif"
         f = discord.File(fn, filename=name)
         await fut
         await sendFile(message.channel, "", f, filename=fn)
@@ -608,13 +627,19 @@ class Sharpness(Command):
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
     rate_limit = (2, 3)
+    _timeout_ = 3
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
         fut = create_task(channel.trigger_typing())
-        resp = await imageProc(url, "Enhance", ["Sharpness", value], user)
+        resp = await imageProc(url, "Enhance", ["Sharpness", value], user, timeout=28)
         fn = resp[0]
+        if fn.endswith(".gif"):
+            if not name.endswith(".gif"):
+                if "." in name:
+                    name = name[:name.rindex(".")]
+                name += ".gif"
         f = discord.File(fn, filename=name)
         await fut
         await sendFile(message.channel, "", f, filename=fn)
@@ -627,13 +652,19 @@ class HueShift(Command):
     usage = "<0:url{attached_file}> <1:adjustment[0.5]>"
     no_parse = True
     rate_limit = (2, 3)
+    _timeout_ = 3
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
         fut = create_task(channel.trigger_typing())
-        resp = await imageProc(url, "hue_shift", [value], user)
+        resp = await imageProc(url, "hue_shift", [value], user, timeout=32)
         fn = resp[0]
+        if fn.endswith(".gif"):
+            if not name.endswith(".gif"):
+                if "." in name:
+                    name = name[:name.rindex(".")]
+                name += ".gif"
         f = discord.File(fn, filename=name)
         await fut
         await sendFile(message.channel, "", f, filename=fn)
@@ -709,13 +740,14 @@ class Rainbow(Command):
     usage = "<0:url{attached_file}> <1:duration[2]>"
     no_parse = True
     rate_limit = (5, 8)
-    _timeout_ = 3
+    _timeout_ = 4
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
         fut = create_task(channel.trigger_typing())
-        resp = await imageProc(url, "rainbow_gif", [value], user, timeout=32)
+        # $%GIF%$ signals to image subprocess that the output is always a .gif image
+        resp = await imageProc(url, "rainbow_gif", [value, "$%GIF%$"], user, timeout=40)
         fn = resp[0]
         f = discord.File(fn, filename=name)
         await fut
@@ -768,9 +800,9 @@ class CreateGIF(Command):
             args[i] = url
         name = "unknown.gif"
         if video is not None:
-            resp = await imageProc("create_gif", "$", ["video", video, delay], user, timeout=64)
+            resp = await imageProc("create_gif", "$", ["video", video, delay], user, timeout=96)
         else:
-            resp = await imageProc("create_gif", "$", ["image", args, delay], user, timeout=64)
+            resp = await imageProc("create_gif", "$", ["image", args, delay], user, timeout=96)
         fn = resp[0]
         f = discord.File(fn, filename=name)
         await fut
@@ -785,6 +817,7 @@ class Resize(Command):
     no_parse = True
     rate_limit = 3
     flags = "l"
+    _timeout_ = 3
     typing = True
 
     async def __call__(self, bot, user, guild, channel, message, flags, args, argv, **void):
@@ -845,8 +878,13 @@ class Resize(Command):
             name = "unknown"
         if not name.endswith(".png"):
             name += ".png"
-        resp = await imageProc(url, "resize_mult", [x, y, op], user)
+        resp = await imageProc(url, "resize_mult", [x, y, op], user, timeout=36)
         fn = resp[0]
+        if fn.endswith(".gif"):
+            if not name.endswith(".gif"):
+                if "." in name:
+                    name = name[:name.rindex(".")]
+                name += ".gif"
         f = discord.File(fn, filename=name)
         await fut
         await sendFile(message.channel, "", f, filename=fn)
@@ -859,7 +897,7 @@ class Magik(Command):
     usage = "<0:url{attached_file}>"
     no_parse = True
     rate_limit = (4, 6)
-    _timeout_ = 2
+    _timeout_ = 3
     typing = True
 
     async def __call__(self, bot, user, guild, channel, message, args, argv, **void):
@@ -901,7 +939,7 @@ class Magik(Command):
         else:
             msg = None
         try:
-            resp = await Request("https://api.alexflipnote.dev/filter/magik?image=" + url, timeout=32, aio=True)
+            resp = await Request("https://api.alexflipnote.dev/filter/magik?image=" + url, timeout=48, aio=True)
         except:
             if msg is not None:
                 await bot.silentDelete(msg)
@@ -922,6 +960,7 @@ class Blend(Command):
     no_parse = True
     rate_limit = (3, 5)
     flags = "l"
+    _timeout_ = 3
     typing = True
 
     async def __call__(self, bot, user, guild, channel, message, flags, args, argv, **void):
@@ -996,8 +1035,13 @@ class Blend(Command):
             name = "unknown"
         if not name.endswith(".png"):
             name += ".png"
-        resp = await imageProc(url1, "blend_op", [url2, operation, opacity], user)
+        resp = await imageProc(url1, "blend_op", [url2, operation, opacity], user, timeout=32)
         fn = resp[0]
+        if fn.endswith(".gif"):
+            if not name.endswith(".gif"):
+                if "." in name:
+                    name = name[:name.rindex(".")]
+                name += ".gif"
         f = discord.File(fn, filename=name)
         await fut
         await sendFile(message.channel, "", f, filename=fn)

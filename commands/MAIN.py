@@ -1156,7 +1156,7 @@ class UpdateReminders(Database):
         # This exists so that checking next scheduled item is O(1)
         self.listed = hlist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str), key=lambda x: x[0]))
 
-    # Fast call: runs 7 times per second
+    # Fast call: runs 24 times per second
     async def _call_(self):
         t = utc()
         while self.listed:

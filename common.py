@@ -345,12 +345,23 @@ SUBS = cdict(math=cdict(procs=hlist(), busy=cdict()), image=cdict(procs=hlist(),
 # Gets amount of processes running in pool.
 subCount = lambda: sum(1 for ptype in SUBS.values() for proc in ptype.procs if proc.is_running())
 
+def forceKill(proc):
+    for child in proc.children(recursive=True):
+        try:
+            child.kill()
+        except:
+            pass
+        else:
+            print(child, "killed.")
+    print(proc, "killed.")
+    return proc.kill()
+
 # Kills all subprocesses in the pool, then restarts it.
 def subKill():
     for ptype in SUBS.values():
-        for sub in ptype.procs:
+        for proc in ptype.procs:
             try:
-                sub.kill()
+                forceKill(proc)
             except psutil.NoSuchProcess:
                 pass
         ptype.procs.clear()
@@ -362,7 +373,7 @@ def procUpdate():
     for pname, ptype in SUBS.items():
         procs = ptype.procs
         b = len(ptype.busy)
-        count = sum(1 for proc in procs if not proc.busy)
+        count = sum(1 for proc in procs if utc() > proc.busy)
         if count > 16:
             return
         if b + 1 > count:
@@ -382,13 +393,14 @@ def procUpdate():
                 )
             else:
                 raise TypeError("Invalid subpool " + pname)
+            proc.busy = nan
             x = bytes(random.randint(0, 255) for _ in loop(32))
             if random.randint(0, 1):
                 x = hashlib.sha256(x).digest()
             x = base64.b64encode(x)
             proc.stdin.write(bytes(repr(x) + "\n", "utf-8"))
             proc.key = x.decode("utf-8", "replace")
-            proc.busy = False
+            proc.busy = utc()
             print(proc, "initialized with key", proc.key)
             procs.append(proc)
         att = 0
@@ -396,8 +408,8 @@ def procUpdate():
             for p in range(len(procs)):
                 if p < len(procs):
                     proc = procs[p]
-                    if not proc.busy:
-                        proc.kill()
+                    if utc() - proc.busy > 3600:
+                        forceKill(proc)
                         procs.pop(p)
                         break
                 else:
@@ -406,14 +418,14 @@ def procUpdate():
             if att >= 16:
                 break
 
-# Sends an operation to the image subprocess pool.
-async def imageProc(image, operation, args, key=-1, timeout=12):
+# Sends an operation to the math subprocess pool.
+async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12, authorize=False):
     if type(key) is not int:
         try:
             key = int(key)
         except (TypeError, ValueError):
             key = key.id
-    procs, busy = SUBS.image.procs, SUBS.image.busy
+    procs, busy = SUBS.math.procs, SUBS.math.busy
     while utc() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
     try:
@@ -421,7 +433,7 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
             for p in range(len(procs)):
                 if p < len(procs):
                     proc = procs[p]
-                    if not proc.busy:
+                    if utc() > proc.busy:
                         raise StopIteration
                 else:
                     break
@@ -429,18 +441,21 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
             await asyncio.sleep(0.5)
     except StopIteration:
         pass
-    d = repr(bytes("`".join(str(i) for i in (image, operation, args)), "utf-8")).encode("utf-8") + b"\n"
-    # print(d)
+    if authorize:
+        args = (expr, prec, rat, proc.key)
+    else:
+        args = (expr, prec, rat)
+    d = repr(bytes("`".join(i if type(i) is str else str(i) for i in args), "utf-8")).encode("utf-8") + b"\n"
     try:
-        proc.busy = True
+        proc.busy = inf
         busy[key] = utc()
         await create_future(procUpdate)
         await create_future(proc.stdin.write, d)
         await create_future(proc.stdin.flush)
         resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
-        proc.busy = False
+        proc.busy = utc()
     except (TimeoutError, asyncio.exceptions.TimeoutError):
-        create_future_ex(proc.kill)
+        create_future_ex(forceKill, proc)
         try:
             procs.pop(p)
         except LookupError:
@@ -458,14 +473,14 @@ async def imageProc(image, operation, args, key=-1, timeout=12):
     output = evalEX(evalEX(resp))
     return output
 
-# Sends an operation to the math subprocess pool.
-async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12, authorize=False):
+# Sends an operation to the image subprocess pool.
+async def imageProc(image, operation, args, key=-1, timeout=24):
     if type(key) is not int:
         try:
             key = int(key)
         except (TypeError, ValueError):
             key = key.id
-    procs, busy = SUBS.math.procs, SUBS.math.busy
+    procs, busy = SUBS.image.procs, SUBS.image.busy
     while utc() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
     try:
@@ -473,7 +488,7 @@ async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12, authorize=False
             for p in range(len(procs)):
                 if p < len(procs):
                     proc = procs[p]
-                    if not proc.busy:
+                    if utc() > proc.busy:
                         raise StopIteration
                 else:
                     break
@@ -481,22 +496,18 @@ async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12, authorize=False
             await asyncio.sleep(0.5)
     except StopIteration:
         pass
-    if authorize:
-        args = (expr, prec, rat, proc.key)
-    else:
-        args = (expr, prec, rat)
-    d = repr(bytes("`".join(i if type(i) is str else str(i) for i in args), "utf-8")).encode("utf-8") + b"\n"
-    # print(d)
+    d = repr(bytes("`".join(str(i) for i in (image, operation, args)), "utf-8")).encode("utf-8") + b"\n"
+    print(d)
     try:
-        proc.busy = True
+        proc.busy = inf
         busy[key] = utc()
         await create_future(procUpdate)
         await create_future(proc.stdin.write, d)
         await create_future(proc.stdin.flush)
         resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
-        proc.busy = False
+        proc.busy = utc()
     except (TimeoutError, asyncio.exceptions.TimeoutError):
-        create_future_ex(proc.kill)
+        create_future_ex(forceKill, proc)
         try:
             procs.pop(p)
         except LookupError:
