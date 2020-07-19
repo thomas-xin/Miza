@@ -227,7 +227,6 @@ def rainbow_gif2(image, duration):
     maxsize = int(min(512, 32768 / (length * scale ** 0.5) ** 0.5))
     size = list(max_size(*image.size, maxsize))
     for f in range(length * scale):
-        filePrint(f, f / length * loops, length, scale)
         image.seek(f % length)
         if str(image.mode) != "RGBA":
             temp = image.convert("RGBA")

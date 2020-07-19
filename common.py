@@ -497,7 +497,6 @@ async def imageProc(image, operation, args, key=-1, timeout=24):
     except StopIteration:
         pass
     d = repr(bytes("`".join(str(i) for i in (image, operation, args)), "utf-8")).encode("utf-8") + b"\n"
-    print(d)
     try:
         proc.busy = inf
         busy[key] = utc()
