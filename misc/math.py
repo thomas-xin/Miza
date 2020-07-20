@@ -483,6 +483,8 @@ def evalSym(f, prec=64, r=False):
                 pass
     # Select list of answers to return based on the desired float precision level
     if prec:
+        if type(f) in (tuple, list, dict):
+            return [f]
         try:
             y = f.evalf(prec, chop=True)
         except:
@@ -502,6 +504,8 @@ def evalSym(f, prec=64, r=False):
         p = prettyAns(f)
         if p == convAns(e):
             p = ""
+        if "." in e:
+            e = e.rstrip("0")
         return [e, p]
     else:
         p = prettyAns(f)

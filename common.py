@@ -382,14 +382,14 @@ def procUpdate():
                     [python, "misc/math.py"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
                 )
             elif pname == "image":
                 proc = psutil.Popen(
                     [python, "misc/image.py"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
                 )
             else:
                 raise TypeError("Invalid subpool " + pname)
@@ -408,6 +408,8 @@ def procUpdate():
             for p in range(len(procs)):
                 if p < len(procs):
                     proc = procs[p]
+                    # Busy variable indicates when the last operation finished;
+                    # processes that are idle longer than 1 hour are automatically terminated
                     if utc() - proc.busy > 3600:
                         forceKill(proc)
                         procs.pop(p)

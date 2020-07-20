@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, re, traceback, requests, urllib, numpy, blend_modes, subprocess, psutil, collections
-import PIL, concurrent.futures
+import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, numpy, requests, blend_modes
+import PIL
 from PIL import Image, ImageChops, ImageEnhance, ImageMath, ImageStat
 
 
@@ -43,42 +43,9 @@ def rdhms(ts):
             raise TypeError("Too many time arguments.")
     return t
 
-#  URL detector, this should probably be replaced by the one used in the main bot
-DOMAIN_FORMAT = re.compile(
-    r"(?:^(\w{1,255}):(.{1,255})@|^)"
-    r"(?:(?:(?=\S{0,253}(?:$|:))"
-    r"((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
-    r"(?:[a-z0-9]{1,63})))"
-    r"|localhost)"
-    r"(:\d{1,5})?",
-    re.IGNORECASE
-)
-SCHEME_FORMAT = re.compile(
-    r"^(http|hxxp|ftp|fxp)s?$",
-    re.IGNORECASE
-)
-
-def isURL(url):
-    url = url.strip()
-    if url.startswith("<") and url[-1] == ">":
-        url = url[1:-1]
-    if not url:
-        return None
-    try:
-        result = urllib.parse.urlparse(url)
-    except:
-        return False
-    scheme = result.scheme
-    domain = result.netloc
-    if not scheme:
-        return False
-    if not re.fullmatch(SCHEME_FORMAT, scheme):
-        return False
-    if not domain:
-        return False
-    if not re.fullmatch(DOMAIN_FORMAT, domain):
-        return False
-    return True
+# URL string detector
+urlIs = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
+isURL = lambda url: re.search(urlIs, url)
 
 
 from_colour = lambda colour, size=128, key=None: Image.fromarray(numpy.tile(numpy.array(colour, dtype=numpy.uint8), (size, size, 1)))
@@ -236,12 +203,12 @@ def rainbow_gif2(image, duration):
             temp = temp.resize(size, Image.HAMMING)
         alpha = temp.split()[-1]
         channels = list(temp.convert("HSV").split())
-        channels[0] = channels[0].point(lambda x: int(((f / length * loops + x / 256) % 1) * 256))
+        channels[0] = channels[0].point(lambda x: int(((f / length / scale * loops + x / 256) % 1) * 256))
         channels = list(Image.merge("HSV", channels).convert("RGB").split())
         channels.append(alpha)
         temp = Image.merge("RGBA", channels)
         out.append(temp)
-    return dict(duration=total, frames=out)
+    return dict(duration=total * scale, frames=out)
 
 def rainbow_gif(image, duration):
     try:
@@ -280,7 +247,7 @@ def rainbow_gif(image, duration):
     if duration < 0:
         rate = -rate
     out = collections.deque()
-    # Repeatedly hueshift image and pass to FFmpeg
+    # Repeatedly hueshift image and return copies
     func = lambda x: (x + rate) & 255
     for i in range(0, 256, abs(rate)):
         if i:
@@ -289,11 +256,26 @@ def rainbow_gif(image, duration):
             if alpha is None:
                 image = merged.convert("RGBA")
             else:
-                out = list(merged.convert("RGB").split())
-                out.append(alpha)
-                image = Image.merge("RGBA", alpha)
+                res = list(merged.convert("RGB").split())
+                res.append(alpha)
+                image = Image.merge("RGBA", res)
         out.append(image)
     return dict(duration=1000 / fps * len(out), frames=out)
+
+
+# def magik(image):
+#     w = wand.image.Image(file=image)
+#     w.format = "png"
+#     w.alpha_channel = True
+#     if w.size >= (2048, 2048):
+#         raise OverflowError("image size too large.")
+#     w.transform(resize='512x512>')
+#     w.liquid_rescale(width=int(w.width * 0.5), height=int(w.height * 0.5), delta_x=1, rigidity=0)
+#     w.liquid_rescale(width=int(w.width * 1.5), height=int(w.height * 1.5), delta_x=2, rigidity=0)
+#     out = io.BytesIO()
+#     w.save(file=out)
+#     out.seek(0)
+#     list_imgs.append(out)
 
 
 # Autodetect max image size, keeping aspect ratio
@@ -618,7 +600,11 @@ def evalImg(url, operation, args):
     out = "cache/" + str(ts) + ".png"
     args = eval(args)
     if operation != "$":
-        image = get_image(url, out)
+        if args[-1] == "$%RAW%$":
+            args.pop(-1)
+            image = requests.get(url, timeout=8).content
+        else:
+            image = get_image(url, out)
         # $%GIF%$ is a special case where the output is always a .gif image
         if args[-1] == "$%GIF%$":
             new = eval(operation)(image, *args[:-1])
@@ -642,7 +628,8 @@ def evalImg(url, operation, args):
                     temp = image.convert("RGBA")
                 else:
                     temp = image
-                new["duration"] += temp.info.get("duration", 1 / 60)
+                if new is not None:
+                    new["duration"] += temp.info.get("duration", 1 / 60)
                 func = getattr(temp, operation, None)
                 if func is None:
                     res = eval(operation)(temp, *args)
@@ -657,6 +644,7 @@ def evalImg(url, operation, args):
                     new["frames"].extend(res)
     else:
         new = eval(url)(*args)
+    filePrint(new)
     if type(new) is dict:
         duration = new["duration"]
         new = new["frames"]
@@ -671,13 +659,18 @@ def evalImg(url, operation, args):
             command.extend(["-fs", str(8388608 - 262144), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out])
             proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             for frame in new:
-                if frame.size != size:
-                    frame = frame.resize(size)
-                if str(frame.mode) != "RGBA":
-                    arr = numpy.array(frame.convert("RGBA"))
+                if issubclass(type(frame), Image.Image):
+                    if frame.size != size:
+                        frame = frame.resize(size)
+                    if str(frame.mode) != "RGBA":
+                        frame = frame.convert("RGBA")
+                    b = frame.tobytes()
+                    # arr = numpy.array(frame)
+                    # b = arr.tobytes()
+                elif type(frame) is io.BytesIO:
+                    b = frame.read()
                 else:
-                    arr = numpy.array(frame)
-                b = arr.tobytes()
+                    b = frame
                 proc.stdin.write(b)
                 time.sleep(0.02)
             proc.stdin.close()

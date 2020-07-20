@@ -120,7 +120,7 @@ class Bot:
 
     # A garbage collector for empty and unassigned objects in the database.
     async def verifyDelete(self, obj):
-        if hasattr(obj, "no_delete"):
+        if not self.ready or hasattr(obj, "no_delete"):
             return
         if obj.checking > utc():
             return
