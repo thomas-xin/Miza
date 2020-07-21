@@ -232,16 +232,13 @@ def rainbow_gif(image, duration):
     # Make sure image is in RGB/HSV format
     if str(image.mode) != "HSV":
         curr = image.convert("HSV")
-        rgb = str(image.mode) == "RGB"
-        if str(image.mode) != "RGBA":
-            image = image.convert("RGBA")
-        if rgb:
-            A = None
-        else:
+        if str(image.mode) == "RGBA":
             A = image.getchannel("A")
+        else:
+            A = None
     else:
-        curr, image = image, image.convert("RGBA")
-        alpha = None
+        curr = image
+        A = None
     channels = list(curr.split())
     if duration < 0:
         rate = -rate
