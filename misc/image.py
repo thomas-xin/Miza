@@ -171,7 +171,6 @@ def create_gif(in_type, args, delay):
     return dict(duration=delay * len(imgs), frames=imgs)
 
 def rainbow_gif2(image, duration):
-    ts = round(time.time() * 1000)
     out = collections.deque()
     total = 0
     for f in range(2147483648):
@@ -275,7 +274,7 @@ def max_size(w, h, maxsize):
     s = w * h
     m = (maxsize * maxsize << 1) / 3
     if s > m:
-        r = m / s
+        r = (m / s) ** 0.5
         w = int(w * r)
         h = int(h * r)
     return w, h
