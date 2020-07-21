@@ -201,11 +201,11 @@ def rainbow_gif2(image, duration):
             temp = image
         if temp.size[0] != size[0] or temp.size[1] != size[1]:
             temp = temp.resize(size, Image.HAMMING)
-        alpha = temp.getchannel("A")
+        A = temp.getchannel("A")
         channels = list(temp.convert("HSV").split())
         channels[0] = channels[0].point(lambda x: int(((f / length / scale * loops + x / 256) % 1) * 256))
         temp = Image.merge("HSV", channels).convert("RGB")
-        temp.putalpha(alpha)
+        temp.putalpha(A)
         out.append(temp)
     return dict(duration=total * scale, frames=out)
 
@@ -236,9 +236,9 @@ def rainbow_gif(image, duration):
         if str(image.mode) != "RGBA":
             image = image.convert("RGBA")
         if rgb:
-            alpha = None
+            A = None
         else:
-            alpha = image.getchannel("A")
+            A = image.getchannel("A")
     else:
         curr, image = image, image.convert("RGBA")
         alpha = None
@@ -251,11 +251,9 @@ def rainbow_gif(image, duration):
     for i in range(0, 256, abs(rate)):
         if i:
             channels[0] = channels[0].point(func)
-            merged = Image.merge("HSV", channels)
-            if alpha is None:
-                image = merged.convert("RGBA")
-            else:
-                image.putalpha(alpha)
+            image = Image.merge("HSV", channels).convert("RGBA")
+            if A is not None:
+                image.putalpha(A)
         out.append(image)
     return dict(duration=1000 / fps * len(out), frames=out)
 
@@ -630,11 +628,9 @@ def hue_shift(image, value):
     channels = list(image.split())
     value *= 256
     channels[0] = channels[0].point(lambda x: (x + value) % 256)
-    image = Image.merge("HSV", channels)
+    image = Image.merge("HSV", channels).convert("RGB")
     if A is not None:
         image.putalpha(A)
-    else:
-        image = image.convert("RGB")
     return image
 
 
