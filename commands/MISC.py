@@ -900,25 +900,24 @@ class UpdateDeviantArt(Database):
                 new = tuple(items)
                 orig = tuple(entries)
                 # O(n) comparison
-                if hash(tuple(sorted(new))) != hash(tuple(sorted(orig))):
-                    if assigned[content].get("reversed", False):
-                        it = reversed(new)
-                    else:
-                        it = new
-                    for i in it:
-                        if i not in entries:
-                            entries[i] = True
-                            self.update()
-                            home = "https://www.deviantart.com/" + items[i][2]
-                            emb = discord.Embed(
-                                colour=discord.Colour(1),
-                                description="🔔 New Deviation from " + items[i][2] + " 🔔\n" + items[i][0],
-                            ).set_image(url=items[i][1]).set_author(name=items[i][2], url=home, icon_url=items[i][3])
-                            embs.append(emb)
-                    for i in orig:
-                        if i not in items:
-                            entries.pop(i)
-                            self.update()
+                if assigned[content].get("reversed", False):
+                    it = reversed(new)
+                else:
+                    it = new
+                for i in it:
+                    if i not in entries:
+                        entries[i] = True
+                        self.update()
+                        home = "https://www.deviantart.com/" + items[i][2]
+                        emb = discord.Embed(
+                            colour=discord.Colour(1),
+                            description="🔔 New Deviation from " + items[i][2] + " 🔔\n" + items[i][0],
+                        ).set_image(url=items[i][1]).set_author(name=items[i][2], url=home, icon_url=items[i][3])
+                        embs.append(emb)
+                for i in orig:
+                    if i not in items:
+                        entries.pop(i)
+                        self.update()
         except:
             print(traceback.format_exc())
         else:

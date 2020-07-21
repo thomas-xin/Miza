@@ -952,6 +952,69 @@ class Magik(Command):
         await sendFile(message.channel, "", f)
 
 
+class Fill(Command):
+    name = ["ImageFill", "FillChannel", "FillImage"]
+    min_level = 0
+    description = "Fills an optional amount of channels in the target image with an optional value."
+    usage = "<0:url{attached_file}> <1*:channels(r)(g)(b)(c)(m)(y)(h)(s)(v)(a)> <-1:value[0]>"
+    no_parse = True
+    rate_limit = 3
+    flags = "l"
+    _timeout_ = 3
+    typing = True
+
+    async def __call__(self, bot, user, guild, channel, message, flags, args, argv, **void):
+        # Take input from any attachments, or otherwise the message contents
+        if message.attachments:
+            args = [bestURL(a) for a in message.attachments] + args
+            argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
+        if not args:
+            raise ArgumentError("Please input an image by URL or attachment.")
+        fut = create_task(channel.trigger_typing())
+        url = args.pop(0)
+        urls = await bot.followURL(url, best=True, allow=True, limit=1)
+        if not urls:
+            urls = await bot.followImage(argv)
+            if not urls:
+                urls = await bot.followImage(url)
+                if not urls:
+                    await fut
+                    raise ArgumentError("Please input an image by URL or attachment.")
+        url = urls[0]
+        if is_numeric(args[-1]):
+            value = await bot.evalMath(args.pop(-1), user)
+            if type(value) is float:
+                if abs(value) <= 1:
+                    value = round(value * 255)
+                else:
+                    raise ValueError("invalid non-integer input value.")
+        else:
+            value = 0
+        if not args:
+            args = "rgb"
+        # Try and find a good name for the output image
+        try:
+            name = url[url.rindex("/") + 1:]
+            if not name:
+                raise ValueError
+            if "." in name:
+                name = name[:name.rindex(".")]
+        except ValueError:
+            name = "unknown"
+        if not name.endswith(".png"):
+            name += ".png"
+        resp = await imageProc(url, "fill_channels", [value, *args], user, timeout=36)
+        fn = resp[0]
+        if fn.endswith(".gif"):
+            if not name.endswith(".gif"):
+                if "." in name:
+                    name = name[:name.rindex(".")]
+                name += ".gif"
+        f = discord.File(fn, filename=name)
+        await fut
+        await sendFile(message.channel, "", f, filename=fn)
+
+
 class Blend(Command):
     name = ["ImageBlend", "ImageOP"]
     min_level = 0

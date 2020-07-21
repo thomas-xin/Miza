@@ -231,8 +231,10 @@ def strActivity(activity):
 
 # Alphanumeric string regular expression.
 atrans = re.compile("[^a-z 0-9]", re.I)
+ntrans = re.compile("[0-9]", re.I)
 is_alphanumeric = lambda string: not re.search(atrans, string)
 to_alphanumeric = lambda string: singleSpace(re.sub(atrans, " ", reconstitute(string)))
+is_numeric = lambda string: re.search(ntrans, string)
 
 
 # Strips code box from the start and end of a message.

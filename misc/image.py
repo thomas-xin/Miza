@@ -48,7 +48,7 @@ urlIs = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
 isURL = lambda url: re.search(urlIs, url)
 
 
-from_colour = lambda colour, size=128, key=None: Image.fromarray(numpy.tile(numpy.array(colour, dtype=numpy.uint8), (size, size, 1)))
+from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), colour) #Image.fromarray(numpy.tile(numpy.array(colour, dtype=numpy.uint8), (size, size, 1)))
 
 
 sizecheck = re.compile("[1-9][0-9]*x[0-9]+")
@@ -165,8 +165,8 @@ def create_gif(in_type, args, delay):
                 if not imgs:
                     size = max_size(img.width, img.height, maxsize)
                 img = resize_to(img, *size, operation="hamming")
-                if str(img.mode) != "RGB":
-                    img = img.convert("RGB")
+                if str(img.mode) != "RGBA":
+                    img = img.convert("RGBA")
                 imgs.append(img)
     return dict(duration=delay * len(imgs), frames=imgs)
 
@@ -201,12 +201,11 @@ def rainbow_gif2(image, duration):
             temp = image
         if temp.size[0] != size[0] or temp.size[1] != size[1]:
             temp = temp.resize(size, Image.HAMMING)
-        alpha = temp.split()[-1]
+        alpha = temp.getchannel("A")
         channels = list(temp.convert("HSV").split())
         channels[0] = channels[0].point(lambda x: int(((f / length / scale * loops + x / 256) % 1) * 256))
-        channels = list(Image.merge("HSV", channels).convert("RGB").split())
-        channels.append(alpha)
-        temp = Image.merge("RGBA", channels)
+        temp = Image.merge("HSV", channels).convert("RGB")
+        temp.putalpha(alpha)
         out.append(temp)
     return dict(duration=total * scale, frames=out)
 
@@ -239,7 +238,7 @@ def rainbow_gif(image, duration):
         if rgb:
             alpha = None
         else:
-            alpha = image.split()[-1]
+            alpha = image.getchannel("A")
     else:
         curr, image = image, image.convert("RGBA")
         alpha = None
@@ -256,9 +255,7 @@ def rainbow_gif(image, duration):
             if alpha is None:
                 image = merged.convert("RGBA")
             else:
-                res = list(merged.convert("RGB").split())
-                res.append(alpha)
-                image = Image.merge("RGBA", res)
+                image.putalpha(alpha)
         out.append(image)
     return dict(duration=1000 / fps * len(out), frames=out)
 
@@ -343,6 +340,89 @@ def resize_to(image, w, h, operation="auto"):
     else:
         raise TypeError("Invalid image operation: \"" + op + '"')
     return image.resize([w, h], filt)
+
+
+channel_map = {
+    "alpha": -1,
+    "a": -1,
+    "red": 0,
+    "r": 0,
+    "green": 1,
+    "g": 1,
+    "blue": 2,
+    "b": 2,
+    "cyan": 3,
+    "c": 3,
+    "magenta": 4,
+    "m": 4,
+    "yellow": 5,
+    "y": 5,
+    "hue": 6,
+    "h": 6,
+    "saturation": 7,
+    "sat": 7,
+    "s": 7,
+    "luminance": 8,
+    "lum": 8,
+    "l": 8,
+    "v": 8
+}
+
+def fill_channels(image, colour, *channels):
+    channels = list(channels)
+    ops = {}
+    for c in channels:
+        try:
+            cid = channel_map[c]
+        except KeyError:
+            if len(c) <= 1:
+                raise TypeError("invalid colour identifier: " + c)
+            channels.extend(c)
+        else:
+            ops[cid] = None
+    ch = Image.new("L", image.size, colour)
+    if "RGB" not in str(image.mode):
+        image = image.convert("RGB")
+    if -1 in ops:
+        image.putalpha(ch)
+    mode = image.mode
+    rgb = False
+    for i in range(3):
+        if i in ops:
+            rgb = True
+    if rgb:
+        spl = list(image.split())
+        for i in range(3):
+            if i in ops:
+                spl[i] = ch
+        image = Image.merge(mode, spl)
+    cmy = False
+    for i in range(3, 6):
+        if i in ops:
+            cmy = True
+    if cmy:
+        spl = list(ImageChops.invert(image).split())
+        for i in range(3, 6):
+            if i in ops:
+                spl[i - 3] = ch
+        image = ImageChops.invert(Image.merge(mode, spl))
+    hsv = False
+    for i in range(6, 9):
+        if i in ops:
+            hsv = True
+    if hsv:
+        if str(image.mode) == "RGBA":
+            A = image.getchannel("A")
+        else:
+            A = None
+        spl = list(image.convert("HSV").split())
+        for i in range(6, 9):
+            if i in ops:
+                spl[i - 6] = ch
+        image = Image.merge("HSV", spl).convert("RGB")
+        if A is not None:
+            image.putalpha(A)
+    return image
 
 
 # Image blend operations (this is a bit of a mess)
@@ -488,11 +568,11 @@ def blend_op(image, url, operation, amount, recursive=True):
         elif filt.startswith("SP_"):
             f = filt[3:]
             if str(image.mode) == "RGBA":
-                A1 = image.split()[-1]
+                A1 = image.getchannel("A")
             else:
                 A1 = None
             if str(image2.mode) == "RGBA":
-                A2 = image2.split()[-1]
+                A2 = image2.getchannel("A")
             else:
                 A2 = None
             if str(image.mode) != "HSV":
@@ -507,17 +587,15 @@ def blend_op(image, url, operation, amount, recursive=True):
                 channels = [channels[0], channels2[1], channels[2]]
             elif f == "LUM":
                 channels = [channels[0], channels[1], channels2[2]]
-            out = Image.merge("RGB", channels)
+            out = Image.merge("HSV", channels).convert("RGB")
             if A1 or A2:
-                out = out.convert("RGBA")
-                spl = list(out.split())
                 if not A1:
                     A = A2
                 elif not A2:
                     A = A1
                 else:
                     A = ImageMath.eval("max(X,Y)", dict(X=A1, Y=A2)).convert("L")
-                spl[-1] = A
+                out.putalpha(A)
         # Otherwise attempt to find as ImageChops filter
         else:
             if str(image.mode) != str(image2.mode):
@@ -544,7 +622,7 @@ Enhance = lambda image, operation, value: getattr(ImageEnhance, operation)(image
 # Hueshift image using HSV channels
 def hue_shift(image, value):
     if str(image.mode) == "RGBA":
-        A = image.split()[-1]
+        A = image.getchannel("A")
     else:
         A = None
     if str(image.mode) != "HSV":
@@ -554,9 +632,7 @@ def hue_shift(image, value):
     channels[0] = channels[0].point(lambda x: (x + value) % 256)
     image = Image.merge("HSV", channels)
     if A is not None:
-        channels = list(image.convert("RGBA").split())
-        channels[-1] = A
-        image = Image.merge("RGBA", channels)
+        image.putalpha(A)
     else:
         image = image.convert("RGB")
     return image
