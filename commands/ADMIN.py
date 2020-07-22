@@ -114,7 +114,9 @@ class Ban(Command):
             )
         update = self.bot.database.bans.update
         ts = utc()
-        banlist = bot.data.bans.get(guild.id, [])
+        banlist = bot.data.bans.get(guild.id, hlist())
+        if type(banlist) is not hlist:
+            banlist = bot.data.bans[guild.id] = hlist(banlist)
         fut = create_task(channel.trigger_typing())
         try:
             bans, glob = await self.getBans(guild)
@@ -198,8 +200,8 @@ class Ban(Command):
             if not p < 0 and not isValid(p):
                 await channel.send("```py\nError: " + repr(PermissionError(
                     str(user) + " has infinite permission level, "
-                    + "and cannot be banned from this server.```"
-                )))
+                    + "and cannot be banned from this server."
+                )) + "```")
                 continue
             elif not p + 1 <= perm and not isnan(perm):
                 reason = "to ban " + str(user) + " from " + guild.name

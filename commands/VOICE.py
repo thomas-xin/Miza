@@ -546,7 +546,7 @@ class CustomAudio(discord.AudioSource):
             opt = "anequalizer="
             width = 4096
             x = round(sqrt(1 + abs(stats.bassboost)), 5)
-            coeff = width * max(0.0625, (0.25 / x))
+            coeff = width * max(0.03125, (0.25 / x))
             ch = " f=" + str(coeff if stats.bassboost > 0 else width - coeff) + " w=" + str(coeff / 2) + " g=" + str(max(0.5, min(48, 4 * math.log2(x * 5))))
             opt += "c0" + ch + "|c1" + ch
             options.append(opt)

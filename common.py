@@ -394,7 +394,7 @@ def procUpdate():
                     stderr=subprocess.PIPE,
                 )
             else:
-                raise TypeError("Invalid subpool " + pname)
+                raise TypeError("invalid subpool " + pname)
             proc.busy = nan
             x = bytes(random.randint(0, 255) for _ in loop(32))
             if random.randint(0, 1):
@@ -407,19 +407,18 @@ def procUpdate():
             procs.append(proc)
         att = 0
         while count > b + 2:
-            for p in range(len(procs)):
-                if p < len(procs):
-                    proc = procs[p]
-                    # Busy variable indicates when the last operation finished;
-                    # processes that are idle longer than 1 hour are automatically terminated
-                    if utc() - proc.busy > 3600:
-                        forceKill(proc)
-                        procs.pop(p)
-                        break
-                else:
+            found = False
+            for p, proc in enumerate(procs):
+                # Busy variable indicates when the last operation finished;
+                # processes that are idle longer than 1 hour are automatically terminated
+                if utc() - proc.busy > 3600:
+                    forceKill(proc)
+                    procs.pop(p)
+                    found = True
+                    count -= 1
                     break
             att += 1
-            if att >= 16:
+            if att >= 16 or not found:
                 break
 
 # Sends an operation to the math subprocess pool.

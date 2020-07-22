@@ -505,7 +505,7 @@ def blend_op(image, url, operation, amount, recursive=True):
             except EOFError:
                 image2.seek(0)
             else:
-                out = deque()
+                out = collections.deque()
                 for f in range(2147483648):
                     try:
                         image2.seek(f)
