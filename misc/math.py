@@ -504,8 +504,8 @@ def evalSym(f, prec=64, r=False):
         p = prettyAns(f)
         if p == convAns(e):
             p = ""
-        if "." in e:
-            e = e.rstrip("0")
+        if "." in str(e):
+            e = str(e).rstrip("0")
         return [e, p]
     else:
         p = prettyAns(f)
