@@ -469,6 +469,9 @@ class CustomAudio(discord.AudioSource):
         else:
             args = []
         options = deque()
+        # This must be first, else the filter will not initialize properly
+        if not isValid(stats.compressor):
+            options.extend(("anoisesrc=a=.001953125:c=brown", "amerge"))
         # Reverses song, this may be very resource consuming
         if self.reverse:
             options.append("areverse")
@@ -528,8 +531,6 @@ class CustomAudio(discord.AudioSource):
         # Compressor setting, this needs a bit of tweaking perhaps
         if stats.compressor:
             comp = min(8000, abs(stats.compressor + sgn(stats.compressor)))
-            if not isValid(stats.compressor):
-                options.extend(("anoisesrc=a=.001953125:c=brown", "amerge"))
             while abs(comp) > 1:
                 c = min(20, comp)
                 try:
