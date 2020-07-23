@@ -370,6 +370,12 @@ def subKill():
         ptype.busy.clear()
     procUpdate()
 
+# Updates process pools once every 120 seconds.
+def procUpdater():
+    while True:
+        procUpdate()
+        time.sleep(120)
+
 # Updates process pool by killing off processes when not necessary, and spawning new ones when required.
 def procUpdate():
     for pname, ptype in SUBS.items():
@@ -420,6 +426,9 @@ def procUpdate():
             att += 1
             if att >= 16 or not found:
                 break
+
+proc_exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+proc_exc.submit(procUpdater)
 
 # Sends an operation to the math subprocess pool.
 async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12, authorize=False):
@@ -675,10 +684,6 @@ async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
     except:
         if exc:
             raise
-
-
-create_future_ex(procUpdate, priority=True)
-
 
 # Manages both sync and async get requests.
 class AutoRequest:
@@ -962,7 +967,7 @@ class __logPrinter:
             except:
                 print(traceback.format_exc())
             time.sleep(1)
-            while "common.py" not in os.listdir() or self.closed:
+            while not os.path.exists("common.py") or self.closed:
                 time.sleep(0.5)
 
     def __call__(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
