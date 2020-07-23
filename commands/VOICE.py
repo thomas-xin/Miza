@@ -537,7 +537,7 @@ class CustomAudio(discord.AudioSource):
                     comp /= c
                 except ZeroDivisionError:
                     comp = 1
-                mult = str(round(c ** 0.58 * math.sqrt(2), 4))
+                mult = str(round((c * math.sqrt(2)) ** 0.5, 4))
                 options.append(
                     "acompressor=mode=" + ("upward" if stats.compressor < 0 else "downward")
                     + ":ratio=" + str(c) + ":level_in=" + mult + ":threshold=0.0625:makeup=" + mult
@@ -588,6 +588,8 @@ class CustomAudio(discord.AudioSource):
         if options:
             if not stats.compressor:
                 options.append("asoftclip=atan")
+            else:
+                options.append("alimiter")
             args.append(("-af", "-filter_complex")[bool(reverb)])
             args.append(",".join(options))
         # print(args)
