@@ -586,7 +586,8 @@ class CustomAudio(discord.AudioSource):
             options.append("volume=" + str(round(stats.volume, 7)))
         # Soft clip audio using atan, reverb filter requires -filter_complex rather than -af option
         if options:
-            options.append("asoftclip=atan")
+            if not stats.compressor:
+                options.append("asoftclip=atan")
             args.append(("-af", "-filter_complex")[bool(reverb)])
             args.append(",".join(options))
         # print(args)
