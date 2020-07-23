@@ -2352,6 +2352,10 @@ async def on_guild_channel_delete(channel):
 @client.event
 async def on_webhooks_update(channel):
     webhooks = await channel.webhooks()
+    for w in bot.cw_cache.get(channel.id, {}).values():
+        if w not in webhooks:
+            bot.cw_cache[channel.id].pop(w.id)
+            bot.cache.users.pop(w.id)
     for w in webhooks:
         bot.add_webhook(w)
 
