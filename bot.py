@@ -1944,7 +1944,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             reacts="❎",
                         ))
     # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
-    if not run and u_id != client.user.id and not u_perm <= -inf:
+    if not run and u_id != client.user.id:
         temp = to_alphanumeric(cpy).lower()
         await bot.event("_nocommand_", text=temp, edit=edit, orig=orig, message=message, perm=u_perm)
     # Return the delay before the message can be called again. This is calculated by the rate limit of the command.

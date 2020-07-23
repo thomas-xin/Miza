@@ -746,6 +746,8 @@ class UpdateMimics(Database):
         if user.id in self.data:
             bot = self.bot
             perm = bot.getPerms(user.id, message.guild)
+            if perm < 0:
+                return
             admin = not inf > perm
             if message.guild is not None:
                 try:
