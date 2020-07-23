@@ -652,7 +652,7 @@ class Info(Command):
             elif s in (discord.Status.offline, discord.Status.invisible):
                 status = "Offline ⚫"
         if member:
-            role = ", ".join("<@&" + str(i.id) + ">" for i in getattr(u, "roles", ()) if not i.is_default())
+            role = ", ".join("<@&" + str(i.id) + ">" for i in reversed(getattr(u, "roles", ())) if not i.is_default())
         else:
             role = None
         coms = seen = msgs = avgs = gmsg = old = 0
