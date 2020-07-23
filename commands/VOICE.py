@@ -463,6 +463,7 @@ class CustomAudio(discord.AudioSource):
         pitchscale = 2 ** ((stats.pitch + stats.resample) / 12)
         chorus = min(16, abs(stats.chorus))
         reverb = stats.reverb
+        volume = stats.volume
         # FIR sample for reverb
         if reverb:
             args = ["-i", "misc/SNB3,0all.wav"]
@@ -527,7 +528,7 @@ class CustomAudio(discord.AudioSource):
                 + C + ":"
                 + D
             )
-            options.append("volume=2")
+            volume *= 2
         # Compressor setting, this needs a bit of tweaking perhaps
         if stats.compressor:
             comp = min(8000, abs(stats.compressor + sgn(stats.compressor)))
@@ -558,7 +559,7 @@ class CustomAudio(discord.AudioSource):
             # Split audio into 2 inputs if wet setting is between 0 and 1, one input passes through FIR filter
             if wet != 1:
                 options.append("asplit[2]")
-            options.append("volume=1.2")
+            volume *= 1.2
             options.append("afir=dry=10:wet=10")
             # Must include amix if asplit is used
             if wet != 1:
@@ -579,17 +580,15 @@ class CustomAudio(discord.AudioSource):
                 except ZeroDivisionError:
                     pan = 1
                 options.append("extrastereo=m=" + str(p) + ":c=0")
-                v = 1 / max(1, round(math.sqrt(abs(p)), 4))
-                if v != 1:
-                    options.append("volume=" + str(v))
-        if stats.volume != 1:
-            options.append("volume=" + str(round(stats.volume, 7)))
+                volume *= 1 / max(1, round(math.sqrt(abs(p)), 4))
+        if volume != 1:
+            options.append("volume=" + str(round(volume, 7)))
         # Soft clip audio using atan, reverb filter requires -filter_complex rather than -af option
         if options:
-            if not stats.compressor:
-                options.append("asoftclip=atan")
-            else:
+            if stats.compressor:
                 options.append("alimiter")
+            elif volume > 1:
+                options.append("asoftclip=atan")
             args.append(("-af", "-filter_complex")[bool(reverb)])
             args.append(",".join(options))
         # print(args)

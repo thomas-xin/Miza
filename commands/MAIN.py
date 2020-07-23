@@ -59,7 +59,7 @@ class Help(Command):
                     break
                 coms = found[k]
                 for com in coms:
-                    a = ", ".join(com.name)
+                    a = ", ".join(n.strip("_") for n in com.name)
                     if not a:
                         a = "[none]"
                     s = "```ini\n[Aliases] " + a
@@ -71,7 +71,7 @@ class Help(Command):
                         )
                     s += "```"
                     emb.add_field(
-                        name=prefix + com.__name__,
+                        name=prefix + com.__name__.strip("_"),
                         value=s,
                         inline=False
                     )

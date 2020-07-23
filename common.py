@@ -691,11 +691,11 @@ class AutoRequest:
         async with self.semaphore:
             async with self.session.get(url, headers=headers, data=data) as resp:
                 if resp.status >= 400:
-                    text = await resp.read()
-                    raise ConnectionError("Error " + str(resp.status) + ": " + text.decode("utf-8", "replace"))
+                    data = await resp.read()
+                    raise ConnectionError("Error " + str(resp.status) + ": " + data.decode("utf-8", "replace"))
                 data = await resp.read()
                 if decode:
-                    data = data.decode("utf-8", "replace")
+                    return data.decode("utf-8", "replace")
                 return data
 
     def __call__(self, url, headers={}, data=None, raw=False, timeout=8, bypass=True, decode=False, aio=False):
@@ -711,7 +711,7 @@ class AutoRequest:
             else:
                 data = resp.content
             if decode:
-                data = data.decode("utf-8", "replace")
+                return data.decode("utf-8", "replace")
             return data
 
 Request = AutoRequest()
