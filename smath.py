@@ -1486,13 +1486,12 @@ def intKey(d):
 utc = time.time
 utc_dt = datetime.datetime.utcnow
 ep = datetime.datetime(1970, 1, 1)
-ep_ts = ep.timestamp()
 
 def utc_ts(dt):
     try:
         return (dt - ep).total_seconds()
     except TypeError:
-        return dt.replace(tzinfo=datetime.timezone.utc).timestamp() - ep_ts
+        return dt.replace(tzinfo=datetime.timezone.utc).timestamp()
 
 # utc_ts = lambda dt: dt.replace(tzinfo=datetime.timezone.utc).timestamp()
 
