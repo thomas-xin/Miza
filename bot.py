@@ -1011,7 +1011,7 @@ class Bot:
         "minute": ("m", "min", "minute", "mins", "minutes"),
         "second": ("s", "sec", "second", "secs", "seconds"),
     }
-    andcheck = re.compile("[^a-z](and)[^a-z]", re.I)
+    connectors = re.compile("[^a-z](and|at)[^a-z]", re.I)
     alphabet = "abcdefghijklmnopqrstuvwxyz"
 
     # Evaluates a time input, using a math process from the subprocess pool when necessary.
@@ -1058,7 +1058,7 @@ class Bot:
                             raise TypeError("Too many time arguments.")
                 else:
                     # Otherwise move on to main parser
-                    f = re.sub(self.andcheck, " ", expr).lower()
+                    f = re.sub(self.connectors, " ", expr).lower()
                     for tc in self.timeChecks:
                         for check in reversed(self.timeChecks[tc]):
                             if check in f:

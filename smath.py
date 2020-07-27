@@ -1486,7 +1486,14 @@ def intKey(d):
 utc = time.time
 utc_dt = datetime.datetime.utcnow
 ep = datetime.datetime(1970, 1, 1)
-utc_ts = lambda dt: (dt - ep).total_seconds()
+ep_ts = ep.timestamp()
+
+def utc_ts(dt):
+    try:
+        return (dt - ep).total_seconds()
+    except TypeError:
+        return dt.replace(tzinfo=datetime.timezone.utc).timestamp() - ep_ts
+
 # utc_ts = lambda dt: dt.replace(tzinfo=datetime.timezone.utc).timestamp()
 
 # Values in seconds of various time intervals.
@@ -1845,7 +1852,7 @@ custom list-like data structure that incorporates the functionality of np arrays
     @waiting
     def __matmul__(self, other):
         temp1 = self.view()
-        temp2 = self.forceTuple(other)
+        temp2 = self.createIterator(other)
         result = temp1 @ temp2
         return self.__class__(result)
 
@@ -2074,18 +2081,6 @@ custom list-like data structure that incorporates the functionality of np arrays
         return item in self.view()
 
     __copy__ = lambda self: self.copy()
-
-    # Converts the target value to a tuple, casting to a 1-tuple if necessary.
-    def forceTuple(self, value):
-        try:
-            return tuple(value)
-        except TypeError:
-            return (value,)
-
-    # Returns a generator containing an infinite amount of the input value.
-    def constantIterator(self, other):
-        while True:
-            yield other
 
     # Creates an iterable from an iterator, making sure the shape matches.
     def createIterator(self, other, force=False):

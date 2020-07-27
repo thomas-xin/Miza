@@ -1111,7 +1111,7 @@ class Reminder(Command):
             content = message.embeds[0].description
         i = content.index("callback")
         content = content[:i] + (
-            "callback-image-img-"
+            "callback-main-reminder-"
             + str(u_id) + "_" + str(pos) + "_" + str(s_id)
             + "-\n"
         )
