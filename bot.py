@@ -1444,6 +1444,7 @@ class Bot:
     async def updateEmbeds(self):
         if not self.ready:
             return
+        sent = False
         for s_id in tuple(self.embedSenders):
             embeds = self.embedSenders[s_id]
             embs = deque()
@@ -1457,6 +1458,7 @@ class Bot:
             if not embeds:
                 self.embedSenders.pop(s_id)
             create_task(self.sendEmbedsTo(s_id, embs))
+            sent = True
         return sent
 
     # For compatibility with guild objects, takes a user and DM channel.
