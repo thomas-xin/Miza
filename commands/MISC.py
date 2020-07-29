@@ -514,7 +514,7 @@ class UpdateDogpiles(Database):
                         if curr[1] >= 3:
                             curr[1] = xrand(-3) + 1
                             if len(checker):
-                                create_task(message.channel.send(checker))
+                                create_task(message.channel.send(checker, tts=message.tts))
                     else:
                         # Don't imitate messages longer than 128 characters to prevent spam
                         if len(checker) > 128:

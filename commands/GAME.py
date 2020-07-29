@@ -721,15 +721,20 @@ class MimicSend(Command):
             raise PermissionError("Not permitted to send into target channel.")
         if m:
             msg = escape_everyone(msg)
+            if msg.startswith("/tts "):
+                msg = msg[5:]
+                tts = True
+            else:
+                tts = False
             for mimic in m:
                 await bot.database.mimics.updateMimic(mimic, guild)
                 name = mimic.name
                 url = mimic.url
                 try:
-                    await waitOnNone(w.send(msg, username=name, avatar_url=url))
+                    await waitOnNone(w.send(msg, username=name, avatar_url=url, tts=tts))
                 except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                     w = await bot.ensureWebhook(channel, force=True)
-                    await waitOnNone(w.send(msg, username=name, avatar_url=url))
+                    await waitOnNone(w.send(msg, username=name, avatar_url=url, tts=tts))
                 mimic.count += 1
                 mimic.total += len(msg)
             create_task(message.add_reaction("👀"))
@@ -790,11 +795,16 @@ class UpdateMimics(Database):
                             name = mimic.name
                             url = mimic.url
                             msg = escape_everyone(k.msg)
+                            if msg.startswith("/tts "):
+                                msg = msg[5:]
+                                tts = True
+                            else:
+                                tts = False
                             try:
-                                await waitOnNone(w.send(msg, username=name, avatar_url=url))
+                                await waitOnNone(w.send(msg, username=name, avatar_url=url, tts=tts))
                             except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                                 w = await bot.ensureWebhook(channel, force=True)
-                                await waitOnNone(w.send(msg, username=name, avatar_url=url))
+                                await waitOnNone(w.send(msg, username=name, avatar_url=url, tts=tts))
                             mimic.count += 1
                             mimic.total += len(k.msg)
                 except Exception as ex:
