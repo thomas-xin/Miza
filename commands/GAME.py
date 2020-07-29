@@ -367,7 +367,7 @@ class MimicConfig(Command):
     no_parse = True
     rate_limit = 1
     
-    async def __call__(self, bot, user, perm, flags, args, **void):
+    async def __call__(self, bot, user, message, perm, flags, args, **void):
         update = self.data.mimics.update
         mimicdb = bot.data.mimics
         m_id = "&" + str(verifyID(args.pop(0)))
