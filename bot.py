@@ -1401,15 +1401,18 @@ class Bot:
                 return
             w = await self.bot.ensureWebhook(channel)
             try:
-                await waitOnNone(w.send(embeds=embeds, username=m.display_name, avatar_url=bestURL(m)), seconds=1)
-                await seen(client.user, event="message", count=len(embs), raw="Sending a message")
+                await w.send(embeds=embeds, username=m.display_name, avatar_url=bestURL(m))
             except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                 w = await self.bot.ensureWebhook(channel, force=True)
-                await waitOnNone(w.send(embeds=embeds, username=m.display_name, avatar_url=bestURL(m)), seconds=1)
-                await seen(client.user, event="message", count=len(embs), raw="Sending a message")
+                await w.send(embeds=embeds, username=m.display_name, avatar_url=bestURL(m))
+            await seen(client.user, event="message", count=len(embeds), raw="Sending a message")
         except Exception as ex:
             print(traceback.format_exc())
             await sendReact(channel, "```py\n" + repr(ex) + "```", reacts="❎")
+    
+    async def sendEmbedsTo(self, s_id, embs):
+        sendable = await self.fetch_sendable(s_id)
+        await self.sendEmbeds(sendable, embs)
 
     # Adds embeds to the embed sender, waiting for the next update event.
     def embedSender(self, channel, embeds=None, embed=None):
@@ -1436,16 +1439,11 @@ class Bot:
         else:
             embs = setDict(self.embedSenders, c_id, [])
             embs.extend(embeds)
-    
-    async def sendEmbedsTo(self, s_id, embs):
-        sendable = await self.fetch_sendable(s_id)
-        await self.sendEmbeds(sendable, embs)
 
     # Updates all embed senders.
     async def updateEmbeds(self):
         if not self.ready:
             return
-        sent = [create_task(self.sendEmbedsTo(s_id, embs)) for s_id, embs in self.embedSenders.items() if embs]
         for s_id in tuple(self.embedSenders):
             embeds = self.embedSenders[s_id]
             embs = deque()
