@@ -1400,25 +1400,13 @@ class Bot:
                     await asyncio.sleep(0.5)
                 return
             w = await self.bot.ensureWebhook(channel)
-            # Send embeds in groups of up to 10, up to 6000 characters
-            embs = deque()
-            for emb in embeds:
-                if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
-                    try:
-                        await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)), seconds=1)
-                    except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
-                        w = await self.bot.ensureWebhook(channel, force=True)
-                        await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)), seconds=1)
-                    embs.clear()
-                embs.append(emb)
-            if embs:
-                try:
-                    await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)), seconds=1)
-                    await seen(client.user, event="message", count=len(embs), raw="Sending a message")
-                except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
-                    w = await self.bot.ensureWebhook(channel, force=True)
-                    await waitOnNone(w.send(embeds=embs, username=m.display_name, avatar_url=bestURL(m)), seconds=1)
-                    await seen(client.user, event="message", count=len(embs), raw="Sending a message")
+            try:
+                await waitOnNone(w.send(embeds=embeds, username=m.display_name, avatar_url=bestURL(m)), seconds=1)
+                await seen(client.user, event="message", count=len(embs), raw="Sending a message")
+            except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
+                w = await self.bot.ensureWebhook(channel, force=True)
+                await waitOnNone(w.send(embeds=embeds, username=m.display_name, avatar_url=bestURL(m)), seconds=1)
+                await seen(client.user, event="message", count=len(embs), raw="Sending a message")
         except Exception as ex:
             print(traceback.format_exc())
             await sendReact(channel, "```py\n" + repr(ex) + "```", reacts="❎")
@@ -1458,7 +1446,19 @@ class Bot:
         if not self.ready:
             return
         sent = [create_task(self.sendEmbedsTo(s_id, embs)) for s_id, embs in self.embedSenders.items() if embs]
-        self.embedSenders.clear()
+        for s_id in tuple(self.embedSenders):
+            embeds = self.embedSenders[s_id]
+            embs = deque()
+            for emb in embeds:
+                # Send embeds in groups of up to 10, up to 6000 characters
+                if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
+                    break
+                embs.append(emb)
+            # Left over embeds are placed back in embed sender
+            self.embedSenders[s_id] = embeds = embeds[len(embs):]
+            if not embeds:
+                self.embedSenders.pop(s_id)
+            create_task(self.sendEmbedsTo(s_id, embs))
         return sent
 
     # For compatibility with guild objects, takes a user and DM channel.
