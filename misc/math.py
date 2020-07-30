@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sympy, time, sys, traceback, random, numpy, collections
+import sympy, time, os, sys, subprocess, traceback, random, numpy, collections
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
 import matplotlib.pyplot as plt
@@ -241,9 +241,39 @@ def integrate(*args, **kwargs):
     except ValueError:
         return sympy.integrate(*plotArgs(args), sympy.Symbol("x"))
 
-# TODO: Implement a SIQS or ECM factorization algorithm, SymPy's one can be rather slow
+if os.name == "nt":
+    def _factorint(n, **kwargs):
+        try:
+            n = str(n)
+            if "." in n:
+                raise TypeError
+            int(n)
+        except (TypeError, ValueError):
+            raise ValueError(n + " is not an integer")
+        data = subprocess.check_output("misc/ecm.exe " + n).decode("utf-8").replace(" ", "")
+        if "<li>" not in data:
+            if not data:
+                raise RuntimeError("no output found.")
+            raise ValueError(data)
+        data = data[data.index("<li>") + 4:]
+        data = data[:data.index("</li>")]
+        if data.endswith("isprime"):
+            data = data[:-7]
+        else:
+            data = data[data.rindex("=") + 1:]
+        factors = {}
+        for factor in data.split("*"):
+            if "^" in factor:
+                k, v = factor.split("^")
+            else:
+                k, v = factor, 1
+            factors[int(k)] = int(v)
+        return factors
+else:
+    _factorint = sympy.factorint
+
 def factorize(*args, **kwargs):
-    temp = sympy.factorint(*args, **kwargs)
+    temp = _factorint(*args, **kwargs)
     output = []
     for k in temp:
         for _ in range(temp[k]):
@@ -278,6 +308,14 @@ def _eval(func, glob=None, loc=None, key=None, **void):
 
 # Allowed functions for ~math
 _globals = dict(sympy.__dict__)
+pop = (
+    "init_printing",
+    "init_session",
+    "seterr",
+    "factorint",
+)
+for i in pop:
+    _globals.pop(i)
 plots = (
     "plot",
     "plot_parametric",
@@ -298,7 +336,8 @@ _globals.update({
     "dice": dice,
     "plt": plot,
     "lim": lim,
-    "factors": sympy.factorint,
+    "factorint": _factorint,
+    "factors": _factorint,
     "factorize": factorize,
     "factor": factorize,
     "intg": integrate,
@@ -328,13 +367,6 @@ _globals.update({
     "C": 299792458,
     "G": 6.6743015e-11,
 })
-pop = (
-    "init_printing",
-    "init_session",
-    "seterr",
-)
-for i in pop:
-    _globals.pop(i)
 pop = (
     "open",
     "input",

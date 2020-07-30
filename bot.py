@@ -987,7 +987,7 @@ class Bot:
         return roundMin(float(x))
 
     # Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
-    async def solveMath(self, f, obj, prec, r, authorize=False):
+    async def solveMath(self, f, obj, prec, r, timeout=12, authorize=False):
         f = f.strip()
         try:
             if obj is None or hasattr(obj, "ghost"):
@@ -996,7 +996,7 @@ class Bot:
                 key = obj.id
         except AttributeError:
             key = int(obj)
-        return await mathProc(f, int(prec), int(r), key, authorize=authorize)
+        return await mathProc(f, int(prec), int(r), key, timeout=12, authorize=authorize)
 
     timeChecks = {
         "galactic year": ("gy", "galactic year", "galactic years"),
@@ -1682,10 +1682,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         try:
             enabled = bot.data.enabled[c_id]
         except KeyError:
-            try:
-                enabled = ["main", "string", "admin"]
-            except KeyError:
-                enabled = ["main", "admin"]
+            enabled = ["main", "string", "admin"]
     else:
         enabled = list(bot.categories)
     u_perm = bot.getPerms(u_id, guild)
@@ -1785,16 +1782,17 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                     d[u_id] = max(t, utc())
                                 else:
                                     raise TooManyRequests("Command has a rate limit of " + sec2Time(x) + "; please wait " + sec2Time(-wait) + ".")
-                        # Parse command flags (this is a bit of a mess)
                         flags = {}
                         if cb_argv is not None:
                             argv = cb_argv
                             if loop:
                                 incDict(flags, h=1)
                         if argv:
+                            # Commands by default always parse unicode fonts as regular text unless otherwise specified.
                             if not hasattr(command, "no_parse"):
                                 argv = reconstitute(argv)
                             argv = argv.strip()
+                            # Parse command flags (this is a bit of a mess)
                             if hasattr(command, "flags"):
                                 flaglist = command.flags
                                 for q in "?-+":

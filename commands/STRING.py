@@ -124,7 +124,7 @@ class Math(Command):
             raise ArgumentError("Input string is empty.")
         r = "r" in flags
         p = flags.get("v", 0) * 2 + 1 << 6
-        resp = await bot.solveMath(argv, user, p, r)
+        resp = await bot.solveMath(argv, user, p, r, timeout=24)
         # Determine whether output is a direct answer or a file
         if type(resp) is dict and "file" in resp:
             await channel.trigger_typing()
@@ -191,7 +191,7 @@ class Time2ID(Command):
 class Fancy(Command):
     name = ["FancyText"]
     min_level = 0
-    description = "Creates a representation of a text string using unicode fonts."
+    description = "Creates translations of a string using unicode fonts."
     usage = "<string>"
     no_parse = True
 
@@ -214,7 +214,7 @@ class Fancy(Command):
 class Zalgo(Command):
     name = ["ZalgoText"]
     min_level = 0
-    description = "Generates random accent symbols between characters in a text string."
+    description = "Generates random combining accent symbols between characters in a string."
     usage = "<string>"
     no_parse = True
     # This is a bit unintuitive with the character IDs
@@ -238,6 +238,30 @@ class Zalgo(Command):
 
 
 class OwOify(Command):
+    maps = [
+        {
+            "r": "w",
+            "R": "W",
+            "l": "w",
+            "L": "w",
+        },
+        {
+            "n": "ny",
+            "N": "NY",
+            "r": "w",
+            "R": "W",
+            "l": "w",
+            "L": "W",
+        },
+        {
+            "n": "ny",
+            "N": "NY",
+            "r": "w",
+            "R": "W",
+            "l": "w",
+            "L": "W",
+        }
+    ]
     omap = {
         "n": "ny",
         "N": "NY",
@@ -247,9 +271,9 @@ class OwOify(Command):
         "L": "W",
     }
     otrans = "".maketrans(omap)
-    name = ["OwO"]
+    name = ["UwU", "OwO", "UWUify"]
     min_level = 0
-    description = "owo-ifies text."
+    description = "Applies the owo text filter to a string."
     usage = "<string>"
     no_parse = True
 
@@ -257,6 +281,25 @@ class OwOify(Command):
         if not argv:
             raise ArgumentError("Input string is empty.")
         return "```fix\n" + argv.translate(self.otrans) + "```"
+
+
+class AltCaps(Command):
+    min_level = 0
+    description = "Alternates the capitalization on characters in a string."
+    usage = "<string>"
+    no_parse = True
+
+    async def __call__(self, argv, **void):
+        a = argv[::2].lower()
+        b = argv[1::2].upper()
+        if len(a) > len(b):
+            c = a[-1]
+            a = a[:-1]
+        else:
+            c = ""
+        if argv[0].isupper():
+            a, b = b, a
+        return "".join(i[0] + i[1] for i in zip(a, b)) + c
 
 
 class Time(Command):

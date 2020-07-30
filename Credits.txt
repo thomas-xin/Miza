@@ -24,6 +24,9 @@ Gregot Hennig and others
 Fabrice Bellard, Michael Niedermayer and others
 -FFmpeg: A complete, cross-platform solution to record, convert and stream audio and video. {https://ffmpeg.org}
 
+Dario Alpern
+-Integer factorization calculator: {https://github.com/alpertron/calculators}
+
 
 MISC:
 
