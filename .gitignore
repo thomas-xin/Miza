@@ -1,6 +1,7 @@
 __pycache__
 *.json
 *.yml
+*.tmp
 *.zip
 *.vs
 cache
