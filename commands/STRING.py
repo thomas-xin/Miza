@@ -269,7 +269,7 @@ class OwOify(Command):
                     temp[i] = c + "y"
             if "a" in flags and "b" not in flags:
                 for i, c in enumerate(out):
-                    if i > 0 and c in "aeiouAEIOU" and out[i - 1] not in "yYwW \n\t":
+                    if i > 0 and c in "aeiouAEIOU" and out[i - 1] not in "aeiouAEIOUyYwW \n\t":
                         if c.isupper():
                             temp[i] = "W" + c.lower()
                         else:
