@@ -319,12 +319,23 @@ class Time(Command):
         s = 0
         # Only check for timezones if the command was called with alias "t" or "time"
         if args and name in "time":
-            for a in (args[0], args[-1]):
+            for arg in (args[0], args[-1]):
+                a = arg
+                h = 0
+                for op in "+-":
+                    try:
+                        i = arg.index(op)
+                    except ValueError:
+                        continue
+                    a = arg[:i]
+                    h += float(arg[i:])
                 tz = a.lower()
                 if tz in TIMEZONES:
                     s = get_timezone(tz)
                     argv = argv.replace(a, "")
                     break
+                h = 0
+            s += h * 3600
         elif name in TIMEZONES:
             s = TIMEZONES.get(name, 0)
         t = utc_dt()

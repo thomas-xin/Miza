@@ -762,13 +762,23 @@ def tzparse(expr):
             args = shlex.split(expr)
         except ValueError:
             args = expr.split()
-        for a in (args[0], args[-1]):
+        for arg in (args[0], args[-1]):
+            a = arg
+            h = 0
+            for op in "+-":
+                try:
+                    i = arg.index(op)
+                except ValueError:
+                    continue
+                a = arg[:i]
+                h += float(arg[i:])
             tz = a.lower()
             if tz in TIMEZONES:
                 t = get_timezone(tz)
-                expr = expr.replace(a, "")
+                expr = expr.replace(arg, "")
                 break
-        return tparser.parse(expr) - datetime.timedelta(seconds=t)
+            h = 0
+        return tparser.parse(expr) - datetime.timedelta(hours=h, seconds=t)
     return tparser.parse(expr)
 
 
@@ -919,6 +929,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
 class __logPrinter:
 
     def __init__(self, file=None):
+        self.buffer = self
         self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.data = {}
         self.funcs = hlist()
