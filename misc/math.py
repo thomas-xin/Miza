@@ -244,17 +244,18 @@ def integrate(*args, **kwargs):
 if os.name == "nt":
     def _factorint(n, **kwargs):
         try:
-            n = str(n)
-            if "." in n:
+            s = str(n)
+            if "." in s:
                 raise TypeError
-            int(n)
+            if abs(int(s)) < 1 << 64:
+                raise ValueError
         except (TypeError, ValueError):
-            raise ValueError(n + " is not an integer")
-        data = subprocess.check_output("misc/ecm.exe " + n).decode("utf-8").replace(" ", "")
+            return sympy.factorint(n, **kwargs)
+        data = subprocess.check_output("misc/ecm.exe " + s).decode("utf-8").replace(" ", "")
         if "<li>" not in data:
             if not data:
                 raise RuntimeError("no output found.")
-            raise ValueError(data)
+            raise RuntimeError(data)
         data = data[data.index("<li>") + 4:]
         data = data[:data.index("</li>")]
         while "(" in data:
@@ -282,9 +283,8 @@ else:
 def factorize(*args, **kwargs):
     temp = _factorint(*args, **kwargs)
     output = []
-    for k in temp:
-        for _ in range(temp[k]):
-            output.append(k)
+    for k in sorted(temp):
+        output.extend([k] * temp[k])
     return output
 
 def rounder(x):

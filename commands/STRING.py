@@ -238,49 +238,46 @@ class Zalgo(Command):
 
 
 class OwOify(Command):
-    maps = [
-        {
-            "r": "w",
-            "R": "W",
-            "l": "w",
-            "L": "w",
-        },
-        {
-            "n": "ny",
-            "N": "NY",
-            "r": "w",
-            "R": "W",
-            "l": "w",
-            "L": "W",
-        },
-        {
-            "n": "ny",
-            "N": "NY",
-            "r": "w",
-            "R": "W",
-            "l": "w",
-            "L": "W",
-        }
-    ]
     omap = {
-        "n": "ny",
-        "N": "NY",
         "r": "w",
         "R": "W",
         "l": "w",
         "L": "W",
     }
     otrans = "".maketrans(omap)
+    the = re.compile("(?:$|\\s)the(?:^|\\s)")
     name = ["UwU", "OwO", "UWUify"]
     min_level = 0
-    description = "Applies the owo text filter to a string."
-    usage = "<string>"
+    description = "Applies the owo/uwu text filter to a string."
+    usage = "<string> <aggressive(?a)> <basic(?b)>"
+    flags = "ab"
     no_parse = True
 
-    async def __call__(self, argv, **void):
+    async def __call__(self, argv, flags, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        return "```fix\n" + argv.translate(self.otrans) + "```"
+        out = argv.translate(self.otrans)
+        temp = None
+        if "a" in flags or "b" not in flags:
+            temp = list(out)
+            for i, c in enumerate(out):
+                if i > 0 and c in "yY" and out[i - 1] not in "wW":
+                    if c.isupper():
+                        out[i] = "W" + c.lower()
+                    else:
+                        out[i] = "w" + c
+                if i < len(out) - 1 and c in "nN" and out[i + 1] not in "yY \n\t":
+                    out[i] = c + "y"
+            if "a" in flags and "b" not in flags:
+                for i, c in enumerate(out):
+                    if i > 0 and c in "aeiouAEIOU" and out[i - 1] not in "wW \n\t":
+                        if c.isupper():
+                            out[i] = "W" + c.lower()
+                        else:
+                            out[i] = "w" + c
+        if temp is not None:
+            out = "".join(temp)
+        return "```fix\n" + out + "```"
 
 
 class AltCaps(Command):
