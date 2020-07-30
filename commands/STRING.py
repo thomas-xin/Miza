@@ -332,7 +332,7 @@ class Time(Command):
                 tz = a.lower()
                 if tz in TIMEZONES:
                     s = get_timezone(tz)
-                    argv = argv.replace(a, "")
+                    argv = argv.replace(arg, "")
                     break
                 h = 0
             s += h * 3600
