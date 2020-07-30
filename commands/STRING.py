@@ -245,7 +245,6 @@ class OwOify(Command):
         "L": "W",
     }
     otrans = "".maketrans(omap)
-    the = re.compile("(?:$|\\s)the(?:^|\\s)")
     name = ["UwU", "OwO", "UWUify"]
     min_level = 0
     description = "Applies the owo/uwu text filter to a string."
@@ -261,7 +260,7 @@ class OwOify(Command):
         if "a" in flags or "b" not in flags:
             temp = list(out)
             for i, c in enumerate(out):
-                if i > 0 and c in "yY" and out[i - 1] not in "wW":
+                if i > 0 and c in "yY" and out[i - 1] not in "wW \n\t":
                     if c.isupper():
                         temp[i] = "W" + c.lower()
                     else:
@@ -277,6 +276,16 @@ class OwOify(Command):
                             temp[i] = "w" + c
         if temp is not None:
             out = "".join(temp)
+            if "a" in flags:
+                for c in " \n\t":
+                    if c in out:
+                        spl = out.split(c)
+                        for i, w in enumerate(spl):
+                            if w.lower().startswith("th"):
+                                spl[i] = "D" if w[0].isupper() else "d" + w[2:]
+                            elif "th" in w:
+                                spl[i] = w.replace("th", "ff")
+                        out = c.join(spl)
         return "```fix\n" + out + "```"
 
 
