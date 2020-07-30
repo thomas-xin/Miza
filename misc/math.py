@@ -259,7 +259,10 @@ if os.name == "nt":
         data = data[:data.index("</li>")]
         while "(" in data:
             i = data.index("(")
-            j = data.index(")")
+            try:
+                j = data.index(")")
+            except ValueError:
+                break
             data = data[:i] + data[j + 1:]
         if data.endswith("isprime"):
             data = data[:-7]
