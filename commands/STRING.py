@@ -296,15 +296,16 @@ class AltCaps(Command):
     no_parse = True
 
     async def __call__(self, argv, **void):
-        a = argv[::2].lower()
-        b = argv[1::2].upper()
+        i = argv[0].isupper()
+        a = argv[i::2].lower()
+        b = argv[1 - i::2].upper()
+        if i:
+            a, b = b, a
         if len(a) > len(b):
             c = a[-1]
             a = a[:-1]
         else:
             c = ""
-        if argv[0].isupper():
-            a, b = b, a
         return "".join(i[0] + i[1] for i in zip(a, b)) + c
 
 
