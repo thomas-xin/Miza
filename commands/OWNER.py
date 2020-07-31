@@ -91,7 +91,7 @@ class Execute(Command):
         "log": 8,
     })
 
-    async def __call__(self, bot, flags, argv, message, channel, guild, **void):
+    def __call__(self, bot, flags, argv, message, channel, guild, **void):
         update = bot.database.exec.update
         if not argv:
             argv = 0
@@ -170,7 +170,7 @@ class UpdateExec(Database):
         t = utc()
         while self.listeners[channel.id] is None and utc() - t < 86400:
             time.sleep(0.5)
-        return self.listeners.pop(channel.id)
+        return self.listeners.pop(channel.id, None)
 
     # Asynchronously evaluates Python code
     async def procFunc(self, proc, channel, bot, term=0):
@@ -193,15 +193,10 @@ class UpdateExec(Database):
         # Run concurrently to avoid blocking bot itself
         # Attempt eval first, then exec
         try:
-            output = await create_future(eval, proc, glob, priority=True)
+            code = await create_future(compile, proc, "<exec>", "eval", optimize=2, priority=True)
         except SyntaxError:
-            pass
-        else:
-            succ = True
-        if not succ:
-            output = create_future(exec, proc, glob, priority=True)
-        if awaitable(output):
-            output = await output
+            code = await create_future(compile, proc, "<exec>", "exec", optimize=2, priority=True)
+        output = await forceCoro(eval, code, glob, priority=True)
         # Output sent to "_" variable if used
         if output is not None:
             glob["_"] = output 
@@ -283,30 +278,53 @@ class UpdateExec(Database):
             emb = discord.Embed(colour=discord.Colour(16777214))
             emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=bestURL(user))
             emb.description = strMessage(message)
+            invalid = deque()
             for c_id, flag in self.data.items():
                 if flag & 2:
-                    channel = await self.bot.fetch_channel(c_id)
-                    self.bot.embedSender(channel, embed=emb)
+                    channel = self.bot.cache.channels.get(c_id)
+                    if channel is not None:
+                        self.bot.embedSender(channel, embed=emb)
 
-    async def _log_(self, msg, **void):
-        # Up to 3 embeds per log entry, rougly split up into 3 sections of 2000 characters
+    # All logs that normally print to stdout/stderr now send to the assigned log channels
+    def _log_(self, msg, **void):
+        while not self.bot.ready:
+            time.sleep(2)
         if msg:
-            msg = limStr(msg, 6000)
-            if len(msg) > 2000:
-                msgs = [msg[:2000], msg[2000:4000], msg[4000:]]
+            if len(msg) > 2041:
+                if "\n" in msg:
+                    msgs = deque()
+                    new = ""
+                    for line in msg.split("\n"):
+                        if new:
+                            line = "\n" + line
+                        if len(new) + len(line) > 2048:
+                            msgs.append(new)
+                            new = line
+                        else:
+                            new += line
+                    if new:
+                        msgs.append(new)
+                else:
+                    msg = limStr(msg, 6000)
+                    msgs = [msg[:2000], msg[2000:4000], msg[4000:]]
             else:
                 msgs = [msg]
             embs = deque()
             for msg in msgs:
                 if msg:
                     embs.append(discord.Embed(colour=discord.Colour(16711680), description=self.prepare_string(msg, lim=2048, fmt="")))
+            invalid = deque()
             for c_id, flag in self.data.items():
                 if flag & 8:
-                    channel = await self.bot.fetch_channel(c_id)
-                    self.bot.embedSender(channel, embeds=embs)
+                    channel = self.bot.cache.channels.get(c_id)
+                    if channel is None:
+                        invalid.append(c_id)
+                    else:
+                        self.bot.embedSender(channel, embeds=embs)
+            [self.data.pop(i) for i in invalid]                        
 
     def __load__(self):
-        print.funcs.append(lambda *args: create_task(self._log_(*args)))
+        print.funcs.append(lambda *args: self._log_(*args))
 
 
 class DownloadServer(Command):
@@ -362,14 +380,14 @@ class Trust(Command):
     usage = "<server_id(curr)(?a)> <enable(?e)> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, bot, flags, message, guild, argv, **void):
+    def __call__(self, bot, flags, message, guild, argv, **void):
         update = bot.database.trusted.update
         if "a" in flags:
             guilds = bot.client.guilds
         else:
             if argv:
                 g_id = verifyID(argv)
-                guild = await bot.fetch_guild(g_id)
+                guild = cdict(id=g_id)
             guilds = [guild]
         if "e" in flags:
             create_task(message.add_reaction("❗"))
@@ -383,17 +401,14 @@ class Trust(Command):
         elif "d" in flags:
             create_task(message.add_reaction("❗"))
             for guild in guilds:
-                try:
-                    bot.data.trusted.pop(guild.id)
-                except KeyError:
-                    pass
+                bot.data.trusted.pop(guild.id, None)
             update()
             return (
-                "```fix\nSuccessfully removed trusted server.```"
+                "```fix\nSuccessfully removed server from trusted list.```"
             )
         return (
             "```css\nTrusted server list "
-            + str(list(noHighlight(bot.cache.guilds[g]) for g in bot.data.trusted)) + ".```"
+            + str(list(noHighlight(bot.cache.guilds.get(g, g)) for g in bot.data.trusted)) + ".```"
         )
 
 
@@ -426,6 +441,10 @@ class Suspend(Command):
                 "```css\nChanged blacklist status of [" + noHighlight(user.name) + "] to ["
                 + noHighlight(new) + "].```"
             )
+        return (
+            "```css\nUser blacklist "
+            + str(list(noHighlight(bot.cache.users.get(u, u)) for u in bot.data.blacklist)) + ".```"
+        )
 
 
 class UpdateBlacklist(Database):

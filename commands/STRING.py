@@ -142,7 +142,7 @@ class Uni2Hex(Command):
     usage = "<string>"
     no_parse = True
 
-    async def __call__(self, argv, **void):
+    def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         b = bytes(argv, "utf-8")
@@ -155,7 +155,7 @@ class Hex2Uni(Command):
     description = "Converts hexadecimal numbers to unicode text."
     usage = "<string>"
 
-    async def __call__(self, argv, **void):
+    def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         b = hex2Bytes(argv.replace("0x", "").replace(" ", ""))
@@ -168,7 +168,7 @@ class ID2Time(Command):
     description = "Converts a discord ID to its corresponding UTC time."
     usage = "<string>"
 
-    async def __call__(self, argv, **void):
+    def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         argv = verifyID(argv)
@@ -181,11 +181,24 @@ class Time2ID(Command):
     description = "Converts a UTC time to its corresponding discord ID."
     usage = "<string>"
 
-    async def __call__(self, argv, **void):
+    def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         argv = tzparse(argv)
         return "```fix\n" + str(time_snowflake(argv)) + "```"
+
+
+class SHA256(Command):
+    name = ["SHA"]
+    min_level = 0
+    description = "Computes the SHA256 hash of a string."
+    usage = "<string>"
+
+    def __call__(self, argv, **void):
+        if not argv:
+            raise ArgumentError("Input string is empty.")
+        argv = bytes2Hex(hashlib.sha256(argv.encode("utf-8")).digest())
+        return "```fix\n" + argv + "```"
 
 
 class Fancy(Command):
@@ -195,7 +208,7 @@ class Fancy(Command):
     usage = "<string>"
     no_parse = True
 
-    async def __call__(self, argv, **void):
+    def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         emb = discord.Embed(colour=randColour())
@@ -252,7 +265,7 @@ class OwOify(Command):
     flags = "ab"
     no_parse = True
 
-    async def __call__(self, argv, flags, **void):
+    def __call__(self, argv, flags, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         out = argv.translate(self.otrans)
@@ -260,16 +273,18 @@ class OwOify(Command):
         if "a" in flags or "b" not in flags:
             temp = list(out)
             for i, c in enumerate(out):
-                if i > 0 and c in "yY" and out[i - 1] not in "wW \n\t":
+                if i > 0 and c in "yY" and out[i - 1].lower() not in "aeiouyw \n\t":
                     if c.isupper():
                         temp[i] = "W" + c.lower()
                     else:
                         temp[i] = "w" + c
-                if i < len(out) - 1 and c in "nN" and out[i + 1] not in "yY \n\t":
+                if i < len(out) - 1 and c in "nN" and out[i + 1].lower() in "aeiou":
                     temp[i] = c + "y"
             if "a" in flags and "b" not in flags:
+                out = "".join(temp)
+                temp = list(out)
                 for i, c in enumerate(out):
-                    if i > 0 and c in "aeiouAEIOU" and out[i - 1] not in "aeiouAEIOUyYwW \n\t":
+                    if i > 0 and c.lower() in "aeiou" and out[i - 1].lower() not in "aeiouyw \n\t":
                         if c.isupper():
                             temp[i] = "W" + c.lower()
                         else:
@@ -295,7 +310,7 @@ class AltCaps(Command):
     usage = "<string>"
     no_parse = True
 
-    async def __call__(self, argv, **void):
+    def __call__(self, argv, **void):
         i = argv[0].isupper()
         a = argv[i::2].lower()
         b = argv[1 - i::2].upper()
@@ -354,6 +369,31 @@ class Time(Command):
             "```ini\nCurrent time at UTC/GMT" + hrs
             + ": [" + str(t) + "].```"
         )
+
+
+class TimeCalc(Command):
+    name = ["TimeDifference"]
+    min_level = 0
+    description = "Computes the difference between two times, or the Unix timestamp of a datetime string."
+    usage = "<0:time1> <1:time2[0]>"
+    no_parse = True
+
+    def __call__(self, argv, user, **void):
+        if not argv:
+            timestamps = [utc()]
+        else:
+            if "," in argv:
+                spl = argv.split(",")
+            elif "-" in argv:
+                spl = argv.split("-")
+            else:
+                spl = [argv]
+            timestamps = [utc_ts(tzparse(t)) for t in spl]
+        if len(timestamps) == 1:
+            out = str(roundMin(timestamps[0])) + " (" + str(datetime.datetime.utcfromtimestamp(timestamps[0])) + " UTC)"
+        else:
+            out = sec2Time(max(timestamps) - min(timestamps))
+        return "```\n" + out + "```"
 
 
 class Follow(Command):

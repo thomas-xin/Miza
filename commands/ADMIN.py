@@ -575,7 +575,7 @@ class RolePreserver(Command):
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, flags, guild, **void):
+    def __call__(self, flags, guild, **void):
         update = self.bot.database.rolepreservers.update
         bot = self.bot
         following = bot.data.rolepreservers
@@ -1431,11 +1431,8 @@ class UpdateRolePreservers(Database):
                 print("_leave_", guild, user, assigned)
                 self.data[guild.id][user.id] = assigned
             else:
-                try:
-                    print("_leave_", guild, user, None)
-                    self.data[guild.id].pop(user.id)
-                except LookupError:
-                    pass
+                print("_leave_", guild, user, None)
+                self.data[guild.id].pop(user.id, None)
             self.update()
 
 

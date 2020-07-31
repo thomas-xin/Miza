@@ -12,6 +12,25 @@ escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@he
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
 
+
+# For compatibility with versions of asyncio and concurrent.futures that have the exceptions stored in a different module
+T0 = TimeoutError
+try:
+    T1 = asyncio.exceptions.TimeoutError
+except AttributeError:
+    try:
+        T1 = asyncio.TimeoutError
+    except AttributeError:
+        T1 = TimeoutError
+try:
+    T2 = concurrent.futures._base.TimeoutError
+except AttributeError:
+    try:
+        T2 = concurrent.futures.TimeoutError
+    except AttributeError:
+        T2 = TimeoutError
+
+
 class ArgumentError(LookupError):
     pass
 class TooManyRequests(PermissionError):
@@ -80,7 +99,7 @@ def getLineCount(fn):
         size = 0
         while True:
             try:
-                i = f.read(8192)
+                i = f.read(32768)
                 if not i:
                     raise EOFError
                 size += len(i)
@@ -431,12 +450,15 @@ proc_exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 proc_exc.submit(procUpdater)
 
 # Sends an operation to the math subprocess pool.
-async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12, authorize=False):
+async def mathProc(expr, prec=64, rat=False, key=None, timeout=12, authorize=False):
     if type(key) is not int:
-        try:
-            key = int(key)
-        except (TypeError, ValueError):
-            key = key.id
+        if key is None:
+            key = random.random()
+        else:
+            try:
+                key = int(key)
+            except (TypeError, ValueError):
+                key = key.id
     procs, busy = SUBS.math.procs, SUBS.math.busy
     while utc() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
@@ -466,32 +488,26 @@ async def mathProc(expr, prec=64, rat=False, key=-1, timeout=12, authorize=False
         await create_future(proc.stdin.flush)
         resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
         proc.busy = utc()
-    except (TimeoutError, asyncio.exceptions.TimeoutError):
+    except (T0, T1):
         create_future_ex(forceKill, proc)
-        try:
-            procs.pop(p)
-        except LookupError:
-            pass
-        try:
-            busy.pop(key)
-        except KeyError:
-            pass
+        procs.pop(p, None)
+        busy.pop(key, None)
         create_future_ex(procUpdate)
         raise
-    try:
-        busy.pop(key)
-    except KeyError:
-        pass
+    busy.pop(key, None)
     output = evalEX(evalEX(resp))
     return output
 
 # Sends an operation to the image subprocess pool.
-async def imageProc(image, operation, args, key=-1, timeout=24):
+async def imageProc(image, operation, args, key=None, timeout=24):
     if type(key) is not int:
-        try:
-            key = int(key)
-        except (TypeError, ValueError):
-            key = key.id
+        if key is None:
+            key = random.random()
+        else:
+            try:
+                key = int(key)
+            except (TypeError, ValueError):
+                key = key.id
     procs, busy = SUBS.image.procs, SUBS.image.busy
     while utc() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
@@ -517,22 +533,13 @@ async def imageProc(image, operation, args, key=-1, timeout=24):
         await create_future(proc.stdin.flush)
         resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
         proc.busy = utc()
-    except (TimeoutError, asyncio.exceptions.TimeoutError):
+    except (T0, T1):
         create_future_ex(forceKill, proc)
-        try:
-            procs.pop(p)
-        except LookupError:
-            pass
-        try:
-            busy.pop(key)
-        except KeyError:
-            pass
+        procs.pop(p, None)
+        busy.pop(key, None)
         create_future_ex(procUpdate)
         raise
-    try:
-        busy.pop(key)
-    except KeyError:
-        pass
+    busy.pop(key, None)
     output = evalEX(evalEX(resp))
     return output
 
@@ -574,11 +581,18 @@ async def safeCoro(coro):
     except:
         print(traceback.format_exc())
 
-# Forces the operation to be a coroutine regardless of whether it is or not.
-async def forceCoro(coro):
-    if awaitable(coro):
-        return await coro
-    return coro
+# Forces the operation to be a coroutine regardless of whether it is or not. Regular functions are executed in the thread pool.
+async def forceCoro(obj, *args, **kwargs):
+    if asyncio.iscoroutinefunction(obj):
+        obj = obj(*args, **kwargs)
+    elif callable(obj):
+        if asyncio.iscoroutinefunction(obj.__call__):
+            obj = obj.__call__(*args, **kwargs)
+        else:
+            obj = await create_future(obj, *args, **kwargs)
+    while awaitable(obj):
+        obj = await obj
+    return obj
 
 
 # Main event loop for all asyncio operations.
@@ -732,7 +746,7 @@ def load_timezones():
         for line in data.split("\n"):
             info = line.split("\t")
             abb = info[0].lower()
-            if len(abb) >= 3 and abb not in TIMEZONES:
+            if len(abb) >= 3 and (abb not in TIMEZONES or "(unofficial)" not in info[1]):
                 temp = info[-1].replace("\\", "/")
                 curr = sorted([round((1 - (i[3] == "−") * 2) * (rdhms(i[4:]) if ":" in i else float(i[4:]) * 60) * 60) for i in temp.split("/") if i.startswith("UTC")])
                 if len(curr) == 1:
@@ -756,30 +770,34 @@ create_future_ex(load_timezones)
 
 # Parses a time expression, with an optional timezone input at the end.
 def tzparse(expr):
-    if " " in expr:
-        t = 0
-        try:
-            args = shlex.split(expr)
-        except ValueError:
-            args = expr.split()
-        for arg in (args[0], args[-1]):
-            a = arg
-            h = 0
-            for op in "+-":
-                try:
-                    i = arg.index(op)
-                except ValueError:
-                    continue
-                a = arg[:i]
-                h += float(arg[i:])
-            tz = a.lower()
-            if tz in TIMEZONES:
-                t = get_timezone(tz)
-                expr = expr.replace(arg, "")
-                break
-            h = 0
-        return tparser.parse(expr) - datetime.timedelta(hours=h, seconds=t)
-    return tparser.parse(expr)
+    try:
+        s = float(expr)
+    except ValueError:
+        if " " in expr:
+            t = 0
+            try:
+                args = shlex.split(expr)
+            except ValueError:
+                args = expr.split()
+            for arg in (args[0], args[-1]):
+                a = arg
+                h = 0
+                for op in "+-":
+                    try:
+                        i = arg.index(op)
+                    except ValueError:
+                        continue
+                    a = arg[:i]
+                    h += float(arg[i:])
+                tz = a.lower()
+                if tz in TIMEZONES:
+                    t = get_timezone(tz)
+                    expr = expr.replace(arg, "")
+                    break
+                h = 0
+            return tparser.parse(expr) - datetime.timedelta(hours=h, seconds=t)
+        return tparser.parse(expr)
+    return datetime.datetime.utcfromtimestamp(s)
 
 
 # Basic inheritable class for all bot commands.
@@ -837,9 +855,7 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
 
     __hash__ = lambda self: hash(self.__name__)
     __str__ = lambda self: self.__name__
-    
-    async def __call__(self, **void):
-        pass
+    __call__ = lambda self, **void: None
 
 
 # Basic inheritable class for all bot databases.
@@ -856,9 +872,8 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
             self.file = "saves/" + name + ".json"
             self.updated = False
             try:
-                f = open(self.file, "rb")
-                s = f.read()
-                f.close()
+                with open(self.file, "rb") as f:
+                    s = f.read()
                 if not s:
                     raise FileNotFoundError
                 data = None
@@ -867,10 +882,10 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                 except pickle.UnpicklingError:
                     pass
                 if type(data) in (str, bytes):
-                    data = eval(data)
+                    data = eval(compile(data, "<database>", "eval", optimize=2))
                 if data is None:
                     try:
-                        data = eval(s)
+                        data = eval(compile(s, "<database>", "eval", optimize=2))
                     except:
                         print(self.file)
                         print(traceback.format_exc())
@@ -898,9 +913,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
 
     __hash__ = lambda self: hash(self.__name__)
     __str__ = lambda self: self.__name__
-
-    async def __call__(self, **void):
-        pass
+    __call__ = lambda self, **void: None
 
     def update(self, force=False):
         if not hasattr(self, "updated"):
@@ -910,15 +923,17 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
             if name:
                 if self.updated:
                     self.updated = False
-                    s = str(self.data)
-                    if len(s) > 262144:
+                    try:
+                        s = str(self.data)
+                    except:
+                        s = None
+                    if not s or len(s) > 262144:
                         # print("Pickling " + name + "...")
                         s = pickle.dumps(self.data)
                     else:
                         s = s.encode("utf-8")
-                    f = open(self.file, "wb")
-                    f.write(s)
-                    f.close()
+                    with open(self.file, "wb") as f:
+                        f.write(s)
                     return True
         else:
             self.updated = True

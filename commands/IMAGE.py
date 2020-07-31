@@ -493,14 +493,14 @@ class Char2Emoj(Command):
     description = "Makes emoji blocks using a string."
     usage = "<0:string> <1:emoji_1> <2:emoji_2>"
 
-    async def __call__(self, args, **extra):
+    def __call__(self, args, **extra):
         try:
             if len(args) != 3:
                 raise IndexError
             for i in range(1, 3):
                 if args[i][0] == ":" and args[i][-1] != ":":
                     args[i] = "<" + args[i] + ">"
-            return await create_future(_c2e, *args[:3])
+            return _c2e(*args[:3])
         except IndexError:
             raise ArgumentError(
                 "Exactly 3 arguments are required for this command.\n"
@@ -1319,7 +1319,7 @@ class _8Ball(Command):
         self.found[url] = True
         return url
 
-    async def __call__(self, channel, **void):
+    def __call__(self, channel, **void):
         url = self.get_buffer(64)
         emb = discord.Embed(
             url=url,

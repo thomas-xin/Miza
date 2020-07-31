@@ -511,12 +511,12 @@ class Mimic(Command):
                 else:
                     mimics.pop(prefix)
                     update()
-                    raise KeyError("Unable to find webhook mimic.")
+                    raise KeyError
                 if not mlist:
                     mimics.pop(prefix)
             except KeyError:
-                # Users are not allowed to delete mimics that do not belong to them
                 mimic = bot.get_mimic(prefix, user)
+                # Users are not allowed to delete mimics that do not belong to them
                 if not isnan(perm) and mimic.u_id != user.id:
                     raise PermissionError("Target mimic does not belong to you.")
                 mimics = mimicdb[mimic.u_id]

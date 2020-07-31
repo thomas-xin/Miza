@@ -83,7 +83,6 @@ class Bot:
         self.started = False
         self.ready = False
         self.embedSenders = cdict()
-        create_future_ex(self.clearcache, priority=True)
         # Assign bot cache to global variables for convenience
         globals().update(self.cache)
 
@@ -105,14 +104,6 @@ class Bot:
             eloop.run_until_complete(client.logout())
             eloop.close()
             sys.exit()
-
-    # Clears cache folder.
-    def clearcache(self):
-        for path in os.listdir("cache"):
-            try:
-                os.remove("cache/" + path)
-            except:
-                print(traceback.format_exc())
 
     # A reimplementation of the print builtin function.
     def print(self, *args, sep=" ", end="\n"):
@@ -611,10 +602,7 @@ class Bot:
 
     # Deletes a message from the bot cache.
     def deleteMessage(self, message):
-        try:
-            self.cache.messages.pop(message.id)
-        except KeyError:
-            pass
+        self.cache.messages.pop(message.id, None)
         if not message.author.bot:
             s = strMessage(message, username=True)
             ch = "deleted/" + str(message.channel.id) + ".txt"
@@ -643,7 +631,7 @@ class Bot:
             self.cache.channels.update(guild._channels)
             self.cache.roles.update(guild._roles)
             if not i & 63:
-                time.sleep(1)
+                time.sleep(0.2)
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def getPrefix(self, guild):
@@ -760,10 +748,7 @@ class Bot:
             self.logDelete(message, no_log)
             await message.delete()
         except:
-            try:
-                self.cache.deleted.pop(message.id)
-            except KeyError:
-                pass
+            self.cache.deleted.pop(message.id, None)
             if exc:
                 raise
 
@@ -800,10 +785,9 @@ class Bot:
             self._globals[module] = mod
             commands = hlist()
             dataitems = hlist()
-            vd = mod.__dict__
-            for k in tuple(vd):
-                var = vd[k]
-                if var not in (Command, Database):
+            items = mod.__dict__
+            for var in items.values():
+                if callable(var) and var not in (Command, Database):
                     load_type = 0
                     try:
                         if issubclass(var, Command):
@@ -990,12 +974,17 @@ class Bot:
     async def solveMath(self, f, obj, prec, r, timeout=12, authorize=False):
         f = f.strip()
         try:
-            if obj is None or hasattr(obj, "ghost"):
+            if obj is None:
+                key = None
+            elif hasattr(obj, "ghost"):
                 key = self.deleted_user
             else:
                 key = obj.id
         except AttributeError:
             key = int(obj)
+        # Bot owners have no semaphore limit
+        if key in self.owners:
+            key = None
         return await mathProc(f, int(prec), int(r), key, timeout=12, authorize=authorize)
 
     timeChecks = {
@@ -1238,10 +1227,7 @@ class Bot:
                             "```py\nError: " + repr(ex).replace("`", "") + "\n```",
                             reacts="❎",
                         ))
-            try:
-                self.proc_call.pop(message.id)
-            except KeyError:
-                pass
+            self.proc_call.pop(message.id, None)
 
     # Handles all updates to the bot. Manages the bot's status and activity on discord, and updates all databases.
     async def handleUpdate(self, force=False):
@@ -1299,7 +1285,7 @@ class Bot:
             # Update databases
             for u in self.database.values():
                 if utc() - u.used > u.rate_limit or force:
-                    create_task(u())
+                    create_task(forceCoro(u))
                     create_task(self.verifyDelete(u))
             self.busy = False
 
@@ -1636,24 +1622,6 @@ def userIter3(x):
     yield to_alphanumeric(x.display_name).replace(" ", "").lower()
 
 
-# For compatibility with versions of asyncio and concurrent.futures that have the exceptions stored in a different module
-T0 = TimeoutError
-try:
-    T1 = asyncio.exceptions.TimeoutError
-except AttributeError:
-    try:
-        T1 = asyncio.TimeoutError
-    except AttributeError:
-        T1 = TimeoutError
-try:
-    T2 = concurrent.futures._base.TimeoutError
-except AttributeError:
-    try:
-        T2 = concurrent.futures.TimeoutError
-    except AttributeError:
-        T2 = TimeoutError
-
-
 # Processes a message, runs all necessary commands and bot events. May be called from another source.
 async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=False):
     if bot.closed:
@@ -1859,7 +1827,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         if timeout >= inf:
                             timeout = None
                         # Create a future to run the command
-                        future = create_task(asyncio.wait_for(command(
+                        future = create_task(asyncio.wait_for(forceCoro(
+                            command,                # command is a callable object, may be async or not
                             client=client,          # for interfacing with discord
                             bot=bot,                # for interfacing with bot's database
                             argv=argv,              # raw text argument
@@ -1905,6 +1874,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                     else:
                                         sent = await channel.send(**response)
                                 else:
+                                    if type(response) not in (str, bytes, bytearray):
+                                        response = str(response)
                                     # Process everything else as a string
                                     if type(response) is str and len(response) <= 2000:
                                         sent = await channel.send(response)
@@ -2369,10 +2340,7 @@ async def on_member_ban(guild, user):
 # Guild destroy event: Remove guild from bot cache.
 @client.event
 async def on_guild_remove(guild):
-    try:
-        bot.cache.guilds.pop(guild.id)
-    except KeyError:
-        pass
+    bot.cache.guilds.pop(guild.id, None)
     print(guild, "removed.")
 
 

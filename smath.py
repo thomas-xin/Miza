@@ -612,10 +612,7 @@ def subDict(d, key):
     except TypeError:
         key = [key]
     for k in key:
-        try:
-            output.pop(k)
-        except KeyError:
-            pass
+        output.pop(k, None)
     return output
 
 
@@ -2180,22 +2177,27 @@ custom list-like data structure that incorporates the functionality of np arrays
 
     # Removes an item from the list. O(n) time complexity.
     @blocking
-    def pop(self, index=None):
-        if index is None:
-            return self.popright(force=True)
-        if index >= len(self.data):
-            return self.popright(force=True)
-        elif index == 0:
-            return self.popleft(force=True)
-        index %= self.size
-        temp = self.data[index + self.offs]
-        if index > self.size >> 1:
-            self.view()[index:-1] = self.data[self.offs + index + 1:self.offs + self.size]
-        else:
-            self.view()[1:index + 1] = self.data[self.offs:self.offs + index]
-            self.offs += 1
-        self.size -= 1
-        return temp
+    def pop(self, index=None, *args):
+        try:
+            if index is None:
+                return self.popright(force=True)
+            if index >= len(self.data):
+                return self.popright(force=True)
+            elif index == 0:
+                return self.popleft(force=True)
+            index %= self.size
+            temp = self.data[index + self.offs]
+            if index > self.size >> 1:
+                self.view()[index:-1] = self.data[self.offs + index + 1:self.offs + self.size]
+            else:
+                self.view()[1:index + 1] = self.data[self.offs:self.offs + index]
+                self.offs += 1
+            self.size -= 1
+            return temp
+        except LookupError:
+            if not args:
+                raise
+            return args[0]
 
     # Inserts an item into the list. O(n) time complexity.
     @blocking
@@ -2256,8 +2258,15 @@ custom list-like data structure that incorporates the functionality of np arrays
 
     # Removes all duplicate values from the list.
     @blocking
-    def removedups(self):
-        temp = np.unique(self.view())
+    def removedups(self, sorted=True):
+        if sorted:
+            temp = np.unique(self.view())
+        else:
+            temp = {}
+            for x in self.view():
+                if x not in temp:
+                    temp[x] = None
+            temp = tuple(temp.keys())
         self.size = len(temp)
         self.view()[:] = temp
         return self
@@ -2387,6 +2396,20 @@ custom list-like data structure that incorporates the functionality of np arrays
 
     extendright = extend
 
+    # Similar to str.join
+    @waiting
+    def join(self, iterable):
+        iterable = self.createIterator(iterable)
+        temp = deque()
+        for i, v in enumerate(iterable):
+            try:
+                temp.extend(v)
+            except TypeError:
+                temp.append(v)
+            if i != len(iterable) - 1:
+                temp.extend(self.view())
+        return self.__class__(temp)
+
     # Fills list with value(s).
     @blocking
     def fill(self, value):
@@ -2481,7 +2504,7 @@ class mdict(cdict):
     __slots__ = ()
 
     count = lambda self: sum(len(v) for v in super().values())
-    extend = lambda self, k, v: setDict(super(), k, hlist()).extend(v).removedups()
+    extend = lambda self, k, v: setDict(super(), k, hlist()).extend(v).uniq(sorted=False)
 
     def append(self, k, v):
         values = setDict(super(), k, hlist())

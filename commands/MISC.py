@@ -832,10 +832,7 @@ class DeviantArt(Command):
             if not assigned:
                 return "```ini\nNo currently subscribed DeviantArt Galleries for [#" + noHighlight(channel) + "].```"
             if "d" in flags:
-                try:
-                    data.pop(channel.id)
-                except KeyError:
-                    pass
+                data.pop(channel.id)
                 return "```css\nSuccessfully removed all DeviantArt Gallery subscriptions from [#" + noHighlight(channel) + "].```"
             return "Currently subscribed DeviantArt Galleries for [#" + noHighlight(channel) + "]:```ini" + strIter(assigned, key=lambda x: x["user"]) + "```"
         urls = await bot.followURL(argv, allow=True)
@@ -887,7 +884,7 @@ class UpdateDeviantArt(Database):
             if not bot.isTrusted(channel.guild.id):
                 raise LookupError
         except LookupError:
-            self.data.pop(c_id)
+            self.data.pop(c_id, None)
             return
         try:
             assigned = self.data.get(c_id)

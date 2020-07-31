@@ -28,7 +28,7 @@ class Help(Command):
     usage = "<command{all}> <category{all}> <verbose(?v)>"
     flags = "v"
 
-    async def __call__(self, args, user, channel, guild, flags, perm, **void):
+    def __call__(self, args, user, channel, guild, flags, perm, **void):
         bot = self.bot
         enabled = bot.data.enabled
         g_id = guild.id
@@ -93,8 +93,7 @@ class Hello(Command):
     min_level = 0
     description = "Sends a waving emoji. Useful for checking whether the bot is online."
     
-    async def __call__(self, **void):
-        # yay
+    def __call__(self, **void):
         return "👋"
 
 
@@ -177,7 +176,7 @@ class EnabledCommands(Command):
     usage = "<command{all}> <add(?e)> <remove(?d)> <list(?l)> <hide(?h)>"
     flags = "aedlh"
 
-    async def __call__(self, argv, args, flags, user, channel, perm, **void):
+    def __call__(self, argv, args, flags, user, channel, perm, **void):
         update = self.data.enabled.update
         bot = self.bot
         enabled = bot.data.enabled
@@ -273,7 +272,7 @@ class Prefix(Command):
     usage = "<prefix[]> <default(?d)>"
     flags = "hd"
 
-    async def __call__(self, argv, guild, perm, bot, flags, **void):
+    def __call__(self, argv, guild, perm, bot, flags, **void):
         pref = bot.data.prefixes
         update = self.data.prefixes.update
         if "d" in flags:
@@ -858,7 +857,7 @@ class Invite(Command):
     min_level = 0
     description = "Sends a link to ⟨MIZA⟩'s homepage and invite code."
     
-    async def __call__(self, **void):
+    def __call__(self, **void):
         if discord_id is None:
             raise FileNotFoundError("Unable to locate bot's Client ID.")
         emb = discord.Embed(colour=randColour())
@@ -1307,11 +1306,8 @@ class UpdateMessageCount(Database):
                 try:
                     return t.get(user.id, 0) / c.get(user.id, 1)
                 except ZeroDivisionError:
-                    c.pop(user.id)
-                    try:
-                        t.pop(user.id)
-                    except KeyError:
-                        pass
+                    c.pop(user.id, None)
+                    t.pop(user.id, None)
                     return 0
         return "Calculating..."            
 
@@ -1477,7 +1473,7 @@ class UpdateUsers(Database):
         for hour in tuple(data):
             if hour > minimum:
                 return
-            data.pop(hour)
+            data.pop(hour, None)
 
     def send_event(self, u_id, event, count=1):
         # print(self.bot.cache.users.get(u_id), event, count)

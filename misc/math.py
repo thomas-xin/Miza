@@ -193,39 +193,34 @@ def plotArgs(args):
 colours = [c + "-H" for c in "bgrymc"]
 
 def plot(*args, **kwargs):
-    if "show" in kwargs:
-        kwargs.pop("show")
+    kwargs.pop("show", None)
     return plotter.plot(*plotArgs(args), show=False, **kwargs)
 
 def plot_parametric(*args, **kwargs):
-    if "show" in kwargs:
-        kwargs.pop("show")
+    kwargs.pop("show", None)
     return plotter.plot_parametric(*plotArgs(args), show=False, **kwargs)
 
 def plot_implicit(*args, **kwargs):
-    if "show" in kwargs:
-        kwargs.pop("show")
+    kwargs.pop("show", None)
     return plotter.plot_implicit(*plotArgs(args), show=False, **kwargs)
 
 def plot_array(*args, **kwargs):
+    kwargs.pop("show", None)
     plt.rcParams["figure.figsize"] = (6.4, 4.8)
     for arr, c in zip(args, colours):
         plt.plot(list(range(len(arr))), arr, c, **kwargs)
     return plt
 
 def plot3d(*args, **kwargs):
-    if "show" in kwargs:
-        kwargs.pop("show")
+    kwargs.pop("show", None)
     return plotter.plot3d(*plotArgs(args), show=False, **kwargs)
 
 def plot3d_parametric_line(*args, **kwargs):
-    if "show" in kwargs:
-        kwargs.pop("show")
+    kwargs.pop("show", None)
     return plotter.plot3d_parametric_line(*plotArgs(args), show=False, **kwargs)
 
 def plot3d_parametric_surface(*args, **kwargs):
-    if "show" in kwargs:
-        kwargs.pop("show")
+    kwargs.pop("show", None)
     return plotter.plot3d_parametric_surface(*plotArgs(args), show=False, **kwargs)
 
 # Multiple variable limit
@@ -379,7 +374,7 @@ pop = (
     "input",
 )
 for i in pop:
-    _globals["__builtins__"].pop
+    _globals["__builtins__"].pop(i)
 
 sym_tr = parser.standard_transformations
 sym_tr += (
