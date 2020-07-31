@@ -821,7 +821,7 @@ class Status(Command):
             shards = len(client.latencies)
         except AttributeError:
             shards = 1
-        size = sum(bot.size) + sum(bot.size2)
+        size = sum(bot.size.values()) + sum(bot.size2.values())
         stats = bot.currState
         cache = await create_future(os.listdir, "cache/")
         return (
