@@ -370,7 +370,6 @@ _globals.update({
     "G": 6.6743015e-11,
 })
 pop = (
-    "open",
     "input",
 )
 for i in pop:
@@ -548,6 +547,40 @@ def evalSym(f, prec=64, r=False):
         return [f, p]
 
 
+@logging
+def procResp(resp):
+    # Return file path if necessary
+    if isinstance(resp[0], Plot):
+        plt.rcParams["figure.figsize"] = (6.4, 4.8)
+        ts = round(time.time() * 1000)
+        name = str(ts) + ".png"
+        fn = "cache/" + name
+        try:
+            resp[0].save(fn)
+        except FileNotFoundError:
+            fn = name
+            resp[0].save(fn)
+        plt.clf()
+        s = "{'file':'" + fn + "'}\n"
+    elif resp[0] == plt:
+        ts = round(time.time() * 1000)
+        name = str(ts) + ".png"
+        fn = "cache/" + name
+        try:
+            plt.savefig(fn)
+        except FileNotFoundError:
+            fn = name
+            plt.savefig(fn)
+        plt.clf()
+        plt.rcParams["figure.figsize"] = (6.4, 4.8)
+        s = "{'file':'" + fn + "'}\n"
+    elif type(resp) is tuple:
+        s = repr(list(resp))
+    else:
+        s = repr([convAns(i) for i in resp])
+    return s.encode("utf-8")
+
+
 if __name__ == "__main__":
     # SHA256 key always taken on startup
     key = eval(sys.stdin.readline()).decode("utf-8", "replace").strip()
@@ -560,36 +593,7 @@ if __name__ == "__main__":
                 if key_in == key:
                     locked = False
             resp = evalSym(*args)
-            # Return file path if necessary
-            if isinstance(resp[0], Plot):
-                plt.rcParams["figure.figsize"] = (6.4, 4.8)
-                ts = round(time.time() * 1000)
-                name = str(ts) + ".png"
-                fn = "cache/" + name
-                try:
-                    resp[0].save(fn)
-                except FileNotFoundError:
-                    fn = name
-                    resp[0].save(fn)
-                plt.clf()
-                s = "{'file':'" + fn + "'}\n"
-            elif resp[0] == plt:
-                ts = round(time.time() * 1000)
-                name = str(ts) + ".png"
-                fn = "cache/" + name
-                try:
-                    plt.savefig(fn)
-                except FileNotFoundError:
-                    fn = name
-                    plt.savefig(fn)
-                plt.clf()
-                plt.rcParams["figure.figsize"] = (6.4, 4.8)
-                s = "{'file':'" + fn + "'}\n"
-            elif type(resp) is tuple:
-                s = repr(list(resp))
-            else:
-                s = repr([convAns(i) for i in resp])
-            b = s.encode("utf-8")
+            b = procResp(resp)
             if len(b) > 8388608:
                 raise OverflowError("Output data too large.")
             sys.stdout.write(repr(b) + "\n")
