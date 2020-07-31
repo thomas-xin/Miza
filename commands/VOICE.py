@@ -3860,6 +3860,7 @@ class UpdateAudio(Database):
                 f.stream = "cache/" + file
                 f.proc = cdict(is_running=lambda: False, kill=lambda: None)
                 f.ensure_time()
+                print("reinstating audio file", file)
         for k, v in self.data.items():
             try:
                 vc = await bot.fetch_channel(k)

@@ -103,7 +103,7 @@ class Bot:
         except (KeyboardInterrupt, SystemExit):
             eloop.run_until_complete(client.logout())
             eloop.close()
-            sys.exit()
+            raise SystemExit
 
     # A reimplementation of the print builtin function.
     def print(self, *args, sep=" ", end="\n"):
@@ -769,82 +769,6 @@ class Bot:
             return self.data.blacklist.get(u_id, False)
         except KeyError:
             return True
-
-    # Loads a module containing commands and databases by name.
-    def getModule(self, module):
-        try:
-            f = module
-            f = ".".join(f.split(".")[:-1])
-            path, module = module, f
-            rename = module.casefold()
-            print("Loading module " + rename + "...")
-            if module in self._globals:
-                mod = importlib.reload(self._globals[module])
-            else:
-                mod = __import__(module)
-            self._globals[module] = mod
-            commands = hlist()
-            dataitems = hlist()
-            items = mod.__dict__
-            for var in items.values():
-                if callable(var) and var not in (Command, Database):
-                    load_type = 0
-                    try:
-                        if issubclass(var, Command):
-                            load_type = 1
-                        elif issubclass(var, Database):
-                            load_type = 2
-                    except TypeError:
-                        pass
-                    if load_type:
-                        obj = var(self, rename)
-                        if load_type == 1:
-                            commands.append(obj)
-                            print("Successfully loaded command " + obj.__name__ + ".")
-                        elif load_type == 2:
-                            dataitems.append(obj)
-                            print("Successfully loaded database " + obj.__name__ + ".")
-            for u in dataitems:
-                for c in commands:
-                    c.data[u.name] = u
-            self.categories[rename] = commands
-            self.codeSize += getLineCount("commands/" + path)
-        except:
-            print(traceback.format_exc())
-
-    # Loads all modules in the commands folder and initializes bot commands and databases.
-    def getModules(self, reload=False):
-        if reload:
-            subKill()
-        files = [i for i in os.listdir("commands") if iscode(i)]
-        self.categories = cdict()
-        self.commands = cdict()
-        self.database = cdict()
-        self.data = cdict()
-        totalsize = [0, 0]
-        totalsize += sum(getLineCount(i) for i in os.listdir() if iscode(i))
-        totalsize += sum(getLineCount(p) for i in os.listdir("misc") for p in ["misc/" + i] if iscode(p))
-        self.codeSize = totalsize
-        self.modload = deque()
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(files))
-        for f in files:
-            self.modload.append(self.executor.submit(self.getModule, f))
-        self.loaded = True
-
-    # Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
-    def update(self):
-        create_task(self.updateEmbeds())
-        saved = hlist()
-        try:
-            for i in self.database:
-                u = self.database[i]
-                if getattr(u, "update", None) is not None:
-                    if u.update(True):
-                        saved.append(i)
-        except:
-            print(traceback.format_exc())
-        # if saved:
-        #     print("Autosaved " + str(saved) + ".")
     
     mmap = {
         "“": '"',
@@ -1124,7 +1048,163 @@ class Bot:
         stats[1] *= mem.total / 100
         stats[2] = disk
         self.currState = stats
+        self.size2 = cdict()
+        files = await create_future(os.listdir, "misc")
+        for f in files:
+            path = "misc/" + f
+            if iscode(path):
+                self.size2[f] = getLineCount(path)
         return stats
+
+    # Loads a module containing commands and databases by name.
+    def getModule(self, module):
+        try:
+            f = module
+            f = ".".join(f.split(".")[:-1])
+            path, module = module, f
+            rename = module.casefold()
+            print("Loading module " + rename + "...")
+            if module in self._globals:
+                if rename in self.categories:
+                    self.unload(module)
+                mod = importlib.reload(self._globals[module])
+            else:
+                mod = __import__(module)
+            self._globals[module] = mod
+            commands = hlist()
+            dataitems = hlist()
+            items = mod.__dict__
+            for var in items.values():
+                if callable(var) and var not in (Command, Database):
+                    load_type = 0
+                    try:
+                        if issubclass(var, Command):
+                            load_type = 1
+                        elif issubclass(var, Database):
+                            load_type = 2
+                    except TypeError:
+                        pass
+                    if load_type:
+                        obj = var(self, rename)
+                        if load_type == 1:
+                            commands.append(obj)
+                            print("Successfully loaded command " + obj.__name__ + ".")
+                        elif load_type == 2:
+                            dataitems.append(obj)
+                            print("Successfully loaded database " + obj.__name__ + ".")
+            for u in dataitems:
+                for c in commands:
+                    c.data[u.name] = u
+            self.categories[rename] = commands
+            self.dbitems[rename] = dataitems
+            self.size[rename] = getLineCount("commands/" + path)
+            if self.ready:
+                for db in dataitems:
+                    for f in dir(db):
+                        if f.startswith("_") and f[-1] == "_" and f[1] != "_":
+                            func = getattr(db, f, None)
+                            if callable(func):
+                                self.events.append(f, func)
+                    func = getattr(db, "_ready_", None)
+                    if callable(func):
+                        fut = create_task(forceCoro(func, bot=self))
+                        time.sleep(0.05)
+                        while True:
+                            try:
+                                fut.result()
+                            except asyncio.InvalidStateError:
+                                time.sleep(0.1)
+                            else:
+                                break
+        except:
+            print(traceback.format_exc())
+
+    def unload(self, mod=None):
+        if mod is None:
+            mods = list(self.categories)
+        else:
+            mod = mod.casefold()
+            if mod not in self.categories:
+                raise KeyError
+            mods = [mod]
+        for mod in mods:
+            rename = mod.casefold()
+            for command in self.categories[rename]:
+                for alias in command.alias:
+                    alias = alias.replace("*", "").replace("_", "").replace("||", "").casefold()
+                    coms = self.commands.get(alias)
+                    if coms:
+                        coms.remove(command)
+                        print(alias, command)
+                    if not coms:
+                        self.commands.pop(alias)
+            for db in self.dbitems[rename]:
+                func = getattr(db, "_destroy_", None)
+                if callable(func):
+                    fut = create_task(forceCoro(func))
+                    time.sleep(0.05)
+                    while True:
+                        try:
+                            fut.result()
+                        except asyncio.InvalidStateError:
+                            time.sleep(0.1)
+                        else:
+                            break
+                for f in dir(db):
+                    if f.startswith("_") and f[-1] == "_" and f[1] != "_":
+                        func = getattr(db, f, None)
+                        if callable(func):
+                            bot.events[f].remove(func)
+                            print(f, db)
+                db.update(True)
+                self.data.pop(db, None)
+                self.database.pop(db, None)
+            self.categories.pop(rename)
+            self.dbitems.pop(rename)
+            self.size.pop(rename)
+
+    def reload(self, mod=None):
+        if not mod:
+            subKill()
+            self.modload = deque()
+            files = [i for i in os.listdir("commands") if iscode(i)]
+            for f in files:
+                self.modload.append(self.executor.submit(self.getModule, f))
+            return [fut.result() for fut in self.modload]           
+        return self.getModule(mod + ".py")
+
+    # Loads all modules in the commands folder and initializes bot commands and databases.
+    def getModules(self):
+        files = [i for i in os.listdir("commands") if iscode(i)]
+        self.categories = cdict()
+        self.dbitems = cdict()
+        self.commands = cdict()
+        self.database = cdict()
+        self.data = cdict()
+        self.size = cdict()
+        for f in os.listdir():
+            if iscode(f):
+                self.size[f] = getLineCount(f)
+        self.modload = deque()
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(files))
+        for f in files:
+            self.modload.append(self.executor.submit(self.getModule, f))
+        self.loaded = True
+
+    # Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
+    def update(self):
+        create_task(self.updateEmbeds())
+        saved = hlist()
+        try:
+            for i in self.database:
+                u = self.database[i]
+                if getattr(u, "update", None) is not None:
+                    if u.update(True):
+                        saved.append(i)
+        except:
+            print(traceback.format_exc())
+        # if saved:
+        #     print("Autosaved " + str(saved) + ".")
 
     zwCallback = zwencode("callback")
 
@@ -2000,7 +2080,6 @@ async def on_ready():
             # Wait until all modules have been loaded successfully, then shut down corresponding executor
             while bot.modload:
                 await create_future(bot.modload.popleft().result, priority=True)
-            create_future_ex(bot.executor.shutdown, wait=False, priority=True)
             # Assign all bot database events to their corresponding keys.
             for u in bot.database.values():
                 for f in dir(u):

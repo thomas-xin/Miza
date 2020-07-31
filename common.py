@@ -446,9 +446,6 @@ def procUpdate():
             if att >= 16 or not found:
                 break
 
-proc_exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-proc_exc.submit(procUpdater)
-
 # Sends an operation to the math subprocess pool.
 async def mathProc(expr, prec=64, rat=False, key=None, timeout=12, authorize=False):
     if type(key) is not int:
@@ -1019,3 +1016,7 @@ getattr(asyncio.futures, "__builtins__", {})["print"] = print
 getattr(asyncio, "__builtins__", {})["print"] = print
 getattr(psutil, "__builtins__", {})["print"] = print
 getattr(subprocess, "__builtins__", {})["print"] = print
+
+
+proc_exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+proc_exc.submit(procUpdater)

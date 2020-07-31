@@ -7,7 +7,7 @@ except ModuleNotFoundError:
 
 
 class Restart(Command):
-    name = ["Shutdown", "Reload", "Reboot"]
+    name = ["Shutdown", "Reload", "Unload", "Reboot"]
     min_level = nan
     description = "Restarts, reloads, or shuts down ⟨MIZA⟩, with an optional delay."
     _timeout_ = inf
@@ -16,6 +16,18 @@ class Restart(Command):
         bot = self.bot
         client = bot.client
         await message.add_reaction("❗")
+        if name == "reload":
+            argv = argv.upper()
+            s = " " + argv if argv else ""
+            await channel.send("Reloading" + s + "...")
+            await create_future(bot.reload, argv)
+            return "Successfully reloaded" + s + "."
+        if name == "unload":
+            argv = argv.upper()
+            s = " " + argv if argv else ""
+            await channel.send("Unloading" + s + "...")
+            await create_future(bot.unload, argv)
+            return "Successfully unloaded" + s + "."
         if argv:
             # Restart announcements for when a time input is specified
             if "in" in argv:
@@ -28,9 +40,6 @@ class Restart(Command):
             await bot.event("_announce_", embed=emb)
             if delay > 0:
                 await asyncio.sleep(delay)
-        if name == "reload":
-            create_future_ex(bot.getModules)
-            return "Reloading... :wave:"
         elif name == "shutdown":
             await channel.send("Shutting down... :wave:")
         else:
@@ -169,7 +178,7 @@ class UpdateExec(Database):
         self.listeners.__setitem__(channel.id, None)
         t = utc()
         while self.listeners[channel.id] is None and utc() - t < 86400:
-            time.sleep(0.5)
+            time.sleep(0.2)
         return self.listeners.pop(channel.id, None)
 
     # Asynchronously evaluates Python code
@@ -186,16 +195,15 @@ class UpdateExec(Database):
                     print=lambda *args, **kwargs: self._print(*args, channel=channel, **kwargs),
                     input=lambda *args, **kwargs: self._input(*args, channel=channel, **kwargs),
                 ))
-        succ = False
         if "\n" not in proc:
             if proc.startswith("await "):
                 proc = proc[6:]
         # Run concurrently to avoid blocking bot itself
         # Attempt eval first, then exec
         try:
-            code = await create_future(compile, proc, "<exec>", "eval", optimize=2, priority=True)
+            code = await create_future(compile, proc, "<terminal>", "eval", optimize=2, priority=True)
         except SyntaxError:
-            code = await create_future(compile, proc, "<exec>", "exec", optimize=2, priority=True)
+            code = await create_future(compile, proc, "<terminal>", "exec", optimize=2, priority=True)
         output = await forceCoro(eval, code, glob, priority=True)
         # Output sent to "_" variable if used
         if output is not None:

@@ -83,7 +83,7 @@ class Help(Command):
                 + "[Commands](https://github.com/thomas-xin/Miza/wiki/Commands) for full command list."
             )
             if bot.categories:
-                s = "```ini\n" + " ".join((sbHighlight(c) for c in standard_commands)) + "```"
+                s = "```ini\n" + " ".join((sbHighlight(c) for c in standard_commands if c in bot.categories)) + "```"
                 emb.add_field(name="Command category list", value=s)
         return dict(embed=emb), 1
 
@@ -821,7 +821,7 @@ class Status(Command):
             shards = len(client.latencies)
         except AttributeError:
             shards = 1
-        size = bot.codeSize
+        size = sum(bot.size) + sum(bot.size2)
         stats = bot.currState
         cache = await create_future(os.listdir, "cache/")
         return (
