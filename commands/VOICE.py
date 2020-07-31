@@ -2733,14 +2733,15 @@ class Dump(Command):
                     "```css\nSuccessfully loaded audio queue data for [" 
                     + noHighlight(guild.name) + "].```", 1
                 )
-        # append dump, adds items without replacing
-        auds.queue.enqueue(q, -1)
-        auds.stats.update(d["stats"])
-        if "h" not in flags:
-            return (
-                "```css\nSuccessfully appended loaded data to queue for [" 
-                + noHighlight(guild.name) + "].```", 1
-            )
+        else:
+            # append dump, adds items without replacing
+            auds.queue.enqueue(q, -1)
+            auds.stats.update(d["stats"])
+            if "h" not in flags:
+                return (
+                    "```css\nSuccessfully appended loaded data to queue for [" 
+                    + noHighlight(guild.name) + "].```", 1
+                )
             
 
 class AudioSettings(Command):
