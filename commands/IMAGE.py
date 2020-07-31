@@ -78,7 +78,7 @@ class IMG(Command):
                         + " has reached the maximum of " + str(lim) + " items. "
                         + "Please remove an item to add another."
                     )
-                key = " ".join(args[:-1]).lower()
+                key = " ".join(args[:-1]).casefold()
                 if len(key) > 2000:
                     raise ArgumentError("Image tag too long.")
                 elif not key:
@@ -110,7 +110,7 @@ class IMG(Command):
                     "```css\nSuccessfully removed all images from the image list for ["
                     + noHighlight(guild.name) + "].```"
                 )
-            key = argv.lower()
+            key = argv.casefold()
             images.pop(key)
             imglists[guild.id] = images
             update()
@@ -127,7 +127,7 @@ class IMG(Command):
             )
         sources = hlist()
         for tag in args:
-            t = tag.lower()
+            t = tag.casefold()
             if t in images:
                 sources.append(images[t])
         r = flags.get("r", 0)
@@ -240,7 +240,7 @@ class React(Command):
                 + "-\nLoading React database...```"
             )
         if "d" in flags:
-            a = reconstitute(argv).lower()
+            a = reconstitute(argv).casefold()
             if a in curr:
                 curr.pop(a)
                 update()
@@ -258,7 +258,7 @@ class React(Command):
                 + "Please remove an item to add another."
             )
         # Limit substring length to 64
-        a = reconstitute(" ".join(args[:-1])).lower()[:64]
+        a = reconstitute(" ".join(args[:-1])).casefold()[:64]
         try:
             e_id = int(args[-1])
         except:
@@ -1351,7 +1351,7 @@ class UpdateReacts(Database):
                     if is_alphanumeric(k) and " " not in k:
                         words = text.split(" ")
                     else:
-                        words = message.content.lower()
+                        words = message.content.casefold()
                     if k in words:
                         emojis = following[k]
                         # Store position for each keyword found

@@ -46,7 +46,7 @@ class Restart(Command):
         # Disconnect as many voice clients as possible
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
-        if name.lower() == "shutdown":
+        if name.casefold() == "shutdown":
             with open(bot.shutdown, "wb") as f:
                 pass
         else:
@@ -98,7 +98,7 @@ class Execute(Command):
         try:
             num = int(argv)
         except (TypeError, ValueError):
-            out = argv.lower()
+            out = argv.casefold()
             num = self.terminal_types[out]
         else:
             out = self.terminal_types[num]

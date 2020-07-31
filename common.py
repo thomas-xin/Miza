@@ -356,7 +356,7 @@ IMAGE_FORMS = {
 def is_image(url):
     if "." in url:
         url = url[url.rindex("."):]
-    url = url.lower()
+    url = url.casefold()
     return IMAGE_FORMS.get(url)
 
 
@@ -745,7 +745,7 @@ def load_timezones():
         data = f.read().decode("utf-8", "replace")
         for line in data.split("\n"):
             info = line.split("\t")
-            abb = info[0].lower()
+            abb = info[0].casefold()
             if len(abb) >= 3 and (abb not in TIMEZONES or "(unofficial)" not in info[1]):
                 temp = info[-1].replace("\\", "/")
                 curr = sorted([round((1 - (i[3] == "−") * 2) * (rdhms(i[4:]) if ":" in i else float(i[4:]) * 60) * 60) for i in temp.split("/") if i.startswith("UTC")])
@@ -789,7 +789,7 @@ def tzparse(expr):
                         continue
                     a = arg[:i]
                     h += float(arg[i:])
-                tz = a.lower()
+                tz = a.casefold()
                 if tz in TIMEZONES:
                     t = get_timezone(tz)
                     expr = expr.replace(arg, "")
@@ -836,7 +836,7 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
             b = a.replace("*", "").replace("_", "").replace("||", "")
             if b:
                 a = b
-            a = a.lower()
+            a = a.casefold()
             if a in bot.commands:
                 bot.commands[a].append(self)
             else:

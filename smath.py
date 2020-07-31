@@ -2624,8 +2624,8 @@ zeroEncoder = demap({chr(i + 97): c for i, c in enumerate(zeroEnc)})
 zeroEncode = "".maketrans(dict(zeroEncoder.a))
 zeroDecode = "".maketrans(dict(zeroEncoder.b))
 isZeroEnc = lambda s: (s[0] in zeroEnc) if s else None
-zwencode = lambda s: (s if type(s) is str else str(s)).lower().translate(zeroEncode)
-zwdecode = lambda s: (s if type(s) is str else str(s)).lower().translate(zeroDecode)
+zwencode = lambda s: (s if type(s) is str else str(s)).casefold().translate(zeroEncode)
+zwdecode = lambda s: (s if type(s) is str else str(s)).casefold().translate(zeroDecode)
 
 
 # SHA256 operations: base64 and base16.

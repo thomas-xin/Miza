@@ -39,7 +39,7 @@ class Help(Command):
         found = {}
         # Get help on categories, then commands
         for a in args:
-            a = a.lower()
+            a = a.casefold()
             if a in bot.categories:
                 coms = bot.categories[a]
             elif a in bot.commands:
@@ -109,7 +109,7 @@ class Perms(Command):
         if len(args) < 1:
             t_user = user
         else:
-            check = args[0].lower()
+            check = args[0].casefold()
             if "@" in args[0] and ("everyone" in check or "here" in check):
                 args[0] = guild.id
             u_id = verifyID(args[0])
@@ -226,7 +226,7 @@ class EnabledCommands(Command):
             )
         else:
             if "e" not in flags and "a" not in flags and "d" not in flags:
-                catg = argv.lower()
+                catg = argv.casefold()
                 if not catg in bot.categories:
                     raise LookupError("Unknown command category " + argv + ".")
                 return (
@@ -234,7 +234,7 @@ class EnabledCommands(Command):
                     + "] is currently" + " not" * (catg not in enabled)
                     + "] enabled in [" + noHighlight(channel.name) + "].```"
                 )
-            args = [i.lower() for i in args]
+            args = [i.casefold() for i in args]
             for catg in args:
                 if not catg in bot.categories:
                     raise LookupError("Unknown command category " + catg + ".")
@@ -882,7 +882,7 @@ class Reminder(Command):
     async def __call__(self, argv, name, message, flags, bot, user, guild, perm, **void):
         msg = message.content
         argv2 = argv
-        argv = msg[msg.lower().index(name) + len(name):].strip(" ").strip("\n")
+        argv = msg[msg.casefold().index(name) + len(name):].strip(" ").strip("\n")
         try:
             args = shlex.split(argv)
         except ValueError:
@@ -935,16 +935,16 @@ class Reminder(Command):
         # This parser is so unnecessarily long for what it does...
         keyed = False
         while True:
-            temp = argv.lower()
+            temp = argv.casefold()
             if name == "remind" and temp.startswith("me "):
                 argv = argv[3:]
-                temp = argv.lower()
+                temp = argv.casefold()
             if temp.startswith("to "):
                 argv = argv[3:]
-                temp = argv.lower()
+                temp = argv.casefold()
             elif temp.startswith("that "):
                 argv = argv[5:]
-                temp = argv.lower()
+                temp = argv.casefold()
             spl = None
             keywords = dict(self.keydict)
             # Reversed regex search

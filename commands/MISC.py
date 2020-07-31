@@ -37,7 +37,7 @@ class DouClub:
     def search(self, query):
         # This string search algorithm could be better
         output = []
-        query = query.lower()
+        query = query.casefold()
         for l in self.data:
             found = True
             qlist = query.split(" ")
@@ -45,7 +45,7 @@ class DouClub:
                 tag = False
                 for k in l:
                     i = str(l[k])
-                    if q in i.lower():
+                    if q in i.casefold():
                         tag = True
                         break
                 if not tag:
@@ -160,7 +160,7 @@ class SheetPull:
 
     def search(self, query, lim):
         output = []
-        query = query.lower()
+        query = query.casefold()
         try:
             int(query)
             mode = 0
@@ -178,7 +178,7 @@ class SheetPull:
                     if len(l) >= 3:
                         found = False
                         for i in l:
-                            if q in i.lower():
+                            if q in i.casefold():
                                 found = True
                         if found:
                             temp = [limLine(e, lim) for e in l]
@@ -787,7 +787,7 @@ class UpdateMathTest(Database):
         if channel.id in self.data:
             if message.author.id != bot.client.user.id:
                 msg = message.content.strip("|").strip("`")
-                if not msg or msg.lower() != msg:
+                if not msg or msg.casefold() != msg:
                     return
                 # Ignore commented messages
                 if msg.startswith("#") or msg.startswith("//") or msg.startswith("\\"):
@@ -958,7 +958,7 @@ class UpdateDeviantArt(Database):
                         token = "?token=" + media["token"][0]
                         # Attempt to find largest available format for media
                         for t in reversed(media["types"]):
-                            if t["t"].lower() == "fullview":
+                            if t["t"].casefold() == "fullview":
                                 if "c" in t:
                                     extra = "/" + t["c"].replace("<prettyName>", prettyName)
                                     break

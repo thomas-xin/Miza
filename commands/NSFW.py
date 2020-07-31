@@ -18,7 +18,7 @@ LOG = False
 def pull_e621(argv, delay=5):
     try:
         v1, v2 = 1, 1
-        items = argv.replace(" ", "%20").lower()
+        items = argv.replace(" ", "%20").casefold()
         baseurl = "https://e621.net/post/index/"
         url = baseurl + "1/" + items
         s = Request(url, decode=True)
@@ -134,7 +134,7 @@ def pull_rule34_xxx(argv, delay=5):
 def pull_rule34_paheal(argv, delay=5):
     try:
         v1, v2 = 1, 1
-        items = argv.lower().split(" ")
+        items = argv.casefold().split(" ")
         if not len(argv.replace(" ", "")):
             tagsearch = [chr(i + 65) for i in range(26)]
         else:
@@ -151,7 +151,7 @@ def pull_rule34_paheal(argv, delay=5):
         for i in range(len(tags)):
             ind = tags[i].index("/")
             tags[i] = tags[i][:ind]
-            t = tags[i].lower()
+            t = tags[i].casefold()
             for a in items:
                 if a in t or a[:-1] == t:
                     valid.append(tags[i])
@@ -317,7 +317,7 @@ class Neko(Command):
         tagNSFW = False
         selected = []
         for tag in args:
-            tag = tag.replace(",", "").lower()
+            tag = tag.replace(",", "").casefold()
             if tag in neko_tags:
                 if neko_tags.get(tag, 0) == True:
                     tagNSFW = True

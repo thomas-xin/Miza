@@ -377,7 +377,7 @@ class RoleGiver(Command):
         data = bot.data.rolegivers
         if "d" in flags:
             if argv:
-                react = args[0].lower()
+                react = args[0].casefold()
                 assigned = data.get(channel.id, {})
                 if react not in assigned:
                     raise LookupError("Rolegiver " + react + " not currently assigned for #" + channel.name + ".")
@@ -405,7 +405,7 @@ class RoleGiver(Command):
                 + " has reached the maximum of 8 items. "
                 + "Please remove an item to add another."
             )
-        react = args[0].lower()
+        react = args[0].casefold()
         if len(react) > 64:
             raise OverflowError("Search substring too long.")
         r = verifyID(reconstitute(" ".join(args[1:])))
@@ -422,7 +422,7 @@ class RoleGiver(Command):
             role = await strLookup(
                 rolelist,
                 r,
-                qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
+                qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").casefold()],
             )
         # Must ensure that the user does not assign roles higher than their own
         if inf > perm:
@@ -533,7 +533,7 @@ class AutoRole(Command):
                 role = await strLookup(
                     rolelist,
                     r,
-                    qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").lower()],
+                    qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").casefold()],
                 )
             # Must ensure that the user does not assign roles higher than their own
             if not inf > perm:
@@ -1347,7 +1347,7 @@ class UpdateRolegivers(Database):
         bot = self.bot
         assigned = self.data.get(message.channel.id, ())
         for k in assigned:
-            if ((k in text) if is_alphanumeric(k) else (k in message.content.lower())):
+            if ((k in text) if is_alphanumeric(k) else (k in message.content.casefold())):
                 alist = assigned[k]
                 for r in alist[0]:
                     try:

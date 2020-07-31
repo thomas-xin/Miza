@@ -1302,7 +1302,7 @@ class AudioDownloader:
         for i in range(len(entry["formats"])):
             stream = resp.streams.fmt_streams[i]
             try:
-                abr = stream.abr.lower()
+                abr = stream.abr.casefold()
             except AttributeError:
                 abr = "0"
             if type(abr) is not str:
@@ -1608,7 +1608,7 @@ class AudioDownloader:
                                         "duration": dur,
                                     }
                                     if not isURL(url):
-                                        if entry.get("ie_key", "").lower() == "youtube":
+                                        if entry.get("ie_key", "").casefold() == "youtube":
                                             temp["url"] = "https://www.youtube.com/watch?v=" + url
                                     temp["research"] = True
                                 except:
@@ -2201,7 +2201,7 @@ class Playlist(Command):
             })
         if not names:
             raise LookupError("No results for " + argv + ".")
-        pl.sort(key=lambda x: x["name"].lower())
+        pl.sort(key=lambda x: x["name"].casefold())
         update()
         return (
             "```css\nAdded " + sbHighlight(", ".join(names))
@@ -2797,8 +2797,8 @@ class AudioSettings(Command):
             + " <chorus(?u)> <nightcore(?n)> <loop(?l)> <repeat(?1)> <shuffle(?x)> <quiet(?q)> <stay(?t)> <disable_all(?d)> <hide(?h)>"
         )
         self.flags = "vspbrcnlxqdh"
-        self.map = {k.lower(): self.aliasMap[k] for k in self.aliasMap}
-        addDict(self.map, {k.lower(): self.aliasExt[k] for k in self.aliasExt})
+        self.map = {k.casefold(): self.aliasMap[k] for k in self.aliasMap}
+        addDict(self.map, {k.casefold(): self.aliasExt[k] for k in self.aliasExt})
         super().__init__(*args)
 
     async def __call__(self, client, channel, user, guild, bot, flags, name, argv, perm, **void):
@@ -3562,7 +3562,7 @@ class Download(Command):
                     fmt = spl[-1]
                     if fmt.startswith("."):
                         fmt = fmt[1:]
-                    if fmt.lower() not in ("mp3", "ogg", "opus", "m4a", "webm", "wav"):
+                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "webm", "wav"):
                         fmt = "ogg"
                     else:
                         argv = " ".join(spl[:-1])
@@ -3610,7 +3610,7 @@ class Download(Command):
                                             "url": e["webpage_url"],
                                         })
                                 else:
-                                    if e["ie_key"].lower() == "youtube":
+                                    if e["ie_key"].casefold() == "youtube":
                                         res.append({
                                             "name": e["title"],
                                             "url": "https://www.youtube.com/watch?v=" + e["url"],

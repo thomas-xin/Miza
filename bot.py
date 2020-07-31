@@ -776,7 +776,7 @@ class Bot:
             f = module
             f = ".".join(f.split(".")[:-1])
             path, module = module, f
-            rename = module.lower()
+            rename = module.casefold()
             print("Loading module " + rename + "...")
             if module in self._globals:
                 mod = importlib.reload(self._globals[module])
@@ -946,18 +946,20 @@ class Bot:
         try:
             if not f:
                 r = [0]
-            elif f.lower() in ("t", "true", "y", "yes", "on"):
-                r = [True]
-            elif f.lower() in ("f", "false", "n", "no", "off"):
-                r = [False]
-            elif f.lower() == "inf":
-                r = [inf]
-            elif f.lower() == "-inf":
-                r = [-inf]
-            elif f.lower() in ("nan", "-nan"):
-                r = [nan]
             else:
-                r = [ast.literal_eval(f)]
+                s = f.casefold()
+                if s in ("t", "true", "y", "yes", "on"):
+                    r = [True]
+                elif s in ("f", "false", "n", "no", "off"):
+                    r = [False]
+                elif s == "inf":
+                    r = [inf]
+                elif s == "-inf":
+                    r = [-inf]
+                elif s in ("nan", "-nan"):
+                    r = [nan]
+                else:
+                    r = [ast.literal_eval(f)]
         except (ValueError, TypeError, SyntaxError):
             r = await self.solveMath(f, obj, 16, 0)
         x = r[0]
@@ -1026,7 +1028,7 @@ class Bot:
                 except ValueError:
                     args = expr.split()
                 for a in (args[0], args[-1]):
-                    tz = a.lower()
+                    tz = a.casefold()
                     if tz in TIMEZONES:
                         t = -get_timezone(tz)
                         expr = expr.replace(a, "")
@@ -1047,7 +1049,7 @@ class Bot:
                             raise TypeError("Too many time arguments.")
                 else:
                     # Otherwise move on to main parser
-                    f = re.sub(self.connectors, " ", expr).lower()
+                    f = re.sub(self.connectors, " ", expr).casefold()
                     for tc in self.timeChecks:
                         for check in reversed(self.timeChecks[tc]):
                             if check in f:
@@ -1194,13 +1196,13 @@ class Bot:
                 msg = msg[len(check):]
                 args = msg.split("-")
             catn, func, vals = args[:3]
-            func = func.lower()
+            func = func.casefold()
             argv = "-".join(args[3:])
             catg = self.categories[catn]
             # Force a rate limit on the reaction processing for the message
             self.proc_call[message.id] = max(utc(), self.proc_call.get(message.id, 0) + 1)
             for f in catg:
-                if f.__name__.lower() == func:
+                if f.__name__.casefold() == func:
                     try:
                         timeout = getattr(f, "_timeout_", 1) * self.timeout
                         if timeout >= inf:
@@ -1607,19 +1609,19 @@ def userIter1(x):
 
 def userQuery2(x):
     yield x
-    yield reconstitute(x).lower()
+    yield reconstitute(x).casefold()
 
 def userIter2(x):
     yield str(x)
-    yield reconstitute(x.name).lower()
-    yield reconstitute(x.display_name).lower()
+    yield reconstitute(x.name).casefold()
+    yield reconstitute(x.display_name).casefold()
 
 def userQuery3(x):
-    yield to_alphanumeric(x).replace(" ", "").lower()
+    yield to_alphanumeric(x).replace(" ", "").casefold()
 
 def userIter3(x):
-    yield to_alphanumeric(x).replace(" ", "").lower()
-    yield to_alphanumeric(x.display_name).replace(" ", "").lower()
+    yield to_alphanumeric(x).replace(" ", "").casefold()
+    yield to_alphanumeric(x.display_name).replace(" ", "").casefold()
 
 
 # Processes a message, runs all necessary commands and bot events. May be called from another source.
@@ -1705,7 +1707,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                     i2 = comm.index(end)
                     if i2 < i:
                         i = i2
-            check = reconstitute(comm[:i]).lower().replace("*", "").replace("_", "").replace("||", "")
+            check = reconstitute(comm[:i]).casefold().replace("*", "").replace("_", "").replace("||", "")
         # Hash table lookup for target command: O(1) average time complexity.
         if check in bot.commands:
             # Multiple commands may have the same alias, run all of them
@@ -1714,9 +1716,9 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                 if command.catg in enabled or admin:
                     alias = command.__name__
                     for a in command.alias:
-                        if a.lower() == check:
+                        if a.casefold() == check:
                             alias = a
-                    alias = alias.lower()
+                    alias = alias.casefold()
                     # argv is the raw parsed argument data
                     argv = comm[i:]
                     run = True
@@ -1914,7 +1916,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         ))
     # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
     if not run and u_id != client.user.id:
-        temp = to_alphanumeric(cpy).lower()
+        temp = to_alphanumeric(cpy).casefold()
         await bot.event("_nocommand_", text=temp, edit=edit, orig=orig, message=message, perm=u_perm)
     # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
     return delay

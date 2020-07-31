@@ -312,7 +312,7 @@ def resize_to(image, w, h, operation="auto"):
         raise OverflowError("Resulting image size too large.")
     if w == image.width and h == image.height:
         return image
-    op = operation.lower().replace(" ", "").replace("_", "")
+    op = operation.casefold().replace(" ", "").replace("_", "")
     if op in resizers:
         filt = resizers[op]
     elif op == "auto":
@@ -490,7 +490,7 @@ blenders = {
 }
 
 def blend_op(image, url, operation, amount, recursive=True):
-    op = operation.lower().replace(" ", "").replace("_", "")
+    op = operation.casefold().replace(" ", "").replace("_", "")
     if op in blenders:
         filt = blenders[op]
     elif op == "auto":

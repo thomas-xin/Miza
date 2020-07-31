@@ -385,7 +385,7 @@ class MimicConfig(Command):
             mimics = mimicdb[mimicdb[m_id].u_id]
             found = True
         mimic = mimicdb[m_id]
-        opt = args.pop(0).lower()
+        opt = args.pop(0).casefold()
         args.extend(bestURL(a) for a in message.attachments)
         if args:
             new = " ".join(args)
@@ -432,7 +432,7 @@ class MimicConfig(Command):
             new = urls[0]
         # May assign a user to the mimic
         elif setting == "auto":
-            if new.lower() in ("none", "null", "0", "false", "f"):
+            if new.casefold() in ("none", "null", "0", "false", "f"):
                 new = None
             else:
                 mim = None

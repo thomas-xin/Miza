@@ -273,20 +273,20 @@ class OwOify(Command):
         if "a" in flags or "b" not in flags:
             temp = list(out)
             for i, c in enumerate(out):
-                if i > 0 and c in "yY" and out[i - 1].lower() not in "aeiouyw \n\t":
+                if i > 0 and c in "yY" and out[i - 1].casefold() not in "aeiouyw \n\t":
                     if c.isupper():
-                        temp[i] = "W" + c.lower()
+                        temp[i] = "W" + c.casefold()
                     else:
                         temp[i] = "w" + c
-                if i < len(out) - 1 and c in "nN" and out[i + 1].lower() in "aeiou":
+                if i < len(out) - 1 and c in "nN" and out[i + 1].casefold() in "aeiou":
                     temp[i] = c + "y"
             if "a" in flags and "b" not in flags:
                 out = "".join(temp)
                 temp = list(out)
                 for i, c in enumerate(out):
-                    if i > 0 and c.lower() in "aeiou" and out[i - 1].lower() not in "aeiouyw \n\t":
+                    if i > 0 and c.casefold() in "aeiou" and out[i - 1].casefold() not in "aeiouyw \n\t":
                         if c.isupper():
-                            temp[i] = "W" + c.lower()
+                            temp[i] = "W" + c.casefold()
                         else:
                             temp[i] = "w" + c
         if temp is not None:
@@ -296,7 +296,7 @@ class OwOify(Command):
                     if c in out:
                         spl = out.split(c)
                         for i, w in enumerate(spl):
-                            if w.lower().startswith("th"):
+                            if w.casefold().startswith("th"):
                                 spl[i] = ("D" if w[0].isupper() else "d") + w[2:]
                             elif "th" in w:
                                 spl[i] = w.replace("th", "ff")
@@ -312,7 +312,7 @@ class AltCaps(Command):
 
     def __call__(self, argv, **void):
         i = argv[0].isupper()
-        a = argv[i::2].lower()
+        a = argv[i::2].casefold()
         b = argv[1 - i::2].upper()
         if i:
             a, b = b, a
@@ -344,7 +344,7 @@ class Time(Command):
                         continue
                     a = arg[:i]
                     h += float(arg[i:])
-                tz = a.lower()
+                tz = a.casefold()
                 if tz in TIMEZONES:
                     s = get_timezone(tz)
                     argv = argv.replace(arg, "")
