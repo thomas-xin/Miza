@@ -953,7 +953,7 @@ class AudioFile:
                     fl = 0
             self.buffered = True
             self.ensure_time()
-            print(self.file, "buffered", fl)
+            # print(self.file, "buffered", fl)
         except:
             # File errored, remove from cache and kill corresponding FFmpeg process if possible
             ytdl.cache.pop(self.file, None)
@@ -1005,7 +1005,7 @@ class AudioFile:
                     fl = os.path.getsize("cache/" + self.file)
                 except FileNotFoundError:
                     fl = 0
-                print(self.file, "loaded", fl)
+                # print(self.file, "loaded", fl)
         # Touch file if file is currently in use
         if self.readers:
             self.ensure_time()
@@ -1064,7 +1064,7 @@ class AudioFile:
                 time.sleep(5)
         # File is removed from cache data
         ytdl.cache.pop(self.file, None)
-        print(self.file, "deleted.")
+        # print(self.file, "deleted.")
 
     # Creates a reader, selecting from direct opus file, single piped FFmpeg, or double piped FFmpeg.
     def create_reader(self, pos=0, auds=None):
