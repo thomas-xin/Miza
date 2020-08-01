@@ -2613,7 +2613,7 @@ class Seek(Command):
             # ~seek takes an optional time input
             orig = auds.stats.position
             expr = argv
-            num = await bot.evalTime(expr, guild, orig)
+            num = await bot.evalTime(expr, user, orig)
         pos = auds.seek(num)
         if auds.player is not None:
             auds.player.time = 1 + utc()

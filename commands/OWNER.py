@@ -32,7 +32,7 @@ class Restart(Command):
             # Restart announcements for when a time input is specified
             if "in" in argv:
                 argv = argv[argv.rindex("in") + 2:]
-            delay = await bot.evalTime(argv, guild)
+            delay = await bot.evalTime(argv, user)
             await channel.send("Preparing to " + name + " in " + sec2Time(delay) + "...")
             emb = discord.Embed(colour=discord.Colour(1))
             emb.set_author(name=str(client.user), url=bot.website, icon_url=bestURL(client.user))
