@@ -84,12 +84,9 @@ ESCAPE_T2 = {
 }
 __emap2 = "".maketrans(ESCAPE_T2)
 
-__sptrans = re.compile("  +")
-
 noHighlight = lambda s: str(s).translate(__emap)
 clrHighlight = lambda s: str(s).translate(__emap2)
 sbHighlight = lambda s: "[" + noHighlight(s) + "]"
-singleSpace = lambda s: re.sub(__sptrans, " ", s)
 
 
 # Counts the number of lines in a file.
