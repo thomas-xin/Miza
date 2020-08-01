@@ -991,7 +991,7 @@ class Bot:
                         t += await self.evalMath(f, obj)
             except:
                 # Use datetime parser if regular parser fails
-                t = utc_ts(tparser.parse(f if f is not None else expr)) - utc_ts(tparser.parse("0s"))
+                t = utc_ts(tzparse(f if f is not None else expr)) - utc_ts(tparser.parse("0s"))
         if type(t) is not float:
             t = float(t)
         return t
