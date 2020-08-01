@@ -926,7 +926,7 @@ class Bot:
         "minute": ("m", "min", "minute", "mins", "minutes"),
         "second": ("s", "sec", "second", "secs", "seconds"),
     }
-    connectors = re.compile("[^a-z](and|at)[^a-z]", re.I)
+    connectors = re.compile("[^a-z](and|at|,|an|a)[^a-z]", re.I)
     alphabet = "abcdefghijklmnopqrstuvwxyz"
 
     # Evaluates a time input, using a math process from the subprocess pool when necessary.

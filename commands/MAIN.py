@@ -878,7 +878,7 @@ class Reminder(Command):
     rate_limit = 1 / 3
     keywords = ["on", "at", "in", "when", "event"]
     keydict = {re.compile("(^|[^a-z0-9])" + i[::-1] + "([^a-z0-9]|$)", re.I): None for i in keywords}
-    timefind = re.compile("(?:(?:(?:[0-9]+:)+[0-9]+|[\\s\-+*\\/^%0-9]+\\s*(?:s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\\s\\-_]year)s?))\\s*)+$", re.I)
+    timefind = re.compile("(?:(?:(?:[0-9]+:)+[0-9.]+|[\\s\-+*\\/^%.,0-9]+\\s*(?:s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\\s\\-_]year)s?))\\s*)+$", re.I)
 
     async def __call__(self, argv, name, message, flags, bot, user, guild, perm, **void):
         msg = message.content
