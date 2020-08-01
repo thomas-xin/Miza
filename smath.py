@@ -832,6 +832,104 @@ def romanNumerals(num, order=0):
     return over + output + sym
 
 
+numWords = {
+    "zero": 0,
+    "a": 1,
+    "an": 1,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+    "twenty": 20,
+    "thirty": 30,
+    "forty": 40,
+    "fifty": 50,
+    "sixty": 60,
+    "seventy": 70,
+    "eighty": 80,
+    "ninety": 90,
+    "hundred": 100,
+    "thousand": 1000,
+    "million": 10 ** 6,
+    "billion": 10 ** 9,
+    "trillion": 10 ** 12,
+    "quadrillion": 10 ** 15,
+    "quintillion": 10 ** 18,
+    "sextillion": 10 ** 21,
+    "septillion": 10 ** 24,
+    "octillion": 10 ** 27,
+    "nonillion": 10 ** 30,
+    "decillion": 10 ** 33,
+    "undecillion": 10 ** 36,
+    "duodecillion": 10 ** 39,
+    "tredecillion": 10 ** 42,
+    "quattuordecillion": 10 ** 45,
+    "quindecillion": 10 ** 48,
+    "sexdecillion": 10 ** 51,
+    "septendecillion": 10 ** 54,
+    "octodecillion": 10 ** 57,
+    "novemdecillion": 10 ** 60,
+    "vigintillion": 10 ** 63,
+    "unvigintillion": 10 ** 66,
+    "duovigintillion": 10 ** 69,
+    "tresvigintillion": 10 ** 72,
+    "quattuorvigintillion": 10 ** 75,
+    "quinvigintillion": 10 ** 78,
+    "sesvigintillion": 10 ** 81,
+    "septemvigintillion": 10 ** 84,
+    "octovigintillion": 10 ** 87,
+    "novemvigintillion": 10 ** 90,
+    "trigintillion": 10 ** 93,
+    "googol": 10 ** 100,
+    "centillion": 1e303,
+    "googolplex": inf,
+    "infinity": inf,
+    "inf": inf
+}
+
+# Parses English words as numbers.
+def numParse(s):
+    out = 0
+    words = singleSpace(s).casefold().split()
+    i = 0
+    while i < len(words):
+        w = words[i]
+        x = numWords.get(w, w)
+        if type(x) is str:
+            x = int(x)
+        while i < len(words) - 1:
+            i += 1
+            w = words[i]
+            y = numWords.get(w, w)
+            if type(y) is str:
+                y = int(y)
+            if x < y:
+                x *= y
+            elif x <= 1000:
+                x += y
+            else:
+                i -= 1
+                break
+        out += x
+        i += 1
+    return out
+
+
 # Limits a string to a maximum length, cutting from the middle and replacing with ".." when possible.
 def limStr(s, maxlen=10):
     if maxlen is None:
@@ -2628,6 +2726,10 @@ def b642Bytes(b, alt_char_set=False):
         b = b.replace(b"-", b"=").replace(b".", b"/")
     b = base64.b64decode(b)
     return b
+
+
+__sptrans = re.compile("  +")
+singleSpace = lambda s: re.sub(__sptrans, " ", s)
 
 
 # Experimental invisible Zero-Width character encoder.

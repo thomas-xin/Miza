@@ -926,7 +926,8 @@ class Bot:
         "minute": ("m", "min", "minute", "mins", "minutes"),
         "second": ("s", "sec", "second", "secs", "seconds"),
     }
-    connectors = re.compile("[^a-z](and|at|,|an|a)[^a-z]", re.I)
+    numericals = re.compile("^(?:(?:(?:[0-9]+|[a-z]{1,}illion)|thousand|hundred|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|zero|an|a|one|two|three|four|five|six|seven|eight|nine)\\s*)(?:(?:(?:[0-9]+|[a-z]{1,}illion)|thousand|hundred|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|zero|one|two|three|four|five|six|seven|eight|nine)\\s*)*", re.I)
+    connectors = re.compile("\\s(?:and|at)\\s", re.I)
     alphabet = "abcdefghijklmnopqrstuvwxyz"
 
     # Evaluates a time input, using a math process from the subprocess pool when necessary.
@@ -973,7 +974,7 @@ class Bot:
                             raise TypeError("Too many time arguments.")
                 else:
                     # Otherwise move on to main parser
-                    f = re.sub(self.connectors, " ", expr).casefold()
+                    f = re.sub(self.connectors, " ", expr.replace(",", "")).casefold()
                     for tc in self.timeChecks:
                         for check in reversed(self.timeChecks[tc]):
                             if check in f:
@@ -981,14 +982,33 @@ class Bot:
                                 isnt = i + len(check) < len(f) and f[i + len(check)] in self.alphabet
                                 if not i or f[i - 1] in self.alphabet or isnt:
                                     continue
-                                n = await self.evalMath(f[:i], obj)
+                                temp = f[:i]
+                                match = re.search(self.numericals, temp)
+                                if match:
+                                    i = match.end()
+                                    n = numParse(temp[:i])
+                                    temp = temp[i:].strip()
+                                    if temp:
+                                        n = await self.evalMath(str(n) + " " + temp, obj)
+                                else:
+                                    n = await self.evalMath(temp, obj)
                                 s = TIMEUNITS[tc]
                                 if type(s) is list:
                                     s = s[0]
                                 t += s * n
                                 f = f[i + len(check):]
-                    if f.strip():
-                        t += await self.evalMath(f, obj)
+                    temp = f.strip()
+                    if temp:
+                        match = re.search(self.numericals, temp)
+                        if match:
+                            i = match.end()
+                            n = numParse(temp[:i])
+                            temp = temp[i:].strip()
+                            if temp:
+                                n = await self.evalMath(str(n) + " " + temp, obj)
+                        else:
+                            n = await self.evalMath(temp, obj)
+                        t += n
             except:
                 # Use datetime parser if regular parser fails
                 t = utc_ts(tzparse(f if f is not None else expr)) - utc_ts(tparser.parse("0s"))
