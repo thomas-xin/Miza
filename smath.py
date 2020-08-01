@@ -12,6 +12,9 @@ from sympy.parsing.sympy_parser import parse_expr
 from itertools import repeat
 from colormath import color_objects, color_conversions
 
+class Dummy(Exception):
+    __slots__ = ()
+
 loop = lambda x: repeat(None, x)
 
 np = numpy
@@ -1624,7 +1627,7 @@ def reconstitute(s):
 class hlist(collections.abc.MutableSequence, collections.abc.Callable):
 
     """
-custom list-like data structure that incorporates the functionality of np arrays but allocates more space on the ends in order to have faster insertion."""
+custom list-like data structure that incorporates the functionality of numpy arrays but allocates more space on the ends in order to have faster insertion."""
 
     maxoff = (1 << 24) - 1
     minsize = 256
@@ -1677,7 +1680,7 @@ custom list-like data structure that incorporates the functionality of np arrays
             self.size = iterable.size
             self.data = iterable.data.copy()
         else:
-            if not issubclass(type(iterable), collections.abc.Sequence):
+            if not issubclass(type(iterable), collections.abc.Sequence) or issubclass(type(iterable), collections.abc.Mapping):
                 try:
                     iterable = deque(iterable)
                 except TypeError:
@@ -2080,9 +2083,7 @@ custom list-like data structure that incorporates the functionality of np arrays
 
     # Creates an iterable from an iterator, making sure the shape matches.
     def createIterator(self, other, force=False):
-        try:
-            len(other)
-        except TypeError:
+        if not issubclass(type(other), collections.abc.Sequence) or issubclass(type(other), collections.abc.Mapping):
             try:
                 other = list(other)
             except TypeError:
@@ -2488,10 +2489,15 @@ class cdict(dict):
     __iter__ = lambda self: iter(tuple(super().__iter__()))
     __setattr__ = lambda self, k, v: super().__setitem__(k, v)
 
-    def __getattr__(self, k):
-        if k.startswith("__") and k.endswith("__"):
-            return self.__class__.__getattribute__(self, k)
-        return super().__getitem__(k)
+    def __getattr__(self, k, default=Dummy):
+        try:
+            if k.startswith("__") and k.endswith("__"):
+                return self.__class__.__getattribute__(self, k)
+            return super().__getitem__(k)
+        except (AttributeError, KeyError):
+            if default is not Dummy:
+                return default
+            raise
 
     ___repr__ = lambda self: super().__repr__()
     to_dict = lambda self: dict(**self)
@@ -2504,7 +2510,13 @@ class mdict(cdict):
     __slots__ = ()
 
     count = lambda self: sum(len(v) for v in super().values())
-    extend = lambda self, k, v: setDict(super(), k, hlist()).extend(v).uniq(sorted=False)
+
+    def extend(self, k, v):
+        try:
+            values = super().__getitem__(k)
+        except KeyError:
+            return super().__setitem__(k, hlist(v).uniq(sorted=False))
+        return values.extend(v).uniq(sorted=False)
 
     def append(self, k, v):
         values = setDict(super(), k, hlist())

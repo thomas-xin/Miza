@@ -122,62 +122,24 @@ async def waitOnNone(coro, seconds=0.5):
         await asyncio.sleep(seconds)
     return resp
 
-# Mutable object storing return values of a function.
-class returns:
-
-    def __init__(self, data=None):
-        self.data = data
-
-    __call__ = lambda self: self.data
-    __bool__ = lambda self: self.data is not None
-
-async def parasync(coro, rets):
-    try:
-        resp = await coro
-        rets.data = returns(resp)
-    except Exception as ex:
-        rets.data = repr(ex)
-    return returns()
 
 # Recursively iterates through an iterable finding coroutines and executing them.
 async def recursiveCoro(item):
-    rets = hlist()
-    try:
-        len(item)
-    except TypeError:
-        item = hlist(item)
+    if not issubclass(type(item), collections.abc.MutableSequence):
+        return item
     for i, obj in enumerate(item):
-        try:
-            if type(obj) in (str, bytes):
-                raise TypeError
-            if issubclass(type(obj), collections.abc.Mapping) or issubclass(type(obj), io.IOBase):
-                raise TypeError
-            if awaitable(obj):
-                raise TypeError
-            obj = tuple(obj)
-        except TypeError:
-            pass
-        if type(obj) is tuple:
-            rets.append(returns())
-            create_task(parasync(recursiveCoro(obj), rets[-1]))
-        elif awaitable(obj):
-            rets.append(returns())
-            create_task(parasync(obj, rets[-1]))
-        else:
-            rets.append(returns(obj))
-    full = False
-    while not full:
-        full = True
-        for i in rets:
-            if not i:
-                full = False
-        await asyncio.sleep(0.2)
-    output = hlist()
-    for i in rets:
-        while isinstance(i, returns):
-            i = i()
-        output.append(i)
-    return output
+        if awaitable(obj):
+            if not hasattr(obj, "__await__"):
+                item[i] = create_task(obj)
+        elif issubclass(type(obj), collections.abc.MutableSequence):
+            item[i] = create_task(recursiveCoro(obj))
+    for i, obj in enumerate(item):
+        if hasattr(obj, "__await__"):
+            try:
+                item[i] = await obj
+            except:
+                pass
+    return item
 
 
 # Sends a message to a channel, then adds reactions accordingly.
@@ -561,22 +523,6 @@ def evalEX(exc):
         raise ex
     return ex
 
-
-# Calls a function, but printing exceptions when they occur.
-def funcSafe(func, *args, **kwargs):
-    try:
-        return func(*args, **kwargs)
-    except:
-        print(func, args, kwargs)
-        print(traceback.format_exc())
-        raise
-
-# Awaits a coroutine, but does not raise exceptions that occur.
-async def safeCoro(coro):
-    try:
-        return await coro
-    except:
-        print(traceback.format_exc())
 
 # Forces the operation to be a coroutine regardless of whether it is or not. Regular functions are executed in the thread pool.
 async def forceCoro(obj, *args, **kwargs):
@@ -1000,8 +946,11 @@ class __logPrinter:
             self.data[file] = ""
         self.data[file] += str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)
 
+    def write(self, *args, end="", **kwargs):
+        args2 = [arg if type(arg) is str else arg.decode("utf-8", "replace") for arg in args]
+        return self.__call__(*args2, end=end, **kwargs)
+
     read = lambda self, *args, **kwargs: bytes()
-    write = lambda self, *args, end="", **kwargs: self.__call__(*args, end, **kwargs)
     flush = open = lambda self: (self, self.__setattr__("closed", False))[0]
     close = lambda self: self.__setattr__("closed", True)
     isatty = lambda self: False
@@ -1010,12 +959,10 @@ class __logPrinter:
 # Sets all instances of print to the custom print implementation.
 print = __p = __logPrinter("log.txt")
 sys.stdout = sys.stderr = print
-getattr(discord, "__builtins__", {})["print"] = print
-getattr(concurrent.futures, "__builtins__", {})["print"] = print
-getattr(asyncio.futures, "__builtins__", {})["print"] = print
-getattr(asyncio, "__builtins__", {})["print"] = print
-getattr(psutil, "__builtins__", {})["print"] = print
-getattr(subprocess, "__builtins__", {})["print"] = print
+for mod in (discord, concurrent.futures, asyncio.futures, asyncio, psutil, subprocess):
+    builtins = getattr(mod, "__builtins__", None)
+    if builtins:
+        builtins["print"] = print
 
 
 proc_exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)

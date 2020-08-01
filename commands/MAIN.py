@@ -878,6 +878,7 @@ class Reminder(Command):
     rate_limit = 1 / 3
     keywords = ["on", "at", "in", "when", "event"]
     keydict = {re.compile("(^|[^a-z0-9])" + i[::-1] + "([^a-z0-9]|$)", re.I): None for i in keywords}
+    timefind = re.compile("(?:(?:(?:[0-9]+:)+[0-9]+|[\\s\-+*\\/^%0-9]+\\s*(?:s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\\s\\-_]year)s?))\\s*)+$", re.I)
 
     async def __call__(self, argv, name, message, flags, bot, user, guild, perm, **void):
         msg = message.content
@@ -996,7 +997,7 @@ class Reminder(Command):
                     msg = ""
                 if spl is not None:
                     msg = " in ".join(spl[:-1])
-                    t = await bot.evalTime(spl[-1], guild)
+                    t = await bot.evalTime(spl[-1], user)
                     break
             if foundkey.get("at"):
                 if " at " in argv:
@@ -1018,8 +1019,15 @@ class Reminder(Command):
                     msg = " on ".join(spl[:-1])
                     t = utc_ts(tzparse(spl[-1])) - utc()
                     break
+            match = re.search(self.timefind, argv)
+            if match:
+                i = match.start()
+                spl = [argv[:i], argv[i:]]
+                msg = spl[0]
+                t = await bot.evalTime(spl[1], user)
+                break
             msg = " ".join(args[:-1])
-            t = await bot.evalTime(args[-1], guild)
+            t = await bot.evalTime(args[-1], user)
             break
         if keyed:
             try:
