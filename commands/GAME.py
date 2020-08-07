@@ -322,7 +322,7 @@ class Text2048(Command):
             size = [4, 4]
         else:
             if "x" in argv:
-                size = await recursiveCoro(bot.evalMath(i, user) for i in argv.split("x"))
+                size = await recursive_coro([bot.evalMath(i, user) for i in argv.split("x")])
             else:
                 if len(args) > 1:
                     dims = args.pop(-1)

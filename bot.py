@@ -1066,7 +1066,7 @@ class Bot:
         procs = await create_future(self.proc.children, recursive=True, priority=True)
         procs.append(self.proc)
         tasks = [self.getProcState(p) for p in procs]
-        resp = await recursiveCoro(tasks)
+        resp = await recursive_coro(tasks)
         stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
         cpu = await create_future(psutil.cpu_count, priority=True)
         mem = await create_future(psutil.virtual_memory, priority=True)

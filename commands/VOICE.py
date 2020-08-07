@@ -3593,7 +3593,7 @@ class Download(Command):
                         process=r,
                         timeout=18,
                     ))
-                returns = await recursiveCoro(returns)
+                returns = await recursive_coro(returns)
                 # Attempt to find data for results, adjusting if they are incomplete
                 for r in returns:
                     try:

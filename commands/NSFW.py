@@ -213,7 +213,7 @@ async def searchRandomNSFW(argv, delay=10):
         pull_e621,
     ]
     data = [create_future(f, argv, delay - 3) for f in funcs]
-    data = await recursiveCoro(data)
+    data = await recursive_coro(data)
     print(data)
     data = [i for i in data if i]
     if not data:

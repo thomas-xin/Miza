@@ -126,12 +126,12 @@ async def waitOnNone(coro, seconds=0.5):
 
 
 # Recursively iterates through an iterable finding coroutines and executing them.
-async def recursiveCoro(item):
+async def recursive_coro(item):
     if not issubclass(type(item), collections.abc.MutableSequence):
         return item
     for i, obj in enumerate(item):
         if awaitable(obj):
-            if not hasattr(obj, "__await__"):
+            if not issubclass(type(obj), asyncio.Task):
                 item[i] = create_task(obj)
         elif issubclass(type(obj), collections.abc.MutableSequence):
             item[i] = create_task(recursiveCoro(obj))
