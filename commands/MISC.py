@@ -9,18 +9,23 @@ import csv, knackpy
 from prettytable import PrettyTable as ptable
 
 
+builtins = cdict(getattr(__builtins__, "__dict__", __builtins__))
+builtins["print"] = lambda *args, **kwargs: None
+knackpy.__builtins__ = builtins
+
+
 class DouClub:
     
     def __init__(self, c_id, c_sec):
         self.id = c_id
         self.secret = c_sec
-        self.time = 0
+        self.time = utc()
         create_future_ex(self.pull)
 
     def pull(self):
         try:
-            # knackpy.__builtins__["print"] = lambda *args, **kwargs: None
             # print("Pulling Doukutsu Club...")
+            knackpy.__builtins__ = builtins
             kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret)
             self.data = kn.data
             self.time = utc()
@@ -114,7 +119,7 @@ class SheetPull:
     
     def __init__(self, url):
         self.url = url
-        self.time = 0
+        self.time = utc()
         create_future_ex(self.pull)
 
     def update(self):
