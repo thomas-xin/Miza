@@ -11,7 +11,7 @@ from prettytable import PrettyTable as ptable
 
 builtins = cdict(getattr(__builtins__, "__dict__", __builtins__))
 builtins["print"] = lambda *args, **kwargs: None
-knackpy.__builtins__ = builtins
+knackpy.__builtins__.update(builtins)
 
 
 class DouClub:
@@ -25,7 +25,7 @@ class DouClub:
     def pull(self):
         try:
             # print("Pulling Doukutsu Club...")
-            knackpy.__builtins__ = builtins
+            knackpy.__builtins__.update(builtins)
             kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret)
             self.data = kn.data
             self.time = utc()

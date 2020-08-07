@@ -1820,7 +1820,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
         else:
             # Parse message to find command.
             i = len(comm)
-            for end in " ?-+":
+            for end in " ?-+\t\n":
                 if end in comm:
                     i2 = comm.index(end)
                     if i2 < i:
@@ -1838,7 +1838,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             alias = a
                     alias = alias.casefold()
                     # argv is the raw parsed argument data
-                    argv = comm[i:]
+                    argv = comm[i:].strip()
                     run = True
                     print(str(getattr(guild, "id", 0)) + ": " + str(user) + " (" + str(u_id) + ") issued command " + msg)
                     req = command.min_level
