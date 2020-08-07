@@ -1,6 +1,8 @@
-import os, sys, subprocess, psutil, asyncio, discord, json, pytz, requests, aiohttp, inspect, importlib
-import urllib.request, urllib.parse, concurrent.futures
+import os, sys, subprocess, psutil, asyncio, discord, json, pytz, requests, aiohttp, inspect, importlib, tracemalloc
 
+tracemalloc.start()
+
+import urllib.request, urllib.parse, concurrent.futures
 
 from smath import *
 
@@ -29,6 +31,9 @@ except AttributeError:
         T2 = concurrent.futures.TimeoutError
     except AttributeError:
         T2 = TimeoutError
+
+
+print_exc = lambda: print(traceback.format_exc(), end="")
 
 
 class ArgumentError(LookupError):
@@ -146,17 +151,17 @@ async def sendReact(channel, *args, reacts=(), **kwargs):
         for react in reacts:
             await sent.add_reaction(react)
     except:
-        print(traceback.format_exc())
+        print_exc()
 
 # Sends a message to a channel, then edits to add links to all attached files.
 async def sendFile(channel, msg, file, filename=None, best=False):
     try:
         message = await channel.send(msg, file=file)
         if filename is not None:
-            create_future_ex(os.remove, filename)
+            create_future_ex(os.remove, filename, priority=True)
     except:
         if filename is not None:
-            create_future_ex(os.remove, filename)
+            create_future_ex(os.remove, filename, priority=True)
         raise
     if message.attachments:
         await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + bestURL(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
@@ -427,7 +432,7 @@ async def mathProc(expr, prec=64, rat=False, key=None, timeout=12, authorize=Fal
                         raise StopIteration
                 else:
                     break
-            await create_future(procUpdate)
+            await create_future(procUpdate, priority=True)
             await asyncio.sleep(0.5)
     except StopIteration:
         pass
@@ -439,16 +444,16 @@ async def mathProc(expr, prec=64, rat=False, key=None, timeout=12, authorize=Fal
     try:
         proc.busy = inf
         busy[key] = utc()
-        await create_future(procUpdate)
+        await create_future(procUpdate, priority=True)
         await create_future(proc.stdin.write, d)
         await create_future(proc.stdin.flush)
-        resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
+        resp = await create_future(proc.stdout.readline, timeout=timeout)
         proc.busy = utc()
     except (T0, T1):
-        create_future_ex(forceKill, proc)
+        create_future_ex(forceKill, proc, priority=True)
         procs.pop(p, None)
         busy.pop(key, None)
-        create_future_ex(procUpdate)
+        create_future_ex(procUpdate, priority=True)
         raise
     busy.pop(key, None)
     output = evalEX(evalEX(resp))
@@ -484,16 +489,16 @@ async def imageProc(image, operation, args, key=None, timeout=24):
     try:
         proc.busy = inf
         busy[key] = utc()
-        await create_future(procUpdate)
+        await create_future(procUpdate, priority=True)
         await create_future(proc.stdin.write, d)
         await create_future(proc.stdin.flush)
-        resp = await asyncio.wait_for(create_future(proc.stdout.readline), timeout=timeout)
+        resp = await create_future(proc.stdout.readline, timeout=timeout)
         proc.busy = utc()
     except (T0, T1):
-        create_future_ex(forceKill, proc)
+        create_future_ex(forceKill, proc, priority=True)
         procs.pop(p, None)
         busy.pop(key, None)
-        create_future_ex(procUpdate)
+        create_future_ex(procUpdate, priority=True)
         raise
     busy.pop(key, None)
     output = evalEX(evalEX(resp))
@@ -521,22 +526,8 @@ def evalEX(exc):
     return ex
 
 
-# Forces the operation to be a coroutine regardless of whether it is or not. Regular functions are executed in the thread pool.
-async def forceCoro(obj, *args, **kwargs):
-    if asyncio.iscoroutinefunction(obj):
-        obj = obj(*args, **kwargs)
-    elif callable(obj):
-        if asyncio.iscoroutinefunction(obj.__call__):
-            obj = obj.__call__(*args, **kwargs)
-        else:
-            obj = await create_future(obj, *args, **kwargs)
-    while awaitable(obj):
-        obj = await obj
-    return obj
-
-
 # Main event loop for all asyncio operations.
-eloop = asyncio.new_event_loop()
+eloop = asyncio.get_event_loop()
 __setloop__ = lambda: asyncio.set_event_loop(eloop)
 
 
@@ -567,7 +558,7 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
     def update(self):
         if not self.pools:
             self._update()
-        self.position = (self.position + 1) & len(self.pools) - 1
+        self.position = (self.position + 1) % len(self.pools)
         random.choice(self.pools).submit(self._update)
 
     def map(self, func, *args, **kwargs):
@@ -578,43 +569,69 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
         self.update()
         return self.pools[self.position].submit(func, *args, **kwargs)
 
-    shutdown = lambda self, wait=True: [exc.shutdown(wait) for exc in self.pools].extend(self.pools.clear())
+    shutdown = lambda self, wait=True: [exc.shutdown(wait) for exc in self.pools].append(self.pools.clear())
 
 pthreads = MultiThreadPool(thread_count=48, initializer=__setloop__)
 athreads = MultiThreadPool(thread_count=64, initializer=__setloop__)
 __setloop__()
 
+def get_event_loop():
+    try:
+        return asyncio.get_event_loop()
+    except RuntimeError:
+        return eloop
+
 # Creates an asyncio Future that waits on a multithreaded one.
 def wrap_future(fut, loop=None):
     if loop is None:
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = eloop
-    new_fut = loop.create_future()
+        loop = get_event_loop()
+    wrapper = loop.create_future()
 
     def on_done(*void):
         try:
-            result = fut.result()
+            res = fut.result()
         except Exception as ex:
-            loop.call_soon_threadsafe(new_fut.set_exception, ex)
+            loop.call_soon_threadsafe(wrapper.set_exception, ex)
         else:
-            loop.call_soon_threadsafe(new_fut.set_result, result)
+            loop.call_soon_threadsafe(wrapper.set_result, res)
 
     fut.add_done_callback(on_done)
-    return new_fut
+    return wrapper
 
 # Runs a function call in a parallel thread, returning a future object waiting on the output.
-create_future = lambda func, *args, loop=None, priority=False, **kwargs: wrap_future((athreads, pthreads)[priority].submit(func, *args, **kwargs), loop=loop)
-create_future_ex = lambda func, *args, priority=False, **kwargs: (athreads, pthreads)[priority].submit(func, *args, **kwargs)
+def create_future_ex(func, *args, timeout=None, priority=False, **kwargs):
+    fut = (athreads, pthreads)[priority].submit(func, *args, **kwargs)
+    if timeout is not None:
+        fut = (athreads, pthreads)[priority].submit(fut.result, timeout=timeout)
+    return fut
+
+# Forces the operation to be a coroutine regardless of whether it is or not. Regular functions are executed in the thread pool.
+async def _create_future(obj, *args, loop, timeout, priority, **kwargs):
+    if asyncio.iscoroutinefunction(obj):
+        obj = obj(*args, **kwargs)
+    elif callable(obj):
+        if asyncio.iscoroutinefunction(obj.__call__):
+            obj = obj.__call__(*args, **kwargs)
+        else:
+            obj = await wrap_future(create_future_ex(obj, *args, timeout=timeout, **kwargs), loop=loop)
+    while awaitable(obj):
+        if timeout is not None:
+            obj = await asyncio.wait_for(obj, timeout=timeout)
+        else:
+            obj = await obj
+    return obj
+
+# High level future asyncio creation function that takes both sync and async functions, as well as coroutines directly.
+def create_future(obj, *args, loop=None, timeout=None, priority=False, **kwargs):
+    if loop is None:
+        loop = get_event_loop()
+    fut = _create_future(obj, *args, loop=loop, timeout=None, priority=priority, **kwargs)
+    return create_task(fut, loop=loop)
 
 # Creates an asyncio Task object from an awaitable object.
 def create_task(fut, *args, loop=None, **kwargs):
     if loop is None:
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = eloop
+        loop = get_event_loop()
     return asyncio.ensure_future(fut, *args, loop=loop, **kwargs)
 
 # A dummy coroutine that returns None.
@@ -706,13 +723,19 @@ def get_timezone(tz):
         return s[is_dst(timezone=tz.upper())]
     return s
 
-create_future_ex(load_timezones)
+create_future_ex(load_timezones, priority=True)
+
+def parse_with_now(expr):
+    if expr.strip().casefold() == "now":
+        return datetime.datetime.utcnow()
+    return tparser.parse(expr)
 
 # Parses a time expression, with an optional timezone input at the end.
 def tzparse(expr):
     try:
         s = float(expr)
     except ValueError:
+        expr = expr.strip()
         if " " in expr:
             t = 0
             try:
@@ -735,8 +758,8 @@ def tzparse(expr):
                     expr = expr.replace(arg, "")
                     break
                 h = 0
-            return tparser.parse(expr) - datetime.timedelta(hours=h, seconds=t)
-        return tparser.parse(expr)
+            return parse_with_now(expr) - datetime.timedelta(hours=h, seconds=t)
+        return parse_with_now(expr)
     return datetime.datetime.utcfromtimestamp(s)
 
 
@@ -789,7 +812,7 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
             try:
                 f()
             except:
-                print(traceback.format_exc())
+                print_exc()
                 self.data.clear()
                 f()
 
@@ -828,7 +851,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                         data = eval(compile(s, "<database>", "eval", optimize=2))
                     except:
                         print(self.file)
-                        print(traceback.format_exc())
+                        print_exc()
                         raise FileNotFoundError
                 bot.data[name] = self.data = data
             except FileNotFoundError:
@@ -847,7 +870,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
             try:
                 f()
             except:
-                print(traceback.format_exc())
+                print_exc()
                 self.data.clear()
                 f()
 
@@ -912,7 +935,7 @@ class __logPrinter:
             outfunc = sys.__stdout__.write
             enc = lambda x: x
         else:
-            outfunc = lambda s: self.filePrint(self.file, s)
+            outfunc = lambda s: (sys.__stdout__.buffer.write(s), self.filePrint(self.file, s))
             enc = lambda x: bytes(x, "utf-8")
         outfunc(enc("Logging started.\n"))
         while True:
@@ -931,7 +954,7 @@ class __logPrinter:
                     else:
                         self.filePrint(f, data)
             except:
-                print(traceback.format_exc())
+                sys.__stdout__.write(traceback.format_exc())
             time.sleep(1)
             while not os.path.exists("common.py") or self.closed:
                 time.sleep(0.5)
@@ -956,7 +979,7 @@ class __logPrinter:
 # Sets all instances of print to the custom print implementation.
 print = __p = __logPrinter("log.txt")
 sys.stdout = sys.stderr = print
-for mod in (discord, concurrent.futures, asyncio.futures, asyncio, psutil, subprocess):
+for mod in (discord, concurrent.futures, asyncio.futures, asyncio, psutil, subprocess, tracemalloc):
     builtins = getattr(mod, "__builtins__", None)
     if builtins:
         builtins["print"] = print

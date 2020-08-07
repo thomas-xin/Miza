@@ -83,7 +83,7 @@ class Help(Command):
                 + "[Commands](https://github.com/thomas-xin/Miza/wiki/Commands) for full command list."
             )
             if bot.categories:
-                s = "```ini\n" + " ".join((sbHighlight(c) for c in standard_commands if c in bot.categories)) + "```"
+                s = "**```ini\n" + " ".join((sbHighlight(c) for c in standard_commands if c in bot.categories)) + "```**"
                 emb.add_field(name="Command category list", value=s)
         return dict(embed=emb), 1
 
@@ -356,8 +356,8 @@ class Loop(Command):
         create_task(sendReact(
             channel,
             (
-                "```css\nLooping [" + func + "] " + str(iters)
-                + " time" + "s" * (iters != 1) + "...```"
+                "*```css\nLooping [" + func + "] " + str(iters)
+                + " time" + "s" * (iters != 1) + "...```*"
             ),
             reacts=["❎"],
         ))
@@ -729,16 +729,16 @@ class Info(Command):
         emb.set_author(name=name, icon_url=url, url=url2)
         d = "<@" + str(u.id) + ">"
         if activity:
-            d += "```\n" + activity + "```"
+            d += "*```\n" + activity + "```*"
         if any((is_sys, is_bot, is_self, is_self_owner, is_guild_owner)):
-            d += "```css\n"
+            d += "**```css\n"
             d += "[Discord staff]\n" * is_sys
             d += "[Bot]\n" * is_bot
             d += "[Myself :3]\n" * is_self
             d += "[My owner ❤️]\n" * is_self_owner
             d += "[Server owner]\n" * (is_guild_owner and not hasattr(guild, "isDM"))
             d = d.strip("\n")
-            d += "```"
+            d += "```**"
         emb.description = d
         emb.add_field(name="User ID", value=str(u.id), inline=0)
         emb.add_field(name="Creation time", value=str(created), inline=1)
@@ -770,7 +770,7 @@ class Info(Command):
         if flags.get("v", 0) > 1:
             fut = create_task(channel.trigger_typing())
             fut2 = create_task(channel.send(embed=emb))
-            data = await create_future(bot.database.users.fetch_events, user.id, interval=3600)
+            data = await create_future(bot.database.users.fetch_events, user.id, interval=3600, timeout=12)
             resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
             fn = resp["file"]
             f = discord.File(fn)
@@ -796,7 +796,7 @@ class Activity(Command):
                 user = await bot.fetch_user(u_id)
             except (TypeError, discord.NotFound):
                 user = await bot.fetch_member_ex(u_id, guild)
-        data = await create_future(bot.database.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)))
+        data = await create_future(bot.database.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=12)
         fut = create_task(channel.trigger_typing())
         try:
             resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
@@ -823,9 +823,9 @@ class Status(Command):
             shards = 1
         size = sum(bot.size.values()) + sum(bot.size2.values())
         stats = bot.currState
-        cache = await create_future(os.listdir, "cache/")
+        cache = await create_future(os.listdir, "cache/", timeout=12)
         return (
-            "```ini"
+            "*```ini"
             + "\nLoaded users: " + sbHighlight(max(len(client.users), len(bot.cache.users)))
             + ", Loaded servers: " + sbHighlight(bot.guilds)
             + ", Loaded shards: " + sbHighlight(shards)
@@ -848,7 +848,7 @@ class Status(Command):
             + ".\nCPU usage: " + sbHighlight(round(stats[0], 3)) + "%"
             + ", RAM usage: " + sbHighlight(round(stats[1] / 1048576, 3)) + " MB"
             + ", Disk usage: " + sbHighlight(round(stats[2] / 1048576, 3)) + " MB"
-            + ".```"
+            + ".```*"
         )
 
 
@@ -878,7 +878,10 @@ class Reminder(Command):
     rate_limit = 1 / 3
     keywords = ["on", "at", "in", "when", "event"]
     keydict = {re.compile("(^|[^a-z0-9])" + i[::-1] + "([^a-z0-9]|$)", re.I): None for i in keywords}
-    timefind = re.compile("(?:(?:(?:[0-9]+:)+[0-9.]+\\s*(?:am|pm)?|[\\s\-+*\\/^%.,0-9]+\\s*(?:am|pm|s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\\s\\-_]year)s?))\\s*)+$", re.I)
+    timefind = None
+
+    def __load__(self):
+        self.timefind = re.compile("(?:(?:(?:[0-9]+:)+[0-9.]+\\s*(?:am|pm)?|" + self.bot.num_words + "|[\\s\-+*\\/^%.,0-9]+\\s*(?:am|pm|s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\\s\\-_]year)s?))\\s*)+$", re.I)
 
     async def __call__(self, argv, name, message, flags, bot, user, guild, perm, **void):
         msg = message.content
@@ -927,9 +930,9 @@ class Reminder(Command):
         if not argv:
             # Set callback message for scrollable list
             return (
-                "```" + "\n" * ("z" in flags) + "callback-main-reminder-"
+                "*```" + "\n" * ("z" in flags) + "callback-main-reminder-"
                 + str(user.id) + "_0_" + str(sendable.id)
-                + "-\nLoading Reminder database...```"
+                + "-\nLoading Reminder database...```*"
             )
         if len(rems) >= 64:
             raise OverflowError("You have reached the maximum of 64 " + word + ". Please remove one to add another.")
@@ -1064,7 +1067,7 @@ class Reminder(Command):
                 msg = "[SAMPLE ANNOUNCEMENT]"
             else:
                 msg = "[SAMPLE REMINDER]"
-            msg = "```asciidoc\n" + msg + "```"
+            msg = "**```asciidoc\n" + msg + "```**"
         elif len(msg) > 1024:
             raise OverflowError("Input message too long (" + str(len(msg)) + "> 1024).")
         username = str(user)
@@ -1140,17 +1143,17 @@ class Reminder(Command):
         if not content:
             content = message.embeds[0].description
         i = content.index("callback")
-        content = content[:i] + (
+        content = "*```" + "\n" * ("\n" in content[:i]) + (
             "callback-main-reminder-"
             + str(u_id) + "_" + str(pos) + "_" + str(s_id)
             + "-\n"
         )
         if not rems:
-            content += "Schedule for " + str(sendable).replace("`", "") + " is currently empty.```"
+            content += "Schedule for " + str(sendable).replace("`", "") + " is currently empty.```*"
             msg = ""
         else:
             t = utc()
-            content += str(len(rems)) + " messages currently scheduled for " + str(sendable).replace("`", "") + ":```"
+            content += str(len(rems)) + " messages currently scheduled for " + str(sendable).replace("`", "") + ":```*"
             msg = strIter(
                 rems[pos:pos + page],
                 key=lambda x: limStr(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + noHighlight(x["msg"]), 96) + "` ➡️ " + ("<@" + str(x["u_id"]) + ">" if "u_id" in x else sec2Time(x["t"] - t)),
@@ -1260,7 +1263,7 @@ class UpdateReminders(Database):
                     if not rems:
                         self.data.pop(u_id)
             except:
-                print(traceback.format_exc())
+                print_exc()
             try:
                 self.data.pop(s)
                 self.update()
@@ -1378,7 +1381,7 @@ class UpdateMessageCount(Database):
                     else:
                         await asyncio.sleep(10)
                 except:
-                    print(traceback.format_exc())
+                    print_exc()
                     await asyncio.sleep(5)
                 else:
                     break

@@ -19,21 +19,21 @@ class Restart(Command):
         if name == "reload":
             argv = argv.upper()
             s = " " + argv if argv else ""
-            await channel.send("Reloading" + s + "...")
-            await create_future(bot.reload, argv)
-            return "Successfully reloaded" + s + "."
+            await channel.send("Reloading" + s.lower() + "...")
+            await create_future(bot.reload, argv, priority=True)
+            return "Successfully reloaded" + s.lower() + "."
         if name == "unload":
             argv = argv.upper()
             s = " " + argv if argv else ""
-            await channel.send("Unloading" + s + "...")
-            await create_future(bot.unload, argv)
-            return "Successfully unloaded" + s + "."
+            await channel.send("Unloading" + s.lower() + "...")
+            await create_future(bot.unload, argv, priority=True)
+            return "Successfully unloaded" + s.lower() + "."
         if argv:
             # Restart announcements for when a time input is specified
             if "in" in argv:
                 argv = argv[argv.rindex("in") + 2:]
             delay = await bot.evalTime(argv, user)
-            await channel.send("Preparing to " + name + " in " + sec2Time(delay) + "...")
+            await channel.send("*Preparing to " + name + " in " + sec2Time(delay) + "...*")
             emb = discord.Embed(colour=discord.Colour(1))
             emb.set_author(name=str(client.user), url=bot.website, icon_url=bestURL(client.user))
             emb.description = "```ini\n[I will be " + ("restarting", "shutting down")[name == "shutdown"] + " in " + sec2Time(delay) + ", apologies for any inconvenience.]```"
@@ -46,12 +46,15 @@ class Restart(Command):
             await channel.send("Restarting... :wave:")
         fut = create_task(channel.trigger_typing())
         bot.closed = True
-        print.close()
+        try:
+            print.close()
+        except:
+            pass
         t = time.time()
         # Call _destroy_ bot event to indicate to all databases the imminent shutdown
         await bot.event("_destroy_")
         # Save any database that has not already been autosaved
-        await create_future(bot.update)
+        await create_future(bot.update, priority=True)
         # Disconnect as many voice clients as possible
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
@@ -65,7 +68,7 @@ class Restart(Command):
                         pass
                     break
                 except:
-                    print(traceback.format_exc())
+                    print_exc()
                     time.sleep(0.1)
         for _ in loop(8):
             try:
@@ -73,7 +76,7 @@ class Restart(Command):
                     os.remove("log.txt")
                 break
             except:
-                print(traceback.format_exc())
+                print_exc()
                 time.sleep(0.1)
         if time.time() - t < 1:
             await asyncio.sleep(1)
@@ -204,7 +207,7 @@ class UpdateExec(Database):
             code = await create_future(compile, proc, "<terminal>", "eval", optimize=2, priority=True)
         except SyntaxError:
             code = await create_future(compile, proc, "<terminal>", "exec", optimize=2, priority=True)
-        output = await forceCoro(eval, code, glob, priority=True)
+        output = await create_future(eval, code, glob, priority=True)
         # Output sent to "_" variable if used
         if output is not None:
             glob["_"] = output 
@@ -225,7 +228,7 @@ class UpdateExec(Database):
         if not hasattr(channel, "guild") or channel.guild is None:
             emb = discord.Embed(colour=randColour())
             emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=bestURL(user))
-            emb.description = "```ini\n[typing...]```"
+            emb.description = "*```ini\n[typing...]```*"
             for c_id, flag in self.data.items():
                 if flag & 2:
                     create_task(self.sendDeleteID(c_id, embed=emb))
@@ -272,7 +275,7 @@ class UpdateExec(Database):
                             output = await self.procFunc(proc, channel, bot, term=f)
                             await channel.send(self.prepare_string(output, fmt=""))
                         except:
-                            # print(traceback.format_exc())
+                            # print_exc()
                             await sendReact(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
         # Relay DM messages
         elif message.guild is None:
@@ -332,7 +335,10 @@ class UpdateExec(Database):
             [self.data.pop(i) for i in invalid]                        
 
     def __load__(self):
-        print.funcs.append(lambda *args: self._log_(*args))
+        try:
+            print.funcs.append(lambda *args: self._log_(*args))
+        except AttributeError:
+            pass
 
 
 class DownloadServer(Command):
@@ -349,7 +355,7 @@ class DownloadServer(Command):
                 "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
                 + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
             )
-            return ("```asciidoc\n[" + response + "]```")
+            return ("**```asciidoc\n[" + response + "]```**")
         if argv:
             g_id = verifyID(argv)
             guild = await bot.fetch_guild(g_id)
@@ -378,7 +384,7 @@ class DownloadServer(Command):
 
             await self.bot.database.counts.getGuildHistory(guild, callback=callback)
         response = uniStr("Download Complete.")
-        return ("```ini\n[" + response + "]```")
+        return ("**```ini\n[" + response + "]```**")
 
 
 class Trust(Command):

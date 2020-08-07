@@ -1,3 +1,5 @@
+# Smudge invaded, on the 1st August 2020 this become my territory *places flag* B3
+
 #!/usr/bin/python3
 
 from common import *
@@ -57,7 +59,7 @@ class Bot:
             )
             f.close()
             print("ERROR: Please fill in details for " + self.authdata + " to continue.")
-            self.setshutdown()
+            self.setshutdown(2)
         auth = ast.literal_eval(f.read())
         f.close()
         try:
@@ -76,7 +78,6 @@ class Bot:
         # Initialize rest of bot variables
         create_task(heartbeatLoop())
         self.proc = psutil.Process()
-        self.getModules()
         self.guilds = 0
         self.blocked = 0
         self.updated = False
@@ -85,25 +86,32 @@ class Bot:
         self.embedSenders = cdict()
         # Assign bot cache to global variables for convenience
         globals().update(self.cache)
+        self.getModules()
 
     __call__ = lambda self: self
 
-    # Waits 2 seconds and shuts down.
-    def setshutdown(self):
-        time.sleep(2)
+    # Waits an amount of seconds and shuts down.
+    def setshutdown(self, delay=None):
+        if delay:
+            time.sleep(delay)
         f = open(self.shutdown, "wb")
         f.close()
-        sys.exit(1)
+        for proc in self.proc.children(recursive=True):
+            try:
+                proc.kill()
+            except:
+                pass
+        self.proc.kill()
 
     # Starts up client.
     def run(self):
         print("Attempting to authorize with token " + self.token + ":")
         try:
-            eloop.run_until_complete(client.start(self.token))
+            get_event_loop().run_until_complete(client.start(self.token))
         except (KeyboardInterrupt, SystemExit):
-            eloop.run_until_complete(client.logout())
-            eloop.close()
-            raise SystemExit
+            get_event_loop().run_until_complete(client.close())
+            get_event_loop().close()
+            self.setshutdown()
 
     # A reimplementation of the print builtin function.
     def print(self, *args, sep=" ", end="\n"):
@@ -150,18 +158,18 @@ class Bot:
         events = self.events.get(ev, ())
         if len(events) == 1:
             try:
-                return await forceCoro(events[0](*args, **kwargs))
+                return await create_future(events[0](*args, **kwargs))
             except:
-                print(traceback.format_exc())
+                print_exc()
             return
-        futs = [create_task(forceCoro(func(*args, **kwargs))) for func in events]
+        futs = [create_future(func(*args, **kwargs)) for func in events]
         out = deque()
         for fut in futs:
             try:
                 res = await fut
                 out.append(res)
             except:
-                print(traceback.format_exc())
+                print_exc()
         return out
 
     # Gets the first accessable text channel in the target guild.
@@ -854,7 +862,7 @@ class Bot:
     }
 
     # Evaluates a math formula to a float value, using a math process from the subprocess pool when necessary.
-    async def evalMath(self, expr, obj, default=0, op=True):
+    async def evalMath(self, expr, obj=None, default=0, op=True):
         if op:
             # Allow mathematical operations on a default value
             _op = None
@@ -926,12 +934,13 @@ class Bot:
         "minute": ("m", "min", "minute", "mins", "minutes"),
         "second": ("s", "sec", "second", "secs", "seconds"),
     }
-    numericals = re.compile("^(?:(?:(?:[0-9]+|[a-z]{1,}illion)|thousand|hundred|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|zero|an|a|one|two|three|four|five|six|seven|eight|nine)\\s*)(?:(?:(?:[0-9]+|[a-z]{1,}illion)|thousand|hundred|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|zero|one|two|three|four|five|six|seven|eight|nine)\\s*)*", re.I)
+    num_words = "(?:(?:(?:[0-9]+|[a-z]{1,}illion)|thousand|hundred|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|zero|one|two|three|four|five|six|seven|eight|nine)\\s*)"
+    numericals = re.compile("^(?:" + num_words + "|(?:a|an)\\s*)(?:" + num_words + ")*", re.I)
     connectors = re.compile("\\s(?:and|at)\\s", re.I)
     alphabet = "abcdefghijklmnopqrstuvwxyz"
 
     # Evaluates a time input, using a math process from the subprocess pool when necessary.
-    async def evalTime(self, expr, obj, default=0, op=True):
+    async def evalTime(self, expr, obj=None, default=0, op=True):
         if op:
             # Allow mathematical operations on a default value
             _op = None
@@ -974,29 +983,29 @@ class Bot:
                             raise TypeError("Too many time arguments.")
                 else:
                     # Otherwise move on to main parser
-                    f = re.sub(self.connectors, " ", expr.replace(",", "")).casefold()
+                    f = singleSpace(re.sub(self.connectors, " ", expr.replace(",", " "))).casefold()
                     for tc in self.timeChecks:
                         for check in reversed(self.timeChecks[tc]):
                             if check in f:
                                 i = f.index(check)
                                 isnt = i + len(check) < len(f) and f[i + len(check)] in self.alphabet
-                                if not i or f[i - 1] in self.alphabet or isnt:
+                                if isnt or not i or f[i - 1] in self.alphabet:
                                     continue
                                 temp = f[:i]
+                                f = f[i + len(check):].strip()
                                 match = re.search(self.numericals, temp)
                                 if match:
                                     i = match.end()
                                     n = numParse(temp[:i])
                                     temp = temp[i:].strip()
                                     if temp:
-                                        n = await self.evalMath(str(n) + " " + temp, obj)
+                                        f = temp + " " + f
                                 else:
                                     n = await self.evalMath(temp, obj)
                                 s = TIMEUNITS[tc]
                                 if type(s) is list:
                                     s = s[0]
                                 t += s * n
-                                f = f[i + len(check):]
                     temp = f.strip()
                     if temp:
                         match = re.search(self.numericals, temp)
@@ -1011,7 +1020,7 @@ class Bot:
                         t += n
             except:
                 # Use datetime parser if regular parser fails
-                t = utc_ts(tzparse(f if f is not None else expr)) - utc_ts(tparser.parse("0s"))
+                t = utc_ts(tzparse(f if f else expr)) - utc_ts(tparser.parse("0s"))
         if type(t) is not float:
             t = float(t)
         return t
@@ -1069,7 +1078,7 @@ class Bot:
         stats[2] = disk
         self.currState = stats
         self.size2 = cdict()
-        files = await create_future(os.listdir, "misc")
+        files = await create_future(os.listdir, "misc", priority=True)
         for f in files:
             path = "misc/" + f
             if iscode(path):
@@ -1083,12 +1092,13 @@ class Bot:
             f = ".".join(f.split(".")[:-1])
             path, module = module, f
             rename = module.casefold()
-            print("Loading module " + rename + "...")
             if module in self._globals:
+                print("Reloading module " + rename + "...")
                 if rename in self.categories:
                     self.unload(module)
                 mod = importlib.reload(self._globals[module])
             else:
+                print("Loading module " + rename + "...")
                 mod = __import__(module)
             self._globals[module] = mod
             commands = hlist()
@@ -1108,10 +1118,10 @@ class Bot:
                         obj = var(self, rename)
                         if load_type == 1:
                             commands.append(obj)
-                            print("Successfully loaded command " + obj.__name__ + ".")
+                            print("Successfully loaded command " + repr(obj) + ".")
                         elif load_type == 2:
                             dataitems.append(obj)
-                            print("Successfully loaded database " + obj.__name__ + ".")
+                            print("Successfully loaded database " + repr(obj) + ".")
             for u in dataitems:
                 for c in commands:
                     c.data[u.name] = u
@@ -1119,6 +1129,7 @@ class Bot:
             self.dbitems[rename] = dataitems
             self.size[rename] = getLineCount("commands/" + path)
             if self.ready:
+                print("Resending _ready_ event to module " + rename + "...")
                 for db in dataitems:
                     for f in dir(db):
                         if f.startswith("_") and f[-1] == "_" and f[1] != "_":
@@ -1127,7 +1138,7 @@ class Bot:
                                 self.events.append(f, func)
                     func = getattr(db, "_ready_", None)
                     if callable(func):
-                        fut = create_task(forceCoro(func, bot=self))
+                        fut = create_future(func, bot=self, priority=True)
                         time.sleep(0.05)
                         while True:
                             try:
@@ -1137,7 +1148,7 @@ class Bot:
                             else:
                                 break
         except:
-            print(traceback.format_exc())
+            print_exc()
 
     def unload(self, mod=None):
         if mod is None:
@@ -1161,7 +1172,7 @@ class Bot:
             for db in self.dbitems[rename]:
                 func = getattr(db, "_destroy_", None)
                 if callable(func):
-                    fut = create_task(forceCoro(func))
+                    fut = create_future(func, priority=True)
                     time.sleep(0.05)
                     while True:
                         try:
@@ -1206,10 +1217,17 @@ class Bot:
             if iscode(f):
                 self.size[f] = getLineCount(f)
         self.modload = deque()
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(files))
+        if getattr(self, "executor", None) is not None:
+            self.executor.shutdown(wait=True)
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(files) + 1)
         for f in files:
+            # try:
+            #     self.getModule(f)
+            # except:
+            #     print_exc()
             self.modload.append(self.executor.submit(self.getModule, f))
         self.loaded = True
+        print("Module finder initialized.")
 
     # Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
     def update(self):
@@ -1222,7 +1240,7 @@ class Bot:
                     if u.update(True):
                         saved.append(i)
         except:
-            print(traceback.format_exc())
+            print_exc()
         # if saved:
         #     print("Autosaved " + str(saved) + ".")
 
@@ -1236,9 +1254,9 @@ class Bot:
             u_perm = self.getPerms(user.id, message.guild)
             if u_perm <= -inf:
                 return
-            msg = message.content
+            msg = message.content.strip("*")
             if not msg and message.embeds:
-                msg = message.embeds[0].description
+                msg = message.embeds[0].description.strip("*")
             if msg[:3] != "```" or len(msg) <= 3:
                 msg = None
                 if message.embeds:
@@ -1269,9 +1287,9 @@ class Bot:
                 reacode = str(reaction).encode("utf-8")
             else:
                 reacode = None
-            msg = message.content
+            msg = message.content.strip("*")
             if not msg and message.embeds:
-                msg = message.embeds[0].description
+                msg = message.embeds[0].description.strip("*")
             if msg[:3] != "```" or len(msg) <= 3:
                 msg = None
                 if message.embeds:
@@ -1323,7 +1341,7 @@ class Bot:
                             timeout=timeout)
                         break
                     except Exception as ex:
-                        print(traceback.format_exc())
+                        print_exc()
                         create_task(sendReact(
                             message.channel,
                             "```py\nError: " + repr(ex).replace("`", "") + "\n```",
@@ -1375,7 +1393,7 @@ class Bot:
                             # Member update events are not sent through for the current user, so manually send a _seen_ event
                             await seen(client.user, event="misc", raw="Changing their status")
                         except discord.HTTPException:
-                            print(traceback.format_exc())
+                            print_exc()
                             await asyncio.sleep(3)
                         except:
                             pass
@@ -1383,11 +1401,11 @@ class Bot:
                         pass
                     self.status_iter = (self.status_iter + 1) % 3
             except:
-                print(traceback.format_exc())
+                print_exc()
             # Update databases
             for u in self.database.values():
                 if utc() - u.used > u.rate_limit or force:
-                    create_task(forceCoro(u))
+                    create_future(u, priority=True)
                     create_task(self.verifyDelete(u))
             self.busy = False
 
@@ -1425,22 +1443,22 @@ class Bot:
                 except discord.Forbidden:
                     pass
                 except discord.HTTPException:
-                    print(traceback.format_exc())
+                    print_exc()
                     await asyncio.sleep(5)
                     temp = await fut
                 except:
-                    print(traceback.format_exc())
+                    print_exc()
                 else:
                     webhooks.extend(temp)
         except discord.HTTPException:
-            print(traceback.format_exc())
+            print_exc()
             await asyncio.sleep(10)
             for _ in loop(5):
                 try:
                     webhooks = await guild.webhooks()
                     break
                 except discord.HTTPException:
-                    print(traceback.format_exc())
+                    print_exc()
                     await asyncio.sleep(15)
         return deque(self.add_webhook(w) for w in webhooks)
 
@@ -1495,7 +1513,7 @@ class Bot:
                 await w.send(embeds=embeds, username=m.display_name, avatar_url=bestURL(m))
             await seen(client.user, event="message", count=len(embeds), raw="Sending a message")
         except Exception as ex:
-            print(traceback.format_exc())
+            print_exc()
             await sendReact(channel, "```py\n" + repr(ex) + "```", reacts="❎")
     
     async def sendEmbedsTo(self, s_id, embs):
@@ -1929,7 +1947,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                         if timeout >= inf:
                             timeout = None
                         # Create a future to run the command
-                        future = create_task(asyncio.wait_for(forceCoro(
+                        future = create_future(
                             command,                # command is a callable object, may be async or not
                             client=client,          # for interfacing with discord
                             bot=bot,                # for interfacing with bot's database
@@ -1943,7 +1961,8 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             guild=guild,            # guild data
                             name=alias,             # alias the command was called as
                             callback=processMessage,# function that called the command
-                        ), timeout=timeout))
+                            timeout=timeout,        # timeout delay for the command
+                        )
                         # Add a callback to typing in the channel if the command takes too long
                         if fut is None and not hasattr(command, "typing"):
                             create_task(delayed_callback(future, 2, typing, channel))
@@ -2003,12 +2022,22 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             await fut
                         print(msg)
                         raise TimeoutError("Request timed out.")
+                    except (ArgumentError, TooManyRequests):
+                        if fut is not None:
+                            await fut
+                        errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
+                        create_task(sendReact(
+                            channel,
+                            errmsg,
+                            reacts="❎",
+                        ))
+                        return
                     # Represents all other errors
                     except Exception as ex:
                         if fut is not None:
                             await fut
                         errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
-                        print(traceback.format_exc())
+                        print_exc()
                         create_task(sendReact(
                             channel,
                             errmsg,
@@ -2036,7 +2065,7 @@ async def heartbeatLoop():
                 try:
                     await create_future(os.remove, bot.heartbeat, priority=True)
                 except:
-                    print(traceback.format_exc())
+                    print_exc()
             await asyncio.sleep(0.5)
     except asyncio.CancelledError:
         sys.exit(1)   
@@ -2049,7 +2078,7 @@ async def fastLoop():
         try:
             sent = await bot.updateEmbeds()
         except:
-            print(traceback.format_exc())
+            print_exc()
         x = freq if sent else 1
         for i in range(x):
             create_task(bot.event("_call_"))
@@ -2062,7 +2091,7 @@ async def slowLoop():
         try:
             if utc() - autosave > 60:
                 autosave = utc()
-                create_future_ex(bot.update)
+                create_future_ex(bot.update, priority=True)
                 create_future_ex(bot.updateClient, priority=True)
             while bot.blocked > 0:
                 print("Update event blocked.")
@@ -2071,7 +2100,7 @@ async def slowLoop():
             await bot.handleUpdate()
             await asyncio.sleep(frand(2) + 2)
         except:
-            print(traceback.format_exc())
+            print_exc()
 
 
 # The event called when the bot starts up.
@@ -2099,7 +2128,10 @@ async def on_ready():
             bot.started = True
             # Wait until all modules have been loaded successfully, then shut down corresponding executor
             while bot.modload:
-                await create_future(bot.modload.popleft().result, priority=True)
+                fut = create_future(bot.modload.popleft().result, priority=True)
+                mod = await fut
+            print("Commands aliases:")
+            print(bot.commands)
             # Assign all bot database events to their corresponding keys.
             for u in bot.database.values():
                 for f in dir(u):
@@ -2107,6 +2139,7 @@ async def on_ready():
                         func = getattr(u, f, None)
                         if callable(func):
                             bot.events.append(f, func)
+            print("Database events:")
             print(bot.events)
             for fut in futs:
                 await fut
@@ -2116,11 +2149,11 @@ async def on_ready():
                 print("Setting bot avatar...")
                 f = await create_future(open, "misc/avatar.png", "rb", priority=True)
                 b = await create_future(f.read, priority=True)
-                create_future_ex(f.close)
+                create_future_ex(f.close, priority=True)
                 await client.user.edit(avatar=b)
                 await seen(client.user, event="misc", raw="Editing their profile")
                 f = await create_future(open, "misc/init.tmp", "wb", priority=True)
-                create_future_ex(f.close)
+                create_future_ex(f.close, priority=True)
             create_task(slowLoop())
             create_task(fastLoop())
             print("Update loops initiated.")
@@ -2138,7 +2171,7 @@ async def on_ready():
                 await fut
             print("Reinitialized.")
     except:
-        print(traceback.format_exc())
+        print_exc()
 
 
 # Server join message
@@ -2270,7 +2303,7 @@ async def handleMessage(message, edit=True):
         await processMessage(message, cpy, edit, msg)
     except Exception as ex:
         errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
-        print(traceback.format_exc())
+        print_exc()
         create_task(sendReact(
             message.channel,
             errmsg,

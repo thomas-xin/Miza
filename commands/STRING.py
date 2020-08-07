@@ -57,7 +57,7 @@ def getTranslate(translator, string, dest, source):
         resp = translator.translate(string, dest, source)
         return resp
     except Exception as ex:
-        print(traceback.format_exc())
+        print_exc()
         return ex
 
 
@@ -77,7 +77,7 @@ class Translate(Command):
         dest = args[0]
         string = " ".join(args[1:])
         fut = create_task(channel.trigger_typing())
-        detected = await create_future(translators["Google Translate"].detect, string)
+        detected = await create_future(translators["Google Translate"].detect, string, timeout=20)
         source = detected.lang
         trans = ["Google Translate", "Papago"]
         if "p" in flags:
@@ -94,7 +94,7 @@ class Translate(Command):
         for i in range(count):
             for t in trans:
                 try:
-                    resp = await create_future(getTranslate, translators[t], string, dest, source)
+                    resp = await create_future(getTranslate, translators[t], string, dest, source, timeout=20)
                     try:
                         output = resp.text
                     except AttributeError:
@@ -146,7 +146,7 @@ class Uni2Hex(Command):
         if not argv:
             raise ArgumentError("Input string is empty.")
         b = bytes(argv, "utf-8")
-        return "```fix\n" + bytes2Hex(b) + "```"
+        return "*```fix\n" + bytes2Hex(b) + "```*"
 
 
 class Hex2Uni(Command):

@@ -288,7 +288,7 @@ class Text2048(Command):
                     data = g.serialize()
             except GameOverError:
                 # Clear reactions and announce game over message
-                await message.edit(content="```\n2048: GAME OVER```")
+                await message.edit(content="**```\n2048: GAME OVER```**")
                 if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
                     await message.clear_reactions()
                 else:
@@ -311,8 +311,8 @@ class Text2048(Command):
                 emb.set_author(name="@everyone", icon_url=bot.discord_icon)
             else:
                 emb.set_author(name=str(u), icon_url=bestURL(u))
-            content = "```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + data.decode("utf-8") + "\nPlaying 2048...```"
-            emb.description = ("```fix\n" if mode & 6 else "```\n") + g.render() + "```"
+            content = "*```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + data.decode("utf-8") + "\nPlaying 2048...```*"
+            emb.description = ("**```fix\n" if mode & 6 else "```\n") + g.render() + "```**"
             emb.set_footer(text="Score: " + str(g.score()))
             await message.edit(content=content, embed=emb)
 
@@ -353,7 +353,7 @@ class Text2048(Command):
             mode |= 2
         if "e" in flags:
             mode |= 1
-        return "```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "\nStarting Game...```"
+        return "*```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "\nStarting Game...```*"
 
 
 class MimicConfig(Command):
@@ -485,18 +485,18 @@ class Mimic(Command):
                         "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
                         + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
                     )
-                    return ("```asciidoc\n[" + response + "]```")
+                    return ("**```asciidoc\n[" + response + "]```**")
                 mimicdb.pop(user.id)
                 update()
                 return (
-                    "```css\nSuccessfully removed all webhook mimics for ["
-                    + noHighlight(user) + "].```"
+                    "*```css\nSuccessfully removed all webhook mimics for ["
+                    + noHighlight(user) + "].```*"
                 )
             # Set callback message for scrollable list
             return (
-                "```" + "\n" * ("z" in flags) + "callback-game-mimic-"
+                "*```" + "\n" * ("z" in flags) + "callback-game-mimic-"
                 + str(user.id) + "_0"
-                + "-\nLoading Mimic database...```"
+                + "-\nLoading Mimic database...```*"
             )
         u_id = user.id
         prefix = args.pop(0)
@@ -530,8 +530,8 @@ class Mimic(Command):
                 mimicdb.pop(mimic.id)
             update()
             return (
-                "```css\nSuccessfully removed webhook mimic [" + mimic.name
-                + "] for [" + noHighlight(user) + "].```"
+                "*```css\nSuccessfully removed webhook mimic [" + mimic.name
+                + "] for [" + noHighlight(user) + "].```*"
             )
         if not prefix:
             raise IndexError("Prefix must not be empty.")
@@ -652,16 +652,16 @@ class Mimic(Command):
         if not content:
             content = message.embeds[0].description
         i = content.index("callback")
-        content = content[:i] + (
+        content = "*```" + "\n" * ("\n" in content[:i]) + (
             "callback-game-mimic-"
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )
         if not mimics:
-            content += "No currently enabled webhook mimics for " + str(user).replace("`", "") + ".```"
+            content += "No currently enabled webhook mimics for " + str(user).replace("`", "") + ".```*"
             msg = ""
         else:
-            content += str(len(mimics)) + " currently enabled webhook mimics for " + str(user).replace("`", "") + ":```"
+            content += str(len(mimics)) + " currently enabled webhook mimics for " + str(user).replace("`", "") + ":```*"
             key = lambda x: limStr("⟨" + ", ".join(i + ": " + (str(noHighlight(mimicdb[i].name)), "[<@" + str(getattr(mimicdb[i], "auto", "None")) + ">]")[bool(getattr(mimicdb[i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
             msg = "```ini\n" + strIter({k: mimics[k] for k in sorted(mimics)[pos:pos + page]}, key=key) + "```"
         emb = discord.Embed(
@@ -690,7 +690,7 @@ class MimicSend(Command):
     no_parse = True
     rate_limit = 0.5
 
-    async def __call__(self, bot, channel, user, perm, args, **void):
+    async def __call__(self, bot, channel, message, user, perm, args, **void):
         update = self.data.mimics.update
         mimicdb = bot.data.mimics
         mimics = setDict(mimicdb, user.id, {})
@@ -863,6 +863,6 @@ class UpdateMimics(Database):
                     await asyncio.sleep(0.45)
                 i += 1
         except:
-            print(traceback.format_exc())
+            print_exc()
         await asyncio.sleep(2)
         self.busy = False

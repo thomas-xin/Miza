@@ -81,15 +81,15 @@ class Purge(Command):
                     deleted += 1
                     delM.popleft()
             except:
-                print(traceback.format_exc())
+                print_exc()
                 for _ in loop(min(5, len(delM))):
                     m = delM.popleft()
                     await bot.silentDelete(m, no_log=-1, exc=True)
                     deleted += 1
         if not "h" in flags:
             return (
-                "```css\nDeleted [" + noHighlight(deleted)
-                + "] message" + "s" * (deleted != 1) + "!```"
+                "*```css\nDeleted [" + noHighlight(deleted)
+                + "] message" + "s" * (deleted != 1) + "!```*"
             )
 
 
@@ -108,9 +108,9 @@ class Ban(Command):
         if not args:
             # Set callback message for scrollable list
             return (
-                "```" + "\n" * ("z" in flags) + "callback-admin-ban-"
+                "*```" + "\n" * ("z" in flags) + "callback-admin-ban-"
                 + str(user.id) + "_0"
-                + "-\nLoading ban list...```"
+                + "-\nLoading ban list...```*"
             )
         update = self.bot.database.bans.update
         ts = utc()
@@ -161,13 +161,13 @@ class Ban(Command):
                             bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
                     update()
                 return (
-                    "```ini\nSuccessfully unbanned [" + noHighlight(user)
-                    + "] from [" + noHighlight(guild) + "].```"
+                    "*```ini\nSuccessfully unbanned [" + noHighlight(user)
+                    + "] from [" + noHighlight(guild) + "].```*"
                 )
             return (
-                "```ini\nCurrent ban for [" + noHighlight(user)
+                "*```ini\nCurrent ban for [" + noHighlight(user)
                 + "] from [" + noHighlight(guild) + "]: ["
-                + sec2Time(ban["t"] - ts) + "].```"
+                + sec2Time(ban["t"] - ts) + "].```*"
             )
         # This parser is a mess too
         bantype = " ".join(args)
@@ -258,12 +258,12 @@ class Ban(Command):
                     print(bot.database.bans.listed)
                     update()
                     await channel.send(
-                        "```css\nUpdated ban for " + sbHighlight(user)
+                        "*```css\nUpdated ban for " + sbHighlight(user)
                         + " from [" + sec2Time(ban["t"] - ts)
-                        + "] to [" + sec2Time(length) + "].```"
+                        + "] to [" + sec2Time(length) + "].```*"
                     )
                 except Exception as ex:
-                    print(traceback.format_exc())
+                    print_exc()
                     await channel.send("```py\nError: " + repr(ex) + "```")
                 return
         try:
@@ -283,13 +283,13 @@ class Ban(Command):
             print(bot.database.bans.listed)
             update()
             await channel.send(
-                "```css\n" + sbHighlight(user)
+                "*```css\n" + sbHighlight(user)
                 + " has been banned from " + sbHighlight(guild)
                 + " for [" + sec2Time(length) + "]. Reason: "
-                + sbHighlight(reason) + "```"
+                + sbHighlight(reason) + "```*"
             )
         except Exception as ex:
-            print(traceback.format_exc())
+            print_exc()
             await channel.send("```py\nError: " + repr(ex) + "```")
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
@@ -323,15 +323,15 @@ class Ban(Command):
         if not content:
             content = message.embeds[0].description
         i = content.index("callback")
-        content = content[:i] + (
+        content = "*```" + "\n" * ("\n" in content[:i]) + (
             "callback-admin-ban-"
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )
         if not bans:
-            content += "Ban list for " + str(guild).replace("`", "") + " is currently empty.```"
+            content += "Ban list for " + str(guild).replace("`", "") + " is currently empty.```*"
         else:
-            content += str(len(bans)) + " users currently banned from " + str(guild).replace("`", "") + ":```"
+            content += str(len(bans)) + " users currently banned from " + str(guild).replace("`", "") + ":```*"
         emb = discord.Embed(colour=discord.Colour(1))
         emb.description = content
         url = bestURL(user)
@@ -342,12 +342,12 @@ class Ban(Command):
                 emb.add_field(
                     name=str(user) + " (" + str(user.id) + ")",
                     value=(
-                        "Duration: " + sec2Time(ban["t"] - ts) + "\n"
-                        + "Reason: " + escape_markdown(str(ban["r"]))
+                        "Duration: *`" + sec2Time(ban["t"] - ts) + "`*\n"
+                        + "Reason: *`" + escape_markdown(str(ban["r"])) + "`*"
                     )
                 )
             except:
-                print(traceback.format_exc())
+                print_exc()
         more = len(bans) - pos - page
         if more > 0:
             emb.set_footer(
@@ -382,11 +382,11 @@ class RoleGiver(Command):
                 if react not in assigned:
                     raise LookupError("Rolegiver " + react + " not currently assigned for #" + channel.name + ".")
                 assigned.pop(react)
-                return "```css\nRemoved [" + react + "] from the rolegiver list for [#" + noHighlight(channel.name) + "].```"
+                return "*```css\nRemoved [" + react + "] from the rolegiver list for [#" + noHighlight(channel.name) + "].```*"
             if channel.id in data:
                 data.pop(channel.id)
                 update()
-            return "```css\nRemoved all automated rolegivers from [#" + noHighlight(channel.name) + "].```"
+            return "*```css\nRemoved all automated rolegivers from [#" + noHighlight(channel.name) + "].```*"
         assigned = setDict(data, channel.id, {})
         if not argv:
             key = lambda alist: "⟨" + ", ".join(str(r) for r in alist[0]) + "⟩, delete: " + str(alist[1])
@@ -436,9 +436,9 @@ class RoleGiver(Command):
         alist[0].append(role.id) 
         update()
         return (
-            "```css\nAdded [" + noHighlight(react)
+            "*```css\nAdded [" + noHighlight(react)
             + "] ➡️ [" + noHighlight(role)
-            + "] to channel [#" + noHighlight(channel.name) + "].```"
+            + "] to channel [#" + noHighlight(channel.name) + "].```*"
         )
 
 
@@ -470,7 +470,7 @@ class AutoRole(Command):
                     try:
                         role = await bot.fetch_role(r, guild)
                     except:
-                        print(traceback.format_exc())
+                        print_exc()
                         continue
                     removed.append(role)
                 # Update all users by removing roles
@@ -489,11 +489,11 @@ class AutoRole(Command):
                             await asyncio.sleep(5)
                         i += 1
                 update()
-                return "```css\nRemoved " + sbHighlight(", ".join(str(role) for role in removed)) + " from the autorole list for " + sbHighlight(guild) + ".```"
+                return "*```css\nRemoved " + sbHighlight(", ".join(str(role) for role in removed)) + " from the autorole list for " + sbHighlight(guild) + ".```*"
             if guild.id in data:
                 data.pop(guild.id)
                 update()
-            return "```css\nRemoved all items from the autorole list for " + sbHighlight(guild) + ".```"
+            return "*```css\nRemoved all items from the autorole list for " + sbHighlight(guild) + ".```*"
         assigned = setDict(data, guild.id, hlist())
         if not argv:
             rlist = hlist()
@@ -561,8 +561,8 @@ class AutoRole(Command):
                         i += 1
                 await fut
         return (
-            "```css\nAdded [" + noHighlight(", ".join(str(role) for role in roles))
-            + "] to the autorole list for [" + noHighlight(guild) + "].```"
+            "*```css\nAdded [" + noHighlight(", ".join(str(role) for role in roles))
+            + "] to the autorole list for [" + noHighlight(guild) + "].```*"
         )
 
 
@@ -585,11 +585,11 @@ class RolePreserver(Command):
             if guild.id in following:
                 following.pop(guild.id)
                 update()
-            return "```css\nDisabled role preservation for [" + noHighlight(guild) + "].```"
+            return "*```css\nDisabled role preservation for [" + noHighlight(guild) + "].```*"
         elif "e" in flags or "a" in flags:
             following[guild.id] = {}
             update()
-            return "```css\nEnabled role preservation for [" + noHighlight(guild) + "].```"
+            return "*```css\nEnabled role preservation for [" + noHighlight(guild) + "].```*"
         else:
             return (
                 "```ini\nRole preservation is currently " + "not " * (curr is None)
@@ -625,7 +625,7 @@ class Lockdown(Command):
                 "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
                 + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
             )
-            return ("```asciidoc\n[" + response + "]```")
+            return ("**```asciidoc\n[" + response + "]```**")
         u_id = self.bot.client.user.id
         for role in guild.roles:
             if len(role.members) != 1 or role.members[-1].id not in (u_id, guild.owner_id):
@@ -634,7 +634,7 @@ class Lockdown(Command):
         for inv in invites:
             create_task(self.invLock(inv, channel))
         response = uniStr("LOCKDOWN REQUESTED.")
-        return ("```asciidoc\n[" + response + "]```")
+        return ("**```asciidoc\n[" + response + "]```**")
 
 
 class SaveChannel(Command):
@@ -688,15 +688,15 @@ class UserLog(Command):
             data[guild.id] = channel.id
             update()
             return (
-                "```css\nEnabled user logging in [" + noHighlight(channel.name)
-                + "] for [" + noHighlight(guild.name) + "].```"
+                "*```css\nEnabled user logging in [" + noHighlight(channel.name)
+                + "] for [" + noHighlight(guild.name) + "].```*"
             )
         elif "d" in flags:
             if guild.id in data:
                 data.pop(guild.id)
                 update()
             return (
-                "```css\nDisabled user logging for [" + noHighlight(guild.name) + "].```"
+                "*```css\nDisabled user logging for [" + noHighlight(guild.name) + "].```*"
             )
         if guild.id in data:
             c_id = data[guild.id]
@@ -727,15 +727,15 @@ class MessageLog(Command):
             data[guild.id] = channel.id
             update()
             return (
-                "```css\nEnabled message logging in [" + noHighlight(channel.name)
-                + "] for [" + noHighlight(guild.name) + "].```"
+                "*```css\nEnabled message logging in [" + noHighlight(channel.name)
+                + "] for [" + noHighlight(guild.name) + "].```*"
             )
         elif "d" in flags:
             if guild.id in data:
                 data.pop(guild.id)
                 update()
             return (
-                "```css\nDisabled message logging for [" + noHighlight(guild.name) + "].```"
+                "*```css\nDisabled message logging for [" + noHighlight(guild.name) + "].```*"
             )
         if guild.id in data:
             c_id = data[guild.id]
@@ -768,15 +768,15 @@ class FileLog(Command):
             data[guild.id] = channel.id
             update()
             return (
-                "```css\nEnabled file logging in [" + noHighlight(channel.name)
-                + "] for [" + noHighlight(guild.name) + "].```"
+                "*```css\nEnabled file logging in [" + noHighlight(channel.name)
+                + "] for [" + noHighlight(guild.name) + "].```*"
             )
         elif "d" in flags:
             if guild.id in data:
                 data.pop(guild.id)
                 update()
             return (
-                "```css\nDisabled file logging for [" + noHighlight(guild.name) + "].```"
+                "*```css\nDisabled file logging for [" + noHighlight(guild.name) + "].```*"
             )
         if guild.id in data:
             c_id = data[guild.id]
@@ -851,17 +851,17 @@ class UpdateBans(Database):
                 try:
                     await guild.unban(user, reason="Temporary ban expired.")
                     text = (
-                        "```css\n[" + noHighlight(user)
-                        + "] has been unbanned from [" + noHighlight(guild) + "].```"
+                        "*```css\n[" + noHighlight(user)
+                        + "] has been unbanned from [" + noHighlight(guild) + "].```*"
                     )
                 except:
                     text = (
-                        "```css\nUnable to unban [" + noHighlight(user)
-                        + "] from [" + noHighlight(guild) + "].```"
+                        "*```css\nUnable to unban [" + noHighlight(user)
+                        + "] from [" + noHighlight(guild) + "].```*"
                     )
                 await channel.send(text)
             except:
-                print(traceback.format_exc())
+                print_exc()
             self.update()
 
 
@@ -957,7 +957,7 @@ class UpdateUserLogs(Database):
         except LookupError:
             return
         except:
-            print(traceback.format_exc())
+            print_exc()
             return
         if guild.id in self.data:
             c_id = self.data[guild.id]
@@ -1085,7 +1085,7 @@ class UpdateUserLogs(Database):
             except StopIteration:
                 pass
             except:
-                print(traceback.format_exc())
+                print_exc()
             if ban is not None:
                 emb.description = (
                     "<@" + str(user.id)
@@ -1093,7 +1093,7 @@ class UpdateUserLogs(Database):
                     + str(ban.id) + ">."
                 )
                 if ban.reason:
-                    emb.description += "\nReason: `" + noHighlight(ban.reason) + "`"
+                    emb.description += "\nReason: *`" + noHighlight(ban.reason) + "`*"
             elif kick is not None:
                 emb.description = (
                     "<@" + str(user.id)
@@ -1101,7 +1101,7 @@ class UpdateUserLogs(Database):
                     + str(kick.id) + ">."
                 )
                 if kick.reason:
-                    emb.description += "\nReason: `" + noHighlight(kick.reason) + "`"
+                    emb.description += "\nReason: *`" + noHighlight(kick.reason) + "`*"
             else:
                 emb.description = (
                     "<@" + str(user.id)
@@ -1128,7 +1128,7 @@ class UpdateMessageLogs(Database):
     
     def callback(self, messages, **void):
         messages = [self.bot.cacheMessage(message) for message in messages]
-        create_future_ex(self.bot.updateClient)
+        create_future_ex(self.bot.updateClient, priority=True)
         return messages
 
     # Edit events are rather straightforward to log
@@ -1387,7 +1387,7 @@ class UpdateAutoRoles(Database):
                     role = await self.bot.fetch_role(random.choice(rolelist), guild)
                     roles.append(role)
                 except:
-                    print(traceback.format_exc())
+                    print_exc()
             print("AutoRole", user, roles)
             # Attempt to add all roles in one API call
             try:
@@ -1410,7 +1410,7 @@ class UpdateRolePreservers(Database):
                         role = await self.bot.fetch_role(r_id, guild)
                         roles.append(role)
                     except:
-                        print(traceback.format_exc())
+                        print_exc()
                 print("RolePreserver", user, roles)
                 # Attempt to add all roles in one API call
                 try:

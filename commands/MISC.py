@@ -8,8 +8,6 @@ except ModuleNotFoundError:
 import csv, knackpy
 from prettytable import PrettyTable as ptable
 
-knackpy.__builtins__["print"] = lambda *args, **kwargs: None
-
 
 class DouClub:
     
@@ -17,21 +15,21 @@ class DouClub:
         self.id = c_id
         self.secret = c_sec
         self.time = 0
-        self.pull()
+        create_future_ex(self.pull)
 
     def pull(self):
         try:
-            knackpy.__builtins__["print"] = lambda *args, **kwargs: None
+            # knackpy.__builtins__["print"] = lambda *args, **kwargs: None
             # print("Pulling Doukutsu Club...")
             kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret)
             self.data = kn.data
             self.time = utc()
         except:
-            print(traceback.format_exc())
+            print_exc()
     
     def update(self):
         if utc() - self.time > 720:
-            create_future_ex(self.pull)
+            create_future_ex(self.pull, timeout=60)
             self.time = utc()
 
     def search(self, query):
@@ -117,11 +115,11 @@ class SheetPull:
     def __init__(self, url):
         self.url = url
         self.time = 0
-        self.pull()
+        create_future_ex(self.pull)
 
     def update(self):
         if utc() - self.time > 720:
-            create_future_ex(self.pull)
+            create_future_ex(self.pull, timeout=60)
             self.time = utc()
 
     def pull(self):
@@ -156,7 +154,7 @@ class SheetPull:
             self.data = sdata
             self.time = utc()
         except:
-            print(traceback.format_exc())
+            print_exc()
 
     def search(self, query, lim):
         output = []
@@ -318,7 +316,7 @@ class CS_hex2xml(Command):
             + '</hack>'
         )
         # This probably doesn't need to run concurrently
-        data = await create_future(bytes, output, "utf-8")
+        data = await create_future(bytes, output, "utf-8", timeout=8)
         b = io.BytesIO(data)
         f = discord.File(b, filename="patch.xml")
         create_task(sendFile(channel, "Patch successfully converted!", f))
@@ -336,7 +334,7 @@ class CS_npc(Command):
     async def __call__(self, bot, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
         argv = " ".join(args)
-        data = await create_future(entity_list.search, argv, lim)
+        data = await create_future(entity_list.search, argv, lim, timeout=8)
         # Sends multiple messages up to 20000 characters total
         if len(data):
             head = entity_list.data[0][1]
@@ -376,7 +374,7 @@ class CS_tsc(Command):
     async def __call__(self, args, flags, **void):
         lim = ("c" not in flags) * 40 + 20
         argv = " ".join(args)
-        data = await create_future(tsc_list.search, argv, lim)
+        data = await create_future(tsc_list.search, argv, lim, timeout=8)
         # Sends multiple messages up to 20000 characters total
         if len(data):
             head = tsc_list.data[0][0]
@@ -417,7 +415,7 @@ class CS_mod(Command):
     async def __call__(self, args, **void):
         argv = " ".join(args)
         data = await searchForums(argv)
-        data += await create_future(douclub.search, argv)
+        data += await create_future(douclub.search, argv, timeout=8)
         # Sends multiple messages up to 20000 characters total
         if len(data):
             response = "Search results for **" + argv + "**:\n"
@@ -443,9 +441,6 @@ class CS_mod(Command):
             return response
         else:
             raise LookupError("No results found for " + argv + ".")
-
-    async def _ready_(self, **void):
-        knackpy.__builtins__["print"] = lambda *args, **kwargs: None
 
 
 class CS_Database(Database):
@@ -539,13 +534,13 @@ class MathQuiz(Command):
         if "d" in flags:
             if channel.id in mathdb.data:
                 mathdb.data.pop(channel.id)
-            return "```css\nDisabled math quizzes for " + sbHighlight(channel.name) + ".```"
+            return "*```css\nDisabled math quizzes for " + sbHighlight(channel) + ".```*"
         if not argv:
             argv = "easy"
         elif argv not in ("easy", "hard"):
             raise TypeError("Invalid quiz mode.")
         mathdb.data[channel.id] = cdict(mode=argv, answer=None)
-        return "```css\nEnabled " + argv + " math quiz for " + sbHighlight(channel.name) + ".```"
+        return "*```css\nEnabled " + argv + " math quiz for " + sbHighlight(channel) + ".```*"
 
 
 class UpdateMathTest(Database):
@@ -694,7 +689,7 @@ class UpdateMathTest(Database):
             d = -d
         st = "(" + str(a) + "*x+" + str(b) + ")*(" + str(c) + "*x+" + str(d) + ")"
         a = [-sympy.Number(b) / a, -sympy.Number(d) / c]
-        q = await create_future(sympy.expand, st)
+        q = await create_future(sympy.expand, st, timeout=8)
         q = self.eqtrans(q).replace("∙", "") + " = 0"
         return q, a
 
@@ -737,7 +732,7 @@ class UpdateMathTest(Database):
         else:
             q = "∫ " + q
             op = sympy.integrate
-        a = await create_future(op, a)
+        a = await create_future(op, a, timeout=8)
         return q, a
 
     # Selects a random math question based on difficulty.
@@ -781,6 +776,21 @@ class UpdateMathTest(Database):
                 channel = await bot.fetch_channel(c_id)
                 await self.newQuestion(channel)
 
+    messages = cdict(
+        correct=[
+            "Great work!",
+            "Very nice!",
+            "Congrats!",
+            "Nice job! Keep going!",
+            "That is correct!",
+            "Bullseye!",
+        ],
+        incorrect=[
+            "Oops, not quite, try again!",
+            "Aw, close, keep trying!",
+        ],
+    )
+
     async def _nocommand_(self, message, **void):
         bot = self.bot
         channel = message.channel
@@ -794,7 +804,7 @@ class UpdateMathTest(Database):
                     return
                 try:
                     x = await bot.solveMath(msg, message.author, 0, 1)
-                    x = await create_future(sympy.sympify, x[0])
+                    x = await create_future(sympy.sympify, x[0], timeout=6)
                 except:
                     return
                 correct = False
@@ -803,15 +813,18 @@ class UpdateMathTest(Database):
                     if x in a:
                         correct = True
                 else:
-                    a = await create_future(sympy.sympify, a)
-                    d = await create_future(sympy.Add, x, -a)
-                    z = await create_future(sympy.simplify, d)
+                    a = await create_future(sympy.sympify, a, timeout=6)
+                    d = await create_future(sympy.Add, x, -a, timeout=12)
+                    z = await create_future(sympy.simplify, d, timeout=18)
                     correct = z == 0
                 if correct:
                     create_task(self.newQuestion(channel))
-                    await channel.send("Great work!")
+                    pull = self.messages.correct
                 else:
-                    await channel.send("Oops! Not quite, try again!")
+                    pull = self.messages.incorrect
+                high = len(messages) ** 2
+                i = isqrt(random.randint(0, high))
+                await channel.send(pull[i])
 
 
 class DeviantArt(Command):
@@ -908,7 +921,7 @@ class UpdateDeviantArt(Database):
                         home = "https://www.deviantart.com/" + items[i][2]
                         emb = discord.Embed(
                             colour=discord.Colour(1),
-                            description="🔔 New Deviation from " + items[i][2] + " 🔔\n" + items[i][0],
+                            description="*🔔 New Deviation from " + items[i][2] + " 🔔*\n" + items[i][0],
                         ).set_image(url=items[i][1]).set_author(name=items[i][2], url=home, icon_url=items[i][3])
                         embs.append(emb)
                 for i in orig:
@@ -916,7 +929,7 @@ class UpdateDeviantArt(Database):
                         entries.pop(i)
                         self.update()
         except:
-            print(traceback.format_exc())
+            print_exc()
         else:
             bot.embedSender(channel, embs)
 
@@ -968,7 +981,7 @@ class UpdateDeviantArt(Database):
                     if not d.get("hasMore", None):
                         break
             except:
-                print(traceback.format_exc())
+                print_exc()
             else:
                 found[content] = items
         # if attempts:

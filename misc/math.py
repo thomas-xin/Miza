@@ -36,7 +36,7 @@ def tryWrapper(func):
         try:
             return func(*args, **kwargs)
         except:
-            print(traceback.format_exc())
+            print(traceback.format_exc(), end="")
     return __call__
 
 # Brainfuck parser below borrowed from:

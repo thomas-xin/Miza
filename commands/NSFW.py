@@ -80,7 +80,7 @@ def pull_e621(argv, delay=5):
         return [url, v1, v2 + 1]
     except:
         if LOG:
-            print(traceback.format_exc())
+            print_exc()
 
 
 def pull_booru(argv, delay=5):
@@ -94,7 +94,7 @@ def pull_booru(argv, delay=5):
         return [url, 1, choice + 1]
     except:
         if LOG:
-            print(traceback.format_exc())
+            print_exc()
 
 
 def pull_rule34_xxx(argv, delay=5):
@@ -128,7 +128,7 @@ def pull_rule34_xxx(argv, delay=5):
             raise EOFError
     except:
         if LOG:
-            print(traceback.format_exc())
+            print_exc()
 
 
 def pull_rule34_paheal(argv, delay=5):
@@ -202,7 +202,7 @@ def pull_rule34_paheal(argv, delay=5):
         return [url, v1, v2 + 1]
     except:
         if LOG:
-            print(traceback.format_exc())
+            print_exc()
 
 
 async def searchRandomNSFW(argv, delay=10):

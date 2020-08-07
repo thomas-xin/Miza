@@ -103,27 +103,27 @@ class IMG(Command):
                         "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
                         + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
                     )
-                    return ("```asciidoc\n[" + response + "]```")
+                    return ("**```asciidoc\n[" + response + "]```**")
                 imglists[guild.id] = {}
                 update()
                 return (
-                    "```css\nSuccessfully removed all images from the image list for ["
-                    + noHighlight(guild.name) + "].```"
+                    "*```css\nSuccessfully removed all images from the image list for ["
+                    + noHighlight(guild.name) + "].```*"
                 )
             key = argv.casefold()
             images.pop(key)
             imglists[guild.id] = images
             update()
             return (
-                "```css\nSuccessfully removed [" + noHighlight(key)
-                + "] from the image list for [" + noHighlight(guild.name) + "].```"
+                "*```css\nSuccessfully removed [" + noHighlight(key)
+                + "] from the image list for [" + noHighlight(guild.name) + "].```*"
             )
         if not argv and not "r" in flags:
             # Set callback message for scrollable list
             return (
-                "```" + "\n" * ("z" in flags) + "callback-image-img-"
+                "*```" + "\n" * ("z" in flags) + "callback-image-img-"
                 + str(user.id) + "_0"
-                + "-\nLoading Image database...```"
+                + "-\nLoading Image database...```*"
             )
         sources = hlist()
         for tag in args:
@@ -174,16 +174,16 @@ class IMG(Command):
         if not content:
             content = message.embeds[0].description
         i = content.index("callback")
-        content = content[:i] + (
+        content = "*```" + "\n" * ("\n" in content[:i]) + (
             "callback-image-img-"
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )
         if not images:
-            content += "Image list for " + str(guild).replace("`", "") + " is currently empty.```"
+            content += "Image list for " + str(guild).replace("`", "") + " is currently empty.```*"
             msg = ""
         else:
-            content += str(len(images)) + " images currently assigned for " + str(guild).replace("`", "") + ":```"
+            content += str(len(images)) + " images currently assigned for " + str(guild).replace("`", "") + ":```*"
             msg = "```ini\n" + strIter({k: "\n" + images[k] for k in tuple(images)[pos:pos + page]}) + "```"
         emb = discord.Embed(
             description=content + msg,
@@ -228,16 +228,16 @@ class React(Command):
                         "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
                         + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
                     )
-                    return ("```asciidoc\n[" + response + "]```")
+                    return ("**```asciidoc\n[" + response + "]```**")
                 if guild.id in following:
                     following.pop(guild.id)
                     update()
-                return "```css\nRemoved all auto reacts for [" + noHighlight(guild.name) + "].```"
+                return "*```css\nSuccessfully removed all auto reacts for [" + noHighlight(guild.name) + "].```*"
             # Set callback message for scrollable list
             return (
-                "```" + "\n" * ("z" in flags) + "callback-image-react-"
+                "*```" + "\n" * ("z" in flags) + "callback-image-react-"
                 + str(user.id) + "_0"
-                + "-\nLoading React database...```"
+                + "-\nLoading React database...```*"
             )
         if "d" in flags:
             a = reconstitute(argv).casefold()
@@ -245,8 +245,8 @@ class React(Command):
                 curr.pop(a)
                 update()
                 return (
-                    "```css\nRemoved [" + noHighlight(a) + "] from the auto react list for ["
-                    + noHighlight(guild.name) + "].```"
+                    "*```css\nRemoved [" + noHighlight(a) + "] from the auto react list for ["
+                    + noHighlight(guild.name) + "].```*"
                 )
             else:
                 raise LookupError(str(a) + " is not in the auto react list.")
@@ -304,16 +304,16 @@ class React(Command):
         if not content:
             content = message.embeds[0].description
         i = content.index("callback")
-        content = content[:i] + (
+        content = "*```" + "\n" * ("\n" in content[:i]) + (
             "callback-image-react-"
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )
         if not curr:
-            content += "No currently assigned auto reactions for " + str(guild).replace("`", "") + ".```"
+            content += "No currently assigned auto reactions for " + str(guild).replace("`", "") + ".```*"
             msg = ""
         else:
-            content += str(len(curr)) + " auto reactions currently assigned for " + str(guild).replace("`", "") + ":```"
+            content += str(len(curr)) + " auto reactions currently assigned for " + str(guild).replace("`", "") + ":```*"
             key = lambda x: "\n" + ", ".join(x)
             msg = "```ini\n" + strIter({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=key) + "```"
         emb = discord.Embed(
@@ -375,14 +375,14 @@ class CreateEmoji(Command):
             raise OverflowError("Max file size to load is 64MB.")
         if len(image) > 262144:
             path = "cache/" + str(guild.id)
-            f = await create_future(open, path, "wb")
-            await create_future(f.write, image)
-            await create_future(f.close)
+            f = await create_future(open, path, "wb", timeout=18)
+            await create_future(f.write, image, timeout=18)
+            await create_future(f.close, timeout=18)
             resp = await imageProc(path, "resize_max", [128], user, timeout=32)
             fn = resp[0]
-            f = await create_future(open, fn, "rb")
-            image = await create_future(f.read)
-            create_future_ex(f.close)
+            f = await create_future(open, fn, "rb", timeout=18)
+            image = await create_future(f.read, timeout=18)
+            create_future_ex(f.close, timeout=18)
         emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
         # This reaction indicates the emoji was created successfully
         await message.add_reaction(emoji)
@@ -792,7 +792,7 @@ class CreateGIF(Command):
             urls = await bot.followURL(url, best=True, allow=True, limit=1)
             url = urls[0]
             if "discord" not in url and "channels" not in url:
-                url, size, dur, fps = await create_future(get_video, url, 16)
+                url, size, dur, fps = await create_future(get_video, url, 16, timeout=60)
                 if size and dur and fps:
                     video = (url, size, dur, fps)
             if not url:
@@ -1141,7 +1141,7 @@ class Cat(Command):
         if not self.header or random.random() > 2 / 3:
             if random.random() > 2 / 3:
                 x = 0
-                url = await create_future(nekos.cat)
+                url = await create_future(nekos.cat, timeout=8)
             else:
                 x = 1
         else:
@@ -1171,7 +1171,7 @@ class Cat(Command):
                         res = await fut
                         out.append(res)
                     except:
-                        print(traceback.format_exc())
+                        print_exc()
                 self.buffer.extend(out)
                 time.sleep(0.25)
         except:
@@ -1188,7 +1188,7 @@ class Cat(Command):
             if len(self.found) >= 4096:
                 return random.choice(tuple(self.found))
             if not self.buffer:
-                return await create_future(nekos.cat)
+                return await create_future(nekos.cat, timeout=8)
         url = self.buffer.popleft()
         self.found[url] = True
         return url
@@ -1249,7 +1249,7 @@ class Dog(Command):
                         res = await fut
                         out.append(res)
                     except:
-                        print(traceback.format_exc())
+                        print_exc()
                 self.buffer.extend(out)
                 time.sleep(0.25)
         except:
@@ -1367,4 +1367,4 @@ class UpdateReacts(Database):
             except ZeroDivisionError:
                 pass
             except:
-                print(traceback.format_exc())
+                print_exc()
