@@ -312,7 +312,7 @@ class Text2048(Command):
             else:
                 emb.set_author(name=str(u), icon_url=bestURL(u))
             content = "*```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + data.decode("utf-8") + "\nPlaying 2048...```*"
-            emb.description = ("**```fix\n" if mode & 6 else "```\n") + g.render() + "```**"
+            emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
             emb.set_footer(text="Score: " + str(g.score()))
             await message.edit(content=content, embed=emb)
 
