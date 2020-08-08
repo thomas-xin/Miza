@@ -88,7 +88,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         self.getModules()
 
     __call__ = lambda self: self
-    __exit__ = lambda self: self.close()
+    __exit__ = lambda self, *args, **kwargs: self.close()
 
     # Waits an amount of seconds and shuts down.
     def setshutdown(self, delay=None):
