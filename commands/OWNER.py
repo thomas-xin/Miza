@@ -55,13 +55,15 @@ class Restart(Command):
         # Disconnect as many voice clients as possible
         for vc in client.voice_clients:
             await vc.disconnect(force=True)
+        with suppress(Exception):
+            await client.close()
         if name.casefold() == "shutdown":
-            with open(bot.shutdown, "wb") as f:
+            with open(bot.shutdown, "wb"):
                 pass
         else:
             for _ in loop(5):
                 try:
-                    with open(bot.restart, "wb") as f:
+                    with open(bot.restart, "wb"):
                         pass
                     break
                 except:
@@ -77,8 +79,6 @@ class Restart(Command):
                 time.sleep(0.1)
         if time.time() - t < 1:
             await asyncio.sleep(1)
-        with suppress(Exception):
-            await client.close()
         bot.close()
         del client
         del bot
