@@ -1404,6 +1404,11 @@ class AudioDownloader:
                     url = resp["url"]
                 except KeyError:
                     url = resp["id"]
+        if isDiscordURL(url):
+            title = url.split("?")[0].split("/")[-1]
+            if "." in title:
+                title = title[:title.rindex(".")]
+            return dict(url=url, webpage_url=url, title=title, direct=True)
         try:
             return self.downloader.extract_info(url, download=False, process=True)
         except youtube_dl.DownloadError as ex:
@@ -1420,7 +1425,7 @@ class AudioDownloader:
             title = url.split("?")[0].split("/")[-1]
             if "." in title:
                 title = title[:title.rindex(".")]
-            return dict(url=url, webpage_url=url, title=title)
+            return dict(url=url, webpage_url=url, title=title, direct=True)
         try:
             return self.downloader.extract_info(url, download=False, process=False)
         except youtube_dl.DownloadError as ex:
@@ -1821,7 +1826,7 @@ ytdl = AudioDownloader()
 
 class Queue(Command):
     server_only = True
-    name = ["Q", "Play", "Enqueue", "P"]
+    name = ["P", "Q", "Play", "Enqueue"]
     alias = name + ["LS"]
     min_level = 0
     description = "Shows the music queue, or plays a song in voice."

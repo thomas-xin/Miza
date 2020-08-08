@@ -45,11 +45,8 @@ class Restart(Command):
         else:
             await channel.send("Restarting... :wave:")
         fut = create_task(channel.trigger_typing())
-        bot.closed = True
-        try:
-            print.close()
-        except:
-            pass
+        with suppress(AttributeError):
+            PRINT.close()
         t = time.time()
         # Call _destroy_ bot event to indicate to all databases the imminent shutdown
         await bot.event("_destroy_")
@@ -80,6 +77,7 @@ class Restart(Command):
                 time.sleep(0.1)
         if time.time() - t < 1:
             await asyncio.sleep(1)
+        bot.close()
         try:
             await client.close()
         except:
