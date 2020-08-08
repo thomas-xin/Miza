@@ -419,10 +419,8 @@ class MimicConfig(Command):
             if len(new) > 16:
                 raise OverflowError("Prefix must be 16 or fewer in length.")
             for prefix in mimics:
-                try:
+                with suppress(ValueError, IndexError):
                     mimics[prefix].remove(m_id)
-                except (ValueError, IndexError):
-                    pass
             if new in mimics:
                 mimics[new].append(m_id)
             else:
@@ -523,10 +521,8 @@ class Mimic(Command):
                 user = await bot.fetch_user(mimic.u_id)
                 m_id = mimic.id
                 for prefix in mimics:
-                    try:
+                    with suppress(ValueError, IndexError):
                         mimics[prefix].remove(m_id)
-                    except (ValueError, IndexError):
-                        pass
                 mimicdb.pop(mimic.id)
             update()
             return (

@@ -77,11 +77,10 @@ class Restart(Command):
                 time.sleep(0.1)
         if time.time() - t < 1:
             await asyncio.sleep(1)
-        bot.close()
-        try:
+        with suppress(Exception):
             await client.close()
-        except:
-            del client
+        bot.close()
+        del client
         del bot
         sys.exit()
 
@@ -128,7 +127,7 @@ class Execute(Command):
                 + noHighlight(channel.name) + "].```"
             )
         elif "d" in flags:
-            try:
+            with suppress(KeyError):
                 if num == 0:
                     # Test bitwise flags for enabled terminals
                     out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec.pop(channel.id)))
@@ -136,8 +135,6 @@ class Execute(Command):
                     bot.data.exec[channel.id] &= -num - 1
                     if not bot.data.exec[channel.id]:
                         bot.data.exec.pop(channel.id)
-            except KeyError:
-                pass
             update()
             return (
                 "```css\nSuccessfully removed [" + out + "] terminal.```"
@@ -256,14 +253,12 @@ class UpdateExec(Database):
                             proc = proc.strip("`")
                         if not proc:
                             return
-                        try:
+                        with suppress(KeyError):
                             # Write to input() listener if required
                             if self.listeners[channel.id] is None:
                                 create_task(message.add_reaction("👀"))
                                 self.listeners[channel.id] = proc
                                 return
-                        except KeyError:
-                            pass
                         if not proc:
                             return
                         proc = proc.translate(self.qtrans)

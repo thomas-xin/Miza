@@ -1176,11 +1176,9 @@ class Cat(Command):
                 futs = [create_task(self.fetch_one()) for _ in loop(8)]
                 out = deque()
                 for fut in futs:
-                    try:
+                    with tracebacksuppressor:
                         res = await fut
                         out.append(res)
-                    except:
-                        print_exc()
                 self.buffer.extend(out)
                 time.sleep(0.25)
         except:
@@ -1251,11 +1249,9 @@ class Dog(Command):
                 futs = [create_task(self.fetch_one()) for _ in loop(8)]
                 out = deque()
                 for fut in futs:
-                    try:
+                    with tracebacksuppressor:
                         res = await fut
                         out.append(res)
-                    except:
-                        print_exc()
                 self.buffer.extend(out)
                 time.sleep(0.25)
         except:
