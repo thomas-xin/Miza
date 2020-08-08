@@ -101,7 +101,7 @@ def getBestIcon(entry):
                 url = entry["webpage_url"]
             except KeyError:
                 url = entry["url"]
-            if "discord" in url and "attachments/" in url:
+            if isDiscordURL(url):
                 if not is_image(url):
                     return "https://cdn.discordapp.com/embed/avatars/0.png"
             return url
@@ -1416,6 +1416,11 @@ class AudioDownloader:
 
     # Extracts audio information from a single URL.
     def extract_from(self, url):
+        if isDiscordURL(url):
+            title = url.split("?")[0].split("/")[-1]
+            if "." in title:
+                title = title[:title.rindex(".")]
+            return dict(url=url, webpage_url=url, title=title)
         try:
             return self.downloader.extract_info(url, download=False, process=False)
         except youtube_dl.DownloadError as ex:

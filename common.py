@@ -307,8 +307,10 @@ __strans = "".maketrans(__smap)
 verifySearch = lambda f: stripAcc(singleSpace(f.strip().translate(__strans)))
 urlFind = re.compile("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+")
 urlIs = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
+urlDiscord = re.compile("^https?:\\/\\/(?:[a-z]\\.)?discord(?:app)?\\.com\\/")
 findURLs = lambda url: re.findall(urlFind, url)
 isURL = lambda url: re.search(urlIs, url)
+isDiscordURL = lambda url: re.search(urlDiscord, url)
 verifyURL = lambda url: url if isURL(url) else urllib.parse.quote(url)
 
 
