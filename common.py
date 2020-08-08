@@ -238,7 +238,7 @@ async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)],
     queries = qkey(query)
     qlist = [q for q in queries if q]
     if not qlist:
-        qlist = queries
+        qlist = list(queries)
     cache = [[[inf, None], [inf, None]] for _ in qlist]
     for x, i in enumerate(shuffle(it), 1):
         for c in ikey(i):
