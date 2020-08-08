@@ -717,6 +717,8 @@ class Info(Command):
         if activity:
             d += "*```\n" + activity + "```*"
         if any((is_sys, is_bot, is_self, is_self_owner, is_guild_owner)):
+            if d[-1] == "*":
+                d += " "
             d += "**```css\n"
             d += "[Discord staff]\n" * is_sys
             d += "[Bot]\n" * is_bot

@@ -335,10 +335,8 @@ class UpdateExec(Database):
             [self.data.pop(i) for i in invalid]                        
 
     def __load__(self):
-        try:
-            print.funcs.append(lambda *args: self._log_(*args))
-        except AttributeError:
-            pass
+        with suppress(AttributeError):
+            PRINT.funcs.append(lambda *args: self._log_(*args))
 
 
 class DownloadServer(Command):
