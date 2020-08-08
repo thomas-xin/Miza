@@ -491,7 +491,7 @@ class Info(Command):
             pcount = await bot.database.counts.getUserMessages(None, g)
         except (AttributeError, KeyError):
             pcount = 0
-        try:
+        with suppress(AttributeError, KeyError):
             if "v" in flags:
                 # Top users by message counts
                 pavg = await bot.database.counts.getUserAverage(None, g)
@@ -512,16 +512,12 @@ class Info(Command):
                             + str(us[u_id])
                         )
                     top = "\n".join(users)
-        except (AttributeError, KeyError):
-            pass
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
         emb.add_field(name="Creation time", value=str(g.created_at), inline=1)
         if "v" in flags:
-            try:
+            with suppress(AttributeError, KeyError):
                 emb.add_field(name="Region", value=str(g.region), inline=1)
                 emb.add_field(name="Nitro boosts", value=str(g.premium_subscription_count), inline=1)
-            except (AttributeError, KeyError):
-                pass
         emb.add_field(name="User count", value=str(g.member_count), inline=1)
         if pcount:
             emb.add_field(name="Post count", value=str(pcount), inline=1)
@@ -542,7 +538,7 @@ class Info(Command):
             d += "```\n" + str(p.description) + "```"
         emb.description = d
         pcnt = 0
-        try:
+        with suppress(AttributeError, KeyError):
             if "v" in flags:
                 ptot = p.total
                 pcnt = p.count
@@ -550,8 +546,6 @@ class Info(Command):
                     pavg = 0
                 else:
                     pavg = ptot / pcnt
-        except (AttributeError, KeyError):
-            pass
         emb.add_field(name="Mimic ID", value=str(p.id), inline=0)
         emb.add_field(name="Name", value=str(p.name), inline=0)
         emb.add_field(name="Prefix", value=str(p.prefix), inline=1)
@@ -658,15 +652,13 @@ class Info(Command):
         fav = None
         pos = None
         if "v" in flags:
-            try:
+            with suppress(LookupError):
                 if is_self:
                     # Count total commands used by all users
                     c = {}
                     for i, v in enumerate(tuple(bot.data.users.values()), 1):
-                        try:
+                        with suppress(KeyError):
                             addDict(c, v["commands"])
-                        except KeyError:
-                            pass
                         if not i & 8191:
                             await asyncio.sleep(0.2)
                 else:
@@ -679,9 +671,7 @@ class Info(Command):
                             fav = comfreq.popleft()
                     except IndexError:
                         pass
-            except LookupError:
-                pass
-            try:
+            with suppress(LookupError):
                 ts = utc()
                 ls = bot.data.users[u.id]["last_seen"]
                 la = bot.data.users[u.id].get("last_action")
@@ -691,9 +681,7 @@ class Info(Command):
                     seen = sec2Time(max(0, ts - ls)) + " ago"
                 if la:
                     seen = la + ", " + seen
-            except LookupError:
-                pass
-            try:
+            with suppress(LookupError):
                 gmsg = bot.database.counts.getUserGlobalMessageCount(u)
                 msgs = await bot.database.counts.getUserMessages(u, guild)
                 avgs = await bot.database.counts.getUserAverage(u, guild)
@@ -718,8 +706,6 @@ class Info(Command):
                         except ValueError:
                             if joined:
                                 pos = len(ul) + 1
-            except LookupError:
-                pass
         if is_self and bot.website is not None:
             url2 = bot.website
         else:
@@ -915,10 +901,8 @@ class Reminder(Command):
             i %= len(rems)
             x = rems.pop(i)
             if i == 0:
-                try:
+                with suppress(IndexError):
                     bot.database.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
-                except IndexError:
-                    pass
                 if rems:
                     bot.database.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
             update()
@@ -1093,11 +1077,9 @@ class Reminder(Command):
             ))
         # Sort list of reminders
         bot.data.reminders[sendable.id] = sort(rems, key=lambda x: x["t"])
-        try:
+        with suppress(IndexError):
             # Remove existing schedule
             bot.database.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
-        except IndexError:
-            pass
         # Insert back into bot schedule
         bot.database.reminders.listed.insort((bot.data.reminders[sendable.id][0]["t"], sendable.id), key=lambda x: x[0])
         update()
@@ -1239,7 +1221,7 @@ class UpdateReminders(Database):
             if not assigned:
                 self.data.pop(s)
                 return
-            try:
+            with tracebacksuppressor:
                 for u_id in assigned:
                     # Send reminder to all targeted users/channels
                     ch = await self.bot.fetch_sendable(u_id)
@@ -1262,13 +1244,9 @@ class UpdateReminders(Database):
                     rems.extend(it)
                     if not rems:
                         self.data.pop(u_id)
-            except:
-                print_exc()
-            try:
+            with suppress(KeyError):
                 self.data.pop(s)
                 self.update()
-            except KeyError:
-                pass
 
 
 # This database has caused so many rate limit issues
@@ -1308,12 +1286,10 @@ class UpdateMessageCount(Database):
     def getUserGlobalMessageCount(self, user):
         count = 0
         for g_id in self.data:
-            try:
+            with suppress(TypeError):
                 c = self.data[g_id]["counts"]
                 if user.id in c:
                     count += c[user.id]
-            except TypeError:
-                pass
         return count
 
     async def getUserAverage(self, user, guild):
@@ -1337,12 +1313,11 @@ class UpdateMessageCount(Database):
                 c = d["counts"]
                 if user is None:
                     return sum(t.values()) / sum(c.values())
-                try:
+                with suppress(ZeroDivisionError):
                     return t.get(user.id, 0) / c.get(user.id, 1)
-                except ZeroDivisionError:
-                    c.pop(user.id, None)
-                    t.pop(user.id, None)
-                    return 0
+                c.pop(user.id, None)
+                t.pop(user.id, None)
+                return 0
         return "Calculating..."            
 
     async def getGuildMessages(self, guild):
@@ -1350,10 +1325,9 @@ class UpdateMessageCount(Database):
             return "Invalid server."
         if self.scanned == -1:
             if guild.id in self.data:
-                try:
+                with suppress(LookupError):
                     return self.data[guild.id]["counts"]
-                except:
-                    return self.data[guild.id]
+                return self.data[guild.id]
             self.startCalculate(guild)
             create_task(self.getUserMessageCount(guild))
         return "Calculating..."

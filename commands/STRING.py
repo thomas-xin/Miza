@@ -430,11 +430,7 @@ class UrbanDictionary(Command):
         )
         fut = create_task(channel.trigger_typing())
         s = await Request(url, headers=self.header, timeout=16, aio=True)
-        # eval is often better at json decoding than json.loads for some reason, this usage isn't 100% safe though
-        try:
-            d = json.loads(s)
-        except:
-            d = eval(s, {}, eval_const)
+        d = eval_json(s)
         l = d["list"]
         if not l:
             await fut

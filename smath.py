@@ -2,9 +2,37 @@
 Adds many useful math-related functions.
 """
 
-import traceback, time, datetime
-import collections, ast, copy, pickle, io
-import random, math, cmath, fractions, mpmath, sympy, shlex, numpy, colorsys, re, hashlib, base64
+import contextlib, concurrent.futures
+
+# A context manager that enables concurrent imports.
+class MultiThreadedImporter(contextlib.AbstractContextManager):
+
+    def __init__(self, glob=None):
+        self.glob = glob
+
+    def __enter__(self):
+        self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=8)
+        self.out = {}
+        return self
+
+    def __import__(self, *modules):
+        for module in modules:
+            self.out[module] = self.exc.submit(__import__, module)
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+        if exc_type and exc_value:
+            raise exc_value
+    
+    def close(self):
+        for k in tuple(self.out):
+            self.out[k] = self.out[k].result()
+        glob = self.glob if self.glob is not None else globals()
+        glob.update(self.out)
+        self.exc.shutdown(True)
+
+with MultiThreadedImporter() as importer:
+    importer.__import__("sys", "collections", "traceback", "time", "datetime", "ast", "copy", "pickle", "io", "random", "math", "cmath", "fractions", "mpmath", "sympy", "shlex", "numpy", "colorsys", "re", "hashlib", "base64")
 
 from scipy import interpolate, special, signal
 from dateutil import parser as tparser
@@ -12,8 +40,35 @@ from sympy.parsing.sympy_parser import parse_expr
 from itertools import repeat
 from colormath import color_objects, color_conversions
 
+suppress = contextlib.suppress
+closing = contextlib.closing
+
+# A context manager that sends exception tracebacks to stdout.
+class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager):
+    
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        if exc_type and exc_value:
+            try:
+                raise exc_value
+            except:
+                print_exc()
+        return True
+
+    async def __aexit__(self, exc_type, exc_value, exc_tb):
+        if exc_type and exc_value:
+            try:
+                raise exc_value
+            except:
+                print_exc()
+        return True
+
+tracebacksuppressor = TracebackSuppressor()
+
+print_exc = lambda: sys.stdout.write(traceback.format_exc())
+
 class Dummy(Exception):
     __slots__ = ()
+
 
 loop = lambda x: repeat(None, x)
 
@@ -45,6 +100,10 @@ eval_const = {
     "nan": nan,
     "Infinity": inf,
 }
+
+# Not completely safe, but much safer than regular eval
+safe_eval = lambda s: eval(s, {}, eval_const)
+
 null = None
 i = I = j = J = 1j
 π = pi = mp.pi
@@ -257,25 +316,21 @@ def isqrt(x):
 
 # Rounds a number to a certain amount of decimal places.
 def round(x, y=None):
-    try:
+    with suppress(Exception):
         if isValid(x):
-            try:
+            with suppress(Exception):
                 if x == int(x):
                     return int(x)
                 if y is None:
                     return int(math.round(x))
-            except:
-                pass
             return roundMin(math.round(x, y))
         else:
             return x
-    except:
-        if type(x) is complex:
-            return round(x.real, y) + round(x.imag, y) * 1j
-    try:
+    if type(x) is complex:
+        return round(x.real, y) + round(x.imag, y) * 1j
+    with suppress(Exception):
         return math.round(x)
-    except:
-        return x
+    return x
 
 # Rounds a number to the nearest integer, with a probability determined by the fractional part.
 def round_random(x):
@@ -289,39 +344,33 @@ def round_random(x):
 
 # Returns integer ceiling value of x, for all complex x.
 def ceil(x):
-    try:
+    with suppress(Exception):
         return math.ceil(x)
-    except:
-        if type(x) is complex:
-            return ceil(x.real) + ceil(x.imag) * 1j
-    try:
+    if type(x) is complex:
+        return ceil(x.real) + ceil(x.imag) * 1j
+    with suppress(Exception):
         return math.ceil(x)
-    except:
-        return x
+    return x
 
 # Returns integer floor value of x, for all complex x.
 def floor(x):
-    try:
+    with suppress(Exception):
         return math.floor(x)
-    except:
-        if type(x) is complex:
-            return floor(x.real) + floor(x.imag) * 1j
-    try:
+    if type(x) is complex:
+        return floor(x.real) + floor(x.imag) * 1j
+    with suppress(Exception):
         return math.floor(x)
-    except:
-        return x
+    return x
 
 # Returns integer truncated value of x, for all complex x.
 def trunc(x):
-    try:
+    with suppress(Exception):
         return math.trunc(x)
-    except:
-        if type(x) is complex:
-            return trunc(x.real) + trunc(x.imag) * 1j
-    try:
+    if type(x) is complex:
+        return trunc(x.real) + trunc(x.imag) * 1j
+    with suppress(Exception):
         return math.trunc(x)
-    except:
-        return x
+    return x
 
 
 # Square wave function with period 2π.
@@ -531,10 +580,9 @@ def generatePrimes(a=2, b=inf, c=1):
 def iterSum(it):
     if issubclass(type(it), collections.abc.Mapping):
         return sum(tuple(it.values()))
-    try:
+    with suppress(TypeError):
         return sum(iter(it))
-    except TypeError:
-        return it
+    return it
 
 # Returns the maximum value of an iterable, using the values rather than keys for dictionaries.
 def iterMax(it):
@@ -544,10 +592,9 @@ def iterMax(it):
         for i in keys:
             if it[i] >= m:
                 return i
-    try:
+    with suppress(TypeError):
         return max(iter(it))
-    except TypeError:
-        return it
+    return it
 
 # This is faster than dict.setdefault apparently
 def setDict(d, k, v, ignore=False):
@@ -755,10 +802,9 @@ def approach(x, y, z, threshold=0.125):
 
 # I forgot what this was for oops
 def scaleRatio(x, y):
-    try:
+    with suppress(ZeroDivisionError):
         return x * (x - y) / (x + y)
-    except ZeroDivisionError:
-        return 0
+    return 0
 
 
 # Returns a python range object but automatically reversing if the direction is not specified.
@@ -991,18 +1037,16 @@ def roundX(num, prec):
         else:
             s += "." + "0" * prec
         return s
-    else:
-        return str(round(num.real))
+    return str(round(num.real))
 
 
 # Attempts to convert an iterable to a string if it isn't already
 def verifyString(s):
     if type(s) is str:
         return s
-    try:
+    with suppress(TypeError):
         return "".join(s)
-    except:
-        return str(s)
+    return str(s)
 
 
 # A hue to colour conversion function with maximum saturation and lightness.
@@ -1014,15 +1058,13 @@ def colour2Raw(*c):
         c = c[0]
     if len(c) == 3:
         return (c[0] << 16) + (c[1] << 8) + c[2]
-    else:
-        return (c[0] << 16) + (c[1] << 8) + c[2] + (c[3] << 24)
+    return (c[0] << 16) + (c[1] << 8) + c[2] + (c[3] << 24)
 
 # Converts an integer to a colour tuple.
 def raw2Colour(x):
     if x > 1 << 24:
         return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255, (x >> 24) & 255))
-    else:
-        return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255))
+    return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255))
 
 # Colour space conversion functions
 rgb_to_hsv = lambda c: list(colorsys.rgb_to_hsv(*c[:3])) + c[3:]
@@ -1071,8 +1113,7 @@ def negColour(c, t=127):
     i = luma(c)
     if i > t:
         return fillColour(0)
-    else:
-        return fillColour(255)
+    return fillColour(255)
 
 # Inverts a colour.
 invColour = lambda c: [255 - i for i in c]
@@ -1101,7 +1142,7 @@ def adjColour(colour, brightness=0, intensity=1, hue=0, bits=0, scale=False):
 def bitCrush(dest, b=0, f=round):
     try:
         a = 1 << b
-    except:
+    except (TypeError, ValueError):
         a = 2 ** b
     try:
         len(dest)
@@ -1109,10 +1150,7 @@ def bitCrush(dest, b=0, f=round):
         for i in range(len(dest)):
             dest[i] = f(dest[i] / a) * a
     except TypeError:
-        try:
-            dest = f(dest / a) * a
-        except:
-            raise
+        dest = f(dest / a) * a
     return dest
 
 
@@ -1196,8 +1234,7 @@ def get(v, i, mode=5):
         return v[floor(i) % size] * (1 - i % 1) + v[ceil(i) % size] * (i % 1)
     elif mode == int(mode):
         return roundMin(interpolate.splev(i, interpolate.splrep(np.arange(1 + size), np.append(v, v[0]), k=int(min(size, mode)))))
-    else:
-        return get(v, i, floor(mode)) * (1 - mode % 1) + (mode % 1) * get(v, i, ceil(mode))
+    return get(v, i, floor(mode)) * (1 - mode % 1) + (mode % 1) * get(v, i, ceil(mode))
 
 
 # Computes product of values in an iterable.
@@ -1211,8 +1248,7 @@ def product(*nums):
 def dotProduct(*vects):
     if len(vects) > 1:
         return sum(product(*(array(v) for v in vects)))
-    else:
-        return sum((i ** 2 for i in vects[-1]))
+    return sum((i ** 2 for i in vects[-1]))
 
 
 # Clips the values in the source iterable to the values in the destination value.
@@ -1321,16 +1357,14 @@ def rdRect(pos, rect, edge=0):
 def diffExpD(r, s, t):
     if r == 1:
         return s * t
-    else:
-        return log(s * (r ** t - 1), r)
+    return log(s * (r ** t - 1), r)
 
 # Returns the predicted time taken for an object with given velocity and decay to reach a certain position.
 def diffExpT(r, s, d):
     coeff = d * log(r) / s + 1
     if coeff < 0:
         return inf
-    else:
-        return log(coeff, r)
+    return log(coeff, r)
 
 # Computes approximate intercept angle for a particle, with speed and optional decay values.
 def predictTrajectory(src, dest, vel, spd, dec=1, boundary=None, edge=0):
@@ -1522,8 +1556,7 @@ def strGetRem(s, arg):
     elif " " + arg in s:
         s = s.replace(" " + arg, "")
         return s, True
-    else:
-        return s, False
+    return s, False
 
 
 # Returns a string representation of an iterable, with options.
@@ -1570,10 +1603,8 @@ def intKey(d):
             t = d[k]
         except KeyError:
             continue
-        try:
+        with suppress(TypeError, ValueError):
             k = int(k)
-        except (TypeError, ValueError):
-            pass
         if type(t) is dict:
             t = intKey(t)
         c[k] = t
@@ -1586,10 +1617,9 @@ utc_dt = datetime.datetime.utcnow
 ep = datetime.datetime(1970, 1, 1)
 
 def utc_ts(dt):
-    try:
+    with suppress(TypeError):
         return (dt - ep).total_seconds()
-    except TypeError:
-        return dt.replace(tzinfo=datetime.timezone.utc).timestamp()
+    return dt.replace(tzinfo=datetime.timezone.utc).timestamp()
 
 # utc_ts = lambda dt: dt.replace(tzinfo=datetime.timezone.utc).timestamp()
 
@@ -2650,10 +2680,9 @@ class demap(collections.abc.Mapping):
         self.b = cdict(reversed(t) for t in self.a.items())
 
     def __getitem__(self, k):
-        try:
+        with suppress(KeyError):
             return self.a.__getitem__(k)
-        except KeyError:
-            return self.b.__getitem__(k)
+        return self.b.__getitem__(k)
 
     def __delitem__(self, k):
         try:
@@ -2683,10 +2712,9 @@ class demap(collections.abc.Mapping):
         return self
 
     def get(self, k, v=None):
-        try:
+        with suppress(KeyError):
             return self.__getitem__(k)
-        except KeyError:
-            return v
+        return v
 
     clear = lambda self: (self.a.clear(), self.b.clear())
     __iter__ = lambda self: iter(self.a.items())

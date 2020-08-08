@@ -378,11 +378,21 @@ class CreateEmoji(Command):
             f = await create_future(open, path, "wb", timeout=18)
             await create_future(f.write, image, timeout=18)
             await create_future(f.close, timeout=18)
-            resp = await imageProc(path, "resize_max", [128], user, timeout=32)
-            fn = resp[0]
-            f = await create_future(open, fn, "rb", timeout=18)
-            image = await create_future(f.read, timeout=18)
-            create_future_ex(f.close, timeout=18)
+            try:
+                resp = await imageProc(path, "resize_max", [128], guild, timeout=32)
+            except:
+                with contextlib.suppress(Exception):
+                    os.remove(path)
+                raise
+            else:
+                fn = resp[0]
+                f = await create_future(open, fn, "rb", timeout=18)
+                image = await create_future(f.read, timeout=18)
+                create_future_ex(f.close, timeout=18)
+                with contextlib.suppress(Exception):
+                    os.remove(fn)
+            with contextlib.suppress(Exception):
+                os.remove(path)
         emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
         # This reaction indicates the emoji was created successfully
         await message.add_reaction(emoji)
@@ -936,6 +946,8 @@ class Magik(Command):
             f = discord.File(fn, filename=name)
             msg = await channel.send(file=f)
             url = msg.attachments[0].url
+            with contextlib.suppress(Exception):
+                os.remove(fn)
         else:
             msg = None
         try:
@@ -1151,10 +1163,7 @@ class Cat(Command):
                 resp = await Request("https://api.alexflipnote.dev/cats", aio=True)
             else:
                 resp = await Request("https://api.thecatapi.com/v1/images/search", aio=True)
-            try:
-                d = json.loads(resp)
-            except:
-                d = eval(resp, {}, eval_const)
+            d = eval_json(resp)
             if type(d) is list:
                 d = random.choice(d)
             url = d["file" if x == 1 else "url"]
@@ -1226,10 +1235,7 @@ class Dog(Command):
             resp = await Request("https://api.alexflipnote.dev/dogs", aio=True)
         else:
             resp = await Request("https://dog.ceo/api/breeds/image/random", aio=True)
-        try:
-            d = json.loads(resp)
-        except:
-            d = eval(resp, {}, eval_const)
+        d = eval_json(resp)
         if type(d) is list:
             d = random.choice(d)
         url = d["file" if x else "message"]

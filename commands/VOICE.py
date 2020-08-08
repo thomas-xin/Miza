@@ -1327,10 +1327,7 @@ class AudioDownloader:
         out = deque()
         self.spotify_headers.rotate()
         resp = Request(url, headers=self.spotify_headers[0])
-        try:
-            d = json.loads(resp)
-        except:
-            d = eval(resp, {}, eval_const)
+        d = eval_json(resp)
         try:
             items = d["items"]
             total = d.get("total", 0)
@@ -1369,15 +1366,9 @@ class AudioDownloader:
     def get_youtube_part(self, url):
         out = deque()
         resp = Request(url)
-        try:
-            d = json.loads(resp)
-        except:
-            d = eval(resp, {}, eval_const)
-        try:
-            items = d["items"]
-            total = d.get("pageInfo", {}).get("totalResults", 0)
-        except KeyError:
-            raise
+        d = eval_json(resp)
+        items = d["items"]
+        total = d.get("pageInfo", {}).get("totalResults", 0)
         for item in items:
             try:
                 snip = item["snippet"]
@@ -3334,10 +3325,7 @@ def extract_lyrics(s):
         s = s[:s.index("window.__")]
     s = s[:s.rindex(");")]
     data = ast.literal_eval(s)
-    try:
-        d = json.loads(data)
-    except json.JSONDecodeError:
-        d = eval(data, {}, eval_const)
+    d = eval_json(data)
     lyrics = d["songPage"]["lyricsData"]["body"]["children"][0]["children"]
     newline = True
     output = ""
@@ -3377,12 +3365,10 @@ async def get_lyrics(item):
         name = None
         path = None
         for h in hits:
-            try:
+            with tracebacksuppressor:
                 name = h["result"]["title"]
                 path = h["result"]["api_path"]
                 break
-            except KeyError:
-                print_exc()
         if path and name:
             s = "https://genius.com" + path
             page = await Request(s, headers=header, decode=True, aio=True)

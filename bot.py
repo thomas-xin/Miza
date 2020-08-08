@@ -16,7 +16,7 @@ client = discord.AutoShardedClient(
 
 
 # Main class containing all global data
-class Bot:
+class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
     
     timeout = 24
     website = "https://github.com/thomas-xin/Miza"
@@ -50,18 +50,17 @@ class Bot:
         try:
             f = open(self.authdata)
         except FileNotFoundError:
-            f = open(self.authdata, "w")
-            f.write(
-                '{\n'
-                + '"discord_token":"",\n'
-                + '"owner_id":""\n'
-                + '}'
-            )
-            f.close()
+            with open(self.authdata, "w") as f:
+                f.write(
+                    '{\n'
+                    + '"discord_token":"",\n'
+                    + '"owner_id":""\n'
+                    + '}'
+                )
             print("ERROR: Please fill in details for " + self.authdata + " to continue.")
             self.setshutdown(2)
-        auth = ast.literal_eval(f.read())
-        f.close()
+        with closing(f):
+            auth = ast.literal_eval(f.read())
         try:
             self.token = auth["discord_token"]
         except KeyError:
@@ -77,7 +76,7 @@ class Bot:
             print("WARNING: owner_id not found. Unable to locate owner.")
         # Initialize rest of bot variables
         create_task(heartbeatLoop())
-        self.proc = psutil.Process()
+        self.proc = PROC
         self.guilds = 0
         self.blocked = 0
         self.updated = False
@@ -89,33 +88,36 @@ class Bot:
         self.getModules()
 
     __call__ = lambda self: self
+    __exit__ = lambda self: self.close()
 
     # Waits an amount of seconds and shuts down.
     def setshutdown(self, delay=None):
         if delay:
             time.sleep(delay)
-        f = open(self.shutdown, "wb")
-        f.close()
+        with open(self.shutdown, "wb"):
+            pass
         for proc in self.proc.children(recursive=True):
-            try:
+            with suppress(Exception):
                 proc.kill()
-            except:
-                pass
         self.proc.kill()
 
     # Starts up client.
     def run(self):
         print("Attempting to authorize with token " + self.token + ":")
-        try:
-            get_event_loop().run_until_complete(client.start(self.token))
-        except (KeyboardInterrupt, SystemExit):
-            get_event_loop().run_until_complete(client.close())
-            get_event_loop().close()
-            self.setshutdown()
+        with closing(get_event_loop()):
+            try:
+                get_event_loop().run_until_complete(client.start(self.token))
+            finally:
+                get_event_loop().run_until_complete(client.close())
+        self.setshutdown()
 
     # A reimplementation of the print builtin function.
     def print(self, *args, sep=" ", end="\n"):
         sys.__stdout__.write(str(sep).join(str(i) for i in args) + end)
+
+    # Closes the bot, preventing all events.
+    def close(self):
+        self.closed = True
 
     # A garbage collector for empty and unassigned objects in the database.
     async def verifyDelete(self, obj):
@@ -155,12 +157,12 @@ class Bot:
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
     async def event(self, ev, *args, **kwargs):
+        if self.closed:
+            return
         events = self.events.get(ev, ())
         if len(events) == 1:
-            try:
+            with tracebacksuppressor:
                 return await create_future(events[0](*args, **kwargs))
-            except:
-                print_exc()
             return
         futs = [create_future(func(*args, **kwargs)) for func in events]
         out = deque()
@@ -197,29 +199,26 @@ class Bot:
                 s_id = int(s_id)
             except (ValueError, TypeError):
                 raise TypeError("Invalid user identifier: " + str(s_id))
-        try:
+        with suppress(KeyError):
             return self.get_user(s_id)
-        except KeyError:
-            try:
-                return self.cache.channels[s_id]
-            except KeyError:
-                try:
-                    user = await client.fetch_user(s_id)
-                except LookupError:
-                    channel = await client.fetch_channel(s_id)
-                    self.cache.channels[s_id] = channel
-                    self.limitCache("channels")
-                    return channel
-                self.cache.users[u_id] = user
-                self.limitCache("users")
-                return user
+        with suppress(KeyError):
+            return self.cache.channels[s_id]
+        try:
+            user = await client.fetch_user(s_id)
+        except LookupError:
+            channel = await client.fetch_channel(s_id)
+            self.cache.channels[s_id] = channel
+            self.limitCache("channels")
+            return channel
+        self.cache.users[u_id] = user
+        self.limitCache("users")
+        return user
 
     # Fetches a user from ID, using the bot cache when possible.
     async def fetch_user(self, u_id):
-        try:
+        with suppress(KeyError):
             return self.get_user(u_id)
-        except KeyError:
-            user = await client.fetch_user(u_id)
+        user = await client.fetch_user(u_id)
         self.cache.users[u_id] = user
         self.limitCache("users")
         return user
@@ -231,10 +230,8 @@ class Bot:
                 u_id = int(u_id)
             except (ValueError, TypeError):
                 raise TypeError("Invalid user identifier: " + str(u_id))
-        try:
+        with suppress(KeyError):
             return self.cache.users[u_id]
-        except KeyError:
-            pass
         if u_id == self.deleted_user:
             user = self.ghostUser()
             user.system = True
@@ -258,7 +255,7 @@ class Bot:
         return user
 
     # Fetches a member in the target server by ID or name lookup.
-    async def fetch_member_ex(self, u_id, guild=None):
+    async def fetch_member_ex(self, u_id, guild=None, allow_banned=True):
         if type(u_id) is not int:
             try:
                 u_id = int(u_id)
@@ -274,38 +271,51 @@ class Bot:
                 except LookupError:
                     pass
             if member is None:
-                members = guild.members
+                if allow_banned and "bans" in self.data:
+                    members = deque(guild.members)
+                    for b in self.data.bans.get(guild.id, ()):
+                        try:
+                            user = await self.fetch_user(b.get("u", self.deleted_user))
+                        except LookupError:
+                            user = self.cache.users[self.deleted_user]
+                    members = list(members)
+                else:
+                    members = guild.members
                 if not members:
                     members = guild.members = await guild.fetch_members(limit=None)
-                    guild._members = {m.id: m for m in members}
+                    guild._members.update({m.id: m for m in members})
                 if type(u_id) is not str:
                     u_id = str(u_id)
-                try:
-                    member = await strLookup(
+                with suppress(LookupError):
+                    return await strLookup(
                         members,
                         u_id,
                         qkey=userQuery1,
                         ikey=userIter1,
                         loose=False,
                     )
-                except LookupError:
-                    try:
-                        member = await strLookup(
+                with suppress(LookupError):
+                    return await strLookup(
                         members,
                         u_id,
                         qkey=userQuery2,
                         ikey=userIter2,
                     )
-                    except LookupError:
-                        try:
-                            member = await strLookup(
-                                members,
-                                u_id,
-                                qkey=userQuery3,
-                                ikey=userIter3,
-                            )
-                        except LookupError:
-                            raise LookupError("Unable to find member data.")
+                with suppress(LookupError):
+                    return await strLookup(
+                        members,
+                        u_id,
+                        qkey=userQuery3,
+                        ikey=userIter3,
+                    )
+                try:
+                    if type(u_id) is str:
+                        members = await guild.query_members(u_id, limit=1)
+                        return members[0]
+                    else:
+                        raise LookupError
+                except (T0, T1, LookupError):
+                    raise LookupError("Unable to find member data.")
         return member
 
     # Fetches the first seen instance of the target user as a member in any shared server.
@@ -316,13 +326,11 @@ class Bot:
             except (ValueError, TypeError):
                 raise TypeError("Invalid user identifier: " + str(u_id))
         if find_others:
-            try:
+            with suppress(LookupError):
                 member = self.cache.members[u_id].guild.get_member(u_id)
                 if member is None:
                     raise LookupError
                 return member
-            except LookupError:
-                pass
         g = bot.cache.guilds
         if guild is None:
             guilds = list(bot.cache.guilds.values())
@@ -373,10 +381,8 @@ class Bot:
                     except (discord.NotFound, discord.HTTPException) as ex:
                         raise LookupError(str(ex))
                 raise TypeError("Invalid server identifier: " + str(g_id))
-        try:
+        with suppress(KeyError):
             return self.cache.guilds[g_id]
-        except KeyError:
-            pass
         try:
             guild = client.get_guild(g_id)
             if guild is None:
@@ -394,10 +400,8 @@ class Bot:
                 c_id = int(c_id)
             except (ValueError, TypeError):
                 raise TypeError("Invalid channel identifier: " + str(c_id))
-        try:
+        with suppress(KeyError):
             return self.cache.channels[c_id]
-        except KeyError:
-            pass
         channel = await client.fetch_channel(c_id)
         self.cache.channels[c_id] = channel
         self.limitCache("channels")
@@ -410,17 +414,13 @@ class Bot:
                 m_id = int(m_id)
             except (ValueError, TypeError):
                 raise TypeError("Invalid message identifier: " + str(m_id))
-        try:
+        with suppress(KeyError):
             return self.cache.messages[m_id]
-        except KeyError:
-            pass
         if channel is None:
             raise LookupError("Message data not found.")
-        try:
+        with suppress(TypeError):
             int(channel)
             channel = await self.fetch_channel(channel)
-        except TypeError:
-            pass
         message = await channel.fetch_message(m_id)
         if message is not None:
             self.cacheMessage(message)
@@ -433,10 +433,8 @@ class Bot:
                 r_id = int(r_id)
             except (ValueError, TypeError):
                 raise TypeError("Invalid role identifier: " + str(r_id))
-        try:
+        with suppress(KeyError):
             return self.cache.roles[r_id]
-        except KeyError:
-            pass
         try:
             role = guild.get_role(r_id)
             if role is None:
@@ -459,10 +457,8 @@ class Bot:
                 e_id = int(e_id)
             except (ValueError, TypeError):
                 raise TypeError("Invalid emoji identifier: " + str(e_id))
-        try:
+        with suppress(KeyError):
             return self.cache.emojis[e_id]
-        except KeyError:
-            pass
         try:
             emoji = client.get_emoji(e_id)
             if emoji is None:
@@ -478,31 +474,25 @@ class Bot:
     
     # Searches the bot database for a webhook mimic from ID.
     def get_mimic(self, m_id, user=None):
-        try:
+        with suppress(KeyError):
             try:
                 m_id = "&" + str(int(m_id))
             except (ValueError, TypeError):
                 pass
             mimic = self.data.mimics[m_id]
             return mimic
-        except KeyError:
-            pass
         if user is not None:
-            try:
+            with suppress(KeyError):
                 mimics = self.data.mimics[user.id]
                 mlist = mimics[m_id]
                 return self.get_mimic(random.choice(mlist))
-            except KeyError:
-                pass
         raise LookupError("Unable to find target mimic.")
 
     # Gets the DM channel for the target user, creating a new one if none exists.
     async def getDM(self, user):
-        try:
+        with suppress(TypeError):
             int(user)
             user = await self.fetch_user(user)
-        except TypeError:
-            pass
         channel = user.dm_channel
         if channel is None:
             channel = await user.create_dm()
@@ -590,11 +580,9 @@ class Bot:
         if users:
             futs = [create_task(self.fetch_user(verifyID(u))) for u in users]
             for fut in futs:
-                try:
+                with suppress(LookupError):
                     res = await fut
                     out.append(bestURL(res))
-                except LookupError:
-                    pass
         for s in emojis:
             s = s[3:]
             i = s.index(":")
@@ -650,10 +638,9 @@ class Bot:
                 g_id = int(guild)
             except TypeError:
                 g_id = 0
-        try:
+        with suppress(KeyError):
             return self.data.prefixes[g_id]
-        except KeyError:
-            return bot.prefix
+        return bot.prefix
 
     # Gets effective permission level for the target user in a certain guild, taking into account roles.
     def getPerms(self, user, guild=None):
@@ -671,13 +658,11 @@ class Bot:
             return inf
         if u_id == guild.owner_id:
             return inf
-        try:
+        with suppress(KeyError):
             perm = self.data.perms[guild.id][u_id]
             if isnan(perm):
                 return -inf
             return perm
-        except KeyError:
-            pass
         m = guild.get_member(u_id)
         if m is None:
             r = guild.get_role(u_id)
@@ -700,13 +685,11 @@ class Bot:
     def getRolePerms(self, role, guild):
         if role.permissions.administrator:
             return inf
-        try:
+        with suppress(KeyError):
             perm = self.data.perms[guild.id][role.id]
             if isnan(perm):
                 return -inf
             return perm
-        except KeyError:
-            pass
         if guild.id == role.id:
             return 0
         p = role.permissions
@@ -773,10 +756,9 @@ class Bot:
         u_id = int(u_id)
         if u_id in self.owners or u_id == client.user.id:
             return False
-        try:
+        with suppress(KeyError):
             return self.data.blacklist.get(u_id, False)
-        except KeyError:
-            return True
+        return True
     
     mmap = {
         "“": '"',
@@ -895,13 +877,11 @@ class Bot:
         except (ValueError, TypeError, SyntaxError):
             r = await self.solveMath(f, obj, 16, 0)
         x = r[0]
-        try:
+        with suppress(TypeError):
             while True:
                 if type(x) is str:
                     raise TypeError
                 x = tuple(x)[0]
-        except TypeError:
-            pass
         return roundMin(float(x))
 
     # Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
@@ -1046,14 +1026,13 @@ class Bot:
 
     # Gets the CPU and memory usage of a process over a period of 1 second.
     async def getProcState(self, proc):
-        try:
+        with suppress(psutil.NoSuchProcess):
             create_future_ex(proc.cpu_percent, priority=True)
             await asyncio.sleep(1)
             c = await create_future(proc.cpu_percent, priority=True)
             m = await create_future(proc.memory_percent, priority=True)
             return float(c), float(m)
-        except psutil.NoSuchProcess:
-            return 0, 0
+        return 0, 0
 
     # Gets the total size of the cache folder.
     getCacheSize = lambda self: sum(os.path.getsize("cache/" + fn) for fn in os.listdir("cache"))
@@ -1087,7 +1066,7 @@ class Bot:
 
     # Loads a module containing commands and databases by name.
     def getModule(self, module):
-        try:
+        with tracebacksuppressor:
             f = module
             f = ".".join(f.split(".")[:-1])
             path, module = module, f
@@ -1147,8 +1126,6 @@ class Bot:
                                 time.sleep(0.1)
                             else:
                                 break
-        except:
-            print_exc()
 
     def unload(self, mod=None):
         if mod is None:
@@ -1270,10 +1247,8 @@ class Bot:
                 while msg.startswith("\n"):
                     msg = msg[1:]
                 check = "callback-"
-                try:
+                with suppress(ValueError):
                     msg = msg[:msg.index("\n")]
-                except ValueError:
-                    pass
                 if not msg.startswith(check):
                     return
             while len(self.proc_call) > 65536:
@@ -1365,7 +1340,7 @@ class Bot:
             self.busy = True
             if not force:
                 create_task(self.getState())
-            try:
+            with tracebacksuppressor:
                 guilds = len(client.guilds)
                 changed = guilds != self.guilds
                 if changed or utc() > self.stat_timer:
@@ -1400,8 +1375,6 @@ class Bot:
                     except discord.NotFound:
                         pass
                     self.status_iter = (self.status_iter + 1) % 3
-            except:
-                print_exc()
             # Update databases
             for u in self.database.values():
                 if utc() - u.used > u.rate_limit or force:
@@ -1632,9 +1605,9 @@ class Bot:
         __repr__ = lambda self: "<Ghost User id=" + str(self.id) + " name='" + str(self.name) + "' discriminator='" + str(self.discriminator) + "' bot=False>"
         __str__ = lambda self: str(self.name) + "#" + str(self.discriminator)
         system = False
-        history = lambda *void1, **void2: None
+        history = lambda *void1, **void2: retNone()
         dm_channel = None
-        create_dm = lambda self: None
+        create_dm = lambda self: retNone()
         relationship = None
         is_friend = lambda self: None
         is_blocked = lambda self: None
@@ -1892,13 +1865,11 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                                                     found = False
                                                     i = argv.index(r)
                                                     if i == 0 or argv[i - 1] == " " or argv[i - 2] == q:
-                                                        try:
+                                                        with suppress(IndexError, KeyError):
                                                             if argv[i + 2] == " " or argv[i + 2] == q:
                                                                 argv = argv[:i] + argv[i + 2:]
                                                                 addDict(flags, {char: 1})
                                                                 found = True
-                                                        except (IndexError, KeyError):
-                                                            pass
                                                     if not found:
                                                         break
                                     if q in argv:
@@ -2054,31 +2025,24 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
 # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
 async def heartbeatLoop():
     print("Heartbeat Loop initiated.")
-    try:
+    with suppress(Exception):
         while True:
-            try:
-                bot.client
-            except NameError:
-                sys.exit()
+            if not bot.client or bot.closed:
+                raise SystemExit
             d = await create_future(os.path.exists, bot.heartbeat, priority=True)
             if d:
-                try:
+                with tracebacksuppressor:
                     await create_future(os.remove, bot.heartbeat, priority=True)
-                except:
-                    print_exc()
             await asyncio.sleep(0.5)
-    except asyncio.CancelledError:
-        sys.exit(1)   
+    bot.setshutdown()  
 
 # The fast update loop that runs 24 times per second. Used for events where timing is important.
 async def fastLoop():
     freq = 24
     sent = 0
     while True:
-        try:
+        with tracebacksuppressor:
             sent = await bot.updateEmbeds()
-        except:
-            print_exc()
         x = freq if sent else 1
         for i in range(x):
             create_task(bot.event("_call_"))
@@ -2088,7 +2052,7 @@ async def fastLoop():
 async def slowLoop():
     autosave = 0
     while True:
-        try:
+        with tracebacksuppressor:
             if utc() - autosave > 60:
                 autosave = utc()
                 create_future_ex(bot.update, priority=True)
@@ -2099,8 +2063,6 @@ async def slowLoop():
                 await asyncio.sleep(1)
             await bot.handleUpdate()
             await asyncio.sleep(frand(2) + 2)
-        except:
-            print_exc()
 
 
 # The event called when the bot starts up.
@@ -2111,7 +2073,7 @@ async def on_ready():
         "<@!" + str(client.user.id) + ">",
     )
     print("Successfully connected as " + str(client.user))
-    try:
+    with tracebacksuppressor:
         futs = deque()
         futs.append(create_task(bot.getState()))
         print("Servers: ")
@@ -2148,12 +2110,12 @@ async def on_ready():
             if not os.path.exists("misc/init.tmp"):
                 print("Setting bot avatar...")
                 f = await create_future(open, "misc/avatar.png", "rb", priority=True)
-                b = await create_future(f.read, priority=True)
-                create_future_ex(f.close, priority=True)
+                with closing(f):
+                    b = await create_future(f.read, priority=True)
                 await client.user.edit(avatar=b)
                 await seen(client.user, event="misc", raw="Editing their profile")
-                f = await create_future(open, "misc/init.tmp", "wb", priority=True)
-                create_future_ex(f.close, priority=True)
+                with open("misc/init.tmp", "wb"):
+                    pass
             create_task(slowLoop())
             create_task(fastLoop())
             print("Update loops initiated.")
@@ -2170,8 +2132,6 @@ async def on_ready():
             for fut in futs:
                 await fut
             print("Reinitialized.")
-    except:
-        print_exc()
 
 
 # Server join message
@@ -2191,11 +2151,8 @@ async def on_guild_join(guild):
         + "201548633244565504" + ">. Thanks for adding me"
     )
     user = None
-    try:
+    with suppress(discord.Forbidden):
         a = await guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add).flatten()
-    except discord.Forbidden:
-        pass
-    else:
         for e in a:
             if e.target.id == client.user.id:
                 user = e.user
@@ -2238,10 +2195,8 @@ async def checkDelete(message, reaction, user):
             if user.id != client.user.id:
                 s = str(reaction)
                 if s in "❌✖️🇽❎":
-                    try:
+                    with suppress(discord.NotFound):
                         await bot.silentDelete(message, exc=True)
-                    except discord.NotFound:
-                        pass
 
 
 # Reaction add event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
@@ -2534,5 +2489,13 @@ async def on_raw_message_edit(payload):
 
 # If this is the module being run and not imported, create a new Bot instance and run it.
 if __name__ == "__main__":
-    bot = Bot()
-    bot.run()
+    _print = print
+    with contextlib.redirect_stdout(PRINT):
+        with contextlib.redirect_stderr(PRINT):
+            sys.stdout = sys.stderr = print = PRINT
+            print("Logging started.")
+            proc_start()
+            with Bot() as bot:
+                bot.run()
+    print = _print
+    sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__

@@ -1,13 +1,17 @@
-import os, sys, subprocess, psutil, asyncio, discord, json, pytz, requests, aiohttp, inspect, importlib, tracemalloc
+import smath
+from smath import *
+
+with MultiThreadedImporter(globals()) as importer:
+    importer.__import__("os", "importlib", "inspect", "tracemalloc", "psutil", "subprocess", "asyncio", "discord", "json", "pytz", "requests", "aiohttp", "psutil")
+
+PROC = psutil.Process()
+quit = lambda *args, **kwargs: PROC.kill()
 
 tracemalloc.start()
 
-import urllib.request, urllib.parse, concurrent.futures
-
-from smath import *
+import urllib.request, urllib.parse
 
 python = ("python3", "python")[os.name == "nt"]
-Process = psutil.Process()
 urlParse = urllib.parse.quote
 escape_markdown = discord.utils.escape_markdown
 escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere").replace("<@&", "<@\xad&")
@@ -33,13 +37,17 @@ except AttributeError:
         T2 = TimeoutError
 
 
-print_exc = lambda: print(traceback.format_exc(), end="")
-
-
 class ArgumentError(LookupError):
     pass
 class TooManyRequests(PermissionError):
     pass
+
+
+# Safer than raw eval, more powerful than json.decode
+def eval_json(s):
+    with suppress(json.JSONDecodeError):
+        return json.loads(s)
+    return safe_eval(s)
 
 
 # Decodes HTML encoded characters in a string.
@@ -146,12 +154,10 @@ async def recursive_coro(item):
 
 # Sends a message to a channel, then adds reactions accordingly.
 async def sendReact(channel, *args, reacts=(), **kwargs):
-    try:
+    with tracebacksuppressor:
         sent = await channel.send(*args, **kwargs)
         for react in reacts:
             await sent.add_reaction(react)
-    except:
-        print_exc()
 
 # Sends a message to a channel, then edits to add links to all attached files.
 async def sendFile(channel, msg, file, filename=None, best=False):
@@ -284,10 +290,9 @@ __imap = {
 __itrans = "".maketrans(__imap)
 
 def verifyID(value):
-    try:
+    with suppress(ValueError):
         return int(str(value).translate(__itrans))
-    except ValueError:
-        return value
+    return value
 
 
 # Strips <> characters from URLs.
@@ -345,10 +350,8 @@ def forceKill(proc):
 def subKill():
     for ptype in SUBS.values():
         for proc in ptype.procs:
-            try:
+            with suppress(psutil.NoSuchProcess):
                 forceKill(proc)
-            except psutil.NoSuchProcess:
-                pass
         ptype.procs.clear()
         ptype.busy.clear()
     procUpdate()
@@ -409,6 +412,12 @@ def procUpdate():
             att += 1
             if att >= 16 or not found:
                 break
+
+
+def proc_start():
+    proc_exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    proc_exc.submit(procUpdater)
+
 
 # Sends an operation to the math subprocess pool.
 async def mathProc(expr, prec=64, rat=False, key=None, timeout=12, authorize=False):
@@ -472,7 +481,7 @@ async def imageProc(image, operation, args, key=None, timeout=24):
     procs, busy = SUBS.image.procs, SUBS.image.busy
     while utc() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
-    try:
+    with suppress(StopIteration):
         while True:
             for p in range(len(procs)):
                 if p < len(procs):
@@ -483,8 +492,6 @@ async def imageProc(image, operation, args, key=None, timeout=24):
                     break
             await create_future(procUpdate)
             await asyncio.sleep(0.5)
-    except StopIteration:
-        pass
     d = repr(bytes("`".join(str(i) for i in (image, operation, args)), "utf-8")).encode("utf-8") + b"\n"
     try:
         proc.busy = inf
@@ -576,10 +583,9 @@ athreads = MultiThreadPool(thread_count=64, initializer=__setloop__)
 __setloop__()
 
 def get_event_loop():
-    try:
+    with suppress(RuntimeError):
         return asyncio.get_event_loop()
-    except RuntimeError:
-        return eloop
+    return eloop
 
 # Creates an asyncio Future that waits on a multithreaded one.
 def wrap_future(fut, loop=None):
@@ -840,10 +846,8 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                 if not s:
                     raise FileNotFoundError
                 data = None
-                try:
+                with suppress(pickle.UnpicklingError):
                     data = pickle.loads(s)
-                except pickle.UnpicklingError:
-                    pass
                 if type(data) in (str, bytes):
                     data = eval(compile(data, "<database>", "eval", optimize=2))
                 if data is None:
@@ -904,7 +908,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
 
 
 # Redirects all print operations to target files, limiting the amount of operations that can occur in any given amount of time for efficiency.
-class __logPrinter:
+class _logPrinter:
 
     def __init__(self, file=None):
         self.buffer = self
@@ -925,8 +929,8 @@ class __logPrinter:
                 f = open(fn, "a", encoding="utf-8")
             else:
                 f = fn
-            f.write(b)
-            f.close()
+            with closing(f):
+                f.write(b)
         except:
             sys.__stdout__.write(traceback.format_exc())
     
@@ -937,7 +941,6 @@ class __logPrinter:
         else:
             outfunc = lambda s: (sys.__stdout__.buffer.write(s), self.filePrint(self.file, s))
             enc = lambda x: bytes(x, "utf-8")
-        outfunc(enc("Logging started.\n"))
         while True:
             try:
                 for f in tuple(self.data):
@@ -976,14 +979,12 @@ class __logPrinter:
     isatty = lambda self: False
 
 
+PRINT = _logPrinter("log.txt")
+
 # Sets all instances of print to the custom print implementation.
-print = __p = __logPrinter("log.txt")
-sys.stdout = sys.stderr = print
-for mod in (discord, concurrent.futures, asyncio.futures, asyncio, psutil, subprocess, tracemalloc):
-    builtins = getattr(mod, "__builtins__", None)
-    if builtins:
-        builtins["print"] = print
 
-
-proc_exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-proc_exc.submit(procUpdater)
+# sys.stdout = sys.stderr = print
+# for mod in (discord, concurrent.futures, asyncio.futures, asyncio, psutil, subprocess, tracemalloc):
+#     builtins = getattr(mod, "__builtins__", None)
+#     if builtins:
+#         builtins["print"] = print

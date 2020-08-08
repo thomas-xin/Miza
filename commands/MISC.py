@@ -962,10 +962,7 @@ class UpdateDeviantArt(Database):
                     # print(req)
                     attempts += 1
                     resp = await Request(req, timeout=16, aio=True)
-                    try:
-                        d = json.loads(resp)
-                    except:
-                        d = eval(resp, {}, eval_const)
+                    d = eval_json(resp)
                     # Parse output from DA API
                     for res in d["results"]:
                         deviation = res["deviation"]
