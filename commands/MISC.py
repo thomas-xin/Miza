@@ -16,7 +16,7 @@ class shut_up_knackpy:
 
     def __call__(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
         s = str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)
-        if s[0] == "R" or s[0] == "G":
+        if s.startswith("Retrieved ") or s.startswith("Get "):
             if s.startswith("Get data from http") or self.retrieve.search(s) or self.get_field_data.search(s):
                 return "Shut up knackpy 😠"
         return PRINT.write(s)
