@@ -976,7 +976,8 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
         bot.database[name] = self
         self.catg = catg
         self.bot = bot
-        self.busy = self.checking = False
+        self.semaphore = Semaphore(1, 1)
+        self.checking = False
         self._globals = globals()
         f = getattr(self, "__load__", None)
         if callable(f):

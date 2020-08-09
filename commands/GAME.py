@@ -839,26 +839,21 @@ class UpdateMimics(Database):
                     mimic.url = "https://cdn.discordapp.com/embed/avatars/0.png"
 
     async def __call__(self):
-        if self.busy:
-            return
-        self.busy = True
-        # Garbage collector for unassigned mimics
-        try:
-            i = 1
-            for m_id in tuple(self.data):
-                if type(m_id) is str:
-                    mimic = self.data[m_id]
-                    try:
-                        if mimic.u_id not in self.data or mimic.id not in self.data[mimic.u_id][mimic.prefix]:
-                            self.data.pop(m_id)
-                            self.update()
-                    except:
-                        self.data.pop(m_id)
-                        self.update()
-                if not i % 8191:
-                    await asyncio.sleep(0.45)
-                i += 1
-        except:
-            print_exc()
-        await asyncio.sleep(2)
-        self.busy = False
+        async with self.semaphore:
+            async with delay(2):
+                # Garbage collector for unassigned mimics
+                with tracebacksuppressor:
+                    i = 1
+                    for m_id in tuple(self.data):
+                        if type(m_id) is str:
+                            mimic = self.data[m_id]
+                            try:
+                                if mimic.u_id not in self.data or mimic.id not in self.data[mimic.u_id][mimic.prefix]:
+                                    self.data.pop(m_id)
+                                    self.update()
+                            except:
+                                self.data.pop(m_id)
+                                self.update()
+                        if not i % 8191:
+                            await asyncio.sleep(0.45)
+                        i += 1

@@ -748,14 +748,15 @@ class AudioQueue(hlist):
         auds = self.auds
         q = self
         if q:
+            entry = q[0]
             # Only start loading a new source if there is one to be found and none is already loading/playing
-            if (auds.source is None or auds.source.closed or auds.source.advanced) and not q[0].get("played", False):
-                if q[0].get("stream", None) not in (None, "none"):
-                    q[0].played = True
+            if (auds.source is None or auds.source.closed or auds.source.advanced) and not entry.get("played", False):
+                if entry.get("stream", None) not in (None, "none"):
+                    entry.played = True
                     if not auds.stats.quiet:
                         if utc() - self.lastsent > 1:
                             try:
-                                u = self.bot.cache.users[q[0].u_id]
+                                u = self.bot.cache.users[entry.u_id]
                                 name = u.display_name
                             except KeyError:
                                 name = "Deleted User"
@@ -768,7 +769,7 @@ class AudioQueue(hlist):
                     self.loading = True
                     try:
                         # Gets audio file stream and loads into audio source object
-                        source = ytdl.getStream(q[0])
+                        source = ytdl.getStream(entry)
                         auds.new(source)
                         self.loading = False
                         auds.ensure_play()
@@ -3657,25 +3658,11 @@ class UpdateAudio(Database):
     async def __call__(self, guild=None, **void):
         bot = self.bot
         client = bot.client
-        with tracebacksuppressor:
-            # Ensure all voice clients are not muted, disconnect ones without matching audio players
-            if guild is not None:
-                g = guild
-                if not self.is_connecting(g.id) and g.id not in self.players:
-                    for c in g.voice_channels:
-                        for m in c.members:
-                            if m.id == client.user.id:
-                                create_task(self._dc(m))
-                else:
-                    m = g.get_member(client.user.id)
-                    if m.voice is not None:
-                        if m.voice.deaf or m.voice.mute or m.voice.afk:
-                            create_task(m.edit(mute=False, deafen=False))
-            else:
-                for vc in client.voice_clients:
-                    if not self.is_connecting(vc.guild.id) and vc.guild.id not in self.players:
-                        create_task(vc.disconnect(force=True))
-                for g in client.guilds:
+        async with self.semaphore:
+            with tracebacksuppressor:
+                # Ensure all voice clients are not muted, disconnect ones without matching audio players
+                if guild is not None:
+                    g = guild
                     if not self.is_connecting(g.id) and g.id not in self.players:
                         for c in g.voice_channels:
                             for m in c.members:
@@ -3686,25 +3673,40 @@ class UpdateAudio(Database):
                         if m.voice is not None:
                             if m.voice.deaf or m.voice.mute or m.voice.afk:
                                 create_task(m.edit(mute=False, deafen=False))
-        # Update audio players
-        if guild is not None:
-            if guild.id in self.players:
-                auds = self.players[guild.id]
-                create_future_ex(auds.update, priority=True)
-        else:
-            a = 1
-            async with delay(0.5):
-                for g in tuple(self.players):
-                    with tracebacksuppressor(KeyError):
-                        auds = self.players[g]
-                        create_future_ex(auds.update, priority=True)
-                        create_task(self.research(auds))
-                    if not a & 15:
-                        await asyncio.sleep(0.2)
-                    a += 1
-            for item in tuple(ytdl.cache.values()):
-                await create_future(item.update)
-        create_future_ex(ytdl.update_dl, priority=True)
+                else:
+                    for vc in client.voice_clients:
+                        if not self.is_connecting(vc.guild.id) and vc.guild.id not in self.players:
+                            create_task(vc.disconnect(force=True))
+                    for g in client.guilds:
+                        if not self.is_connecting(g.id) and g.id not in self.players:
+                            for c in g.voice_channels:
+                                for m in c.members:
+                                    if m.id == client.user.id:
+                                        create_task(self._dc(m))
+                        else:
+                            m = g.get_member(client.user.id)
+                            if m.voice is not None:
+                                if m.voice.deaf or m.voice.mute or m.voice.afk:
+                                    create_task(m.edit(mute=False, deafen=False))
+            # Update audio players
+            if guild is not None:
+                if guild.id in self.players:
+                    auds = self.players[guild.id]
+                    create_future_ex(auds.update, priority=True)
+            else:
+                a = 1
+                async with delay(0.5):
+                    for g in tuple(self.players):
+                        with tracebacksuppressor(KeyError):
+                            auds = self.players[g]
+                            create_future_ex(auds.update, priority=True)
+                            create_task(self.research(auds))
+                        if not a & 15:
+                            await asyncio.sleep(0.2)
+                        a += 1
+                for item in tuple(ytdl.cache.values()):
+                    await create_future(item.update)
+            create_future_ex(ytdl.update_dl, priority=True)
 
     def _announce_(self, *args, **kwargs):
         for auds in self.players.values():

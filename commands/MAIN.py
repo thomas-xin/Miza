@@ -610,7 +610,7 @@ class Info(Command):
                                         guild = None
                                         u = channel.recipient
                             if guild is not None:
-                                return await self.getGuildData(guild, flags)                        
+                                return await self.getGuildData(guild, flags)
         elif not name.startswith("server"):
             u = user
         else:

@@ -1201,7 +1201,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 return
             msg = message.content.strip("*")
             if not msg and message.embeds:
-                msg = message.embeds[0].description.strip("*")
+                msg = str(message.embeds[0].description).strip("*")
             if msg[:3] != "```" or len(msg) <= 3:
                 msg = None
                 if message.embeds:
@@ -1232,7 +1232,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 reacode = None
             msg = message.content.strip("*")
             if not msg and message.embeds:
-                msg = message.embeds[0].description.strip("*")
+                msg = str(message.embeds[0].description).strip("*")
             if msg[:3] != "```" or len(msg) <= 3:
                 msg = None
                 if message.embeds:
@@ -1928,7 +1928,7 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
                             await fut
                         print(msg)
                         raise TimeoutError("Request timed out.")
-                    except (ArgumentError, TooManyRequests):
+                    except (ArgumentError, TooManyRequests) as ex:
                         if fut is not None:
                             await fut
                         errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
