@@ -665,12 +665,10 @@ class Info(Command):
                     c = bot.data.users[u.id]["commands"]
                 coms = iterSum(c)
                 if type(c) is dict:
-                    try:
+                    with suppress(IndexError):
                         comfreq = deque(sort(c, reverse=True).keys())
                         while fav is None:
                             fav = comfreq.popleft()
-                    except IndexError:
-                        pass
             with suppress(LookupError):
                 ts = utc()
                 ls = bot.data.users[u.id]["last_seen"]
@@ -1330,10 +1328,13 @@ class UpdateMessageCount(Database):
 
     # What are the rate limits for the message history calls?
     async def getChannelHistory(self, channel, limit=None, callback=None):
-        async with self.semaphore:
-            messages = []
-            # 16 attempts to download channel
-            history = await aretry(lambda: channel.history(limit=limit, oldest_first=(limit is None).flatten()), attempts=16, delay=20)
+        while True:
+            with tracebacksuppressor:
+                async with self.semaphore:
+                    messages = []
+                    # 16 attempts to download channel
+                    history = await aretry(lambda: channel.history(limit=limit, oldest_first=(limit is None).flatten()), attempts=16, delay=20)
+                    break
         if callback:
             return await create_future(callback, channel=channel, messages=messages)
         return messages

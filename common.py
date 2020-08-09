@@ -617,10 +617,8 @@ def evalEX(exc):
         if type(exc) is bytes:
             exc = exc.decode("utf-8", "replace")
         s = exc[exc.index("(") + 1:exc.index(")")]
-        try:
+        with suppress(TypeError, SyntaxError, ValueError):
             s = ast.literal_eval(s)
-        except:
-            pass
         ex = RuntimeError(s)
     except:
         print(exc)

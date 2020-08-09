@@ -148,10 +148,8 @@ class Ban(Command):
                 else:
                     banlist.pops(ind)["u"]
                     if 0 in ind:
-                        try:
+                        with suppress(LookupError):
                             bot.database.bans.listed.remove(guild.id, key=lambda x: x[-1])
-                        except LookupError:
-                            pass
                         if banlist:
                             bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
                     update()
@@ -238,14 +236,10 @@ class Ban(Command):
                 try:
                     ban = bans[u.id]
                     # Remove from global schedule, then sort and re-add
-                    try:
+                    with suppress(LookupError):
                         banlist.remove(user.id, key=lambda x: x["u"])
-                    except IndexError:
-                        pass
-                    try:
+                    with suppress(LookupError):
                         bot.database.bans.listed.remove(guild.id, key=lambda x: x[-1])
-                    except LookupError:
-                        pass
                     if length < inf:
                         banlist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": ban.get("r", None)}, key=lambda x: x["t"])
                         bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
@@ -263,14 +257,10 @@ class Ban(Command):
                 return
         try:
             await guild.ban(user, reason=reason, delete_message_days=0)
-            try:
+            with suppress(LookupError):
                 banlist.remove(user.id, key=lambda x: x["u"])
-            except IndexError:
-                pass
-            try:
+            with suppress(LookupError):
                 bot.database.bans.listed.remove(guild.id, key=lambda x: x[-1])
-            except LookupError:
-                pass
             if length < inf:
                 banlist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": reason}, key=lambda x: x["t"])
                 bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
@@ -1061,7 +1051,7 @@ class UpdateUserLogs(Database):
             # Check audit log to find whether user left or was kicked/banned
             kick = None
             ban = None
-            try:
+            with tracebacksuppressor(StopIteration):
                 ts = utc()
                 futs = [create_task(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)).flatten()) for action in ("ban", "kick")]
                 bans = await futs[0]
@@ -1076,10 +1066,6 @@ class UpdateUserLogs(Database):
                         if log.target.id == user.id:
                             kick = cdict(id=log.user.id, reason=log.reason)
                             raise StopIteration
-            except StopIteration:
-                pass
-            except:
-                print_exc()
             if ban is not None:
                 emb.description = (
                     "<@" + str(user.id)
@@ -1369,11 +1355,9 @@ class UpdateAutoRoles(Database):
     async def _join_(self, user, guild, **void):
         if guild.id in self.data:
             # Do not apply autorole to users who have roles from role preservers
-            try:
+            with suppress(KeyError):
                 if user.id in self.bot.data.rolepreservers[guild.id]:
                     return
-            except KeyError:
-                pass
             roles = deque()
             assigned = self.data[guild.id]
             for rolelist in assigned:

@@ -960,7 +960,7 @@ class UpdateDeviantArt(Database):
             else:
                 f_id = "&folderid=" + str(content)
             items = {}
-            try:
+            with tracebacksuppressor:
                 url = base + user + f_id + "&offset="
                 for i in range(0, 13824, 24):
                     req = url + str(i)
@@ -987,9 +987,6 @@ class UpdateDeviantArt(Database):
                     successes += 1
                     if not d.get("hasMore", None):
                         break
-            except:
-                print_exc()
-            else:
                 found[content] = items
         # if attempts:
         #     print(successes, "of", attempts, "DeviantArt requests executed successfully.")

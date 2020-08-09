@@ -1323,7 +1323,7 @@ class UpdateReacts(Database):
         g_id = message.guild.id
         data = self.data
         if g_id in data:
-            try:
+            with tracebacksuppressor(ZeroDivisionError):
                 following = self.data[g_id]
                 if type(following) != mdict:
                     following = self.data[g_id] = mdict(following)
@@ -1345,7 +1345,3 @@ class UpdateReacts(Database):
                         except discord.HTTPException as ex:
                             if "10014" in repr(ex):
                                 emojis.remove(react)
-            except ZeroDivisionError:
-                pass
-            except:
-                print_exc()

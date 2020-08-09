@@ -59,33 +59,22 @@ def getDuration(filename):
             resp = bytes().join(res)
             break
         except:
-            try:
+            with suppress():
                 proc.kill()
-            except:
-                pass
             print_exc()
     if not resp:
         return None
     s = resp.decode("utf-8", "replace")
-    try:
+    with tracebacksuppressor(ValueError):
         i = s.index("Duration: ")
         d = s[i + 10:]
         i = 2147483647
         for c in ", \n\r":
-            try:
+            with suppress(ValueError):
                 x = d.index(c)
-            except ValueError:
-                pass
-            else:
                 if x < i:
                     i = x
         dur = rdhms(d[:i])
-    except ValueError:
-        return
-    except:
-        print(s)
-        print_exc()
-        return
     return dur
 
 
@@ -233,9 +222,8 @@ class CustomAudio(discord.AudioSource):
 
     # A call to voice_client.play ignoring discord.py client exceptions.
     def ensure_play(self):
-        with tracebacksuppressor:
-            with suppress(discord.ClientException):
-                self.vc.play(self, after=self.update)
+        with tracebacksuppressor(discord.ClientException):
+            self.vc.play(self, after=self.update)
 
     # Stops currently playing source, closing it if possible.
     def stop(self):
@@ -783,7 +771,7 @@ class AudioQueue(hlist):
                         source = ytdl.getStream(q[0])
                         auds.new(source)
                         self.loading = False
-                        auds.ensure_play(timeout=45)
+                        auds.ensure_play()
                     except:
                         self.loading = False
                         print_exc()
@@ -3076,10 +3064,8 @@ class Player(Command):
         if message is None:
             return
         if not guild.id in bot.database.audio.players:
-            try:
+            with suppress(discord.NotFound, discord.Forbidden):
                 await message.clear_reactions()
-            except (discord.NotFound, discord.Forbidden):
-                pass
             return
         auds = bot.database.audio.players[guild.id]
         if reaction is None:
@@ -3092,10 +3078,8 @@ class Player(Command):
             if auds.player.type:
                 auds.stats.quiet |= 2
         elif auds.player is None or auds.player.message.id != message.id:
-            try:
+            with suppress(discord.NotFound, discord.Forbidden):
                 await message.clear_reactions()
-            except (discord.NotFound, discord.Forbidden):
-                pass
             return
         if perm < 1:
             return

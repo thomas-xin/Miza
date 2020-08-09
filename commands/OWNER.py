@@ -53,30 +53,26 @@ class Restart(Command):
             # Save any database that has not already been autosaved
             await create_future(bot.update, priority=True)
             # Disconnect as many voice clients as possible
-            for vc in client.voice_clients:
-                await vc.disconnect(force=True)
+            futs = deque()
+            for guild in client.guilds:
+                member = guild.get_member(client.user.id)
+                if member:
+                    voice = member.voice
+                    if voice:
+                        futs.append(create_task(member.move_to(None)))
+            for fut in futs:
+                with suppress():
+                    await fut
         with suppress():
             await client.close()
         if name.casefold() == "shutdown":
             with open(bot.shutdown, "wb"):
                 pass
         else:
-            for _ in loop(5):
-                try:
-                    with open(bot.restart, "wb"):
-                        pass
-                    break
-                except:
-                    print_exc()
-                    time.sleep(0.1)
-        for _ in loop(8):
-            try:
-                if os.path.exists("log.txt"):
-                    os.remove("log.txt")
-                break
-            except:
-                print_exc()
-                time.sleep(0.1)
+            with open(bot.restart, "wb"):
+                pass
+        with tracebacksuppressor:
+            await aretry(os.remove, "log.txt", attempts=8, delay=0.1)
         if time.time() - t < 1:
             await asyncio.sleep(1)
         bot.close()

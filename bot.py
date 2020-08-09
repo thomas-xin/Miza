@@ -469,10 +469,8 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
     # Searches the bot database for a webhook mimic from ID.
     def get_mimic(self, m_id, user=None):
         with suppress(KeyError):
-            try:
+            with suppress(ValueError, TypeError):
                 m_id = "&" + str(int(m_id))
-            except (ValueError, TypeError):
-                pass
             mimic = self.data.mimics[m_id]
             return mimic
         if user is not None:

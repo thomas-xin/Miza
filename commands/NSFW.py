@@ -22,7 +22,7 @@ def pull_e621(argv, delay=5):
         baseurl = "https://e621.net/post/index/"
         url = baseurl + "1/" + items
         s = Request(url, decode=True)
-        try:
+        with suppress(ValueError):
             ind = s.index('class="next_page" rel="next"')
             s = s[ind - 90:ind]
             d = s.split(" ")
@@ -37,29 +37,21 @@ def pull_e621(argv, delay=5):
 
             url = baseurl + str(v1) + "/" + items
             s = Request(url, decode=True)
-        except ValueError:
-            pass
 
-        try:
+        with suppress(ValueError):
             limit = s.index('class="next_page" rel="next"')
             s = s[:limit]
-        except ValueError:
-            pass
 
         search = '<a href="/post/show/'
         sources = []
-        while True:
-            try:
+        with suppress(ValueError):
+            while True:
                 ind1 = s.index(search)
                 s = s[ind1 + len(search):]
                 ind2 = s.index('"')
                 target = s[:ind2]
-                try:
+                with suppress(ValueError):
                     sources.append(int(target))
-                except ValueError:
-                    pass
-            except ValueError:
-                break
         x = None
         while not x:
             v2 = xrand(len(sources))
@@ -102,7 +94,7 @@ def pull_rule34_xxx(argv, delay=5):
     try:
         t = utc()
         while utc() - t < delay:
-            try:
+            with suppress(TimeoutError):
                 sources = rule34_sync.getImages(
                     tags=argv,
                     fuzzy=True,
@@ -110,8 +102,6 @@ def pull_rule34_xxx(argv, delay=5):
                     singlePage=True
                 )
                 break
-            except TimeoutError:
-                pass
         if sources:
             attempts = 0
             while attempts < 256:
@@ -163,27 +153,23 @@ def pull_rule34_paheal(argv, delay=5):
             s = Request(baseurl + items + "/1", decode=True)
         except ConnectionError:
             s = Request(baseurl + items.upper() + "/1", decode=True)
-        try:
+        with suppress(ValueError):
             ind = s.index('">Last</a><br>')
             s = s[ind - 5:ind]
             v1 = xrand(1, int(s.split("/")[-1]))
             url = url[:-1] + str(v1)
 
             s = Request(url, decode=True)
-        except ValueError:
-            pass
-        try:
+        with suppress(ValueError):
             limit = s.index("class=''>Images</h3><div class='blockbody'>")
             s = s[limit:]
             limit = s.index("</div></div></section>")
             s = s[:limit]
-        except ValueError:
-            pass
 
         search = 'href="'
         sources = []
-        while True:
-            try:
+        with suppress(ValueError):
+            while True:
                 ind1 = s.index(search)
                 s = s[ind1 + len(search):]
                 ind2 = s.index('"')
@@ -195,8 +181,6 @@ def pull_rule34_paheal(argv, delay=5):
                 found = is_image(target) is not None
                 if target[0] == "h" and found:
                     sources.append(target)
-            except ValueError:
-                break
         v2 = xrand(len(sources))
         url = sources[v2]
         return [url, v1, v2 + 1]
