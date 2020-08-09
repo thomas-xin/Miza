@@ -194,7 +194,7 @@ class CustomAudio(discord.AudioSource):
     }
 
     def __init__(self, channel, vc, bot):
-        try:
+        with tracebacksuppressor:
             # Class instance variables
             self.paused = False
             self.stats = cdict(self.defaults)
@@ -218,8 +218,6 @@ class CustomAudio(discord.AudioSource):
             self.queue = AudioQueue()
             self.queue._init_(auds=self)
             bot.database.audio.players[vc.guild.id] = self
-        except:
-            print_exc()
 
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
@@ -235,12 +233,9 @@ class CustomAudio(discord.AudioSource):
 
     # A call to voice_client.play ignoring discord.py client exceptions.
     def ensure_play(self):
-        try:
-            self.vc.play(self, after=self.update)
-        except discord.ClientException:
-            pass
-        except:
-            print_exc()
+        with tracebacksuppressor:
+            with suppress(discord.ClientException):
+                self.vc.play(self, after=self.update)
 
     # Stops currently playing source, closing it if possible.
     def stop(self):
@@ -301,7 +296,7 @@ class CustomAudio(discord.AudioSource):
         return self.stats.position
 
     # Sends a deletable message to the audio player's channel.
-    announce = lambda self, *args, **kwargs: create_task(sendReact(self.channel, *args, reacts="❎", **kwargs))
+    announce = lambda self, *args, **kwargs: await_fut(sendReact(self.channel, *args, reacts="❎", **kwargs))
 
     # Kills this audio player, stopping audio playback. Will cause bot to leave voice upon next update event.
     def kill(self, reason=None):
@@ -309,7 +304,7 @@ class CustomAudio(discord.AudioSource):
         g = self.vc.guild.id
         self.bot.database.audio.players.pop(g, None)
         self.bot.database.audio.connecting.pop(g, None)
-        try:
+        with suppress(LookupError):
             if reason is None:
                 reason = (
                     "```css\n🎵 Successfully disconnected from ["
@@ -317,8 +312,6 @@ class CustomAudio(discord.AudioSource):
                 )
             if reason:
                 self.announce(reason)
-        except LookupError:
-            pass
         self.stop()
 
     # Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
@@ -326,7 +319,7 @@ class CustomAudio(discord.AudioSource):
         vc = self.vc
         guild = vc.guild
         if hasattr(self, "dead"):
-            create_task(vc.disconnect())
+            await_fut(vc.disconnect())
             if self.dead is not None:
                 self.kill()
             return
@@ -346,12 +339,12 @@ class CustomAudio(discord.AudioSource):
             except:
                 if getattr(self, "att", 0) <= 0:
                     print_exc()
-                    create_task(vc.disconnect())
+                    await_fut(vc.disconnect())
                     self.att = utc()
                 elif utc() - self.att > 10:
                     self.dead = True
                     return
-                create_task(self.reconnect())
+                await_fut(self.reconnect())
         if self.stats.stay:
             cnt = inf
         else:
@@ -365,7 +358,7 @@ class CustomAudio(discord.AudioSource):
             elif self.timeout < utc() - 10:
                 if guild.afk_channel is not None:
                     if guild.afk_channel.id != vc.channel.id:
-                        create_task(self.move_unmute(vc, guild.afk_channel))
+                        await_fut(self.move_unmute(vc, guild.afk_channel))
                     else:
                         cnt = 0
                         ch = None
@@ -380,18 +373,18 @@ class CustomAudio(discord.AudioSource):
                                 "```ini\n🎵 Detected " + sbHighlight(cnt) + " user" + "s" * (cnt != 1)
                                 + " in [#" + noHighlight(ch) + "], moving... 🎵```"
                             )
-                            create_task(vc.move_to(ch))
+                            await_fut(vc.move_to(ch))
         else:
             self.timeout = utc()
         if m.voice is not None:
             if m.voice.deaf or m.voice.mute or m.voice.afk:
-                create_task(m.edit(mute=False, deafen=False))
+                await_fut(m.edit(mute=False, deafen=False))
         # Attempt to reconnect if not connected, otherwise update queue
         if not (vc.is_connected() or self.bot.database.audio.is_connecting(vc.guild.id)):
-            create_task(self.reconnect())
+            await_fut(self.reconnect())
         else:
             self.att = 0
-        create_future_ex(self.queue.update_load, timeout=120)
+        self.queue.update_load()
 
     # Moves to the target channel, unmuting self if necessary.
     async def move_unmute(self, vc, channel):
@@ -403,10 +396,10 @@ class CustomAudio(discord.AudioSource):
         try:
             if hasattr(self, "dead") or self.vc.is_connected():
                 return
-            self.bot.database.audio.connecting[self.vc.guild.id] = True
+            self.bot.database.audio.connecting[self.vc.guild.id] = utc()
             if getattr(self, "att", 0) <= 0:
                 self.att = utc()
-            self.vc = await self.vc.channel.connect(timeout=30, reconnect=False)
+            self.vc = await self.vc.channel.connect(timeout=6, reconnect=True)
             user = self.vc.guild.get_member(self.bot.client.user.id)
             if getattr(user, "voice", None) is not None:
                 if user.voice.deaf or user.voice.mute or user.voice.afk:
@@ -712,7 +705,7 @@ class AudioQueue(hlist):
                     continue
             q.pops(dels)
             self.advance(process=False)
-        create_task(self.auds.updatePlayer())
+        await_fut(self.auds.updatePlayer())
 
     # Advances queue when applicable, taking into account loop/repeat/shuffle settings.
     def advance(self, looped=True, repeated=True, shuffled=True, process=True):
@@ -790,7 +783,7 @@ class AudioQueue(hlist):
                         source = ytdl.getStream(q[0])
                         auds.new(source)
                         self.loading = False
-                        create_future_ex(auds.ensure_play, timeout=45)
+                        auds.ensure_play(timeout=45)
                     except:
                         self.loading = False
                         print_exc()
@@ -835,9 +828,8 @@ def org2xm(org, dat=None):
         org = verifyURL(org)
         data = None
         resp = None
-        try:
-            # Make sure file header is correct
-            resp = requests.get(org, timeout=8, stream=True)
+        # Make sure file header is correct
+        with requests.get(org, timeout=8, stream=True) as resp:
             it = resp.iter_content(4096)
             b = bytes()
             while len(b) < 4:
@@ -845,14 +837,6 @@ def org2xm(org, dat=None):
             if not b.startswith(b"Org-"):
                 raise ValueError("Invalid file header.")
             data = b + resp.content
-            resp.close()
-        except:
-            if resp is not None:
-                try:
-                    resp.close()
-                except:
-                    pass
-            raise
         if not data:
             raise FileNotFoundError("Error downloading file content.")
     else:
@@ -891,10 +875,8 @@ def org2xm(org, dat=None):
     if not os.path.getsize(r_xm):
         raise RuntimeError("Converted file is empty.")
     for f in (r_org, r_dat)[:2 - orig]:
-        try:
+        with suppress():
             os.remove(f)
-        except (PermissionError, FileNotFoundError):
-            pass
     return r_xm
 
 
@@ -930,23 +912,22 @@ class AudioFile:
             fl = 0
             # Attempt to monitor status of output file
             while fl < 4096:
-                if not self.proc.is_running():
-                    if check_fmt:
-                        try:
-                            xm = org2xm(stream)
-                        except ValueError:
-                            pass
+                with delay(0.1):
+                    if not self.proc.is_running():
+                        if check_fmt:
+                            try:
+                                xm = org2xm(stream)
+                            except ValueError:
+                                pass
+                            else:
+                                return self.load(xm, check_fmt=False, force=True)
+                        print(self.proc.args)
+                        err = self.proc.stderr.read().decode("utf-8", "replace")
+                        if err:
+                            ex = RuntimeError(err)
                         else:
-                            return self.load(xm, check_fmt=False, force=True)
-                    print(self.proc.args)
-                    err = self.proc.stderr.read().decode("utf-8", "replace")
-                    if err:
-                        ex = RuntimeError(err)
-                    else:
-                        ex = RuntimeError("FFmpeg did not start correctly, or file was too small.")
-                    raise ex
-                # Wait for a while before checking file again
-                time.sleep(0.1)
+                            ex = RuntimeError("FFmpeg did not start correctly, or file was too small.")
+                        raise ex
                 try:
                     fl = os.path.getsize("cache/" + self.file)
                 except FileNotFoundError:
@@ -958,22 +939,15 @@ class AudioFile:
             # File errored, remove from cache and kill corresponding FFmpeg process if possible
             ytdl.cache.pop(self.file, None)
             if self.proc is not None:
-                try:
+                with suppress():
                     self.proc.kill()
-                except:
-                    print_exc()
-            try:
+            with suppress():
                 os.remove("cache/" + self.file)
-            except:
-                pass
             raise
         # Handy way to get external IP using youtube stream links :3
         if ytdl.bot is not None and "videoplayback" in stream:
-            try:
+            with suppress(ValueError):
                 i = stream.index("&ip=") + 4
-            except ValueError:
-                pass
-            else:
                 ip = stream[i:].split("&")[0]
                 ytdl.bot.updateIP(ip)
         return self
@@ -995,12 +969,7 @@ class AudioFile:
             if not self.loaded:
                 self.loaded = True
                 if not isURL(self.stream):
-                    for _ in loop(3):
-                        try:
-                            os.remove(self.stream)
-                            break
-                        except (PermissionError, FileNotFoundError):
-                            time.sleep(0.5)
+                    retry(os.remove, self.stream, attempts=3, delay=0.5)
                 try:
                     fl = os.path.getsize("cache/" + self.file)
                 except FileNotFoundError:
@@ -1045,23 +1014,9 @@ class AudioFile:
     def destroy(self):
         self.expired = True
         if self.proc.is_running():
-            try:
+            with suppress():
                 self.proc.kill()
-            except:
-                pass
-        # Up to 8 attempts over a span of 40 seconds to delete the file
-        for _ in loop(8):
-            try:
-                os.remove("cache/" + self.file)
-                break
-            except FileNotFoundError:
-                break
-            except PermissionError:
-                self.ensure_time()
-                return
-            except:
-                print_exc()
-                time.sleep(5)
+        retry(os.remove, "cache/" + self.file, attempts=8, delay=5)
         # File is removed from cache data
         ytdl.cache.pop(self.file, None)
         # print(self.file, "deleted.")
@@ -1103,7 +1058,7 @@ class AudioFile:
             self.readers[key] = True
             callback = lambda: self.readers.pop(key, None)
             if buff:
-                while not self.buffered:
+                while not self.buffered and not self.closed:
                     time.sleep(0.1)
                 # Select buffered reader for files not yet fully loaded, convert while downloading
                 player = BufferedAudioReader(self, args, callback=callback)
@@ -1145,10 +1100,8 @@ class LoadedAudioReader(discord.AudioSource):
 
     def close(self, *void1, **void2):
         self.closed = True
-        try:
+        with suppress():
             self.proc.kill()
-        except:
-            pass
         if callable(self.callback):
             self.callback()
 
@@ -1178,7 +1131,7 @@ class BufferedAudioReader(discord.AudioSource):
 
     # Required loop running in background to feed data to FFmpeg
     def run(self):
-        while not self.file.buffered:
+        while not self.file.buffered and not self.closed:
             time.sleep(0.1)
         while True:
             b = bytes()
@@ -1190,7 +1143,7 @@ class BufferedAudioReader(discord.AudioSource):
                 self.proc.stdin.flush()
             except (ValueError, EOFError):
                 # Only stop when file is confirmed to be finished
-                if self.file.loaded:
+                if self.file.loaded or self.file.closed:
                     break
                 time.sleep(0.1)
         self.full = True
@@ -1205,14 +1158,10 @@ class BufferedAudioReader(discord.AudioSource):
 
     def close(self):
         self.closed = True
-        try:
+        with suppress():
             self.stream.close()
-        except:
-            pass
-        try:
+        with suppress():
             self.proc.kill()
-        except:
-            pass
         if callable(self.callback):
             self.callback()
 
@@ -1244,7 +1193,7 @@ class AudioDownloader:
         self.downloading = cdict()
         self.cache = cdict()
         self.searched = cdict()
-        self.requests = 0
+        self.semaphore = Semaphore(4, 2)
         self.update_dl()
         self.setup_pages()
 
@@ -1260,13 +1209,10 @@ class AudioDownloader:
             self.lastclear = utc()
             self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
             self.spotify_headers = []
-            for _ in loop(8):
-                try:
-                    self.spotify_headers = deque({"authorization": "Bearer " + json.loads(Request("https://open.spotify.com/get_access_token")[:512])["accessToken"]} for _ in loop(8))
-                except:
-                    print_exc()
-                else:
-                    break
+            with tracebacksuppressor:
+                tokens = [aretry(lambda: Request("https://open.spotify.com/get_access_token", attempts=8, delay=0.5, aio=True)) for _ in loop(8)]
+                tokens = await_fut(recursive_coro(tokens))
+                self.spotify_headers = deque({"authorization": "Bearer " + json.loads(token[:512])["accessToken"]} for token in tokens if type(token) is str)
 
     # Gets data from pytube and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def from_pytube(self, url):
@@ -1277,16 +1223,10 @@ class AudioDownloader:
                 if isURL(url):
                     raise youtube_dl.DownloadError("Not a youtube link.")
                 url = "https://www.youtube.com/watch?v=" + url
-        for _ in loop(3):
-            try:
-                resp = pytube.YouTube(url)
-                break
-            except pytube.exceptions.RegexMatchError:
-                raise youtube_dl.DownloadError("Invalid single youtube link.")
-            except KeyError as ex:
-                resp = ex
-        if issubclass(type(resp), Exception):
-            raise resp
+        try:
+            resp = retry(pytube.YouTube, url, attempts=3)
+        except pytube.exceptions.RegexMatchError:
+            raise youtube_dl.DownloadError("Invalid single youtube link.")
         entry = {
             "formats": [
                 {
@@ -1316,8 +1256,7 @@ class AudioDownloader:
             else:
                 try:
                     abr = float(abr)
-                except:
-                    print_exc()
+                except (ValueError, TypeError):
                     continue
             entry["formats"][i]["abr"] = abr
         return entry
@@ -1479,24 +1418,23 @@ class AudioDownloader:
                     maxitems = 5000
                     # Optimized searching with lookaheads
                     for i, curr in enumerate(range(0, maxitems, page)):
-                        if curr >= maxitems:
-                            break
-                        search = url + "&pageToken=" + self.yt_pages[i]
-                        fut = create_future_ex(self.get_youtube_part, search, timeout=90)
-                        futs.append(fut)
-                        if not math.log2(i + 4) % 1 or not 4 + i & 15:
-                            while futs:
-                                fut = futs.popleft()
-                                res = fut.result()
-                                if not i:
-                                    maxitems = res[1] + page
-                                if not res[0]:
-                                    maxitems = 0
-                                    futs.clear()
-                                    break
-                                output += res[0]
-                        else:
-                            time.sleep(0.03125)
+                        with delay(0.03125):
+                            if curr >= maxitems:
+                                break
+                            search = url + "&pageToken=" + self.yt_pages[i]
+                            fut = create_future_ex(self.get_youtube_part, search, timeout=90)
+                            futs.append(fut)
+                            if not math.log2(i + 4) % 1 or not 4 + i & 15:
+                                while futs:
+                                    fut = futs.popleft()
+                                    res = fut.result()
+                                    if not i:
+                                        maxitems = res[1] + page
+                                    if not res[0]:
+                                        maxitems = 0
+                                        futs.clear()
+                                        break
+                                    output += res[0]
                     while futs:
                         output.extend(futs.popleft().result()[0])
             if re.search(self.spotifyFind, item):
@@ -1530,24 +1468,23 @@ class AudioDownloader:
                     maxitems = 10000
                     # Optimized searching with lookaheads
                     for i, curr in enumerate(range(0, maxitems, page)):
-                        if curr >= maxitems:
-                            break
-                        search = url + "&offset=" + str(curr) + "&limit=" + str(page)
-                        fut = create_future_ex(self.get_spotify_part, search, timeout=90)
-                        futs.append(fut)
-                        if not math.log2(i + 1) % 1 or not i & 7:
-                            while futs:
-                                fut = futs.popleft()
-                                res = fut.result()
-                                if not i:
-                                    maxitems = res[1] + page
-                                if not res[0]:
-                                    maxitems = 0
-                                    futs.clear()
-                                    break
-                                output += res[0]
-                        else:
-                            time.sleep(0.125)
+                        with delay(0.125):
+                            if curr >= maxitems:
+                                break
+                            search = url + "&offset=" + str(curr) + "&limit=" + str(page)
+                            fut = create_future_ex(self.get_spotify_part, search, timeout=90)
+                            futs.append(fut)
+                            if not math.log2(i + 1) % 1 or not i & 7:
+                                while futs:
+                                    fut = futs.popleft()
+                                    res = fut.result()
+                                    if not i:
+                                        maxitems = res[1] + page
+                                    if not res[0]:
+                                        maxitems = 0
+                                        futs.clear()
+                                        break
+                                    output += res[0]
                     while futs:
                         output.extend(futs.popleft().result()[0])
             # Only proceed if no items have already been found (from playlists in this case)
@@ -1640,8 +1577,6 @@ class AudioDownloader:
     # Performs a search, storing and using cached search results for efficiency.
     def search(self, item, force=False):
         item = verifySearch(item)
-        while self.requests > 4:
-            time.sleep(0.1)
         if item in self.searched:
             if utc() - self.searched[item].t < 18000:
                 return self.searched[item].data
@@ -1649,17 +1584,15 @@ class AudioDownloader:
                 self.searched.pop(item)
         while len(self.searched) > 262144:
             self.searched.pop(next(iter(self.searched)))
-        try:
-            self.requests += 1
-            obj = cdict(t=utc())
-            obj.data = output = self.extract(item, force)
-            self.searched[item] = obj
-            self.requests = max(self.requests - 1, 0)
-            return output
-        except Exception as ex:
-            print_exc()
-            self.requests = max(self.requests - 1, 0)
-            return repr(ex)
+        with self.semaphore:
+            try:
+                obj = cdict(t=utc())
+                obj.data = output = self.extract(item, force)
+                self.searched[item] = obj
+                return output
+            except Exception as ex:
+                print_exc()
+                return repr(ex)
 
     # Gets the stream URL of a queue entry, starting download when applicable.
     def getStream(self, entry, force=False, download=True, callback=None):
@@ -1720,7 +1653,7 @@ class AudioDownloader:
             f.ensure_time()
             # Files may have a callback set for when they are loaded
             if callback is not None:
-                create_future_ex(callback)
+                await_fut(create_future(callback))
             return f
         except:
             # Remove entry URL if loading failed
@@ -1755,11 +1688,8 @@ class AudioDownloader:
             subprocess.check_output(args)
         except subprocess.CalledProcessError:
             # Attempt to convert file from org if FFmpeg failed
-            try:
+            with suppress(ValueError):
                 xm = org2xm(stream)
-            except ValueError:
-                pass
-            else:
                 # Re-estimate duration if file was successfully converted from org
                 args[8] = xm
                 dur = getDuration(xm)
@@ -1769,10 +1699,8 @@ class AudioDownloader:
                     br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
                     args[-4] = str(br)
                 subprocess.check_output(args)
-                try:
+                with suppress():
                     os.remove(xm)
-                except (PermissionError, FileNotFoundError):
-                    pass
                 return fn, info["name"] + "." + fmt
             raise
         return fn, info["name"] + "." + fmt
@@ -1780,8 +1708,6 @@ class AudioDownloader:
     # Extracts full data for a single entry. Uses cached results for optimization.
     def extractSingle(self, i):
         item = i.url
-        while self.requests > 4:
-            time.sleep(0.1)
         if item in self.searched:
             if utc() - self.searched[item].t < 18000:
                 it = self.searched[item].data[0]
@@ -1793,32 +1719,30 @@ class AudioDownloader:
                 self.searched.pop(item, None)
         while len(self.searched) > 262144:
             self.searched.pop(next(iter(self.searched)))
-        try:
-            self.requests += 1
-            data = self.extract_true(item)
-            if "entries" in data:
-                data = data["entries"][0]
-            obj = cdict(t=utc())
-            obj.data = out = [cdict(
-                name=data["title"],
-                url=data["webpage_url"],
-                stream=getBestAudio(data),
-                icon=getBestIcon(data),
-            )]
+        with self.semaphore:
             try:
-                out[0].duration = data["duration"]
-            except KeyError:
-                out[0].research = True
-            self.searched[item] = obj
-            it = out[0]
-            i.name = it.name
-            i.duration = it.get("duration")
-            i.url = it.url
-            self.requests = max(self.requests - 1, 0)
-        except:
-            self.requests = max(self.requests - 1, 0)
-            i.url = ""
-            print_exc()
+                data = self.extract_true(item)
+                if "entries" in data:
+                    data = data["entries"][0]
+                obj = cdict(t=utc())
+                obj.data = out = [cdict(
+                    name=data["title"],
+                    url=data["webpage_url"],
+                    stream=getBestAudio(data),
+                    icon=getBestIcon(data),
+                )]
+                try:
+                    out[0].duration = data["duration"]
+                except KeyError:
+                    out[0].research = True
+                self.searched[item] = obj
+                it = out[0]
+                i.name = it.name
+                i.duration = it.get("duration")
+                i.url = it.url
+            except:
+                i.url = ""
+                print_exc()
         return True
 
 ytdl = AudioDownloader()
@@ -1874,29 +1798,26 @@ class Queue(Command):
         except KeyError:
             future = create_task(forceJoin(guild, channel, user, client, bot, preparing=True))
         # Start typing event asynchronously to avoid delays
-        future2 = create_task(channel.trigger_typing())
-        # Perform search concurrently, may contain multiple URLs
-        out = None
-        urls = await bot.followURL(argv, allow=True, images=False)
-        if urls:
-            if len(urls) == 1:
-                argv = urls[0]
+        with discord.context_managers.Typing(channel):
+            # Perform search concurrently, may contain multiple URLs
+            out = None
+            urls = await bot.followURL(argv, allow=True, images=False)
+            if urls:
+                if len(urls) == 1:
+                    argv = urls[0]
+                else:
+                    out = [create_future(ytdl.search, url) for url in urls]
+            if out is None:
+                resp = await create_future(ytdl.search, argv, timeout=180)
             else:
-                out = [create_future(ytdl.search, url) for url in urls]
-        if out is None:
-            resp = await create_future(ytdl.search, argv, timeout=180)
-        else:
-            resp = deque()
-            for fut in out:
-                temp = await fut
-                # Ignore errors when searching with multiple URLs
-                if type(temp) not in (str, bytes):
-                    resp.extend(temp)
-        # Wait for audio player to finish loading if necessary
-        if future is not None:
-            auds = await future
-        # Wait for typing event to finish
-        await future2
+                resp = deque()
+                for fut in out:
+                    # Ignore errors when searching with multiple URLs
+                    if type(temp) not in (str, bytes):
+                        resp.extend(temp)
+            # Wait for audio player to finish loading if necessary
+            if future is not None:
+                auds = await future
         if "f" in flags or "b" in flags:
             if not isAlone(auds, user) and perm < 1:
                 raise self.permError(perm, 1, "to force play while other users are in voice")
@@ -2069,12 +1990,10 @@ class Queue(Command):
                     u = bot.cache.users[e.u_id]
                     name = u.display_name
                 except KeyError:
-                    try:
+                    name = "Deleted User"
+                    with suppress():
                         u = await bot.fetch_user(e.u_id)
                         name = u.display_name
-                    except:
-                        print_exc()
-                        name = "Deleted User"
                 curr += "\n```css\n" + sbHighlight(name) + "\n"
             if auds.reverse and len(auds.queue):
                 estim = currTime + elapsed - e_dur(auds.queue[0].duration)
@@ -2109,8 +2028,8 @@ class Queue(Command):
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
-                create_task(message.add_reaction(react.decode("utf-8")))
-                await asyncio.sleep(0.5)
+                async with delay(0.5):
+                    create_task(message.add_reaction(react.decode("utf-8")))
 
 
 class Playlist(Command):
@@ -2180,14 +2099,9 @@ class Playlist(Command):
         urls = await bot.followURL(argv, allow=True, images=False)
         if urls:
             argv = urls[0]
-        fut = create_task(channel.trigger_typing())
+        with discord.context_managers.Typing(channel):
         # Unlike ~queue this command only supports a single URL/search
-        try:
             resp = await create_future(ytdl.search, argv, timeout=180)
-        except:
-            await fut
-            raise
-        await fut
         if type(resp) is str:
             raise evalEX(resp)
         # Assign search results to default playlist entries
@@ -2264,8 +2178,8 @@ class Playlist(Command):
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
-                create_task(message.add_reaction(react.decode("utf-8")))
-                await asyncio.sleep(0.5)
+                async with delay(0.5):
+                    create_task(message.add_reaction(react.decode("utf-8")))
         
 
 class Connect(Command):
@@ -2329,6 +2243,7 @@ class Connect(Command):
                 auds = bot.database.audio.players[guild.id]
             except KeyError:
                 raise LookupError("Unable to find voice channel.")
+            auds.channel = channel
             if not isAlone(auds, user) and perm < 1:
                 raise self.permError(perm, 1, "to disconnect while other users are in voice")
             auds.dead = True
@@ -2341,38 +2256,34 @@ class Connect(Command):
             if vc.guild.id == guild.id:
                 joined = True
                 if vc.channel.id != vc_.id:
-                    connecting[guild.id] = utc()
-                    try:
+                    with suppress():
                         await vc.move_to(vc_)
-                        connecting[guild.id] = 0
-                    except:
-                        connecting[guild.id] = 0
-                        raise
                 break
         if not joined:
             connecting[guild.id] = utc()
-            vc = cdict(is_connected = lambda: False)
-            t = utc()
-            # Make connection attempts over the span of up to 10 seconds
-            while not vc.is_connected() and utc() - t < 10:
-                try:
-                    vc = await vc_.connect(timeout=30, reconnect=False)
-                    for _ in loop(12):
-                        if vc.is_connected():
-                            break
-                        await asyncio.sleep(1 / 3)
-                except discord.ClientException:
-                    print_exc()
-                    await asyncio.sleep(1)
-            # If voice client object is not set, the connect operation failed.
-            if isinstance(vc, cdict):
-                connecting[guild.id] = 0
-                raise ConnectionError("Unable to connect to voice channel.")
+            vc = cdict(channel=vc_, is_playing=lambda: False, is_connected=lambda: None, guild=vc_.guild, disconnect=retNone, move_to=retNone, play=lambda: exec("raise RuntimeError"), stop=lambda: None, source=None)
         # Create audio source if none already exists
         if guild.id not in bot.database.audio.players:
             bot.database.audio.players[guild.id] = auds = CustomAudio(channel, vc, bot)
-        # Unset connecting tag
-        joined = connecting.pop(guild.id, None)
+        if not joined:
+
+            async def set_voice_client(auds):
+                voice_client = await vc_.connect(timeout=8, reconnect=True)
+                auds.vc = voice_client
+                connecting.pop(voice_client.guild.id, None)
+
+            create_task(set_voice_client(auds))
+            check_if_connected = lambda: create_future(True if guild.get_member(client.user.id).voice else exec('raise ConnectionError("Unable to connect to voice channel.")'))
+            try:
+                await aretry(check_if_connected, attempts=16, delay=0.125)
+            except:
+                connecting.pop(guild.id, None)
+                bot.database.audio.players.pop(guild.id)
+                raise
+            joined = True
+        if vc.is_connected():
+            # Unset connecting tag
+            connecting.pop(guild.id, None)
         member = guild.get_member(client.user.id)
         if getattr(member, "voice", None) is not None:
             if member.voice.deaf or member.voice.mute or member.voice.afk:
@@ -2666,10 +2577,9 @@ class Dump(Command):
         if argv == "" and not message.attachments or name == "save":
             if name == "load":
                 raise ArgumentError("Please input a file, URL or json data to load.")
-            fut = create_task(channel.trigger_typing())
-            resp = await create_future(getDump, auds, "x" in flags, js=True, timeout=18)
-            f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
-            await fut
+            with discord.context_managers.Typing(channel):
+                resp = await create_future(getDump, auds, "x" in flags, js=True, timeout=18)
+                f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
             create_task(sendFile(channel, "Queue data for **" + guild.name + "**:", f))
             return
         if not isAlone(auds, user) and perm < 1:
@@ -2694,28 +2604,27 @@ class Dump(Command):
             # Queue may already be in dict form if loaded from database
             d = argv
         q = d["queue"]
-        fut = create_task(channel.trigger_typing())
-        # Copy items and cast to cdict queue entries
-        for i, e in enumerate(q):
-            if type(e) is not cdict:
-                e = q[i] = cdict(e)
-            e.u_id = user.id
-            e.skips = deque()
-            if not 1 + i & 2047:
-                await asyncio.sleep(0.2)
-        if auds.player is not None:
-            auds.player.time = 1 + utc()
-        # Shuffle newly loaded dump if autoshuffle is on
-        if auds.stats.shuffle:
-            shuffle(q)
-        for k in d["stats"]:
-            if k not in auds.stats:
-                d["stats"].pop(k)
-            if k in "loop repeat shuffle quiet stay":
-                d["stats"][k] = bool(d["stats"][k])
-            else:
-                d["stats"][k] = float(d["stats"][k])
-        await fut
+        with discord.context_managers.Typing(channel):
+            # Copy items and cast to cdict queue entries
+            for i, e in enumerate(q):
+                if type(e) is not cdict:
+                    e = q[i] = cdict(e)
+                e.u_id = user.id
+                e.skips = deque()
+                if not 1 + i & 2047:
+                    await asyncio.sleep(0.2)
+            if auds.player is not None:
+                auds.player.time = 1 + utc()
+            # Shuffle newly loaded dump if autoshuffle is on
+            if auds.stats.shuffle:
+                shuffle(q)
+            for k in d["stats"]:
+                if k not in auds.stats:
+                    d["stats"].pop(k)
+                if k in "loop repeat shuffle quiet stay":
+                    d["stats"][k] = bool(d["stats"][k])
+                else:
+                    d["stats"][k] = float(d["stats"][k])
         if "a" not in flags:
             # Basic dump, replaces current queue
             if auds.queue:
@@ -3193,8 +3102,8 @@ class Player(Command):
         orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]) + "\n"
         if reaction is None and auds.player.type:
             for b in self.buttons:
-                create_task(message.add_reaction(b.decode("utf-8")))
-                await asyncio.sleep(0.5)
+                async with delay(0.5):
+                    create_task(message.add_reaction(b.decode("utf-8")))
         else:
             if not auds.player.type:
                 emoji = bytes()
@@ -3453,13 +3362,8 @@ class Lyrics(Command):
             item = verifySearch(to_alphanumeric(search))
             if not item:
                 item = search
-        fut = create_task(channel.trigger_typing())
-        try:
+        with discord.context_managers.Typing(channel):
             name, lyrics = await get_lyrics(item)
-        except:
-            await fut
-            raise
-        await fut
         # Escape colour markdown because that will interfere with the colours we want
         text = clrHighlight(lyrics.strip()).replace("#", "♯")
         msg = "Lyrics for **" + discord.utils.escape_markdown(name) + "**:"
@@ -3592,7 +3496,7 @@ class Download(Command):
                 returns = await recursive_coro(returns)
                 # Attempt to find data for results, adjusting if they are incomplete
                 for r in returns:
-                    try:
+                    with tracebacksuppressor:
                         if type(r) is not str:
                             data = r
                             for e in data["entries"]:
@@ -3613,9 +3517,6 @@ class Download(Command):
                                             "name": e["title"],
                                             "url": "https://www.youtube.com/watch?v=" + e["url"],
                                         })
-                    except:
-                        print(r)
-                        print_exc()
             if not res:
                 raise LookupError("No results for " + argv + ".")
             res = res[:10]
@@ -3644,8 +3545,8 @@ class Download(Command):
         )
         # Add reaction numbers corresponding to search results
         for i in range(len(res)):
-            create_task(sent.add_reaction(str(i) + b"\xef\xb8\x8f\xe2\x83\xa3".decode("utf-8")))
-            await asyncio.sleep(0.5)
+            async with delay(0.5):
+                create_task(sent.add_reaction(str(i) + b"\xef\xb8\x8f\xe2\x83\xa3".decode("utf-8")))
         # await sent.add_reaction("❎")
 
     async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, argv, user, **void):
@@ -3668,31 +3569,32 @@ class Download(Command):
                     else:
                         fl = guild.filesize_limit
                     # Perform all these tasks asynchronously to save time
-                    create_task(channel.trigger_typing())
-                    create_task(message.edit(
-                        content="```ini\nDownloading [" + noHighlight(ensure_url(url)) + "]...```",
-                        embed=None,
-                    ))
-                    try:
-                        if int(spl[3]):
-                            auds = bot.database.audio.players[guild.id]
-                        else:
+                    with discord.context_managers.Typing(channel):
+                        create_task(message.edit(
+                            content="```ini\nDownloading [" + noHighlight(ensure_url(url)) + "]...```",
+                            embed=None,
+                        ))
+                        try:
+                            if int(spl[3]):
+                                auds = bot.database.audio.players[guild.id]
+                            else:
+                                auds = None
+                        except LookupError:
                             auds = None
-                    except LookupError:
-                        auds = None
-                    fn, out = await create_future(
-                        ytdl.download_file,
-                        url,
-                        fmt=spl[2],
-                        auds=auds,
-                        fl=fl,
-                        timeout=180,
-                    )
-                    f = discord.File(fn, out)
-                    create_task(message.edit(
-                        content="```ini\nUploading [" + noHighlight(out) + "]...```",
-                        embed=None,
-                    ))
+                        fn, out = await create_future(
+                            ytdl.download_file,
+                            url,
+                            fmt=spl[2],
+                            auds=auds,
+                            fl=fl,
+                            timeout=180,
+                        )
+                        f = discord.File(fn, out)
+                        create_task(message.edit(
+                            content="```ini\nUploading [" + noHighlight(out) + "]...```",
+                            embed=None,
+                        ))
+                        create_task(channel.trigger_typing())
                     await sendFile(
                         channel=channel,
                         msg="",
@@ -3725,21 +3627,21 @@ class UpdateAudio(Database):
         auds.searching += 1
         searched = 0
         q = auds.queue
-        for i, e in enumerate(q, 1):
-            if searched >= 32 or i > 128:
-                break
-            if "research" in e:
-                try:
-                    await create_future(ytdl.extractSingle, e, timeout=18)
-                    e.pop("research", None)
-                    searched += 1
-                except:
-                    e.pop("research", None)
-                    print_exc()
+        async with delay(2):
+            for i, e in enumerate(q, 1):
+                if searched >= 32 or i > 128:
                     break
-            if not i & 7:
-                await asyncio.sleep(0.4)
-        await asyncio.sleep(2)
+                if "research" in e:
+                    try:
+                        await create_future(ytdl.extractSingle, e, timeout=18)
+                        e.pop("research", None)
+                        searched += 1
+                    except:
+                        e.pop("research", None)
+                        print_exc()
+                        break
+                if not i & 7:
+                    await asyncio.sleep(0.4)
         auds.searching = max(auds.searching - 1, 0)
 
     # Delays audio player display message by 15 seconds when a user types in the target channel
@@ -3764,21 +3666,14 @@ class UpdateAudio(Database):
 
     # Makes 1 attempt to disconnect a single member from voice.
     async def _dc(self, member):
-        try:
+        with tracebacksuppressor(discord.Forbidden):
             await member.move_to(None)
-        except discord.Forbidden:
-            pass
-        except:
-            print_exc()
 
     # Updates all voice clients
     async def __call__(self, guild=None, **void):
-        if self.busy > 1:
-            return
-        self.busy += 1
         bot = self.bot
         client = bot.client
-        try:
+        with tracebacksuppressor:
             # Ensure all voice clients are not muted, disconnect ones without matching audio players
             if guild is not None:
                 g = guild
@@ -3807,8 +3702,6 @@ class UpdateAudio(Database):
                         if m.voice is not None:
                             if m.voice.deaf or m.voice.mute or m.voice.afk:
                                 create_task(m.edit(mute=False, deafen=False))
-        except:
-            print_exc()
         # Update audio players
         if guild is not None:
             if guild.id in self.players:
@@ -3816,21 +3709,18 @@ class UpdateAudio(Database):
                 create_future_ex(auds.update, priority=True)
         else:
             a = 1
-            for g in tuple(self.players):
-                try:
-                    auds = self.players[g]
-                    create_future_ex(auds.update, priority=True)
-                    create_task(self.research(auds))
-                except:
-                    print_exc()
-                if not a & 15:
-                    await asyncio.sleep(0.2)
-                a += 1
-            await asyncio.sleep(0.5)
+            async with delay(0.5):
+                for g in tuple(self.players):
+                    with tracebacksuppressor(KeyError):
+                        auds = self.players[g]
+                        create_future_ex(auds.update, priority=True)
+                        create_task(self.research(auds))
+                    if not a & 15:
+                        await asyncio.sleep(0.2)
+                    a += 1
             for item in tuple(ytdl.cache.values()):
                 await create_future(item.update)
         create_future_ex(ytdl.update_dl, priority=True)
-        self.busy = max(0, self.busy - 1)
 
     def _announce_(self, *args, **kwargs):
         for auds in self.players.values():

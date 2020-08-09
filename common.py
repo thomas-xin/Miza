@@ -19,6 +19,110 @@ time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
 
 
+class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+
+    def __init__(self, limit=256, buffer=32, delay=0.05):
+        self.limit = limit
+        self.buffer = buffer
+        self.delay = delay
+        self.active = 0
+        self.passive = 0
+    
+    def __enter__(self):
+        if self.active >= self.limit:
+            if self.passive >= self.buffer:
+                raise RuntimeError("Semaphore object of limit " + str(self.limit) + " overloaded by " + str(self.passive))
+            self.passive += 1
+            while self.active >= self.limit:
+                time.sleep(self.delay)
+            self.passive -= 1
+        self.active += 1
+        return self
+    
+    async def __aenter__(self):
+        if self.active >= self.limit:
+            if self.passive >= self.buffer:
+                raise RuntimeError("Semaphore object of limit " + str(self.limit) + " overloaded by " + str(self.passive))
+            self.passive += 1
+            while self.active >= self.limit:
+                await asyncio.sleep(self.delay)
+            self.passive -= 1
+        self.active += 1
+        return self
+    
+    def __exit__(self, *args):
+        self.active -= 1
+
+    async def __aexit__(self, *args):
+        self.active -= 1
+
+    async def __call__(self):
+        while self.value >= self.limit:
+            await asyncio.sleep(self.delay)
+
+
+# A context manager that sends exception tracebacks to stdout.
+class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+
+    def __init__(self, *args, **kwargs):
+        self.exceptions = args + tuple(kwargs.values())
+    
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        if exc_type and exc_value:
+            for exception in self.exceptions:
+                if issubclass(type(exc_value), exception):
+                    return True
+            try:
+                raise exc_value
+            except:
+                print_exc()
+        return True
+
+    async def __aexit__(self, *args):
+        return self.__exit__(*args)
+
+    __call__ = lambda self, *args, **kwargs: self.__class__(*args, **kwargs)
+
+tracebacksuppressor = TracebackSuppressor()
+
+
+# A context manager that delays the return of a function call.
+class delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator):
+
+    def __init__(self, duration=0):
+        self.duration = duration
+        self.start = utc()
+    
+    def __exit__(self, *args):
+        remaining = self.duration - utc() + self.start
+        if remaining > 0:
+            time.sleep(remaining)
+
+    async def __aexit__(self, *args):
+        remaining = self.duration - utc() + self.start
+        if remaining > 0:
+            await asyncio.sleep(remaining)
+
+
+def retry(func, *args, attempts=5, delay=1, **kwargs):
+    for i in range(attempts):
+        try:
+            return func(*args, **kwargs)
+        except:
+            if i >= attempts - 1:
+                raise
+        time.sleep(delay)
+
+async def aretry(func, *args, attempts=5, delay=1, **kwargs):
+    for i in range(attempts):
+        try:
+            return await func(*args, **kwargs)
+        except:
+            if i >= attempts - 1:
+                raise
+        await asyncio.sleep(delay)
+
+
 # For compatibility with versions of asyncio and concurrent.futures that have the exceptions stored in a different module
 T0 = TimeoutError
 try:
@@ -142,13 +246,11 @@ async def recursive_coro(item):
             if not issubclass(type(obj), asyncio.Task):
                 item[i] = create_task(obj)
         elif issubclass(type(obj), collections.abc.MutableSequence):
-            item[i] = create_task(recursiveCoro(obj))
+            item[i] = create_task(recursive_coro(obj))
     for i, obj in enumerate(item):
         if hasattr(obj, "__await__"):
-            try:
+            with suppress():
                 item[i] = await obj
-            except:
-                pass
     return item
 
 
@@ -199,13 +301,11 @@ def strMessage(message, limit=1024, username=False):
         data += "\n⟨" + ", ".join(str(i.to_dict()) for i in message.embeds) + "⟩"
     if message.reactions:
         data += "\n{" + ", ".join(str(i) for i in message.reactions) + "}"
-    try:
+    with suppress(AttributeError):
         t = message.created_at
         if message.edited_at:
             t = message.edited_at
         data += "\n`(" + str(t) + ")`"
-    except AttributeError:
-        pass
     if not data:
         data = "```css\n" + uniStr("[EMPTY MESSAGE]") + "```"
     return limStr(data, limit)
@@ -339,11 +439,8 @@ subCount = lambda: sum(1 for ptype in SUBS.values() for proc in ptype.procs if p
 
 def forceKill(proc):
     for child in proc.children(recursive=True):
-        try:
+        with suppress():
             child.kill()
-        except:
-            pass
-        else:
             print(child, "killed.")
     print(proc, "killed.")
     return proc.kill()
@@ -434,7 +531,7 @@ async def mathProc(expr, prec=64, rat=False, key=None, timeout=12, authorize=Fal
     procs, busy = SUBS.math.procs, SUBS.math.busy
     while utc() - busy.get(key, 0) < 60:
         await asyncio.sleep(0.5)
-    try:
+    with suppress(StopIteration):
         while True:
             for p in range(len(procs)):
                 if p < len(procs):
@@ -445,8 +542,6 @@ async def mathProc(expr, prec=64, rat=False, key=None, timeout=12, authorize=Fal
                     break
             await create_future(procUpdate, priority=True)
             await asyncio.sleep(0.5)
-    except StopIteration:
-        pass
     if authorize:
         args = (expr, prec, rat, proc.key)
     else:
@@ -642,9 +737,23 @@ def create_task(fut, *args, loop=None, **kwargs):
         loop = get_event_loop()
     return asyncio.ensure_future(fut, *args, loop=loop, **kwargs)
 
+def _await_fut(fut, delay):
+    if not issubclass(type(fut), asyncio.Task):
+        fut = create_task(fut)
+    while True:
+        with suppress(asyncio.InvalidStateError):
+            return fut.result()
+        time.sleep(delay)
+
+await_fut = lambda fut, delay=0.05, timeout=None, priority=False: create_future_ex(_await_fut, fut, delay, timeout=timeout, priority=priority).result(timeout=timeout)
+
 # A dummy coroutine that returns None.
 async def retNone(*args, **kwargs):
     return
+
+async def delayed_coro(fut, duration=None):
+    async with delay(duration):
+        return await fut
 
 # A function that takes a coroutine, and calls a second function if it takes longer than the specified delay.
 async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
@@ -669,7 +778,7 @@ class AutoRequest:
 
     async def _init_(self):
         self.session = aiohttp.ClientSession()
-        self.semaphore = asyncio.Semaphore(512)
+        self.semaphore = Semaphore(512)
 
     async def aio_call(self, url, headers, data, decode):
         async with self.semaphore:
@@ -944,23 +1053,23 @@ class _logPrinter:
             outfunc = lambda s: (sys.__stdout__.buffer.write(s), self.filePrint(self.file, s))
             enc = lambda x: bytes(x, "utf-8")
         while True:
-            try:
-                for f in tuple(self.data):
-                    if not self.data[f]:
-                        self.data.pop(f)
-                        continue
-                    out = limStr(self.data[f], 8192)
-                    self.data[f] = ""
-                    data = enc(out)
-                    if self.funcs:
-                        [func(out) for func in self.funcs]
-                    if f == self.file:
-                        outfunc(data)
-                    else:
-                        self.filePrint(f, data)
-            except:
-                sys.__stdout__.write(traceback.format_exc())
-            time.sleep(1)
+            with delay(1):
+                try:
+                    for f in tuple(self.data):
+                        if not self.data[f]:
+                            self.data.pop(f)
+                            continue
+                        out = limStr(self.data[f], 8192)
+                        self.data[f] = ""
+                        data = enc(out)
+                        if self.funcs:
+                            [func(out) for func in self.funcs]
+                        if f == self.file:
+                            outfunc(data)
+                        else:
+                            self.filePrint(f, data)
+                except:
+                    sys.__stdout__.write(traceback.format_exc())
             while not os.path.exists("common.py") or self.closed:
                 time.sleep(0.5)
 

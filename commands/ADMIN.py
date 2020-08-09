@@ -117,13 +117,8 @@ class Ban(Command):
         banlist = bot.data.bans.get(guild.id, hlist())
         if type(banlist) is not hlist:
             banlist = bot.data.bans[guild.id] = hlist(banlist)
-        fut = create_task(channel.trigger_typing())
-        try:
+        with discord.context_managers.Typing(channel):
             bans, glob = await self.getBans(guild)
-        except:
-            await fut
-            raise
-        await fut
         u_id = verifyID(args.pop(0))
         try:
             user = await bot.fetch_user(u_id)
@@ -356,8 +351,8 @@ class Ban(Command):
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
-                create_task(message.add_reaction(react.decode("utf-8")))
-                await asyncio.sleep(0.5)
+                async with delay(0.5):
+                    create_task(message.add_reaction(react.decode("utf-8")))
 
 
 class RoleGiver(Command):
@@ -550,16 +545,15 @@ class AutoRole(Command):
         # Update all users by adding roles
         if "x" in flags or name == "instarole":
             if roles:
-                fut = create_task(channel.trigger_typing())
-                i = 1
-                for member in guild.members:
-                    role = random.choice(roles)
-                    if role not in member.roles:
-                        create_task(member.add_roles(role, reason="InstaRole", atomic=True))
-                        if not i % 5:
-                            await asyncio.sleep(5)
-                        i += 1
-                await fut
+                with discord.context_managers.Typing(channel):
+                    i = 1
+                    for member in guild.members:
+                        role = random.choice(roles)
+                        if role not in member.roles:
+                            create_task(member.add_roles(role, reason="InstaRole", atomic=True))
+                            if not i % 5:
+                                await asyncio.sleep(5)
+                            i += 1
         return (
             "*```css\nAdded [" + noHighlight(", ".join(str(role) for role in roles))
             + "] to the autorole list for [" + noHighlight(guild) + "].```*"
@@ -665,11 +659,11 @@ class SaveChannel(Command):
         h = h[::-1]
         s = ""
         while h:
-            if s:
-                s += "\n\n"
-            s += "\n\n".join(strMessage(m, limit=2048, username=True) for m in h[:4096])
-            h = h[4096:]
-            await asyncio.sleep(0.32)
+            async with delay(0.32):
+                if s:
+                    s += "\n\n"
+                s += "\n\n".join(strMessage(m, limit=2048, username=True) for m in h[:4096])
+                h = h[4096:]
         return bytes(s, "utf-8")
 
 

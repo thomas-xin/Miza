@@ -44,18 +44,18 @@ class Restart(Command):
             await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
-        fut = create_task(channel.trigger_typing())
-        with suppress(AttributeError):
-            PRINT.close()
-        t = time.time()
-        # Call _destroy_ bot event to indicate to all databases the imminent shutdown
-        await bot.event("_destroy_")
-        # Save any database that has not already been autosaved
-        await create_future(bot.update, priority=True)
-        # Disconnect as many voice clients as possible
-        for vc in client.voice_clients:
-            await vc.disconnect(force=True)
-        with suppress(Exception):
+        with discord.context_managers.Typing(channel):
+            with suppress(AttributeError):
+                PRINT.close()
+            t = time.time()
+            # Call _destroy_ bot event to indicate to all databases the imminent shutdown
+            await bot.event("_destroy_")
+            # Save any database that has not already been autosaved
+            await create_future(bot.update, priority=True)
+            # Disconnect as many voice clients as possible
+            for vc in client.voice_clients:
+                await vc.disconnect(force=True)
+        with suppress():
             await client.close()
         if name.casefold() == "shutdown":
             with open(bot.shutdown, "wb"):
@@ -350,7 +350,7 @@ class DownloadServer(Command):
         if argv:
             g_id = verifyID(argv)
             guild = await bot.fetch_guild(g_id)
-        async with channel.typing():
+        with discord.context_managers.Typing(channel):
             send = channel.send
 
             # Create callback function to send all results of the guild download.

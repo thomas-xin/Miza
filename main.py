@@ -114,10 +114,18 @@ while not os.path.exists(sd):
     except:
         traceback.print_exc()
     time.sleep(0.5)
+
+if proc.is_running():
+    try:
+        for child in proc.children():
+            child.kill()
+        proc.kill()
+    except:
+        pass
     
 delete(sd)
 delete(rs)
 delete(hb)
         
-input("Shutdown signal confirmed. Press [ENTER] to close. ")
+print("Shutdown signal confirmed. Program will now terminate. ")
 raise SystemExit

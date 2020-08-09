@@ -5,7 +5,7 @@ Adds many useful math-related functions.
 import contextlib, concurrent.futures
 
 # A context manager that enables concurrent imports.
-class MultiThreadedImporter(contextlib.AbstractContextManager):
+class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.ContextDecorator):
 
     def __init__(self, glob=None):
         self.glob = glob
@@ -40,33 +40,21 @@ from sympy.parsing.sympy_parser import parse_expr
 from itertools import repeat
 from colormath import color_objects, color_conversions
 
-suppress = contextlib.suppress
+
+class EmptyContext(contextlib.AbstractContextManager):
+
+    __exit__ = lambda *args: None
+
+emptyctx = EmptyContext()
+
+
+suppress = lambda *args, **kwargs: contextlib.suppress(BaseException) if not args and not kwargs else contextlib.suppress(*args + tuple(kwargs.values()))
 closing = contextlib.closing
 
-# A context manager that sends exception tracebacks to stdout.
-class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager):
-    
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        if exc_type and exc_value:
-            try:
-                raise exc_value
-            except:
-                print_exc()
-        return True
-
-    async def __aexit__(self, exc_type, exc_value, exc_tb):
-        if exc_type and exc_value:
-            try:
-                raise exc_value
-            except:
-                print_exc()
-        return True
-
-tracebacksuppressor = TracebackSuppressor()
 
 print_exc = lambda: sys.stdout.write(traceback.format_exc())
 
-class Dummy(Exception):
+class Dummy(BaseException):
     __slots__ = ()
 
 

@@ -42,6 +42,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         self.events = mdict()
         self.proc_call = cdict()
         self.mention = ()
+        self.semaphore = Semaphore(2, 1)
         print("Time: " + str(datetime.datetime.now()))
         print("Initializing...")
         # O(1) time complexity for searching directory
@@ -58,14 +59,14 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                     + '}'
                 )
             print("ERROR: Please fill in details for " + self.authdata + " to continue.")
-            self.setshutdown(2)
+            self.setshutdown(2, force=True)
         with closing(f):
             auth = ast.literal_eval(f.read())
         try:
             self.token = auth["discord_token"]
         except KeyError:
             print("ERROR: discord_token not found. Unable to login.")
-            self.setshutdown()
+            self.setshutdown(force=True)
         try:
             owner_id = auth["owner_id"]
             if type(owner_id) not in (list, tuple):
@@ -82,6 +83,9 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         self.updated = False
         self.started = False
         self.ready = False
+        self.stat_timer = 0
+        self.lastCheck = 0
+        self.status_iter = xrand(3)
         self.embedSenders = cdict()
         # Assign bot cache to global variables for convenience
         globals().update(self.cache)
@@ -91,13 +95,14 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
     __exit__ = lambda self, *args, **kwargs: self.close()
 
     # Waits an amount of seconds and shuts down.
-    def setshutdown(self, delay=None):
+    def setshutdown(self, delay=None, force=False):
         if delay:
             time.sleep(delay)
-        with open(self.shutdown, "wb"):
-            pass
+        if force:
+            with open(self.shutdown, "wb"):
+                pass
         for proc in self.proc.children(recursive=True):
-            with suppress(Exception):
+            with suppress():
                 proc.kill()
         self.proc.kill()
 
@@ -105,10 +110,9 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
     def run(self):
         print("Attempting to authorize with token " + self.token + ":")
         with closing(get_event_loop()):
-            try:
+            with suppress():
                 get_event_loop().run_until_complete(client.start(self.token))
-            finally:
-                get_event_loop().run_until_complete(client.close())
+            get_event_loop().run_until_complete(client.close())
         self.setshutdown()
 
     # A reimplementation of the print builtin function.
@@ -129,24 +133,20 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         data = obj.data
         for key in tuple(data):
             if key != 0 and type(key) is not str:
-                try:
+                with suppress():
                     # Database keys may be user, guild, or channel IDs
                     if getattr(obj, "user", None):
                         d = await self.fetch_user(key)
                     else:
                         if not data[key] and not started:
                             raise LookupError
-                        try:
+                        with suppress():
                             d = await self.fetch_guild(key)
                             if d is not None:
                                 continue
-                        except:
-                            pass
                         d = await self.fetch_channel(key)
                     if d is not None:
                         continue
-                except:
-                    pass
                 print("Deleting " + str(key) + " from " + str(obj) + "...")
                 data.pop(key)
                 obj.update()
@@ -167,11 +167,9 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         futs = [create_future(func(*args, **kwargs)) for func in events]
         out = deque()
         for fut in futs:
-            try:
+            with tracebacksuppressor:
                 res = await fut
                 out.append(res)
-            except:
-                print_exc()
         return out
 
     # Gets the first accessable text channel in the target guild.
@@ -257,19 +255,15 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
     # Fetches a member in the target server by ID or name lookup.
     async def fetch_member_ex(self, u_id, guild=None, allow_banned=True):
         if type(u_id) is not int:
-            try:
+            with suppress(TypeError, ValueError):
                 u_id = int(u_id)
-            except (TypeError, ValueError):
-                pass
         member = None
         if type(u_id) is int:
             member = guild.get_member(u_id)
         if member is None:
             if type(u_id) is int:
-                try:
+                with suppress(LookupError):
                     member = await self.fetch_member(u_id, guild)
-                except LookupError:
-                    pass
             if member is None:
                 if allow_banned and "bans" in self.data:
                     members = deque(guild.members)
@@ -1086,13 +1080,11 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             for var in items.values():
                 if callable(var) and var not in (Command, Database):
                     load_type = 0
-                    try:
+                    with suppress(TypeError):
                         if issubclass(var, Command):
                             load_type = 1
                         elif issubclass(var, Database):
                             load_type = 2
-                    except TypeError:
-                        pass
                     if load_type:
                         obj = var(self, rename)
                         if load_type == 1:
@@ -1117,15 +1109,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                                 self.events.append(f, func)
                     func = getattr(db, "_ready_", None)
                     if callable(func):
-                        fut = create_future(func, bot=self, priority=True)
-                        time.sleep(0.05)
-                        while True:
-                            try:
-                                fut.result()
-                            except asyncio.InvalidStateError:
-                                time.sleep(0.1)
-                            else:
-                                break
+                        await_fut(create_future(func, bot=self, priority=True), priority=True)
 
     def unload(self, mod=None):
         if mod is None:
@@ -1149,15 +1133,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             for db in self.dbitems[rename]:
                 func = getattr(db, "_destroy_", None)
                 if callable(func):
-                    fut = create_future(func, priority=True)
-                    time.sleep(0.05)
-                    while True:
-                        try:
-                            fut.result()
-                        except asyncio.InvalidStateError:
-                            time.sleep(0.1)
-                        else:
-                            break
+                    await_fut(create_future(func, priority=True), priority=True)
                 for f in dir(db):
                     if f.startswith("_") and f[-1] == "_" and f[1] != "_":
                         func = getattr(db, f, None)
@@ -1198,10 +1174,6 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             self.executor.shutdown(wait=True)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(files) + 1)
         for f in files:
-            # try:
-            #     self.getModule(f)
-            # except:
-            #     print_exc()
             self.modload.append(self.executor.submit(self.getModule, f))
         self.loaded = True
         print("Module finder initialized.")
@@ -1210,14 +1182,12 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
     def update(self):
         create_task(self.updateEmbeds())
         saved = hlist()
-        try:
+        with tracebacksuppressor:
             for i in self.database:
                 u = self.database[i]
                 if getattr(u, "update", None) is not None:
                     if u.update(True):
                         saved.append(i)
-        except:
-            print_exc()
         # if saved:
         #     print("Autosaved " + str(saved) + ".")
 
@@ -1326,61 +1296,43 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
 
     # Handles all updates to the bot. Manages the bot's status and activity on discord, and updates all databases.
     async def handleUpdate(self, force=False):
-        if not hasattr(self, "stat_timer"):
-            self.stat_timer = 0
-        if not hasattr(self, "lastCheck"):
-            self.lastCheck = 0
-        if not hasattr(self, "busy"):
-            self.busy = False
-        if not hasattr(self, "status_iter"):
-            self.status_iter = xrand(3)
         if utc() - self.lastCheck > 0.5 or force:
-            while self.busy and not force:
-                await asyncio.sleep(0.1)
-            self.busy = True
-            if not force:
-                create_task(self.getState())
-            with tracebacksuppressor:
-                guilds = len(client.guilds)
-                changed = guilds != self.guilds
-                if changed or utc() > self.stat_timer:
-                    # Status changes every 12-21 seconds
-                    self.stat_timer = utc() + float(frand(5)) + 12
-                    self.guilds = guilds
-                    try:
-                        u = await self.fetch_user(tuple(self.owners)[0])
-                        n = u.name
-                        place = ", from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place!"
-                        activity = discord.Streaming(
-                            name=(
-                                "live to " + uniStr(guilds) + " server"
-                                + "s" * (guilds != 1) + place
-                            ),
-                            url=self.website,
-                        )
-                        activity.game = self.website
-                        if changed:
-                            print(repr(activity))
-                        # Status iterates through 3 possible choices
-                        status = (discord.Status.online, discord.Status.dnd, discord.Status.idle)[self.status_iter]
-                        try:
+            semaphore = self.semaphore if not force else emptyctx
+            with semaphore:
+                if not force:
+                    create_task(self.getState())
+                with tracebacksuppressor:
+                    guilds = len(client.guilds)
+                    changed = guilds != self.guilds
+                    if changed or utc() > self.stat_timer:
+                        # Status changes every 12-21 seconds
+                        self.stat_timer = utc() + float(frand(5)) + 12
+                        self.guilds = guilds
+                        with suppress(discord.NotFound):
+                            u = await self.fetch_user(tuple(self.owners)[0])
+                            n = u.name
+                            place = ", from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place!"
+                            activity = discord.Streaming(
+                                name=(
+                                    "live to " + uniStr(guilds) + " server"
+                                    + "s" * (guilds != 1) + place
+                                ),
+                                url=self.website,
+                            )
+                            activity.game = self.website
+                            if changed:
+                                print(repr(activity))
+                            # Status iterates through 3 possible choices
+                            status = (discord.Status.online, discord.Status.dnd, discord.Status.idle)[self.status_iter]
                             await client.change_presence(activity=activity, status=status)
                             # Member update events are not sent through for the current user, so manually send a _seen_ event
                             await seen(client.user, event="misc", raw="Changing their status")
-                        except discord.HTTPException:
-                            print_exc()
-                            await asyncio.sleep(3)
-                        except:
-                            pass
-                    except discord.NotFound:
-                        pass
-                    self.status_iter = (self.status_iter + 1) % 3
-            # Update databases
-            for u in self.database.values():
-                if utc() - u.used > u.rate_limit or force:
-                    create_future(u, priority=True)
-                    create_task(self.verifyDelete(u))
-            self.busy = False
+                        self.status_iter = (self.status_iter + 1) % 3
+                # Update databases
+                for u in self.database.values():
+                    if utc() - u.used > u.rate_limit or force:
+                        create_future(u, priority=True)
+                        create_task(self.verifyDelete(u))
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
@@ -1411,28 +1363,13 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             webhooks = deque()
             futs = [channel.webhooks() for channel in guild.text_channels]
             for fut in futs:
-                try:
+                with tracebacksuppressor(discord.Forbidden):
                     temp = await fut
-                except discord.Forbidden:
-                    pass
-                except discord.HTTPException:
-                    print_exc()
-                    await asyncio.sleep(5)
-                    temp = await fut
-                except:
-                    print_exc()
-                else:
                     webhooks.extend(temp)
         except discord.HTTPException:
             print_exc()
             await asyncio.sleep(10)
-            for _ in loop(5):
-                try:
-                    webhooks = await guild.webhooks()
-                    break
-                except discord.HTTPException:
-                    print_exc()
-                    await asyncio.sleep(15)
+            webhooks = await aretry(guild.webhooks, attempts=5, delay=15)
         return deque(self.add_webhook(w) for w in webhooks)
 
     # Gets a valid webhook for the target channel, creating a new one when necessary.
@@ -1476,7 +1413,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             if single:
                 for emb in embeds:
                     create_task(channel.send(embed=emb))
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(1)
                 return
             w = await self.bot.ensureWebhook(channel)
             try:
@@ -2025,15 +1962,14 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
 # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
 async def heartbeatLoop():
     print("Heartbeat Loop initiated.")
-    with suppress(Exception):
+    with tracebacksuppressor:
         while True:
             if not bot.client or bot.closed:
                 raise SystemExit
-            d = await create_future(os.path.exists, bot.heartbeat, priority=True)
+            d = await delayed_coro(create_future(os.path.exists, bot.heartbeat, priority=True), 0.5)
             if d:
-                with tracebacksuppressor:
+                with tracebacksuppressor(FileNotFoundError):
                     await create_future(os.remove, bot.heartbeat, priority=True)
-            await asyncio.sleep(0.5)
     bot.setshutdown()  
 
 # The fast update loop that runs 24 times per second. Used for events where timing is important.
@@ -2045,24 +1981,24 @@ async def fastLoop():
             sent = await bot.updateEmbeds()
         x = freq if sent else 1
         for i in range(x):
-            create_task(bot.event("_call_"))
-            await asyncio.sleep(1 / freq)
+            async with delay(1 / freq):
+                await bot.event("_call_")
 
 # The lazy update loop that runs once every 2-4 seconds. Calls the bot database autosave event once every ~60 seconds.
 async def slowLoop():
     autosave = 0
     while True:
-        with tracebacksuppressor:
-            if utc() - autosave > 60:
-                autosave = utc()
-                create_future_ex(bot.update, priority=True)
-                create_future_ex(bot.updateClient, priority=True)
-            while bot.blocked > 0:
-                print("Update event blocked.")
-                bot.blocked -= 1
-                await asyncio.sleep(1)
-            await bot.handleUpdate()
-            await asyncio.sleep(frand(2) + 2)
+        async with delay(frand(2) + 2):
+            async with tracebacksuppressor:
+                if utc() - autosave > 60:
+                    autosave = utc()
+                    await create_future(bot.update, priority=True)
+                    await create_future(bot.updateClient, priority=True)
+                while bot.blocked > 0:
+                    print("Update event blocked.")
+                    bot.blocked -= 1
+                    await asyncio.sleep(1)
+                await bot.handleUpdate()
 
 
 # The event called when the bot starts up.
@@ -2212,7 +2148,7 @@ async def on_raw_reaction_add(payload):
     if user.id != client.user.id:
         reaction = str(payload.emoji)
         await bot.reactCallback(message, reaction, user)
-        create_task(checkDelete(message, reaction, user))
+        await checkDelete(message, reaction, user)
 
 
 # Reaction remove event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
@@ -2228,7 +2164,7 @@ async def on_raw_reaction_remove(payload):
     if user.id != client.user.id:
         reaction = str(payload.emoji)
         await bot.reactCallback(message, reaction, user)
-        create_task(checkDelete(message, reaction, user))
+        await checkDelete(message, reaction, user)
 
 
 # Voice state update event: automatically unmutes self if server muted, calls _seen_ bot database event.
@@ -2259,11 +2195,11 @@ async def handleMessage(message, edit=True):
     except Exception as ex:
         errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
         print_exc()
-        create_task(sendReact(
+        await sendReact(
             message.channel,
             errmsg,
             reacts="❎",
-        ))
+        )
 
 
 # Typing event: calls _typing_ and _seen_ bot database events.

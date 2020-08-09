@@ -756,14 +756,13 @@ class Info(Command):
             emb.add_field(name="Roles", value=role, inline=0)
         # Double verbose option sends an activity graph
         if flags.get("v", 0) > 1:
-            fut = create_task(channel.trigger_typing())
-            fut2 = create_task(channel.send(embed=emb))
-            data = await create_future(bot.database.users.fetch_events, user.id, interval=3600, timeout=12)
-            resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
-            fn = resp["file"]
-            f = discord.File(fn)
-            await fut2
-            await fut
+            with discord.context_managers.Typing(channel):
+                fut = create_task(channel.send(embed=emb))
+                data = await create_future(bot.database.users.fetch_events, user.id, interval=3600, timeout=12)
+                resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
+                fn = resp["file"]
+                f = discord.File(fn)
+                await fut
             return dict(file=f, filename=fn, best=True)
         return dict(embed=emb)
 
@@ -785,15 +784,10 @@ class Activity(Command):
             except (TypeError, discord.NotFound):
                 user = await bot.fetch_member_ex(u_id, guild)
         data = await create_future(bot.database.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=12)
-        fut = create_task(channel.trigger_typing())
-        try:
+        with discord.context_managers.Typing(channel):
             resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
-        except:
-            await fut
-            raise
-        fn = resp["file"]
-        f = discord.File(fn)
-        await fut
+            fn = resp["file"]
+            f = discord.File(fn)
         return dict(file=f, filename=fn, best=True)
 
 
@@ -1158,8 +1152,8 @@ class Reminder(Command):
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
-                create_task(message.add_reaction(react.decode("utf-8")))
-                await asyncio.sleep(0.5)
+                async with delay(0.5):
+                    create_task(message.add_reaction(react.decode("utf-8")))
 
 
 # This database is such a hassle to manage, it has to be able to persist between bot restarts, and has to be able to update with O(1) time complexity when idle
@@ -1336,40 +1330,12 @@ class UpdateMessageCount(Database):
 
     # What are the rate limits for the message history calls?
     async def getChannelHistory(self, channel, limit=None, callback=None):
-        # Semaphore of 32, idk if this is enough
-        while self.req > 32:
-            await asyncio.sleep(4)
-        self.req += 1
-        try:
+        async with self.semaphore:
             messages = []
             # 16 attempts to download channel
-            for i in range(16):
-                history = channel.history(limit=limit, oldest_first=(limit is None))
-                try:
-                    messages = await history.flatten()
-                except discord.Forbidden:
-                    # Don't attempt any more if the response was forbidden
-                    break
-                except discord.HTTPException as ex:
-                    # Wait longer between attempts if the error was a rate limit
-                    if "429" in str(ex):
-                        await asyncio.sleep(20 * (i ** 2 + 1))
-                    else:
-                        await asyncio.sleep(10)
-                except:
-                    print_exc()
-                    await asyncio.sleep(5)
-                else:
-                    break
-        except:
-            self.req -= 1
-            raise
-        self.req -= 1
+            history = await aretry(lambda: channel.history(limit=limit, oldest_first=(limit is None).flatten()), attempts=16, delay=20)
         if callback:
-            fut = callback(channel=channel, messages=messages)
-            if awaitable(fut):
-                return await fut
-            return fut
+            return await create_future(callback, channel=channel, messages=messages)
         return messages
 
     async def getGuildHistory(self, guild, limit=None, callback=None):
@@ -1412,7 +1378,7 @@ class UpdateMessageCount(Database):
 
     def __load__(self):
         self.scanned = False
-        self.req = 0
+        self.semaphore = Semaphore(32, 128)
 
     async def __call__(self):
         if self.scanned:
@@ -1425,9 +1391,8 @@ class UpdateMessageCount(Database):
             if guild.id not in self.data:
                 oneyear = utc_dt() - guild.created_at < year
                 if guild.member_count < 512 or oneyear:
-                    self.startCalculate(guild)
-                    while self.req > 32:
-                        await asyncio.sleep(5)
+                    async with self.semaphore:
+                        self.startCalculate(guild)
                     if not i & 7:
                         await asyncio.sleep(60)
                     i += 1

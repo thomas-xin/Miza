@@ -76,36 +76,35 @@ class Translate(Command):
             raise ArgumentError("Input string is empty.")
         dest = args[0]
         string = " ".join(args[1:])
-        fut = create_task(channel.trigger_typing())
-        detected = await create_future(translators["Google Translate"].detect, string, timeout=20)
-        source = detected.lang
-        trans = ["Google Translate", "Papago"]
-        if "p" in flags:
-            trans = trans[::-1]
-        if "v" in flags:
-            count = 2
-            end = "\nDetected language: **" + str(source) + "**"
-        else:
-            count = 1
-            end = ""
-        response = "**" + str(user) + "**:"
-        print(string, dest, source)
-        # Attempt to use all available translators if possible
-        for i in range(count):
-            for t in trans:
-                try:
-                    resp = await create_future(getTranslate, translators[t], string, dest, source, timeout=20)
+        with discord.context_managers.Typing(channel):
+            detected = await create_future(translators["Google Translate"].detect, string, timeout=20)
+            source = detected.lang
+            trans = ["Google Translate", "Papago"]
+            if "p" in flags:
+                trans = trans[::-1]
+            if "v" in flags:
+                count = 2
+                end = "\nDetected language: **" + str(source) + "**"
+            else:
+                count = 1
+                end = ""
+            response = "**" + str(user) + "**:"
+            print(string, dest, source)
+            # Attempt to use all available translators if possible
+            for i in range(count):
+                for t in trans:
                     try:
-                        output = resp.text
-                    except AttributeError:
-                        output = str(resp)
-                    response += "\n" + output + "  `" + t + "`"
-                    source, dest = dest, source
-                    break
-                except:
-                    if t == trans[-1] and i == count - 1:
-                        raise
-        await fut
+                        resp = await create_future(getTranslate, translators[t], string, dest, source, timeout=20)
+                        try:
+                            output = resp.text
+                        except AttributeError:
+                            output = str(resp)
+                        response += "\n" + output + "  `" + t + "`"
+                        source, dest = dest, source
+                        break
+                    except:
+                        if t == trans[-1] and i == count - 1:
+                            raise
         return response + end    
 
 
@@ -428,33 +427,31 @@ class UrbanDictionary(Command):
             "https://mashape-community-urban-dictionary.p.rapidapi.com/define?term="
             + argv.replace(" ", "%20")
         )
-        fut = create_task(channel.trigger_typing())
-        s = await Request(url, headers=self.header, timeout=16, aio=True)
-        d = eval_json(s)
-        l = d["list"]
-        if not l:
-            await fut
-            raise LookupError("No results for " + argv + ".")
-        l.sort(
-            key=lambda e: scaleRatio(e.get("thumbs_up", 0), e.get("thumbs_down", 0)),
-            reverse=True,
-        )
-        if "v" in flags:
-            output = (
-                "```ini\n[" + noHighlight(argv) + "]\n"
-                + clrHighlight("\n".join(
-                    "[" + str(i + 1) + "] " + l[i].get(
-                        "definition", "",
-                    ).replace("\n", " ").replace("\r", "") for i in range(
-                        min(len(l), 1 + 2 * flags["v"])
-                    )
-                )).replace("#", "♯")
-                + "```"
+        with discord.context_managers.Typing(channel):
+            s = await Request(url, headers=self.header, timeout=16, aio=True)
+            d = eval_json(s)
+            l = d["list"]
+            if not l:
+                raise LookupError("No results for " + argv + ".")
+            l.sort(
+                key=lambda e: scaleRatio(e.get("thumbs_up", 0), e.get("thumbs_down", 0)),
+                reverse=True,
             )
-        else:
-            output = (
-                "```ini\n[" + noHighlight(argv) + "]\n"
-                + clrHighlight(l[0].get("definition", "")).replace("#", "♯") + "```"
-            )
-        await fut
+            if "v" in flags:
+                output = (
+                    "```ini\n[" + noHighlight(argv) + "]\n"
+                    + clrHighlight("\n".join(
+                        "[" + str(i + 1) + "] " + l[i].get(
+                            "definition", "",
+                        ).replace("\n", " ").replace("\r", "") for i in range(
+                            min(len(l), 1 + 2 * flags["v"])
+                        )
+                    )).replace("#", "♯")
+                    + "```"
+                )
+            else:
+                output = (
+                    "```ini\n[" + noHighlight(argv) + "]\n"
+                    + clrHighlight(l[0].get("definition", "")).replace("#", "♯") + "```"
+                )
         return output
