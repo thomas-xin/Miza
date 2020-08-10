@@ -659,6 +659,8 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         if m is None:
             r = guild.get_role(u_id)
             if r is None:
+                with suppress(KeyError):
+                    return self.data.perms[guild.id][guild.id]
                 return -inf
             return self.getRolePerms(r, guild)
         p = m.guild_permissions
