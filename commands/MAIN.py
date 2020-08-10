@@ -651,6 +651,16 @@ class Info(Command):
         coms = seen = msgs = avgs = gmsg = old = 0
         fav = None
         pos = None
+        with suppress(LookupError):
+            ts = utc()
+            ls = bot.data.users[u.id]["last_seen"]
+            la = bot.data.users[u.id].get("last_action")
+            if type(ls) is str:
+                seen = ls
+            else:
+                seen = sec2Time(max(0, ts - ls)) + " ago"
+            if la:
+                seen = la + ", " + seen
         if "v" in flags:
             with suppress(LookupError):
                 if is_self:
@@ -669,16 +679,6 @@ class Info(Command):
                         comfreq = deque(sort(c, reverse=True).keys())
                         while fav is None:
                             fav = comfreq.popleft()
-            with suppress(LookupError):
-                ts = utc()
-                ls = bot.data.users[u.id]["last_seen"]
-                la = bot.data.users[u.id].get("last_action")
-                if type(ls) is str:
-                    seen = ls
-                else:
-                    seen = sec2Time(max(0, ts - ls)) + " ago"
-                if la:
-                    seen = la + ", " + seen
             with suppress(LookupError):
                 gmsg = bot.database.counts.getUserGlobalMessageCount(u)
                 msgs = await bot.database.counts.getUserMessages(u, guild)
@@ -718,11 +718,11 @@ class Info(Command):
             if d[-1] == "*":
                 d += " "
             d += "**```css\n"
-            d += "[Discord staff]\n" * is_sys
-            d += "[Bot]\n" * is_bot
+            d += "[Discord staff ⚠️]\n" * is_sys
+            d += "[Bot 🤖]\n" * is_bot
             d += "[Myself :3]\n" * is_self
             d += "[My owner ❤️]\n" * is_self_owner
-            d += "[Server owner]\n" * (is_guild_owner and not hasattr(guild, "isDM"))
+            d += "[Server owner 👀]\n" * (is_guild_owner and not hasattr(guild, "isDM"))
             d = d.strip("\n")
             d += "```**"
         emb.description = d
@@ -752,16 +752,6 @@ class Info(Command):
             emb.add_field(name="Server rank", value=str(pos), inline=1)
         if role:
             emb.add_field(name="Roles", value=role, inline=0)
-        # Double verbose option sends an activity graph
-        if flags.get("v", 0) > 1:
-            with discord.context_managers.Typing(channel):
-                fut = create_task(channel.send(embed=emb))
-                data = await create_future(bot.database.users.fetch_events, user.id, interval=3600, timeout=12)
-                resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
-                fn = resp["file"]
-                f = discord.File(fn)
-                await fut
-            return dict(file=f, filename=fn, best=True)
         return dict(embed=emb)
 
 
