@@ -9,33 +9,19 @@ import csv, knackpy
 from prettytable import PrettyTable as ptable
 
 
-class shut_up_knackpy:
-
-    retrieve = re.compile("^Retrieved [0-9]{1,} (?:records|fields)$")
-    get_field_data = re.compile("^Get field data for [A-Za-z0-9_-]+$")
-
-    def __call__(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
-        s = str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)
-        if s.startswith("Retrieved ") or s.startswith("Get "):
-            if s.startswith("Get data from http") or self.retrieve.search(s) or self.get_field_data.search(s):
-                return "Shut up knackpy 😠"
-        return PRINT.write(s)
-
-
 class DouClub:
     
     def __init__(self, c_id, c_sec):
         self.id = c_id
         self.secret = c_sec
         self.time = utc()
+        self.knack = knackpy.App(app_id=self.id, api_key=self.secret)
         create_future_ex(self.pull)
 
     def pull(self):
         with tracebacksuppressor:
             # print("Pulling Doukutsu Club...")
-            knackpy.__builtins__["print"] = shut_up_knackpy()
-            kn = knackpy.Knack(obj="object_1", app_id=self.id, api_key=self.secret)
-            knackpy.__builtins__["print"] = print
+            self.data = self.knack.get("object_1")
             self.data = kn.data
             self.time = utc()
     
@@ -63,7 +49,7 @@ class DouClub:
                     break
             if found:
                 output.append({
-                    "author": l["Author"],
+                    "author": l["Author"]["identifierdata[0]['title'"],
                     "name": l["Title"],
                     "description": l["Description"],
                     "url": (

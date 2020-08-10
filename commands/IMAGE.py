@@ -379,7 +379,7 @@ class CreateEmoji(Command):
                 try:
                     resp = await imageProc(path, "resize_max", [128], guild, timeout=32)
                 except:
-                    with contextlib.suppress():
+                    with suppress():
                         os.remove(path)
                     raise
                 else:
@@ -387,9 +387,9 @@ class CreateEmoji(Command):
                     f = await create_future(open, fn, "rb", timeout=18)
                     image = await create_future(f.read, timeout=18)
                     create_future_ex(f.close, timeout=18)
-                    with contextlib.suppress():
+                    with suppress():
                         os.remove(fn)
-                with contextlib.suppress():
+                with suppress():
                     os.remove(path)
             emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
             # This reaction indicates the emoji was created successfully
@@ -931,7 +931,7 @@ class Magik(Command):
                 f = discord.File(fn, filename=name)
                 msg = await channel.send(file=f)
                 url = msg.attachments[0].url
-                with contextlib.suppress():
+                with suppress():
                     os.remove(fn)
             else:
                 msg = None
@@ -1101,20 +1101,7 @@ class Blend(Command):
         await sendFile(message.channel, "", f, filename=fn)
 
 
-with open("auth.json") as f:
-    auth = ast.literal_eval(f.read())
-try:
-    cat_key = auth["cat_api_key"]
-except:
-    cat_key = None
-    print("WARNING: cat_api_key not found. Unable to use Cat API to pull cat images.")
-
-
 class Cat(Command):
-    if cat_key:
-        header = {"x-api-key": cat_key}
-    else:
-        header = None
     min_level = 0
     description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it."
     usage = "<verbose(?v)>"
@@ -1129,7 +1116,7 @@ class Cat(Command):
 
     # Fetches one image from random pool
     async def fetch_one(self):
-        if not self.header or random.random() > 2 / 3:
+        if random.random() > 2 / 3:
             if random.random() > 2 / 3:
                 x = 0
                 url = await create_future(nekos.cat, timeout=8)
@@ -1194,7 +1181,7 @@ class Cat(Command):
 
 class Dog(Command):
     min_level = 0
-    description = "Pulls a random image from api.alexflipnote.dev/dogs or images.dog.ceo and embeds it."
+    description = "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it."
     usage = "<verbose(?v)>"
     flags = "v"
     rate_limit = 0.25
@@ -1207,18 +1194,26 @@ class Dog(Command):
 
     # Fetches one image from random pool
     async def fetch_one(self):
-        x = random.random() > 2 / 3
-        if x:
-            resp = await Request("https://api.alexflipnote.dev/dogs", aio=True)
+        if random.random() > 2 / 3:
+            if random.random() > 2 / 3:
+                x = 0
+                url = await create_future(nekos.img, "woof", timeout=8)
+            else:
+                x = 1
         else:
-            resp = await Request("https://dog.ceo/api/breeds/image/random", aio=True)
-        d = eval_json(resp)
-        if type(d) is list:
-            d = random.choice(d)
-        url = d["file" if x else "message"]
-        url = url.replace("\\", "/")
-        while "///" in url:
-            url = url.replace("///", "//")
+            x = 2
+        if x:
+            if x == 1:
+                resp = await Request("https://api.alexflipnote.dev/dogs", aio=True)
+            else:
+                resp = await Request("https://dog.ceo/api/breeds/image/random", aio=True)
+            d = eval_json(resp)
+            if type(d) is list:
+                d = random.choice(d)
+            url = d["file" if x == 1 else "message"]
+            url = url.replace("\\", "/")
+            while "///" in url:
+                url = url.replace("///", "//")
         return url
 
     # Refills image buffer to a certain amount
@@ -1244,8 +1239,10 @@ class Dog(Command):
             if not self.refilling:
                 self.refilling = True
                 create_task(self.refill_buffer(amount << 1))
-            if not self.buffer:
+            if len(self.found) >= 4096:
                 return random.choice(tuple(self.found))
+            if not self.buffer:
+                return await create_future(nekos.img, "woof", timeout=8)
         url = self.buffer.popleft()
         self.found[url] = True
         return url
