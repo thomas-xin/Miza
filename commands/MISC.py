@@ -22,7 +22,6 @@ class DouClub:
         with tracebacksuppressor:
             # print("Pulling Doukutsu Club...")
             self.data = self.knack.get("object_1")
-            self.data = kn.data
             self.time = utc()
     
     def update(self):
