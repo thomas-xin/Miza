@@ -11,7 +11,6 @@ if not os.path.exists("auth.json"):
         "discord_token": "",
         "owner_id": [],
         "google_api_key": "",
-        "cat_api_key": "",
         "rapidapi_key": "",
         "genius_key": "",
         "papago_id": "",
