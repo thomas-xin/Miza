@@ -284,7 +284,7 @@ class CustomAudio(discord.AudioSource):
         return self.stats.position
 
     # Sends a deletable message to the audio player's channel.
-    announce = lambda self, *args, **kwargs: await_fut(sendReact(self.channel, *args, reacts="❎", **kwargs))
+    announce = lambda self, *args, sync=True, **kwargs: create_task(sendReact(self.channel, *args, reacts="❎", **kwargs)) if not sync else await_fut(sendReact(self.channel, *args, reacts="❎", **kwargs))
 
     # Kills this audio player, stopping audio playback. Will cause bot to leave voice upon next update event.
     def kill(self, reason=None):
@@ -357,11 +357,11 @@ class CustomAudio(discord.AudioSource):
                                     cnt = c
                                     ch = channel
                         if ch:
+                            await_fut(vc.move_to(ch))
                             self.announce(
                                 "```ini\n🎵 Detected " + sbHighlight(cnt) + " user" + "s" * (cnt != 1)
-                                + " in [#" + noHighlight(ch) + "], moving... 🎵```"
+                                + " in [#" + noHighlight(ch) + "], automatically joined! 🎵```"
                             )
-                            await_fut(vc.move_to(ch))
         else:
             self.timeout = utc()
         if m.voice is not None:
@@ -760,12 +760,13 @@ class AudioQueue(hlist):
                                 name = u.display_name
                             except KeyError:
                                 name = "Deleted User"
+                            self.lastsent = utc()
                             auds.announce(
                                 "*```ini\n🎵 Now playing "
                                 + sbHighlight(q[0].name)
-                                + ", added by " + sbHighlight(name) + "! 🎵```*"
+                                + ", added by " + sbHighlight(name) + "! 🎵```*",
+                                sync=False,
                             )
-                            self.lastsent = utc()
                     self.loading = True
                     try:
                         # Gets audio file stream and loads into audio source object
@@ -3712,7 +3713,7 @@ class UpdateAudio(Database):
 
     def _announce_(self, *args, **kwargs):
         for auds in self.players.values():
-            auds.announce(*args, **kwargs)
+            auds.announce(*args, sync=False, **kwargs)
 
     # Stores all currently playing audio data to temporary database when bot shuts down
     async def _destroy_(self, **void):
