@@ -320,7 +320,7 @@ class AltCaps(Command):
             a = a[:-1]
         else:
             c = ""
-        return "".join(i[0] + i[1] for i in zip(a, b)) + c
+        return "```fix\n" + "".join(i[0] + i[1] for i in zip(a, b)) + c + "```"
 
 
 class Time(Command):
