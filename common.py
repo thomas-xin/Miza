@@ -31,7 +31,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     def __enter__(self):
         if self.active >= self.limit:
             if self.passive >= self.buffer:
-                raise RuntimeError("Semaphore object of limit " + str(self.limit) + " overloaded by " + str(self.passive))
+                raise SemaphoreOverflowError("Semaphore object of limit " + str(self.limit) + " overloaded by " + str(self.passive))
             self.passive += 1
             while self.active >= self.limit:
                 time.sleep(self.delay)
@@ -42,7 +42,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     async def __aenter__(self):
         if self.active >= self.limit:
             if self.passive >= self.buffer:
-                raise RuntimeError("Semaphore object of limit " + str(self.limit) + " overloaded by " + str(self.passive))
+                raise SemaphoreOverflowError("Semaphore object of limit " + str(self.limit) + " overloaded by " + str(self.passive))
             self.passive += 1
             while self.active >= self.limit:
                 await asyncio.sleep(self.delay)
@@ -59,6 +59,9 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     async def __call__(self):
         while self.value >= self.limit:
             await asyncio.sleep(self.delay)
+
+class SemaphoreOverflowError(RuntimeError):
+    pass
 
 
 # A context manager that sends exception tracebacks to stdout.
@@ -751,6 +754,10 @@ async def retNone(*args, **kwargs):
 
 async def delayed_coro(fut, duration=None):
     async with delay(duration):
+        return await fut
+
+async def traceback_coro(fut, *args):
+    with tracebacksuppressor(*args):
         return await fut
 
 # A function that takes a coroutine, and calls a second function if it takes longer than the specified delay.

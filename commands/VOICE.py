@@ -1517,18 +1517,22 @@ class AudioDownloader:
                                 temp = self.extract(entry["url"], search=False)[0]
                             else:
                                 # Get as much data as possible from all other items, set "research" flag to have bot lazily extract more info in background
-                                try:
+                                with tracebacksuppressor:
                                     found = True
                                     if "title" in entry:
                                         title = entry["title"]
                                     else:
                                         title = entry["url"].split("/")[-1]
+                                        if "." in title:
+                                            title = title[:title.rindex(".")]
                                         found = False
                                     if "duration" in entry:
                                         dur = float(entry["duration"])
                                     else:
                                         dur = None
-                                    url = entry.get("webpage_url", entry.get("url", entry["id"]))
+                                    url = entry.get("webpage_url", entry.get("url", entry.get("id")))
+                                    if not url:
+                                        continue
                                     temp = {
                                         "name": title,
                                         "url": url,
@@ -1538,8 +1542,6 @@ class AudioDownloader:
                                         if entry.get("ie_key", "").casefold() == "youtube":
                                             temp["url"] = "https://www.youtube.com/watch?v=" + url
                                     temp["research"] = True
-                                except:
-                                    print_exc()
                             output.append(cdict(temp))
                 else:
                     # Single item results must contain full data, we take advantage of that here
