@@ -693,7 +693,7 @@ class AudioQueue(hlist):
                     continue
             q.pops(dels)
             self.advance(process=False)
-        await_fut(self.auds.updatePlayer())
+        create_task(self.auds.updatePlayer())
 
     # Advances queue when applicable, taking into account loop/repeat/shuffle settings.
     def advance(self, looped=True, repeated=True, shuffled=True, process=True):
@@ -1645,7 +1645,7 @@ class AudioDownloader:
             f.ensure_time()
             # Files may have a callback set for when they are loaded
             if callback is not None:
-                await_fut(create_future(callback))
+                create_future(callback)
             return f
         except:
             # Remove entry URL if loading failed

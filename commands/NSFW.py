@@ -270,6 +270,7 @@ neko_tags = {
     "baka": False,
     "cat": False,
     "gif": False,
+    "woof": True,
     "404": 2,
 }
 

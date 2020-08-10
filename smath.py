@@ -34,7 +34,6 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
 with MultiThreadedImporter() as importer:
     importer.__import__("sys", "collections", "traceback", "time", "datetime", "ast", "copy", "pickle", "io", "random", "math", "cmath", "fractions", "mpmath", "sympy", "shlex", "numpy", "colorsys", "re", "hashlib", "base64")
 
-from scipy import interpolate, special, signal
 from dateutil import parser as tparser
 from sympy.parsing.sympy_parser import parse_expr
 from itertools import repeat
@@ -2157,35 +2156,8 @@ def vectorScalarOp(dest, source, operator):
     return dest
 
 
-# Interpolates a 1 dimensional iterable using an optional interpolation mode.
-def resizeVector(v, length, mode=5):
-    size = len(v)
-    new = round(length)
-    if new == size:
-        resized = v
-    elif mode == 0:
-        resized = np.array([v[round(i / new * size) % size] for i in range(new)])
-    elif mode <= 5 and mode == int(mode):
-        spl = interpolate.splrep(np.arange(1 + size), np.append(v, v[0]), k=int(min(size, mode)))
-        resized = np.array([interpolate.splev((i / new * size) % size, spl) for i in range(new)])
-    elif mode <= 5:
-        if math.floor(mode) == 0:
-            resized1 = resizeVector(v, new, 0)
-        else:
-            spl1 = interpolate.splrep(np.arange(1 + size), np.append(v, v[0]), k=floor(min(size, mode)))
-            resized1 = np.array([interpolate.splev((i / new * size) % size, spl1) for i in range(new)])
-        spl2 = interpolate.splrep(np.arange(1 + size), np.append(v, v[0]), k=ceil(min(size, mode)))
-        resized2 = np.array([interpolate.splev((i / new * size) % size, spl2) for i in range(new)])
-        resized = resized1 * (1 - mode % 1) + (mode % 1) * resized2
-    else:
-        resizing = []
-        for i in range(1, floor(mode)):
-            resizing.append(resizeVector(v, new, i / floor(mode) * 5))
-        resized = np.mean(resizing, 0)
-    return resized
-
 # Uses an optional interpolation mode to get a certain position in an iterable.
-def get(v, i, mode=5):
+def get(v, i, mode=1):
     size = len(v)
     i = i.real + i.imag * size
     if i == int(i) or mode == 0:
@@ -2194,8 +2166,6 @@ def get(v, i, mode=5):
         return get(v, i, 0) * (1 - mode) + mode * get(v, i, 1)
     elif mode == 1:
         return v[floor(i) % size] * (1 - i % 1) + v[ceil(i) % size] * (i % 1)
-    elif mode == int(mode):
-        return roundMin(interpolate.splev(i, interpolate.splrep(np.arange(1 + size), np.append(v, v[0]), k=int(min(size, mode)))))
     return get(v, i, floor(mode)) * (1 - mode % 1) + (mode % 1) * get(v, i, ceil(mode))
 
 
