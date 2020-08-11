@@ -129,7 +129,7 @@ class Ban(Command):
                 users = [member]
             except LookupError:
                 role = await bot.fetch_role(u_id, guild)
-                users = [role.members]
+                users = role.members
         if not args or name == "unban":
             user = users[0]
             try:
