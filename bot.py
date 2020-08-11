@@ -1331,7 +1331,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 # Update databases
                 for u in self.database.values():
                     if utc() - u.used > u.rate_limit or force:
-                        traceback_coro(create_future(u, priority=True), SemaphoreOverflowError)
+                        create_task(traceback_coro(create_future(u, priority=True), SemaphoreOverflowError))
                         create_task(self.verifyDelete(u))
 
     # Adds a webhook to the bot's user and webhook cache.
