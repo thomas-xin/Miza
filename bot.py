@@ -1994,7 +1994,7 @@ def fastLoop():
                 with delay(1 / freq):
                     await_fut(bot.event("_call_"), delay=0.003, priority=True)
                 loop_inc += 1
-            loop_inc &= 2147483647
+        loop_inc &= 2147483647
 
 # The lazy update loop that runs once every 2-4 seconds. Calls the bot database autosave event once every ~60 seconds.
 async def slowLoop():

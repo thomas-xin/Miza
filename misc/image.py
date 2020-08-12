@@ -48,7 +48,7 @@ urlIs = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
 isURL = lambda url: re.search(urlIs, url)
 
 
-from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), colour) #Image.fromarray(numpy.tile(numpy.array(colour, dtype=numpy.uint8), (size, size, 1)))
+from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), tuple(colour)) #Image.fromarray(numpy.tile(numpy.array(colour, dtype=numpy.uint8), (size, size, 1)))
 
 
 sizecheck = re.compile("[1-9][0-9]*x[0-9]+")
