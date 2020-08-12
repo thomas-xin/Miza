@@ -702,10 +702,15 @@ def wrap_future(fut, loop=None):
     fut.add_done_callback(on_done)
     return wrapper
 
-def create_thread(func, *args, **kwargs):
+def shutdown_thread_after(thread, fut):
+    fut.result()
+    return thread.shutdown(wait=True)
+
+def create_thread(func, *args, wait=False, **kwargs):
     thread = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    thread.submit(func, *args, **kwargs)
-    thread.shutdown(wait=False)
+    fut = thread.submit(func, *args, **kwargs)
+    if wait:
+        create_future_ex(shutdown_thread_after, thread, fut, priority=True)
     return thread
 
 # Runs a function call in a parallel thread, returning a future object waiting on the output.
