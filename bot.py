@@ -1180,7 +1180,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
 
     # Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
     def update(self):
-        create_task(self.updateEmbeds())
+        self.updateEmbeds()
         saved = hlist()
         with tracebacksuppressor:
             for i in self.database:
@@ -1457,7 +1457,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             embs.extend(embeds)
 
     # Updates all embed senders.
-    async def updateEmbeds(self):
+    def updateEmbeds(self):
         if not self.ready:
             return
         sent = False
@@ -1963,31 +1963,40 @@ async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=
 async def heartbeatLoop():
     print("Heartbeat Loop initiated.")
     with tracebacksuppressor:
-        while True:
-            if not bot.client or bot.closed:
-                raise SystemExit
+        while not bot.closed:
             d = await delayed_coro(create_future(os.path.exists, bot.heartbeat, priority=True), 0.5)
             if d:
                 with tracebacksuppressor(FileNotFoundError):
                     await create_future(os.remove, bot.heartbeat, priority=True)
-    bot.setshutdown()  
+    bot.setshutdown()
 
-# The fast update loop that runs 24 times per second. Used for events where timing is important.
-async def fastLoop():
-    freq = 24
-    sent = 0
-    while True:
-        with tracebacksuppressor:
-            sent = await bot.updateEmbeds()
-        x = freq if sent else 1
-        for i in range(x):
+loop_inc = 0
+
+# The fast update loop that runs 96 times per second. Used for events where timing is important.
+def fastLoop():
+    global loop_inc
+
+    async def event_call(freq):
+        for i in range(freq):
             async with delay(1 / freq):
                 await bot.event("_call_")
+
+    freq = 96
+    sent = 0
+    while not bot.closed:
+        with tracebacksuppressor:
+            sent = bot.updateEmbeds()
+        if sent:
+            await_fut(event_call, freq, delay=0.005, priority=True)
+        else:
+            with delay(1 / freq):
+                await_fut(bot.event("_call_"), delay=0.003, priority=True)
+        loop_inc = loop_inc + 1 & 2147483647
 
 # The lazy update loop that runs once every 2-4 seconds. Calls the bot database autosave event once every ~60 seconds.
 async def slowLoop():
     autosave = 0
-    while True:
+    while not bot.closed:
         async with delay(frand(2) + 2):
             async with tracebacksuppressor:
                 if utc() - autosave > 60:
@@ -2053,7 +2062,7 @@ async def on_ready():
                 with open("misc/init.tmp", "wb"):
                     pass
             create_task(slowLoop())
-            create_task(fastLoop())
+            create_thread(fastLoop)
             print("Update loops initiated.")
             # Load all webhooks from cached guilds.
             futs = [create_task(bot.load_webhooks(guild)) for guild in bot.cache.guilds.values()]
@@ -2425,6 +2434,7 @@ async def on_raw_message_edit(payload):
 
 # If this is the module being run and not imported, create a new Bot instance and run it.
 if __name__ == "__main__":
+    # Redirects all output to the main log manager (PRINT).
     _print = print
     with contextlib.redirect_stdout(PRINT):
         with contextlib.redirect_stderr(PRINT):

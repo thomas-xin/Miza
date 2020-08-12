@@ -1155,7 +1155,7 @@ class UpdateReminders(Database):
         # This exists so that checking next scheduled item is O(1)
         self.listed = hlist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str), key=lambda x: x[0]))
 
-    # Fast call: runs 24 times per second
+    # Fast call: runs 96 times per second
     async def _call_(self):
         t = utc()
         while self.listed:
@@ -1323,7 +1323,7 @@ class UpdateMessageCount(Database):
                 async with self.semaphore:
                     messages = []
                     # 16 attempts to download channel
-                    history = await aretry(lambda: channel.history(limit=limit, oldest_first=(limit is None).flatten()), attempts=16, delay=20)
+                    messages = await aretry(lambda: channel.history(limit=limit, oldest_first=(limit is None)).flatten(), attempts=16, delay=20)
                     break
         if callback:
             return await create_future(callback, channel=channel, messages=messages)
