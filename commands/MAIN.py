@@ -1369,7 +1369,7 @@ class UpdateMessageCount(Database):
 
     def __load__(self):
         self.scanned = False
-        self.semaphore = Semaphore(32, 128)
+        self.semaphore = Semaphore(32, 256)
 
     async def __call__(self):
         if self.scanned:

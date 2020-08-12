@@ -1183,7 +1183,7 @@ class AudioDownloader:
         self.downloading = cdict()
         self.cache = cdict()
         self.searched = cdict()
-        self.semaphore = Semaphore(4, 2)
+        self.semaphore = Semaphore(4, 128)
         self.update_dl()
         self.setup_pages()
 
@@ -3661,8 +3661,8 @@ class UpdateAudio(Database):
     async def __call__(self, guild=None, **void):
         bot = self.bot
         client = bot.client
-        async with self.semaphore:
-            with tracebacksuppressor:
+        with tracebacksuppressor(SemaphoreOverflowError):
+            async with self.semaphore:
                 # Ensure all voice clients are not muted, disconnect ones without matching audio players
                 if guild is not None:
                     g = guild

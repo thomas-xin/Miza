@@ -1298,41 +1298,42 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
     async def handleUpdate(self, force=False):
         if utc() - self.lastCheck > 0.5 or force:
             semaphore = self.semaphore if not force else emptyctx
-            with semaphore:
-                if not force:
-                    create_task(self.getState())
-                with tracebacksuppressor:
-                    guilds = len(client.guilds)
-                    changed = guilds != self.guilds
-                    if changed or utc() > self.stat_timer:
-                        # Status changes every 12-21 seconds
-                        self.stat_timer = utc() + float(frand(5)) + 12
-                        self.guilds = guilds
-                        with suppress(discord.NotFound):
-                            u = await self.fetch_user(tuple(self.owners)[0])
-                            n = u.name
-                            place = ", from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place!"
-                            activity = discord.Streaming(
-                                name=(
-                                    "live to " + uniStr(guilds) + " server"
-                                    + "s" * (guilds != 1) + place
-                                ),
-                                url=self.website,
-                            )
-                            activity.game = self.website
-                            if changed:
-                                print(repr(activity))
-                            # Status iterates through 3 possible choices
-                            status = (discord.Status.online, discord.Status.dnd, discord.Status.idle)[self.status_iter]
-                            await client.change_presence(activity=activity, status=status)
-                            # Member update events are not sent through for the current user, so manually send a _seen_ event
-                            await seen(client.user, event="misc", raw="Changing their status")
-                        self.status_iter = (self.status_iter + 1) % 3
-                # Update databases
-                for u in self.database.values():
-                    if utc() - u.used > u.rate_limit or force:
-                        create_task(traceback_coro(create_future(u, priority=True), SemaphoreOverflowError))
-                        create_task(self.verifyDelete(u))
+            with suppress(SemaphoreOverflowError):
+                with semaphore:
+                    if not force:
+                        create_task(self.getState())
+                    with tracebacksuppressor:
+                        guilds = len(client.guilds)
+                        changed = guilds != self.guilds
+                        if changed or utc() > self.stat_timer:
+                            # Status changes every 12-21 seconds
+                            self.stat_timer = utc() + float(frand(5)) + 12
+                            self.guilds = guilds
+                            with suppress(discord.NotFound):
+                                u = await self.fetch_user(tuple(self.owners)[0])
+                                n = u.name
+                                place = ", from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place!"
+                                activity = discord.Streaming(
+                                    name=(
+                                        "live to " + uniStr(guilds) + " server"
+                                        + "s" * (guilds != 1) + place
+                                    ),
+                                    url=self.website,
+                                )
+                                activity.game = self.website
+                                if changed:
+                                    print(repr(activity))
+                                # Status iterates through 3 possible choices
+                                status = (discord.Status.online, discord.Status.dnd, discord.Status.idle)[self.status_iter]
+                                await client.change_presence(activity=activity, status=status)
+                                # Member update events are not sent through for the current user, so manually send a _seen_ event
+                                await seen(client.user, event="misc", raw="Changing their status")
+                            self.status_iter = (self.status_iter + 1) % 3
+                    # Update databases
+                    for u in self.database.values():
+                        if utc() - u.used > u.rate_limit or force:
+                            create_future(u, priority=True)
+                            create_task(self.verifyDelete(u))
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):

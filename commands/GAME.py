@@ -839,10 +839,10 @@ class UpdateMimics(Database):
                     mimic.url = "https://cdn.discordapp.com/embed/avatars/0.png"
 
     async def __call__(self):
-        async with self.semaphore:
-            async with delay(2):
-                # Garbage collector for unassigned mimics
-                with tracebacksuppressor:
+        with tracebacksuppressor(SemaphoreOverflowError):
+            async with self.semaphore:
+                async with delay(2):
+                    # Garbage collector for unassigned mimics
                     i = 1
                     for m_id in tuple(self.data):
                         if type(m_id) is str:
