@@ -1318,12 +1318,26 @@ class UpdateMessageCount(Database):
 
     # What are the rate limits for the message history calls?
     async def getChannelHistory(self, channel, limit=None, callback=None):
+
+        async def delay_if_exc(channel):
+            t = utc()
+            history = channel.history(limit=limit, oldest_first=(limit is None))
+            try:
+                return await history.flatten()
+            except discord.Forbidden:
+                return []
+            except:
+                remaining = 20 - utc() + t
+                if remaining > 0:
+                    await asyncio.sleep(remaining)
+                raise
+
         while True:
             with tracebacksuppressor:
                 async with self.semaphore:
                     messages = []
                     # 16 attempts to download channel
-                    messages = await aretry(lambda: channel.history(limit=limit, oldest_first=(limit is None)).flatten(), attempts=16, delay=20)
+                    messages = await aretry(delay_if_exc, channel, attempts=16, delay=20)
                     break
         if callback:
             return await create_future(callback, channel=channel, messages=messages)

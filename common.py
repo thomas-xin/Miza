@@ -336,32 +336,75 @@ def noCodeBox(s):
     return s
 
 
+# A fuzzy substring search that returns the ratio of characters matched between two strings.
+def fuzzy_substring(sub, s, match_start=False):
+    match = 0
+    if not match_start or sub and s.startswith(sub[0]):
+        found = list(repeat(0, len(s)))
+        x = 0
+        for i, c in enumerate(sub):
+            temp = s[x:]
+            if temp.startswith(c):
+                if found[x] < 1:
+                    match += 1
+                    found[x] = 1
+                x += 1
+            elif c in temp:
+                y = temp.index(c)
+                x += y
+                if found[x] < 1:
+                    found[x] = 1
+                    match += 1 - y / len(s)
+                x += 1
+            else:
+                temp = s[:x]
+                if c in temp:
+                    y = temp.rindex(c)
+                    if found[y] < 1:
+                        match += 1 - (x - y) / len(s)
+                        found[y] = 1
+                    x = y + 1
+        if len(sub) > len(s):
+            match *= len(s) / len(sub)
+    # ratio = match / len(s)
+    ratio = max(0, min(1, match / len(s)))
+    return ratio
+
+
 # A string lookup operation with an iterable, multiple attempts, and sorts by priority.
-async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)], loose=True):
+async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)], loose=True, fuzzy=0):
     queries = qkey(query)
     qlist = [q for q in queries if q]
     if not qlist:
         qlist = list(queries)
-    cache = [[[inf, None], [inf, None]] for _ in qlist]
+    cache = [[[nan, None], [nan, None]] for _ in qlist]
     for x, i in enumerate(shuffle(it), 1):
         for c in ikey(i):
             if not c and i:
                 continue
-            for a, b in enumerate(qkey(c)):
-                if b == qlist[a]:
-                    return i
-                elif b.startswith(qlist[a]):
-                    if len(b) < cache[a][0][0]:
-                        cache[a][0] = [len(b), i]
-                elif loose and qlist[a] in b:
-                    if len(b) < cache[a][1][0]:
-                        cache[a][1] = [len(b), i]
+            if fuzzy:
+                for a, b in enumerate(qkey(c)):
+                    match = fuzzy_substring(qlist[a], b)
+                    if match >= 1:
+                        return i
+                    elif match >= fuzzy and not match <= cache[a][0][0]:
+                        cache[a][0] = [match, i]
+            else:
+                for a, b in enumerate(qkey(c)):
+                    if b == qlist[a]:
+                        return i
+                    elif b.startswith(qlist[a]):
+                        if not len(b) >= cache[a][0][0]:
+                            cache[a][0] = [len(b), i]
+                    elif loose and qlist[a] in b:
+                        if not len(b) >= cache[a][1][0]:
+                            cache[a][1] = [len(b), i]
         if not x & 1023:
             await asyncio.sleep(0.1)
     for c in cache:
         if c[0][0] < inf:
             return c[0][1]
-    if loose:
+    if loose and not fuzzy:
         for c in cache:
             if c[1][0] < inf:
                 return c[1][1]
@@ -411,6 +454,7 @@ verifySearch = lambda f: stripAcc(singleSpace(f.strip().translate(__strans)))
 urlFind = re.compile("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+")
 urlIs = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
 urlDiscord = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/")
+# This reminds me of Perl - Smudge
 findURLs = lambda url: re.findall(urlFind, url)
 isURL = lambda url: re.search(urlIs, url)
 isDiscordURL = lambda url: re.search(urlDiscord, url)

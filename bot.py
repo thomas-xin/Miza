@@ -301,6 +301,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                         u_id,
                         qkey=userQuery3,
                         ikey=userIter3,
+                        fuzzy=1 / 3,
                     )
                 try:
                     if type(u_id) is str:
@@ -1649,7 +1650,7 @@ def userQuery3(x):
     yield to_alphanumeric(x).replace(" ", "").casefold()
 
 def userIter3(x):
-    yield to_alphanumeric(x).replace(" ", "").casefold()
+    yield to_alphanumeric(x.name).replace(" ", "").casefold()
     yield to_alphanumeric(x.display_name).replace(" ", "").casefold()
 
 
@@ -1971,11 +1972,8 @@ async def heartbeatLoop():
                     await create_future(os.remove, bot.heartbeat, priority=True)
     bot.setshutdown()
 
-loop_inc = 0
-
 # The fast update loop that runs 96 times per second. Used for events where timing is important.
 def fastLoop():
-    global loop_inc
 
     async def event_call(freq):
         for i in range(freq):
@@ -1989,12 +1987,9 @@ def fastLoop():
             sent = bot.updateEmbeds()
             if sent:
                 await_fut(event_call(freq), delay=0.005, priority=True)
-                loop_inc += freq
             else:
                 with delay(1 / freq):
                     await_fut(bot.event("_call_"), delay=0.003, priority=True)
-                loop_inc += 1
-        loop_inc &= 2147483647
 
 # The lazy update loop that runs once every 2-4 seconds. Calls the bot database autosave event once every ~60 seconds.
 async def slowLoop():
