@@ -64,26 +64,22 @@ class IMG(Command):
         images = imglists.get(guild.id, {})
         if "a" in flags or "e" in flags or "d" in flags:
             if message.attachments:
-                args = [bestURL(a) for a in message.attachments] + args
-                argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
+                args = [best_url(a) for a in message.attachments] + args
+                argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
             req = 2
             if perm < req:
                 reason = "to change image list for " + guild.name
-                raise self.permError(perm, req, reason)
+                raise self.perm_error(perm, req, reason)
             if "a" in flags or "e" in flags:
-                lim = 64 << bot.isTrusted(guild.id) * 2 + 1
+                lim = 64 << bot.is_trusted(guild.id) * 2 + 1
                 if len(images) > lim:
-                    raise OverflowError(
-                        "Image list for " + guild.name
-                        + " has reached the maximum of " + str(lim) + " items. "
-                        + "Please remove an item to add another."
-                    )
+                    raise OverflowError(f"Image list for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
                 key = " ".join(args[:-1]).casefold()
                 if len(key) > 2000:
                     raise ArgumentError("Image tag too long.")
                 elif not key:
                     raise ArgumentError("Image tag must not be empty.")
-                urls = await bot.followURL(args[-1], best=True, allow=True, limit=1)
+                urls = await bot.follow_url(args[-1], best=True, allow=True, limit=1)
                 url = urls[0]
                 if len(url) > 2000:
                     raise ArgumentError("Image url too long.")
@@ -92,32 +88,19 @@ class IMG(Command):
                 imglists[guild.id] = images
                 update()
                 if not "h" in flags:
-                    return (
-                        "```css\nSuccessfully added [" + noHighlight(key)
-                        + "] to the image list for [" + noHighlight(guild.name) + "].```"
-                    )
+                    return css_md(f"Successfully added {sqr_md(key)} to the image list for {sqr_md(guild)}.")
             if not args:
                 # This deletes all images for the current guild
                 if "f" not in flags:
-                    response = uniStr(
-                        "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
-                        + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
-                    )
-                    return ("**```asciidoc\n[" + response + "]```**")
+                    return bot.dangerous_command
                 imglists[guild.id] = {}
                 update()
-                return (
-                    "*```css\nSuccessfully removed all images from the image list for ["
-                    + noHighlight(guild.name) + "].```*"
-                )
+                return italics(css_md(f"Successfully removed all images from the image list for {sqr_md(guild)}."))
             key = argv.casefold()
             images.pop(key)
             imglists[guild.id] = images
             update()
-            return (
-                "*```css\nSuccessfully removed [" + noHighlight(key)
-                + "] from the image list for [" + noHighlight(guild.name) + "].```*"
-            )
+            return italics(css_md(f"Successfully removed {sqr_md(key)} from the image list for {sqr_md(guild)}."))
         if not argv and not "r" in flags:
             # Set callback message for scrollable list
             return (
@@ -134,16 +117,16 @@ class IMG(Command):
         for _ in loop(r):
             sources.append(random.choice(tuple(images)))
         if not len(sources):
-            raise LookupError("Target image " + argv + " not found. Use img for list.")
+            raise LookupError(f"Target image {argv} not found. Use img for list.")
         url = random.choice(sources)
         if "v" in flags:
             return url
         emb = discord.Embed(
             url=url,
-            colour=randColour(),
+            colour=rand_colour(),
         )
         emb.set_image(url=url)
-        bot.embedSender(channel, embed=emb)
+        bot.send_embeds(channel, embed=emb)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_")]
@@ -180,22 +163,20 @@ class IMG(Command):
             + "-\n"
         )
         if not images:
-            content += "Image list for " + str(guild).replace("`", "") + " is currently empty.```*"
+            content += f"Image list for {str(guild).replace('`', '')} is currently empty.```*"
             msg = ""
         else:
-            content += str(len(images)) + " images currently assigned for " + str(guild).replace("`", "") + ":```*"
-            msg = "```ini\n" + strIter({k: "\n" + images[k] for k in tuple(images)[pos:pos + page]}) + "```"
+            content += f"{len(images)} images currently assigned for {str(guild).replace('`', '')}:```*"
+            msg = "```ini\n" + iter2str({k: "\n" + images[k] for k in tuple(images)[pos:pos + page]}) + "```"
         emb = discord.Embed(
             description=content + msg,
-            colour=randColour(),
+            colour=rand_colour(),
         )
-        url = bestURL(user)
+        url = best_url(user)
         emb.set_author(name=str(user), url=url, icon_url=url)
         more = len(images) - pos - page
         if more > 0:
-            emb.set_footer(
-                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
-            )
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
@@ -217,22 +198,18 @@ class React(Command):
     async def __call__(self, bot, flags, guild, message, user, argv, args, **void):
         update = self.data.reacts.update
         following = bot.data.reacts
-        curr = setDict(following, guild.id, mdict())
+        curr = set_dict(following, guild.id, mdict())
         if type(curr) is not mdict:
             following[guild.id] = curr = mdict(curr)
         if not argv:
             if "d" in flags:
                 # This deletes all auto reacts for the current guild
                 if "f" not in flags:
-                    response = uniStr(
-                        "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
-                        + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
-                    )
-                    return ("**```asciidoc\n[" + response + "]```**")
+                    return bot.dangerous_command
                 if guild.id in following:
                     following.pop(guild.id)
                     update()
-                return "*```css\nSuccessfully removed all auto reacts for [" + noHighlight(guild.name) + "].```*"
+                return italics(css_md(f"Successfully removed all auto reacts for {sqr_md(guild)}."))
             # Set callback message for scrollable list
             return (
                 "*```" + "\n" * ("z" in flags) + "callback-image-react-"
@@ -240,25 +217,18 @@ class React(Command):
                 + "-\nLoading React database...```*"
             )
         if "d" in flags:
-            a = reconstitute(argv).casefold()
+            a = unicode_prune(argv).casefold()
             if a in curr:
                 curr.pop(a)
                 update()
-                return (
-                    "*```css\nRemoved [" + noHighlight(a) + "] from the auto react list for ["
-                    + noHighlight(guild.name) + "].```*"
-                )
+                return italics(css_md(f"Removed {sqr_md(a)} from the auto react list for {sqr_md(guild)}."))
             else:
-                raise LookupError(str(a) + " is not in the auto react list.")
-        lim = 64 << bot.isTrusted(guild.id) * 2 + 1
+                raise LookupError(f"{a} is not in the auto react list.")
+        lim = 64 << bot.is_trusted(guild.id) * 2 + 1
         if curr.count() >= lim:
-            raise OverflowError(
-                "React list for " + guild.name
-                + " has reached the maximum of " + str(lim) + " items. "
-                + "Please remove an item to add another."
-            )
+            raise OverflowError(f"React list for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
         # Limit substring length to 64
-        a = reconstitute(" ".join(args[:-1])).casefold()[:64]
+        a = unicode_prune(" ".join(args[:-1])).casefold()[:64]
         try:
             e_id = int(args[-1])
         except:
@@ -270,10 +240,7 @@ class React(Command):
         curr.append(a, str(emoji))
         following[guild.id] = mdict({i: curr[i] for i in sorted(curr)})
         update()
-        return (
-            "```css\nAdded [" + noHighlight(a) + "] ➡️ [" + noHighlight(args[-1]) + "] to the auto react list for ["
-            + noHighlight(guild.name) + "].```"
-        )
+        return css_md(f"Added {sqr_md(a)} ➡️ {sqr_md(args[-1])} to the auto react list for {sqr_md(guild)}.")
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_")]
@@ -310,23 +277,21 @@ class React(Command):
             + "-\n"
         )
         if not curr:
-            content += "No currently assigned auto reactions for " + str(guild).replace("`", "") + ".```*"
+            content += f"No currently assigned auto reactions for {str(guild).replace('`', '')}.```*"
             msg = ""
         else:
-            content += str(len(curr)) + " auto reactions currently assigned for " + str(guild).replace("`", "") + ":```*"
+            content += f"{len(curr)} auto reactions currently assigned for {str(guild).replace('`', '')}:```*"
             key = lambda x: "\n" + ", ".join(x)
-            msg = "```ini\n" + strIter({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=key) + "```"
+            msg = "```ini\n" + iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=key) + "```"
         emb = discord.Embed(
             description=content + msg,
-            colour=randColour(),
+            colour=rand_colour(),
         )
-        url = bestURL(user)
+        url = best_url(user)
         emb.set_author(name=str(user), url=url, icon_url=url)
         more = len(curr) - pos - page
         if more > 0:
-            emb.set_footer(
-                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
-            )
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
@@ -349,17 +314,17 @@ class CreateEmoji(Command):
     async def __call__(self, bot, user, guild, channel, message, args, argv, **void):
         # Take input from any attachments, or otherwise the message contents
         if message.attachments:
-            args = [bestURL(a) for a in message.attachments] + args
-            argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
+            args = [best_url(a) for a in message.attachments] + args
+            argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args:
             raise ArgumentError("Please enter URL, emoji, or attached file to add.")
         with discord.context_managers.Typing(channel):
             url = args.pop(-1)
-            urls = await bot.followURL(url, best=True, allow=True, limit=1)
+            urls = await bot.follow_url(url, best=True, allow=True, limit=1)
             if not urls:
-                urls = await bot.followImage(argv)
+                urls = await bot.follow_to_image(argv)
                 if not urls:
-                    urls = await bot.followImage(url)
+                    urls = await bot.follow_to_image(url)
                     if not urls:
                         raise ArgumentError("Please input an image by URL or attachment.")
             url = urls[0]
@@ -377,7 +342,7 @@ class CreateEmoji(Command):
                 await create_future(f.write, image, timeout=18)
                 await create_future(f.close, timeout=18)
                 try:
-                    resp = await imageProc(path, "resize_max", [128], guild, timeout=32)
+                    resp = await process_image(path, "resize_max", [128], guild, timeout=32)
                 except:
                     with suppress():
                         os.remove(path)
@@ -394,10 +359,7 @@ class CreateEmoji(Command):
             emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
             # This reaction indicates the emoji was created successfully
             await message.add_reaction(emoji)
-        return (
-           "```css\nSuccessfully created emoji [" + noHighlight(emoji) + "] in ["
-            + noHighlight(guild.name) + "].```"
-        )
+        return css_md(f"Successfully created emoji {sqr_md(emoji)} for {sqr_md(guild)}.")
 
 
 # Char2Emoj, a simple script to convert a string into a block of text
@@ -491,7 +453,7 @@ def _c2e(string, em1, em2):
     print("[" + em1 + "]", "[" + em2 + "]")
     if len(em1) + len(em2) > 2 and ":" in em1 + em2:
         return output
-    return "```fix\n" + output + "```"
+    return fix_md(output)
 
 
 class Char2Emoj(Command):
@@ -518,16 +480,16 @@ class Char2Emoj(Command):
 async def get_image(bot, user, message, args, argv, ext="png"):
     # Take input from any attachments, or otherwise the message contents
     if message.attachments:
-        args = [bestURL(a) for a in message.attachments] + args
-        argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
+        args = [best_url(a) for a in message.attachments] + args
+        argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
     if not args:
         raise ArgumentError("Please input an image by URL or attachment.")
     url = args.pop(0)
-    urls = await bot.followURL(url, best=True, allow=True, limit=1)
+    urls = await bot.follow_url(url, best=True, allow=True, limit=1)
     if not urls:
-        urls = await bot.followImage(argv)
+        urls = await bot.follow_to_image(argv)
         if not urls:
-            urls = await bot.followImage(url)
+            urls = await bot.follow_to_image(url)
             if not urls:
                 raise ArgumentError("Please input an image by URL or attachment.")
     url = urls[0]
@@ -535,9 +497,9 @@ async def get_image(bot, user, message, args, argv, ext="png"):
     if not value:
         value = 2
     else:
-        value = await bot.evalMath(value, user)
-        if not abs(value) <= 16:
-            raise OverflowError("Maximum multiplier input is 16.")
+        value = await bot.eval_math(value, user)
+        if not abs(value) <= 64:
+            raise OverflowError("Maximum multiplier input is 64.")
     # Try and find a good name for the output image
     try:
         name = url[url.rindex("/") + 1:]
@@ -565,7 +527,7 @@ class Saturate(Command):
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await imageProc(url, "Enhance", ["Color", value], user, timeout=28)
+            resp = await process_image(url, "Enhance", ["Color", value], user, timeout=28)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -573,7 +535,7 @@ class Saturate(Command):
                         name = name[:name.rindex(".")]
                     name += ".gif"
             f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f, filename=fn)
+        await send_with_file(message.channel, "", f, filename=fn)
 
 
 class Contrast(Command):
@@ -589,7 +551,7 @@ class Contrast(Command):
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await imageProc(url, "Enhance", ["Contrast", value], user, timeout=28)
+            resp = await process_image(url, "Enhance", ["Contrast", value], user, timeout=28)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -597,7 +559,7 @@ class Contrast(Command):
                         name = name[:name.rindex(".")]
                     name += ".gif"
             f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f, filename=fn)
+        await send_with_file(message.channel, "", f, filename=fn)
 
 
 class Brightness(Command):
@@ -613,7 +575,7 @@ class Brightness(Command):
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await imageProc(url, "Enhance", ["Brightness", value], user, timeout=28)
+            resp = await process_image(url, "Enhance", ["Brightness", value], user, timeout=28)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -621,7 +583,7 @@ class Brightness(Command):
                         name = name[:name.rindex(".")]
                     name += ".gif"
             f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f, filename=fn)
+        await send_with_file(message.channel, "", f, filename=fn)
 
 
 class Sharpness(Command):
@@ -637,7 +599,7 @@ class Sharpness(Command):
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await imageProc(url, "Enhance", ["Sharpness", value], user, timeout=28)
+            resp = await process_image(url, "Enhance", ["Sharpness", value], user, timeout=28)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -645,7 +607,7 @@ class Sharpness(Command):
                         name = name[:name.rindex(".")]
                     name += ".gif"
             f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f, filename=fn)
+        await send_with_file(message.channel, "", f, filename=fn)
 
 
 class HueShift(Command):
@@ -661,7 +623,7 @@ class HueShift(Command):
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await imageProc(url, "hue_shift", [value], user, timeout=32)
+            resp = await process_image(url, "hue_shift", [value], user, timeout=32)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -669,7 +631,7 @@ class HueShift(Command):
                         name = name[:name.rindex(".")]
                     name += ".gif"
             f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f, filename=fn)
+        await send_with_file(message.channel, "", f, filename=fn)
 
 
 class Colour(Command):
@@ -690,7 +652,7 @@ class Colour(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, name, argv, **void):
-        argv = singleSpace(argv.replace("#", "").replace(",", " ")).strip()
+        argv = single_space(argv.replace("#", "").replace(",", " ")).strip()
         # Try to parse as colour tuple first
         if " " in argv:
             channels = [min(255, max(0, int(round(float(i.strip()))))) for i in argv.split(" ")[:5] if i]
@@ -716,22 +678,21 @@ class Colour(Command):
             channels = [round(x * 255) for x in self.trans[name](adj)]
         adj = [x / 255 for x in channels]
         # Any exceptions encountered during colour transformations will immediately terminate the command
-        msg = (
-            "```ini\nHEX colour code: " + sbHighlight(bytes(channels).hex().upper())
-            + "\nDEC colour code: " + sbHighlight(colour2Raw(channels))
+        msg = ini_md(
+            "HEX colour code: " + sqr_md(bytes(channels).hex().upper())
+            + "\nDEC colour code: " + sqr_md(colour2raw(channels))
             + "\nRGB values: " + str(channels)
-            + "\nHSV values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_hsv(adj)))
-            + "\nCMY values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_cmy(adj)))
-            + "\nLAB values: " + sbHighlight(", ".join(str(round(x)) for x in rgb_to_lab(adj)))
-            + "\nLUV values: " + sbHighlight(", ".join(str(round(x)) for x in rgb_to_luv(adj)))
-            + "\nXYZ values: " + sbHighlight(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
-            + "```"
+            + "\nHSV values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_hsv(adj)))
+            + "\nCMY values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_cmy(adj)))
+            + "\nLAB values: " + sqr_md(", ".join(str(round(x)) for x in rgb_to_lab(adj)))
+            + "\nLUV values: " + sqr_md(", ".join(str(round(x)) for x in rgb_to_luv(adj)))
+            + "\nXYZ values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
         )
         with discord.context_managers.Typing(channel):
-            resp = await imageProc("from_colour", "$", [channels], user)
+            resp = await process_image("from_colour", "$", [channels], user)
             fn = resp[0]
             f = discord.File(fn, filename="colour.png")
-        await sendFile(channel, msg, f, filename=fn, best=True)
+        await send_with_file(channel, msg, f, filename=fn, best=True)
 
 
 class Rainbow(Command):
@@ -748,10 +709,10 @@ class Rainbow(Command):
         name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
         with discord.context_managers.Typing(channel):
             # $%GIF%$ signals to image subprocess that the output is always a .gif image
-            resp = await imageProc(url, "rainbow_gif", [value, "$%GIF%$"], user, timeout=40)
+            resp = await process_image(url, "rainbow_gif", [value, "$%GIF%$"], user, timeout=40)
             fn = resp[0]
             f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f, filename=fn)
+        await send_with_file(message.channel, "", f, filename=fn)
 
 
 class CreateGIF(Command):
@@ -768,12 +729,12 @@ class CreateGIF(Command):
     async def __call__(self, bot, user, guild, channel, message, flags, args, **void):
         # Take input from any attachments, or otherwise the message contents
         if message.attachments:
-            args += [bestURL(a) for a in message.attachments]
+            args += [best_url(a) for a in message.attachments]
         if not args:
             raise ArgumentError("Please input images by URL or attachment.")
         if "r" in flags:
             fr = args.pop(-1)
-            rate = await bot.evalMath(fr, user)
+            rate = await bot.eval_math(fr, user)
         else:
             rate = 16
         # Validate framerate values to prevent issues further down the line
@@ -789,23 +750,23 @@ class CreateGIF(Command):
         with discord.context_managers.Typing(channel):
             video = None
             for i, url in enumerate(args):
-                urls = await bot.followURL(url, best=True, allow=True, limit=1)
+                urls = await bot.follow_url(url, best=True, allow=True, limit=1)
                 url = urls[0]
                 if "discord" not in url and "channels" not in url:
                     url, size, dur, fps = await create_future(get_video, url, 16, timeout=60)
                     if size and dur and fps:
                         video = (url, size, dur, fps)
                 if not url:
-                    raise ArgumentError("Invalid URL detected: \"" + url + '"')
+                    raise ArgumentError(f'Invalid URL detected: "{url}".')
                 args[i] = url
             name = "unknown.gif"
             if video is not None:
-                resp = await imageProc("create_gif", "$", ["video", video, delay], user, timeout=96)
+                resp = await process_image("create_gif", "$", ["video", video, delay], user, timeout=96)
             else:
-                resp = await imageProc("create_gif", "$", ["image", args, delay], user, timeout=96)
+                resp = await process_image("create_gif", "$", ["image", args, delay], user, timeout=96)
             fn = resp[0]
             f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f, filename=fn)
+        await send_with_file(message.channel, "", f, filename=fn)
 
 
 class Resize(Command):
@@ -822,22 +783,19 @@ class Resize(Command):
     async def __call__(self, bot, user, guild, channel, message, flags, args, argv, **void):
         # Take input from any attachments, or otherwise the message contents
         if message.attachments:
-            args = [bestURL(a) for a in message.attachments] + args
-            argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
+            args = [best_url(a) for a in message.attachments] + args
+            argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args:
             if "l" in flags:
-                return (
-                    "```ini\nAvailable scaling operations: ["
-                    + "nearest, linear, hamming, bicubic, lanczos, auto]```"
-                )
+                return ini_md("Available scaling operations: [nearest, linear, hamming, bicubic, lanczos, auto]")
             raise ArgumentError("Please input an image by URL or attachment.")
         with discord.context_managers.Typing(channel):
             url = args.pop(0)
-            urls = await bot.followURL(url, best=True, allow=True, limit=1)
+            urls = await bot.follow_url(url, best=True, allow=True, limit=1)
             if not urls:
-                urls = await bot.followImage(argv)
+                urls = await bot.follow_to_image(argv)
                 if not urls:
-                    urls = await bot.followImage(url)
+                    urls = await bot.follow_to_image(url)
                     if not urls:
                         raise ArgumentError("Please input an image by URL or attachment.")
             url = urls[0]
@@ -852,14 +810,14 @@ class Resize(Command):
                     spl = shlex.split(value)
                 except ValueError:
                     spl = value.split()
-                x = await bot.evalMath(spl.pop(0), user)
+                x = await bot.eval_math(spl.pop(0), user)
                 if spl:
-                    y = await bot.evalMath(spl.pop(0), user)
+                    y = await bot.eval_math(spl.pop(0), user)
                 else:
                     y = x
                 for value in (x, y):
-                    if not value >= -16 or not value <= 16:
-                        raise OverflowError("Maximum multiplier input is 16.")
+                    if not value >= -32 or not value <= 32:
+                        raise OverflowError("Maximum multiplier input is 32.")
                 if spl:
                     op = " ".join(spl)
                 else:
@@ -875,7 +833,7 @@ class Resize(Command):
                 name = "unknown"
             if not name.endswith(".png"):
                 name += ".png"
-            resp = await imageProc(url, "resize_mult", [x, y, op], user, timeout=36)
+            resp = await process_image(url, "resize_mult", [x, y, op], user, timeout=36)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -883,7 +841,7 @@ class Resize(Command):
                         name = name[:name.rindex(".")]
                     name += ".gif"
             f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f, filename=fn)
+        await send_with_file(message.channel, "", f, filename=fn)
 
 
 class Magik(Command):
@@ -905,11 +863,11 @@ class Magik(Command):
             raise ArgumentError("Please input an image by URL or attachment.")
         with discord.context_managers.Typing(channel):
             url = args.pop(0)
-            urls = await bot.followURL(url, best=False, allow=True, limit=1)
+            urls = await bot.follow_url(url, best=False, allow=True, limit=1)
             if not urls:
-                urls = await bot.followImage(argv)
+                urls = await bot.follow_to_image(argv)
                 if not urls:
-                    urls = await bot.followImage(url)
+                    urls = await bot.follow_to_image(url)
                     if not urls:
                         raise ArgumentError("Please input an image by URL or attachment.")
             url = urls[0]
@@ -926,7 +884,7 @@ class Magik(Command):
                 name += ".png"
             # Site only allows cdn.discord URLs, reupload images to discord temporarily for all other image links
             if "cdn.discord" not in url[:32]:
-                resp = await imageProc(url, "resize_max", [512, "hamming"], user)
+                resp = await process_image(url, "resize_max", [512, "hamming"], user)
                 fn = resp[0]
                 f = discord.File(fn, filename=name)
                 msg = await channel.send(file=f)
@@ -936,16 +894,16 @@ class Magik(Command):
             else:
                 msg = None
             try:
-                resp = await Request("https://api.alexflipnote.dev/filter/magik?image=" + url, timeout=48, aio=True)
+                resp = await Request(f"https://api.alexflipnote.dev/filter/magik?image={url}", timeout=48, aio=True)
             except:
                 if msg is not None:
-                    await bot.silentDelete(msg)
+                    await bot.silent_delete(msg)
                 raise
             if msg is not None:
-                create_task(bot.silentDelete(msg))
+                create_task(bot.silent_delete(msg))
             b = resp
             f = discord.File(io.BytesIO(b), filename=name)
-        await sendFile(message.channel, "", f)
+        await send_with_file(message.channel, "", f)
 
 
 class Fill(Command):
@@ -962,22 +920,22 @@ class Fill(Command):
     async def __call__(self, bot, user, guild, channel, message, flags, args, argv, **void):
         # Take input from any attachments, or otherwise the message contents
         if message.attachments:
-            args = [bestURL(a) for a in message.attachments] + args
-            argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
+            args = [best_url(a) for a in message.attachments] + args
+            argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args:
             raise ArgumentError("Please input an image by URL or attachment.")
         with discord.context_managers.Typing(channel):
             url = args.pop(0)
-            urls = await bot.followURL(url, best=True, allow=True, limit=1)
+            urls = await bot.follow_url(url, best=True, allow=True, limit=1)
             if not urls:
-                urls = await bot.followImage(argv)
+                urls = await bot.follow_to_image(argv)
                 if not urls:
-                    urls = await bot.followImage(url)
+                    urls = await bot.follow_to_image(url)
                     if not urls:
                         raise ArgumentError("Please input an image by URL or attachment.")
             url = urls[0]
             if is_numeric(args[-1]):
-                value = await bot.evalMath(args.pop(-1), user)
+                value = await bot.eval_math(args.pop(-1), user)
                 if type(value) is float:
                     if abs(value) <= 1:
                         value = round(value * 255)
@@ -998,7 +956,7 @@ class Fill(Command):
                 name = "unknown"
             if not name.endswith(".png"):
                 name += ".png"
-            resp = await imageProc(url, "fill_channels", [value, *args], user, timeout=36)
+            resp = await process_image(url, "fill_channels", [value, *args], user, timeout=36)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -1006,7 +964,7 @@ class Fill(Command):
                         name = name[:name.rindex(".")]
                     name += ".gif"
             f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f, filename=fn)
+        await send_with_file(message.channel, "", f, filename=fn)
 
 
 class Blend(Command):
@@ -1023,33 +981,33 @@ class Blend(Command):
     async def __call__(self, bot, user, guild, channel, message, flags, args, argv, **void):
         # Take input from any attachments, or otherwise the message contents
         if message.attachments:
-            args = [bestURL(a) for a in message.attachments] + args
-            argv = " ".join(bestURL(a) for a in message.attachments) + " " * bool(argv) + argv
+            args = [best_url(a) for a in message.attachments] + args
+            argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args:
             if "l" in flags:
-                return (
-                    "```ini\nAvailable blend operations: ["
+                return ini_md(
+                    "Available blend operations: ["
                     + "replace, add, sub, mul, div, mod, and, or, xor, nand, nor, xnor, "
                     + "difference, overlay, screen, soft, hard, lighten, darken, "
-                    + "burn, linearburn, dodge, lineardodge, hue, sat, lum, extract, merge]```"
+                    + "burn, linearburn, dodge, lineardodge, hue, sat, lum, extract, merge]"
                 )
             raise ArgumentError("Please input an image by URL or attachment.")
         with discord.context_managers.Typing(channel):
-            urls = await bot.followURL(args.pop(0), best=True, allow=True, limit=1)
+            urls = await bot.follow_url(args.pop(0), best=True, allow=True, limit=1)
             if urls:
                 url1 = urls[0]
             else:
                 url1 = None
-            urls = await bot.followURL(args.pop(0), best=True, allow=True, limit=1)
+            urls = await bot.follow_url(args.pop(0), best=True, allow=True, limit=1)
             if urls:
                 url2 = urls[0]
             else:
                 url1 = None
             fromA = False
             if not url1 or not url2:
-                urls = await bot.followImage(argv)
+                urls = await bot.follow_to_image(argv)
                 if not urls:
-                    urls = await bot.followImage(url)
+                    urls = await bot.follow_to_image(url)
                     if not urls:
                         raise ArgumentError("Please input an image by URL or attachment.")
                 if not url1:
@@ -1070,11 +1028,11 @@ class Blend(Command):
                     spl = value.split()
                 operation = spl.pop(0)
                 if spl:
-                    opacity = await bot.evalMath(spl.pop(-1), user)
+                    opacity = await bot.eval_math(spl.pop(-1), user)
                 else:
                     opacity = 1
-                if not opacity >= -16 or not opacity <= 16:
-                    raise OverflowError("Maximum multiplier input is 16.")
+                if not opacity >= -256 or not opacity <= 256:
+                    raise OverflowError("Maximum multiplier input is 256.")
                 if spl:
                     operation += " ".join(spl)
                 if not operation:
@@ -1090,7 +1048,7 @@ class Blend(Command):
                 name = "unknown"
             if not name.endswith(".png"):
                 name += ".png"
-            resp = await imageProc(url1, "blend_op", [url2, operation, opacity], user, timeout=32)
+            resp = await process_image(url1, "blend_op", [url2, operation, opacity], user, timeout=32)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -1098,7 +1056,7 @@ class Blend(Command):
                         name = name[:name.rindex(".")]
                     name += ".gif"
             f = discord.File(fn, filename=name)
-        await sendFile(message.channel, "", f, filename=fn)
+        await send_with_file(message.channel, "", f, filename=fn)
 
 
 class Cat(Command):
@@ -1173,10 +1131,10 @@ class Cat(Command):
             return text
         emb = discord.Embed(
             url=url,
-            colour=randColour(),
+            colour=rand_colour(),
         )
         emb.set_image(url=url)
-        self.bot.embedSender(channel, embed=emb)
+        self.bot.send_embeds(channel, embed=emb)
 
 
 class Dog(Command):
@@ -1254,10 +1212,10 @@ class Dog(Command):
             return text
         emb = discord.Embed(
             url=url,
-            colour=randColour(),
+            colour=rand_colour(),
         )
         emb.set_image(url=url)
-        self.bot.embedSender(channel, embed=emb)
+        self.bot.send_embeds(channel, embed=emb)
 
 
 class _8Ball(Command):
@@ -1301,10 +1259,10 @@ class _8Ball(Command):
         url = self.get_buffer(64)
         emb = discord.Embed(
             url=url,
-            colour=randColour(),
+            colour=rand_colour(),
         )
         emb.set_image(url=url)
-        self.bot.embedSender(channel, embed=emb)
+        self.bot.send_embeds(channel, embed=emb)
 
 
 class UpdateImages(Database):

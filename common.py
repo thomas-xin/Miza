@@ -2,7 +2,7 @@ import smath
 from smath import *
 
 with MultiThreadedImporter(globals()) as importer:
-    importer.__import__("os", "importlib", "inspect", "tracemalloc", "psutil", "subprocess", "asyncio", "discord", "json", "pytz", "requests", "aiohttp", "psutil")
+    importer.__import__("os", "importlib", "inspect", "tracemalloc", "psutil", "subprocess", "asyncio", "discord", "json", "pytz", "requests", "aiohttp", "psutil", "threading")
 
 PROC = psutil.Process()
 quit = lambda *args, **kwargs: PROC.kill()
@@ -12,13 +12,14 @@ tracemalloc.start()
 import urllib.request, urllib.parse
 
 python = ("python3", "python")[os.name == "nt"]
-urlParse = urllib.parse.quote
+url_parse = urllib.parse.quote
 escape_markdown = discord.utils.escape_markdown
 escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere").replace("<@&", "<@\xad&")
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
 
 
+# Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks.
 class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
     def __init__(self, limit=256, buffer=32, delay=0.05):
@@ -31,7 +32,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     def __enter__(self):
         if self.active >= self.limit:
             if self.passive >= self.buffer:
-                raise SemaphoreOverflowError("Semaphore object of limit " + str(self.limit) + " overloaded by " + str(self.passive))
+                raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
             self.passive += 1
             while self.active >= self.limit:
                 time.sleep(self.delay)
@@ -42,7 +43,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     async def __aenter__(self):
         if self.active >= self.limit:
             if self.passive >= self.buffer:
-                raise SemaphoreOverflowError("Semaphore object of limit " + str(self.limit) + " overloaded by " + str(self.passive))
+                raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
             self.passive += 1
             while self.active >= self.limit:
                 await asyncio.sleep(self.delay)
@@ -61,7 +62,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
             await asyncio.sleep(self.delay)
 
 class SemaphoreOverflowError(RuntimeError):
-    pass
+    __slots__ = ()
 
 
 # A context manager that sends exception tracebacks to stdout.
@@ -89,12 +90,51 @@ class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.Abstract
 tracebacksuppressor = TracebackSuppressor()
 
 
+# Sends an exception into the target discord sendable, with the autodelete react.
+send_exception = lambda sendable, ex: send_with_react(sendable, exc_repr(ex), reacts="❎")
+
+
+# A context manager that sends exception tracebacks to a sendable.
+class ExceptionSender(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+
+    def __init__(self, sendable, *args, **kwargs):
+        self.sendable = sendable
+        self.exceptions = args + tuple(kwargs.values())
+    
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        if exc_type and exc_value:
+            for exception in self.exceptions:
+                if issubclass(type(exc_value), exception):
+                    create_task(send_exception(self.sendable, exc_value))
+                    return True
+            create_task(send_exception(self.sendable, exc_value))
+            with tracebacksuppressor:
+                raise exc_value
+        return True
+
+    async def __aexit__(self, exc_type, exc_value, exc_tb):
+        if exc_type and exc_value:
+            for exception in self.exceptions:
+                if issubclass(type(exc_value), exception):
+                    await send_exception(self.sendable, exc_value)
+                    return True
+            await send_exception(self.sendable, exc_value)
+            with tracebacksuppressor:
+                raise exc_value
+        return True
+
+    __call__ = lambda self, *args, **kwargs: self.__class__(*args, **kwargs)
+
+
 # A context manager that delays the return of a function call.
-class delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator):
+class delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
     def __init__(self, duration=0):
         self.duration = duration
         self.start = utc()
+
+    def __call__(self):
+        return self.exit()
     
     def __exit__(self, *args):
         remaining = self.duration - utc() + self.start
@@ -107,23 +147,31 @@ class delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextMa
             await asyncio.sleep(remaining)
 
 
-def retry(func, *args, attempts=5, delay=1, **kwargs):
+# Repeatedly retries a synchronous operation, with optional break exceptions.
+def retry(func, *args, attempts=5, delay=1, exc=(), **kwargs):
     for i in range(attempts):
+        t = utc()
         try:
             return func(*args, **kwargs)
-        except:
-            if i >= attempts - 1:
+        except BaseException as ex:
+            if i >= attempts - 1 or ex in exc:
                 raise
-        time.sleep(delay)
+        remaining = delay - utc() + t
+        if remaining > 0:
+            time.sleep(delay)
 
-async def aretry(func, *args, attempts=5, delay=1, **kwargs):
+# Repeatedly retries a asynchronous operation, with optional break exceptions.
+async def aretry(func, *args, attempts=5, delay=1, exc=(), **kwargs):
     for i in range(attempts):
+        t = utc()
         try:
             return await func(*args, **kwargs)
-        except:
-            if i >= attempts - 1:
+        except BaseException as ex:
+            if i >= attempts - 1 or ex in exc:
                 raise
-        await asyncio.sleep(delay)
+        remaining = delay - utc() + t
+        if remaining > 0:
+            await asyncio.sleep(delay)
 
 
 # For compatibility with versions of asyncio and concurrent.futures that have the exceptions stored in a different module
@@ -143,11 +191,17 @@ except AttributeError:
     except AttributeError:
         T2 = TimeoutError
 
+try:
+    ISE = asyncio.exceptions.InvalidStateError
+except AttributeError:
+    ISE = asyncio.InvalidStateError
+
 
 class ArgumentError(LookupError):
-    pass
+    __slots__ = ()
+
 class TooManyRequests(PermissionError):
-    pass
+    __slots__ = ()
 
 
 # Safer than raw eval, more powerful than json.decode
@@ -158,7 +212,7 @@ def eval_json(s):
 
 
 # Decodes HTML encoded characters in a string.
-def htmlDecode(s):
+def html_decode(s):
     while len(s) > 7:
         try:
             i = s.index("&#")
@@ -204,36 +258,46 @@ ESCAPE_T2 = {
 }
 __emap2 = "".maketrans(ESCAPE_T2)
 
-noHighlight = lambda s: str(s).translate(__emap)
-clrHighlight = lambda s: str(s).translate(__emap2)
-sbHighlight = lambda s: "[" + noHighlight(s) + "]"
+# Discord markdown format helper functions
+no_md = lambda s: str(s).translate(__emap)
+clr_md = lambda s: str(s).translate(__emap2)
+sqr_md = lambda s: f"[{no_md(s)}]" if not issubclass(type(s), discord.abc.GuildChannel) else f"[#{no_md(s)}]"
+italics = lambda s: f"*{s}*"
+bold = lambda s: f"**{s}**"
+single_md = lambda s: f"`{s}`"
+code_md = lambda s: f"```\n{s}```"
+py_md = lambda s: f"```py\n{s}```"
+ini_md = lambda s: f"```ini\n{s}```"
+css_md = lambda s: f"```css\n{s}```"
+fix_md = lambda s: f"```fix\n{s}```"
+
+# Discord object mention formatting
+user_mention = lambda u_id: f"<@{u_id}>"
+user_pc_mention = lambda u_id: f"<@!{u_id}>"
+channel_mention = lambda c_id: f"<#{c_id}>"
+role_mention = lambda r_id: f"<@&{r_id}>"
 
 
 # Counts the number of lines in a file.
-def getLineCount(fn):
-    with open(fn, "rb") as f:
-        count = 1
-        size = 0
-        while True:
-            try:
-                i = f.read(32768)
-                if not i:
-                    raise EOFError
-                size += len(i)
-                count += i.count(b"\n")
-            except EOFError:
-                return hlist((size, count))
+def line_count(fn):
+    with open(fn, "r", encoding="utf-8") as f:
+        data = f.read()
+        return hlist((len(data), data.count("\n") + 1))
 
 
 # Checks if a file is a python code file using its filename extension.
-iscode = lambda fn: str(fn).endswith(".py") or str(fn).endswith(".pyw")
+is_code = lambda fn: str(fn).endswith(".py") or str(fn).endswith(".pyw")
+
+def touch(file):
+    with open(file, "ab"):
+        pass
 
 
 # Checks if an object can be used in "await" operations.
 awaitable = lambda obj: hasattr(obj, "__await__") or issubclass(type(obj), asyncio.Future) or issubclass(type(obj), asyncio.Task) or inspect.isawaitable(obj)
 
 # Async function that waits for a given time interval if the result of the input coroutine is None.
-async def waitOnNone(coro, seconds=0.5):
+async def wait_on_none(coro, seconds=0.5):
     resp = await coro
     if resp is None:
         await asyncio.sleep(seconds)
@@ -258,14 +322,14 @@ async def recursive_coro(item):
 
 
 # Sends a message to a channel, then adds reactions accordingly.
-async def sendReact(channel, *args, reacts=(), **kwargs):
+async def send_with_react(channel, *args, reacts=(), **kwargs):
     with tracebacksuppressor:
         sent = await channel.send(*args, **kwargs)
         for react in reacts:
             await sent.add_reaction(react)
 
 # Sends a message to a channel, then edits to add links to all attached files.
-async def sendFile(channel, msg, file, filename=None, best=False):
+async def send_with_file(channel, msg, file, filename=None, best=False):
     try:
         message = await channel.send(msg, file=file)
         if filename is not None:
@@ -275,29 +339,33 @@ async def sendFile(channel, msg, file, filename=None, best=False):
             create_future_ex(os.remove, filename, priority=True)
         raise
     if message.attachments:
-        await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + bestURL(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
+        await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
+
+
+# Creates and starts a coroutine for typing in a channel.
+typing = lambda self: create_task(self.trigger_typing())
 
 
 # Finds the best URL for a discord object's icon.
-bestURL = lambda obj: obj if type(obj) is str else (strURL(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if obj.proxy_url else obj.url))
+best_url = lambda obj: obj if type(obj) is str else (to_png(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if obj.proxy_url else obj.url))
 
 
 # Finds emojis and user mentions in a string.
-emojiFind = re.compile("<.?:[^<>:]+:[0-9]+>")
-findEmojis = lambda s: re.findall(emojiFind, s)
-userFind = re.compile("<@!?[0-9]+>")
-findUsers = lambda s: re.findall(userFind, s)
+__emojiFind = re.compile("<.?:[^<>:]+:[0-9]+>")
+__userFind = re.compile("<@!?[0-9]+>")
+find_emojis = lambda s: re.findall(__emojiFind, s)
+find_users = lambda s: re.findall(__userFind, s)
 
 
 # Returns a string representation of a message object.
-def strMessage(message, limit=1024, username=False):
+def message_repr(message, limit=1024, username=False):
     c = message.content
     s = getattr(message, "system_content", None)
     if s and len(s) > len(c):
         c = s
     if username:
-        c = "<@" + str(message.author.id) + ">:\n" + c
-    data = limStr(c, limit)
+        c = user_mention(message.author.id) + ":\n" + c
+    data = lim_str(c, limit)
     if message.attachments:
         data += "\n[" + ", ".join(i.url for i in message.attachments) + "]"
     if message.embeds:
@@ -308,71 +376,40 @@ def strMessage(message, limit=1024, username=False):
         t = message.created_at
         if message.edited_at:
             t = message.edited_at
-        data += "\n`(" + str(t) + ")`"
+        data += f"\n`({t})`"
     if not data:
-        data = "```css\n" + uniStr("[EMPTY MESSAGE]") + "```"
-    return limStr(data, limit)
+        data = css_md(uni_str("[EMPTY MESSAGE]"))
+    return lim_str(data, limit)
+
+exc_repr = lambda ex: lim_str(py_md(f"Error: {repr(ex).replace('`', '')}"), 2000)
 
 # Returns a string representation of an activity object.
-def strActivity(activity):
+def activity_repr(activity):
     if hasattr(activity, "type") and activity.type != discord.ActivityType.custom:
         t = activity.type.name
-        return t[0].upper() + t[1:] + " " + activity.name
+        if t == "listening":
+            t += " to"
+        return f"{t.capitalize()} {activity.name}"
     return str(activity)
 
 
 # Alphanumeric string regular expression.
-atrans = re.compile("[^a-z 0-9]", re.I)
-ntrans = re.compile("[0-9]", re.I)
-is_alphanumeric = lambda string: not re.search(atrans, string)
-to_alphanumeric = lambda string: singleSpace(re.sub(atrans, " ", reconstitute(string)))
-is_numeric = lambda string: re.search(ntrans, string)
+__atrans = re.compile("[^a-z 0-9]", re.I)
+__ntrans = re.compile("[0-9]", re.I)
+is_alphanumeric = lambda string: not re.search(__atrans, string)
+to_alphanumeric = lambda string: single_space(re.sub(__atrans, " ", unicode_prune(string)))
+is_numeric = lambda string: re.search(__ntrans, string)
 
 
 # Strips code box from the start and end of a message.
-def noCodeBox(s):
+def strip_code_box(s):
     if s.startswith("```") and s.endswith("```"):
         s = s[s.index("\n") + 1:-3]
     return s
 
 
-# A fuzzy substring search that returns the ratio of characters matched between two strings.
-def fuzzy_substring(sub, s, match_start=False):
-    match = 0
-    if not match_start or sub and s.startswith(sub[0]):
-        found = list(repeat(0, len(s)))
-        x = 0
-        for i, c in enumerate(sub):
-            temp = s[x:]
-            if temp.startswith(c):
-                if found[x] < 1:
-                    match += 1
-                    found[x] = 1
-                x += 1
-            elif c in temp:
-                y = temp.index(c)
-                x += y
-                if found[x] < 1:
-                    found[x] = 1
-                    match += 1 - y / len(s)
-                x += 1
-            else:
-                temp = s[:x]
-                if c in temp:
-                    y = temp.rindex(c)
-                    if found[y] < 1:
-                        match += 1 - (x - y) / len(s)
-                        found[y] = 1
-                    x = y + 1
-        if len(sub) > len(s):
-            match *= len(s) / len(sub)
-    # ratio = match / len(s)
-    ratio = max(0, min(1, match / len(s)))
-    return ratio
-
-
 # A string lookup operation with an iterable, multiple attempts, and sorts by priority.
-async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)], loose=True, fuzzy=0):
+async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)], loose=True, fuzzy=0):
     queries = qkey(query)
     qlist = [q for q in queries if q]
     if not qlist:
@@ -408,15 +445,15 @@ async def strLookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)],
         for c in cache:
             if c[1][0] < inf:
                 return c[1][1]
-    raise LookupError("No results for " + str(query) + ".")
+    raise LookupError(f"No results for {query}.")
 
 
 # Generates a random colour across the spectrum, in intervals of 128.
-randColour = lambda: colour2Raw(colourCalculation(xrand(12) * 128))
+rand_colour = lambda: colour2raw(hue2colour(xrand(12) * 128))
 
 
 # Gets the string representation of a url object with the maximum allowed image size for discord, replacing webp with png format when possible.
-def strURL(url):
+def to_png(url):
     if type(url) is not str:
         url = str(url)
     if url.endswith("?size=1024"):
@@ -435,30 +472,46 @@ __imap = {
 }
 __itrans = "".maketrans(__imap)
 
-def verifyID(value):
-    with suppress(ValueError):
-        return int(str(value).translate(__itrans))
-    return value
+def verify_id(obj):
+    if type(obj) is int:
+        return obj
+    if type(obj) is str:
+        with suppress(ValueError):
+            return int(str(obj).translate(__itrans))
+        return obj
+    with suppress(AttributeError):
+        return obj.id
+    return int(obj)
 
 
 # Strips <> characters from URLs.
-def stripAcc(url):
+def strip_acc(url):
     if url.startswith("<") and url[-1] == ">":
         s = url[1:-1]
-        if isURL(s):
+        if is_url(s):
             return s
     return url
+
 __smap = {"|": "", "*": ""}
 __strans = "".maketrans(__smap)
-verifySearch = lambda f: stripAcc(singleSpace(f.strip().translate(__strans)))
-urlFind = re.compile("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+")
-urlIs = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
-urlDiscord = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/")
+verify_search = lambda f: strip_acc(single_space(f.strip().translate(__strans)))
+__urlFind = re.compile("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+")
+__urlMatch = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
+__urlDiscord = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/")
+__urlTenor = re.compile("^https?:\\/\\/tenor.com(?:\\/view)?/[a-zA-Z0-9\\-_]+-[0-9]+")
+__urlImgur = re.compile("^https?:\\/\\/(?:[a-z]\\.)?imgur.com/[a-zA-Z0-9\\-_]+")
 # This reminds me of Perl - Smudge
-findURLs = lambda url: re.findall(urlFind, url)
-isURL = lambda url: re.search(urlIs, url)
-isDiscordURL = lambda url: re.search(urlDiscord, url)
-verifyURL = lambda url: url if isURL(url) else urllib.parse.quote(url)
+find_urls = lambda url: re.findall(__urlFind, url)
+is_url = lambda url: re.search(__urlMatch, url)
+is_discord_url = lambda url: re.search(__urlDiscord, url)
+is_tenor_url = lambda url: re.search(__urlTenor, url)
+is_imgur_url = lambda url: re.search(__urlImgur, url)
+
+def is_discord_message_link(url):
+    check = url[:64]
+    return "channels/" in check and "discord" in check
+
+verify_url = lambda url: url if is_url(url) else urllib.parse.quote(url)
 
 
 # Checks if a URL contains a valid image extension, and removes it if possible.
@@ -478,13 +531,30 @@ def is_image(url):
     return IMAGE_FORMS.get(url)
 
 
+status_text = {
+    discord.Status.online: "Online",
+    discord.Status.idle: "Idle",
+    discord.Status.dnd: "DND",
+    discord.Status.invisible: "Invisible",
+    discord.Status.offline: "Offline",
+}
+status_icon = {
+    discord.Status.online: "🟢",
+    discord.Status.idle: "🟡",
+    discord.Status.dnd: "🔴",
+    discord.Status.invisible: "⚫",
+    discord.Status.offline: "⚫",
+}
+status_order = tuple(status_text)
+
+
 # Subprocess pool for resource-consuming operations.
 SUBS = cdict(math=cdict(procs=hlist(), busy=cdict()), image=cdict(procs=hlist(), busy=cdict()))
 
 # Gets amount of processes running in pool.
-subCount = lambda: sum(1 for ptype in SUBS.values() for proc in ptype.procs if proc.is_running())
+sub_count = lambda: sum(1 for ptype in SUBS.values() for proc in ptype.procs if proc.is_running())
 
-def forceKill(proc):
+def force_kill(proc):
     for child in proc.children(recursive=True):
         with suppress():
             child.kill()
@@ -493,23 +563,23 @@ def forceKill(proc):
     return proc.kill()
 
 # Kills all subprocesses in the pool, then restarts it.
-def subKill():
+def sub_kill():
     for ptype in SUBS.values():
         for proc in ptype.procs:
             with suppress(psutil.NoSuchProcess):
-                forceKill(proc)
+                force_kill(proc)
         ptype.procs.clear()
         ptype.busy.clear()
-    procUpdate()
+    proc_update()
 
 # Updates process pools once every 120 seconds.
-def procUpdater():
+def proc_updater():
     while True:
-        procUpdate()
-        time.sleep(120)
+        with delay(120):
+            proc_update()
 
 # Updates process pool by killing off processes when not necessary, and spawning new ones when required.
-def procUpdate():
+def proc_update():
     for pname, ptype in SUBS.items():
         procs = ptype.procs
         b = len(ptype.busy)
@@ -532,7 +602,7 @@ def procUpdate():
                     stderr=subprocess.PIPE,
                 )
             else:
-                raise TypeError("invalid subpool " + pname)
+                raise TypeError(f"invalid subpool {pname}.")
             proc.busy = nan
             x = bytes(random.randint(0, 255) for _ in loop(32))
             if random.randint(0, 1):
@@ -550,7 +620,7 @@ def procUpdate():
                 # Busy variable indicates when the last operation finished;
                 # processes that are idle longer than 1 hour are automatically terminated
                 if utc() - proc.busy > 3600:
-                    forceKill(proc)
+                    force_kill(proc)
                     procs.pop(p)
                     found = True
                     count -= 1
@@ -562,11 +632,11 @@ def procUpdate():
 
 def proc_start():
     proc_exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    proc_exc.submit(procUpdater)
+    proc_exc.submit(proc_updater)
 
 
 # Sends an operation to the math subprocess pool.
-async def mathProc(expr, prec=64, rat=False, key=None, timeout=12, authorize=False):
+async def process_math(expr, prec=64, rat=False, key=None, timeout=12, authorize=False):
     if type(key) is not int:
         if key is None:
             key = random.random()
@@ -587,7 +657,7 @@ async def mathProc(expr, prec=64, rat=False, key=None, timeout=12, authorize=Fal
                         raise StopIteration
                 else:
                     break
-            await create_future(procUpdate, priority=True)
+            await create_future(proc_update, priority=True)
             await asyncio.sleep(0.5)
     if authorize:
         args = (expr, prec, rat, proc.key)
@@ -597,23 +667,23 @@ async def mathProc(expr, prec=64, rat=False, key=None, timeout=12, authorize=Fal
     try:
         proc.busy = inf
         busy[key] = utc()
-        await create_future(procUpdate, priority=True)
+        await create_future(proc_update, priority=True)
         await create_future(proc.stdin.write, d)
-        await create_future(proc.stdin.flush)
+        await create_future(proc.stdin.flush, timeout=timeout)
         resp = await create_future(proc.stdout.readline, timeout=timeout)
         proc.busy = utc()
-    except (T0, T1):
-        create_future_ex(forceKill, proc, priority=True)
+    except (T0, T1, T2):
+        create_future_ex(force_kill, proc, priority=True)
         procs.pop(p, None)
         busy.pop(key, None)
-        create_future_ex(procUpdate, priority=True)
+        create_future_ex(proc_update, priority=True)
         raise
     busy.pop(key, None)
     output = evalEX(evalEX(resp))
     return output
 
 # Sends an operation to the image subprocess pool.
-async def imageProc(image, operation, args, key=None, timeout=24):
+async def process_image(image, operation, args, key=None, timeout=24):
     if type(key) is not int:
         if key is None:
             key = random.random()
@@ -634,22 +704,22 @@ async def imageProc(image, operation, args, key=None, timeout=24):
                         raise StopIteration
                 else:
                     break
-            await create_future(procUpdate)
+            await create_future(proc_update)
             await asyncio.sleep(0.5)
     d = repr(bytes("`".join(str(i) for i in (image, operation, args)), "utf-8")).encode("utf-8") + b"\n"
     try:
         proc.busy = inf
         busy[key] = utc()
-        await create_future(procUpdate, priority=True)
+        await create_future(proc_update, priority=True)
         await create_future(proc.stdin.write, d)
-        await create_future(proc.stdin.flush)
+        await create_future(proc.stdin.flush, timeout=timeout)
         resp = await create_future(proc.stdout.readline, timeout=timeout)
         proc.busy = utc()
-    except (T0, T1):
-        create_future_ex(forceKill, proc, priority=True)
+    except (T0, T1, T2):
+        create_future_ex(force_kill, proc, priority=True)
         procs.pop(p, None)
         busy.pop(key, None)
-        create_future_ex(procUpdate, priority=True)
+        create_future_ex(proc_update, priority=True)
         raise
     busy.pop(key, None)
     output = evalEX(evalEX(resp))
@@ -670,7 +740,7 @@ def evalEX(exc):
     except:
         print(exc)
         raise
-    if issubclass(type(ex), Exception):
+    if issubclass(type(ex), BaseException):
         raise ex
     return ex
 
@@ -683,7 +753,7 @@ __setloop__ = lambda: asyncio.set_event_loop(eloop)
 # Thread pool manager for multithreaded operations.
 class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 
-    def __init__(self, pool_count=3, thread_count=64, initializer=None):
+    def __init__(self, pool_count=1, thread_count=8, initializer=None):
         self.pools = hlist()
         self.pool_count = max(1, pool_count)
         self.thread_count = max(1, thread_count)
@@ -720,9 +790,8 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 
     shutdown = lambda self, wait=True: [exc.shutdown(wait) for exc in self.pools].append(self.pools.clear())
 
-pthreads = MultiThreadPool(thread_count=48, initializer=__setloop__)
-athreads = MultiThreadPool(thread_count=64, initializer=__setloop__)
-__setloop__()
+pthreads = MultiThreadPool(pool_count=2, thread_count=48, initializer=__setloop__)
+athreads = MultiThreadPool(pool_count=2, thread_count=64, initializer=__setloop__)
 
 def get_event_loop():
     with suppress(RuntimeError):
@@ -769,7 +838,7 @@ async def _create_future(obj, *args, loop, timeout, priority, **kwargs):
     if asyncio.iscoroutinefunction(obj):
         obj = obj(*args, **kwargs)
     elif callable(obj):
-        if asyncio.iscoroutinefunction(obj.__call__):
+        if asyncio.iscoroutinefunction(obj.__call__) or not is_main_thread():
             obj = obj.__call__(*args, **kwargs)
         else:
             obj = await wrap_future(create_future_ex(obj, *args, timeout=timeout, **kwargs), loop=loop)
@@ -784,7 +853,7 @@ async def _create_future(obj, *args, loop, timeout, priority, **kwargs):
 def create_future(obj, *args, loop=None, timeout=None, priority=False, **kwargs):
     if loop is None:
         loop = get_event_loop()
-    fut = _create_future(obj, *args, loop=loop, timeout=None, priority=priority, **kwargs)
+    fut = _create_future(obj, *args, loop=loop, timeout=timeout, priority=priority, **kwargs)
     return create_task(fut, loop=loop)
 
 # Creates an asyncio Task object from an awaitable object.
@@ -797,14 +866,20 @@ def _await_fut(fut, delay):
     if not issubclass(type(fut), asyncio.Task):
         fut = create_task(fut)
     while True:
-        with suppress(asyncio.InvalidStateError):
+        with suppress(ISE):
             return fut.result()
         time.sleep(delay)
 
-await_fut = lambda fut, delay=0.05, timeout=None, priority=False: create_future_ex(_await_fut, fut, delay, timeout=timeout, priority=priority).result(timeout=timeout)
+def await_fut(fut, delay=0.05, timeout=None, priority=False):
+    if is_main_thread():
+        return create_future_ex(_await_fut, fut, delay, timeout=timeout, priority=priority).result(timeout=timeout)
+    else:
+        return _await_fut(fut, delay)
+
+is_main_thread = lambda: threading.current_thread() is threading.main_thread()
 
 # A dummy coroutine that returns None.
-async def retNone(*args, **kwargs):
+async def async_nop(*args, **kwargs):
     return
 
 async def delayed_coro(fut, duration=None):
@@ -820,7 +895,7 @@ async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
     await asyncio.sleep(delay)
     try:
         return fut.result()
-    except asyncio.exceptions.InvalidStateError:
+    except ISE:
         res = func(*args, **kwargs)
         if awaitable(res):
             await res
@@ -834,31 +909,31 @@ async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
             raise
 
 # Manages both sync and async get requests.
-class AutoRequest:
+class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, collections.abc.Callable):
 
     async def _init_(self):
-        self.session = aiohttp.ClientSession()
-        self.semaphore = Semaphore(512)
+        self.session = aiohttp.ClientSession(loop=eloop)
+        self.semaphore = Semaphore(512, 256)
 
-    async def aio_call(self, url, headers, data, decode):
+    async def aio_call(self, url, headers, data, method, decode):
         async with self.semaphore:
-            async with self.session.get(url, headers=headers, data=data) as resp:
+            async with getattr(self.session, method)(url, headers=headers, data=data) as resp:
                 if resp.status >= 400:
                     data = await resp.read()
-                    raise ConnectionError("Error " + str(resp.status) + ": " + data.decode("utf-8", "replace"))
+                    raise ConnectionError(f"Error {resp.status}: {data.decode('utf-8', 'replace')}")
                 data = await resp.read()
                 if decode:
                     return data.decode("utf-8", "replace")
                 return data
 
-    def __call__(self, url, headers={}, data=None, raw=False, timeout=8, bypass=True, decode=False, aio=False):
+    def __call__(self, url, headers={}, data=None, raw=False, timeout=8, method="get", bypass=True, decode=False, aio=False):
         if bypass and "user-agent" not in headers:
-            headers["user-agent"] = "Mozilla/5." + str(xrand(1, 10))
+            headers["user-agent"] = f"Mozilla/5.{xrand(1, 10)}"
         if aio:
-            return create_task(asyncio.wait_for(self.aio_call(url, headers, data, decode), timeout=timeout))
-        with requests.get(url, headers=headers, data=data, stream=True, timeout=timeout) as resp:
+            return create_task(asyncio.wait_for(self.aio_call(url, headers, data, method, decode), timeout=timeout))
+        with getattr(requests, method)(url, headers=headers, data=data, stream=True, timeout=timeout) as resp:
             if resp.status_code >= 400:
-                raise ConnectionError("Error " + str(resp.status_code) + ": " + resp.text)
+                raise ConnectionError(f"Error {resp.status_code}: {resp.text}")
             if raw:
                 data = resp.raw.read()
             else:
@@ -867,7 +942,14 @@ class AutoRequest:
                 return data.decode("utf-8", "replace")
             return data
 
-Request = AutoRequest()
+    def __exit__(self, *args):
+        self.session.close()
+
+    def __aexit__(self, *args):
+        self.session.close()
+        return async_nop()
+
+Request = RequestManager()
 create_task(Request._init_())
 
 
@@ -882,7 +964,7 @@ def load_timezones():
             abb = info[0].casefold()
             if len(abb) >= 3 and (abb not in TIMEZONES or "(unofficial)" not in info[1]):
                 temp = info[-1].replace("\\", "/")
-                curr = sorted([round((1 - (i[3] == "−") * 2) * (rdhms(i[4:]) if ":" in i else float(i[4:]) * 60) * 60) for i in temp.split("/") if i.startswith("UTC")])
+                curr = sorted([round((1 - (i[3] == "−") * 2) * (time_parse(i[4:]) if ":" in i else float(i[4:]) * 60) * 60) for i in temp.split("/") if i.startswith("UTC")])
                 if len(curr) == 1:
                     curr = curr[0]
                 TIMEZONES[abb] = curr
@@ -952,11 +1034,7 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
             req = self.min_level
         if reason is None:
             reason = "for command " + self.name[-1]
-        return PermissionError(
-            "Insufficient priviliges " + str(reason)
-            + ". Required level: " + str(req)
-            + ", Current level: " + str(perm) + "."
-        )
+        return PermissionError(f"Insufficient priviliges {reason}. Required level: {req}, Current level: {perm}.")
 
     def __init__(self, bot, catg):
         self.used = {}
@@ -972,15 +1050,13 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
         self.name.append(self.__name__)
         if not hasattr(self, "min_display"):
             self.min_display = self.min_level
-        for a in self.alias:
-            b = a.replace("*", "").replace("_", "").replace("||", "")
-            if b:
-                a = b
-            a = a.casefold()
+        self.aliases = {full_prune(alias).replace("*", "").replace("_", "").replace("||", ""): alias for alias in self.alias}
+        self.aliases.pop("", None)
+        for a in self.aliases:
             if a in bot.commands:
                 bot.commands[a].append(self)
             else:
-                bot.commands[a] = hlist([self])
+                bot.commands[a] = hlist((self,))
         self.catg = catg
         self.bot = bot
         self._globals = bot._globals
@@ -993,9 +1069,20 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
                 self.data.clear()
                 f()
 
-    __hash__ = lambda self: hash(self.__name__)
-    __str__ = lambda self: self.__name__
+    __hash__ = lambda self: hash(self.__name__) ^ hash(self.catg)
+    __str__ = lambda self: f"Command <{self.__name__}>"
     __call__ = lambda self, **void: None
+
+    def unload(self):
+        bot = self.bot
+        for alias in self.alias:
+            alias = alias.replace("*", "").replace("_", "").replace("||", "")
+            coms = bot.commands.get(alias)
+            if coms:
+                coms.remove(self)
+                print("unloaded", alias, "from", self)
+            if not coms:
+                bot.commands.pop(alias)
 
 
 # Basic inheritable class for all bot databases.
@@ -1051,7 +1138,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                 f()
 
     __hash__ = lambda self: hash(self.__name__)
-    __str__ = lambda self: self.__name__
+    __str__ = lambda self: f"Database <{self.__name__}>"
     __call__ = lambda self, **void: None
 
     def update(self, force=False):
@@ -1077,21 +1164,39 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
         else:
             self.updated = True
         return False
+    
+    def unload(self):
+        bot = self.bot
+        func = getattr(self, "_destroy_", None)
+        if callable(func):
+            await_fut(create_future(func, priority=True), priority=True)
+        for f in dir(self):
+            if f.startswith("_") and f[-1] == "_" and f[1] != "_":
+                func = getattr(self, f, None)
+                if callable(func):
+                    bot.events[f].remove(func)
+                    print("unloaded", f, "from", self)
+        self.update(True)
+        bot.data.pop(self, None)
+        bot.database.pop(self, None)
 
 
 # Redirects all print operations to target files, limiting the amount of operations that can occur in any given amount of time for efficiency.
-class _logPrinter:
+class __logPrinter:
 
     def __init__(self, file=None):
         self.buffer = self
-        self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.data = {}
         self.funcs = hlist()
         self.file = file
-        self.future = self.exec.submit(self.updatePrint)
+        self.closed = True
+
+    def start(self):
+        self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.future = self.exec.submit(self.update_print)
         self.closed = False
 
-    def filePrint(self, fn, b):
+    def file_print(self, fn, b):
         try:
             if type(fn) not in (str, bytes):
                 f = fn
@@ -1106,12 +1211,12 @@ class _logPrinter:
         except:
             sys.__stdout__.write(traceback.format_exc())
     
-    def updatePrint(self):
+    def update_print(self):
         if self.file is None:
             outfunc = sys.__stdout__.write
             enc = lambda x: x
         else:
-            outfunc = lambda s: (sys.__stdout__.buffer.write(s), self.filePrint(self.file, s))
+            outfunc = lambda s: (sys.__stdout__.buffer.write(s), self.file_print(self.file, s))
             enc = lambda x: bytes(x, "utf-8")
         while True:
             with delay(1):
@@ -1120,7 +1225,7 @@ class _logPrinter:
                         if not self.data[f]:
                             self.data.pop(f)
                             continue
-                        out = limStr(self.data[f], 8192)
+                        out = lim_str(self.data[f], 8192)
                         self.data[f] = ""
                         data = enc(out)
                         if self.funcs:
@@ -1128,18 +1233,21 @@ class _logPrinter:
                         if f == self.file:
                             outfunc(data)
                         else:
-                            self.filePrint(f, data)
+                            self.file_print(f, data)
                 except:
                     sys.__stdout__.write(traceback.format_exc())
             while not os.path.exists("common.py") or self.closed:
                 time.sleep(0.5)
 
     def __call__(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
+        out = str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)
+        if type(args[0]) is str and args[0].startswith("WARNING:"):
+            return sys.__stdout__.write(out)
         if file is None:
             file = self.file
         if file not in self.data:
             self.data[file] = ""
-        self.data[file] += str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)
+        self.data[file] += out
 
     def write(self, *args, end="", **kwargs):
         args2 = [arg if type(arg) is str else arg.decode("utf-8", "replace") for arg in args]
@@ -1151,7 +1259,7 @@ class _logPrinter:
     isatty = lambda self: False
 
 
-PRINT = _logPrinter("log.txt")
+PRINT = __logPrinter("log.txt")
 
 # Sets all instances of print to the custom print implementation.
 

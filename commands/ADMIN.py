@@ -16,25 +16,25 @@ class Purge(Command):
     flags = "aeh"
     rate_limit = 2
 
-    async def __call__(self, client, bot, argv, args, channel, name, flags, perm, guild, **void):
+    async def __call__(self, bot, argv, args, channel, name, flags, perm, guild, **void):
         t_user = -1
         if "a" in flags or "e" in flags or "@" in argv and ("everyone" in argv or "here" in argv):
             t_user = None
         if len(args) < 2:
             if t_user == -1:
-                t_user = client.user
+                t_user = bot.user
             if len(args) < 1:
                 count = 1
             else:
-                num = await bot.evalMath(args[0], guild.id)
+                num = await bot.eval_math(args[0], guild.id)
                 count = round(num)
         else:
             a1 = args[0]
             a2 = " ".join(args[1:])
-            num = await bot.evalMath(a2, guild.id)
+            num = await bot.eval_math(a2, guild.id)
             count = round(num)
             if t_user == -1:
-                u_id = verifyID(a1)
+                u_id = verify_id(a1)
                 try:
                     t_user = await bot.fetch_user(u_id)
                 except (TypeError, discord.NotFound):
@@ -53,7 +53,7 @@ class Purge(Command):
             if not lim < inf:
                 lim = None
             hist = await channel.history(limit=lim, before=dt).flatten()
-            isbot = t_user is not None and t_user.id == client.user.id
+            isbot = t_user is not None and t_user.id == bot.user.id
             for i in range(len(hist)):
                 m = hist[i]
                 if t_user is None or isbot and m.author.bot or m.author.id == t_user.id:
@@ -77,20 +77,17 @@ class Purge(Command):
                     for _ in loop(len(dels)):
                         delM.popleft()
                 else:
-                    await bot.silentDelete(delM[0], no_log=-1, exc=True)
+                    await bot.silent_delete(delM[0], no_log=-1, exc=True)
                     deleted += 1
                     delM.popleft()
             except:
                 print_exc()
                 for _ in loop(min(5, len(delM))):
                     m = delM.popleft()
-                    await bot.silentDelete(m, no_log=-1, exc=True)
+                    await bot.silent_delete(m, no_log=-1, exc=True)
                     deleted += 1
         if not "h" in flags:
-            return (
-                "*```css\nDeleted [" + noHighlight(deleted)
-                + "] message" + "s" * (deleted != 1) + "!```*"
-            )
+            return italics(css_md(f"Deleted {sqr_md(deleted)} message{'s' if deleted != 1 else ''}!"))
 
 
 class Ban(Command):
@@ -119,7 +116,7 @@ class Ban(Command):
             banlist = bot.data.bans[guild.id] = hlist(banlist)
         with discord.context_managers.Typing(channel):
             bans, glob = await self.getBans(guild)
-        u_id = verifyID(args.pop(0))
+        u_id = verify_id(args.pop(0))
         try:
             user = await bot.fetch_user(u_id)
             users = [user]
@@ -135,10 +132,7 @@ class Ban(Command):
             try:
                 ban = bans[user.id]
             except LookupError:
-                return (
-                    "```ini\n[" + noHighlight(user)
-                    + "] is currently not banned from [" + noHighlight(guild) + "].```"
-                )
+                return ini_md(f"{sqr_md(user)} is currently not banned from {sqr_md(guild)}.")
             if name == "unban":
                 await guild.unban(user)
                 try:
@@ -153,15 +147,8 @@ class Ban(Command):
                         if banlist:
                             bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
                     update()
-                return (
-                    "*```ini\nSuccessfully unbanned [" + noHighlight(user)
-                    + "] from [" + noHighlight(guild) + "].```*"
-                )
-            return (
-                "*```ini\nCurrent ban for [" + noHighlight(user)
-                + "] from [" + noHighlight(guild) + "]: ["
-                + sec2Time(ban["t"] - ts) + "].```*"
-            )
+                return css_md(f"Successfully unbanned {sqr_md(user)} from {sqr_md(guild)}.")
+            return italics(ini_md(f"Current ban for {sqr_md(user)} from {sqr_md(guild)}: {sqr_md(sec2time(ban['t'] - ts))}."))
         # This parser is a mess too
         bantype = " ".join(args)
         if bantype.startswith("for "):
@@ -186,19 +173,18 @@ class Ban(Command):
             if expr.startswith(op):
                 expr = expr[len(op):].strip()
                 _op = at
-        num = await bot.evalTime(expr, guild, op=False)
+        num = await bot.eval_time(expr, guild, op=False)
         create_task(message.add_reaction("❗"))
         for user in users:
-            p = bot.getPerms(user, guild)
-            if not p < 0 and not isValid(p):
-                await channel.send("```py\nError: " + repr(PermissionError(
-                    str(user) + " has infinite permission level, "
-                    + "and cannot be banned from this server."
-                )) + "```")
+            p = bot.get_perms(user, guild)
+            if not p < 0 and not is_finite(p):
+                ex = PermissionError(f"{user} has infinite permission level, and cannot be banned from this server.")
+                await send_exception(channel, ex)
                 continue
             elif not p + 1 <= perm and not isnan(perm):
                 reason = "to ban " + str(user) + " from " + guild.name
-                await channel.send("```py\nError: " + repr(self.permError(perm, p + 1, reason)) + "```")
+                ex = self.perm_error(perm, p + 1, reason)
+                await send_exception(channel, ex)
                 continue
             if _op is not None:
                 try:
@@ -228,12 +214,12 @@ class Ban(Command):
     async def createBan(self, guild, user, reason, length, channel, bans, glob):
         ts = utc()
         bot = self.bot
-        banlist = setDict(bot.data.bans, guild.id, hlist())
+        banlist = set_dict(bot.data.bans, guild.id, hlist())
         update = bot.database.bans.update
         for b in glob:
             u = b.user
             if user.id == u.id:
-                try:
+                async with ExceptionSender(channel):
                     ban = bans[u.id]
                     # Remove from global schedule, then sort and re-add
                     with suppress(LookupError):
@@ -246,16 +232,10 @@ class Ban(Command):
                     print(banlist)
                     print(bot.database.bans.listed)
                     update()
-                    await channel.send(
-                        "*```css\nUpdated ban for " + sbHighlight(user)
-                        + " from [" + sec2Time(ban["t"] - ts)
-                        + "] to [" + sec2Time(length) + "].```*"
-                    )
-                except Exception as ex:
-                    print_exc()
-                    await channel.send("```py\nError: " + repr(ex) + "```")
+                    msg = css_md(f"Updated ban for {sqr_md(user)} from {sqr_md(sec2time(ban['t'] - ts))} to {sqr_md(sec2time(length))}.")
+                    await channel.send(msg)
                 return
-        try:
+        async with ExceptionSender(channel):
             await guild.ban(user, reason=reason, delete_message_days=0)
             with suppress(LookupError):
                 banlist.remove(user.id, key=lambda x: x["u"])
@@ -267,15 +247,8 @@ class Ban(Command):
             print(banlist)
             print(bot.database.bans.listed)
             update()
-            await channel.send(
-                "*```css\n" + sbHighlight(user)
-                + " has been banned from " + sbHighlight(guild)
-                + " for [" + sec2Time(length) + "]. Reason: "
-                + sbHighlight(reason) + "```*"
-            )
-        except Exception as ex:
-            print_exc()
-            await channel.send("```py\nError: " + repr(ex) + "```")
+            msg = css_md(f"{sqr_md(user)} has been banned from {sqr_md(guild)} for {sqr_md(sec2time(length))}. Reason: {sqr_md(reason)}")
+            await channel.send(msg)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_")]
@@ -314,30 +287,25 @@ class Ban(Command):
             + "-\n"
         )
         if not bans:
-            content += "Ban list for " + str(guild).replace("`", "") + " is currently empty.```*"
+            content += f"Ban list for {str(guild).replace('`', '')} is currently empty.```*"
         else:
-            content += str(len(bans)) + " users currently banned from " + str(guild).replace("`", "") + ":```*"
+            content += f"{len(bans)} users currently banned from {str(guild).replace('`', '')}:```*"
         emb = discord.Embed(colour=discord.Colour(1))
         emb.description = content
-        url = bestURL(user)
+        url = best_url(user)
         emb.set_author(name=str(user), url=url, icon_url=url)
         for i, ban in enumerate(sorted(bans.values(), key=lambda x: x["t"])[pos:pos + page]):
             try:
                 user = await bot.fetch_user(ban["u"])
                 emb.add_field(
-                    name=str(user) + " (" + str(user.id) + ")",
-                    value=(
-                        "Duration: *`" + sec2Time(ban["t"] - ts) + "`*\n"
-                        + "Reason: *`" + escape_markdown(str(ban["r"])) + "`*"
-                    )
+                    name=f"{user} ({user.id})",
+                    value=f"Duration {italics(single_md(sec2time(ban['t'] - ts)))}\nReason: {italics(single_md(escape_markdown(str(ban['r']))))}"
                 )
             except:
                 print_exc()
         more = len(bans) - pos - page
         if more > 0:
-            emb.set_footer(
-                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
-            )
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
@@ -365,35 +333,25 @@ class RoleGiver(Command):
                 react = args[0].casefold()
                 assigned = data.get(channel.id, {})
                 if react not in assigned:
-                    raise LookupError("Rolegiver " + react + " not currently assigned for #" + channel.name + ".")
+                    raise LookupError(f"Rolegiver {react} not currently assigned for #{channel}.")
                 assigned.pop(react)
-                return "*```css\nRemoved [" + react + "] from the rolegiver list for [#" + noHighlight(channel.name) + "].```*"
+                return italics(css_md(f"Removed {sqr_md(react)} from the rolegiver list for {sqr_md(channel)}."))
             if channel.id in data:
                 data.pop(channel.id)
                 update()
-            return "*```css\nRemoved all automated rolegivers from [#" + noHighlight(channel.name) + "].```*"
-        assigned = setDict(data, channel.id, {})
+            return italics(css_md(f"Removed all automated rolegivers from {sqr_md(channel)}."))
+        assigned = set_dict(data, channel.id, {})
         if not argv:
-            key = lambda alist: "⟨" + ", ".join(str(r) for r in alist[0]) + "⟩, delete: " + str(alist[1])
+            key = lambda alist: f"⟨{', '.join(str(r) for r in alist[0])}⟩, delete: {alist[1]}"
             if not assigned:
-                return (
-                    "```ini\nNo currently active rolegivers for [#"
-                    + noHighlight(channel) + "].```"
-                )
-            return (
-                "Currently active rolegivers in <#" + str(channel.id)
-                + ">:\n```ini\n" + strIter(assigned, key=key) + "```"
-            )
+                return ini_md(f"No currently active rolegivers for {sqr_md(channel)}.")
+            return f"Currently active rolegivers in {channel_mention(channel.id)}:\n{ini_md(iter2str(assigned, key=key))}"
         if sum(len(alist[0]) for alist in assigned) >= 8:
-            raise OverflowError(
-                "Rolegiver list for #" + channel.name
-                + " has reached the maximum of 8 items. "
-                + "Please remove an item to add another."
-            )
+            raise OverflowError(f"Rolegiver list for #{channel} has reached the maximum of 8 items. Please remove an item to add another.")
         react = args[0].casefold()
         if len(react) > 64:
             raise OverflowError("Search substring too long.")
-        r = verifyID(reconstitute(" ".join(args[1:])))
+        r = verify_id(unicode_prune(" ".join(args[1:])))
         if len(guild.roles) <= 1:
             guild.roles = await guild.fetch_roles()
             guild.roles.sort()
@@ -407,7 +365,7 @@ class RoleGiver(Command):
             role = await strLookup(
                 rolelist,
                 r,
-                qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").casefold()],
+                qkey=lambda x: [str(x), unicode_prune(x).replace(" ", "").casefold()],
             )
         # Must ensure that the user does not assign roles higher than their own
         if inf > perm:
@@ -416,15 +374,11 @@ class RoleGiver(Command):
                 raise LookupError("Member data not found for this server.")
             if memb.top_role <= role:
                 raise PermissionError("Target role is higher than your highest role.")
-        alist = setDict(assigned, react, [[], False])
+        alist = set_dict(assigned, react, [[], False])
         alist[1] |= "x" in flags
         alist[0].append(role.id) 
         update()
-        return (
-            "*```css\nAdded [" + noHighlight(react)
-            + "] ➡️ [" + noHighlight(role)
-            + "] to channel [#" + noHighlight(channel.name) + "].```*"
-        )
+        return italics(css_md(f"Added {sqr_md(react)} ➡️ {sqr_md(role)} to {sqr_md(channel.name)}."))
 
 
 class AutoRole(Command):
@@ -433,10 +387,7 @@ class AutoRole(Command):
     min_level = 3
     min_display = "3+"
     _timeout_ = 7
-    description = (
-        "Causes any new user joining the server to automatically gain the targeted role.\n"
-        + "Input multiple roles to create a randomized role giver."
-    )
+    description = "Causes any new user joining the server to automatically gain the targeted role. Input multiple roles to create a randomized role giver."
     usage = "<role[]> <disable(?d)> <update_all(?x)>"
     flags = "aedx"
     rate_limit = 1
@@ -448,7 +399,7 @@ class AutoRole(Command):
         if "d" in flags:
             assigned = data.get(guild.id, None)
             if argv and assigned:
-                i = await bot.evalMath(argv, guild)
+                i = await bot.eval_math(argv, guild)
                 roles = assigned.pop(i)
                 removed = deque()
                 for r in roles:
@@ -474,12 +425,13 @@ class AutoRole(Command):
                             await asyncio.sleep(5)
                         i += 1
                 update()
-                return "*```css\nRemoved " + sbHighlight(", ".join(str(role) for role in removed)) + " from the autorole list for " + sbHighlight(guild) + ".```*"
+                rolestr = sqr_md(", ".join(str(role) for role in removed))
+                return italics(css_md(f"Removed {rolestr} from the autorole list for {sqr_md(guild)}."))
             if guild.id in data:
                 data.pop(guild.id)
                 update()
-            return "*```css\nRemoved all items from the autorole list for " + sbHighlight(guild) + ".```*"
-        assigned = setDict(data, guild.id, hlist())
+            return italics(css_md(f"Removed all items from the autorole list for {sqr_md(guild)}."))
+        assigned = set_dict(data, guild.id, hlist())
         if not argv:
             rlist = hlist()
             for roles in assigned:
@@ -489,21 +441,12 @@ class AutoRole(Command):
                     new.append(role)
                 rlist.append(new)
             if not assigned:
-                return (
-                    "```ini\nNo currently active autoroles for " + sbHighlight(guild) + ".```"
-                )
-            return (
-                "Currently active autoroles for **" + escape_markdown(guild.name)
-                + "**:\n```ini\n" + strIter(rlist) + "```"
-            )
+                return ini_md(f"No currently active autoroles for {sqr_md(guild)}.")
+            return f"Currently active autoroles for {bold(escape_markdown(guild.name))}:\n{ini_md(iter2str(rlist))}"
         if sum(len(alist) for alist in assigned) >= 8:
-            raise OverflowError(
-                "Autorole list for " + channel.name
-                + " has reached the maximum of 8 items. "
-                + "Please remove an item to add another."
-            )
+            raise OverflowError(f"Autorole list for #{channel} has reached the maximum of 8 items. Please remove an item to add another.")
         roles = hlist()
-        rolenames = (verifyID(i) for i in args)
+        rolenames = (verify_id(i) for i in args)
         if len(guild.roles) <= 1:
             guild.roles = await guild.fetch_roles()
             guild.roles.sort()
@@ -518,7 +461,7 @@ class AutoRole(Command):
                 role = await strLookup(
                     rolelist,
                     r,
-                    qkey=lambda x: [str(x), reconstitute(x).replace(" ", "").casefold()],
+                    qkey=lambda x: [str(x), unicode_prune(x).replace(" ", "").casefold()],
                 )
             # Must ensure that the user does not assign roles higher than their own
             if not inf > perm:
@@ -544,10 +487,8 @@ class AutoRole(Command):
                             if not i % 5:
                                 await asyncio.sleep(5)
                             i += 1
-        return (
-            "*```css\nAdded [" + noHighlight(", ".join(str(role) for role in roles))
-            + "] to the autorole list for [" + noHighlight(guild) + "].```*"
-        )
+        rolestr = sqr_md(", ".join(str(role) for role in roles))
+        return italics(css_md(f"Added {rolestr} to the autorole list for {sqr_md(guild)}."))
 
 
 class RolePreserver(Command):
@@ -569,16 +510,14 @@ class RolePreserver(Command):
             if guild.id in following:
                 following.pop(guild.id)
                 update()
-            return "*```css\nDisabled role preservation for [" + noHighlight(guild) + "].```*"
+            return italics(css_md(f"Disabled role preservation for {sqr_md(guild)}."))
         elif "e" in flags or "a" in flags:
             following[guild.id] = {}
             update()
-            return "*```css\nEnabled role preservation for [" + noHighlight(guild) + "].```*"
-        else:
-            return (
-                "```ini\nRole preservation is currently " + "not " * (curr is None)
-                + "enabled in [" + noHighlight(guild) + "].```"
-            )
+            return italics(css_md(f"Enabled role preservation for {sqr_md(guild)}."))
+        if curr is None:
+            return ini_md(f"Role preservation is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
+        return ini_md(f"Role preservation is currently enabled in {sqr_md(guild)}.")
 
 
 class Lockdown(Command):
@@ -592,33 +531,24 @@ class Lockdown(Command):
         perm = role.permissions
         perm.administrator = False
         perm.send_messages = False
-        try:
+        async with ExceptionSender(channel):
             await role.edit(permissions=perm, reason="Server Lockdown.")
-        except Exception as ex:
-            await channel.send(limStr("```py\n" + noHighlight(repr(ex)) + "```", 2000))
     
     async def invLock(self, inv, channel):
-        try:
+        async with ExceptionSender(channel):
             await inv.delete(reason="Server Lockdown.")
-        except Exception as ex:
-            await channel.send(limStr("```py\n" + noHighlight(repr(ex)) + "```", 2000))
     
     async def __call__(self, guild, channel, flags, **void):
         if "f" not in flags:
-            response = uniStr(
-                "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
-                + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
-            )
-            return ("**```asciidoc\n[" + response + "]```**")
-        u_id = self.bot.client.user.id
+            return self.bot.dangerous_command
+        u_id = self.bot.user.id
         for role in guild.roles:
             if len(role.members) != 1 or role.members[-1].id not in (u_id, guild.owner_id):
                 create_task(self.roleLock(role, channel))
         invites = await guild.invites()
         for inv in invites:
             create_task(self.invLock(inv, channel))
-        response = uniStr("LOCKDOWN REQUESTED.")
-        return ("**```asciidoc\n[" + response + "]```**")
+        return bold(css_md(uni_str("LOCKDOWN REQUESTED.")))
 
 
 class SaveChannel(Command):
@@ -634,12 +564,12 @@ class SaveChannel(Command):
         ch = channel
         if args:
             if len(args) >= 2:
-                num = await self.bot.evalMath(" ".join(args[1:]), guild)
+                num = await self.bot.eval_math(" ".join(args[1:]), guild)
                 if not num <= 65536:
                     raise OverflowError("Maximum number of messages allowed is 65536.")
                 if num <= 0:
                     raise ValueError("Please input a valid message limit.")
-            ch = await self.bot.fetch_channel(verifyID(args[0]))
+            ch = await self.bot.fetch_channel(verify_id(args[0]))
             if guild is None or hasattr(guild, "ghost"):
                 if guild.id != ch.id:
                     raise PermissionError("Target channel is not in this server.")
@@ -652,15 +582,16 @@ class SaveChannel(Command):
             async with delay(0.32):
                 if s:
                     s += "\n\n"
-                s += "\n\n".join(strMessage(m, limit=2048, username=True) for m in h[:4096])
+                s += "\n\n".join(message_repr(m, limit=2048, username=True) for m in h[:4096])
                 h = h[4096:]
         return bytes(s, "utf-8")
 
 
 class UserLog(Command):
     server_only = True
+    name = ["MemberLog"]
     min_level = 3
-    description = "Causes ⟨MIZA⟩ to log user events from the server, in the current channel."
+    description = "Causes ⟨MIZA⟩ to log user and member events from the server, in the current channel."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
     rate_limit = 1
@@ -671,29 +602,17 @@ class UserLog(Command):
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
-            return (
-                "*```css\nEnabled user logging in [" + noHighlight(channel.name)
-                + "] for [" + noHighlight(guild.name) + "].```*"
-            )
+            return italics(css_md(f"Enabled user event logging in {sqr_md(channel)} for {sqr_md(guild)}."))
         elif "d" in flags:
             if guild.id in data:
                 data.pop(guild.id)
                 update()
-            return (
-                "*```css\nDisabled user logging for [" + noHighlight(guild.name) + "].```*"
-            )
+            return italics(css_md(f"Disabled user event logging for {sqr_md(guild)}."))
         if guild.id in data:
             c_id = data[guild.id]
             channel = await bot.fetch_channel(c_id)
-            return (
-                "```css\nUser logging for [" + noHighlight(guild.name)
-                + "] is currently enabled in [" + noHighlight(channel.name)
-                + "].```"
-            )
-        return (
-            "```css\nUser logging is currently disabled in ["
-            + noHighlight(guild.name) + "].```"
-        )
+            return ini_md(f"User event logging for {sqr_md(guild)} is currently enabled in {sqr_md(channel)}.")
+        return ini_md(f"User event logging is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
 
 
 class MessageLog(Command):
@@ -710,29 +629,17 @@ class MessageLog(Command):
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
-            return (
-                "*```css\nEnabled message logging in [" + noHighlight(channel.name)
-                + "] for [" + noHighlight(guild.name) + "].```*"
-            )
+            return italics(css_md(f"Enabled message event logging in {sqr_md(channel)} for {sqr_md(guild)}."))
         elif "d" in flags:
             if guild.id in data:
                 data.pop(guild.id)
                 update()
-            return (
-                "*```css\nDisabled message logging for [" + noHighlight(guild.name) + "].```*"
-            )
+            return italics(css_md(f"Disabled message event logging for {sqr_md(guild)}."))
         if guild.id in data:
             c_id = data[guild.id]
             channel = await bot.fetch_channel(c_id)
-            return (
-                "```css\nMessage logging for [" + noHighlight(guild.name)
-                + "] is currently enabled in [" + noHighlight(channel.name)
-                + "].```"
-            )
-        return (
-            "```css\nMessage logging is currently disabled in ["
-            + noHighlight(guild.name) + "].```"
-        )
+            return ini_md(f"Message event logging for {sqr_md(guild)} is currently enabled in {sqr_md(channel)}.")
+        return ini_md(f"Message event logging is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
 
 
 class FileLog(Command):
@@ -744,36 +651,24 @@ class FileLog(Command):
     rate_limit = 1
 
     async def __call__(self, bot, flags, channel, guild, **void):
-        if not bot.isTrusted(guild.id):
+        if not bot.is_trusted(guild.id):
             raise PermissionError("Must be in a trusted server to log deleted files.")
         data = bot.data.logF
         update = bot.database.logF.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
-            return (
-                "*```css\nEnabled file logging in [" + noHighlight(channel.name)
-                + "] for [" + noHighlight(guild.name) + "].```*"
-            )
+            return italics(css_md(f"Enabled file deletion logging in {sqr_md(channel)} for {sqr_md(guild)}."))
         elif "d" in flags:
             if guild.id in data:
                 data.pop(guild.id)
                 update()
-            return (
-                "*```css\nDisabled file logging for [" + noHighlight(guild.name) + "].```*"
-            )
+            return italics(css_md(f"Disabled file deletion logging for {sqr_md(guild)}."))
         if guild.id in data:
             c_id = data[guild.id]
             channel = await bot.fetch_channel(c_id)
-            return (
-                "```css\nFile logging for [" + noHighlight(guild.name)
-                + "] is currently enabled in [" + noHighlight(channel.name)
-                + "].```"
-            )
-        return (
-            "```css\nFile logging is currently disabled in ["
-            + noHighlight(guild.name) + "].```"
-        )
+            return ini_md(f"File deletion logging for {sqr_md(guild)} is currently enabled in {sqr_md(channel)}.")
+        return ini_md(f"File deletion logging is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
 
 
 # TODO: Stop being lazy and finish this damn command
@@ -825,7 +720,7 @@ class UpdateBans(Database):
             try:
                 guild = await self.bot.fetch_guild(g_id)
                 user = await self.bot.fetch_user(x.u)
-                m = guild.get_member(self.bot.client.user.id)
+                m = guild.get_member(self.bot.user.id)
                 try:
                     channel = await self.bot.fetch_channel(x.c)
                     if not channel.permissions_for(m).send_messages:
@@ -834,15 +729,9 @@ class UpdateBans(Database):
                     channel = await self.bot.get_first_sendable(guild, m)
                 try:
                     await guild.unban(user, reason="Temporary ban expired.")
-                    text = (
-                        "*```css\n[" + noHighlight(user)
-                        + "] has been unbanned from [" + noHighlight(guild) + "].```*"
-                    )
+                    text = italics(css_md(f"{sqr_md(user)} has been unbanned from {sqr_md(guild)}."))
                 except:
-                    text = (
-                        "*```css\nUnable to unban [" + noHighlight(user)
-                        + "] from [" + noHighlight(guild) + "].```*"
-                    )
+                    text = italics(css_md(f"Unable to unban {sqr_md(user)} from {sqr_md(guild)}."))
                 await channel.send(text)
             except:
                 print_exc()
@@ -859,20 +748,20 @@ class ServerProtector(Database):
         try:
             await guild.kick(user, reason="Triggered automated server protection response for excessive " + msg + ".")
             await owner.send(
-                "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
-                + "automated server protection response due to exessive " + msg + " in `" + noHighlight(guild) + "` `(" + str(guild.id) + ")`, "
+                f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
+                + f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
                 + "and has been removed from the server to prevent any potential further attacks."
             )
         except discord.Forbidden:
             await owner.send(
-                "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
-                + "automated server protection response due to exessive " + msg + " in `" + noHighlight(guild) + "` `(" + str(guild.id) + ")`, "
+                f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
+                + f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
                 + "and were unable to be automatically removed from the server; please watch them carefully to prevent any potential further attacks."
             )
 
     async def targetWarn(self, u_id, guild, msg):
         print("Channel Deletion warning by <@" + str(u_id) + "> in " + str(guild) + ".")
-        user = self.bot.client.user
+        user = self.bot.user
         owner = guild.owner
         if owner.id == user.id:
             owner = await self.bot.fetch_user(tuple(self.owners)[0])
@@ -881,15 +770,15 @@ class ServerProtector(Database):
                 return
             user = guild.owner
             await owner.send(
-                "Apologies for the inconvenience, but your account <@" + str(user.id) + "> `(" + str(user.id) + ")` has triggered an "
-                + "automated server protection response due to exessive " + msg + " in `" + noHighlight(guild) + "` `(" + str(guild.id) + ")`. "
+                f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
+                + f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
                 + "If this was intentional, please ignore this message."
             )
         elif u_id == user.id:
             create_task(guild.leave())
             await owner.send(
-                "Apologies for the inconvenience, but <@" + str(user.id) + "> `(" + str(user.id)+ ")` has triggered an "
-                + "automated server protection response due to exessive " + msg + " in `" + noHighlight(guild) + "` `(" + str(guild.id) + ")`, "
+                f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
+                + f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
                 + "and will promptly leave the server to prevent any potential further attacks."
             )
         else:
@@ -898,28 +787,28 @@ class ServerProtector(Database):
     async def _channel_delete_(self, channel, guild, **void):
         if channel.id in self.bot.cache.deleted:
             return
-        if self.bot.isTrusted(guild.id):
+        if self.bot.is_trusted(guild.id):
             audits = await guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete).flatten()
             ts = utc()
             cnt = {}
             for log in audits:
                 if ts - utc_ts(log.created_at) < 120:
-                    addDict(cnt, {log.user.id: 1})
+                    add_dict(cnt, {log.user.id: 1})
             for u_id in cnt:
                 if cnt[u_id] > 2:
-                    create_task(self.targetWarn(u_id, guild, "channel deletions `(" + str(cnt[u_id]) + ")`"))
+                    create_task(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
 
     async def _ban_(self, user, guild, **void):
-        if self.bot.isTrusted(guild.id):
+        if self.bot.is_trusted(guild.id):
             audits = await guild.audit_logs(limit=13, action=discord.AuditLogAction.ban).flatten()
             ts = utc()
             cnt = {}
             for log in audits:
                 if ts - utc_ts(log.created_at) < 10:
-                    addDict(cnt, {log.user.id: 1})
+                    add_dict(cnt, {log.user.id: 1})
             for u_id in cnt:
                 if cnt[u_id] > 5:
-                    create_task(self.targetWarn(u_id, guild, "banning `(" + str(cnt[u_id]) + ")`"))
+                    create_task(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
 
 
 class UpdateUserLogs(Database):
@@ -927,7 +816,7 @@ class UpdateUserLogs(Database):
 
     # Send a member update globally for all user updates
     async def _user_update_(self, before, after, **void):
-        for guild in self.bot.client.guilds:
+        for guild in self.bot.guilds:
             create_task(self._member_update_(before, after, guild))
 
     async def _member_update_(self, before, after, guild=None):
@@ -952,8 +841,8 @@ class UpdateUserLogs(Database):
                 self.update()
                 return
             emb = discord.Embed()
-            b_url = bestURL(before)
-            a_url = bestURL(after)
+            b_url = best_url(before)
+            a_url = best_url(after)
             emb.set_author(name=str(after), icon_url=a_url, url=a_url)
             emb.description = (
                 "<@" + str(after.id)
@@ -988,11 +877,11 @@ class UpdateUserLogs(Database):
                             add.append(r)
                     rchange = ""
                     if sub:
-                        rchange = "❌ " + escape_markdown(", ".join("<@&" + str(r.id) + ">" for r in sub))
+                        rchange = "❌ " + escape_markdown(", ".join(role_mention(r.id) for r in sub))
                     if add:
                         rchange += (
                             "\n" * bool(rchange) + "✅ " 
-                            + escape_markdown(", ".join("<@&" + str(r.id) + ">" for r in add))
+                            + escape_markdown(", ".join(role_mention(r.id) for r in add))
                         )
                     if rchange:
                         emb.add_field(name="Roles", value=rchange)
@@ -1001,18 +890,14 @@ class UpdateUserLogs(Database):
             if b_url != a_url:
                 emb.add_field(
                     name="Avatar",
-                    value=(
-                        "[Before](" + str(b_url) 
-                        + ") ➡️ [After](" 
-                        + str(a_url) + ")"
-                    ),
+                    value=f"[Before]({b_url}) ➡️ [After]({a_url})",
                 )
                 emb.set_thumbnail(url=a_url)
                 change = True
                 colour[2] += 255
             if change:
-                emb.colour = colour2Raw(colour)
-                self.bot.embedSender(channel, emb)
+                emb.colour = colour2raw(colour)
+                self.bot.send_embeds(channel, emb)
 
     async def _join_(self, user, **void):
         guild = getattr(user, "guild", None)
@@ -1026,13 +911,10 @@ class UpdateUserLogs(Database):
                 return
             # Colour: White
             emb = discord.Embed(colour=16777214)
-            url = bestURL(user)
+            url = best_url(user)
             emb.set_author(name=str(user), icon_url=url, url=url)
-            emb.description = (
-                "<@" + str(user.id)
-                + "> has joined the server."
-            )
-            self.bot.embedSender(channel, emb)
+            emb.description = f"{user_mention(user.id)} has joined the server."
+            self.bot.send_embeds(channel, emb)
     
     async def _leave_(self, user, **void):
         guild = getattr(user, "guild", None)
@@ -1046,16 +928,18 @@ class UpdateUserLogs(Database):
                 return
             # Colour: Black
             emb = discord.Embed(colour=1)
-            url = bestURL(user)
+            url = best_url(user)
             emb.set_author(name=str(user), icon_url=url, url=url)
             # Check audit log to find whether user left or was kicked/banned
+            prune = None
             kick = None
             ban = None
             with tracebacksuppressor(StopIteration):
                 ts = utc()
-                futs = [create_task(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)).flatten()) for action in ("ban", "kick")]
+                futs = [create_task(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)).flatten()) for action in ("ban", "kick", "member_prune")]
                 bans = await futs[0]
                 kicks = await futs[1]
+                prunes = await futs[2]
                 for log in bans:
                     if ts - utc_ts(log.created_at) < 3:
                         if log.target.id == user.id:
@@ -1066,28 +950,29 @@ class UpdateUserLogs(Database):
                         if log.target.id == user.id:
                             kick = cdict(id=log.user.id, reason=log.reason)
                             raise StopIteration
+                for log in prunes:
+                    if ts - utc_ts(log.created_at) < 3:
+                        try:
+                            reason = f"{log.extra.delete_member_days} days of inactivity"
+                        except AttributeError:
+                            reason = None
+                        prune = cdict(id=log.user.id, reason=reason)
+                        raise StopIteration
             if ban is not None:
-                emb.description = (
-                    "<@" + str(user.id)
-                    + "> has been banned by <@"
-                    + str(ban.id) + ">."
-                )
+                emb.description = f"{user_mention(user.id)} has been banned by {user_mention(ban.id)}."
                 if ban.reason:
-                    emb.description += "\nReason: *`" + noHighlight(ban.reason) + "`*"
+                    emb.description += f"\nReason: *`{no_md(ban.reason)}`*"
             elif kick is not None:
-                emb.description = (
-                    "<@" + str(user.id)
-                    + "> has been kicked by <@"
-                    + str(kick.id) + ">."
-                )
+                emb.description = f"{user_mention(user.id)} has been kicked by {user_mention(kick.id)}."
                 if kick.reason:
-                    emb.description += "\nReason: *`" + noHighlight(kick.reason) + "`*"
+                    emb.description += f"\nReason: *`{no_md(kick.reason)}`*"
+            elif prune is not None:
+                emb.description = f"{user_mention(user.id)} has been pruned by {user_mention(prune.id)}."
+                if prune.reason:
+                    emb.description += f"\nReason: *`{no_md(prune.reason)}`*"
             else:
-                emb.description = (
-                    "<@" + str(user.id)
-                    + "> has left the server."
-                )
-            self.bot.embedSender(channel, emb)
+                emb.description = f"{user_mention(user.id)} has left the server."
+            self.bot.send_embeds(channel, emb)
 
 
 class UpdateMessageLogs(Database):
@@ -1101,14 +986,16 @@ class UpdateMessageLogs(Database):
         for h in tuple(self.dc):
             if utc_dt() - h > datetime.timedelta(seconds=3600):
                 self.dc.pop(h)
+
+    def _bot_ready_(self, **void):
         if not self.searched:
             self.searched = True
-            lim = floor(2097152 / len(self.bot.client.guilds))
-            return [create_task(self.bot.database.counts.getGuildHistory(guild, lim, callback=self.callback)) for guild in self.bot.cache.guilds.values()]
+            lim = floor(2097152 / len(self.bot.guilds))
+            return [create_task(self.bot.database.counts.getGuildHistory(guild, lim, callback=self.callback)) for guild in self.bot.guilds]
     
     def callback(self, messages, **void):
-        messages = [self.bot.cacheMessage(message) for message in messages]
-        create_future_ex(self.bot.updateClient, priority=True)
+        messages = [self.bot.add_message(message) for message in messages]
+        create_future_ex(self.bot.update_from_client, priority=True)
         return messages
 
     # Edit events are rather straightforward to log
@@ -1124,22 +1011,17 @@ class UpdateMessageLogs(Database):
                     self.update()
                     return
                 u = before.author
-                name = u.name
-                name_id = name + bool(u.display_name) * ("#" + u.discriminator)
-                url = bestURL(u)
-                emb = discord.Embed(colour=colour2Raw(0, 0, 255))
-                emb.set_author(name=name_id, icon_url=url, url=url)
-                emb.description = (
-                    "**Message edited in** <#"
-                    + str(before.channel.id) + ">:"
-                )
-                emb.add_field(name="Before", value=strMessage(before))
-                emb.add_field(name="After", value=strMessage(after))
-                self.bot.embedSender(channel, emb)
+                url = best_url(u)
+                emb = discord.Embed(colour=colour2raw(0, 0, 255))
+                emb.set_author(name=str(u), icon_url=url, url=url)
+                emb.description = f"**Message edited in** {channel_mention(before.channel.id)}:"
+                emb.add_field(name="Before", value=message_repr(before))
+                emb.add_field(name="After", value=message_repr(after))
+                self.bot.send_embeds(channel, emb)
 
     # Delete events must attempt to find the user who deleted the message
     async def _delete_(self, message, bulk=False, **void):
-        cu_id = self.bot.client.user.id
+        cu_id = self.bot.user.id
         if bulk:
             return
         guild = message.guild
@@ -1153,22 +1035,21 @@ class UpdateMessageLogs(Database):
                 return
             now = utc_dt()
             u = message.author
-            name = u.name
-            name_id = name + bool(u.display_name) * ("#" + u.discriminator)
-            url = bestURL(u)
+            name_id = str(u)
+            url = best_url(u)
             action = discord.AuditLogAction.message_delete
             try:
                 t = u
-                init = "<@" + str(t.id) + ">"
-                d_level = self.bot.isDeleted(message)
+                init = user_mention(t.id)
+                d_level = self.bot.is_deleted(message)
                 if d_level:
                     if d_level > 1:
                         if d_level < 3:
                             pass
                             # self.logDeleted(message)
                         return
-                    t = self.bot.client.user
-                    init = "<@" + str(t.id) + ">"
+                    t = self.bot.user
+                    init = user_mention(t.id)
                 else:
                     # Attempt to find who deleted the message
                     if not guild.get_member(cu_id).guild_permissions.view_audit_log:
@@ -1185,7 +1066,7 @@ class UpdateMessageLogs(Database):
                         except AttributeError:
                             cnt = int(e.extra.get("count", 1))
                         h = e.created_at
-                        cs = setDict(self.dc, h, 0)
+                        cs = set_dict(self.dc, h, 0)
                         c = cnt - cs
                         if c >= 1:
                             if self.dc[h] == 0:
@@ -1198,21 +1079,18 @@ class UpdateMessageLogs(Database):
                         if now - h < datetime.timedelta(seconds=s):
                             if targ == u.id and cid == message.channel.id:
                                 t = e.user
-                                init = "<@" + str(t.id) + ">"
+                                init = user_mention(t.id)
             except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
-            emb = discord.Embed(colour=colour2Raw(255, 0, 0))
+            emb = discord.Embed(colour=colour2raw(255, 0, 0))
             emb.set_author(name=name_id, icon_url=url, url=url)
-            emb.description = (
-                init + " **deleted message from** <#"
-                + str(message.channel.id) + ">:\n"
-            )
-            emb.description += strMessage(message, limit=2048 - len(emb.description))
-            self.bot.embedSender(channel, emb)
+            emb.description = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\n"
+            emb.description += message_repr(message, limit=2048 - len(emb.description))
+            self.bot.send_embeds(channel, emb)
 
     # Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
     async def _bulk_delete_(self, messages, **void):
-        cu = self.bot.client.user
+        cu = self.bot.user
         cu_id = cu.id
         guild = messages[0].guild
         if guild.id in self.data:
@@ -1227,9 +1105,9 @@ class UpdateMessageLogs(Database):
             action = discord.AuditLogAction.message_bulk_delete
             try:
                 init = "[UNKNOWN USER]"
-                if self.bot.isDeleted(messages[-1]):
-                    t = self.bot.client.user
-                    init = "<@" + str(t.id) + ">"
+                if self.bot.is_deleted(messages[-1]):
+                    t = self.bot.user
+                    init = user_mention(t.id)
                 else:
                     # Attempt to find who deleted the messages
                     if not guild.get_member(cu_id).guild_permissions.view_audit_log:
@@ -1246,7 +1124,7 @@ class UpdateMessageLogs(Database):
                         except AttributeError:
                             cnt = int(e.extra.get("count", 1))
                         h = e.created_at
-                        cs = setDict(self.dc, h, 0)
+                        cs = set_dict(self.dc, h, 0)
                         c = cnt - cs
                         if c >= len(messages):
                             if self.dc[h] == 0:
@@ -1257,39 +1135,34 @@ class UpdateMessageLogs(Database):
                         if now - h < datetime.timedelta(seconds=s):
                             if e.target is None or e.target.id == messages[-1].channel.id:
                                 t = e.user
-                                init = "<@" + str(t.id) + ">"
+                                init = user_mention(t.id)
             except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
-            emb = discord.Embed(colour=colour2Raw(255, 0, 255))
-            emb.description = (
-                init + " **deleted " + str(len(messages)) + " message" + "s" * (len(messages) != 1) + " from** <#"
-                + str(messages[-1].channel.id) + ">:"
-            )
+            emb = discord.Embed(colour=colour2raw(255, 0, 255))
+            emb.description = f"{init} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from** {channel_mention(messages[-1].channel.id)}:\n"
             embs = deque([emb])
             for message in messages:
                 u = message.author
-                name = u.name
-                name_id = name + bool(u.display_name) * ("#" + u.discriminator)
-                url = bestURL(u)
-                emb = discord.Embed(colour=colour2Raw(127, 0, 127))
-                emb.set_author(name=name_id, icon_url=url, url=url)
-                emb.description = strMessage(message, limit=2048)
+                url = best_url(u)
+                emb = discord.Embed(colour=colour2raw(127, 0, 127))
+                emb.set_author(name=str(u), icon_url=url, url=url)
+                emb.description = message_repr(message, limit=2048)
                 embs.append(emb)
-            self.bot.embedSender(channel, embs)
+            self.bot.send_embeds(channel, embs)
 
 
 class UpdateFileLogs(Database):
     name = "logF"
 
     async def _delete_(self, message, **void):
-        if self.bot.isDeleted(message) > 1:
+        if self.bot.is_deleted(message) > 1:
             return
         guild = message.guild
         if guild.id in self.data:
             c_id = self.data[guild.id]
             if message.attachments:
                 try:
-                    if not self.bot.isTrusted(guild.id):
+                    if not self.bot.is_trusted(guild.id):
                         raise EOFError
                     channel = await self.bot.fetch_channel(c_id)
                 except (EOFError, discord.NotFound):
@@ -1308,9 +1181,9 @@ class UpdateFileLogs(Database):
                         fil = discord.File(io.BytesIO(b), filename=str(a).split("/")[-1])
                         fils.append(fil)
                     except:
-                        msg += bestURL(a) + "\n"
-                emb = discord.Embed(colour=randColour())
-                emb.description = "File" + "s" * (len(fils) + len(msg) != 1) + " deleted from <@" + str(message.author.id) + ">"
+                        msg += best_url(a) + "\n"
+                emb = discord.Embed(colour=rand_colour())
+                emb.description = f"File{'s' if len(fils) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
                 if not msg:
                     msg = None
                 await channel.send(msg, embed=emb, files=fils)
@@ -1341,12 +1214,12 @@ class UpdateRolegivers(Database):
                         continue
                     await user.add_roles(
                         role,
-                        reason="Keyword \"" + k + "\" found in message \"" + message.content + "\".",
+                        reason=f'Keyword "{k}" found in message "{message.content}".',
                         atomic=True,
                     )
-                    print("Granted role " + str(role) + " to " + str(user) + ".")
+                    print(f"RoleGiver: Granted {role} to {user} in {guild}.")
                 if alist[1]:
-                    await bot.silentDelete(message)
+                    await bot.silent_delete(message)
 
 
 class UpdateAutoRoles(Database):
@@ -1361,12 +1234,10 @@ class UpdateAutoRoles(Database):
             roles = deque()
             assigned = self.data[guild.id]
             for rolelist in assigned:
-                try:
+                with tracebacksuppressor:
                     role = await self.bot.fetch_role(random.choice(rolelist), guild)
                     roles.append(role)
-                except:
-                    print_exc()
-            print("AutoRole", user, roles)
+            print(f"AutoRole: Granted {roles} to {user} in {guild}.")
             # Attempt to add all roles in one API call
             try:
                 await user.add_roles(*roles, reason="AutoRole", atomic=False)
@@ -1384,12 +1255,10 @@ class UpdateRolePreservers(Database):
                 roles = deque()
                 assigned = self.data[guild.id][user.id]
                 for r_id in assigned:
-                    try:
+                    with tracebacksuppressor:
                         role = await self.bot.fetch_role(r_id, guild)
                         roles.append(role)
-                    except:
-                        print_exc()
-                print("RolePreserver", user, roles)
+                print(f"RolePreserver: Granted {roles} to {user} in {guild}.")
                 # Attempt to add all roles in one API call
                 try:
                     await user.edit(roles=roles, reason="RolePreserver")

@@ -18,8 +18,8 @@ except:
 
 
 # Default and standard command categories to enable.
-default_commands = ["main", "string", "admin"]
-standard_commands = default_commands + ["voice", "image", "game"]
+default_commands = frozenset(("main", "string", "admin"))
+standard_commands = default_commands.union(("voice", "image", "game"))
 
 
 class Help(Command):
@@ -32,9 +32,9 @@ class Help(Command):
         bot = self.bot
         enabled = bot.data.enabled
         g_id = guild.id
-        prefix = bot.getPrefix(g_id)
+        prefix = bot.get_prefix(g_id)
         v = "v" in flags
-        emb = discord.Embed(colour=randColour())
+        emb = discord.Embed(colour=rand_colour())
         emb.set_author(name="❓ Help ❓")
         found = {}
         # Get help on categories, then commands
@@ -50,7 +50,7 @@ class Help(Command):
                 if com.__name__ in found:
                     found[com.__name__].append(com)
                 else:
-                    found[com.__name__] = hlist([com])
+                    found[com.__name__] = hlist((com,))
         if found:
             # Display list of found commands in an embed
             i = 0
@@ -62,13 +62,10 @@ class Help(Command):
                     a = ", ".join(n.strip("_") for n in com.name)
                     if not a:
                         a = "[none]"
-                    s = "```ini\n[Aliases] " + a
-                    s += "\n[Effect] " + com.description.replace("⟨MIZA⟩", bot.client.user.name)
+                    s = f"```ini\n[Aliases] {a}"
+                    s += f"\n[Effect] {com.description.replace('⟨MIZA⟩', bot.user.name)}"
                     if v or len(found) <= 1:
-                        s += (
-                            "\n[Usage] " + prefix + com.__name__ + " " + com.usage
-                            + "\n[Level] " + str(com.min_display)
-                        )
+                        s += f"\n[Usage] {prefix}{com.__name__} {com.usage}\n[Level] {com.min_display}"
                     s += "```"
                     emb.add_field(
                         name=prefix + com.__name__.strip("_"),
@@ -83,7 +80,7 @@ class Help(Command):
                 + "[Commands](https://github.com/thomas-xin/Miza/wiki/Commands) for full command list."
             )
             if bot.categories:
-                s = "**```ini\n" + " ".join((sbHighlight(c) for c in standard_commands if c in bot.categories)) + "```**"
+                s = bold(ini_md(' '.join((sqr_md(c) for c in standard_commands if c in bot.categories))))
                 emb.add_field(name="Command category list", value=s)
         return dict(embed=emb), 1
 
@@ -112,7 +109,7 @@ class Perms(Command):
             check = args[0].casefold()
             if "@" in args[0] and ("everyone" in check or "here" in check):
                 args[0] = guild.id
-            u_id = verifyID(args[0])
+            u_id = verify_id(args[0])
             try:
                 t_user = await bot.fetch_user(u_id)
             except (TypeError, discord.NotFound):
@@ -121,16 +118,16 @@ class Perms(Command):
                 except LookupError:
                     t_user = guild.get_role(u_id)
                     if t_user is None:
-                        raise LookupError("No results for " + str(u_id))
+                        raise LookupError(f"No results for {u_id}.")
         print(t_user)
-        t_perm = roundMin(bot.getPerms(t_user.id, guild))
+        t_perm = round_min(bot.get_perms(t_user.id, guild))
         # If permission level is given, attempt to change permission level, otherwise get current permission level
         if len(args) > 1:
             name = str(t_user)
             orig = t_perm
             expr = " ".join(args[1:])
-            num = await bot.evalMath(expr, user, orig)
-            c_perm = roundMin(num)
+            num = await bot.eval_math(expr, user, orig)
+            c_perm = round_min(num)
             if t_perm is nan or isnan(c_perm):
                 m_perm = nan
             else:
@@ -146,25 +143,10 @@ class Perms(Command):
                     bot.setPerms(t_user.id, guild, c_perm)
                 if "h" in flags:
                     return
-                return (
-                    "```css\nChanged permissions for [" + noHighlight(name)
-                    + "] in [" + noHighlight(guild.name)
-                    + "] from [" + noHighlight(t_perm)
-                    + "] to [" + noHighlight(c_perm) + "].```"
-                )
-            else:
-                reason = (
-                    "to change permissions for " + str(name)
-                    + " in " + str(guild.name)
-                    + " from " + str(t_perm)
-                    + " to " + str(c_perm)
-                )
-                raise self.permError(perm, m_perm, reason)
-        return (
-            "```css\nCurrent permissions for [" + noHighlight(t_user.name)
-            + "] in [" + noHighlight(guild.name)
-            + "]: [" + noHighlight(t_perm) + "].```"
-        )
+                return css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to {sqr_md(c_perm)}.")
+            reason = f"to change permissions for {name} in {guild} from {t_perm} to {c_perm}"
+            raise self.perm_error(perm, m_perm, reason)
+        return css_md(f"Current permissions for {sqr_md(t_user)} in {sqr_md(guild)}: {sqr_md(t_perm)}.")
 
 
 class EnabledCommands(Command):
@@ -184,84 +166,61 @@ class EnabledCommands(Command):
         if "a" in flags or "e" in flags or "d" in flags:
             req = 3
             if perm < req:
-                reason = (
-                    "to change command list for "
-                    + channel.name
-                )
-                raise self.permError(perm, req, reason)
+                reason = f"to change enabled command list for {channel}"
+                raise self.perm_error(perm, req, reason)
         if not args:
             if "l" in flags:
-                return (
-                    "```css\nStandard command categories:\n"
-                    + str(standard_commands) + "```"
-                )
+                return css_md(f"Standard command categories:\n{standard_commands}")
             if "e" in flags or "a" in flags:
-                categories = list(standard_commands)
+                categories = set(standard_commands)
                 enabled[channel.id] = categories
                 update()
                 if "h" in flags:
                     return
-                return (
-                    "```css\nEnabled all standard command categories in ["
-                    + noHighlight(channel.name) + "].```"
-                )
+                return css_md(f"Enabled all standard command categories in {sqr_md(channel)}.")
             if "d" in flags:
-                enabled[channel.id] = []
+                enabled[channel.id].clear()
                 update()
                 if "h" in flags:
                     return
-                return (
-                    "```css\nDisabled all command categories in ["
-                    + noHighlight(channel.name) + "].```"
-                )
+                return css_md(f"Disabled all standard command categories in {sqr_md(channel)}.")
             temp = enabled.get(channel.id, default_commands)
             if not temp:
-                return (
-                    "```ini\nNo currently enabled commands in [#" + str(channel) + "].```"
-                )
-            return (
-                "Currently enabled command categories in <#" + str(channel.id)
-                + ">:\n```ini\n"
-                + strIter(temp) + "```"
-            )
-        else:
-            if "e" not in flags and "a" not in flags and "d" not in flags:
-                catg = argv.casefold()
-                if not catg in bot.categories:
-                    raise LookupError("Unknown command category " + argv + ".")
-                return (
-                    "```css\nCommand category [" + noHighlight(catg)
-                    + "] is currently" + " not" * (catg not in enabled)
-                    + "] enabled in [" + noHighlight(channel.name) + "].```"
-                )
-            args = [i.casefold() for i in args]
-            for catg in args:
-                if not catg in bot.categories:
-                    raise LookupError("Unknown command category " + catg + ".")
-            curr = setDict(enabled, channel.id, list(default_commands))
-            for catg in args:
-                if "d" not in flags:
-                    if catg not in enabled:
+                return ini_md(f"No currently enabled commands in {sqr_md(channel)}.")
+            return f"Currently enabled command categories in {channel_mention(channel.id)}:\n{ini_md(iter2str(temp))}"
+        if "e" not in flags and "a" not in flags and "d" not in flags:
+            catg = argv.casefold()
+            if not catg in bot.categories:
+                raise LookupError(f"Unknown command category {argv}.")
+            if catg in enabled:
+                return css_md(f"Command category {sqr_md(catg)} is currently enabled in {sqr_md(channel)}.")
+            return css_md(f"Command category {sqr_md(catg)} is currently disabled in {sqr_md(channel)}. Use ?e to enable.")
+        args = [i.casefold() for i in args]
+        for catg in args:
+            if not catg in bot.categories:
+                raise LookupError(f"Unknown command category {catg}.")
+        curr = set_dict(enabled, channel.id, set(default_commands))
+        for catg in args:
+            if "d" not in flags:
+                if catg not in enabled:
+                    if type(curr) is set:
+                        curr.add(catg)
+                    else:
                         curr.append(catg)
-                        update()
-                if "d" in flags:
-                    if catg in enabled:
-                        curr.remove(catg)
-                        update()
-            if curr == default_commands:
-                enabled.pop(channel.id)
-                update()
-            if "h" in flags:
-                return
-            if "e" in flags:
-                return (
-                    "```css\nEnabled command category [" + noHighlight(", ".join(args))
-                    + "] in [" + noHighlight(channel.name) + "].```"
-                )
-            return (
-                "```css\nDisabled command category [" + noHighlight(", ".join(args))
-                + "] in [" + noHighlight(channel.name) + "].```"
-            )
+                    update()
+            if "d" in flags:
+                if catg in enabled:
+                    curr.remove(catg)
+                    update()
+        check = curr if type(curr) is set else frozenset(curr)
+        if check == default_commands:
+            enabled.pop(channel.id)
+            update()
+        if "h" in flags:
+            return
+        category = "category" if len(args) == 1 else "categories"
+        action = "Enabled" if "e" in flags else "Disabled"
+        return css_md(f"{action} command {category} {sqr_md(', '.join(args))} in {sqr_md(channel)}.")
 
 
 class Prefix(Command):
@@ -279,22 +238,13 @@ class Prefix(Command):
             if guild.id in pref:
                 pref.pop(guild.id)
                 update()
-            return (
-                "```css\nSuccessfully reset command prefix for ["
-                + noHighlight(guild.name) + "].```"
-            )
+            return css_md(f"Successfully reset command prefix for {sqr_md(guild)}.")
         if not argv:
-            return (
-                "```css\nCurrent command prefix for [" + noHighlight(guild.name)
-                + "]: [" + noHighlight(bot.getPrefix(guild)) + "].```"
-            )
+            return css_md(f"Current command prefix for {sqr_md(guild)}: {sqr_md(bot.get_prefix(guild))}.")
         req = 3
         if perm < req:
-            reason = (
-                "to change command prefix for "
-                + guild.name
-            )
-            raise self.permError(perm, req, reason)
+            reason = f"to change command prefix for {guild}"
+            raise self.perm_error(perm, req, reason)
         prefix = argv
         # Backslash is not allowed, it is used to escape commands normally
         if prefix.startswith("\\"):
@@ -302,10 +252,7 @@ class Prefix(Command):
         pref[guild.id] = prefix
         update()
         if "h" not in flags:
-            return (
-                "```css\nSuccessfully changed command prefix for [" + noHighlight(guild.name)
-                + "] to [" + noHighlight(argv) + "].```"
-            )
+            return css_md(f"Successfully changed command prefix for {sqr_md(guild)} to {sqr_md(argv)}.")
 
 
 class Loop(Command):
@@ -322,11 +269,11 @@ class Loop(Command):
         if not args:
             # Ah yes, I made this error specifically for people trying to use this command to loop songs 🙃
             raise ArgumentError("Please input loop iterations and target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioSettings command.")
-        num = await bot.evalMath(args[0], user)
+        num = await bot.eval_math(args[0], user)
         iters = round(num)
         # Bot owner bypasses restrictions
         if not isnan(perm):
-            if iters > 32 and not bot.isTrusted(guild.id):
+            if iters > 32 and not bot.is_trusted(guild.id):
                 raise PermissionError("Must be in a trusted server to execute loop of more than 32 iterations.")
             # Required level is 1/3 the amount of loops required, rounded up
             scale = 3
@@ -336,7 +283,7 @@ class Loop(Command):
                     "to execute loop of " + str(iters)
                     + " iterations"
                 )
-                raise self.permError(perm, ceil(iters / scale), reason)
+                raise self.perm_error(perm, ceil(iters / scale), reason)
             elif iters > 256:
                 raise PermissionError("Must be owner to execute loop of more than 256 iterations.")
         func = func2 = " ".join(args[1:])
@@ -347,18 +294,15 @@ class Loop(Command):
             # Detects when an attempt is made to loop the loop command
             for n in self.name:
                 if (
-                    (bot.getPrefix(guild) + n).upper() in func.replace(" ", "").upper()
+                    (bot.get_prefix(guild) + n).upper() in func.replace(" ", "").upper()
                 ) or (
-                    (str(bot.client.user.id) + ">" + n).upper() in func.replace(" ", "").upper()
+                    (str(bot.user.id) + ">" + n).upper() in func.replace(" ", "").upper()
                 ):
                     raise PermissionError("Must be owner to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
-        create_task(sendReact(
+        create_task(send_with_react(
             channel,
-            (
-                "*```css\nLooping [" + func + "] " + str(iters)
-                + " time" + "s" * (iters != 1) + "...```*"
-            ),
+            italics(css_md(f"Looping {sqr_md(func)} {iters} time{'s' if iters != 1 else ''}...")),
             reacts=["❎"],
         ))
         for i in range(iters):
@@ -380,32 +324,32 @@ class Avatar(Command):
 
     async def getGuildData(self, g):
         # Gets icon display of a server and returns as an embed.
-        url = strURL(g.icon_url)
+        url = to_png(g.icon_url)
         name = g.name
-        emb = discord.Embed(colour=randColour())
+        emb = discord.Embed(colour=rand_colour())
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
-        emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
+        emb.description = f"{sqr_md(name)}({url})"
         return dict(embed=emb)
 
     def getMimicData(self, p):
         # Gets icon display of a mimic and returns as an embed.
-        url = strURL(p.url)
+        url = to_png(p.url)
         name = p.name
-        emb = discord.Embed(colour=randColour())
+        emb = discord.Embed(colour=rand_colour())
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
-        emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
+        emb.description = f"{sqr_md(name)}({url})"
         return dict(embed=emb)
 
-    async def __call__(self, argv, guild, bot, client, user, **void):
+    async def __call__(self, argv, guild, bot, user, **void):
         g, guild = guild, None
         # This is a mess 🙃
         if argv:
             try:
-                u_id = verifyID(argv)
+                u_id = verify_id(argv)
             except:
                 u_id = argv
             try:
@@ -425,10 +369,10 @@ class Avatar(Command):
                                 guild = g
                             else:
                                 try:
-                                    guild = await bot.fetch_guild(u_id)
+                                    guild = bot.cache.guilds[u_id]
                                 except:
                                     try:
-                                        channel = await bot.fetch_channel(u_id)
+                                        channel = bot.cache.channels[u_id]
                                     except:
                                         u = None
                                         if g.id in bot.data.counts:
@@ -436,7 +380,7 @@ class Avatar(Command):
                                                 u = bot.ghostUser()
                                                 u.id = u_id
                                         if u is None:
-                                            raise LookupError("No results for " + argv)
+                                            raise LookupError(f"No results for {argv}.")
                                     try:
                                         guild = channel.guild
                                     except NameError:
@@ -450,12 +394,12 @@ class Avatar(Command):
             u = user
         guild = g
         name = str(u)
-        url = bestURL(u)
-        emb = discord.Embed(colour=randColour())
+        url = best_url(u)
+        emb = discord.Embed(colour=rand_colour())
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
-        emb.description = "[" + discord.utils.escape_markdown(name) + "](" + url + ")"
+        emb.description = f"{sqr_md(name)}({url})"
         return dict(embed=emb)
 
 
@@ -469,21 +413,21 @@ class Info(Command):
 
     async def getGuildData(self, g, flags={}):
         bot = self.bot
-        url = strURL(g.icon_url)
+        url = to_png(g.icon_url)
         name = g.name
         try:
             u = g.owner
         except (AttributeError, KeyError):
             u = None
-        emb = discord.Embed(colour=randColour())
+        emb = discord.Embed(colour=rand_colour())
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         if u is not None:
-            d = "Owner: <@" + str(u.id) + ">"
+            d = user_mention(u.id)
         else:
             d = ""
         if g.description:
-            d += "```\n" + str(g.description) + "```"
+            d += code_md(g.description)
         emb.description = d
         top = None
         try:
@@ -492,26 +436,22 @@ class Info(Command):
         except (AttributeError, KeyError):
             pcount = 0
         with suppress(AttributeError, KeyError):
-            if "v" in flags:
-                # Top users by message counts
-                pavg = await bot.database.counts.getUserAverage(None, g)
-                users = deque()
-                us = await bot.database.counts.getGuildMessages(g)
-                if type(us) is str:
-                    top = us
-                else:
-                    ul = sorted(
-                        us,
-                        key=lambda k: us[k],
-                        reverse=True,
-                    )
-                    for i in range(min(32, flags.get("v", 0) * 5, len(us))):
-                        u_id = ul[i]
-                        users.append(
-                            "<@" + str(u_id) + ">: "
-                            + str(us[u_id])
-                        )
-                    top = "\n".join(users)
+            # Top users by message counts
+            pavg = await bot.database.counts.getUserAverage(None, g)
+            users = deque()
+            us = await bot.database.counts.getGuildMessages(g)
+            if type(us) is str:
+                top = us
+            else:
+                ul = sorted(
+                    us,
+                    key=lambda k: us[k],
+                    reverse=True,
+                )
+                for i in range(min(32, flags.get("v", 0) * 5 + 5, len(us))):
+                    u_id = ul[i]
+                    users.append(f"{user_mention(u_id)}: {us[u_id]}")
+                top = "\n".join(users)
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
         emb.add_field(name="Creation time", value=str(g.created_at), inline=1)
         if "v" in flags:
@@ -528,14 +468,14 @@ class Info(Command):
         return dict(embed=emb)
 
     def getMimicData(self, p, flags={}):
-        url = strURL(p.url)
+        url = to_png(p.url)
         name = p.name
-        emb = discord.Embed(colour=randColour())
+        emb = discord.Embed(colour=rand_colour())
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
-        d = "<@" + str(p.u_id) + ">```fix\n" + p.id + "```"
+        d = f"{user_mention(p.u_id)}{fix_md(p.id)}"
         if p.description:
-            d += "```\n" + str(p.description) + "```"
+            d += code_md(p.description)
         emb.description = d
         pcnt = 0
         with suppress(AttributeError, KeyError):
@@ -555,20 +495,20 @@ class Info(Command):
             ctime = datetime.datetime.fromtimestamp(p.birthday)
             age = (utc_dt() - ctime).total_seconds() / TIMEUNITS["year"]
             emb.add_field(name="Birthday", value=str(ctime), inline=1)
-            emb.add_field(name="Age", value=str(roundMin(round(age, 1))), inline=1)
+            emb.add_field(name="Age", value=str(round_min(round(age, 1))), inline=1)
         if pcnt:
             emb.add_field(name="Post count", value=str(pcnt), inline=1)
             if "v" in flags:
                 emb.add_field(name="Average post length", value=str(round(pavg, 9)), inline=1)
         return dict(embed=emb)
 
-    async def __call__(self, argv, name, guild, channel, bot, client, user, flags, **void):
+    async def __call__(self, argv, name, guild, channel, bot, user, flags, **void):
         member = True
         g, guild = guild, None
         # This is a mess 🙃
         if argv:
             try:
-                u_id = verifyID(argv)
+                u_id = verify_id(argv)
             except:
                 u_id = argv
             try:
@@ -590,10 +530,10 @@ class Info(Command):
                                 guild = g
                             else:
                                 try:
-                                    guild = await bot.fetch_guild(u_id)
+                                    guild = bot.cache.guilds[u_id]
                                 except:
                                     try:
-                                        channel = await bot.fetch_channel(u_id)
+                                        channel = bot.cache.channels[u_id]
                                     except:
                                         u = None
                                         if g.id in bot.data.counts:
@@ -601,7 +541,7 @@ class Info(Command):
                                                 u = bot.ghostUser()
                                                 u.id = u_id
                                         if u is None:
-                                            raise LookupError("No results for " + argv)
+                                            raise LookupError(f"No results for {argv}.")
                                     try:
                                         guild = channel.guild
                                     except NameError:
@@ -618,34 +558,43 @@ class Info(Command):
         guild = g
         name = str(u)
         dname = u.display_name * (u.display_name != u.name) if member else None
-        url = bestURL(u)
+        url = best_url(u)
         try:
             is_sys = u.system
         except (AttributeError, KeyError):
             is_sys = False
         is_bot = u.bot
-        is_self = u.id == client.user.id
-        is_self_owner = u.id in bot.owners
+        is_self = u.id == bot.user.id
+        is_self_owner = bot.is_owner(u.id)
         is_guild_owner = u.id == guild.owner_id
         if member:
             joined = getattr(u, "joined_at", None)
         else:
             joined = None
         created = u.created_at
-        activity = "\n".join(strActivity(i) for i in getattr(u, "activities", []))
+        activity = "\n".join(activity_repr(i) for i in getattr(u, "activities", ()))
         status = None
         if hasattr(u, "status"):
-            s = u.status
-            if s == discord.Status.online:
-                status = "Online 🟢"
-            elif s == discord.Status.idle:
-                status = "Idle 🟡"
-            elif s == discord.Status.dnd:
-                status = "DND 🔴"
-            elif s in (discord.Status.offline, discord.Status.invisible):
-                status = "Offline ⚫"
+            # Show up to 3 different statuses based on the user's desktop, web and mobile status.
+            if not is_self:
+                status_items = [(u.desktop_status, "🖥️"), (u.web_status, "🕸️"), (u.mobile_status, "📱")]
+            else:
+                status_items = [(bot.statuses[(i + bot.status_iter) % 3], x) for i, x in enumerate(("🖥️", "🕸️", "📱"))]
+            for s, i in sorted(status_items, key=lambda x: status_order.index(x[0])):
+                icon = status_icon[s]
+                if not status:
+                    status = status_text[s] + " `" + icon
+                if s not in (discord.Status.offline, discord.Status.invisible):
+                    if icon not in status:
+                        status += icon
+                    status += i
+            if status:
+                status += "`"
+                if len(status) >= 16:
+                    status = status.replace(" ", "\n")
         if member:
-            role = ", ".join("<@&" + str(i.id) + ">" for i in reversed(getattr(u, "roles", ())) if not i.is_default())
+            rolelist = [role_mention(i.id) for i in reversed(getattr(u, "roles", ())) if not i.is_default()]
+            role = ", ".join(rolelist)
         else:
             role = None
         coms = seen = msgs = avgs = gmsg = old = 0
@@ -658,9 +607,12 @@ class Info(Command):
             if type(ls) is str:
                 seen = ls
             else:
-                seen = sec2Time(max(0, ts - ls)) + " ago"
+                seen = f"{sec2time(max(0, ts - ls))} ago"
             if la:
-                seen = la + ", " + seen
+                seen = f"{la}, {seen}"
+        with suppress(LookupError):
+            old = bot.data.counts.get(guild.id, {})["oldest"][u.id]
+            old = snowflake_time(old)
         if "v" in flags:
             with suppress(LookupError):
                 if is_self:
@@ -668,12 +620,12 @@ class Info(Command):
                     c = {}
                     for i, v in enumerate(tuple(bot.data.users.values()), 1):
                         with suppress(KeyError):
-                            addDict(c, v["commands"])
+                            add_dict(c, v["commands"])
                         if not i & 8191:
                             await asyncio.sleep(0.2)
                 else:
                     c = bot.data.users[u.id]["commands"]
-                coms = iterSum(c)
+                coms = iter_sum(c)
                 if type(c) is dict:
                     with suppress(IndexError):
                         comfreq = deque(sort(c, reverse=True).keys())
@@ -683,50 +635,53 @@ class Info(Command):
                 gmsg = bot.database.counts.getUserGlobalMessageCount(u)
                 msgs = await bot.database.counts.getUserMessages(u, guild)
                 avgs = await bot.database.counts.getUserAverage(u, guild)
-                old = bot.data.counts.get(guild.id, {})["oldest"].get(u.id)
-                if old:
-                    old = snowflake_time(old)
-                if guild.owner.id != client.user.id:
-                    us = await bot.database.counts.getGuildMessages(guild)
-                    if type(us) is str:
-                        pos = us
-                    else:
-                        ul = sorted(
-                            us,
-                            key=lambda k: us[k],
-                            reverse=True,
-                        )
-                        try:
-                            i = ul.index(u.id)
-                            while i >= 1 and us[ul[i - 1]] == us[ul[i]]:
-                                i -= 1
-                            pos = i + 1
-                        except ValueError:
-                            if joined:
-                                pos = len(ul) + 1
+        with suppress(LookupError):
+            if not hasattr(guild, "ghost"):
+                us = await bot.database.counts.getGuildMessages(guild)
+                if type(us) is str:
+                    pos = us
+                else:
+                    ul = sorted(
+                        us,
+                        key=lambda k: us[k],
+                        reverse=True,
+                    )
+                    try:
+                        i = ul.index(u.id)
+                        while i >= 1 and us[ul[i - 1]] == us[ul[i]]:
+                            i -= 1
+                        pos = i + 1
+                    except ValueError:
+                        if joined:
+                            pos = len(ul) + 1
         if is_self and bot.website is not None:
             url2 = bot.website
         else:
             url2 = url
-        emb = discord.Embed(colour=randColour())
+        emb = discord.Embed(colour=rand_colour())
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url2)
-        d = "<@" + str(u.id) + ">"
+        d = user_mention(u.id)
         if activity:
-            d += "*```\n" + activity + "```*"
+            d += italics(code_md(activity))
         if any((is_sys, is_bot, is_self, is_self_owner, is_guild_owner)):
             if d[-1] == "*":
                 d += " "
             d += "**```css\n"
-            d += "[Discord staff ⚠️]\n" * is_sys
-            d += "[Bot 🤖]\n" * is_bot
-            d += "[Myself :3]\n" * is_self
-            d += "[My owner ❤️]\n" * is_self_owner
-            d += "[Server owner 👀]\n" * (is_guild_owner and not hasattr(guild, "isDM"))
+            if is_sys:
+                d += "[Discord staff ⚠️]\n"
+            if is_bot:
+                d += "[Bot 🤖]\n"
+            if is_self:
+                d += "[Myself :3]\n"
+            if is_self_owner:
+                d += "[My owner ❤️]\n"
+            if is_guild_owner and not hasattr(guild, "isDM"):
+                d += "[Server owner 👀]\n"
             d = d.strip("\n")
             d += "```**"
         emb.description = d
-        emb.add_field(name="User ID", value=str(u.id), inline=0)
+        emb.add_field(name="User ID", value="`" + str(u.id) + "`", inline=0)
         emb.add_field(name="Creation time", value=str(created), inline=1)
         if joined:
             emb.add_field(name="Join time", value=str(joined), inline=1)
@@ -751,7 +706,7 @@ class Info(Command):
         if pos:
             emb.add_field(name="Server rank", value=str(pos), inline=1)
         if role:
-            emb.add_field(name="Roles", value=role, inline=0)
+            emb.add_field(name=f"Roles ({len(rolelist)})", value=role, inline=0)
         return dict(embed=emb)
 
 
@@ -766,14 +721,14 @@ class Activity(Command):
 
     async def __call__(self, guild, user, argv, flags, channel, bot, **void):
         if argv:
-            u_id = verifyID(argv)
+            u_id = verify_id(argv)
             try:
                 user = await bot.fetch_user(u_id)
             except (TypeError, discord.NotFound):
                 user = await bot.fetch_member_ex(u_id, guild)
         data = await create_future(bot.database.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=12)
         with discord.context_managers.Typing(channel):
-            resp = await bot.solveMath("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
+            resp = await bot.solve_math("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
             fn = resp["file"]
             f = discord.File(fn)
         return dict(file=f, filename=fn, best=True)
@@ -784,42 +739,41 @@ class Status(Command):
     min_level = 0
     description = "Shows the bot's current internal program state."
 
-    async def __call__(self, flags, client, bot, **void):
-        active = bot.getActive()
-        latency = sec2Time(client.latency)
+    async def __call__(self, flags, bot, **void):
+        active = bot.get_active()
+        latency = sec2time(bot.latency)
         try:
-            shards = len(client.latencies)
+            shards = len(bot.latencies)
         except AttributeError:
             shards = 1
         size = sum(bot.size.values()) + sum(bot.size2.values())
-        stats = bot.currState
+        stats = bot.curr_state
         cache = await create_future(os.listdir, "cache/", timeout=12)
-        return (
-            "*```ini"
-            + "\nLoaded users: " + sbHighlight(max(len(client.users), len(bot.cache.users)))
-            + ", Loaded servers: " + sbHighlight(bot.guilds)
-            + ", Loaded shards: " + sbHighlight(shards)
+        return italics(ini_md(
+            "Loaded users: " + sqr_md(len(bot.cache.users))
+            + ", Loaded servers: " + sqr_md(len(bot.guilds))
+            + ", Loaded shards: " + sqr_md(shards)
             
-            + ".\nActive processes: " + sbHighlight(active[0])
-            + ", Active threads: " + sbHighlight(active[1])
-            + ", Active coroutines: " + sbHighlight(active[2])
+            + ".\nActive processes: " + sqr_md(active[0])
+            + ", Active threads: " + sqr_md(active[1])
+            + ", Active coroutines: " + sqr_md(active[2])
             
-            + ".\nConnected voice channels: " + sbHighlight(len(client.voice_clients))
+            + ".\nConnected voice channels: " + sqr_md(len(bot.voice_clients))
             
-            + ".\nCached files: " + sbHighlight(len(cache))
+            + ".\nCached files: " + sqr_md(len(cache))
             
-            + ".\nCode size: " + sbHighlight(size[0]) + " bytes"
-            + ", " + sbHighlight(size[1]) + " lines"
+            + ".\nCode size: " + sqr_md(size[0]) + " bytes"
+            + ", " + sqr_md(size[1]) + " lines"
 
-            + ".\nSystem time: " + sbHighlight(datetime.datetime.now())
-            + ".\nPing latency: " + sbHighlight(latency)
-            + ".\nPublic IP address: " + sbHighlight(bot.ip)
+            + ".\nSystem time: " + sqr_md(datetime.datetime.now())
+            + ".\nPing latency: " + sqr_md(latency)
+            + ".\nPublic IP address: " + sqr_md(bot.ip)
             
-            + ".\nCPU usage: " + sbHighlight(round(stats[0], 3)) + "%"
-            + ", RAM usage: " + sbHighlight(round(stats[1] / 1048576, 3)) + " MB"
-            + ", Disk usage: " + sbHighlight(round(stats[2] / 1048576, 3)) + " MB"
-            + ".```*"
-        )
+            + ".\nCPU usage: " + sqr_md(round(stats[0], 3)) + "%"
+            + ", RAM usage: " + sqr_md(round(stats[1] / 1048576, 3)) + " MB"
+            + ", Disk usage: " + sqr_md(round(stats[2] / 1048576, 3)) + " MB"
+            + "."
+        ))
 
 
 class Invite(Command):
@@ -830,11 +784,11 @@ class Invite(Command):
     def __call__(self, **void):
         if discord_id is None:
             raise FileNotFoundError("Unable to locate bot's Client ID.")
-        emb = discord.Embed(colour=randColour())
-        user = self.bot.client.user
-        url = bestURL(user)
+        emb = discord.Embed(colour=rand_colour())
+        user = self.bot.user
+        url = best_url(user)
         emb.set_author(name=str(user), icon_url=url, url=url)
-        emb.description = "[Homepage](" + self.bot.website + ")\n[Invite](https://discordapp.com/oauth2/authorize?permissions=8&client_id=" + str(discord_id) + "&scope=bot)"
+        emb.description = f"[Homepage]({self.bot.website})\n[Invite](https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord.id}&scope=bot)"
         return dict(embed=emb)
 
 
@@ -847,7 +801,7 @@ class Reminder(Command):
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = 1 / 3
     keywords = ["on", "at", "in", "when", "event"]
-    keydict = {re.compile("(^|[^a-z0-9])" + i[::-1] + "([^a-z0-9]|$)", re.I): None for i in keywords}
+    keydict = {re.compile(f"(^|[^a-z0-9]){i[::-1]}([^a-z0-9]|$)", re.I): None for i in keywords}
     timefind = None
 
     def __load__(self):
@@ -864,7 +818,7 @@ class Reminder(Command):
         if "announce" in name:
             req = 2
             if req > perm:
-                raise self.permError(perm, req, "for command " + name)
+                raise self.perm_error(perm, req, "for command " + name)
             sendable = message.channel
             word = "announcements"
         else:
@@ -874,14 +828,11 @@ class Reminder(Command):
         update = bot.database.reminders.update
         if "d" in flags:
             if not len(rems):
-                return (
-                    "```ini\nNo " + word + " currently set for ["
-                    + noHighlight(sendable) + "].```"
-                )
+                return ini_md(f"No {word} currently set for {sqr_md(sendable)}.")
             if not argv:
                 i = 0
             else:
-                i = await bot.evalMath(argv2, user)
+                i = await bot.eval_math(argv2, user)
             i %= len(rems)
             x = rems.pop(i)
             if i == 0:
@@ -890,11 +841,7 @@ class Reminder(Command):
                 if rems:
                     bot.database.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
             update()
-            return (
-                "```ini\nSuccessfully removed ["
-                + limStr(noHighlight(x["msg"]), 128) + "] from " + word + " list for ["
-                + noHighlight(sendable) + "].```"
-            )
+            return ini_md(f"Successfully removed {sqr_md(lim_str(x['msg'], 128))} from {word} list for {sqr_md(sendable)}.")
         if not argv:
             # Set callback message for scrollable list
             return (
@@ -903,7 +850,7 @@ class Reminder(Command):
                 + "-\nLoading Reminder database...```*"
             )
         if len(rems) >= 64:
-            raise OverflowError("You have reached the maximum of 64 " + word + ". Please remove one to add another.")
+            raise OverflowError(f"You have reached the maximum of 64 {word}. Please remove one to add another.")
         # This parser is so unnecessarily long for what it does...
         keyed = False
         while True:
@@ -944,7 +891,7 @@ class Reminder(Command):
                     msg = ""
                 if spl is not None:
                     msg = " event ".join(spl[:-1])
-                    t = verifyID(spl[-1])
+                    t = verify_id(spl[-1])
                     keyed = True
                     break
             if foundkey.get("when"):
@@ -957,7 +904,7 @@ class Reminder(Command):
                     msg = ""
                 if spl is not None:
                     msg = " when ".join(spl[:-1])
-                    t = verifyID(spl[-1])
+                    t = verify_id(spl[-1])
                     keyed = True
                     break
             if foundkey.get("in"):
@@ -968,7 +915,7 @@ class Reminder(Command):
                     msg = ""
                 if spl is not None:
                     msg = " in ".join(spl[:-1])
-                    t = await bot.evalTime(spl[-1], user)
+                    t = await bot.eval_time(spl[-1], user)
                     break
             if foundkey.get("at"):
                 if " at " in argv:
@@ -1018,10 +965,10 @@ class Reminder(Command):
                 i = match.start()
                 spl = [argv[:i], argv[i:]]
                 msg = spl[0]
-                t += await bot.evalTime(spl[1], user)
+                t += await bot.eval_time(spl[1], user)
                 break
             msg = " ".join(args[:-1])
-            t = await bot.evalTime(args[-1], user)
+            t = await bot.eval_time(args[-1], user)
             break
         if keyed:
             try:
@@ -1035,11 +982,11 @@ class Reminder(Command):
                 msg = "[SAMPLE ANNOUNCEMENT]"
             else:
                 msg = "[SAMPLE REMINDER]"
-            msg = "**```asciidoc\n" + msg + "```**"
+            msg = bold(css_md(msg))
         elif len(msg) > 1024:
-            raise OverflowError("Input message too long (" + str(len(msg)) + "> 1024).")
+            raise OverflowError(f"Input message too long ({len(msg)} > 1024).")
         username = str(user)
-        url = bestURL(user)
+        url = best_url(user)
         ts = utc()
         if keyed:
             # Schedule for an event from a user
@@ -1050,7 +997,7 @@ class Reminder(Command):
                 t=inf,
             ))
             s = "$" + str(t)
-            seq = setDict(bot.data.reminders, s, deque())
+            seq = set_dict(bot.data.reminders, s, deque())
             seq.append(sendable.id)
         else:
             # Schedule for an event at a certain time
@@ -1070,13 +1017,13 @@ class Reminder(Command):
         emb = discord.Embed(description=msg)
         emb.set_author(name=username, url=url, icon_url=url)
         if "announce" in name:
-            out = "```css\nSuccessfully set announcement for " + sbHighlight(sendable)
+            out = f"```css\nSuccessfully set announcement for {sqr_md(sendable)}"
         else:
-            out = "```css\nSuccessfully set reminder for " + sbHighlight(sendable)
+            out = f"```css\nSuccessfully set reminder for {sqr_md(sendable)}"
         if keyed:
-            out += " upon next event from " + sbHighlight("<@" + str(t) + ">")
+            out += f" upon next event from {sqr_md(user_mention(t))}"
         else:
-            out += " in " + sbHighlight(sec2Time(t))
+            out += f" in {sqr_md(sec2time(t))}"
         out += ":```"
         return dict(content=out, embed=emb)
 
@@ -1089,7 +1036,7 @@ class Reminder(Command):
         guild = message.guild
         user = await bot.fetch_user(u_id)
         rems = bot.data.reminders.get(s_id, [])
-        sendable = await bot.fetch_sendable(s_id)
+        sendable = await bot.fetch_messageable(s_id)
         page = 16
         last = max(0, len(rems) - page)
         if reaction is not None:
@@ -1115,28 +1062,26 @@ class Reminder(Command):
             + "-\n"
         )
         if not rems:
-            content += "Schedule for " + str(sendable).replace("`", "") + " is currently empty.```*"
+            content += f"Schedule for {str(sendable).replace('`', '')} is currently empty.```*"
             msg = ""
         else:
             t = utc()
-            content += str(len(rems)) + " messages currently scheduled for " + str(sendable).replace("`", "") + ":```*"
-            msg = strIter(
+            content += f"{len(rems)} messages currently scheduled for {str(sendable).replace('`', '')}:```*"
+            msg = iter2str(
                 rems[pos:pos + page],
-                key=lambda x: limStr(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + noHighlight(x["msg"]), 96) + "` ➡️ " + ("<@" + str(x["u_id"]) + ">" if "u_id" in x else sec2Time(x["t"] - t)),
+                key=lambda x: lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x["msg"]), 96) + "` ➡️ " + (user_mention(x["u_id"]) if "u_id" in x else sec2time(x["t"] - t)),
                 left="`[",
                 right="]`",
             )
         emb = discord.Embed(
             description=content + msg,
-            colour=randColour(),
+            colour=rand_colour(),
         )
-        url = bestURL(user)
+        url = best_url(user)
         emb.set_author(name=str(user), url=url, icon_url=url)
         more = len(rems) - pos - page
         if more > 0:
-            emb.set_footer(
-                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
-            )
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
@@ -1186,14 +1131,14 @@ class UpdateReminders(Database):
                 self.listed.insort((temp[0]["t"], u_id), key=lambda x: x[0])
             # print(self.listed)
             # Send reminder to target user/channel
-            ch = await self.bot.fetch_sendable(u_id)
+            ch = await self.bot.fetch_messageable(u_id)
             emb = discord.Embed(description=x.msg)
             try:
                 u = self.bot.get_user(x["user"], replace=True)
             except KeyError:
                 u = x
-            emb.set_author(name=u.name, url=bestURL(u), icon_url=bestURL(u))
-            self.bot.embedSender(ch, emb)
+            emb.set_author(name=u.name, url=best_url(u), icon_url=best_url(u))
+            self.bot.send_embeds(ch, emb)
             self.update()
 
     # Seen event: runs when users perform discord actions
@@ -1208,9 +1153,9 @@ class UpdateReminders(Database):
             with tracebacksuppressor:
                 for u_id in assigned:
                     # Send reminder to all targeted users/channels
-                    ch = await self.bot.fetch_sendable(u_id)
-                    rems = setDict(self.data, u_id, [])
-                    pops = {}
+                    ch = await self.bot.fetch_messageable(u_id)
+                    rems = set_dict(self.data, u_id, [])
+                    pops = set()
                     for i, x in enumerate(reversed(rems), 1):
                         if x.get("u_id", None) == user.id:
                             emb = discord.Embed(description=x["msg"])
@@ -1218,10 +1163,10 @@ class UpdateReminders(Database):
                                 u = self.bot.get_user(x["user"], replace=True)
                             except KeyError:
                                 u = cdict(x)
-                            emb.set_author(name=u.name, url=bestURL(u), icon_url=bestURL(u))
-                            self.bot.embedSender(ch, emb)
-                            pops[len(rems) - i] = True
-                        elif isValid(x["t"]):
+                            emb.set_author(name=u.name, url=best_url(u), icon_url=best_url(u))
+                            self.bot.send_embeds(ch, emb)
+                            pops.add(len(rems) - i)
+                        elif is_finite(x["t"]):
                             break
                     it = [rems[i] for i in range(len(rems)) if i not in pops]
                     rems.clear()
@@ -1246,7 +1191,7 @@ class UpdateMessageCount(Database):
 
     async def getUserMessages(self, user, guild):
         if self.scanned == -1:
-            c_id = self.bot.client.user.id
+            c_id = self.bot.user.id
             if guild is None or hasattr(guild, "isDM"):
                 channel = user.dm_channel
                 if channel is None:
@@ -1278,7 +1223,7 @@ class UpdateMessageCount(Database):
 
     async def getUserAverage(self, user, guild):
         if self.scanned == -1:
-            c_id = self.bot.client.user.id
+            c_id = self.bot.user.id
             if guild is None or hasattr(guild, "isDM"):
                 channel = user.dm_channel
                 if channel is None:
@@ -1333,12 +1278,13 @@ class UpdateMessageCount(Database):
                 raise
 
         while True:
-            with tracebacksuppressor:
+            with tracebacksuppressor(SemaphoreOverflowError):
                 async with self.semaphore:
                     messages = []
                     # 16 attempts to download channel
                     messages = await aretry(delay_if_exc, channel, attempts=16, delay=20)
                     break
+            await asyncio.sleep(30)
         if callback:
             return await create_future(callback, channel=channel, messages=messages)
         return messages
@@ -1354,7 +1300,7 @@ class UpdateMessageCount(Database):
         year = datetime.timedelta(seconds=31556925.216)
         oneyear = utc_dt() - guild.created_at < year
         if guild.member_count > 512 and not oneyear:
-            addDict(self.data[guild.id], {0: True})
+            add_dict(self.data[guild.id], {0: True})
             return
         print(guild)
         data = {}
@@ -1376,7 +1322,7 @@ class UpdateMessageCount(Database):
                     avgs[u] = length
                 if not i & 8191:
                     await asyncio.sleep(0.5)
-        addDict(self.data[guild.id], {"counts": data, "totals": avgs, 0: True})
+        add_dict(self.data[guild.id], {"counts": data, "totals": avgs, 0: True})
         self.update()
         print(guild)
         print(self.data[guild.id])
@@ -1390,7 +1336,7 @@ class UpdateMessageCount(Database):
             return
         self.scanned = True
         year = datetime.timedelta(seconds=31556925.216)
-        guilds = self.bot.client.guilds
+        guilds = self.bot.guilds
         i = 1
         for guild in sorted(guilds, key=lambda g: g.member_count, reverse=True):
             if guild.id not in self.data:
@@ -1412,7 +1358,7 @@ class UpdateMessageCount(Database):
                 d = self.data[guild.id]
                 if type(d) is str:
                     return
-                if user.id not in setDict(d, "oldest", {}):
+                if user.id not in set_dict(d, "oldest", {}):
                     d["oldest"][user.id] = message.id
                 count = d["counts"].get(user.id, 0) + 1
                 total = d["totals"].get(user.id, 0) + self.getMessageLength(message)
@@ -1457,8 +1403,8 @@ class UpdateUsers(Database):
 
     def send_event(self, u_id, event, count=1):
         # print(self.bot.cache.users.get(u_id), event, count)
-        data = setDict(setDict(self.data, u_id, {}), "recent", {})
-        hour = roundMin(round(utc() // self.interval) / self.scale)
+        data = set_dict(set_dict(self.data, u_id, {}), "recent", {})
+        hour = round_min(round(utc() // self.interval) / self.scale)
         if data:
             self.clear_events(data, hour - self.hours)
         try:
@@ -1476,7 +1422,7 @@ class UpdateUsers(Database):
         data = self.data.get(u_id, EMPTY).get("recent")
         if not data:
             return list(repeat(0, round(self.hours / self.interval * interval)))
-        hour = roundMin(round(utc() // self.interval) / self.scale)
+        hour = round_min(round(utc() // self.interval) / self.scale)
         # print(hour)
         self.clear_events(data, hour - self.hours)
         start = hour - self.hours
@@ -1492,12 +1438,12 @@ class UpdateUsers(Database):
     # User seen, add event to activity database
     def _seen_(self, user, delay, event, count=1, raw=None, **void):
         self.send_event(user.id, event, count=count)
-        addDict(self.data, {user.id: {"last_seen": 0}})
+        add_dict(self.data, {user.id: {"last_seen": 0}})
         self.data[user.id]["last_seen"] = utc() + delay
         self.data[user.id]["last_action"] = raw
 
     # User executed command, add to activity database
     def _command_(self, user, command, **void):
         self.send_event(user.id, "command")
-        addDict(self.data, {user.id: {"commands": {str(command): 1}}})
+        add_dict(self.data, {user.id: {"commands": {str(command): 1}}})
         self.update()

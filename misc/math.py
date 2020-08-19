@@ -13,7 +13,7 @@ getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
 
 
 # For debugging only
-def filePrint(*args, sep=" ", end="\n", prefix="", file="log.txt", **void):
+def file_print(*args, sep=" ", end="\n", prefix="", file="log.txt", **void):
     with open(file, "ab") as f:
         f.write((str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix)).encode("utf-8"))
 
@@ -22,7 +22,7 @@ def logging(func):
         try:
             output = func(self, *args, **kwargs)
         except:
-            filePrint(traceback.format_exc(), file=file)
+            file_print(traceback.format_exc(), file=file)
             raise
         return output
     return call
@@ -31,7 +31,7 @@ def logging(func):
 BF_PREC = 256
 BF_ALPHA = "0123456789abcdefghijklmnopqrstuvwxyz"
 
-def tryWrapper(func):
+def TryWrapper(func):
     def __call__(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -162,7 +162,7 @@ special_colours = {
 
 # For the ~activity command.
 def plt_special(d, user, **void):
-    plt.rcParams["figure.figsize"] = (24, 12)
+    plt.rcParams["figure.dpi"] = 256
     temp = numpy.zeros(len(next(iter(d.values()))))
     hours = 168
     width = hours / len(temp)
@@ -206,7 +206,6 @@ def plot_implicit(*args, **kwargs):
 
 def plot_array(*args, **kwargs):
     kwargs.pop("show", None)
-    plt.rcParams["figure.figsize"] = (6.4, 4.8)
     for arr, c in zip(args, colours):
         plt.plot(list(range(len(arr))), arr, c, **kwargs)
     return plt
@@ -551,9 +550,9 @@ def evalSym(f, prec=64, r=False):
 def procResp(resp):
     # Return file path if necessary
     if isinstance(resp[0], Plot):
-        plt.rcParams["figure.figsize"] = (6.4, 4.8)
+        plt.rcParams["figure.dpi"] = 256
         ts = round(time.time() * 1000)
-        name = str(ts) + ".png"
+        name = f"{ts}.png"
         fn = "cache/" + name
         try:
             resp[0].save(fn)
@@ -563,8 +562,9 @@ def procResp(resp):
         plt.clf()
         s = "{'file':'" + fn + "'}\n"
     elif resp[0] == plt:
+        plt.rcParams["figure.dpi"] = 256
         ts = round(time.time() * 1000)
-        name = str(ts) + ".png"
+        name = f"{ts}.png"
         fn = "cache/" + name
         try:
             plt.savefig(fn)
@@ -572,12 +572,11 @@ def procResp(resp):
             fn = name
             plt.savefig(fn)
         plt.clf()
-        plt.rcParams["figure.figsize"] = (6.4, 4.8)
         s = "{'file':'" + fn + "'}\n"
     elif type(resp) is tuple:
-        s = repr(list(resp))
+        s = str(list(resp))
     else:
-        s = repr([convAns(i) for i in resp])
+        s = str([convAns(i) for i in resp])
     return s.encode("utf-8")
 
 

@@ -12,7 +12,7 @@ ANIM = False
 
 
 # For debugging only
-def filePrint(*args, sep=" ", end="\n", prefix="", file="log.txt", **void):
+def file_print(*args, sep=" ", end="\n", prefix="", file="log.txt", **void):
     with open(file, "ab") as f:
         f.write((str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix)).encode("utf-8"))
 
@@ -21,14 +21,14 @@ def logging(func):
         try:
             output = func(self, *args, **kwargs)
         except:
-            filePrint(traceback.format_exc(), file=file)
+            file_print(traceback.format_exc(), file=file)
             raise
         return output
     return call
 
 
-# Time input detector, used to read FFprobe output
-def rdhms(ts):
+# Converts a time interval represented using days:hours:minutes:seconds, to a value in seconds.
+def time_parse(ts):
     data = ts.split(":")
     t = 0
     mult = 1
@@ -44,8 +44,8 @@ def rdhms(ts):
     return t
 
 # URL string detector
-urlIs = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
-isURL = lambda url: re.search(urlIs, url)
+url_match = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
+is_url = lambda url: re.search(url_match, url)
 
 
 from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), tuple(colour)) #Image.fromarray(numpy.tile(numpy.array(colour, dtype=numpy.uint8), (size, size, 1)))
@@ -98,7 +98,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
                     else:
                         if x < i:
                             i = x
-                dur = rdhms(d[:i])
+                dur = time_parse(d[:i])
             else:
                 d = s
             if orig_fps is None:
@@ -332,7 +332,7 @@ def resize_to(image, w, h, operation="auto"):
         else:
             filt = Image.BILINEAR
     else:
-        raise TypeError("Invalid image operation: \"" + op + '"')
+        raise TypeError(f'Invalid image operation: "{op}"')
     return image.resize([w, h], filt)
 
 
@@ -636,7 +636,7 @@ def get_image(url, out):
     if type(url) not in (bytes, bytearray, io.BytesIO):
         if url in CACHE:
             return CACHE[url]
-        if isURL(url):
+        if is_url(url):
             with requests.get(url, stream=True, timeout=8) as resp:
                 data = resp.content
             if len(data) > 67108864:
@@ -712,7 +712,7 @@ def evalImg(url, operation, args):
                     new["frames"].extend(res)
     else:
         new = eval(url)(*args)
-    filePrint(new)
+    file_print(new)
     if type(new) is dict:
         duration = new["duration"]
         new = new["frames"]

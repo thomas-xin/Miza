@@ -32,7 +32,7 @@ except:
     print("WARNING: google_api_key not found. Unable to use API to search youtube playlists.")
 
 
-async def createPlayer(auds, p_type=0, verbose=False):
+async def create_player(auds, p_type=0, verbose=False):
     auds.stats.quiet |= 2 * p_type
     # Set callback message for updating audio player
     text = (
@@ -40,7 +40,7 @@ async def createPlayer(auds, p_type=0, verbose=False):
         + "\nInitializing virtual audio player...```"
     )
     await auds.channel.send(text)
-    await auds.updatePlayer()
+    await auds.update_player()
 
 
 # Gets estimated duration from duration stored in queue entry
@@ -48,7 +48,7 @@ e_dur = lambda d: float(d) if type(d) is str else (d if d is not None else 300)
 
 
 # Runs ffprobe on a file or url, returning the duration if possible.
-def getDuration(filename):
+def get_duration(filename):
     command = ["ffprobe", "-hide_banner", filename]
     resp = None
     for _ in loop(3):
@@ -74,12 +74,12 @@ def getDuration(filename):
                 x = d.index(c)
                 if x < i:
                     i = x
-        dur = rdhms(d[:i])
-    return dur
+        dur = time_parse(d[:i])
+        return dur
 
 
 # Gets the best icon/thumbnail for a queue entry.
-def getBestIcon(entry):
+def get_best_icon(entry):
     try:
         return entry["thumbnail"]
     except KeyError:
@@ -90,7 +90,7 @@ def getBestIcon(entry):
                 url = entry["webpage_url"]
             except KeyError:
                 url = entry["url"]
-            if isDiscordURL(url):
+            if is_discord_url(url):
                 if not is_image(url):
                     return "https://cdn.discordapp.com/embed/avatars/0.png"
             return url
@@ -98,7 +98,7 @@ def getBestIcon(entry):
 
 
 # Gets the best audio file download link for a queue entry.
-def getBestAudio(entry):
+def get_best_audio(entry):
     best = -1
     try:
         fmts = entry["formats"]
@@ -125,7 +125,7 @@ def getBestAudio(entry):
 
 
 # Joins a voice channel and returns the associated audio player.
-async def forceJoin(guild, channel, user, client, bot, preparing=False, vc=None):
+async def auto_join(guild, channel, user, bot, preparing=False, vc=None):
     if type(channel) in (str, int):
         channel = await bot.fetch_channel(channel)
     if guild.id not in bot.database.audio.players:
@@ -143,8 +143,18 @@ async def forceJoin(guild, channel, user, client, bot, preparing=False, vc=None)
     return auds
 
 
+# Helper function to save all items in a queue
+copy_entry = lambda item: {"name": item.name, "url": item.url, "duration": item.duration}
+
+
+async def disconnect_members(members):
+    futs = [create_task(member.move_to(None)) for member in members]
+    for fut in futs:
+        await fut
+
+
 # Checks if the user is alone in voice chat (excluding bots).
-def isAlone(auds, user):
+def is_alone(auds, user):
     for m in auds.vc.channel.members:
         if m.id != user.id and not m.bot:
             return False
@@ -154,12 +164,12 @@ def isAlone(auds, user):
 # Replaces youtube search queries in youtube-dl with actual youtube search links.
 def ensure_url(url):
     if url.startswith("ytsearch:"):
-        url = "https://www.youtube.com/results?search_query=" + verifyURL(url[9:])
+        url = f"https://www.youtube.com/results?search_query={verify_url(url[9:])}"
     return url
 
 
 # Audio player that wraps discord audio sources, contains a queue, and also manages audio settings.
-class CustomAudio(discord.AudioSource):
+class CustomAudio(discord.AudioSource, collections.abc.Hashable):
 
     # Empty opus packet data
     emptyopus = b"\xfc\xff\xfe"
@@ -182,7 +192,7 @@ class CustomAudio(discord.AudioSource):
         "position": 0,
     }
 
-    def __init__(self, channel, vc, bot):
+    def __init__(self, bot, vc=None, channel=None):
         with tracebacksuppressor:
             # Class instance variables
             self.paused = False
@@ -198,7 +208,7 @@ class CustomAudio(discord.AudioSource):
             self.player = None
             self.timeout = utc()
             self.lastsent = 0
-            self.lastEnd = 0
+            self.last_end = 0
             self.pausec = False
             self.curr_timeout = 0
             self.bot = bot
@@ -211,19 +221,41 @@ class CustomAudio(discord.AudioSource):
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
         classname = classname[classname.index("'") + 1:]
-        return (
-            "<" + classname + " object at " + hex(id(self)).upper().replace("X", "x") + ">: {"
-            + "\"vc\": " + str(self.vc)
-            + ", \"queue\": " + str(self.queue)
-            + ", \"stats\": " + str(self.stats)
-            + ", \"source\": " + str(self.source)
-            + "}"
-        )
+        return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>: " + "{" + f'"vc": {self.vc}, "queue": {len(self.queue)}, "stats": {self.stats}, "source": {self.source}' + "}"
 
-    # A call to voice_client.play ignoring discord.py client exceptions.
+    __hash__ = lambda self: self.channel.id ^ self.guild.id
+
+    def __getattr__(self, key):
+        with suppress(AttributeError):
+            return self.__getattribute__(key)
+        with suppress(AttributeError, KeyError):
+            return getattr(self.__getattribute__("source"), key)
+        with suppress(AttributeError, KeyError):
+            return getattr(self.__getattribute__("vc"), key)
+        with suppress(AttributeError, LookupError):
+            return getattr(self.__getattribute__("queue"), key)
+        return getattr(self.__getattribute__("channel"), key)
+
+    def get_dump(self, position, js=False):
+        lim = 32768
+        if len(self.queue) > lim:
+            raise OverflowError(f"Too many items in queue ({len(self.queue)} > {lim}).")
+        q = [copy_entry(item) for item in self.queue]
+        s = dict(self.stats)
+        d = {
+            "stats": s,
+            "queue": q,
+        }
+        if not position:
+            d["stats"].pop("position")
+        if js:
+            return json.dumps(d)
+        return d
+
+    # A call to voice_client.play ignoring discord.py bot exceptions.
     def ensure_play(self):
-        with tracebacksuppressor(discord.ClientException):
-            self.vc.play(self, after=self.update)
+        with tracebacksuppressor(RuntimeError, discord.ClientException):
+            self.play(self, after=self.update)
 
     # Stops currently playing source, closing it if possible.
     def stop(self):
@@ -284,20 +316,17 @@ class CustomAudio(discord.AudioSource):
         return self.stats.position
 
     # Sends a deletable message to the audio player's channel.
-    announce = lambda self, *args, sync=True, **kwargs: create_task(sendReact(self.channel, *args, reacts="❎", **kwargs)) if not sync else await_fut(sendReact(self.channel, *args, reacts="❎", **kwargs))
+    announce = lambda self, *args, sync=True, **kwargs: create_task(send_with_react(self.channel, *args, reacts="❎", **kwargs)) if not sync else await_fut(send_with_react(self.channel, *args, reacts="❎", **kwargs))
 
     # Kills this audio player, stopping audio playback. Will cause bot to leave voice upon next update event.
     def kill(self, reason=None):
         self.dead = None
-        g = self.vc.guild.id
+        g = self.guild.id
         self.bot.database.audio.players.pop(g, None)
         self.bot.database.audio.connecting.pop(g, None)
         with suppress(LookupError):
             if reason is None:
-                reason = (
-                    "```css\n🎵 Successfully disconnected from ["
-                    + noHighlight(self.vc.guild.name) + "]. 🎵```"
-                )
+                reason = css_md(f"🎵 Successfully disconnected from {sqr_md(self.guild)}. 🎵")
             if reason:
                 self.announce(reason)
         self.stop()
@@ -305,7 +334,7 @@ class CustomAudio(discord.AudioSource):
     # Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
     def update(self, *void1, **void2):
         vc = self.vc
-        guild = vc.guild
+        guild = self.guild
         if hasattr(self, "dead"):
             await_fut(vc.disconnect())
             if self.dead is not None:
@@ -314,7 +343,7 @@ class CustomAudio(discord.AudioSource):
         if not hasattr(vc, "channel"):
             self.dead = True
             return
-        m = guild.get_member(self.bot.client.user.id)
+        m = guild.get_member(self.bot.user.id)
         if m is None:
             self.dead = True
             return
@@ -324,6 +353,8 @@ class CustomAudio(discord.AudioSource):
                 if q and not self.pausec and self.source is not None:
                     vc.play(self, after=self.update)
                 self.att = 0
+            except (RuntimeError, discord.ClientException):
+                pass
             except:
                 if getattr(self, "att", 0) <= 0:
                     print_exc()
@@ -358,10 +389,7 @@ class CustomAudio(discord.AudioSource):
                                     ch = channel
                         if ch:
                             await_fut(vc.move_to(ch))
-                            self.announce(
-                                "```ini\n🎵 Detected " + sbHighlight(cnt) + " user" + "s" * (cnt != 1)
-                                + " in [#" + noHighlight(ch) + "], automatically joined! 🎵```"
-                            )
+                            self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else 's'} in {sqr_md(ch)}, automatically joined! 🎵"))
         else:
             self.timeout = utc()
         if m.voice is not None:
@@ -374,10 +402,42 @@ class CustomAudio(discord.AudioSource):
             self.att = 0
         self.queue.update_load()
 
-    # Moves to the target channel, unmuting self if necessary.
+    # Moves to the target channel, unmuting self afterwards.
     async def move_unmute(self, vc, channel):
         await vc.move_to(channel)
-        await channel.guild.get_member(self.bot.client.user.id).edit(mute=False, deafen=False)
+        await channel.guild.get_member(self.bot.user.id).edit(mute=False, deafen=False)
+
+    async def smart_connect(self, channel=None):
+        if not self.vc.is_connected():
+            guild = channel.guild
+            member = guild.get_member(self.bot.user.id)
+            if member is None:
+                self.dead = True
+                raise RuntimeError("Audio player not associated with guild.")
+            if guild.voice_client is not None:
+                self.vc = guild.voice_client
+                if channel is not None:
+                    await self.vc.move_to(channel)
+                if not self.vc.is_connected():
+                    await self.vc.connect(_tries=3)
+                return self.vc
+            if member.voice is not None:
+                if channel is None:
+                    channel = member.voice.channel
+                await member.move_to(None)
+        if channel is None:
+            return self.vc
+        try:
+            return await aretry(channel.connect, timeout=6, reconnect=True, attempts=5, delay=2, exc={ConnectionError, ConnectionResetError, discord.Forbidden, discord.ClientException})
+        except:
+            self.dead = True
+            raise
+
+    async def set_voice_client(self, channel):
+        voice_client = await self.smart_connect(channel)
+        self.vc = voice_client
+        self.bot.database.audio.connecting.pop(voice_client.guild.id, None)
+        return voice_client
 
     # Attempts to reconnect to a voice channel that was removed. Gives up if unable to rejoin within 20 seconds.
     async def reconnect(self):
@@ -387,8 +447,8 @@ class CustomAudio(discord.AudioSource):
             self.bot.database.audio.connecting[self.vc.guild.id] = utc()
             if getattr(self, "att", 0) <= 0:
                 self.att = utc()
-            self.vc = await self.vc.channel.connect(timeout=6, reconnect=True)
-            user = self.vc.guild.get_member(self.bot.client.user.id)
+            self.vc = await self.smart_connect(self.vc.channel)
+            user = self.vc.guild.get_member(self.bot.user.id)
             if getattr(user, "voice", None) is not None:
                 if user.voice.deaf or user.voice.mute or user.voice.afk:
                     create_task(user.edit(mute=False, deafen=False))
@@ -405,7 +465,7 @@ class CustomAudio(discord.AudioSource):
         self.bot.database.audio.connecting.pop(self.vc.guild.id, None)
 
     # Updates audio player messages.
-    async def updatePlayer(self):
+    async def update_player(self):
         curr = self.player
         self.stats.quiet &= -3
         if curr is not None:
@@ -420,7 +480,7 @@ class CustomAudio(discord.AudioSource):
             if utc() > curr.time:
                 curr.time = inf
                 try:
-                    await self.bot.reactCallback(curr.message, "❎", self.bot.client.user)
+                    await self.bot.react_callback(curr.message, "❎", self.bot.user)
                 except discord.NotFound:
                     self.player = None
                     print_exc()
@@ -443,7 +503,7 @@ class CustomAudio(discord.AudioSource):
             args = []
         options = deque()
         # This must be first, else the filter will not initialize properly
-        if not isValid(stats.compressor):
+        if not is_finite(stats.compressor):
             options.extend(("anoisesrc=a=.001953125:c=brown", "amerge"))
         # Reverses song, this may be very resource consuming
         if self.reverse:
@@ -540,7 +600,7 @@ class CustomAudio(discord.AudioSource):
             if coeff > 1:
                 decay = str(round(1 - 4 / (3 + coeff), 4))
                 options.append("aecho=1:1:479|613:" + decay + "|" + decay)
-                if not isValid(coeff):
+                if not is_finite(coeff):
                     options.append("aecho=1:1:757|937:1|1")
         # Pan setting, uses extrastereo and volume filters to balance
         if stats.pan != 1:
@@ -609,14 +669,14 @@ class CustomAudio(discord.AudioSource):
                         create_future_ex(self.queue.advance, timeout=120)
                 # If there is a source to read from, update the queue
                 elif empty and queueable and self.source is not None:
-                    if utc() - self.lastEnd > 0.5:
+                    if utc() - self.last_end > 0.5:
                         if self.reverse:
                             ended = self.stats.position <= 0.5
                         else:
                             ended = ceil(self.stats.position) >= e_dur(self.queue[0].duration) - 0.5
                         if self.curr_timeout and utc() - self.curr_timeout > 0.5 or ended:
                             if not found:
-                                self.lastEnd = utc()
+                                self.last_end = utc()
                                 if not self.has_read or not self.queue:
                                     if self.queue:
                                         self.queue[0].url = ""
@@ -669,31 +729,27 @@ class AudioQueue(hlist):
                     q.pop()
                 q.rotate(1)
             dels = deque()
-            for i in range(len(q)):
+            for i, e in enumerate(q):
                 if i >= len(q) or i > 8191:
                     break
-                e = q[i]
                 if i < 2:
                     if not e.get("stream", None):
                         if not i:
                             callback = self.update_play
                         else:
                             callback = None
-                        create_future_ex(ytdl.getStream, e, callback=callback, timeout=90)
+                        create_future_ex(ytdl.get_stream, e, callback=callback, timeout=90)
                         break
                 if "file" in e:
                     e["file"].ensure_time()
                 if not e.url:
                     if not self.auds.stats.quiet:
-                        self.auds.announce(
-                            "```ini\nA problem occurred while loading " + sbHighlight(e.name)
-                            + ", and it has been removed from the queue as a result.```"
-                        )
+                        self.auds.announce(ini_md(f"A problem occured while loading {sqr_md(e.name)}, and it has been automatically removed from the queue."))
                     dels.append(i)
                     continue
             q.pops(dels)
             self.advance(process=False)
-        create_task(self.auds.updatePlayer())
+        create_task(self.auds.update_player())
 
     # Advances queue when applicable, taking into account loop/repeat/shuffle settings.
     def advance(self, looped=True, repeated=True, shuffled=True, process=True):
@@ -732,7 +788,7 @@ class AudioQueue(hlist):
                         "name": p["name"],
                         "url": p["url"],
                         "duration": p["duration"],
-                        "u_id": self.bot.client.user.id,
+                        "u_id": self.bot.user.id,
                         "skips": (),
                         "research": True,
                     }
@@ -761,16 +817,11 @@ class AudioQueue(hlist):
                             except KeyError:
                                 name = "Deleted User"
                             self.lastsent = utc()
-                            auds.announce(
-                                "*```ini\n🎵 Now playing "
-                                + sbHighlight(q[0].name)
-                                + ", added by " + sbHighlight(name) + "! 🎵```*",
-                                sync=False,
-                            )
+                            auds.announce(italics(ini_md(f"🎵 Now playing {sqr_md(q[0].name)}, added by {sqr_md(name)}! 🎵")), sync=False)
                     self.loading = True
                     try:
                         # Gets audio file stream and loads into audio source object
-                        source = ytdl.getStream(entry)
+                        source = ytdl.get_stream(entry)
                         auds.new(source)
                         self.loading = False
                         auds.ensure_play()
@@ -813,9 +864,9 @@ def org2xm(org, dat=None):
     if os.name != "nt":
         raise OSError("org2xm is only available on Windows.")
     if not org or type(org) is not bytes:
-        if not isURL(org):
+        if not is_url(org):
             raise TypeError("Invalid input URL.")
-        org = verifyURL(org)
+        org = verify_url(org)
         data = None
         resp = None
         # Make sure file header is correct
@@ -843,8 +894,8 @@ def org2xm(org, dat=None):
     r_dat = "cache/" + str(ts) + ".dat"
     orig = False
     # Load custom sample bank if specified
-    if dat is not None and isURL(dat):
-        dat = verifyURL(dat)
+    if dat is not None and is_url(dat):
+        dat = verify_url(dat)
         with open(r_dat, "wb") as f:
             dat = Request(dat)
             f.write(dat)
@@ -887,7 +938,7 @@ class AudioFile:
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
         classname = classname[classname.index("'") + 1:]
-        return "<" + classname + " object " + self.file + " at " + hex(id(self)).upper().replace("X", "x") + ">"
+        return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>"
     
     def load(self, stream, check_fmt=False, force=False):
         if self.loading and not force:
@@ -939,7 +990,7 @@ class AudioFile:
             with suppress(ValueError):
                 i = stream.index("&ip=") + 4
                 ip = stream[i:].split("&")[0]
-                ytdl.bot.updateIP(ip)
+                ytdl.bot.update_ip(ip)
         return self
 
     # Touch the file to update its cache time.
@@ -958,7 +1009,7 @@ class AudioFile:
         elif self.buffered and not self.proc.is_running():
             if not self.loaded:
                 self.loaded = True
-                if not isURL(self.stream):
+                if not is_url(self.stream):
                     retry(os.remove, self.stream, attempts=3, delay=0.5)
                 try:
                     fl = os.path.getsize("cache/" + self.file)
@@ -1021,7 +1072,7 @@ class AudioFile:
         else:
             auds.paused &= -3
         stats.position = pos
-        if not isValid(stats.pitch * stats.speed):
+        if not is_finite(stats.pitch * stats.speed):
             raise OverflowError("Speed setting out of range.")
         # Construct FFmpeg options
         options = auds.construct_options(full=False)
@@ -1062,7 +1113,7 @@ class AudioFile:
         return self.open()
 
     # Audio duration estimation: Get values from file if possible, otherwise URL
-    duration = lambda self: self.dur if getattr(self, "dur", None) is not None else setDict(self.__dict__, "dur", getDuration("cache/" + self.file) if self.loaded else getDuration(self.stream), ignore=True)
+    duration = lambda self: self.dur if getattr(self, "dur", None) is not None else set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded else get_duration(self.stream), ignore=True)
 
 
 # Audio reader for fully loaded files. FFmpeg with single pipe for output.
@@ -1202,19 +1253,19 @@ class AudioDownloader:
             with tracebacksuppressor:
                 tokens = [aretry(lambda: Request("https://open.spotify.com/get_access_token", attempts=8, delay=0.5, aio=True)) for _ in loop(8)]
                 tokens = await_fut(recursive_coro(tokens))
-                self.spotify_headers = deque({"authorization": "Bearer " + json.loads(token[:512])["accessToken"]} for token in tokens if type(token) is str)
+                self.spotify_headers = deque({"authorization": f"Bearer {json.loads(token[:512])['accessToken']}"} for token in tokens if type(token) is str)
 
     # Gets data from pytube and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def from_pytube(self, url):
         # pytube only accepts direct youtube links
-        url = verifyURL(url)
+        url = verify_url(url)
         if not url.startswith("https://www.youtube.com/"):
             if not url.startswith("http://youtu.be/"):
-                if isURL(url):
+                if is_url(url):
                     raise youtube_dl.DownloadError("Not a youtube link.")
-                url = "https://www.youtube.com/watch?v=" + url
+                url = f"https://www.youtube.com/watch?v={url}"
         try:
-            resp = retry(pytube.YouTube, url, attempts=3)
+            resp = retry(pytube.YouTube, url, attempts=3, exc={pytube.exceptions.RegexMatchError})
         except pytube.exceptions.RegexMatchError:
             raise youtube_dl.DownloadError("Invalid single youtube link.")
         entry = {
@@ -1284,7 +1335,7 @@ class AudioDownloader:
                 dur /= 1000
             temp = cdict(
                 name=name,
-                url="ytsearch:" + (name + " ~ " + artists).replace(":", "-"),
+                url=f"ytsearch:{name} ~ {artists}".replace(":", "-"),
                 duration=dur,
                 research=True,
             )
@@ -1305,7 +1356,7 @@ class AudioDownloader:
             except KeyError:
                 continue
             name = snip.get("title", v_id)
-            url = "https://www.youtube.com/watch?v=" + v_id
+            url = f"https://www.youtube.com/watch?v={v_id}"
             temp = cdict(
                 name=name,
                 url=url,
@@ -1320,7 +1371,7 @@ class AudioDownloader:
 
     # Repeatedly makes calls to youtube-dl until there is no more data to be collected.
     def extract_true(self, url):
-        while not isURL(url):
+        while not is_url(url):
             resp = self.extract_from(url)
             if "entries" in resp:
                 resp = resp["entries"][0]
@@ -1333,7 +1384,7 @@ class AudioDownloader:
                     url = resp["url"]
                 except KeyError:
                     url = resp["id"]
-        if isDiscordURL(url):
+        if is_discord_url(url):
             title = url.split("?")[0].split("/")[-1]
             if "." in title:
                 title = title[:title.rindex(".")]
@@ -1350,7 +1401,7 @@ class AudioDownloader:
 
     # Extracts audio information from a single URL.
     def extract_from(self, url):
-        if isDiscordURL(url):
+        if is_discord_url(url):
             title = url.split("?")[0].split("/")[-1]
             if "." in title:
                 title = title[:title.rindex(".")]
@@ -1359,7 +1410,7 @@ class AudioDownloader:
             return self.downloader.extract_info(url, download=False, process=False)
         except youtube_dl.DownloadError as ex:
             if "403" in str(ex):
-                if isURL(url):
+                if is_url(url):
                     try:
                         return self.from_pytube(url)
                     except youtube_dl.DownloadError:
@@ -1368,7 +1419,7 @@ class AudioDownloader:
 
     # Extracts info from a URL or search, adjusting accordingly.
     def extract_info(self, item, count=1, search=False):
-        if search and not item.startswith("ytsearch:") and not isURL(item):
+        if search and not item.startswith("ytsearch:") and not is_url(item):
             item = item.replace(":", "-")
             if count == 1:
                 c = ""
@@ -1376,14 +1427,14 @@ class AudioDownloader:
                 c = str(count)
             exc = ""
             try:
-                return self.downloader.extract_info("ytsearch" + c + ":" + item, download=False, process=False)
+                return self.downloader.extract_info(f"ytsearch{c}:{item}", download=False, process=False)
             except Exception as ex:
                 exc = repr(ex)
             try:
-                return self.downloader.extract_info("scsearch" + c + ":" + item, download=False, process=False)
+                return self.downloader.extract_info(f"scsearch{c}:{item}", download=False, process=False)
             except Exception as ex:
                 raise ConnectionError(exc + repr(ex))
-        if isURL(item) or not search:
+        if is_url(item) or not search:
             return self.extract_from(item)
         return self.downloader.extract_info(item, download=False, process=False)
 
@@ -1401,7 +1452,7 @@ class AudioDownloader:
                         break
                 # Pages may contain up to 50 items each
                 if p_id:
-                    url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&key=" + google_api_key + "&playlistId=" + p_id
+                    url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&key={google_api_key}&playlistId={p_id}"
                     page = 50
                 if page:
                     futs = deque()
@@ -1411,7 +1462,7 @@ class AudioDownloader:
                         with delay(0.03125):
                             if curr >= maxitems:
                                 break
-                            search = url + "&pageToken=" + self.yt_pages[i]
+                            search = f"{url}&pageToken={self.yt_pages[i]}"
                             fut = create_future_ex(self.get_youtube_part, search, timeout=90)
                             futs.append(fut)
                             if not math.log2(i + 4) % 1 or not 4 + i & 15:
@@ -1433,21 +1484,21 @@ class AudioDownloader:
                     url = item[item.index("playlist"):]
                     url = url[url.index("/") + 1:]
                     key = url.split("/")[0]
-                    url = "https://api.spotify.com/v1/playlists/" + str(key) + "/tracks?type=track,episode"
+                    url = f"https://api.spotify.com/v1/playlists/{key}/tracks?type=track,episode"
                     page = 100
                 # Spotify album searches contain up to 50 items each
                 elif "album" in item:
                     url = item[item.index("album"):]
                     url = url[url.index("/") + 1:]
                     key = url.split("/")[0]
-                    url = "https://api.spotify.com/v1/albums/" + str(key) + "/tracks?type=track,episode"
+                    url = f"https://api.spotify.com/v1/albums/{key}/tracks?type=track,episode"
                     page = 50
                 # Single track links also supported
                 elif "track" in item:
                     url = item[item.index("track"):]
                     url = url[url.index("/") + 1:]
                     key = url.split("/")[0]
-                    url = "https://api.spotify.com/v1/tracks/" + str(key)
+                    url = f"https://api.spotify.com/v1/tracks/{key}"
                     page = 1
                 else:
                     raise TypeError("Unsupported Spotify URL.")
@@ -1480,8 +1531,8 @@ class AudioDownloader:
             # Only proceed if no items have already been found (from playlists in this case)
             if not len(output):
                 # Allow loading of files output by ~dump
-                if isURL(item):
-                    url = verifyURL(item)
+                if is_url(item):
+                    url = verify_url(item)
                     if url.endswith(".json") or url.endswith(".txt"):
                         s = Request(url)
                         if len(s) > 8388608:
@@ -1495,7 +1546,7 @@ class AudioDownloader:
                 if resp.get("_type", None) == "url":
                     resp = self.extract_from(resp["url"])
                 if resp is None or not len(resp):
-                    raise EOFError("No search results found.")
+                    raise LookupError(f"No results for {item}")
                 # Check if result is a playlist
                 if resp.get("_type", None) == "playlist":
                     entries = list(resp["entries"])
@@ -1507,8 +1558,8 @@ class AudioDownloader:
                                 "name": data["title"],
                                 "url": data["webpage_url"],
                                 "duration": float(data["duration"]),
-                                "stream": getBestAudio(resp),
-                                "icon": getBestIcon(resp),
+                                "stream": get_best_audio(resp),
+                                "icon": get_best_icon(resp),
                             }
                             output.append(cdict(temp))
                     else:
@@ -1539,9 +1590,9 @@ class AudioDownloader:
                                         "url": url,
                                         "duration": dur,
                                     }
-                                    if not isURL(url):
+                                    if not is_url(url):
                                         if entry.get("ie_key", "").casefold() == "youtube":
-                                            temp["url"] = "https://www.youtube.com/watch?v=" + url
+                                            temp["url"] = f"https://www.youtube.com/watch?v={url}"
                                     temp["research"] = True
                             output.append(cdict(temp))
                 else:
@@ -1555,8 +1606,8 @@ class AudioDownloader:
                         "name": resp["title"],
                         "url": resp["webpage_url"],
                         "duration": dur,
-                        "stream": getBestAudio(resp),
-                        "icon": getBestIcon(resp),
+                        "stream": get_best_audio(resp),
+                        "icon": get_best_icon(resp),
                     }
                     output.append(cdict(temp))
             return output
@@ -1568,7 +1619,7 @@ class AudioDownloader:
 
     # Performs a search, storing and using cached search results for efficiency.
     def search(self, item, force=False):
-        item = verifySearch(item)
+        item = verify_search(item)
         if item in self.searched:
             if utc() - self.searched[item].t < 18000:
                 return self.searched[item].data
@@ -1587,7 +1638,7 @@ class AudioDownloader:
                 return repr(ex)
 
     # Gets the stream URL of a queue entry, starting download when applicable.
-    def getStream(self, entry, force=False, download=True, callback=None):
+    def get_stream(self, entry, force=False, download=True, callback=None):
         stream = entry.get("stream", None)
         icon = entry.get("icon", None)
         # "none" indicates stream is currently loading
@@ -1597,7 +1648,7 @@ class AudioDownloader:
         # If "research" tag is set, entry does not contain full data and requires another search
         if "research" in entry:
             try:
-                self.extractSingle(entry)
+                self.extract_single(entry)
                 entry.pop("research", None)
             except:
                 print_exc()
@@ -1609,8 +1660,8 @@ class AudioDownloader:
         # If stream is still not found or is a soundcloud audio fragment playlist file, perform secondary youtube-dl search
         if stream in (None, "none") or stream.startswith("https://cf-hls-media.sndcdn.com/"):
             data = self.extract(entry["url"], search=False)
-            stream = setDict(data[0], "stream", data[0].url)
-            icon = setDict(data[0], "icon", data[0].url)
+            stream = set_dict(data[0], "stream", data[0].url)
+            icon = set_dict(data[0], "icon", data[0].url)
         # Use SHA-256 hash of URL to avoid filename conflicts
         h = shash(entry["url"])
         fn = h + ".opus"
@@ -1655,14 +1706,14 @@ class AudioDownloader:
     # For ~download
     def download_file(self, url, fmt="ogg", auds=None, fl=8388608):
         # Select a filename based on current time to avoid conflicts
-        fn = "cache/&" + str(time_snowflake(utc_dt())) + "." + fmt
+        fn = f"cache/&{time_snowflake(utc_dt())}.{fmt}"
         info = self.extract(url)[0]
-        self.getStream(info, force=True, download=False)
+        self.get_stream(info, force=True, download=False)
         stream = info["stream"]
         if not stream:
-            raise LookupError("No stream URLs found for " + url)
+            raise LookupError(f"No stream URLs found for {url}")
         # Attempt to automatically adjust output bitrate based on file duration
-        duration = getDuration(stream)
+        duration = get_duration(stream)
         if type(duration) not in (int, float):
             dur = 960
         else:
@@ -1684,7 +1735,7 @@ class AudioDownloader:
                 xm = org2xm(stream)
                 # Re-estimate duration if file was successfully converted from org
                 args[8] = xm
-                dur = getDuration(xm)
+                dur = get_duration(xm)
                 if dur:
                     if auds:
                         dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
@@ -1693,12 +1744,12 @@ class AudioDownloader:
                 subprocess.check_output(args)
                 with suppress():
                     os.remove(xm)
-                return fn, info["name"] + "." + fmt
+                return fn, f"{info['name']}.{fmt}"
             raise
-        return fn, info["name"] + "." + fmt
+        return fn, f"{info['name']}.{fmt}"
 
     # Extracts full data for a single entry. Uses cached results for optimization.
-    def extractSingle(self, i):
+    def extract_single(self, i):
         item = i.url
         if item in self.searched:
             if utc() - self.searched[item].t < 18000:
@@ -1720,8 +1771,8 @@ class AudioDownloader:
                 obj.data = out = [cdict(
                     name=data["title"],
                     url=data["webpage_url"],
-                    stream=getBestAudio(data),
-                    icon=getBestIcon(data),
+                    stream=get_best_audio(data),
+                    icon=get_best_icon(data),
                 )]
                 try:
                     out[0].duration = data["duration"]
@@ -1754,13 +1805,13 @@ class Queue(Command):
     rate_limit = (0.5, 1.5)
     typing = True
 
-    async def __call__(self, bot, client, user, perm, message, channel, guild, flags, name, argv, **void):
+    async def __call__(self, bot, user, perm, message, channel, guild, flags, name, argv, **void):
         # This command is a bit of a mess
         if not argv:
             if message.attachments:
                 argv = message.attachments[0].url
         if not argv:
-            auds = await forceJoin(guild, channel, user, client, bot)
+            auds = await auto_join(guild, channel, user, bot)
             elapsed = auds.stats.position
             q = auds.queue
             v = "v" in flags
@@ -1773,7 +1824,7 @@ class Queue(Command):
                         auds.queue[0].pop("played", None)
                 create_future_ex(auds.queue.update_play, timeout=120)
                 create_future_ex(auds.ensure_play, timeout=120)
-                return "```css\nSuccessfully resumed audio playback in [" + noHighlight(guild.name) + "].```", 1
+                return css_md(f"Successfully resumed audio playback in {sqr_md(guild)}."), 1
             if not len(q):
                 auds.preparing = False
                 create_future_ex(auds.update, timeout=180)
@@ -1788,12 +1839,12 @@ class Queue(Command):
             auds = bot.database.audio.players[guild.id]
             future = None
         except KeyError:
-            future = create_task(forceJoin(guild, channel, user, client, bot, preparing=True))
+            future = create_task(auto_join(guild, channel, user, bot, preparing=True))
         # Start typing event asynchronously to avoid delays
         with discord.context_managers.Typing(channel):
             # Perform search concurrently, may contain multiple URLs
             out = None
-            urls = await bot.followURL(argv, allow=True, images=False)
+            urls = await bot.follow_url(argv, allow=True, images=False)
             if urls:
                 if len(urls) == 1:
                     argv = urls[0]
@@ -1811,10 +1862,10 @@ class Queue(Command):
             if future is not None:
                 auds = await future
         if "f" in flags or "b" in flags:
-            if not isAlone(auds, user) and perm < 1:
-                raise self.permError(perm, 1, "to force play while other users are in voice")
+            if not is_alone(auds, user) and perm < 1:
+                raise self.perm_error(perm, 1, "to force play while other users are in voice")
         if auds.stats.quiet & 2:
-            setDict(flags, "h", 1)
+            set_dict(flags, "h", 1)
         elapsed = auds.stats.position
         q = auds.queue
         # Raise exceptions returned by searches
@@ -1837,7 +1888,7 @@ class Queue(Command):
             if "research" in e:
                 temp["research"] = True
             added.append(cdict(temp))
-            names.append(noHighlight(name))
+            names.append(no_md(name))
         # Prepare to enqueue entries
         if "b" not in flags:
             total_duration = 0
@@ -1864,19 +1915,15 @@ class Queue(Command):
             auds.queue.enqueue(added, -1)
             total_duration = max(total_duration / auds.speed, tdur)
         if not names:
-            raise LookupError("No results for " + str(argv) + ".")
+            raise LookupError(f"No results for {argv}.")
         if "v" in flags:
-            names = noHighlight(hlist(i.name + ": " + dhms(e_dur(i.duration)) for i in added))
+            names = no_md(hlist(i.name + ": " + time_disp(e_dur(i.duration)) for i in added))
         elif len(names) == 1:
             names = names[0]
         else:
-            names = str(len(names)) + " items"
+            names = f"{len(names)} items"
         if "h" not in flags:
-            return (
-                "```css\n🎶 Added [" + names
-                + "] to the queue! Estimated time until playing: ["
-                + sec2Time(total_duration) + "]. 🎶```", 1
-            )
+            return css_md(f"🎶 Added {names} to the queue! Estimated time until playing: {sqr_md(sec2time(total_duration))}. 🎶"), 1
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos, v = [int(i) for i in vals.split("_")]
@@ -1886,7 +1933,7 @@ class Queue(Command):
             return
         user = await bot.fetch_user(u_id)
         guild = message.guild
-        auds = await forceJoin(guild, message.channel, user, bot.client, bot)
+        auds = await auto_join(guild, message.channel, user, bot)
         q = auds.queue
         last = max(0, len(q) - 10)
         if reaction is not None:
@@ -1933,7 +1980,7 @@ class Queue(Command):
         cnt = len(q)
         info = (
             str(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
-            + sec2Time(totalTime / auds.speed) + "```*"
+            + sec2time(totalTime / auds.speed) + "```*"
         )
         if not q:
             duration = 0
@@ -1949,17 +1996,14 @@ class Queue(Command):
         if not q:
             countstr = "Queue is currently empty.\n"
         else:
-            countstr = "Currently playing [" + discord.utils.escape_markdown(q[0].name) + "](" + q[0].url + ")\n"
-        countstr += (
-            "`(" + uniStr(dhms(elapsed))
-            + "/" + uniStr(dhms(duration)) + ") "
-        )
+            countstr = f"Currently playing {sqr_md(q[0].name)}({q[0].url})\n"
+        countstr += f"`({uni_str(time_disp(elapsed))}/{uni_str(time_disp(duration))}) "
         countstr += bar + "`\n"
         emb = discord.Embed(
             description=content + info + countstr,
-            colour=randColour(),
+            colour=rand_colour(),
         )
-        url = bestURL(user)
+        url = best_url(user)
         emb.set_author(name=str(user), url=url, icon_url=url)
         if q:
             icon = q[0].get("icon", "")
@@ -1973,10 +2017,7 @@ class Queue(Command):
             e = q[i]
             curr = "`"
             curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
-            curr += "【" + str(i) + "】` ["
-            curr += discord.utils.escape_markdown(limStr(noHighlight(e.name), 64))
-            curr += "](" + ensure_url(e.url) + ") `("
-            curr += dhms(e_dur(e.duration)) + ")`"
+            curr += f"【{i}】` {sqr_md(lim_str(no_md(e.name), 64))}({ensure_url(e.url)}) `({time_disp(e_dur(e.duration))})`"
             if v:
                 try:
                     u = bot.cache.users[e.u_id]
@@ -1986,7 +2027,7 @@ class Queue(Command):
                     with suppress():
                         u = await bot.fetch_user(e.u_id)
                         name = u.display_name
-                curr += "\n```css\n" + sbHighlight(name) + "\n"
+                curr += "\n" + css_md(sqr_md(name))
             if auds.reverse and len(auds.queue):
                 estim = currTime + elapsed - e_dur(auds.queue[0].duration)
             else:
@@ -1994,13 +2035,13 @@ class Queue(Command):
             if v:
                 if estim > 0:
                     curr += "Time until playing: "
-                    estimate = sec2Time(estim / auds.speed)
+                    estimate = sec2time(estim / auds.speed)
                     if i <= 1 or not auds.stats.shuffle:
                         curr += "[" + estimate + "]"
                     else:
                         curr += "{" + estimate + "}"
                 else:
-                    curr += "Remaining time: [" + sec2Time((estim + e_dur(e.duration)) / auds.speed) + "]"
+                    curr += "Remaining time: [" + sec2time((estim + e_dur(e.duration)) / auds.speed) + "]"
                 curr += "```"
             curr += "\n"
             if len(embstr) + len(curr) > 2048 - len(emb.description):
@@ -2014,9 +2055,7 @@ class Queue(Command):
         emb.description += embstr
         more = len(q) - i
         if more > 0:
-            emb.set_footer(
-                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
-            )
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
@@ -2042,28 +2081,18 @@ class Playlist(Command):
         if argv or "d" in flags:
             req = 2
             if perm < req:
-                reason = (
-                    "to modify default playlist for "
-                    + guild.name
-                )
-                raise self.permError(perm, req, reason)
-        pl = setDict(bot.data.playlists, guild.id, [])
+                reason = f"to modify default playlist for {guild.name}"
+                raise self.perm_error(perm, req, reason)
+        pl = set_dict(bot.data.playlists, guild.id, [])
         if not argv:
             if "d" in flags:
                 # This deletes all default playlist entries for the current guild
                 if "f" not in flags:
-                    response = uniStr(
-                        "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
-                        + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
-                    )
-                    return ("**```asciidoc\n[" + response + "]```**")
+                    return bot.dangerous_command
                 pl[guild.id].clear()
                 pl.pop(guild.id)
                 update()
-                return (
-                    "*```css\nRemoved all entries from the default playlist for "
-                    + sbHighlight(guild) + ".```*"
-                )
+                return italics(css_md(f"Removed all entries from the default playlist for {sqr_md(guild)}."))
             # Set callback message for scrollable list
             return (
                 "*```" + "\n" * ("z" in flags) + "callback-voice-playlist-"
@@ -2072,23 +2101,15 @@ class Playlist(Command):
             )
         if "d" in flags:
             # Can only remove by index atm
-            i = await bot.evalMath(argv, guild.id)
+            i = await bot.eval_math(argv, guild.id)
             temp = pl[i]
             pl.pop(i)
             update()
-            return (
-                "*```css\nRemoved " + sbHighlight(temp.name)
-                + " from the default playlist for "
-                + sbHighlight(guild.name) + "```*"
-            )
-        lim = 8 << self.bot.isTrusted(guild.id) * 2 + 1
+            return italics(css_md(f"Removed {sqr_md(temp.name)} from the default playlist for {sqr_md(guild)}."))
+        lim = 8 << self.bot.is_trusted(guild.id) * 2 + 1
         if len(pl) >= lim:
-            raise OverflowError(
-                "Playlist size for " + guild.name
-                + " has reached the maximum of " + str(lim) + " items. "
-                + "Please remove an item to add another."
-            )
-        urls = await bot.followURL(argv, allow=True, images=False)
+            raise OverflowError(f"Playlist for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
+        urls = await bot.follow_url(argv, allow=True, images=False)
         if urls:
             argv = urls[0]
         with discord.context_managers.Typing(channel):
@@ -2100,21 +2121,17 @@ class Playlist(Command):
         names = []
         for e in resp:
             name = e.name
-            names.append(noHighlight(name))
+            names.append(no_md(name))
             pl.append({
                 "name": name,
                 "url": e.url,
                 "duration": e.duration,
             })
         if not names:
-            raise LookupError("No results for " + argv + ".")
+            raise LookupError(f"No results for {argv}.")
         pl.sort(key=lambda x: x["name"].casefold())
         update()
-        return (
-            "```css\nAdded " + sbHighlight(", ".join(names))
-            + " to the default playlist for "
-            + sbHighlight(guild.name) + ".```"
-        )
+        return css_md(f"Added {sqr_md(', '.join(names))} to the default playlist for {sqr_md(guild)}.")
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_")]
@@ -2150,23 +2167,21 @@ class Playlist(Command):
             + "-\n"
         )
         if not pl:
-            content += "No currently enabled default playlist for " + str(guild).replace("`", "") + ".```*"
+            content += f"No currently enabled default playlist for {str(guild).replace('`', '')}.```*"
             msg = ""
         else:
-            content += str(len(pl)) + " items in default playlist for " + str(guild).replace("`", "") + ":```*"
-            key = lambda x: limStr(sbHighlight(x["name"]) + "(" + x["url"] + ")", 1900 / page)
-            msg = strIter(pl[pos:pos + page], key=key, offset=pos, left="`【", right="】`")
+            content += f"{len(pl)} items in default playlist for {str(guild).replace('`', '')}:```*"
+            key = lambda x: lim_str(sqr_md(x["name"]) + "(" + x["url"] + ")", 1900 / page)
+            msg = iter2str(pl[pos:pos + page], key=key, offset=pos, left="`【", right="】`")
         emb = discord.Embed(
             description=content + msg,
-            colour=randColour(),
+            colour=rand_colour(),
         )
-        url = bestURL(user)
+        url = best_url(user)
         emb.set_author(name=str(user), url=url, icon_url=url)
         more = len(pl) - pos - page
         if more > 0:
-            emb.set_footer(
-                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
-            )
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
@@ -2186,11 +2201,11 @@ class Connect(Command):
 
     async def __call__(self, user, channel, name="join", argv="", vc=None, **void):
         bot = self.bot
-        client = bot.client
+        bot = bot
         if name in ("dc", "disconnect", "leave", "fuckoff"):
             vc_ = None
         elif argv or name == "move":
-            c_id = verifyID(argv)
+            c_id = verify_id(argv)
             if not c_id > 0:
                 vc_ = None
             else:
@@ -2226,25 +2241,45 @@ class Connect(Command):
         else:
             guild = vc_.guild
         # Use permission level in target guild to make sure user is able to perform command
-        perm = bot.getPerms(user, guild)
+        perm = bot.get_perms(user, guild)
         if perm < 0:
-            raise self.permError(perm, 0, "for command " + self.name + " in " + str(guild))
+            raise self.perm_error(perm, 0, f"for command {self.name} in {guild}")
         # If no voice channel is selected, perform disconnect
         if vc_ is None:
+            if argv:
+                u_id = verify_id(argv)
+                try:
+                    t_user = await bot.fetch_user(u_id)
+                except (TypeError, discord.NotFound):
+                    try:
+                        t_user = await bot.fetch_member_ex(u_id, guild)
+                    except LookupError:
+                        t_role = guild.get_role(u_id)
+                        if t_role is None:
+                            raise LookupError(f"No results for {u_id}.")
+                        members = [member for member in t_role.members if member.voice is not None]
+                        if not members:
+                            return code_md("No members to disconnect.")
+                        await disconnect_members(members)
+                        if len(members) == 1:
+                            return ini_md(f"Disconnected {sqr_md(members[0])} from {sqr_md(vc_)}."), 1
+                        return ini_md(f"Disconnected {sqr_md(str(members) + ' members')} from {sqr_md(vc_)}."), 1
+                await member.move_to(None)
+                return ini_md(f"Disconnected {sqr_md(member)} from {sqr_md(vc_)}."), 1
             try:
                 auds = bot.database.audio.players[guild.id]
             except KeyError:
                 raise LookupError("Unable to find voice channel.")
             auds.channel = channel
-            if not isAlone(auds, user) and perm < 1:
-                raise self.permError(perm, 1, "to disconnect while other users are in voice")
+            if not is_alone(auds, user) and perm < 1:
+                raise self.perm_error(perm, 1, "to disconnect while other users are in voice")
             auds.dead = True
             connecting.pop(guild.id, None)
             await bot.database.audio(guild=guild)
             return
         # Check if already in voice, move if that is the case
         joined = False
-        for vc in client.voice_clients:
+        for vc in bot.voice_clients:
             if vc.guild.id == guild.id:
                 joined = True
                 if vc.channel.id != vc_.id:
@@ -2253,19 +2288,15 @@ class Connect(Command):
                 break
         if not joined:
             connecting[guild.id] = utc()
-            vc = cdict(channel=vc_, is_playing=lambda: False, is_connected=lambda: None, guild=vc_.guild, disconnect=retNone, move_to=retNone, play=lambda: exec("raise RuntimeError"), stop=lambda: None, source=None)
+            vc = cdict(channel=vc_, is_playing=lambda: False, is_connected=lambda: None, guild=vc_.guild, disconnect=async_nop, move_to=async_nop, play=lambda *args, **kwargs: exec("raise RuntimeError"), stop=lambda: None, source=None)
         # Create audio source if none already exists
         if guild.id not in bot.database.audio.players:
-            bot.database.audio.players[guild.id] = auds = CustomAudio(channel, vc, bot)
+            bot.database.audio.players[guild.id] = auds = CustomAudio(bot, vc, channel)
         if not joined:
-
-            async def set_voice_client(auds):
-                voice_client = await vc_.connect(timeout=8, reconnect=True)
-                auds.vc = voice_client
-                connecting.pop(voice_client.guild.id, None)
-
-            create_task(set_voice_client(auds))
-            check_if_connected = lambda: create_future(True if guild.get_member(client.user.id).voice else exec('raise ConnectionError("Unable to connect to voice channel.")'))
+            if not vc_.permissions_for(guild.get_member(bot.user.id)).connect:
+                raise ConnectionError("Insufficient permissions to connect to voice channel.")
+            create_task(auds.set_voice_client(vc_))
+            check_if_connected = lambda: create_future(True if guild.get_member(bot.user.id).voice else exec('raise ConnectionError("Connection timed out.")'))
             try:
                 await aretry(check_if_connected, attempts=16, delay=0.125)
             except:
@@ -2276,30 +2307,28 @@ class Connect(Command):
         if vc.is_connected():
             # Unset connecting tag
             connecting.pop(guild.id, None)
-        member = guild.get_member(client.user.id)
+        member = guild.get_member(bot.user.id)
         if getattr(member, "voice", None) is not None:
             if member.voice.deaf or member.voice.mute or member.voice.afk:
                 create_task(member.edit(mute=False, deafen=False))
         if joined:
             # Send update event to bot audio database upon joining
             create_task(bot.database.audio(guild=guild))
-            return (
-                "```css\n🎵 Successfully connected to [#" + noHighlight(vc_.name)
-                + "] in [" + noHighlight(guild.name) + "]. 🎵```", 1
-            )
+            return css_md(f"🎵 Successfully connected to {sqr_md(vc_)} in {sqr_md(guild)}. 🎵"), 1
 
 
 class Skip(Command):
     server_only = True
-    name = ["Remove", "Rem", "S", "SK", "ClearQueue", "Clear", "CQ"]
+    name = ["S", "SK", "CQ", "Remove", "Rem", "ClearQueue", "Clear"]
     min_level = 0
     min_display = "0~1"
     description = "Removes an entry or range of entries from the voice channel queue."
     usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
     flags = "fhv"
     rate_limit = (0.5, 1.5)
+    ellipsis = re.compile("\\.{3,}")
 
-    async def __call__(self, client, user, perm, bot, name, args, argv, guild, flags, message, **void):
+    async def __call__(self, bot, user, perm, name, args, argv, guild, flags, message, **void):
         if guild.id not in bot.database.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.database.audio.players[guild.id]
@@ -2309,8 +2338,8 @@ class Skip(Command):
             args = [argv]
             flags["f"] = True
         if "f" in flags:
-            if not isAlone(auds, user) and perm < 1:
-                raise self.permError(perm, 1, "to force skip while other users are in voice")
+            if not is_alone(auds, user) and perm < 1:
+                raise self.perm_error(perm, 1, "to force skip while other users are in voice")
         count = len(auds.queue)
         if not count:
             raise IndexError("Queue is currently empty.")
@@ -2320,16 +2349,16 @@ class Skip(Command):
         # Accept range/slice inputs
         elif ":" in argv or ".." in argv:
             while "..." in argv:
-                argv = argv.replace("...", "..")
+                argv = re.sub(self.ellipsis, "..", argv)
             l = argv.replace("..", ":").split(":")
             it = None
             if len(l) > 3:
                 raise ArgumentError("Too many arguments for range input.")
             elif len(l) > 2:
-                num = await bot.evalMath(l[0], user)
+                num = await bot.eval_math(l[0], user)
                 it = int(round(float(num)))
             if l[0]:
-                num = await bot.evalMath(l[0], user)
+                num = await bot.eval_math(l[0], user)
                 if num > count:
                     num = count
                 else:
@@ -2338,7 +2367,7 @@ class Skip(Command):
             else:
                 left = 0
             if l[1]:
-                num = await bot.evalMath(l[1], user)
+                num = await bot.eval_math(l[1], user)
                 if num > count:
                     num = count
                 else:
@@ -2351,11 +2380,11 @@ class Skip(Command):
             # Accept multiple single indices
             elems = [0] * len(args)
             for i in range(len(args)):
-                elems[i] = await bot.evalMath(args[i], user)
+                elems[i] = await bot.eval_math(args[i], user)
         if not "f" in flags:
             valid = True
             for e in elems:
-                if not isValid(e):
+                if not is_finite(e):
                     valid = False
                     break
             if not valid:
@@ -2369,17 +2398,17 @@ class Skip(Command):
             pos = float(pos)
             try:
                 # If infinite entries are selected and force flag is set, remove all items
-                if not isValid(pos):
+                if not is_finite(pos):
                     if "f" in flags:
                         auds.queue.clear()
                         create_future_ex(auds.new, timeout=18)
                         if "h" not in flags:
-                            return "*```fix\nRemoved all items from the queue.```*", 1
+                            return italics(fix_md("Removed all items from the queue.")), 1
                         return
                     raise LookupError
                 curr = auds.queue[pos]
             except LookupError:
-                response += "\n" + repr(IndexError("Entry " + str(pos) + " is out of range."))
+                response += "\n" + repr(IndexError(f"Entry {pos} is out of range."))
                 continue
             # Add skips if voting
             if issubclass(type(curr.skips), collections.abc.MutableSequence):
@@ -2393,19 +2422,14 @@ class Skip(Command):
                 curr.skips = None
             if curr.skips is not None:
                 if len(response) > 1200:
-                    response = limStr(response, 1200)
+                    response = lim_str(response, 1200)
                 else:
-                    response += (
-                        "Voted to remove [" + noHighlight(curr.name)
-                        + "] from the queue.\nCurrent vote count: ["
-                        + str(len(curr.skips)) + "], required vote count: ["
-                        + str(required) + "].\n"
-                    )
+                    response += f"Voted to remove {sqr_md(curr.name)} from the queue.\nCurrent vote count: {sqr_md(len(curr.skips))}, required vote count: {sqr_md(required)}.\n"
             if not i & 2047:
                 await asyncio.sleep(0.2)
             i += 1
         # Get list of items to remove from the queue, based on whether they have sufficient amount of skips
-        pops = deque()
+        pops = set()
         count = 0
         i = 1
         while i < len(auds.queue):
@@ -2415,13 +2439,10 @@ class Skip(Command):
                 if count <= 3:
                     q.pop(i)
                 else:
-                    pops.append(i)
+                    pops.add(i)
                     i += 1
                 if count < 4:
-                    response += (
-                        "[" + noHighlight(song.name)
-                        + "] has been removed from the queue.\n"
-                    )
+                    response += f"{sqr_md(song.name)} has been removed from the queue.\n"
                 count += 1
             else:
                 i += 1
@@ -2438,17 +2459,11 @@ class Skip(Command):
                 await create_future(auds.stop, timeout=18)
                 create_future_ex(auds.queue.advance, timeout=18)
                 if count < 4:
-                    response += (
-                        "[" + noHighlight(song.name)
-                        + "] has been removed from the queue.\n"
-                    )
+                    response += f"{sqr_md(song.name)} has been removed from the queue.\n"
                 count += 1
         if "h" not in flags:
             if count >= 4:
-                return (
-                    "*```css\n[" + str(count)
-                    + "] items have been removed from the queue.```*"
-                )
+                return italics(css_md(f"{count} items have been removed from the queue."))
             return response + "```", 1
 
 
@@ -2461,12 +2476,12 @@ class Pause(Command):
     usage = "<hide(?h)>"
     flags = "h"
 
-    async def __call__(self, bot, name, guild, client, user, perm, channel, flags, **void):
-        auds = await forceJoin(guild, channel, user, client, bot)
+    async def __call__(self, bot, name, guild, user, perm, channel, flags, **void):
+        auds = await auto_join(guild, channel, user, bot)
         auds.preparing = False
         if name in ("pause", "stop"):
-            if not isAlone(auds, user) and perm < 1:
-                raise self.permError(perm, 1, "to " + name + " while other users are in voice")
+            if not is_alone(auds, user) and perm < 1:
+                raise self.perm_error(perm, 1, f"to {name} while other users are in voice")
         elif auds.stats.position <= 0:
             if auds.queue:
                 auds.queue[0].pop("played", None)
@@ -2488,10 +2503,7 @@ class Pause(Command):
         await bot.database.audio(guild=guild)
         if "h" not in flags:
             past = name + "pe" * (name == "stop") + "d"
-            return (
-                "*```css\nSuccessfully " + past + " audio playback in ["
-                + noHighlight(guild.name) + "].```*", 1
-            )
+            return italics(css_md(f"Successfully {past} audio playback in {sqr_md(guild)}.")), 1
 
 
 class Seek(Command):
@@ -2504,51 +2516,25 @@ class Seek(Command):
     flags = "h"
     rate_limit = (0.5, 2.5)
 
-    async def __call__(self, argv, bot, guild, client, user, perm, channel, name, flags, **void):
-        auds = await forceJoin(guild, channel, user, client, bot)
-        if not isAlone(auds, user) and perm < 1:
-            raise self.permError(perm, 1, "to seek while other users are in voice")
+    async def __call__(self, argv, bot, guild, user, perm, channel, name, flags, **void):
+        auds = await auto_join(guild, channel, user, bot)
+        if not is_alone(auds, user) and perm < 1:
+            raise self.perm_error(perm, 1, "to seek while other users are in voice")
         # ~replay always seeks to position 0
         if name == "replay":
             num = 0
         elif not argv:
-            return "```ini\nCurrent audio position: [" + sec2Time(auds.stats.position) + "]```", 1
+            return ini_md(f"Current audio position: {sqr_md(sec2time(auds.stats.position))}."), 1
         else:
             # ~seek takes an optional time input
             orig = auds.stats.position
             expr = argv
-            num = await bot.evalTime(expr, user, orig)
+            num = await bot.eval_time(expr, user, orig)
         pos = auds.seek(num)
         if auds.player is not None:
             auds.player.time = 1 + utc()
         if "h" not in flags:
-            return (
-                "*```css\nSuccessfully moved audio position to ["
-                + noHighlight(sec2Time(pos)) + "].```*", 1
-            )
-
-
-# Helper function to save all items in a queue
-copyDict = lambda item: {"name": item.name, "url": item.url, "duration": item.duration}
-
-def getDump(auds, position, js=False):
-    lim = 32768
-    if len(auds.queue) > lim:
-        raise OverflowError(
-            "Too many items in queue (" + str(len(auds.queue))
-            + " > " + str(lim) + ")."
-        )
-    q = [copyDict(item) for item in auds.queue]
-    s = dict(auds.stats)
-    d = {
-        "stats": s,
-        "queue": q,
-    }
-    if not position:
-        d["stats"].pop("position")
-    if js:
-        return json.dumps(d)
-    return d
+            return italics(css_md(f"Successfully moved audio position to {sqr_md(sec2time(pos))}.")), 1
 
 
 class Dump(Command):
@@ -2563,26 +2549,26 @@ class Dump(Command):
     flags = "ahx"
     rate_limit = (1, 2)
 
-    async def __call__(self, guild, channel, user, client, bot, perm, name, argv, flags, message, vc=None, **void):
-        auds = await forceJoin(guild, channel, user, client, bot, vc=vc)
+    async def __call__(self, guild, channel, user, bot, perm, name, argv, flags, message, vc=None, **void):
+        auds = await auto_join(guild, channel, user, bot, vc=vc)
         # ~save is the same as ~dump without an argument
         if argv == "" and not message.attachments or name == "save":
             if name == "load":
                 raise ArgumentError("Please input a file, URL or json data to load.")
             with discord.context_managers.Typing(channel):
-                resp = await create_future(getDump, auds, "x" in flags, js=True, timeout=18)
+                resp = await create_future(auds.get_dump, "x" in flags, js=True, timeout=18)
                 f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
-            create_task(sendFile(channel, "Queue data for **" + guild.name + "**:", f))
+            create_task(send_with_file(channel, f"Queue data for {bold(str(guild))}:", f))
             return
-        if not isAlone(auds, user) and perm < 1:
-            raise self.permError(perm, 1, "to load new queue while other users are in voice")
+        if not is_alone(auds, user) and perm < 1:
+            raise self.perm_error(perm, 1, "to load new queue while other users are in voice")
         if type(argv) is str:
             try:
                 if message.attachments:
                     url = message.attachments[0].url
                 else:
                     url = argv
-                urls = await bot.followURL(argv, allow=True, images=False)
+                urls = await bot.follow_url(argv, allow=True, images=False)
                 url = urls[0]
                 s = await Request(url, aio=True)
                 s = s[s.index(b"{"):]
@@ -2631,19 +2617,13 @@ class Dump(Command):
             await create_future(auds.queue.update_play, timeout=18)
             await create_future(auds.new, auds.file, auds.stats.position, timeout=18)
             if "h" not in flags:
-                return (
-                    "*```css\nSuccessfully loaded audio queue data for [" 
-                    + noHighlight(guild.name) + "].```*", 1
-                )
+                return italics(css_md(f"Successfully loaded audio data for {sqr_md(guild)}.")), 1
         else:
             # append dump, adds items without replacing
             auds.queue.enqueue(q, -1)
             auds.stats.update(d["stats"])
             if "h" not in flags:
-                return (
-                    "*```css\nSuccessfully appended loaded data to queue for [" 
-                    + noHighlight(guild.name) + "].```*", 1
-                )
+                return italics(css_md(f"Successfully appended loaded data to queue for {sqr_md(guild)}.")), 1
             
 
 class AudioSettings(Command):
@@ -2701,11 +2681,11 @@ class AudioSettings(Command):
         )
         self.flags = "vspbrcnlxqdh"
         self.map = {k.casefold(): self.aliasMap[k] for k in self.aliasMap}
-        addDict(self.map, {k.casefold(): self.aliasExt[k] for k in self.aliasExt})
+        add_dict(self.map, {k.casefold(): self.aliasExt[k] for k in self.aliasExt})
         super().__init__(*args)
 
-    async def __call__(self, client, channel, user, guild, bot, flags, name, argv, perm, **void):
-        auds = await forceJoin(guild, channel, user, client, bot)
+    async def __call__(self, bot, channel, user, guild, flags, name, argv, perm, **void):
+        auds = await auto_join(guild, channel, user, bot)
         ops = hlist()
         op1 = self.map[name]
         if op1 == "reset":
@@ -2751,19 +2731,12 @@ class AudioSettings(Command):
                 key = lambda x: (round(x * 100, 9), x)[type(x) is bool]
                 d = dict(auds.stats)
                 d.pop("position", None)
-                return (
-                    "Current audio settings for **" + discord.utils.escape_markdown(guild.name) + "**:\n```ini\n"
-                    + strIter(d, key=key) + "```"
-                )
+                return f"Current audio settings for **{escape_markdown(guild.name)}**:\n{ini_md(iter2str(d, key=key))}"
             orig = bot.database.audio.players[guild.id].stats[op]
             num = round(100 * orig, 9)
-            return (
-                "```css\nCurrent audio " + op
-                + " setting in [" + noHighlight(guild.name)
-                + "]: [" + str(num) + "].```"
-            )
-        if not isAlone(auds, user) and perm < 1:
-            raise self.permError(perm, 1, "to modify audio settings while other users are in voice")
+            return css_md(f"Current audio {op} setting in {sqr_md(guild)}: [{num}].")
+        if not is_alone(auds, user) and perm < 1:
+            raise self.perm_error(perm, 1, "to modify audio settings while other users are in voice")
         # No audio setting selected
         if not ops:
             if disable:
@@ -2777,10 +2750,7 @@ class AudioSettings(Command):
                 auds.stats = cdict(auds.defaults)
                 if auds.queue and res:
                     await create_future(auds.new, auds.file, pos, timeout=18)
-                return (
-                    "*```css\nSuccessfully reset all audio settings for ["
-                    + noHighlight(guild.name) + "].```*"
-                )
+                return italics(css_md(f"Successfully reset all audio settings for {sqr_md(guild)}."))
             else:
                 # Default to volume
                 ops.append("volume")
@@ -2798,8 +2768,8 @@ class AudioSettings(Command):
             # Values should be scaled by 100 to indicate percentage
             origStats = bot.database.audio.players[guild.id].stats
             orig = round(origStats[op] * 100, 9)
-            num = await bot.evalMath(argv, user, orig)
-            val = roundMin(float(num / 100))
+            num = await bot.eval_math(argv, user, orig)
+            val = round_min(float(num / 100))
             new = round(num, 9)
             if op in "loop repeat shuffle quiet stay":
                 origStats[op] = new = bool(val)
@@ -2816,13 +2786,9 @@ class AudioSettings(Command):
                             print(auds.args)
                         await create_future(auds.stop, timeout=18)
                         raise RuntimeError("Unable to adjust audio setting.")
-            s += (
-                "\nChanged audio {" + str(op)
-                + "} setting from [" + str(orig)
-                + "] to [" + str(new) + "]."
-            )
+            s += f"\nChanged audio {op} setting from [{orig}] to [{new}]."
         if "h" not in flags:
-            return "```css" + s + "```", 1
+            return css_md(s), 1
 
 
 class Rotate(Command):
@@ -2835,22 +2801,21 @@ class Rotate(Command):
     flags = "h"
     rate_limit = 5
 
-    async def __call__(self, perm, argv, flags, guild, channel, user, client, bot, **void):
-        auds = await forceJoin(guild, channel, user, client, bot)
-        amount = await bot.evalMath(argv, user)
+    async def __call__(self, perm, argv, flags, guild, channel, user, bot, **void):
+        auds = await auto_join(guild, channel, user, bot)
+        if not argv:
+            amount = 1
+        else:
+            amount = await bot.eval_math(argv, user)
         if len(auds.queue) > 1 and amount:
-            if not isAlone(auds, user) and perm < 1:
-                raise self.permError(perm, 1, "to rotate queue while other users are in voice")
+            if not is_alone(auds, user) and perm < 1:
+                raise self.perm_error(perm, 1, "to rotate queue while other users are in voice")
             # Clear "played" tag of current item
             auds.queue[0].pop("played", None)
             auds.queue.rotate(-amount)
             auds.seek(inf)
         if "h" not in flags:
-            return (
-                "*```css\nSuccessfully rotated queue ["
-                + str(amount) + "] step"
-                + "s" * (amount != 1) + ".```*", 1
-            )
+            return italics(css_md(f"Successfully rotated queue [{amount}] step{'s' if amount != 1 else ''}.")), 1
 
 
 class Shuffle(Command):
@@ -2858,24 +2823,26 @@ class Shuffle(Command):
     min_level = 0
     min_display = "0~1"
     description = "Shuffles the audio queue."
-    usage = "<hide(?h)>"
+    usage = "<force(?f)> <hide(?h)>"
     flags = "h"
     rate_limit = 5
 
-    async def __call__(self, perm, flags, guild, channel, user, client, bot, **void):
-        auds = await forceJoin(guild, channel, user, client, bot)
+    async def __call__(self, perm, flags, guild, channel, user, bot, **void):
+        auds = await auto_join(guild, channel, user, bot)
         if len(auds.queue) > 1:
-            if not isAlone(auds, user) and perm < 1:
-                raise self.permError(perm, 1, "to shuffle queue while other users are in voice")
-            # Clear "played" tag of current item
-            auds.queue[0].pop("played", None)
-            shuffle(auds.queue)
-            auds.seek(inf)
+            if not is_alone(auds, user) and perm < 1:
+                raise self.perm_error(perm, 1, "to shuffle queue while other users are in voice")
+            if "f" in flags:
+                # Clear "played" tag of current item
+                auds.queue[0].pop("played", None)
+                shuffle(auds.queue)
+                auds.seek(inf)
+            else:
+                temp = auds.queue.popleft()
+                shuffle(auds.queue)
+                auds.queue.appendleft(temp)
         if "h" not in flags:
-            return (
-                "*```css\nSuccessfully shuffled queue for ["
-                + noHighlight(guild.name) + "].```*", 1
-            )
+            return italics(css_md(f"Successfully shuffled queue for {sqr_md(guild)}.")), 1
 
 
 class Reverse(Command):
@@ -2887,20 +2854,15 @@ class Reverse(Command):
     flags = "h"
     rate_limit = 5
 
-    async def __call__(self, perm, flags, guild, channel, user, client, bot, **void):
-        auds = await forceJoin(guild, channel, user, client, bot)
+    async def __call__(self, perm, flags, guild, channel, user, bot, **void):
+        auds = await auto_join(guild, channel, user, bot)
         if len(auds.queue) > 1:
-            if not isAlone(auds, user) and perm < 1:
-                raise self.permError(perm, 1, "to reverse queue while other users are in voice")
-            # Clear "played" tag of current item
-            auds.queue[0].pop("played", None)
+            if not is_alone(auds, user) and perm < 1:
+                raise self.perm_error(perm, 1, "to reverse queue while other users are in voice")
             reverse(auds.queue)
             auds.queue.rotate(-1)
         if "h" not in flags:
-            return (
-                "*```css\nSuccessfully reversed queue for ["
-                + noHighlight(guild.name) + "].```*", 1
-            )
+            return italics(css_md(f"Successfully reversed queue for {sqr_md(guild)}.")), 1
 
 
 class Unmute(Command):
@@ -2920,10 +2882,7 @@ class Unmute(Command):
                     if user.voice.deaf or user.voice.mute or user.voice.afk:
                         create_task(user.edit(mute=False, deafen=False))
         if "h" not in flags:
-            return (
-                "*```css\nSuccessfully unmuted all users in voice channels in ["
-                + noHighlight(guild.name) + "].```*", 1
-            )
+            return italics(css_md(f"Successfully unmuted all users in voice channels in {sqr_md(guild)}.")), 1
 
 
 class VoiceNuke(Command):
@@ -2936,16 +2895,15 @@ class VoiceNuke(Command):
     rate_limit = 10
 
     async def __call__(self, guild, flags, **void):
+        connected = set()
         for vc in guild.voice_channels:
             for user in vc.members:
-                if user.id != self.bot.client.user.id:
+                if user.id != self.bot.user.id:
                     if user.voice is not None:
-                        create_task(user.move_to(None))
+                        connected.add(user)
+        await disconnect_members(connected)
         if "h" not in flags:
-            return (
-                "*```css\nSuccessfully removed all users in voice channels in ["
-                + noHighlight(guild.name) + "].```*", 1
-            )
+            return italics(css_md(f"Successfully removed all users from voice channels in {sqr_md(guild)}.")), 1
 
 
 # This whole thing is a mess, I can't be bothered cleaning this up lol
@@ -2986,7 +2944,7 @@ class Player(Command):
                 skips = len(s)
             else:
                 skips = 0
-            output = "Playing " + noHighlight(q[0].name) + ", "
+            output = "Playing " + no_md(q[0].name) + ", "
             output += str(len(q)) + " item" + "s" * (len(q) != 1) + " total "
             output += skips * "🚫"
         else:
@@ -3056,8 +3014,8 @@ class Player(Command):
         else:
             p = [0, 0.25]
         output += (
-            " (" + uniStr(dhms(p[0]))
-            + "/" + uniStr(dhms(p[1])) + ") "
+            " (" + uni_str(time_disp(p[0]))
+            + "/" + uni_str(time_disp(p[1])) + ") "
         )
         sym = "⬜⬛"
         r = round(min(1, p[0] / p[1]) * self.barsize)
@@ -3168,13 +3126,13 @@ class Player(Command):
                 elif i == 14:
                     auds.dead = True
                     auds.player = None
-                    await bot.silentDelete(message)
+                    await bot.silent_delete(message)
                     return
                 else:
                     auds.player = None
-                    await bot.silentDelete(message)
+                    await bot.silent_delete(message)
                     return
-        text = limStr(orig + self.showCurr(auds) + "```", 2000)
+        text = lim_str(orig + self.showCurr(auds) + "```", 2000)
         last = message.channel.last_message
         if last is not None and (auds.player.type or message.id == last.id):
             auds.player.events += 1
@@ -3190,7 +3148,7 @@ class Player(Command):
                 content=text,
             )
             auds.player.message = message
-            await bot.silentDelete(temp, no_log=True)
+            await bot.silent_delete(temp, no_log=True)
         if auds.queue and not auds.paused & 1:
             maxdel = e_dur(auds.queue[0].duration) - auds.stats.position + 2
             delay = min(maxdel, e_dur(auds.queue[0].duration) / self.barsize / abs(auds.stats.speed))
@@ -3202,8 +3160,8 @@ class Player(Command):
             delay = inf
         auds.player.time = utc() + delay
 
-    async def __call__(self, guild, channel, user, client, bot, flags, perm, **void):
-        auds = await forceJoin(channel.guild, channel, user, client, bot)
+    async def __call__(self, guild, channel, user, bot, flags, perm, **void):
+        auds = await auto_join(channel.guild, channel, user, bot)
         if "c" in flags or auds.stats.quiet & 2:
             req = 3
             if perm < req:
@@ -3214,14 +3172,11 @@ class Player(Command):
                         reason = "override"
                 else:
                     reason = "create controllable"
-                raise self.permError(perm, req, "to " + reason + " virtual audio player for " + noHighlight(guild.name))
+                raise self.perm_error(perm, req, f"to {reason} virtual audio player for {guild}")
         if "d" in flags:
             auds.player = None
-            return (
-                "*```css\nDisabled virtual audio players in ["
-                + noHighlight(channel.guild.name) + "].```*"
-            )
-        await createPlayer(auds, p_type="c" in flags, verbose="z" in flags)
+            return italics(css_md(f"Disabled virtual audio players in {sqr_md(channel.guild)}.")), 1
+        await create_player(auds, p_type="c" in flags, verbose="z" in flags)
 
 
 # Small helper function to fetch song lyrics from json data, because sometimes genius.com refuses to include it in the HTML
@@ -3260,7 +3215,7 @@ def extract_lyrics(s):
 async def get_lyrics(item):
     url = "https://api.genius.com/search"
     for i in range(2):
-        header = {"Authorization": "Bearer " + genius_key}
+        header = {"Authorization": f"Bearer {genius_key}"}
         if i == 0:
             search = item
         else:
@@ -3296,7 +3251,7 @@ async def get_lyrics(item):
                 print_exc()
                 print(s)
                 print(text)
-    raise LookupError("No results for " + item + ".")
+    raise LookupError(f"No results for {item}.")
 
 
 class Lyrics(Command):
@@ -3337,7 +3292,7 @@ class Lyrics(Command):
             except LookupError:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
         # Extract song name if input is a URL, otherwise search song name directly
-        urls = await bot.followURL(argv, allow=True, images=False)
+        urls = await bot.follow_url(argv, allow=True, images=False)
         if urls:
             resp = await create_future(ytdl.search, urls[0], timeout=18)
             search = resp[0].name
@@ -3345,24 +3300,24 @@ class Lyrics(Command):
             search = argv
         search = search.translate(self.bot.mtrans)
         # Attempt to find best query based on the song name
-        item = verifySearch(to_alphanumeric(re.sub(self.lyric_trans, "", search)))
+        item = verify_search(to_alphanumeric(re.sub(self.lyric_trans, "", search)))
         if not item:
-            item = verifySearch(to_alphanumeric(search))
+            item = verify_search(to_alphanumeric(search))
             if not item:
                 item = search
         with discord.context_managers.Typing(channel):
             name, lyrics = await get_lyrics(item)
         # Escape colour markdown because that will interfere with the colours we want
-        text = clrHighlight(lyrics.strip()).replace("#", "♯")
-        msg = "Lyrics for **" + discord.utils.escape_markdown(name) + "**:"
-        s = msg + "```ini\n" + text + "```"
+        text = clr_md(lyrics.strip()).replace("#", "♯")
+        msg = f"Lyrics for **{escape_markdown(name)}**:"
+        s = msg + ini_md(text)
         # Directly return lyrics in a code box if it fits
         if "v" not in flags and len(s) <= 2000:
             return s
-        title = "Lyrics for " + name + ":"
+        title = f"Lyrics for {name}:"
         if len(text) > 6000:
             return (title + "\n\n" + text).strip()
-        emb = discord.Embed(colour=randColour())
+        emb = discord.Embed(colour=rand_colour())
         emb.set_author(name=title)
         # Separate lyrics into paragraphs and attempt to add them one at a time, adding extra embed fields when necessary
         iterations = 0
@@ -3372,7 +3327,7 @@ class Lyrics(Command):
             para = paragraphs.pop(0)
             if not emb.description and len(curr) + len(para) > 2000:
                 if len(para) <= 2000:
-                    emb.description = "```ini\n" + curr.strip() + "```"
+                    emb.description = ini_md(curr.strip())
                     curr = para
                 else:
                     p = [i + "\n" for i in para.split("\n")]
@@ -3383,7 +3338,7 @@ class Lyrics(Command):
                     paragraphs = p + paragraphs
             elif emb.description and len(curr) + len(para) > 1000:
                 if len(para) <= 1000:
-                    emb.add_field(name="Page " + str(len(emb.fields) + 2), value="```ini\n" + curr.strip() + "```", inline=False)
+                    emb.add_field(name=f"Page {len(emb.fields) + 2}", value=ini_md(curr.strip()), inline=False)
                     curr = para
                 else:
                     p = [i + "\n" for i in para.split("\n")]
@@ -3399,17 +3354,17 @@ class Lyrics(Command):
                 break
         if curr:
             if emb.description:
-                emb.add_field(name="Page " + str(len(emb.fields) + 2), value="```ini\n" + curr.strip() + "```", inline=False)
+                emb.add_field(name=f"Page {len(emb.fields) + 2}", value=ini_md(curr.strip()), inline=False)
             else:
-                emb.description = "```ini\n" + curr.strip() + "```"
+                emb.description = ini_md(curr.strip())
         try:
             if len(emb) > 6000:
                 raise OverflowError
-            bot.embedSender(channel, emb)
+            bot.send_embeds(channel, emb)
         except (OverflowError, discord.HTTPException):
             # Lyrics result was too long for embed, send a file instead
             print_exc()
-            return (title + "\n\n" + emb.description + "\n\n".join(noCodeBox(f.value) for f in emb.fields)).strip()
+            return (title + "\n\n" + emb.description + "\n\n".join(strip_code_box(f.value) for f in emb.fields)).strip()
 
 
 class Download(Command):
@@ -3425,19 +3380,19 @@ class Download(Command):
 
     async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
         if name in ("af", "audiofilter"):
-            setDict(flags, "a", 1)
+            set_dict(flags, "a", 1)
         # Prioritize attachments in message
         for a in message.attachments:
             argv = a.url + " " + argv
         # Attempt to download items in queue if no search query provided
         if not argv:
             try:
-                auds = await forceJoin(guild, channel, user, bot.client, bot)
+                auds = await auto_join(guild, channel, user, bot)
                 if not auds.queue:
                     raise EOFError
                 res = [{"name": e.name, "url": e.url} for e in auds.queue[:10]]
                 fmt = "ogg"
-                end = "Current items in queue for " + guild.name + ":"
+                end = f"Current items in queue for {guild}:"
             except:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
         else:
@@ -3459,10 +3414,10 @@ class Download(Command):
                     fmt = "ogg"
             else:
                 fmt = "ogg"
-            argv = verifySearch(argv)
+            argv = verify_search(argv)
             res = []
             # Input may be a URL or set of URLs, in which case we attempt to find the first one
-            urls = await bot.followURL(argv, allow=True, images=False)
+            urls = await bot.follow_url(argv, allow=True, images=False)
             if urls:
                 temp = await create_future(ytdl.extract, urls[0], timeout=120)
                 res.extend(temp)
@@ -3476,7 +3431,7 @@ class Download(Command):
                 for r in range(2):
                     returns.append(create_future(
                         ytdl.downloader.extract_info,
-                        searches[r] + ":" + argv.replace(":", "~"),
+                        f"{searches[r]}:{argv}".replace(":", "~"),
                         download=False,
                         process=r,
                         timeout=18,
@@ -3503,12 +3458,12 @@ class Download(Command):
                                     if e["ie_key"].casefold() == "youtube":
                                         res.append({
                                             "name": e["title"],
-                                            "url": "https://www.youtube.com/watch?v=" + e["url"],
+                                            "url": f"https://www.youtube.com/watch?v={e['url']}",
                                         })
             if not res:
-                raise LookupError("No results for " + argv + ".")
+                raise LookupError(f"No results for {argv}.")
             res = res[:10]
-            end = "Search results for " + argv + ":"
+            end = f"Search results for {argv}:"
         a = flags.get("a", 0)
         end += "\nDestination format: {." + fmt + "}"
         if a:
@@ -3516,21 +3471,16 @@ class Download(Command):
         end += "```*"
         # Encode URL list into bytes and then custom base64 representation, hide in code box header
         url_bytes = bytes(repr([e["url"] for e in res]), "utf-8")
-        url_enc = bytes2B64(url_bytes, True).decode("utf-8", "replace")
+        url_enc = bytes2b64(url_bytes, True).decode("utf-8", "replace")
         msg = (
             "*```" + "\n" * ("z" in flags) + "callback-voice-download-" + str(user.id) 
             + "_" + str(len(res)) + "_" + fmt + "_" + str(int(bool(a))) + "-" + url_enc + "\n" + end
         )
-        emb = discord.Embed(colour=randColour())
-        url = bestURL(user)
+        emb = discord.Embed(colour=rand_colour())
+        url = best_url(user)
         emb.set_author(name=str(user), url=url, icon_url=url)
-        emb.description = "\n".join(
-            ["`【" + str(i) + "】` [" + discord.utils.escape_markdown(e["name"] + "](" + ensure_url(e["url"]) + ")") for i in range(len(res)) for e in [res[i]]]
-        )
-        sent = await channel.send(
-            msg,
-            embed=emb,
-        )
+        emb.description = "\n".join((f"`【{i}】` [{escape_markdown(e['name'])}]({ensure_url(e['url'])})" for i in range(len(res)) for e in [res[i]]))
+        sent = await channel.send(msg, embed=emb)
         # Add reaction numbers corresponding to search results
         for i in range(len(res)):
             async with delay(0.5):
@@ -3538,7 +3488,7 @@ class Download(Command):
         # await sent.add_reaction("❎")
 
     async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, argv, user, **void):
-        if reaction is None or user.id == bot.client.user.id:
+        if reaction is None or user.id == bot.user.id:
             return
         spl = vals.split("_")
         u_id = int(spl[0])
@@ -3549,7 +3499,7 @@ class Download(Command):
                 num = int(reaction.decode("utf-8")[0])
                 if num <= int(spl[1]):
                     # Reconstruct list of URLs from hidden encoded data
-                    data = ast.literal_eval(b642Bytes(argv, True).decode("utf-8", "replace"))
+                    data = ast.literal_eval(b642bytes(argv, True).decode("utf-8", "replace"))
                     url = data[num]
                     # Select maximum allowed file size
                     if guild is None:
@@ -3559,7 +3509,7 @@ class Download(Command):
                     # Perform all these tasks asynchronously to save time
                     with discord.context_managers.Typing(channel):
                         create_task(message.edit(
-                            content="```ini\nDownloading [" + noHighlight(ensure_url(url)) + "]...```",
+                            content=ini_md(f"Downloading {sqr_md(ensure_url(url))}..."),
                             embed=None,
                         ))
                         try:
@@ -3579,18 +3529,18 @@ class Download(Command):
                         )
                         f = discord.File(fn, out)
                         create_task(message.edit(
-                            content="```ini\nUploading [" + noHighlight(out) + "]...```",
+                            content=css_md(f"Uploading {sqr_md(out)}..."),
                             embed=None,
                         ))
                         create_task(channel.trigger_typing())
-                    await sendFile(
+                    await send_with_file(
                         channel=channel,
                         msg="",
                         file=f,
                         filename=fn,
                     )
                     create_future_ex(os.remove, fn, timeout=18)
-                    create_task(bot.silentDelete(message, no_log=True))
+                    create_task(bot.silent_delete(message, no_log=True))
 
 
 class UpdateAudio(Database):
@@ -3621,7 +3571,7 @@ class UpdateAudio(Database):
                     break
                 if "research" in e:
                     try:
-                        await create_future(ytdl.extractSingle, e, timeout=18)
+                        await create_future(ytdl.extract_single, e, timeout=18)
                         e.pop("research", None)
                         searched += 1
                     except:
@@ -3636,7 +3586,7 @@ class UpdateAudio(Database):
     async def _typing_(self, channel, user, **void):
         if getattr(channel, "guild", None) is None:
             return
-        if channel.guild.id in self.players and user.id != self.bot.client.user.id:
+        if channel.guild.id in self.players and user.id != self.bot.user.id:
             auds = self.players[channel.guild.id]
             if auds.player is not None and channel.id == auds.channel.id:
                 t = utc() + 15
@@ -3645,7 +3595,7 @@ class UpdateAudio(Database):
 
     # Delays audio player display message by 10 seconds when a user sends a message in the target channel
     async def _send_(self, message, **void):
-        if message.guild.id in self.players and message.author.id != self.bot.client.user.id:
+        if message.guild.id in self.players and message.author.id != self.bot.user.id:
             auds = self.players[message.guild.id]
             if auds.player is not None and message.channel.id == auds.channel.id:
                 t = utc() + 10
@@ -3660,7 +3610,7 @@ class UpdateAudio(Database):
     # Updates all voice clients
     async def __call__(self, guild=None, **void):
         bot = self.bot
-        client = bot.client
+        bot = bot
         with tracebacksuppressor(SemaphoreOverflowError):
             async with self.semaphore:
                 # Ensure all voice clients are not muted, disconnect ones without matching audio players
@@ -3669,25 +3619,25 @@ class UpdateAudio(Database):
                     if not self.is_connecting(g.id) and g.id not in self.players:
                         for c in g.voice_channels:
                             for m in c.members:
-                                if m.id == client.user.id:
+                                if m.id == bot.user.id:
                                     create_task(self._dc(m))
                     else:
-                        m = g.get_member(client.user.id)
+                        m = g.get_member(bot.user.id)
                         if m.voice is not None:
                             if m.voice.deaf or m.voice.mute or m.voice.afk:
                                 create_task(m.edit(mute=False, deafen=False))
                 else:
-                    for vc in client.voice_clients:
+                    for vc in bot.voice_clients:
                         if not self.is_connecting(vc.guild.id) and vc.guild.id not in self.players:
                             create_task(vc.disconnect(force=True))
-                    for g in client.guilds:
+                    for g in bot.guilds:
                         if not self.is_connecting(g.id) and g.id not in self.players:
                             for c in g.voice_channels:
                                 for m in c.members:
-                                    if m.id == client.user.id:
+                                    if m.id == bot.user.id:
                                         create_task(self._dc(m))
                         else:
-                            m = g.get_member(client.user.id)
+                            m = g.get_member(bot.user.id)
                             if m.voice is not None:
                                 if m.voice.deaf or m.voice.mute or m.voice.afk:
                                     create_task(m.edit(mute=False, deafen=False))
@@ -3718,7 +3668,7 @@ class UpdateAudio(Database):
     # Stores all currently playing audio data to temporary database when bot shuts down
     async def _destroy_(self, **void):
         for auds in tuple(self.players.values()):
-            d = await create_future(getDump, auds, True)
+            d = await create_future(auds.get_dump, True)
             self.data[auds.vc.channel.id] = {"dump": d, "channel": auds.channel.id}
             await create_future(auds.kill)
         for file in tuple(ytdl.cache.values()):
@@ -3728,7 +3678,7 @@ class UpdateAudio(Database):
         await create_future(self.update, True, priority=True)
 
     # Restores all audio players from temporary database when applicable
-    async def _ready_(self, bot, **void):
+    async def _bot_ready_(self, bot, **void):
         ytdl.bot = bot
         for file in os.listdir("cache"):
             if file.endswith(".opus") and file not in ytdl.cache:
@@ -3739,12 +3689,12 @@ class UpdateAudio(Database):
                 f.ensure_time()
                 print("reinstating audio file", file)
         for k, v in self.data.items():
-            try:
+            with tracebacksuppressor:
                 vc = await bot.fetch_channel(k)
                 channel = await bot.fetch_channel(v["channel"])
                 guild = channel.guild
-                client = bot.client
-                user = client.user
+                bot = bot
+                user = bot.user
                 perm = inf
                 name = "dump"
                 argv = v["dump"]
@@ -3752,9 +3702,7 @@ class UpdateAudio(Database):
                 message = cdict(attachments=None)
                 for dump in bot.commands.dump:
                     print("auto-loading queue", argv, "to", guild)
-                    await dump(guild, channel, user, client, bot, perm, name, argv, flags, message, vc=vc)
-            except:
-                print_exc()
+                    await dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc)
         self.data.clear()
         self.update()
 

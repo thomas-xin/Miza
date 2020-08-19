@@ -8,45 +8,49 @@ from common import *
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
 
-# discord.py client object.
-client = discord.AutoShardedClient(
-    max_messages=1024,
-    heartbeat_timeout=30,
-)
 
+# Main class containing all global bot data.
+class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collections.abc.Callable):
 
-# Main class containing all global data
-class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
-    
-    timeout = 24
     website = "https://github.com/thomas-xin/Miza"
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
     heartbeat = "heartbeat.tmp"
     restart = "restart.tmp"
     shutdown = "shutdown.tmp"
-    savedata = "data.json"
     authdata = "auth.json"
     caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "deleted")
-    client = client
+    statuses = (discord.Status.online, discord.Status.idle, discord.Status.dnd)
+    # Default command prefix
     prefix = "~"
     # This is a fixed ID apparently
     deleted_user = 456226577798135808
     _globals = globals()
             
-    def __init__(self):
+    def __init__(self, cache_size=4194304, timeout=24):
+        # Initializes client (first in __mro__ of class inheritance)
+        super().__init__(max_messages=256, heartbeat_timeout=timeout)
+        self.cache_size = cache_size
+        self.timeout = timeout
+        self.set_classes()
+        self.set_client_events()
         self.bot = self
+        self.client = super()
         self.closed = False
         self.loaded = False
-        self.cache = cdict({c: cdict() for c in self.caches})
+        # Base cache: contains all other caches
+        self.cache = fcdict({c: cdict() for c in self.caches})
+        # Channel-Webhook cache: for accessing all webhooks for a channel.
         self.cw_cache = cdict()
         self.events = mdict()
-        self.proc_call = cdict()
+        self.react_sem = cdict()
         self.mention = ()
         self.semaphore = Semaphore(2, 1)
-        print("Time: " + str(datetime.datetime.now()))
+        self.ready_semaphore = Semaphore(1, 256)
+        self.guild_semaphore = Semaphore(8, inf)
+        print("Time:", datetime.datetime.now())
         print("Initializing...")
         # O(1) time complexity for searching directory
-        directory = dict.fromkeys(os.listdir())
+        directory = frozenset(os.listdir())
         [os.mkdir(folder) for folder in ("cache", "saves", "deleted") if folder not in directory]
         try:
             f = open(self.authdata)
@@ -58,7 +62,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                     + '"owner_id":""\n'
                     + '}'
                 )
-            print("ERROR: Please fill in details for " + self.authdata + " to continue.")
+            print(f"ERROR: Please fill in details for {self.authdata} to continue.")
             self.setshutdown(2, force=True)
         with closing(f):
             auth = ast.literal_eval(f.read())
@@ -70,49 +74,53 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         try:
             owner_id = auth["owner_id"]
             if type(owner_id) not in (list, tuple):
-                owner_id = [owner_id]
-            self.owners = cdict({int(i): True for i in owner_id})
+                owner_id = {owner_id}
+            self.owners = set(int(i) for i in owner_id)
         except KeyError:
-            self.owners = ()
+            self.owners = set()
             print("WARNING: owner_id not found. Unable to locate owner.")
         # Initialize rest of bot variables
-        create_task(heartbeatLoop())
         self.proc = PROC
-        self.guilds = 0
+        self.guild_count = 0
         self.blocked = 0
         self.updated = False
         self.started = False
         self.ready = False
         self.stat_timer = 0
-        self.lastCheck = 0
+        self.last_check = 0
         self.status_iter = xrand(3)
-        self.embedSenders = cdict()
+        self.curr_state = hzero(3)
+        self.embed_senders = cdict()
         # Assign bot cache to global variables for convenience
         globals().update(self.cache)
-        self.getModules()
+        self.get_modules()
 
     __call__ = lambda self: self
     __exit__ = lambda self, *args, **kwargs: self.close()
+
+    def __getattr__(self, key):
+        with suppress(AttributeError):
+            return self.__getattribute__(key)
+        with suppress(AttributeError):
+            return getattr(self.__getattribute__("user"), key)
+        return getattr(self.__getattribute__("proc"), key)
 
     # Waits an amount of seconds and shuts down.
     def setshutdown(self, delay=None, force=False):
         if delay:
             time.sleep(delay)
         if force:
-            with open(self.shutdown, "wb"):
-                pass
-        for proc in self.proc.children(recursive=True):
-            with suppress():
-                proc.kill()
-        self.proc.kill()
+            touch(self.shutdown)
+        force_kill(self.proc)
 
     # Starts up client.
     def run(self):
-        print("Attempting to authorize with token " + self.token + ":")
+        print(f"Attempting to authorize with token {self.token}:")
         with closing(get_event_loop()):
             with suppress():
-                get_event_loop().run_until_complete(client.start(self.token))
-            get_event_loop().run_until_complete(client.close())
+                get_event_loop().run_until_complete(self.start(self.token))
+            with suppress():
+                get_event_loop().run_until_complete(self.close())
         self.setshutdown()
 
     # A reimplementation of the print builtin function.
@@ -120,11 +128,10 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         sys.__stdout__.write(str(sep).join(str(i) for i in args) + end)
 
     # Closes the bot, preventing all events.
-    def close(self):
-        self.closed = True
+    close = lambda self: setattr(self, "closed", True) or create_task(super().close())
 
     # A garbage collector for empty and unassigned objects in the database.
-    async def verifyDelete(self, obj):
+    async def garbage_collect(self, obj):
         if not self.ready or hasattr(obj, "no_delete"):
             return
         if obj.checking > utc():
@@ -147,16 +154,15 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                         d = await self.fetch_channel(key)
                     if d is not None:
                         continue
-                print("Deleting " + str(key) + " from " + str(obj) + "...")
+                print(f"Deleting {key} from {repr(obj)}...")
                 data.pop(key)
                 obj.update()
             if random.random() > .99:
                 await asyncio.sleep(0.2)
         obj.checking = utc() + 10
-        self.started = True
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
-    async def event(self, ev, *args, **kwargs):
+    async def send_event(self, ev, *args, **kwargs):
         if self.closed:
             return
         events = self.events.get(ev, ())
@@ -191,34 +197,37 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         return channel
 
     # Fetches either a user or channel object from ID, using the bot cache when possible.
-    async def fetch_sendable(self, s_id):
+    async def fetch_messageable(self, s_id):
         if type(s_id) is not int:
             try:
                 s_id = int(s_id)
             except (ValueError, TypeError):
-                raise TypeError("Invalid user identifier: " + str(s_id))
+                raise TypeError(f"Invalid messageable identifier: {s_id}")
         with suppress(KeyError):
             return self.get_user(s_id)
         with suppress(KeyError):
             return self.cache.channels[s_id]
         try:
-            user = await client.fetch_user(s_id)
+            user = await super().fetch_user(s_id)
         except LookupError:
-            channel = await client.fetch_channel(s_id)
+            channel = await super().fetch_channel(s_id)
             self.cache.channels[s_id] = channel
-            self.limitCache("channels")
+            self.limit_cache("channels")
             return channel
         self.cache.users[u_id] = user
-        self.limitCache("users")
+        self.limit_cache("users")
         return user
 
     # Fetches a user from ID, using the bot cache when possible.
     async def fetch_user(self, u_id):
         with suppress(KeyError):
             return self.get_user(u_id)
-        user = await client.fetch_user(u_id)
+        u_id = verify_id(u_id)
+        if type(u_id) is not int:
+            raise TypeError(f"Invalid user identifier: {u_id}")
+        user = await super().fetch_user(u_id)
         self.cache.users[u_id] = user
-        self.limitCache("users")
+        self.limit_cache("users")
         return user
 
     # Gets a user from ID, using the bot cache.
@@ -227,21 +236,19 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             try:
                 u_id = int(u_id)
             except (ValueError, TypeError):
-                raise TypeError("Invalid user identifier: " + str(u_id))
+                raise TypeError(f"Invalid user identifier: {u_id}")
         with suppress(KeyError):
             return self.cache.users[u_id]
         if u_id == self.deleted_user:
-            user = self.ghostUser()
+            user = self.GhostUser()
             user.system = True
             user.name = "Deleted User"
             user.display_name = "Deleted User"
             user.id = u_id
-            user.mention = "<@" + str(u_id) + ">"
             user.avatar_url = self.discord_icon
-            user.created_at = snowflake_time(u_id)
         else:
             try:
-                user = client.get_user(u_id)
+                user = super().get_user(u_id)
                 if user is None:
                     raise TypeError
             except:
@@ -249,7 +256,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                     return self.get_user(self.deleted_user)
                 raise KeyError("Target user ID not found.")
         self.cache.users[u_id] = user
-        self.limitCache("users")
+        self.limit_cache("users")
         return user
 
     # Fetches a member in the target server by ID or name lookup.
@@ -281,7 +288,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 if type(u_id) is not str:
                     u_id = str(u_id)
                 with suppress(LookupError):
-                    return await strLookup(
+                    return await str_lookup(
                         members,
                         u_id,
                         qkey=userQuery1,
@@ -289,14 +296,14 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                         loose=False,
                     )
                 with suppress(LookupError):
-                    return await strLookup(
+                    return await str_lookup(
                         members,
                         u_id,
                         qkey=userQuery2,
                         ikey=userIter2,
                     )
                 with suppress(LookupError):
-                    return await strLookup(
+                    return await str_lookup(
                         members,
                         u_id,
                         qkey=userQuery3,
@@ -319,16 +326,18 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             try:
                 u_id = int(u_id)
             except (ValueError, TypeError):
-                raise TypeError("Invalid user identifier: " + str(u_id))
+                raise TypeError(f"Invalid user identifier: {u_id}")
         if find_others:
             with suppress(LookupError):
                 member = self.cache.members[u_id].guild.get_member(u_id)
                 if member is None:
                     raise LookupError
+                if member.guild.get_member(u_id) is None:
+                    raise LookupError
                 return member
         g = bot.cache.guilds
         if guild is None:
-            guilds = list(bot.cache.guilds.values())
+            guilds = deque(bot.cache.guilds.values())
         else:
             if find_others:
                 guilds = [g[i] for i in g if g[i].id != guild.id]
@@ -345,7 +354,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         if member is None:
             raise LookupError("Unable to find member data.")
         self.cache.members[u_id] = member
-        self.limitCache("members")
+        self.limit_cache("members")
         return member
 
     # Fetches a guild from ID, using the bot cache when possible.
@@ -357,35 +366,32 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 if follow_invites:
                     try:
                         # Parse and follow invites to get partial guild info
-                        invite = await client.fetch_invite(g_id.strip("< >"))
+                        invite = await super().fetch_invite(g_id.strip("< >"))
                         g = invite.guild
                         if not hasattr(g, "member_count"):
                             guild = cdict(member_count=invite.approximate_member_count)
                             for at in g.__slots__:
                                 setattr(guild, at, getattr(g, at))
-                            guild.created_at = snowflake_time(guild.id)
                             icon = str(guild.icon)
-                            guild.icon_url = (
-                                "https://cdn.discordapp.com/icons/"
-                                + str(guild.id) + "/" + icon
-                                + ".gif" * icon.startswith("a_")
-                            )
+                            guild.icon_url = f"https://cdn.discordapp.com/icons/{guild.id}/{icon}"
+                            if icon.startswith("a_"):
+                                guild.icon_url += ".gif"
                         else:
                             guild = g
                         return guild
                     except (discord.NotFound, discord.HTTPException) as ex:
                         raise LookupError(str(ex))
-                raise TypeError("Invalid server identifier: " + str(g_id))
+                raise TypeError(f"Invalid server identifier: {g_id}")
         with suppress(KeyError):
             return self.cache.guilds[g_id]
         try:
-            guild = client.get_guild(g_id)
+            guild = super().get_guild(g_id)
             if guild is None:
                 raise EOFError
         except:
-            guild = await client.fetch_guild(g_id)
+            guild = await super().fetch_guild(g_id)
         self.cache.guilds[g_id] = guild
-        self.limitCache("guilds", limit=65536)
+        self.limit_cache("guilds")
         return guild
 
     # Fetches a channel from ID, using the bot cache when possible.
@@ -394,12 +400,12 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             try:
                 c_id = int(c_id)
             except (ValueError, TypeError):
-                raise TypeError("Invalid channel identifier: " + str(c_id))
+                raise TypeError(f"Invalid channel identifier: {c_id}")
         with suppress(KeyError):
             return self.cache.channels[c_id]
-        channel = await client.fetch_channel(c_id)
+        channel = await super().fetch_channel(c_id)
         self.cache.channels[c_id] = channel
-        self.limitCache("channels")
+        self.limit_cache("channels")
         return channel
 
     # Fetches a message from ID and channel, using the bot cache when possible.
@@ -408,7 +414,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             try:
                 m_id = int(m_id)
             except (ValueError, TypeError):
-                raise TypeError("Invalid message identifier: " + str(m_id))
+                raise TypeError(f"Invalid message identifier: {m_id}")
         with suppress(KeyError):
             return self.cache.messages[m_id]
         if channel is None:
@@ -418,7 +424,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             channel = await self.fetch_channel(channel)
         message = await channel.fetch_message(m_id)
         if message is not None:
-            self.cacheMessage(message)
+            self.add_message(message)
         return message
 
     # Fetches a role from ID and guild, using the bot cache when possible.
@@ -442,7 +448,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             if role is None:
                 raise LookupError("Role not found.")
         self.cache.roles[r_id] = role
-        self.limitCache("roles")
+        self.limit_cache("roles")
         return role
 
     # Fetches an emoji from ID and guild, using the bot cache when possible.
@@ -455,7 +461,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         with suppress(KeyError):
             return self.cache.emojis[e_id]
         try:
-            emoji = client.get_emoji(e_id)
+            emoji = super().get_emoji(e_id)
             if emoji is None:
                 raise EOFError
         except:
@@ -464,7 +470,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             else:
                 raise discord.NotFound("Emoji not found.")
         self.cache.emojis[e_id] = emoji
-        self.limitCache("emojis")
+        self.limit_cache("emojis")
         return emoji
     
     # Searches the bot database for a webhook mimic from ID.
@@ -482,7 +488,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         raise LookupError("Unable to find target mimic.")
 
     # Gets the DM channel for the target user, creating a new one if none exists.
-    async def getDM(self, user):
+    async def get_dm(self, user):
         with suppress(TypeError):
             int(user)
             user = await self.fetch_user(user)
@@ -492,11 +498,11 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         return channel
 
     # Finds URLs in a string, following any discord message links found.
-    async def followURL(self, url, it=None, best=False, preserve=True, images=True, allow=False, limit=None):
+    async def follow_url(self, url, it=None, best=False, preserve=True, images=True, allow=False, limit=None):
         if limit is not None and limit <= 0:
             return []
         if it is None:
-            urls = findURLs(url)
+            urls = find_urls(url)
             if not urls:
                 return []
             it = {}
@@ -512,46 +518,55 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         else:
             medias = "video"
         for url in urls:
-            # An attempt at checking for discord message links
-            check = url[:64]
-            if "channels/" in check and "discord" in check:
+            if is_discord_message_link(url):
                 found = deque()
                 spl = url[url.index("channels/") + 9:].replace("?", "/").split("/")
                 c = await self.fetch_channel(spl[1])
                 m = await self.fetch_message(spl[2], c)
                 # All attachments should be valid URLs
                 if best:
-                    found.extend(bestURL(a) for a in m.attachments)
+                    found.extend(best_url(a) for a in m.attachments)
                 else:
                     found.extend(a.url for a in m.attachments)
-                found.extend(findURLs(m.content))
+                found.extend(find_urls(m.content))
                 # Attempt to find URLs in embed contents
                 for e in m.embeds:
                     for a in medias:
                         obj = getattr(e, a, None)
                         if obj:
                             if best:
-                                url = bestURL(obj)
+                                url = best_url(obj)
                             else:
                                 url = obj.url
                             if url:
                                 found.append(url)
                                 break
                 # Attempt to find URLs in embed descriptions
-                [found.extend(findURLs(e.description)) for e in m.embeds if e.description]
+                [found.extend(find_urls(e.description)) for e in m.embeds if e.description]
                 for u in found:
                     # Do not attempt to find the same URL twice
                     if u not in it:
                         it[u] = True
                         if not len(it) & 255:
                             await asyncio.sleep(0.2)
-                        found2 = await self.followURL(u, it, best=best, preserve=preserve, images=images, allow=allow, limit=limit)
+                        found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, allow=allow, limit=limit)
                         if len(found2):
                             out.extend(found2)
                         elif allow and m.content:
                             lost.append(m.content)
                         elif preserve:
                             lost.append(u)
+            elif images and is_imgur_url(url):
+                first = url.split("?")[0]
+                if not first.endswith(".jpg"):
+                    first += ".jpg"
+                lost.append(first)
+            elif images and is_tenor_url(url):
+                s = await Request(url, decode=True, aio=True)
+                search ='<meta class="dynamic" property="og:image" content="'
+                s = s[s.index(search) + len(search):]
+                s = s[:s.index('"')]
+                lost.append(s)
             else:
                 out.append(url)
         if lost:
@@ -563,42 +578,44 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         return out
 
     # Follows a message link, replacing emojis and user mentions with their icon URLs.
-    async def followImage(self, url):
-        temp = findURLs(url)
+    async def follow_to_image(self, url):
+        temp = find_urls(url)
         if temp:
             return temp
-        users = findUsers(url)
-        emojis = findEmojis(url)
+        users = find_users(url)
+        emojis = find_emojis(url)
         out = deque()
         if users:
-            futs = [create_task(self.fetch_user(verifyID(u))) for u in users]
+            futs = [create_task(self.fetch_user(verify_id(u))) for u in users]
             for fut in futs:
                 with suppress(LookupError):
                     res = await fut
-                    out.append(bestURL(res))
+                    out.append(best_url(res))
         for s in emojis:
             s = s[3:]
             i = s.index(":")
             e_id = s[i + 1:s.rindex(">")]
-            out.append("https://cdn.discordapp.com/emojis/" + e_id + ".png?v=1")
+            out.append(f"https://cdn.discordapp.com/emojis/{e_id}.png?v=1")
         return out
 
     # Inserts a message into the bot cache, discarding existing ones if full.
-    def cacheMessage(self, message):
+    def add_message(self, message):
         self.cache.messages[message.id] = message
-        self.limitCache("messages", 4194304)
+        self.limit_cache("messages")
         return message
 
     # Deletes a message from the bot cache.
-    def deleteMessage(self, message):
+    def remove_message(self, message):
         self.cache.messages.pop(message.id, None)
         if not message.author.bot:
-            s = strMessage(message, username=True)
-            ch = "deleted/" + str(message.channel.id) + ".txt"
+            s = message_repr(message, username=True)
+            ch = f"deleted/{message.channel.id}.txt"
             print(s, file=ch)
 
     # Limits a cache to a certain amount, discarding oldest entries first.
-    def limitCache(self, cache=None, limit=1048576):
+    def limit_cache(self, cache=None, limit=None):
+        if limit is None:
+            limit = self.cache_size
         if cache is not None:
             caches = [self.cache[cache]]
         else:
@@ -608,22 +625,22 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 c.pop(next(iter(c)))
     
     # Updates bot cache from the discord.py client cache.
-    def updateClient(self):
-        self.cache.guilds.update(client._connection._guilds)
-        self.cache.emojis.update(client._connection._emojis)
-        self.cache.users.update(client._connection._users)
-        self.cache.channels.update(client._connection._private_channels)
+    def update_from_client(self):
+        self.cache.guilds.update(self._connection._guilds)
+        self.cache.emojis.update(self._connection._emojis)
+        self.cache.users.update(self._connection._users)
+        self.cache.channels.update(self._connection._private_channels)
 
     # Updates bot cache from the discord.py guild objects.
-    def cacheFromGuilds(self):
-        for i, guild in enumerate(client.guilds, 1):
+    def update_from_guilds(self):
+        for i, guild in enumerate(self.guilds, 1):
             self.cache.channels.update(guild._channels)
             self.cache.roles.update(guild._roles)
             if not i & 63:
                 time.sleep(0.2)
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
-    def getPrefix(self, guild):
+    def get_prefix(self, guild):
         try:
             g_id = guild.id
         except AttributeError:
@@ -633,19 +650,19 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 g_id = 0
         with suppress(KeyError):
             return self.data.prefixes[g_id]
-        return bot.prefix
+        return self.prefix
 
     # Gets effective permission level for the target user in a certain guild, taking into account roles.
-    def getPerms(self, user, guild=None):
+    def get_perms(self, user, guild=None):
         try:
             u_id = user.id
         except AttributeError:
             u_id = int(user)
-        if u_id in self.owners:
+        if self.is_owner(u_id):
             return nan
-        if self.isBlacklisted(u_id):
+        if self.is_blacklisted(u_id):
             return -inf
-        if u_id == client.user.id:
+        if u_id == self.user.id:
             return inf
         if guild is None or hasattr(guild, "ghost"):
             return inf
@@ -663,13 +680,13 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 with suppress(KeyError):
                     return self.data.perms[guild.id][guild.id]
                 return -inf
-            return self.getRolePerms(r, guild)
+            return self.get_role_perms(r, guild)
         p = m.guild_permissions
         if p.administrator:
             return inf
         perm = -inf
-        for role in m.roles: 
-            rp = self.getRolePerms(role, guild)
+        for role in m.roles:
+            rp = self.get_role_perms(role, guild)
             if rp > perm:
                 perm = rp
         if isnan(perm):
@@ -677,7 +694,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         return perm
     
     # Gets effective permission level for the target role in a certain guild, taking into account permission values.
-    def getRolePerms(self, role, guild):
+    def get_role_perms(self, role, guild):
         if role.permissions.administrator:
             return inf
         with suppress(KeyError):
@@ -699,18 +716,18 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         return -1
 
     # Sets the permission value for a snowflake in a guild to a value.
-    def setPerms(self, user, guild, value):
+    def set_perms(self, user, guild, value):
         perms = self.data.perms
         try:
             u_id = user.id
         except AttributeError:
             u_id = user
-        g_perm = setDict(perms, guild.id, {})
-        g_perm.update({u_id: roundMin(value)})
+        g_perm = set_dict(perms, guild.id, {})
+        g_perm.update({u_id: round_min(value)})
         self.database.perms.update()
 
     # Checks if a message has been flagged as deleted by the deleted cache.
-    def isDeleted(self, message):
+    def is_deleted(self, message):
         try:
             m_id = int(message.id)
         except AttributeError:
@@ -718,42 +735,47 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         return self.cache.deleted.get(m_id, False)
 
     # Logs if a message has been deleted.
-    def logDelete(self, message, no_log=False):
+    def log_delete(self, message, no_log=False):
         try:
             m_id = int(message.id)
         except AttributeError:
             m_id = int(message)
         self.cache.deleted[m_id] = no_log + 2
-        self.limitCache("deleted", limit=4096)
+        self.limit_cache("deleted", limit=4096)
     
     # Silently deletes a message, bypassing logs.
-    async def silentDelete(self, message, exc=False, no_log=False, delay=None):
+    async def silent_delete(self, message, exc=False, no_log=False, delay=None):
         if delay:
             await asyncio.sleep(float(delay))
         try:
-            self.logDelete(message, no_log)
+            self.log_delete(message, no_log)
             await message.delete()
         except:
             self.cache.deleted.pop(message.id, None)
             if exc:
                 raise
 
-    # Checks if a guild is trusted.
-    def isTrusted(self, g_id):
+    # Checks if a user is an owner of the bot.
+    is_owner = lambda self, user: verify_id(user) in self.owners
+
+    # Checks if a guild is trusted by the bot.
+    def is_trusted(self, guild):
         try:
             trusted = self.data.trusted
         except (AttributeError, KeyError):
             return False
-        return g_id in trusted
+        return verify_id(guild) in trusted
 
     # Checks if a user is blacklisted from the bot.
-    def isBlacklisted(self, u_id):
-        u_id = int(u_id)
-        if u_id in self.owners or u_id == client.user.id:
+    def is_blacklisted(self, user):
+        u_id = verify_id(user)
+        if self.is_owner(u_id) or u_id == self.user.id:
             return False
         with suppress(KeyError):
             return self.data.blacklist.get(u_id, False)
         return True
+
+    dangerous_command = bold(css_md(uni_str('[WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. REPEAT COMMAND WITH "?f" FLAG TO CONFIRM.]')))
     
     mmap = {
         "“": '"',
@@ -839,7 +861,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
     }
 
     # Evaluates a math formula to a float value, using a math process from the subprocess pool when necessary.
-    async def evalMath(self, expr, obj=None, default=0, op=True):
+    async def eval_math(self, expr, obj=None, default=0, op=True):
         if op:
             # Allow mathematical operations on a default value
             _op = None
@@ -847,7 +869,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 if expr.startswith(op):
                     expr = expr[len(op):].strip()
                     _op = at
-            num = await self.evalMath(expr, obj, op=False)
+            num = await self.eval_math(expr, obj, op=False)
             if _op is not None:
                 num = getattr(float(default), _op)(num)
             return num
@@ -870,17 +892,17 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 else:
                     r = [ast.literal_eval(f)]
         except (ValueError, TypeError, SyntaxError):
-            r = await self.solveMath(f, obj, 16, 0)
+            r = await self.solve_math(f, obj, 16, 0)
         x = r[0]
         with suppress(TypeError):
             while True:
                 if type(x) is str:
                     raise TypeError
                 x = tuple(x)[0]
-        return roundMin(float(x))
+        return round_min(float(x))
 
     # Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
-    async def solveMath(self, f, obj, prec, r, timeout=12, authorize=False):
+    async def solve_math(self, f, obj, prec, r, timeout=12, authorize=False):
         f = f.strip()
         try:
             if obj is None:
@@ -892,11 +914,11 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         except AttributeError:
             key = int(obj)
         # Bot owners have no semaphore limit
-        if key in self.owners:
+        if self.is_owner(key):
             key = None
-        return await mathProc(f, int(prec), int(r), key, timeout=12, authorize=authorize)
+        return await process_math(f, int(prec), int(r), key, timeout=12, authorize=authorize)
 
-    timeChecks = {
+    TimeChecks = {
         "galactic year": ("gy", "galactic year", "galactic years"),
         "millenium": ("ml", "millenium", "millenia"),
         "century": ("c", "century", "centuries"),
@@ -915,7 +937,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
     alphabet = "abcdefghijklmnopqrstuvwxyz"
 
     # Evaluates a time input, using a math process from the subprocess pool when necessary.
-    async def evalTime(self, expr, obj=None, default=0, op=True):
+    async def eval_time(self, expr, obj=None, default=0, op=True):
         if op:
             # Allow mathematical operations on a default value
             _op = None
@@ -923,7 +945,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 if expr.startswith(op):
                     expr = expr[len(op):].strip(" ")
                     _op = at
-            num = await self.evalTime(expr, obj, op=False)
+            num = await self.eval_time(expr, obj, op=False)
             if _op is not None:
                 num = getattr(float(default), _op)(num)
             return num
@@ -948,7 +970,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                     data = expr.split(":")
                     mult = 1
                     while len(data):
-                        t += await self.evalMath(data[-1], obj) * mult
+                        t += await self.eval_math(data[-1], obj) * mult
                         data = data[:-1]
                         if mult <= 60:
                             mult *= 60
@@ -958,9 +980,9 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                             raise TypeError("Too many time arguments.")
                 else:
                     # Otherwise move on to main parser
-                    f = singleSpace(re.sub(self.connectors, " ", expr.replace(",", " "))).casefold()
-                    for tc in self.timeChecks:
-                        for check in reversed(self.timeChecks[tc]):
+                    f = single_space(re.sub(self.connectors, " ", expr.replace(",", " "))).casefold()
+                    for tc in self.TimeChecks:
+                        for check in reversed(self.TimeChecks[tc]):
                             if check in f:
                                 i = f.index(check)
                                 isnt = i + len(check) < len(f) and f[i + len(check)] in self.alphabet
@@ -971,12 +993,12 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                                 match = re.search(self.numericals, temp)
                                 if match:
                                     i = match.end()
-                                    n = numParse(temp[:i])
+                                    n = num_parse(temp[:i])
                                     temp = temp[i:].strip()
                                     if temp:
                                         f = temp + " " + f
                                 else:
-                                    n = await self.evalMath(temp, obj)
+                                    n = await self.eval_math(temp, obj)
                                 s = TIMEUNITS[tc]
                                 if type(s) is list:
                                     s = s[0]
@@ -986,12 +1008,12 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                         match = re.search(self.numericals, temp)
                         if match:
                             i = match.end()
-                            n = numParse(temp[:i])
+                            n = num_parse(temp[:i])
                             temp = temp[i:].strip()
                             if temp:
-                                n = await self.evalMath(str(n) + " " + temp, obj)
+                                n = await self.eval_math(str(n) + " " + temp, obj)
                         else:
-                            n = await self.evalMath(temp, obj)
+                            n = await self.eval_math(temp, obj)
                         t += n
             except:
                 # Use datetime parser if regular parser fails
@@ -1000,27 +1022,27 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             t = float(t)
         return t
 
-    ipCheck = re.compile("^([0-9]{1,3}\\.){3}[0-9]{1,3}$")
+    ip_check = re.compile("^([0-9]{1,3}\\.){3}[0-9]{1,3}$")
 
     # Updates the bot's stored external IP address.
-    def updateIP(self, ip):
-        if re.search(self.ipCheck, ip):
+    def update_ip(self, ip):
+        if re.search(self.ip_check, ip):
             self.ip = ip
 
     # Gets the external IP address from api.ipify.org
-    async def getIP(self):
+    async def get_ip(self):
         resp = await Request("https://api.ipify.org", decode=True, aio=True)
-        self.updateIP(resp)
+        self.update_ip(resp)
 
     # Gets the amount of active processes, threads, coroutines.
-    def getActive(self):
+    def get_active(self):
         procs = 2 + sum(1 for c in self.proc.children(True))
         thrds = self.proc.num_threads()
         coros = sum(1 for i in asyncio.all_tasks())
         return hlist((procs, thrds, coros))
 
     # Gets the CPU and memory usage of a process over a period of 1 second.
-    async def getProcState(self, proc):
+    async def get_proc_state(self, proc):
         with suppress(psutil.NoSuchProcess):
             create_future_ex(proc.cpu_percent, priority=True)
             await asyncio.sleep(1)
@@ -1030,49 +1052,48 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         return 0, 0
 
     # Gets the total size of the cache folder.
-    getCacheSize = lambda self: sum(os.path.getsize("cache/" + fn) for fn in os.listdir("cache"))
+    get_cache_size = lambda self: sum(os.path.getsize("cache/" + fn) for fn in os.listdir("cache"))
 
     # Gets the status of the bot.
-    async def getState(self):
+    async def get_state(self):
         stats = hzero(3)
-        if getattr(self, "currState", None) is None:
-            self.currState = stats
         procs = await create_future(self.proc.children, recursive=True, priority=True)
         procs.append(self.proc)
-        tasks = [self.getProcState(p) for p in procs]
+        tasks = [self.get_proc_state(p) for p in procs]
         resp = await recursive_coro(tasks)
         stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
         cpu = await create_future(psutil.cpu_count, priority=True)
         mem = await create_future(psutil.virtual_memory, priority=True)
-        disk = await create_future(self.getCacheSize, priority=True)
+        disk = await create_future(self.get_cache_size, priority=True)
         # CPU is totalled across all cores
         stats[0] /= cpu
         # Memory is in %
         stats[1] *= mem.total / 100
         stats[2] = disk
-        self.currState = stats
-        self.size2 = cdict()
+        self.size2 = fcdict()
         files = await create_future(os.listdir, "misc", priority=True)
         for f in files:
             path = "misc/" + f
-            if iscode(path):
-                self.size2[f] = getLineCount(path)
+            if is_code(path):
+                self.size2[f] = line_count(path)
+        self.curr_state = stats
         return stats
 
     # Loads a module containing commands and databases by name.
-    def getModule(self, module):
+    def get_module(self, module):
         with tracebacksuppressor:
             f = module
             f = ".".join(f.split(".")[:-1])
             path, module = module, f
-            rename = module.casefold()
+            new = False
             if module in self._globals:
-                print("Reloading module " + rename + "...")
-                if rename in self.categories:
+                print(f"Reloading module {module}...")
+                if module in self.categories:
                     self.unload(module)
                 mod = importlib.reload(self._globals[module])
             else:
-                print("Loading module " + rename + "...")
+                print(f"Loading module {module}...")
+                new = True
                 mod = __import__(module)
             self._globals[module] = mod
             commands = hlist()
@@ -1087,101 +1108,81 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                         elif issubclass(var, Database):
                             load_type = 2
                     if load_type:
-                        obj = var(self, rename)
+                        obj = var(self, module)
                         if load_type == 1:
                             commands.append(obj)
-                            print("Successfully loaded command " + repr(obj) + ".")
+                            print(f"Successfully loaded command {repr(obj)}.")
                         elif load_type == 2:
                             dataitems.append(obj)
-                            print("Successfully loaded database " + repr(obj) + ".")
+                            print(f"Successfully loaded database {repr(obj)}.")
             for u in dataitems:
                 for c in commands:
                     c.data[u.name] = u
-            self.categories[rename] = commands
-            self.dbitems[rename] = dataitems
-            self.size[rename] = getLineCount("commands/" + path)
-            if self.ready:
-                print("Resending _ready_ event to module " + rename + "...")
+            self.categories[module] = commands
+            self.dbitems[module] = dataitems
+            self.size[module] = line_count("commands/" + path)
+            if not new:
+                while not self.ready:
+                    time.sleep(0.5)
+                print(f"Resending _ready_ event to module {module}...")
                 for db in dataitems:
                     for f in dir(db):
                         if f.startswith("_") and f[-1] == "_" and f[1] != "_":
                             func = getattr(db, f, None)
                             if callable(func):
                                 self.events.append(f, func)
-                    func = getattr(db, "_ready_", None)
-                    if callable(func):
-                        await_fut(create_future(func, bot=self, priority=True), priority=True)
+                    for e in ("_bot_ready_", "_ready_"):
+                        func = getattr(db, e, None)
+                        if callable(func):
+                            await_fut(create_future(func, bot=self, priority=True), priority=True)
 
     def unload(self, mod=None):
         if mod is None:
-            mods = list(self.categories)
+            mods = deque(self.categories)
         else:
             mod = mod.casefold()
             if mod not in self.categories:
                 raise KeyError
             mods = [mod]
         for mod in mods:
-            rename = mod.casefold()
-            for command in self.categories[rename]:
-                for alias in command.alias:
-                    alias = alias.replace("*", "").replace("_", "").replace("||", "").casefold()
-                    coms = self.commands.get(alias)
-                    if coms:
-                        coms.remove(command)
-                        print(alias, command)
-                    if not coms:
-                        self.commands.pop(alias)
-            for db in self.dbitems[rename]:
-                func = getattr(db, "_destroy_", None)
-                if callable(func):
-                    await_fut(create_future(func, priority=True), priority=True)
-                for f in dir(db):
-                    if f.startswith("_") and f[-1] == "_" and f[1] != "_":
-                        func = getattr(db, f, None)
-                        if callable(func):
-                            bot.events[f].remove(func)
-                            print(f, db)
-                db.update(True)
-                self.data.pop(db, None)
-                self.database.pop(db, None)
-            self.categories.pop(rename)
-            self.dbitems.pop(rename)
-            self.size.pop(rename)
+            for command in self.categories[mod]:
+                command.unload()
+            for database in self.dbitems[mod]:
+                database.unload()
+            self.categories.pop(mod)
+            self.dbitems.pop(mod)
+            self.size.pop(mod)
 
     def reload(self, mod=None):
         if not mod:
-            subKill()
-            self.modload = deque()
-            files = [i for i in os.listdir("commands") if iscode(i)]
+            sub_kill()
+            modload = deque()
+            files = [i for i in os.listdir("commands") if is_code(i)]
             for f in files:
-                self.modload.append(self.executor.submit(self.getModule, f))
-            return [fut.result() for fut in self.modload]           
-        return self.getModule(mod + ".py")
+                modload.append(create_future_ex(self.get_module, f, priority=True))
+            return [fut.result() for fut in modload]           
+        return self.get_module(mod + ".py")
 
     # Loads all modules in the commands folder and initializes bot commands and databases.
-    def getModules(self):
-        files = [i for i in os.listdir("commands") if iscode(i)]
-        self.categories = cdict()
-        self.dbitems = cdict()
-        self.commands = cdict()
-        self.database = cdict()
-        self.data = cdict()
-        self.size = cdict()
+    def get_modules(self):
+        files = [i for i in os.listdir("commands") if is_code(i)]
+        self.categories = fcdict()
+        self.dbitems = fcdict()
+        self.commands = fcdict()
+        self.database = fcdict()
+        self.data = fcdict()
+        self.size = fcdict()
         for f in os.listdir():
-            if iscode(f):
-                self.size[f] = getLineCount(f)
+            if is_code(f):
+                self.size[f] = line_count(f)
         self.modload = deque()
-        if getattr(self, "executor", None) is not None:
-            self.executor.shutdown(wait=True)
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(files) + 1)
         for f in files:
-            self.modload.append(self.executor.submit(self.getModule, f))
+            self.modload.append(create_future(self.get_module, f, priority=True))
         self.loaded = True
-        print("Module finder initialized.")
 
     # Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
     def update(self):
-        self.updateEmbeds()
+        self.update_embeds()
         saved = hlist()
         with tracebacksuppressor:
             for i in self.database:
@@ -1192,14 +1193,14 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         # if saved:
         #     print("Autosaved " + str(saved) + ".")
 
-    zwCallback = zwencode("callback")
+    zw_callback = zwencode("callback")
 
     # Operates on reactions on special messages, calling the _callback_ methods of commands when necessary.
-    async def reactCallback(self, message, reaction, user):
-        if message.author.id == client.user.id:
+    async def react_callback(self, message, reaction, user):
+        if message.author.id == self.user.id:
             if self.closed:
                 return
-            u_perm = self.getPerms(user.id, message.guild)
+            u_perm = self.get_perms(user.id, message.guild)
             if u_perm <= -inf:
                 return
             msg = message.content.strip("*")
@@ -1209,7 +1210,7 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 msg = None
                 if message.embeds:
                     s = message.embeds[0].footer.text
-                    if isZeroEnc(s):
+                    if is_zero_enc(s):
                         msg = s
                 if not msg:
                     return
@@ -1222,11 +1223,11 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                     msg = msg[:msg.index("\n")]
                 if not msg.startswith(check):
                     return
-            while len(self.proc_call) > 65536:
-                self.proc_call.pop(next(iter(self.proc_call)))
-            while utc() - self.proc_call.get(message.id, 0) < 30:
+            while len(self.react_sem) > 65536:
+                self.react_sem.pop(next(iter(self.react_sem)))
+            while utc() - self.react_sem.get(message.id, 0) < 30:
                 # Ignore if more than 2 reactions already queued for target message
-                if self.proc_call.get(message.id, 0) - utc() > 1:
+                if self.react_sem.get(message.id, 0) - utc() > 1:
                     return
                 await asyncio.sleep(0.2)
             if reaction is not None:
@@ -1240,13 +1241,13 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 msg = None
                 if message.embeds:
                     s = message.embeds[0].footer.text
-                    if isZeroEnc(s):
+                    if is_zero_enc(s):
                         msg = s
                 if not msg:
                     return
                 # Experimental zero-width invisible character encoded message (unused)
                 try:
-                    msg = msg[msg.index(self.zwCallback) + len(self.zwCallback):]
+                    msg = msg[msg.index(self.zw_callback) + len(self.zw_callback):]
                 except ValueError:
                     return
                 msg = zwdecode(msg)
@@ -1264,16 +1265,15 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             argv = "-".join(args[3:])
             catg = self.categories[catn]
             # Force a rate limit on the reaction processing for the message
-            self.proc_call[message.id] = max(utc(), self.proc_call.get(message.id, 0) + 1)
+            self.react_sem[message.id] = max(utc(), self.react_sem.get(message.id, 0) + 1)
             for f in catg:
                 if f.__name__.casefold() == func:
-                    try:
+                    async with ExceptionSender(message.channel):
                         timeout = getattr(f, "_timeout_", 1) * self.timeout
                         if timeout >= inf:
                             timeout = None
                         await asyncio.wait_for(
                             f._callback_(
-                                client=client,
                                 message=message,
                                 channel=message.channel,
                                 guild=message.guild,
@@ -1286,64 +1286,334 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                             ),
                             timeout=timeout)
                         break
-                    except Exception as ex:
-                        print_exc()
-                        create_task(sendReact(
-                            message.channel,
-                            "```py\nError: " + repr(ex).replace("`", "") + "\n```",
-                            reacts="❎",
-                        ))
-            self.proc_call.pop(message.id, None)
+            self.react_sem.pop(message.id, None)
 
     # Handles all updates to the bot. Manages the bot's status and activity on discord, and updates all databases.
-    async def handleUpdate(self, force=False):
-        if utc() - self.lastCheck > 0.5 or force:
+    async def handle_update(self, force=False):
+        if utc() - self.last_check > 0.5 or force:
             semaphore = self.semaphore if not force else emptyctx
             with suppress(SemaphoreOverflowError):
                 with semaphore:
+                    self.last_check = utc()
                     if not force:
-                        create_task(self.getState())
+                        create_task(self.get_state())
                     with tracebacksuppressor:
-                        guilds = len(client.guilds)
-                        changed = guilds != self.guilds
+                        guild_count = len(self.guilds)
+                        changed = guild_count != self.guild_count
                         if changed or utc() > self.stat_timer:
                             # Status changes every 12-21 seconds
-                            self.stat_timer = utc() + float(frand(5)) + 12
-                            self.guilds = guilds
+                            self.stat_timer = utc() + float(frand(5)) + 8
+                            self.guild_count = guild_count
+                            self.status_iter = (self.status_iter + 1) % 3
                             with suppress(discord.NotFound):
                                 u = await self.fetch_user(tuple(self.owners)[0])
                                 n = u.name
-                                place = ", from " + uniStr(n) + "'" + "s" * (n[-1] != "s") + " place!"
-                                activity = discord.Streaming(
-                                    name=(
-                                        "live to " + uniStr(guilds) + " server"
-                                        + "s" * (guilds != 1) + place
-                                    ),
-                                    url=self.website,
-                                )
+                                text = f"live to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {uni_str(n)}'{'s' if n[-1] != 's' else ''} place!"
+                                activity = discord.Streaming(name=text, url=self.website)
                                 activity.game = self.website
                                 if changed:
                                     print(repr(activity))
                                 # Status iterates through 3 possible choices
-                                status = (discord.Status.online, discord.Status.dnd, discord.Status.idle)[self.status_iter]
-                                await client.change_presence(activity=activity, status=status)
+                                status = self.statuses[self.status_iter]
+                                await self.change_presence(activity=activity, status=status)
                                 # Member update events are not sent through for the current user, so manually send a _seen_ event
-                                await seen(client.user, event="misc", raw="Changing their status")
-                            self.status_iter = (self.status_iter + 1) % 3
+                                await self.seen(self.user, event="misc", raw="Changing their status")
                     # Update databases
                     for u in self.database.values():
                         if utc() - u.used > u.rate_limit or force:
                             create_future(u, priority=True)
-                            create_task(self.verifyDelete(u))
+                            create_task(self.garbage_collect(u))
+
+    # Processes a message, runs all necessary commands and bot events. May be called from another source.
+    async def process_message(self, message, msg, edit=True, orig=None, cb_argv=None, loop=False):
+        if self.closed:
+            return
+        cpy = msg
+        # Strip quote from message.
+        if msg[:2] == "> ":
+            msg = msg[2:]
+        # Strip spoiler from message.
+        elif msg[:2] == "||" and msg[-2:] == "||":
+            msg = msg[2:-2]
+        # Strip code boxes from message.
+        msg = msg.replace("`", "").strip()
+        # Get user, channel, guild that the message belongs to
+        user = message.author
+        guild = message.guild
+        u_id = user.id
+        channel = message.channel
+        c_id = channel.id
+        if guild:
+            g_id = guild.id
+        else:
+            g_id = 0
+        # Get list of enabled commands for the channel.
+        if g_id:
+            try:
+                enabled = self.data.enabled[c_id]
+            except KeyError:
+                enabled = {"main", "string", "admin"}
+        else:
+            enabled = frozenset(self.categories)
+        u_perm = self.get_perms(u_id, guild)
+        admin = not inf > u_perm
+        # Gets prefix for current guild.
+        if u_id == self.user.id:
+            prefix = self.prefix
+        else:
+            prefix = self.get_prefix(guild)
+        op = False
+        comm = msg
+        # Mentioning the bot serves as an alias for the prefix.
+        for check in (*self.mention, prefix):
+            if comm.startswith(check):
+                comm = comm[len(check):].strip()
+                op = True
+        # Respond to blacklisted users attempting to use a command, or when mentioned without a command.
+        if (u_perm <= -inf and op) or msg in self.mention:
+            if not u_perm < 0 and not u_perm <= -inf:
+                create_task(send_with_react(
+                    channel,
+                    f"I have been summoned! Use `{prefix}?` or `{prefix}help` for help!",
+                    reacts="❎",
+                ))
+            else:
+                print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
+                create_task(send_with_react(
+                    channel,
+                    "Sorry, you are currently not permitted to request my services.",
+                    reacts="❎",
+                ))
+            return
+        delay = 0
+        run = False
+        if op:
+            # Special case: the ? alias for the ~help command, since ? is an argument flag indicator and will otherwise be parsed as one.
+            if len(comm) and comm[0] == "?":
+                check = comm[0]
+                i = 1
+            else:
+                # Parse message to find command.
+                i = len(comm)
+                for end in " ?-+\t\n":
+                    if end in comm:
+                        i2 = comm.index(end)
+                        if i2 < i:
+                            i = i2
+                check = full_prune(comm[:i]).replace("*", "").replace("_", "").replace("||", "")
+            # Hash table lookup for target command: O(1) average time complexity.
+            if check in bot.commands:
+                # Multiple commands may have the same alias, run all of them
+                for command in bot.commands[check]:
+                    # Make sure command is enabled, administrators bypass this
+                    if command.catg in enabled or admin:
+                        # argv is the raw parsed argument data
+                        argv = comm[i:].strip()
+                        run = True
+                        print(f"{getattr(guild, 'id', 0)}: {user} ({u_id}) issued command {msg}")
+                        req = command.min_level
+                        fut = None
+                        try:
+                            # Make sure server-only commands can only be run in servers.
+                            if guild is None:
+                                if getattr(command, "server_only", False):
+                                    raise ReferenceError("This command is only available in servers.")
+                            # Make sure target has permission to use the target command, rate limit the command if necessary.
+                            if u_perm is not nan:
+                                if not u_perm >= req:
+                                    raise command.perm_error(u_perm, req, "for command " + check)
+                                x = command.rate_limit
+                                if x:
+                                    if issubclass(type(x), collections.abc.Sequence):
+                                        x = x[not self.is_trusted(getattr(guild, "id", 0))]
+                                    delay += x
+                                    d = command.used
+                                    t = d.get(u_id, -inf)
+                                    wait = utc() - t - x
+                                    if wait > -1:
+                                        if wait < 0:
+                                            w = max(0.2, -wait)
+                                            d[u_id] = max(t, utc()) + w
+                                            await asyncio.sleep(w)
+                                        if len(d) >= 4096:
+                                            d.pop(next(iter(d)))
+                                        d[u_id] = max(t, utc())
+                                    else:
+                                        raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
+                            flags = {}
+                            if cb_argv is not None:
+                                argv = cb_argv
+                                if loop:
+                                    inc_dict(flags, h=1)
+                            if argv:
+                                # Commands by default always parse unicode fonts as regular text unless otherwise specified.
+                                if not hasattr(command, "no_parse"):
+                                    argv = unicode_prune(argv)
+                                argv = argv.strip()
+                                # Parse command flags (this is a bit of a mess)
+                                if hasattr(command, "flags"):
+                                    flaglist = command.flags
+                                    for q in "?-+":
+                                        if q in argv:
+                                            for char in flaglist:
+                                                flag = q + char
+                                                for r in (flag, flag.upper()):
+                                                    while len(argv) >= 4 and r in argv:
+                                                        found = False
+                                                        i = argv.index(r)
+                                                        if i == 0 or argv[i - 1] == " " or argv[i - 2] == q:
+                                                            with suppress(IndexError, KeyError):
+                                                                if argv[i + 2] == " " or argv[i + 2] == q:
+                                                                    argv = argv[:i] + argv[i + 2:]
+                                                                    add_dict(flags, {char: 1})
+                                                                    found = True
+                                                        if not found:
+                                                            break
+                                        if q in argv:
+                                            for char in flaglist:
+                                                flag = q + char
+                                                for r in (flag, flag.upper()):
+                                                    while len(argv) >= 2 and r in argv:
+                                                        found = False
+                                                        for check in (r + " ", " " + r):
+                                                            if check in argv:
+                                                                argv = argv.replace(check, "")
+                                                                add_dict(flags, {char: 1})
+                                                                found = True
+                                                        if argv == r:
+                                                            argv = ""
+                                                            add_dict(flags, {char: 1})
+                                                            found = True
+                                                        if not found:
+                                                            break
+                            if argv:
+                                argv = argv.strip()
+                            # args is a list of arguments parsed from argv, using shlex syntax when possible.
+                            if not argv:
+                                args = []
+                            else:
+                                argv2 = single_space(argv.replace("\n", " ").replace("\r", "").replace("\t", " "))
+                                try:
+                                    args = shlex.split(argv2)
+                                except ValueError:
+                                    args = argv2.split()
+                            # Assign "guild" as an object that mimics the discord.py guild if there is none
+                            if guild is None:
+                                guild = self.UserGuild(
+                                    user=user,
+                                    channel=channel,
+                                )
+                                channel = guild.channel
+                            # Automatically start typing if the command is time consuming
+                            tc = getattr(command, "time_consuming", False)
+                            if not loop and tc:
+                                fut = create_task(channel.trigger_typing())
+                            # Send bot event: user has executed command
+                            await self.send_event("_command_", user=user, command=command)
+                            # Get maximum time allowed for command to process
+                            timeout = getattr(command, "_timeout_", 1) * bot.timeout
+                            if timeout >= inf:
+                                timeout = None
+                            # Create a future to run the command
+                            future = create_future(
+                                command,                        # command is a callable object, may be async or not
+                                bot=bot,                        # for interfacing with bot's database
+                                argv=argv,                      # raw text argument
+                                args=args,                      # split text arguments
+                                flags=flags,                    # special flags
+                                perm=u_perm,                    # permission level
+                                user=user,                      # user that invoked the command
+                                message=message,                # message data
+                                channel=channel,                # channel data
+                                guild=guild,                    # guild data
+                                name=check,                     # alias the command was called as
+                                callback=self.process_message,  # function that called the command
+                                timeout=timeout,                # timeout delay for the command
+                            )
+                            # Add a callback to typing in the channel if the command takes too long
+                            if fut is None and not hasattr(command, "typing"):
+                                create_task(delayed_callback(future, 2, typing, channel))
+                            response = await future
+                            # Process response to command if there is one
+                            if response is not None:
+                                if fut is not None:
+                                    await fut
+                                # Raise exceptions returned by the command
+                                if issubclass(type(response), Exception):
+                                    raise response
+                                elif bool(response) is not False:
+                                    # If 2-tuple returned, send as message-react pair
+                                    if type(response) is tuple and len(response) == 2:
+                                        response, react = response
+                                        if react == 1:
+                                            react = "❎"
+                                    else:
+                                        react = False
+                                    sent = None
+                                    # Process list as a sequence of messages to send
+                                    if type(response) is list:
+                                        for r in response:
+                                            async with delay(1):
+                                                create_task(channel.send(r))
+                                    # Process dict as kwargs for a message send
+                                    elif issubclass(type(response), collections.abc.Mapping):
+                                        if "file" in response:
+                                            sent = await send_with_file(channel, response.get("content", ""), **response)
+                                        else:
+                                            sent = await channel.send(**response)
+                                    else:
+                                        if type(response) not in (str, bytes, bytearray):
+                                            response = str(response)
+                                        # Process everything else as a string
+                                        if type(response) is str and len(response) <= 2000:
+                                            sent = await channel.send(response)
+                                        else:
+                                            # Send a file if the message is too long
+                                            if type(response) is not bytes:
+                                                response = bytes(str(response), "utf-8")
+                                                filemsg = "Response too long for message."
+                                            else:
+                                                filemsg = "Response data:"
+                                            if len(response) <= guild.filesize_limit:
+                                                b = io.BytesIO(response)
+                                                f = discord.File(b, filename="message.txt")
+                                                sent = await send_with_file(channel, filemsg, f)
+                                            else:
+                                                raise OverflowError("Response too long for file upload.")
+                                    # Add targeted react if there is one
+                                    if react and sent:
+                                        await sent.add_reaction(react)
+                        # Represents any timeout error that occurs
+                        except (T0, T1, T2):
+                            if fut is not None:
+                                await fut
+                            print(msg)
+                            raise TimeoutError("Request timed out.")
+                        except (ArgumentError, TooManyRequests) as ex:
+                            if fut is not None:
+                                await fut
+                            create_task(send_exception(channel, ex))
+                            return
+                        # Represents all other errors
+                        except Exception as ex:
+                            if fut is not None:
+                                await fut
+                            print_exc()
+                            create_task(send_exception(channel, ex))
+        # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
+        if not run and u_id != bot.user.id:
+            temp = to_alphanumeric(cpy).casefold()
+            await self.send_event("_nocommand_", text=temp, edit=edit, orig=orig, message=message, perm=u_perm)
+        # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
+        return delay
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
-        user = bot.ghostUser()
+        user = self.GhostUser()
         user.id = w.id
-        user.mention = "<@" + str(w.id) + ">"
         user.name = w.name
         user.display_name = w.name
-        user.created_at = user.joined_at = w.created_at
+        user.joined_at = w.created_at
         user.avatar = w.avatar
         user.avatar_url = w.avatar_url
         user.bot = True
@@ -1351,33 +1621,40 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
         user.dm_channel = w.channel
         user.webhook = w
         self.cache.users[w.id] = user
-        self.limitCache("users")
+        self.limit_cache("users")
         if w.token:
-            webhooks = setDict(self.cw_cache, w.channel.id, cdict())
+            webhooks = set_dict(self.cw_cache, w.channel.id, cdict())
             webhooks[w.id] = w
         return user
 
+    async def get_webhooks(self, guild):
+        with suppress(discord.PermissionError):
+            return await guild.webhooks()
+        return []
+
     # Loads all webhooks in the target guild.
     async def load_webhooks(self, guild):
-        try:
-            webhooks = await guild.webhooks()
-        except discord.Forbidden:
-            webhooks = deque()
-            futs = [channel.webhooks() for channel in guild.text_channels]
-            for fut in futs:
-                with tracebacksuppressor(discord.Forbidden):
-                    temp = await fut
-                    webhooks.extend(temp)
-        except discord.HTTPException:
-            print_exc()
-            await asyncio.sleep(10)
-            webhooks = await aretry(guild.webhooks, attempts=5, delay=15)
-        return deque(self.add_webhook(w) for w in webhooks)
+        async with self.guild_semaphore:
+            try:
+                webhooks = await guild.webhooks()
+            except discord.Forbidden:
+                webhooks = deque()
+                futs = [channel.webhooks() for channel in guild.text_channels]
+                for fut in futs:
+                    with tracebacksuppressor(discord.Forbidden):
+                        temp = await fut
+                        webhooks.extend(temp)
+            except discord.HTTPException:
+                print_exc()
+                await asyncio.sleep(10)
+                webhooks = await aretry(get_webhooks, guild, attempts=5, delay=15, exc=(discord.Forbidden,))
+            return deque(self.add_webhook(w) for w in webhooks)
 
     # Gets a valid webhook for the target channel, creating a new one when necessary.
-    async def ensureWebhook(self, channel, force=False):
-        while not self.ready:
-            await asyncio.sleep(2)
+    async def ensure_webhook(self, channel, force=False):
+        async with self.ready_semaphore:
+            while not self.ready:
+                await asyncio.sleep(2)
         wlist = None
         if channel.id in self.cw_cache:
             if force:
@@ -1385,15 +1662,24 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             else:
                 wlist = list(self.cw_cache[channel.id].values())
         if not wlist:
-            w = await channel.create_webhook(name=bot.client.user.name, reason="Auto Webhook")
+            w = await channel.create_webhook(name=self.user.name, reason="Auto Webhook")
             self.add_webhook(w)
         else:
             w = random.choice(wlist)
         return w
 
-    # Sends a list of embeds to the target channel, using a webhook when possible.
-    async def sendEmbeds(self, channel, embeds):
+    async def send_with_webhook(self, channel, *args, **kwargs):
+        w = await self.ensure_webhook(channel)
         try:
+            await w.send(*args, **kwargs)
+        except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
+            w = await self.ensure_webhook(channel, force=True)
+            await w.send(*args, **kwargs)
+        await self.seen(self.user, event="message", count=len(kwargs.get("embeds", (None,))), raw="Sending a message")
+
+    # Sends a list of embeds to the target channel, using a webhook when possible.
+    async def _send_embeds(self, channel, embeds):
+        async with ExceptionSender(channel):
             if not embeds:
                 return
             guild = getattr(channel, "guild", None)
@@ -1403,37 +1689,28 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                 single = True
             else:
                 try:
-                    m = guild.get_member(client.user.id)
+                    m = guild.get_member(self.user.id)
                 except (AttributeError, LookupError):
                     m = None
                 if m is None:
-                    m = client.user
+                    m = self.user
                     single = True
                 else:
                     if not m.guild_permissions.manage_webhooks:
                         single = True
             if single:
                 for emb in embeds:
-                    create_task(channel.send(embed=emb))
-                    await asyncio.sleep(1)
+                    async with delay(1):
+                        create_task(channel.send(embed=emb))
                 return
-            w = await self.bot.ensureWebhook(channel)
-            try:
-                await w.send(embeds=embeds, username=m.display_name, avatar_url=bestURL(m))
-            except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
-                w = await self.bot.ensureWebhook(channel, force=True)
-                await w.send(embeds=embeds, username=m.display_name, avatar_url=bestURL(m))
-            await seen(client.user, event="message", count=len(embeds), raw="Sending a message")
-        except Exception as ex:
-            print_exc()
-            await sendReact(channel, "```py\n" + repr(ex) + "```", reacts="❎")
+            await self.send_with_webhook(channel, embeds=embeds, username=m.display_name, avatar_url=best_url(m))
     
-    async def sendEmbedsTo(self, s_id, embs):
-        sendable = await self.fetch_sendable(s_id)
-        await self.sendEmbeds(sendable, embs)
+    async def send_embeds_to(self, s_id, embs):
+        sendable = await self.fetch_messageable(s_id)
+        await self._send_embeds(sendable, embs)
 
     # Adds embeds to the embed sender, waiting for the next update event.
-    def embedSender(self, channel, embeds=None, embed=None):
+    def send_embeds(self, channel, embeds=None, embed=None):
         if embeds is not None and not issubclass(type(embeds), collections.abc.Sequence):
             embeds = (embeds,)
         if embed is not None:
@@ -1453,18 +1730,18 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
             c_id = channel.id
         user = self.cache.users.get(c_id)
         if user is not None:
-            create_task(self.sendEmbeds(user, embeds))
+            create_task(self._send_embeds(user, embeds))
         else:
-            embs = setDict(self.embedSenders, c_id, [])
+            embs = set_dict(self.embed_senders, c_id, [])
             embs.extend(embeds)
 
     # Updates all embed senders.
-    def updateEmbeds(self):
+    def update_embeds(self):
         if not self.ready:
             return
         sent = False
-        for s_id in tuple(self.embedSenders):
-            embeds = self.embedSenders[s_id]
+        for s_id in tuple(self.embed_senders):
+            embeds = self.embed_senders[s_id]
             embs = deque()
             for emb in embeds:
                 # Send embeds in groups of up to 10, up to 6000 characters
@@ -1472,141 +1749,569 @@ class Bot(contextlib.AbstractContextManager, collections.abc.Callable):
                     break
                 embs.append(emb)
             # Left over embeds are placed back in embed sender
-            self.embedSenders[s_id] = embeds = embeds[len(embs):]
+            self.embed_senders[s_id] = embeds = embeds[len(embs):]
             if not embeds:
-                self.embedSenders.pop(s_id)
-            create_task(self.sendEmbedsTo(s_id, embs))
+                self.embed_senders.pop(s_id)
+            create_task(self.send_embeds_to(s_id, embs))
             sent = True
         return sent
 
-    # For compatibility with guild objects, takes a user and DM channel.
-    class userGuild(discord.Object):
+    # The fast update loop that runs 96 times per second. Used for events where timing is important.
+    def fast_loop(self):
 
-        class userChannel(discord.abc.PrivateChannel):
+        async def event_call(freq):
+            for i in range(freq):
+                async with delay(1 / freq):
+                    await self.send_event("_call_")
 
-            def __init__(self, channel, **void):
-                self.channel = channel
-                self.recipient = channel.recipient
-                self.me = client.user.id
-                self.id = channel.id
-                self.send = channel.send
-                self.history = channel.history
-                self.created_at = channel.created_at
-                self.trigger_typing = lambda *args: channel.trigger_typing()
-                self.pins = channel.pins
+        freq = 96
+        sent = 0
+        while not self.closed:
+            with tracebacksuppressor:
+                sent = self.update_embeds()
+                if sent:
+                    await_fut(event_call(freq), delay=0.005, priority=True)
+                else:
+                    with delay(1 / freq):
+                        await_fut(self.send_event("_call_"), delay=0.001, priority=True)
 
-            def fetch_message(self, id):
-                return bot.fetch_message(id, self.channel)
+    # The lazy update loop that runs once every 2-4 seconds. Calls the bot database autosave event once every ~60 seconds.
+    async def slow_loop(self):
+        autosave = 0
+        while not self.closed:
+            async with delay(frand(2) + 2):
+                async with tracebacksuppressor:
+                    if utc() - autosave > 60:
+                        autosave = utc()
+                        await create_future(self.update, priority=True)
+                        await create_future(self.update_from_client, priority=True)
+                    while self.blocked > 0:
+                        print("Update event blocked.")
+                        self.blocked -= 1
+                        await asyncio.sleep(1)
+                    await self.handle_update()
 
-            me = client.user
-            name = "DM"
-            topic = None
-            is_nsfw = lambda: True
-            is_news = lambda: False
+    # User seen event
+    seen = lambda self, user, delay=0, event=None, **kwargs: create_task(self.send_event("_seen_", user=user, delay=delay, event=event, **kwargs))
 
-        def __init__(self, user, channel, **void):
-            self.channel = self.system_channel = self.rules_channel = self.userChannel(channel)
-            self.id = self.channel.id
-            self.name = self.channel.name
-            self.members = [user, client.user]
-            self.channels = self.text_channels = [self.channel]
-            self.voice_channels = []
-            self.me = self.channel.me
-            self.roles = []
-            self.emojis = []
-            self.get_channel = lambda *void1, **void2: self.channel
-            self.owner_id = client.user.id
-            self.owner = client.user
-            self.fetch_member = bot.fetch_user
+    # Deletes own messages if any of the "X" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot.
+    async def check_to_delete(self, message, reaction, user):
+        if message.author.id == self.user.id:
+            u_perm = self.get_perms(user.id, message.guild)
+            check = False
+            if not u_perm < 3:
+                check = True
+            else:
+                for react in message.reactions:
+                    if str(reaction) == str(react):
+                        users = await react.users().flatten()
+                        for u in users:
+                            if u.id == self.user.id:
+                                check = True
+                                break
+            if check and user.id != self.user.id:
+                s = str(reaction)
+                if s in "❌✖️🇽❎":
+                    with suppress(discord.NotFound):
+                        await self.silent_delete(message, exc=True)
 
-        filesize_limit = 8388608
-        bitrate_limit = 98304
-        emoji_limit = 0
-        large = False
-        description = ""
-        max_members = 2
-        unavailable = False
-        isDM = True
-        ghost = True
+    # Handles a new sent message, calls processMessage and sends an error if an exception occurs.
+    async def handle_message(self, message, edit=True):
+        cpy = msg = message.content
+        async with ExceptionSender(message.channel):
+            if msg and msg[0] == "\\":
+                cpy = msg[1:]
+            await self.process_message(message, cpy, edit, msg)
 
-    # Represents a deleted/not found user.
-    class ghostUser(discord.abc.Snowflake):
-        
-        def __init__(self):
-            self.id = 0
-            self.name = "[USER DATA NOT FOUND]"
-            self.discriminator = "0000"
-            self.avatar = ""
-            self.avatar_url = ""
-            self.bot = False
-            self.display_name = ""
+    def set_classes(bot):
 
-        __repr__ = lambda self: "<Ghost User id=" + str(self.id) + " name='" + str(self.name) + "' discriminator='" + str(self.discriminator) + "' bot=False>"
-        __str__ = lambda self: str(self.name) + "#" + str(self.discriminator)
-        system = False
-        history = lambda *void1, **void2: retNone()
-        dm_channel = None
-        create_dm = lambda self: retNone()
-        relationship = None
-        is_friend = lambda self: None
-        is_blocked = lambda self: None
-        colour = color = discord.Colour(16777215)
-        mention = "<@0>"
-        created_at = 0
-        ghost = True
+        # For compatibility with guild objects, takes a user and DM channel.
+        class UserGuild(discord.Object):
 
-    # Represents a deleted/not found message.
-    class ghostMessage(discord.abc.Snowflake):
-        
-        def __init__(self):
-            self.author = bot.ghostUser()
-            self.content = "```css\n" + uniStr("[MESSAGE DATA NOT FOUND]") + "```"
-            self.channel = None
-            self.guild = None
-            self.id = 0
+            class UserChannel(discord.abc.PrivateChannel):
 
-        async def delete(self, *void1, **void2):
-            pass
+                def __init__(self, channel, **void):
+                    self.channel = channel
 
-        __repr__ = lambda self: str(
-            (
-                self.system_content,
-                self.content
-            )[len(self.system_content) > len(self.content)]
-        )
-        tts = False
-        type = "default"
-        nonce = False
-        embeds = ()
-        call = None
-        mention_everyone = False
-        mentions = ()
-        webhook_id = None
-        attachments = ()
-        pinned = False
-        flags = None
-        reactions = ()
-        activity = None
-        clean_content = ""
-        system_content = ""
-        edited_at = None
-        jump_url = "https://discord.com/channels/-1/-1/-1"
-        is_system = lambda self: None
-        created_at = 0
-        edit = delete
-        publish = delete
-        pin = delete
-        unpin = delete
-        add_reaction = delete
-        remove_reaction = delete
-        clear_reaction = delete
-        clear_reactions = delete
-        ack = delete
-        ghost = True
+                def __getattr__(self, key):
+                    return getattr(self.__getattribute__("channel"), key)
 
+                def fetch_message(self, id):
+                    return bot.fetch_message(id, self.channel)
 
-# Creates and starts a coroutine for typing in a channel.
-typing = lambda self: create_task(self.trigger_typing())
+                me = bot.user
+                name = "DM"
+                topic = None
+                is_nsfw = lambda: True
+                is_news = lambda: False
+
+            def __init__(self, user, channel, **void):
+                self.channel = self.system_channel = self.rules_channel = self.UserChannel(channel)
+                self.members = [user, bot.user]
+                self.channels = self.text_channels = [self.channel]
+                self.voice_channels = []
+                self.roles = []
+                self.emojis = []
+                self.get_channel = lambda *void1, **void2: self.channel
+                self.owner_id = bot.user.id
+                self.owner = bot.user
+                self.fetch_member = bot.fetch_user
+                self.voice_client = None
+
+            def __getattr__(self, key):
+                return getattr(self.__getattribute__("channel"), key)
+
+            filesize_limit = 8388608
+            bitrate_limit = 98304
+            emoji_limit = 0
+            large = False
+            description = ""
+            max_members = 2
+            unavailable = False
+            isDM = True
+            ghost = True
+
+        # Represents a deleted/not found user.
+        class GhostUser(discord.abc.Snowflake):
+            
+            def __init__(self):
+                self.id = 0
+                self.name = "[USER DATA NOT FOUND]"
+                self.discriminator = "0000"
+                self.avatar = ""
+                self.avatar_url = ""
+                self.bot = False
+                self.display_name = ""
+
+            __repr__ = lambda self: f"<Ghost User id={self.id} name='{self.name}' discriminator='{self.discriminator}' bot=False>"
+            __str__ = lambda self: f"{self.name}#{self.discriminator}"
+            system = False
+            history = lambda *void1, **void2: async_nop()
+            dm_channel = None
+            create_dm = lambda self: async_nop()
+            relationship = None
+            is_friend = lambda self: None
+            is_blocked = lambda self: None
+            colour = color = discord.Colour(16777215)
+    
+            @property
+            def mention(self):
+                return f"<@{self.id}>"
+
+            @property
+            def created_at(self):
+                return snowflake_time(self.id)
+
+            ghost = True
+
+        # Represents a deleted/not found message.
+        class GhostMessage(discord.abc.Snowflake):
+
+            content = bold(css_md(uni_str("[MESSAGE DATA NOT FOUND]")))
+            
+            def __init__(self):
+                self.author = bot.get_user(bot.deleted_user)
+                self.channel = None
+                self.guild = None
+                self.id = 0
+
+            async def delete(self, *void1, **void2):
+                pass
+
+            __repr__ = lambda self: self.system_content if self.system_content else self.content
+            tts = False
+            type = "default"
+            nonce = False
+            embeds = ()
+            call = None
+            mention_everyone = False
+            mentions = ()
+            webhook_id = None
+            attachments = ()
+            pinned = False
+            flags = None
+            reactions = ()
+            activity = None
+            clean_content = ""
+            system_content = ""
+            edited_at = None
+            jump_url = "https://discord.com/channels/-1/-1/-1"
+            is_system = lambda self: None
+
+            @property
+            def created_at(self):
+                return snowflake_time(self.id)
+
+            edit = delete
+            publish = delete
+            pin = delete
+            unpin = delete
+            add_reaction = delete
+            remove_reaction = delete
+            clear_reaction = delete
+            clear_reactions = delete
+            ack = delete
+            ghost = True
+
+        bot.UserGuild = UserGuild
+        bot.GhostUser = GhostUser
+        bot.GhostMessage = GhostMessage
+    
+    def set_client_events(self):
+
+        print("Setting client events...")
+
+        # The event called when the bot starts up.
+        @self.event
+        async def on_ready():
+            print("Successfully connected as " + str(self.user))
+            self.mention = (user_mention(self.user.id), user_pc_mention(self.user.id))
+            with tracebacksuppressor:
+                futs = set()
+                futs.add(create_task(self.get_state()))
+                print("Servers: ")
+                for guild in self.guilds:
+                    if guild.unavailable:
+                        print(f"> Guild {guild.id} is not available.")
+                    else:
+                        print("> " + guild.name)
+                await self.handle_update()
+                futs.add(create_future(self.update_from_client, priority=True))
+                futs.add(create_future(self.update_from_guilds, priority=True))
+                create_task(self.get_ip())
+                if not self.started:
+                    self.started = True
+                    print("Loading imported modules...")
+                    # Wait until all modules have been loaded successfully
+                    while self.modload:
+                        fut = self.modload.popleft()
+                        with tracebacksuppressor:
+                            print(fut)
+                            mod = await fut
+                    print("Command aliases:")
+                    print(self.commands)
+                    # Assign all bot database events to their corresponding keys.
+                    for u in self.database.values():
+                        for f in dir(u):
+                            if f.startswith("_") and f[-1] == "_" and f[1] != "_":
+                                func = getattr(u, f, None)
+                                if callable(func):
+                                    self.events.append(f, func)
+                    print("Database events:")
+                    print(self.events)
+                    for fut in futs:
+                        await fut
+                    await self.fetch_user(self.deleted_user)
+                    # Set bot avatar if none has been set.
+                    if not os.path.exists("misc/init.tmp"):
+                        print("Setting bot avatar...")
+                        f = await create_future(open, "misc/avatar.png", "rb", priority=True)
+                        with closing(f):
+                            b = await create_future(f.read, priority=True)
+                        await self.user.edit(avatar=b)
+                        await self.seen(self.user, event="misc", raw="Editing their profile")
+                        touch("misc/init.tmp")
+                    create_task(self.slow_loop())
+                    create_thread(self.fast_loop)
+                    print("Update loops initiated.")
+                    # Load all webhooks from cached guilds.
+                    futs = deque(create_task(self.load_webhooks(guild)) for guild in self.guilds)
+                    print("Bot ready.")
+                    # Send bot_ready event to all databases.
+                    await self.send_event("_bot_ready_", bot=self)
+                    for fut in futs:
+                        await fut
+                    self.ready = True
+                    # Send ready event to all databases.
+                    await self.send_event("_ready_", bot=self)
+                    PRINT.start()
+                    print("Initialization complete.")
+                else:
+                    for fut in futs:
+                        await fut
+                    print("Reinitialized.")
+
+        # Server join message
+        @self.event
+        async def on_guild_join(guild):
+            create_task(self.load_webhooks(guild))
+            print("New server: " + str(guild))
+            g = await self.fetch_guild(guild.id)
+            m = guild.get_member(self.user.id)
+            channel = await self.get_first_sendable(g, m)
+            emb = discord.Embed(colour=discord.Colour(8364031))
+            url = to_png(self.user.avatar_url)
+            emb.set_author(name=self.user.name, url=url, icon_url=url)
+            emb.description = f"Hi there! I'm {self.user.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
+            user = None
+            with suppress(discord.Forbidden):
+                a = await guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add).flatten()
+                for e in a:
+                    if e.target.id == self.user.id:
+                        user = e.user
+                        break
+            if user is not None:
+                emb.description += f", {user_mention(self.user.id)}"
+            emb.description += (
+                f"!\nMy default prefix is `{self.prefix}`, which can be changed as desired on a per-server basis. Mentioning me also serves as an alias for all prefixes.\n"
+                + f"For more information, use the `{self.prefix}help` command, and my source code is available at {self.website} for those who are interested.\n"
+                + "Pleased to be at your service 🙂"
+            )
+            if not m.guild_permissions.administrator:
+                emb.add_field(name="Psst!", value=(
+                    "I noticed you haven't given me administrator permissions here.\n"
+                    + "That's completely understandable if intentional, but please note that without the required permissions, some features may not function well, or not at all."
+                ))
+            await channel.send(embed=emb)
+
+        # Reaction add event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
+        @self.event
+        async def on_raw_reaction_add(payload):
+            try:
+                channel = await self.fetch_channel(payload.channel_id)
+                user = await self.fetch_user(payload.user_id)
+                message = await self.fetch_message(payload.message_id, channel=channel)
+            except discord.NotFound:
+                return
+            await self.seen(user, event="reaction", raw="Adding a reaction")
+            if user.id != self.user.id:
+                reaction = str(payload.emoji)
+                await self.react_callback(message, reaction, user)
+                await self.check_to_delete(message, reaction, user)
+
+        # Reaction remove event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
+        @self.event
+        async def on_raw_reaction_remove(payload):
+            try:
+                channel = await self.fetch_channel(payload.channel_id)
+                user = await self.fetch_user(payload.user_id)
+                message = await self.fetch_message(payload.message_id, channel=channel)
+            except discord.NotFound:
+                return
+            await self.seen(user, event="reaction", raw="Removing a reaction")
+            if user.id != self.user.id:
+                reaction = str(payload.emoji)
+                await self.react_callback(message, reaction, user)
+                await self.check_to_delete(message, reaction, user)
+
+        # Voice state update event: automatically unmutes self if server muted, calls _seen_ bot database event.
+        @self.event
+        async def on_voice_state_update(member, before, after):
+            if member.id == self.user.id:
+                after = member.voice
+                if after is not None:
+                    if after.mute or after.deaf:
+                        # print("Unmuted self in " + member.guild.name)
+                        await member.edit(mute=False, deafen=False)
+                    await self.handle_update()
+            # Check for users with a voice state.
+            if after is not None and not after.afk:
+                if before is None:
+                    await self.seen(member, event="misc", raw="Joining a voice channel")
+                elif any((getattr(before, attr) != getattr(after, attr) for attr in ("self_mute", "self_deaf", "self_stream", "self_video"))):
+                    await self.seen(member, event="misc", raw="Updating their voice settings")
+
+        # Typing event: calls _typing_ and _seen_ bot database events.
+        @self.event
+        async def on_typing(channel, user, when):
+            await self.send_event("_typing_", channel=channel, user=user)
+            await self.seen(user, delay=10, event="typing", raw="Typing")
+
+        # Message send event: processes new message. calls _send_ and _seen_ bot database events.
+        @self.event
+        async def on_message(message):
+            self.add_message(message)
+            guild = message.guild
+            if guild:
+                create_task(self.send_event("_send_", message=message))
+            await self.seen(message.author, event="message", raw="Sending a message")
+            await self.react_callback(message, None, message.author)
+            await self.handle_message(message, False)
+
+        # Message edit event: processes edited message, uses raw payloads rather than discord.py message cache. calls _edit_ and _seen_ bot database events.
+        @self.event
+        async def on_raw_message_edit(payload):
+            data = payload.data
+            m_id = int(data["id"])
+            raw = False
+            if payload.cached_message:
+                before = payload.cached_message
+                after = await self.fetch_message(m_id, payload.message_id)
+            else:
+                try:
+                    before = messages[m_id]
+                except LookupError:
+                    # If message was not in cache, create a ghost message object to represent old message.
+                    c_id = data.get("channel_id")
+                    if not c_id:
+                        return
+                    before = self.GhostMessage()
+                    before.channel = channel = await self.fetch_channel(c_id)
+                    before.guild = guild = getattr(channel, "guild", None)
+                    before.id = payload.message_id
+                    try:
+                        u_id = data["author"]["id"]
+                    except KeyError:
+                        u_id = None
+                        before.author = None
+                    else:
+                        if guild is not None:
+                            user = guild.get_member(u_id)
+                        else:
+                            user = None
+                        if not user:
+                            user = await self.fetch_user(u_id)
+                        before.author = user
+                    try:
+                        after = await channel.fetch_message(before.id)
+                    except LookupError:
+                        after = copy.copy(before)
+                        after._update(data)
+                    else:
+                        before.author = after.author
+                    raw = True
+                else:
+                    after = copy.copy(before)
+                    after._update(data)
+            self.add_message(after)
+            if raw or before.content != after.content:
+                await self.handle_message(after)
+                if getattr(after, "guild", None):
+                    create_task(self.send_event("_edit_", before=before, after=after))
+                await self.seen(after.author, event="message", raw="Editing a message")
+
+        # Message delete event: uses raw payloads rather than discord.py message cache. calls _delete_ bot database event.
+        @self.event
+        async def on_raw_message_delete(payload):
+            try:
+                message = payload.cached_message
+                if message is None:
+                    raise LookupError
+            except:
+                channel = await self.fetch_channel(payload.channel_id)
+                try:
+                    message = await self.fetch_message(payload.message_id, channel)
+                    if message is None:
+                        raise LookupError
+                except:
+                    # If message was not in cache, create a ghost message object to represent old message.
+                    message = self.GhostMessage()
+                    message.channel = channel
+                    try:
+                        message.guild = channel.guild
+                    except AttributeError:
+                        message.guild = None
+                    message.id = payload.message_id
+                    message.author = await self.fetch_user(self.deleted_user)
+            guild = message.guild
+            if guild:
+                await self.send_event("_delete_", message=message)
+
+        # Message bulk delete event: uses raw payloads rather than discord.py message cache. calls _bulk_delete_ and _delete_ bot database events.
+        @self.event
+        async def on_raw_bulk_message_delete(payload):
+            try:
+                messages = payload.cached_messages
+                if messages is None or len(messages) < len(payload.message_ids):
+                    raise LookupError
+            except:
+                messages = set()
+                channel = await self.fetch_channel(payload.channel_id)
+                for m_id in payload.message_ids:
+                    try:
+                        message = await self.fetch_message(m_id, channel)
+                        if message is None:
+                            raise LookupError
+                    except:
+                        # If message was not in cache, create a ghost message object to represent old message.
+                        message = self.GhostMessage()
+                        message.channel = channel
+                        try:
+                            message.guild = channel.guild
+                        except AttributeError:
+                            message.guild = None
+                        message.id = m_id
+                        message.author = await self.fetch_user(self.deleted_user)
+                    messages.add(message)
+            messages = sorted(messages, key=lambda m: m.id)
+            await self.send_event("_bulk_delete_", messages=messages)
+            for message in messages:
+                guild = getattr(message, "guild", None)
+                if guild:
+                    await self.send_event("_delete_", message=message, bulk=True)
+
+        # User update event: calls _user_update_ and _seen_ bot database events.
+        @self.event
+        async def on_user_update(before, after):
+            await self.send_event("_user_update_", before=before, after=after)
+            await self.seen(after, event="misc", raw="Editing their profile")
+
+        # Member update event: calls _member_update_ and _seen_ bot database events.
+        @self.event
+        async def on_member_update(before, after):
+            await self.send_event("_member_update_", before=before, after=after)
+            if any((getattr(before, attr) != getattr(after, attr) for attr in ("desktop_status", "web_status", "mobile_status", "activity"))):
+                # A little bit of a trick to make sure this part is only called once per user event.
+                # This is necessary because on_member_update is called once for every member object.
+                # By fetching the first instance of a matching member object,
+                # this ensures the event will not be called multiple times if the user shares multiple guilds with the bot.
+                try:
+                    member = await self.fetch_member(after.id, find_others=True)
+                except LookupError:
+                    member = None
+                if member is None or member.guild == after.guild:
+                    await self.seen(after, event="misc", raw="Changing their status")
+
+        # Member join event: calls _join_ and _seen_ bot database events.
+        @self.event
+        async def on_member_join(member):
+            await self.send_event("_join_", user=member, guild=member.guild)
+            await self.seen(member, event="misc", raw="Joining a server")
+
+        # Member leave event: calls _leave_ bot database event.
+        @self.event
+        async def on_member_remove(member):
+            await self.send_event("_leave_", user=member, guild=member.guild)
+
+        # Channel create event: calls _channel_create_ bot database event.
+        @self.event
+        async def on_guild_channel_create(channel):
+            self.cache.channels[channel.id] = channel
+            guild = channel.guild
+            if guild:
+                await self.send_event("_channel_create_", channel=channel, guild=guild)
+
+        # Channel delete event: calls _channel_delete_ bot database event.
+        @self.event
+        async def on_guild_channel_delete(channel):
+            print(channel, "was deleted from", channel.guild)
+            guild = channel.guild
+            if guild:
+                await self.send_event("_channel_delete_", channel=channel, guild=guild)
+
+        # Webhook update event: updates the bot's webhook cache if there are new webhooks.
+        @self.event
+        async def on_webhooks_update(channel):
+            webhooks = await channel.webhooks()
+            for w in tuple(self.cw_cache.get(channel.id, {}).values()):
+                if w not in webhooks:
+                    self.cw_cache[channel.id].pop(w.id)
+                    self.cache.users.pop(w.id)
+            for w in webhooks:
+                self.add_webhook(w)
+
+        # User ban event: calls _ban_ bot database event.
+        @self.event
+        async def on_member_ban(guild, user):
+            print(user, "was banned from", guild)
+            if guild:
+                await self.send_event("_ban_", user=user, guild=guild)
+
+        # Guild destroy event: Remove guild from bot cache.
+        @self.event
+        async def on_guild_remove(guild):
+            self.cache.guilds.pop(guild.id, None)
+            print(guild, "removed.")
 
 
 # Queries for searching members
@@ -1639,12 +2344,13 @@ def userIter1(x):
 
 def userQuery2(x):
     yield x
-    yield reconstitute(x).casefold()
+    yield full_prune(x)
 
 def userIter2(x):
     yield str(x)
-    yield reconstitute(x.name).casefold()
-    yield reconstitute(x.display_name).casefold()
+    yield str(x).casefold()
+    yield full_prune(x.name)
+    yield full_prune(x.display_name)
 
 def userQuery3(x):
     yield to_alphanumeric(x).replace(" ", "").casefold()
@@ -1654,315 +2360,8 @@ def userIter3(x):
     yield to_alphanumeric(x.display_name).replace(" ", "").casefold()
 
 
-# Processes a message, runs all necessary commands and bot events. May be called from another source.
-async def processMessage(message, msg, edit=True, orig=None, cb_argv=None, loop=False):
-    if bot.closed:
-        return
-    cpy = msg
-    # Strip quote from message.
-    if msg[:2] == "> ":
-        msg = msg[2:]
-    # Strip spoiler from message.
-    elif msg[:2] == "||" and msg[-2:] == "||":
-        msg = msg[2:-2]
-    # Strip code boxes from message.
-    msg = msg.replace("`", "").strip()
-    # Get user, channel, guild that the message belongs to
-    user = message.author
-    guild = message.guild
-    u_id = user.id
-    channel = message.channel
-    c_id = channel.id
-    if guild:
-        g_id = guild.id
-    else:
-        g_id = 0
-    # Get list of enabled commands for the channel.
-    if g_id:
-        try:
-            enabled = bot.data.enabled[c_id]
-        except KeyError:
-            enabled = ["main", "string", "admin"]
-    else:
-        enabled = list(bot.categories)
-    u_perm = bot.getPerms(u_id, guild)
-    admin = not inf > u_perm
-    # Gets prefix for current guild.
-    if u_id == client.user.id:
-        prefix = bot.prefix
-    else:
-        prefix = bot.getPrefix(guild)
-    op = False
-    comm = msg
-    # Mentioning the bot serves as an alias for the prefix.
-    for check in (*bot.mention, prefix):
-        if comm.startswith(check):
-            comm = comm[len(check):].strip()
-            op = True
-    # Respond to blacklisted users attempting to use a command, or when mentioned without a command.
-    if (u_perm <= -inf and op) or msg in bot.mention:
-        if not u_perm < 0 and not u_perm <= -inf:
-            create_task(sendReact(
-                channel,
-                (
-                    "Hi, did you require my services for anything? Use `"
-                    + prefix + "?` or `" + prefix + "help` for help."
-                ),
-                reacts="❎",
-            ))
-        else:
-            print(
-                "Ignoring command from blacklisted user "
-                + str(user) + " (" + str(u_id) + "): "
-                + limStr(message.content, 256)
-            )
-            create_task(sendReact(
-                channel,
-                "Sorry, you are currently not permitted to request my services.",
-                reacts="❎",
-            ))
-        return
-    delay = 0
-    run = False
-    if op:
-        # Special case: the ? alias for the ~help command, since ? is an argument flag indicator and will otherwise be parsed as one.
-        if len(comm) and comm[0] == "?":
-            check = comm[0]
-            i = 1
-        else:
-            # Parse message to find command.
-            i = len(comm)
-            for end in " ?-+\t\n":
-                if end in comm:
-                    i2 = comm.index(end)
-                    if i2 < i:
-                        i = i2
-            check = reconstitute(comm[:i]).casefold().replace("*", "").replace("_", "").replace("||", "")
-        # Hash table lookup for target command: O(1) average time complexity.
-        if check in bot.commands:
-            # Multiple commands may have the same alias, run all of them
-            for command in bot.commands[check]:
-                # Make sure command is enabled, administrators bypass this
-                if command.catg in enabled or admin:
-                    alias = command.__name__
-                    for a in command.alias:
-                        if a.casefold() == check:
-                            alias = a
-                    alias = alias.casefold()
-                    # argv is the raw parsed argument data
-                    argv = comm[i:].strip()
-                    run = True
-                    print(str(getattr(guild, "id", 0)) + ": " + str(user) + " (" + str(u_id) + ") issued command " + msg)
-                    req = command.min_level
-                    fut = None
-                    try:
-                        # Make sure server-only commands can only be run in servers.
-                        if guild is None:
-                            if getattr(command, "server_only", False):
-                                raise ReferenceError("This command is only available in servers.")
-                        # Make sure target has permission to use the target command, rate limit the command if necessary.
-                        if u_perm is not nan:
-                            if not u_perm >= req:
-                                raise command.permError(u_perm, req, "for command " + alias)
-                            x = command.rate_limit
-                            if x:
-                                if issubclass(type(x), collections.abc.Sequence):
-                                    x = x[not bot.isTrusted(getattr(guild, "id", 0))]
-                                delay += x
-                                d = command.used
-                                t = d.get(u_id, -inf)
-                                wait = utc() - t - x
-                                if wait > -1:
-                                    if wait < 0:
-                                        w = max(0.2, -wait)
-                                        d[u_id] = max(t, utc()) + w
-                                        await asyncio.sleep(w)
-                                    if len(d) >= 4096:
-                                        d.pop(next(iter(d)))
-                                    d[u_id] = max(t, utc())
-                                else:
-                                    raise TooManyRequests("Command has a rate limit of " + sec2Time(x) + "; please wait " + sec2Time(-wait) + ".")
-                        flags = {}
-                        if cb_argv is not None:
-                            argv = cb_argv
-                            if loop:
-                                incDict(flags, h=1)
-                        if argv:
-                            # Commands by default always parse unicode fonts as regular text unless otherwise specified.
-                            if not hasattr(command, "no_parse"):
-                                argv = reconstitute(argv)
-                            argv = argv.strip()
-                            # Parse command flags (this is a bit of a mess)
-                            if hasattr(command, "flags"):
-                                flaglist = command.flags
-                                for q in "?-+":
-                                    if q in argv:
-                                        for char in flaglist:
-                                            flag = q + char
-                                            for r in (flag, flag.upper()):
-                                                while len(argv) >= 4 and r in argv:
-                                                    found = False
-                                                    i = argv.index(r)
-                                                    if i == 0 or argv[i - 1] == " " or argv[i - 2] == q:
-                                                        with suppress(IndexError, KeyError):
-                                                            if argv[i + 2] == " " or argv[i + 2] == q:
-                                                                argv = argv[:i] + argv[i + 2:]
-                                                                addDict(flags, {char: 1})
-                                                                found = True
-                                                    if not found:
-                                                        break
-                                    if q in argv:
-                                        for char in flaglist:
-                                            flag = q + char
-                                            for r in (flag, flag.upper()):
-                                                while len(argv) >= 2 and r in argv:
-                                                    found = False
-                                                    for check in (r + " ", " " + r):
-                                                        if check in argv:
-                                                            argv = argv.replace(check, "")
-                                                            addDict(flags, {char: 1})
-                                                            found = True
-                                                    if argv == r:
-                                                        argv = ""
-                                                        addDict(flags, {char: 1})
-                                                        found = True
-                                                    if not found:
-                                                        break
-                        if argv:
-                            argv = argv.strip()
-                        # args is a list of arguments parsed from argv, using shlex syntax when possible.
-                        if not argv:
-                            args = []
-                        else:
-                            argv2 = singleSpace(argv.replace("\n", " ").replace("\r", "").replace("\t", " "))
-                            try:
-                                args = shlex.split(argv2)
-                            except ValueError:
-                                args = argv2.split()
-                        # Assign "guild" as an object that mimics the discord.py guild if there is none
-                        if guild is None:
-                            guild = bot.userGuild(
-                                user=user,
-                                channel=channel,
-                            )
-                            channel = guild.channel
-                        # Automatically start typing if the command is time consuming
-                        tc = getattr(command, "time_consuming", False)
-                        if not loop and tc:
-                            fut = create_task(channel.trigger_typing())
-                        # Send bot event: user has executed command
-                        await bot.event("_command_", user=user, command=command)
-                        # Get maximum time allowed for command to process
-                        timeout = getattr(command, "_timeout_", 1) * bot.timeout
-                        if timeout >= inf:
-                            timeout = None
-                        # Create a future to run the command
-                        future = create_future(
-                            command,                # command is a callable object, may be async or not
-                            client=client,          # for interfacing with discord
-                            bot=bot,                # for interfacing with bot's database
-                            argv=argv,              # raw text argument
-                            args=args,              # split text arguments
-                            flags=flags,            # special flags
-                            perm=u_perm,            # permission level
-                            user=user,              # user that invoked the command
-                            message=message,        # message data
-                            channel=channel,        # channel data
-                            guild=guild,            # guild data
-                            name=alias,             # alias the command was called as
-                            callback=processMessage,# function that called the command
-                            timeout=timeout,        # timeout delay for the command
-                        )
-                        # Add a callback to typing in the channel if the command takes too long
-                        if fut is None and not hasattr(command, "typing"):
-                            create_task(delayed_callback(future, 2, typing, channel))
-                        response = await future
-                        # Process response to command if there is one
-                        if response is not None:
-                            if fut is not None:
-                                await fut
-                            # Raise exceptions returned by the command
-                            if issubclass(type(response), Exception):
-                                raise response
-                            elif bool(response) is not False:
-                                # If 2-tuple returned, send as message-react pair
-                                if type(response) is tuple and len(response) == 2:
-                                    response, react = response
-                                    if react == 1:
-                                        react = "❎"
-                                else:
-                                    react = False
-                                sent = None
-                                # Process list as a sequence of messages to send
-                                if type(response) is list:
-                                    for r in response:
-                                        create_task(channel.send(r))
-                                        await asyncio.sleep(0.5)
-                                # Process dict as kwargs for a message send
-                                elif issubclass(type(response), collections.abc.Mapping):
-                                    if "file" in response:
-                                        sent = await sendFile(channel, response.get("content", ""), **response)
-                                    else:
-                                        sent = await channel.send(**response)
-                                else:
-                                    if type(response) not in (str, bytes, bytearray):
-                                        response = str(response)
-                                    # Process everything else as a string
-                                    if type(response) is str and len(response) <= 2000:
-                                        sent = await channel.send(response)
-                                    else:
-                                        # Send a file if the message is too long
-                                        if type(response) is not bytes:
-                                            response = bytes(str(response), "utf-8")
-                                            filemsg = "Response too long for message."
-                                        else:
-                                            filemsg = "Response data:"
-                                        if len(response) <= guild.filesize_limit:
-                                            b = io.BytesIO(response)
-                                            f = discord.File(b, filename="message.txt")
-                                            sent = await sendFile(channel, filemsg, f)
-                                        else:
-                                            raise OverflowError("Response too long for file upload.")
-                                # Add targeted react if there is one
-                                if react and sent:
-                                    await sent.add_reaction(react)
-                    # Represents any timeout error that occurs
-                    except (T0, T1, T2):
-                        if fut is not None:
-                            await fut
-                        print(msg)
-                        raise TimeoutError("Request timed out.")
-                    except (ArgumentError, TooManyRequests) as ex:
-                        if fut is not None:
-                            await fut
-                        errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
-                        create_task(sendReact(
-                            channel,
-                            errmsg,
-                            reacts="❎",
-                        ))
-                        return
-                    # Represents all other errors
-                    except Exception as ex:
-                        if fut is not None:
-                            await fut
-                        errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
-                        print_exc()
-                        create_task(sendReact(
-                            channel,
-                            errmsg,
-                            reacts="❎",
-                        ))
-    # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
-    if not run and u_id != client.user.id:
-        temp = to_alphanumeric(cpy).casefold()
-        await bot.event("_nocommand_", text=temp, edit=edit, orig=orig, message=message, perm=u_perm)
-    # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
-    return delay
-
-
 # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
-async def heartbeatLoop():
+async def heartbeat_loop():
     print("Heartbeat Loop initiated.")
     with tracebacksuppressor:
         while not bot.closed:
@@ -1970,464 +2369,6 @@ async def heartbeatLoop():
             if d:
                 with tracebacksuppressor(FileNotFoundError):
                     await create_future(os.remove, bot.heartbeat, priority=True)
-    bot.setshutdown()
-
-# The fast update loop that runs 96 times per second. Used for events where timing is important.
-def fastLoop():
-
-    async def event_call(freq):
-        for i in range(freq):
-            async with delay(1 / freq):
-                await bot.event("_call_")
-
-    freq = 96
-    sent = 0
-    while not bot.closed:
-        with tracebacksuppressor:
-            sent = bot.updateEmbeds()
-            if sent:
-                await_fut(event_call(freq), delay=0.005, priority=True)
-            else:
-                with delay(1 / freq):
-                    await_fut(bot.event("_call_"), delay=0.003, priority=True)
-
-# The lazy update loop that runs once every 2-4 seconds. Calls the bot database autosave event once every ~60 seconds.
-async def slowLoop():
-    autosave = 0
-    while not bot.closed:
-        async with delay(frand(2) + 2):
-            async with tracebacksuppressor:
-                if utc() - autosave > 60:
-                    autosave = utc()
-                    await create_future(bot.update, priority=True)
-                    await create_future(bot.updateClient, priority=True)
-                while bot.blocked > 0:
-                    print("Update event blocked.")
-                    bot.blocked -= 1
-                    await asyncio.sleep(1)
-                await bot.handleUpdate()
-
-
-# The event called when the bot starts up.
-@client.event
-async def on_ready():
-    bot.mention = (
-        "<@" + str(client.user.id) + ">",
-        "<@!" + str(client.user.id) + ">",
-    )
-    print("Successfully connected as " + str(client.user))
-    with tracebacksuppressor:
-        futs = deque()
-        futs.append(create_task(bot.getState()))
-        print("Servers: ")
-        for guild in client.guilds:
-            if guild.unavailable:
-                print("> " + str(guild.id) + " is not available.")
-            else:
-                print("> " + guild.name)
-        await bot.handleUpdate()
-        futs.append(create_future(bot.updateClient, priority=True))
-        futs.append(create_future(bot.cacheFromGuilds, priority=True))
-        create_task(bot.getIP())
-        if not bot.started:
-            bot.started = True
-            # Wait until all modules have been loaded successfully, then shut down corresponding executor
-            while bot.modload:
-                fut = create_future(bot.modload.popleft().result, priority=True)
-                mod = await fut
-            print("Commands aliases:")
-            print(bot.commands)
-            # Assign all bot database events to their corresponding keys.
-            for u in bot.database.values():
-                for f in dir(u):
-                    if f.startswith("_") and f[-1] == "_" and f[1] != "_":
-                        func = getattr(u, f, None)
-                        if callable(func):
-                            bot.events.append(f, func)
-            print("Database events:")
-            print(bot.events)
-            for fut in futs:
-                await fut
-            await bot.fetch_user(bot.deleted_user)
-            # Set bot avatar if none has been set.
-            if not os.path.exists("misc/init.tmp"):
-                print("Setting bot avatar...")
-                f = await create_future(open, "misc/avatar.png", "rb", priority=True)
-                with closing(f):
-                    b = await create_future(f.read, priority=True)
-                await client.user.edit(avatar=b)
-                await seen(client.user, event="misc", raw="Editing their profile")
-                with open("misc/init.tmp", "wb"):
-                    pass
-            create_task(slowLoop())
-            create_thread(fastLoop)
-            print("Update loops initiated.")
-            # Load all webhooks from cached guilds.
-            futs = [create_task(bot.load_webhooks(guild)) for guild in bot.cache.guilds.values()]
-            print("Ready.")
-            # Send ready event to all databases.
-            await bot.event("_ready_", bot=bot)
-            for fut in futs:
-                await fut
-            bot.ready = True
-            print("Initialization complete.")
-        else:
-            for fut in futs:
-                await fut
-            print("Reinitialized.")
-
-
-# Server join message
-@client.event
-async def on_guild_join(guild):
-    create_task(bot.load_webhooks(guild))
-    print("New server: " + str(guild))
-    g = await bot.fetch_guild(guild.id)
-    m = guild.get_member(client.user.id)
-    channel = await bot.get_first_sendable(g, m)
-    emb = discord.Embed(colour=discord.Colour(8364031))
-    url = strURL(client.user.avatar_url)
-    emb.set_author(name=client.user.name, url=url, icon_url=url)
-    emb.description = (
-        "Hi there! I'm " + client.user.name
-        + ", a multipurpose discord bot created by <@"
-        + "201548633244565504" + ">. Thanks for adding me"
-    )
-    user = None
-    with suppress(discord.Forbidden):
-        a = await guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add).flatten()
-        for e in a:
-            if e.target.id == client.user.id:
-                user = e.user
-                break
-    if user is not None:
-        emb.description += ", <@" + str(user.id) + ">"
-    emb.description += (
-        "!\nMy default prefix is `" + bot.prefix + "`, which can be changed as desired on a per-server basis. Mentioning me also serves as an alias for all prefixes.\n"
-        + "For more information, use the `" + bot.prefix + "help` command, and my source code is available at " + bot.website + " for those who are interested.\n"
-        + "Pleased to be at your service 🙂"
-    )
-    if not m.guild_permissions.administrator:
-        emb.add_field(name="Psst!", value=(
-            "I noticed you haven't given me administrator permissions here.\n"
-            + "That's completely understandable if intentional, but please note that without the required permissions, some features may not function well, or not at all."
-        ))
-    await channel.send(embed=emb)
-
-
-# User seen event
-seen = lambda user, delay=0, event=None, **kwargs: create_task(bot.event("_seen_", user=user, delay=delay, event=event, **kwargs))
-
-
-# Deletes own messages if any of the "X" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot.
-async def checkDelete(message, reaction, user):
-    if message.author.id == client.user.id:
-        u_perm = bot.getPerms(user.id, message.guild)
-        check = False
-        if not u_perm < 3:
-            check = True
-        else:
-            for react in message.reactions:
-                if str(reaction) == str(react):
-                    users = await react.users().flatten()
-                    for u in users:
-                        if u.id == client.user.id:
-                            check = True
-                            break
-        if check:
-            if user.id != client.user.id:
-                s = str(reaction)
-                if s in "❌✖️🇽❎":
-                    with suppress(discord.NotFound):
-                        await bot.silentDelete(message, exc=True)
-
-
-# Reaction add event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
-@client.event
-async def on_raw_reaction_add(payload):
-    try:
-        channel = await bot.fetch_channel(payload.channel_id)
-        user = await bot.fetch_user(payload.user_id)
-        message = await bot.fetch_message(payload.message_id, channel=channel)
-    except discord.NotFound:
-        return
-    await seen(user, event="reaction", raw="Adding a reaction")
-    if user.id != client.user.id:
-        reaction = str(payload.emoji)
-        await bot.reactCallback(message, reaction, user)
-        await checkDelete(message, reaction, user)
-
-
-# Reaction remove event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
-@client.event
-async def on_raw_reaction_remove(payload):
-    try:
-        channel = await bot.fetch_channel(payload.channel_id)
-        user = await bot.fetch_user(payload.user_id)
-        message = await bot.fetch_message(payload.message_id, channel=channel)
-    except discord.NotFound:
-        return
-    await seen(user, event="reaction", raw="Removing a reaction")
-    if user.id != client.user.id:
-        reaction = str(payload.emoji)
-        await bot.reactCallback(message, reaction, user)
-        await checkDelete(message, reaction, user)
-
-
-# Voice state update event: automatically unmutes self if server muted, calls _seen_ bot database event.
-@client.event
-async def on_voice_state_update(member, before, after):
-    if member.id == client.user.id:
-        after = member.voice
-        if after is not None:
-            if after.mute or after.deaf:
-                # print("Unmuted self in " + member.guild.name)
-                await member.edit(mute=False, deafen=False)
-            await bot.handleUpdate()
-    # Check for users with a voice state.
-    if after is not None and not after.afk:
-        if before is None:
-            await seen(member, event="misc", raw="Joining a voice channel")
-        elif (before.self_mute, before.self_deaf, before.self_stream, before.self_video) != (after.self_mute, after.self_deaf, after.self_stream, after.self_video):
-            await seen(member, event="misc", raw="Updating their voice settings")
-
-
-# Handles a new sent message, calls processMessage and sends an error if an exception occurs.
-async def handleMessage(message, edit=True):
-    cpy = msg = message.content
-    try:
-        if msg and msg[0] == "\\":
-            cpy = msg[1:]
-        await processMessage(message, cpy, edit, msg)
-    except Exception as ex:
-        errmsg = limStr("```py\nError: " + repr(ex).replace("`", "") + "\n```", 2000)
-        print_exc()
-        await sendReact(
-            message.channel,
-            errmsg,
-            reacts="❎",
-        )
-
-
-# Typing event: calls _typing_ and _seen_ bot database events.
-@client.event
-async def on_typing(channel, user, when):
-    await bot.event("_typing_", channel=channel, user=user)
-    await seen(user, delay=10, event="typing", raw="Typing")
-
-
-# Message send event: processes new message. calls _send_ and _seen_ bot database events.
-@client.event
-async def on_message(message):
-    bot.cacheMessage(message)
-    guild = message.guild
-    if guild:
-        create_task(bot.event("_send_", message=message))
-    await seen(message.author, event="message", raw="Sending a message")
-    await bot.reactCallback(message, None, message.author)
-    await handleMessage(message, False)
-
-
-# User update event: calls _user_update_ and _seen_ bot database events.
-@client.event
-async def on_user_update(before, after):
-    await bot.event("_user_update_", before=before, after=after)
-    await seen(after, event="misc", raw="Editing their profile")
-
-
-# Member update event: calls _member_update_ and _seen_ bot database events.
-@client.event
-async def on_member_update(before, after):
-    await bot.event("_member_update_", before=before, after=after)
-    if str(before.status) != str(after.status) or str(before.activity) != str(after.activity):
-        # A little bit of a trick to make sure this part is only called once per user event.
-        # This is necessary because on_member_update is called once for every member object.
-        # By fetching the first instance of a matching member object,
-        # this ensures the event will not be called multiple times if the user shares multiple guilds with the bot.
-        try:
-            member = await bot.fetch_member(after.id, find_others=True)
-        except LookupError:
-            member = None
-        if member is None or member.guild == after.guild:
-            await seen(after, event="misc", raw="Changing their status")
-
-
-# Member join event: calls _join_ and _seen_ bot database events.
-@client.event
-async def on_member_join(member):
-    await bot.event("_join_", user=member, guild=member.guild)
-    await seen(member, event="misc", raw="Joining a server")
-
-
-# Member leave event: calls _leave_ bot database event.
-@client.event
-async def on_member_remove(member):
-    await bot.event("_leave_", user=member, guild=member.guild)
-
-
-# Message delete event: uses raw payloads rather than discord.py message cache. calls _delete_ bot database event.
-@client.event
-async def on_raw_message_delete(payload):
-    try:
-        message = payload.cached_message
-        if message is None:
-            raise LookupError
-    except:
-        channel = await bot.fetch_channel(payload.channel_id)
-        try:
-            message = await bot.fetch_message(payload.message_id, channel)
-            if message is None:
-                raise LookupError
-        except:
-            # If message was not in cache, create a ghost message object to represent old message.
-            message = bot.ghostMessage()
-            message.channel = channel
-            try:
-                message.guild = channel.guild
-            except AttributeError:
-                message.guild = None
-            message.id = payload.message_id
-            message.created_at = snowflake_time(message.id)
-            message.author = await bot.fetch_user(bot.deleted_user)
-    guild = message.guild
-    if guild:
-        await bot.event("_delete_", message=message)
-    bot.deleteMessage(message)
-
-
-# Message bulk delete event: uses raw payloads rather than discord.py message cache. calls _bulk_delete_ and _delete_ bot database events.
-@client.event
-async def on_raw_bulk_message_delete(payload):
-    try:
-        messages = payload.cached_messages
-        if messages is None or len(messages) < len(payload.message_ids):
-            raise LookupError
-    except:
-        messages = deque()
-        channel = await bot.fetch_channel(payload.channel_id)
-        for m_id in payload.message_ids:
-            try:
-                message = await bot.fetch_message(m_id, channel)
-                if message is None:
-                    raise LookupError
-            except:
-                # If message was not in cache, create a ghost message object to represent old message.
-                message = bot.ghostMessage()
-                message.channel = channel
-                try:
-                    message.guild = channel.guild
-                except AttributeError:
-                    message.guild = None
-                message.id = m_id
-                message.created_at = snowflake_time(message.id)
-                message.author = await bot.fetch_user(bot.deleted_user)
-            messages.append(message)
-    messages = sorted(messages, key=lambda m: m.id)
-    await bot.event("_bulk_delete_", messages=messages)
-    for message in messages:
-        guild = getattr(message, "guild", None)
-        if guild:
-            await bot.event("_delete_", message=message, bulk=True)
-        bot.deleteMessage(message)
-
-
-# Channel create event: calls _channel_create_ bot database event.
-@client.event
-async def on_guild_channel_create(channel):
-    bot.cache.channels[channel.id] = channel
-    guild = channel.guild
-    if guild:
-        await bot.event("_channel_create_", channel=channel, guild=guild)
-
-
-# Channel delete event: calls _channel_delete_ bot database event.
-@client.event
-async def on_guild_channel_delete(channel):
-    print(channel, "was deleted from", channel.guild)
-    guild = channel.guild
-    if guild:
-        await bot.event("_channel_delete_", channel=channel, guild=guild)
-
-
-# Webhook update event: updates the bot's webhook cache if there are new webhooks.
-@client.event
-async def on_webhooks_update(channel):
-    webhooks = await channel.webhooks()
-    for w in tuple(bot.cw_cache.get(channel.id, {}).values()):
-        if w not in webhooks:
-            bot.cw_cache[channel.id].pop(w.id)
-            bot.cache.users.pop(w.id)
-    for w in webhooks:
-        bot.add_webhook(w)
-
-
-# User ban event: calls _ban_ bot database event.
-@client.event
-async def on_member_ban(guild, user):
-    print(user, "was banned from", guild)
-    if guild:
-        await bot.event("_ban_", user=user, guild=guild)
-
-
-# Guild destroy event: Remove guild from bot cache.
-@client.event
-async def on_guild_remove(guild):
-    bot.cache.guilds.pop(guild.id, None)
-    print(guild, "removed.")
-
-
-# Message edit event: processes edited message, uses raw payloads rather than discord.py message cache. calls _edit_ and _seen_ bot database events.
-@client.event
-async def on_raw_message_edit(payload):
-    data = payload.data
-    m_id = int(data["id"])
-    raw = False
-    if payload.cached_message:
-        before = payload.cached_message
-        after = await bot.fetch_message(m_id, payload.message_id)
-    else:
-        try:
-            before = messages[m_id]
-        except LookupError:
-            # If message was not in cache, create a ghost message object to represent old message.
-            c_id = data.get("channel_id")
-            if not c_id:
-                return
-            before = bot.ghostMessage()
-            before.channel = channel = await bot.fetch_channel(c_id)
-            before.guild = guild = getattr(channel, "guild", None)
-            before.id = payload.message_id
-            before.created_at = snowflake_time(before.id)
-            try:
-                u_id = data["author"]["id"]
-            except KeyError:
-                u_id = None
-                before.author = None
-            else:
-                if guild is not None:
-                    user = guild.get_member(u_id)
-                else:
-                    user = None
-                if not user:
-                    user = await bot.fetch_user(u_id)
-                before.author = user
-            try:
-                after = await channel.fetch_message(before.id)
-            except LookupError:
-                after = copy.copy(before)
-                after._update(data)
-            else:
-                before.author = after.author
-            raw = True
-        else:
-            after = copy.copy(before)
-            after._update(data)
-    bot.cacheMessage(after)
-    if raw or before.content != after.content:
-        await handleMessage(after)
-        if getattr(after, "guild", None):
-            create_task(bot.event("_edit_", before=before, after=after))
-        await seen(after.author, event="message", raw="Editing a message")
 
 
 # If this is the module being run and not imported, create a new Bot instance and run it.
@@ -2439,7 +2380,10 @@ if __name__ == "__main__":
             sys.stdout = sys.stderr = print = PRINT
             print("Logging started.")
             proc_start()
-            with Bot() as bot:
-                bot.run()
+            miza = bot = client = Bot()
+            miza.miza = miza
+            create_task(heartbeat_loop())
+            with miza:
+                miza.run()
     print = _print
     sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__

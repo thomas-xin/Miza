@@ -201,7 +201,7 @@ async def searchRandomNSFW(argv, delay=10):
     print(data)
     data = [i for i in data if i]
     if not data:
-        raise LookupError("No results for " + argv + ".")
+        raise LookupError(f"No results for {argv}.")
     item = random.choice(data)
     return item
 
@@ -307,10 +307,7 @@ class Neko(Command):
                 if neko_tags.get(tag, 0) == True:
                     tagNSFW = True
                     if not isNSFW:
-                        raise PermissionError(
-                            "This command is only available in "
-                            + uniStr("NSFW") + " channels."
-                            )
+                        raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels.")
                 selected.append(tag)
         for _ in loop(flags.get("r", 0)):
             possible = [i for i in neko_tags if neko_tags[i] <= isNSFW]
@@ -319,8 +316,7 @@ class Neko(Command):
             if not argv:
                 url = nekos.img("neko")
             else:
-                raise EOFError(
-                    "Search tag " + argv + " not found. Use ?l for list.")
+                raise LookupError(f"Search tag {argv} not found. Use ?l for list.")
         else:
             v = xrand(len(selected))
             get = selected[v]
@@ -340,11 +336,11 @@ class Neko(Command):
             return text
         emb = discord.Embed(
             url=url,
-            colour=randColour(),
+            colour=rand_colour(),
         )
         emb.set_image(url=url)
         print(url)
-        self.bot.embedSender(channel, embed=emb)
+        self.bot.send_embeds(channel, embed=emb)
 
 
 class Lewd(Command):
@@ -360,7 +356,7 @@ class Lewd(Command):
 
     async def __call__(self, args, flags, channel, **void):
         if not is_nsfw(channel):
-            raise PermissionError("This command is only available in NSFW channels.")
+            raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels.")
         objs = await searchRandomNSFW(" ".join(args), 12)
         url = objs[0]
         if "v" in flags:
@@ -373,8 +369,8 @@ class Lewd(Command):
             return text
         emb = discord.Embed(
             url=url,
-            colour=randColour(),
+            colour=rand_colour(),
         )
         emb.set_image(url=url)
         print(url)
-        self.bot.embedSender(channel, embed=emb)
+        self.bot.send_embeds(channel, embed=emb)

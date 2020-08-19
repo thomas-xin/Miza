@@ -41,7 +41,6 @@ from colormath import color_objects, color_conversions
 
 
 class EmptyContext(contextlib.AbstractContextManager):
-
     __exit__ = lambda *args: None
 
 emptyctx = EmptyContext()
@@ -110,7 +109,7 @@ twinprime = mp.twinprime
 
 Function = sympy.Function
 Symbol = sympy.Symbol
-factorize = factorint = primeFactors = sympy.ntheory.factorint
+factorize = factorint = prime_factors = sympy.ntheory.factorint
 mobius = sympy.ntheory.mobius
 
 TRUE, FALSE = True, False
@@ -154,7 +153,7 @@ def shuffle(it):
             random.shuffle(it)
             return it
         except TypeError:
-            raise TypeError("Shuffling " + type(it) + " is not supported.")
+            raise TypeError(f"Shuffling {type(it)} is not supported.")
 
 # Reverses an iterable, in-place if possible, returning it.
 def reverse(it):
@@ -176,14 +175,14 @@ def reverse(it):
         temp = it.reverse()
         it.data = temp.data
         it.offs = temp.offs
-        it.chash = None
+        it.hash = None
         del temp
         return it
     else:
         try:
             return list(reversed(it))
         except TypeError:
-            raise TypeError("Reversing " + type(it) + " is not supported.")
+            raise TypeError(f"Reversing {type(it)} is not supported.")
 
 # Sorts an iterable with an optional key, in-place if possible, returning it.
 def sort(it, key=None, reverse=False):
@@ -206,7 +205,7 @@ def sort(it, key=None, reverse=False):
         return deque(it)
     elif isinstance(it, hlist):
         it.__init__(sorted(it, key=key, reverse=reverse))
-        it.chash = None
+        it.hash = None
         return it
     else:
         try:
@@ -214,7 +213,7 @@ def sort(it, key=None, reverse=False):
             it.sort(key=key, reverse=reverse)
             return it
         except TypeError:
-            raise TypeError("Sorting " + type(it) + " is not supported.")
+            raise TypeError(f"Sorting {type(it)} is not supported.")
 
 
 class hlist(collections.abc.MutableSequence, collections.abc.Callable):
@@ -224,7 +223,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     maxoff = (1 << 24) - 1
     minsize = 256
-    __slots__ = ("chash", "block", "offs", "size", "data")
+    __slots__ = ("hash", "block", "offs", "size", "data", "frozenset")
 
     # For thread-safety: Waits until the list is not busy performing an operation.
     def waiting(func):
@@ -248,7 +247,8 @@ custom list-like data structure that incorporates the functionality of numpy arr
                     if time.time() - t > 1:
                         raise TimeoutError("Request timed out.")
             self.block = True
-            self.chash = None
+            self.hash = None
+            self.frozenset = None
             try:
                 output = func(self, *args, **kwargs)
                 self.block = False
@@ -260,14 +260,18 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     # Init takes arguments and casts to a deque if possible, else generates as a single value. Allocates space equal to 3 times the length of the input iterable.
     def __init__(self, *args, **void):
-        self.block = True
+        self.block = True if not getattr(self, "block", None) else 2
+        self.hash = None
         if not args:
-            iterable = ()
+            self.offs = 0
+            self.size = 0
+            self.data = None
+            self.block = False
+            return
         elif len(args) == 1:
             iterable = args[0]
         else:
             iterable = args
-        self.chash = None
         if issubclass(type(iterable), self.__class__) and iterable:
             self.offs = iterable.offs
             self.size = iterable.size
@@ -282,11 +286,22 @@ custom list-like data structure that incorporates the functionality of numpy arr
             size = max(self.minsize, self.size * 3)
             self.offs = size // 3
             self.data = np.empty(size, dtype=object)
-            self.view()[:] = iterable
-        self.block = False
+            self.view[:] = iterable
+        self.block = True if self.block >= 2 else False
+
+    def __getattr__(self, k):
+        with suppress(AttributeError):
+            return self.__getattribute__(k)
+        return getattr(self.__getattribute__("view"), k)
 
     # Returns a numpy array representing the items currently "in" the list.
-    view = lambda self: self.data[self.offs:self.offs + self.size]
+    @property
+    def view(self):
+        data = self.__getattribute__("data")
+        if data is None:
+            return []
+        offs, size = [self.__getattribute__(i) for i in ("offs", "size")]
+        return data[offs:offs + size]
 
     @waiting
     def __call__(self, arg=1, *void1, **void2):
@@ -296,42 +311,47 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     # Returns the hash value of the data in the list.
     def __hash__(self):
-        if self.chash is None:
-            self.chash = hash(self.view().tobytes())
-        return self.chash
+        if self.hash is None:
+            self.hash = hash(self.view.tobytes())
+        return self.hash
+
+    def to_frozenset(self):
+        if self.frozenset is None:
+            self.frozenset = frozenset(self)
+        return self.frozenset
 
     # Basic functions
     __str__ = lambda self: "[" + ", ".join(repr(i) for i in iter(self)) + "]"
-    __repr__ = lambda self: self.__class__.__name__ + "(" + str(tuple(self)) + ")"
+    __repr__ = lambda self: f"{self.__class__.__name__}({tuple(self) if self.__bool__() else ''})"
     __bool__ = lambda self: bool(self.size)
 
     # Arithmetic functions
 
     @blocking
     def __iadd__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         np.add(arr, iterable, out=arr)
         return self
 
     @blocking
     def __isub__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         np.subtract(arr, iterable, out=arr)
         return self
 
     @blocking
     def __imul__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         np.multiply(arr, iterable, out=arr)
         return self
 
     @blocking
     def __imatmul__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         temp = np.matmul(arr, iterable)
         self.size = len(temp)
         arr[:self.size] = temp
@@ -339,36 +359,36 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     @blocking
     def __itruediv__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         np.true_divide(arr, iterable, out=arr)
         return self
 
     @blocking
     def __ifloordiv__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         np.floor_divide(arr, iterable, out=arr)
         return self
 
     @blocking
     def __imod__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         np.mod(arr, iterable, out=arr)
         return self
 
     @blocking
     def __ipow__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         np.power(arr, iterable, out=arr)
         return self
 
     @blocking
     def __ilshift__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         try:
             np.left_shift(arr, iterable, out=arr)
         except (TypeError, ValueError):
@@ -377,8 +397,8 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     @blocking
     def __irshift__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         try:
             np.right_shift(arr, iterable, out=arr)
         except (TypeError, ValueError):
@@ -387,28 +407,28 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     @blocking
     def __iand__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         np.logical_and(arr, iterable, out=arr)
         return self
 
     @blocking
     def __ixor__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         np.logical_xor(arr, iterable, out=arr)
         return self
 
     @blocking
     def __ior__(self, other):
-        iterable = self.createIterator(other)
-        arr = self.view()
+        iterable = self.to_iterable(other)
+        arr = self.view
         np.logical_or(arr, iterable, out=arr)
         return self
 
     @waiting
     def __neg__(self):
-        return self.__class__(-self.view())
+        return self.__class__(-self.view)
 
     @waiting
     def __pos__(self):
@@ -417,11 +437,11 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @waiting
     def __abs__(self):
         d = self.data
-        return self.__class__(np.abs(self.view()))
+        return self.__class__(np.abs(self.view))
 
     @waiting
     def __invert__(self):
-        return self.__class__(np.invert(self.view()))
+        return self.__class__(np.invert(self.view))
 
     @waiting
     def __add__(self, other):
@@ -443,8 +463,8 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     @waiting
     def __matmul__(self, other):
-        temp1 = self.view()
-        temp2 = self.createIterator(other)
+        temp1 = self.view
+        temp2 = self.to_iterable(other)
         result = temp1 @ temp2
         return self.__class__(result)
 
@@ -504,25 +524,25 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     @waiting
     def __round__(self, prec=0):
-        temp = np.round(self.view(), prec)
+        temp = np.round(self.view, prec)
         return self.__class__(temp)
 
     @waiting
     def __trunc__(self):
-        temp = np.trunc(self.view())
+        temp = np.trunc(self.view)
         return self.__class__(temp)
 
     @waiting
     def __floor__(self):
-        temp = np.floor(self.view())
+        temp = np.floor(self.view)
         return self.__class__(temp)
 
     @waiting
     def __ceil__(self):
-        temp = np.ceil(self.view())
+        temp = np.ceil(self.view)
         return self.__class__(temp)
 
-    __index__ = lambda self: self.view()
+    __index__ = lambda self: self.view
     __radd__ = __add__
     __rsub__ = lambda self, other: -self + other
     __rmul__ = __mul__
@@ -531,40 +551,40 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @waiting
     def __rtruediv__(self, other):
         temp = self.__class__(self.data)
-        iterable = self.createIterator(other)
-        arr = temp.view()
+        iterable = self.to_iterable(other)
+        arr = temp.view
         np.true_divide(iterable, arr, out=arr)
         return temp
 
     @waiting
     def __rfloordiv__(self, other):
         temp = self.__class__(self.data)
-        iterable = self.createIterator(other)
-        arr = temp.view()
+        iterable = self.to_iterable(other)
+        arr = temp.view
         np.floor_divide(iterable, arr, out=arr)
         return temp
 
     @waiting
     def __rmod__(self, other):
         temp = self.__class__(self.data)
-        iterable = self.createIterator(other)
-        arr = temp.view()
+        iterable = self.to_iterable(other)
+        arr = temp.view
         np.mod(iterable, arr, out=arr)
         return temp
 
     @waiting
     def __rpow__(self, other):
         temp = self.__class__(self.data)
-        iterable = self.createIterator(other)
-        arr = temp.view()
+        iterable = self.to_iterable(other)
+        arr = temp.view
         np.power(iterable, arr, out=arr)
         return temp
 
     @waiting
     def __rlshift__(self, other):
         temp = self.__class__(self.data)
-        iterable = self.createIterator(other)
-        arr = temp.view()
+        iterable = self.to_iterable(other)
+        arr = temp.view
         try:
             np.left_shift(iterable, arr, out=arr)
         except (TypeError, ValueError):
@@ -574,8 +594,8 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @waiting
     def __rrshift__(self, other):
         temp = self.__class__(self.data)
-        iterable = self.createIterator(other)
-        arr = temp.view()
+        iterable = self.to_iterable(other)
+        arr = temp.view
         try:
             np.right_shift(iterable, arr, out=arr)
         except (TypeError, ValueError):
@@ -590,39 +610,39 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     @waiting
     def __lt__(self, other):
-        it = self.createIterator(other)
-        return self.view() < other
+        it = self.to_iterable(other)
+        return self.view < other
 
     @waiting
     def __le__(self, other):
-        it = self.createIterator(other)
-        return self.view() <= other
+        it = self.to_iterable(other)
+        return self.view <= other
 
     @waiting
     def __eq__(self, other):
         try:
-            it = self.createIterator(other)
-            return self.view() == other
+            it = self.to_iterable(other)
+            return self.view == other
         except (TypeError, IndexError):
             return
 
     @waiting
     def __ne__(self, other):
         try:
-            it = self.createIterator(other)
-            return self.view() != other
+            it = self.to_iterable(other)
+            return self.view != other
         except (TypeError, IndexError):
             return
 
     @waiting
     def __gt__(self, other):
-        it = self.createIterator(other)
-        return self.view() > other
+        it = self.to_iterable(other)
+        return self.view > other
 
     @waiting
     def __ge__(self, other):
-        it = self.createIterator(other)
-        return self.view() >= other
+        it = self.to_iterable(other)
+        return self.view >= other
 
     # Takes ints, floats, slices and iterables for indexing
     @waiting
@@ -630,12 +650,12 @@ custom list-like data structure that incorporates the functionality of numpy arr
         if len(args) == 1:
             key = args[0]
             if type(key) in (float, complex):
-                return get(self.view(), key, 1)
+                return get(self.view, key, 1)
             if type(key) is int:
                 key = key % self.size
-                return self.view().__getitem__(key)
-            return self.__class__(self.view().__getitem__(key))
-        return self.__class__(self.view().__getitem__(*args))
+                return self.view.__getitem__(key)
+            return self.__class__(self.view.__getitem__(key))
+        return self.__class__(self.view.__getitem__(*args))
 
     # Takes ints, slices and iterables for indexing
     @blocking
@@ -644,8 +664,8 @@ custom list-like data structure that incorporates the functionality of numpy arr
             key = args[0]
             if type(key) is int:
                 key = key % self.size
-            return self.view().__setitem__(key, args[1])
-        return self.view().__setitem__(*args)
+            return self.view.__setitem__(key, args[1])
+        return self.view.__setitem__(*args)
 
     # Takes ints and slices for indexing
     @blocking
@@ -662,30 +682,27 @@ custom list-like data structure that incorporates the functionality of numpy arr
     # Basic sequence functions
     __len__ = lambda self: self.size
     __length_hint__ = __len__
-    __iter__ = lambda self: iter(self.view())
-    __reversed__ = lambda self: iter(np.flip(self.view()))
+    __iter__ = lambda self: iter(self.view)
+    __reversed__ = lambda self: iter(np.flip(self.view))
 
     @waiting
     def __bytes__(self):
-        return bytes(round(i) & 255 for i in self.view())
+        return bytes(round(i) & 255 for i in self.view)
 
     def __contains__(self, item):
-        return item in self.view()
+        return item in self.view
 
     __copy__ = lambda self: self.copy()
 
     # Creates an iterable from an iterator, making sure the shape matches.
-    def createIterator(self, other, force=False):
+    def to_iterable(self, other, force=False):
         if not issubclass(type(other), collections.abc.Sequence) or issubclass(type(other), collections.abc.Mapping):
             try:
                 other = list(other)
             except TypeError:
                 other = [other]
         if len(other) not in (1, self.size) and not force:
-            raise IndexError(
-                "Unable to perform operation on objects with size "
-                + str(self.size) + " and " + str(len(other)) + "."
-            )
+            raise IndexError(f"Unable to perform operation on objects with size {self.size} and {len(other)}.")
         return other
 
     @blocking
@@ -696,19 +713,19 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     @waiting
     def copy(self):
-        return self.__class__(self.view())
+        return self.__class__(self.view)
 
     @waiting
     def sort(self, *args, **kwargs):
-        return self.__class__(sorted(self.view(), *args, **kwargs))
+        return self.__class__(sorted(self.view, *args, **kwargs))
 
     @waiting
     def shuffle(self, *args, **kwargs):
-        return self.__class__(shuffle(self.view(), *args, **kwargs))
+        return self.__class__(shuffle(self.view, *args, **kwargs))
 
     @waiting
     def reverse(self):
-        return self.__class__(np.flip(self.view()))
+        return self.__class__(np.flip(self.view))
 
     # Rotates the list a certain amount of steps, using np.roll for large rotate operations.
     @blocking
@@ -727,7 +744,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
                 self.appendright(self.popleft(force=True), force=True)
                 steps += 1
             return self
-        self.view()[:] = np.roll(self.view(), steps)
+        self.view[:] = np.roll(self.view, steps)
         return self
 
     @blocking
@@ -743,7 +760,9 @@ custom list-like data structure that incorporates the functionality of numpy arr
             if abs(len(self.data) // 3 - self.offs) > self.maxoff:
                 self.reconstitute(force=True)
             return False
-        self.offs = self.size // 3
+        self.offs = 0
+        self.size = 0
+        self.data = None
         return True
 
     # For compatibility with dict.get
@@ -782,9 +801,9 @@ custom list-like data structure that incorporates the functionality of numpy arr
             index %= self.size
             temp = self.data[index + self.offs]
             if index > self.size >> 1:
-                self.view()[index:-1] = self.data[self.offs + index + 1:self.offs + self.size]
+                self.view[index:-1] = self.data[self.offs + index + 1:self.offs + self.size]
             else:
-                self.view()[1:index + 1] = self.data[self.offs:self.offs + index]
+                self.view[1:index + 1] = self.data[self.offs:self.offs + index]
                 self.offs += 1
             self.size -= 1
             return temp
@@ -796,6 +815,9 @@ custom list-like data structure that incorporates the functionality of numpy arr
     # Inserts an item into the list. O(n) time complexity.
     @blocking
     def insert(self, index, value):
+        if self.data is None:
+            self.__init__((value,))
+            return self
         if index >= len(self.data):
             return self.append(value, force=True)
         elif index == 0:
@@ -805,23 +827,26 @@ custom list-like data structure that incorporates the functionality of numpy arr
             if self.size + self.offs + 1 >= len(self.data):
                 self.reconstitute(force=True)
             self.size += 1
-            self.view()[index + 1:] = self.view()[index:-1]
+            self.view[index + 1:] = self.view[index:-1]
         else:
             if self.offs < 1:
                 self.reconstitute(force=True)
             self.size += 1
             self.offs -= 1
-            self.view()[:index] = self.view()[1:index + 1]
-        self.view()[index] = value
+            self.view[:index] = self.view[1:index + 1]
+        self.view[index] = value
         return self
 
     # Insertion sort using a binary search to find target position. O(n) time complexity.
     @blocking
     def insort(self, value, key=None, sorted=True):
+        if self.data is None:
+            self.__init__((value,))
+            return self
         if not sorted:
             self.__init__(sorted(self, key=key))
         if key is None:
-            return self.insert(np.searchsorted(self.view(), value), value, force=True)
+            return self.insert(np.searchsorted(self.view, value), value, force=True)
         v = key(value)
         x = self.size
         index = (x >> 1) + self.offs
@@ -850,19 +875,28 @@ custom list-like data structure that incorporates the functionality of numpy arr
             self.pops(pops, force=True)
         return self
 
+    discard = remove
+
     # Removes all duplicate values from the list.
     @blocking
     def removedups(self, sorted=True):
         if sorted:
-            temp = np.unique(self.view())
+            try:
+                temp = np.unique(self.view)
+            except TypeError:
+                temp = {}
+                for x in self.view:
+                    if x not in temp:
+                        temp[x] = None
+                temp = sorted(temp)
         else:
             temp = {}
-            for x in self.view():
+            for x in self.view:
                 if x not in temp:
                     temp[x] = None
             temp = tuple(temp.keys())
         self.size = len(temp)
-        self.view()[:] = temp
+        self.view[:] = temp
         return self
 
     uniq = unique = removedups
@@ -882,9 +916,9 @@ custom list-like data structure that incorporates the functionality of numpy arr
     def search(self, value, key=None, sorted=False):
         if key is None:
             if sorted and self.size > self.minsize:
-                i = np.searchsorted(self.view(), value)
-                if self.view()[i] != value:
-                    raise IndexError(str(value) + " not found.")
+                i = np.searchsorted(self.view, value)
+                if self.view[i] != value:
+                    raise IndexError(f"{value} not found.")
                 pops = self.__class__()
                 pops.append(i)
                 for x in range(i + self.offs - 1, -1, -1):
@@ -899,7 +933,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
                         break
                 return pops
             else:
-                return self.__class__(np.arange(self.size, dtype=np.uint32)[self.view() == value])
+                return self.__class__(np.arange(self.size, dtype=np.uint32)[self.view == value])
         if sorted:
             v = value
             d = self.data
@@ -928,9 +962,9 @@ custom list-like data structure that incorporates the functionality of numpy arr
                 pops.append(i - self.offs)
                 i -= 1
         else:
-            pops = self.__class__(i for i, x in enumerate(self.view()) if key(x) == value)
+            pops = self.__class__(i for i, x in enumerate(self.view) if key(x) == value)
         if not pops:
-            raise IndexError(str(value) + " not found.")
+            raise IndexError(f"{value} not found.")
         return pops
     
     find = findall = search
@@ -939,14 +973,17 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @waiting
     def count(self, value, key=None):
         if key is None:
-            return sum(self.view() == value)
+            return sum(self.view == value)
         return sum(1 for i in self if key(i) == value)
 
-    concat = lambda self, value: self.__class__(np.concatenate([self.view(), value]))
+    concat = lambda self, value: self.__class__(np.concatenate([self.view, value]))
 
     # Appends item at the start of the list, reallocating when necessary.
     @blocking
     def appendleft(self, value):
+        if self.data is None:
+            self.__init__((value,))
+            return self
         if self.offs <= 0:
             self.reconstitute(force=True)
         self.offs -= 1
@@ -957,35 +994,44 @@ custom list-like data structure that incorporates the functionality of numpy arr
     # Appends item at the end of the list, reallocating when necessary.
     @blocking
     def append(self, value):
+        if self.data is None:
+            self.__init__((value,))
+            return self
         if self.offs + self.size >= len(self.data):
             self.reconstitute(force=True)
         self.data[self.offs + self.size] = value
         self.size += 1
         return self
 
-    appendright = append
+    appendright = add = append
 
     # Appends iterable at the start of the list, reallocating when necessary.
     @blocking
     def extendleft(self, value):
-        value = self.createIterator(reversed(value), force=True)
+        if self.data is None:
+            self.__init__(reversed(value))
+            return self
+        value = self.to_iterable(reversed(value), force=True)
         if self.offs >= len(value):
             self.data[self.offs - len(value):self.offs] = value
             self.offs -= len(value)
             self.size += len(value)
             return self
-        self.__init__(np.concatenate([value, self.view()]))
+        self.__init__(np.concatenate([value, self.view]))
         return self
 
     # Appends iterable at the end of the list, reallocating when necessary.
     @blocking
     def extend(self, value):
-        value = self.createIterator(value, force=True)
+        if self.data is None:
+            self.__init__(value)
+            return self
+        value = self.to_iterable(value, force=True)
         if len(self.data) - self.offs - self.size >= len(value):
             self.data[self.offs + self.size:self.offs + self.size + len(value)] = value
             self.size += len(value)
             return self
-        self.__init__(np.concatenate([self.view(), value]))
+        self.__init__(np.concatenate([self.view, value]))
         return self
 
     extendright = extend
@@ -993,7 +1039,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     # Similar to str.join
     @waiting
     def join(self, iterable):
-        iterable = self.createIterator(iterable)
+        iterable = self.to_iterable(iterable)
         temp = deque()
         for i, v in enumerate(iterable):
             try:
@@ -1001,18 +1047,119 @@ custom list-like data structure that incorporates the functionality of numpy arr
             except TypeError:
                 temp.append(v)
             if i != len(iterable) - 1:
-                temp.extend(self.view())
+                temp.extend(self.view)
         return self.__class__(temp)
 
     # Fills list with value(s).
     @blocking
     def fill(self, value):
-        self.view()[:] = value
+        self.view[:] = value
 
-    # For compatibility with dict attributes.
+    # For compatibility with dict() attributes.
     keys = lambda self: range(len(self))
     values = lambda self: iter(self)
     items = lambda self: enumerate(self)
+
+    # For compatibility with set() attributes.
+    @waiting
+    def isdisjoint(self, other):
+        if type(other) not in (set, frozenset):
+            other = frozenset(other)
+        return self.to_frozenset().isdisjoint(other)
+    
+    @waiting
+    def issubset(self, other):
+        if type(other) not in (set, frozenset):
+            other = frozenset(other)
+        return self.to_frozenset().issubset(other)
+
+    @waiting
+    def issuperset(self, other):
+        if type(other) not in (set, frozenset):
+            other = frozenset(other)
+        return self.to_frozenset().issuperset(other)
+    
+    @waiting
+    def union(self, *others):
+        args = deque()
+        for other in others:
+            if type(other) not in (set, frozenset):
+                other = frozenset(other)
+            args.append(other)
+        return self.to_frozenset().union(*args)
+    
+    @waiting
+    def intersection(self, *others):
+        args = deque()
+        for other in others:
+            if type(other) not in (set, frozenset):
+                other = frozenset(other)
+            args.append(other)
+        return self.to_frozenset().intersection(*args)
+
+    @waiting
+    def difference(self, *others):
+        args = deque()
+        for other in others:
+            if type(other) not in (set, frozenset):
+                other = frozenset(other)
+            args.append(other)
+        return self.to_frozenset().difference(*args)
+    
+    @waiting
+    def symmetric_difference(self, other):
+        if type(other) not in (set, frozenset):
+            other = frozenset(other)
+        return self.to_frozenset().symmetric_difference(other)
+
+    @blocking
+    def update(self, *others, uniq=True):
+        for other in others:
+            if issubclass(other, collections.abc.Mapping):
+                other = other.values()
+            self.extend(other, force=True)
+        if uniq:
+            self.uniq(False, force=True)
+
+    @blocking
+    def intersection_update(self, *others, uniq=True):
+        pops = set()
+        for other in others:
+            if issubclass(other, collections.abc.Mapping):
+                other = other.values()
+            if type(other) not in (set, frozenset):
+                other = frozenset(other)
+            for i, v in enumerate(self):
+                if v not in other:
+                    pops.add(i)
+        self.pops(pops)
+        if uniq:
+            self.uniq(False, force=True)
+
+    @blocking
+    def difference_update(self, *others, uniq=True):
+        pops = set()
+        for other in others:
+            if issubclass(other, collections.abc.Mapping):
+                other = other.values()
+            if type(other) not in (set, frozenset):
+                other = frozenset(other)
+            for i, v in enumerate(self):
+                if v in other:
+                    pops.add(i)
+        self.pops(pops)
+        if uniq:
+            self.uniq(False, force=True)
+
+    @blocking
+    def symmetric_difference_update(self, other):
+        data = set(self)
+        if issubclass(other, collections.abc.Mapping):
+            other = other.values()
+        if type(other) not in (set, frozenset):
+            other = frozenset(other)
+        data.symmetric_difference_update(other)
+        self.__init__(data)
 
     # Clips all values in list to input boundaries.
     @blocking
@@ -1021,7 +1168,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
             b = -a
         if a > b:
             a, b = b, a
-        arr = self.view()
+        arr = self.view
         np.clip(arr, a, b, out=arr)
         return self
 
@@ -1029,39 +1176,39 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     @waiting
     def real(self):
-        return self.__class__(np.real(self.view()))
+        return self.__class__(np.real(self.view))
 
     @waiting
     def imag(self):
-        return self.__class__(np.imag(self.view()))
+        return self.__class__(np.imag(self.view))
     
     @waiting
     def float(self):
-        return self.__class__(float(i.real) for i in self.view())
+        return self.__class__(float(i.real) for i in self.view)
 
     @waiting
     def complex(self):
-        return self.__class__(complex(i) for i in self.view())
+        return self.__class__(complex(i) for i in self.view)
 
     @waiting
     def mpf(self):
-        return self.__class__(mpf(i.real) for i in self.view())
+        return self.__class__(mpf(i.real) for i in self.view)
         
     # Reallocates list.
     @blocking
     def reconstitute(self, data=None):
-        self.__init__(self.view())
+        self.__init__(data if data is not None else self.view)
         return self
 
     # Removes items according to an array of indices.
     @blocking
     def delitems(self, iterable):
-        iterable = self.createIterator(iterable, force=True)
+        iterable = self.to_iterable(iterable, force=True)
         if len(iterable) == 1:
             return self.pop(iterable[0], force=True)
-        temp = np.delete(self.view(), iterable)
+        temp = np.delete(self.view, iterable)
         self.size = len(temp)
-        self.view()[:] = temp
+        self.view[:] = temp
         return self
 
     pops = delitems
@@ -1071,30 +1218,54 @@ hrange = lambda a, b=None, c=None: hlist(xrange(a, b, c))
 hzero = lambda size: hlist(repeat(0, size))
 
 
-# Class-operated dictionary, with attributes corresponding to keys.
+# Class-based dictionary, with attributes corresponding to keys.
 class cdict(dict):
 
     __slots__ = ()
 
     __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
-    __repr__ = lambda self: self.__class__.__name__ + "(" + super().__repr__() + ")"
+    __repr__ = lambda self: f"{self.__class__.__name__}({super().__repr__() if super().__len__() else ''})"
     __str__ = lambda self: super().__repr__()
     __iter__ = lambda self: iter(tuple(super().__iter__()))
-    __setattr__ = lambda self, k, v: super().__setitem__(k, v)
 
-    def __getattr__(self, k, default=Dummy):
-        try:
-            if k.startswith("__") and k.endswith("__"):
-                return self.__class__.__getattribute__(self, k)
-            return super().__getitem__(k)
-        except (AttributeError, KeyError):
-            if default is not Dummy:
-                return default
-            raise
+    def __getattr__(self, k):
+        with suppress(AttributeError):
+            return self.__getattribute__(k)
+        if not k.startswith("__") or not k.endswith("__"):
+            return self.__getitem__(k)
+        raise AttributeError(k)
+
+    def __setattr__(self, k, v):
+        if k.startswith("__") and k.endswith("__"):
+            return object.__setattr__(self, k, v)
+        return self.__setitem__(k, v)
+
+    @property
+    def __dict__(self):
+        return self
 
     ___repr__ = lambda self: super().__repr__()
     to_dict = lambda self: dict(**self)
     to_list = lambda self: list(super().values())
+
+
+# A full-casefold string lookup mapping object.
+class fcdict(cdict):
+
+    __slots__ = ()
+
+    __init__ = lambda self, *args, **kwargs: super().__init__({full_prune(k): v for k, v in dict(*args, **kwargs).items()})
+    __setitem__ = lambda self, k, v: super().__setitem__(full_prune(k), v)
+    __getitem__ = lambda self, k: super().__getitem__(full_prune(k))
+    __contains__ = lambda self, k: super().__contains__(full_prune(k))
+
+    def pop(self, k, default=Dummy):
+        try:
+            return super().pop(full_prune(k))
+        except KeyError:
+            if default is not Dummy:
+                return default
+            raise
 
 
 # Dictionary with multiple assignable values per key.
@@ -1112,7 +1283,7 @@ class mdict(cdict):
         return values.extend(v).uniq(sorted=False)
 
     def append(self, k, v):
-        values = setDict(super(), k, hlist())
+        values = set_dict(super(), k, hlist())
         if v not in values:
             values.append(v)
 
@@ -1180,15 +1351,22 @@ class demap(collections.abc.Mapping):
         with suppress(KeyError):
             return self.__getitem__(k)
         return v
+    
+    def pop(self, k, v=None):
+        with suppress(KeyError):
+            temp = self.__getitem__(k)
+            self.__delitem__(k)
+            return temp
+        return v
 
     clear = lambda self: (self.a.clear(), self.b.clear())
+    __bool__ = lambda self: self.a.__bool__()
     __iter__ = lambda self: iter(self.a.items())
     __reversed__ = lambda self: reversed(self.a.items())
     __len__ = lambda self: self.b.__len__()
     __str__ = lambda self: self.a.__str__()
-    __repr__ = lambda self: self.__class__.__name__ + "(" + self.a.___repr__() + ")"
+    __repr__ = lambda self: f"{self.__class__.__name__}({self.a.__repr__() if self.b.__bool__() else ''})"
     __contains__ = lambda self, k: k in self.a or k in self.b
-    pop = __delitem__
 
 
 phase = cmath.phase
@@ -1278,13 +1456,13 @@ def isqrt(x):
 # Rounds a number to a certain amount of decimal places.
 def round(x, y=None):
     with suppress(Exception):
-        if isValid(x):
+        if is_finite(x):
             with suppress(Exception):
                 if x == int(x):
                     return int(x)
                 if y is None:
                     return int(math.round(x))
-            return roundMin(math.round(x, y))
+            return round_min(math.round(x, y))
         else:
             return x
     if type(x) is complex:
@@ -1295,7 +1473,7 @@ def round(x, y=None):
 
 # Rounds a number to the nearest integer, with a probability determined by the fractional part.
 def round_random(x):
-    y = roundMin(x)
+    y = round_min(x)
     if type(y) is int:
         return y
     x, y = divmod(x, 1)
@@ -1363,7 +1541,7 @@ rrand = lambda x=1, y=0: frand(x) ** (1 - y)
 
 
 # Computes modular inverse of two integers.
-def modularInv(a, b):
+def modular_inv(a, b):
     if b == 0:
         return (1, a)
     a %= b
@@ -1377,7 +1555,7 @@ def modularInv(a, b):
 
 
 # Computes Pisano period of an integer.
-def pisanoPeriod(x):
+def pisano_period(x):
     a, b = 0, 1
     for i in range(0, x * x):
         a, b = b, (a + b) % x
@@ -1432,7 +1610,7 @@ def next6np(start=0):
 
 
 # Checks if a number is prime using multiple probability tests limited to O(log^2(n)) iterations.
-def isPrime(n):
+def is_prime(n):
     
     def divisibility(n):
         t = min(n, 2 + ceil(log(n) ** 2))
@@ -1480,7 +1658,7 @@ def isPrime(n):
                 return False
         return True
 
-    def solovoyStrassen(n):
+    def solovoy_strassen(n):
         t = min(n, 2 + ceil(log(n)))
         g = next6np()
         while True:
@@ -1511,13 +1689,13 @@ def isPrime(n):
             return False
         if not miller(n):
             return False
-        if not solovoyStrassen(n):
+        if not solovoy_strassen(n):
             return False
         return True
     return None
 
 # Generates a number of prime numbers between a and b.
-def generatePrimes(a=2, b=inf, c=1):
+def generate_primes(a=2, b=inf, c=1):
     primes = hlist()
     a = round(a)
     b = round(b)
@@ -1538,7 +1716,7 @@ def generatePrimes(a=2, b=inf, c=1):
 
 
 # Returns the sum of an iterable, using the values rather than keys for dictionaries.
-def iterSum(it):
+def iter_sum(it):
     if issubclass(type(it), collections.abc.Mapping):
         return sum(tuple(it.values()))
     with suppress(TypeError):
@@ -1546,7 +1724,7 @@ def iterSum(it):
     return it
 
 # Returns the maximum value of an iterable, using the values rather than keys for dictionaries.
-def iterMax(it):
+def iter_max(it):
     if issubclass(type(it), collections.abc.Mapping):
         keys, values = tuple(it.keys()), tuple(it.values())
         m = max(values)
@@ -1558,7 +1736,7 @@ def iterMax(it):
     return it
 
 # This is faster than dict.setdefault apparently
-def setDict(d, k, v, ignore=False):
+def set_dict(d, k, v, ignore=False):
     try:
         v = d.__getitem__(k)
         if v is None and ignore:
@@ -1568,7 +1746,7 @@ def setDict(d, k, v, ignore=False):
     return v
 
 # Adds two dictionaries similar to dict.update, but adds conflicting values rather than replacing.
-def addDict(a, b, replace=True, insert=None):
+def add_dict(a, b, replace=True, insert=None):
     if type(a) is not dict:
         if replace:
             r = b
@@ -1601,13 +1779,13 @@ def addDict(a, b, replace=True, insert=None):
                 r[k] = b[k]
                 continue
             if type(temp) is dict or type(b[k]) is dict:
-                r[k] = addDict(b[k], temp, replace)
+                r[k] = add_dict(b[k], temp, replace)
                 continue
             r[k] = b[k] + temp
     return r
 
 # Increments a key value pair in a dictionary, replacing if nonexistent.
-def incDict(d, **kwargs):
+def inc_dict(d, **kwargs):
     for k, v in kwargs.items():
         try:
             d[k] += v
@@ -1616,7 +1794,7 @@ def incDict(d, **kwargs):
     return d
 
 # Subtracts a list of keys from a dictionary.
-def subDict(d, key):
+def sub_dict(d, key):
     output = dict(d)
     try:
         key[0]
@@ -1628,24 +1806,24 @@ def subDict(d, key):
 
 
 # Casts a number to integers if the conversion would not alter the value.
-def roundMin(x):
+def round_min(x):
     if type(x) is int:
         return x
     if type(x) is not complex:
-        if isValid(x):
+        if is_finite(x):
             y = math.round(x)
             if x == y:
                 return int(y)
         return x
     else:
         if x.imag == 0:
-            return roundMin(x.real)
+            return round_min(x.real)
         else:
-            return roundMin(complex(x).real) + roundMin(complex(x).imag) * (1j)
+            return round_min(complex(x).real) + round_min(complex(x).imag) * (1j)
 
 
 # Rounds a number to various fractional positions if possible.
-def closeRound(n):
+def close_round(n):
     rounds = [0.125, 0.375, 0.625, 0.875, 0.25, 0.5, 0.75, 1 / 3, 2 / 3]
     a = math.floor(n)
     b = n % 1
@@ -1657,7 +1835,7 @@ def closeRound(n):
 
 
 # Converts a float to a fraction represented by a numerator/denominator pair.
-def toFrac(num, limit=2147483647):
+def to_frac(num, limit=2147483647):
     if num >= limit:
         return [limit, 1]
     if num <= 0:
@@ -1686,14 +1864,14 @@ def lcm2(x, y=1):
         i = True
         if x != int(x):
             i = False
-            x = toFrac(x)[0]
+            x = to_frac(x)[0]
         if y != int(y):
             i = False
-            y = toFrac(y)[0]
+            y = to_frac(y)[0]
         if i:
             return x * y // gcd(x, y)
         else:
-            return toFrac(x / y)[0]
+            return to_frac(x / y)[0]
     return x
 
 # Computes the lowest common multiple of numbers in an arbitrary amount of inputs.
@@ -1709,7 +1887,7 @@ def lcm(*x):
     return x[-1]
 
 def lcmRange(x):
-    primes = generatePrimes(1, x, -1)
+    primes = generate_primes(1, x, -1)
     y = 1
     for p in primes:
         y *= p ** floor(log(x, p))
@@ -1717,15 +1895,15 @@ def lcmRange(x):
 
 
 # Computes the mean of all numbers in an iterable.
-mean = lambda *nums: roundMin(np.mean(nums))
+mean = lambda *nums: round_min(np.mean(nums))
 
 
 # Raises a number to a power, keeping sign.
 def pwr(x, power=2):
     if x.real >= 0:
-        return roundMin(x ** power)
+        return round_min(x ** power)
     else:
-        return roundMin(-((-x) ** power))
+        return round_min(-((-x) ** power))
 
 
 # Alters the pulse width of an array representing domain values for a function with period 2π.
@@ -1739,15 +1917,14 @@ isnan = cmath.isnan
 
 
 # Checks if a number is finite in value.
-def isValid(x):
+def is_finite(x):
     if type(x) is int:
         return True
     if type(x) is complex:
         return not (cmath.isinf(x) or cmath.isnan(x))
-    try:
+    with suppress():
         return x.is_finite()
-    except:
-        return math.isfinite(x)
+    return math.isfinite(x)
 
 
 # Inverse exponential function to approach a destination smoothly.
@@ -1762,7 +1939,7 @@ def approach(x, y, z, threshold=0.125):
 
 
 # I forgot what this was for oops
-def scaleRatio(x, y):
+def scale_ratio(x, y):
     with suppress(ZeroDivisionError):
         return x * (x - y) / (x + y)
     return 0
@@ -1782,7 +1959,7 @@ def xrange(a, b=None, c=None):
 
 
 # Returns the Roman Numeral representation of an integer.
-def romanNumerals(num, order=0):
+def roman_numerals(num, order=0):
     num = num if type(num) is int else int(num)
     carry = 0
     over = ""
@@ -1791,7 +1968,7 @@ def romanNumerals(num, order=0):
     if num >= 4000:
         carry = num // 1000
         num %= 1000
-        over = romanNumerals(carry, order + 1)
+        over = roman_numerals(carry, order + 1)
     while num >= 1000:
         num -= 1000
         output += "M"
@@ -1839,7 +2016,7 @@ def romanNumerals(num, order=0):
     return over + output + sym
 
 
-numWords = {
+NumWords = {
     "zero": 0,
     "a": 1,
     "an": 1,
@@ -1910,19 +2087,19 @@ numWords = {
 }
 
 # Parses English words as numbers.
-def numParse(s):
+def num_parse(s):
     out = 0
-    words = singleSpace(s).casefold().split()
+    words = single_space(s).casefold().split()
     i = 0
     while i < len(words):
         w = words[i]
-        x = numWords.get(w, w)
+        x = NumWords.get(w, w)
         if type(x) is str:
             x = int(x)
         while i < len(words) - 1:
             i += 1
             w = words[i]
-            y = numWords.get(w, w)
+            y = NumWords.get(w, w)
             if type(y) is str:
                 y = int(y)
             if x < y:
@@ -1938,7 +2115,7 @@ def numParse(s):
 
 
 # Limits a string to a maximum length, cutting from the middle and replacing with ".." when possible.
-def limStr(s, maxlen=10):
+def lim_str(s, maxlen=10):
     if maxlen is None:
         return s
     if type(s) is not str:
@@ -1946,13 +2123,13 @@ def limStr(s, maxlen=10):
     over = (len(s) - maxlen) / 2
     if over > 0:
         half = len(s) / 2
-        s = s[: ceil(half - over - 1)] + ".." + s[ceil(half + over + 1) :]
+        s = s[:ceil(half - over - 1)] + ".." + s[ceil(half + over + 1):]
     return s
 
 
 # Returns a string representation of a number with a limited amount of characters, using scientific notation when required.
-def expNum(num, maxlen=10, decimals=0):
-    if not isValid(num):
+def exp_num(num, maxlen=10, decimals=0):
+    if not is_finite(num):
         if num.real > 0:
             return "inf"
         elif num.real < 0:
@@ -1960,9 +2137,9 @@ def expNum(num, maxlen=10, decimals=0):
         else:
             return "NaN"
     if type(num) is complex:
-        i = expNum(num.imag, maxlen // 2 - 1, decimals)
+        i = exp_num(num.imag, maxlen // 2 - 1, decimals)
         p = "+" if num.imag > 0 else ""
-        return expNum(num.real, ceil(maxlen / 2) - 1, decimals) + p + i + "i"
+        return exp_num(num.real, ceil(maxlen / 2) - 1, decimals) + p + i + "i"
     if num < 0:
         n = "-"
         num = -num
@@ -1973,7 +2150,7 @@ def expNum(num, maxlen=10, decimals=0):
     except:
         numlen = floor(math.log10(max(0.001, num)))
     if log(max(0.001, num), 10) <= maxlen - decimals:
-        return n + roundX(num, min(maxlen - numlen - 2 - len(n), decimals))
+        return n + round_at(num, min(maxlen - numlen - 2 - len(n), decimals))
     else:
         if numlen > 0:
             try:
@@ -1982,14 +2159,14 @@ def expNum(num, maxlen=10, decimals=0):
                 loglen = floor(math.log10(numlen)) + len(n)
         else:
             loglen = 0
-        s = roundX(num / 10 ** numlen, maxlen - loglen - 5)[: max(1, maxlen - loglen - 2)]
+        s = round_at(num / 10 ** numlen, maxlen - loglen - 5)[: max(1, maxlen - loglen - 2)]
         if s[:3] == "10.":
             s = "9." + "9" * (maxlen - loglen - 4)
         return n + s + "e+" + str(numlen)
 
 
 # Rounds a number to a certain amount of decimal places, appending 0s if the number is too short.
-def roundX(num, prec):
+def round_at(num, prec):
     if prec > 0:
         s = str(round(num.real, round(prec)))
         if "." in s:
@@ -2002,7 +2179,7 @@ def roundX(num, prec):
 
 
 # Attempts to convert an iterable to a string if it isn't already
-def verifyString(s):
+def verify_string(s):
     if type(s) is str:
         return s
     with suppress(TypeError):
@@ -2011,10 +2188,10 @@ def verifyString(s):
 
 
 # A hue to colour conversion function with maximum saturation and lightness.
-colourCalculation = lambda a, offset=0: adjColour(colorsys.hsv_to_rgb((a / 1536) % 1, 1, 1), offset, 255)
+hue2colour = lambda a, offset=0: adj_colour(colorsys.hsv_to_rgb((a / 1536) % 1, 1, 1), offset, 255)
 
 # Converts a colour tuple to a single integer.
-def colour2Raw(*c):
+def colour2raw(*c):
     while len(c) == 1:
         c = c[0]
     if len(c) == 3:
@@ -2022,10 +2199,10 @@ def colour2Raw(*c):
     return (c[0] << 16) + (c[1] << 8) + c[2] + (c[3] << 24)
 
 # Converts an integer to a colour tuple.
-def raw2Colour(x):
+def raw2colour(x):
     if x > 1 << 24:
-        return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255, (x >> 24) & 255))
-    return verifyColour(((x >> 16) & 255, (x >> 8) & 255, x & 255))
+        return verify_colour(((x >> 16) & 255, (x >> 8) & 255, x & 255, (x >> 24) & 255))
+    return verify_colour(((x >> 16) & 255, (x >> 8) & 255, x & 255))
 
 # Colour space conversion functions
 rgb_to_hsv = lambda c: list(colorsys.rgb_to_hsv(*c[:3])) + c[3:]
@@ -2040,13 +2217,13 @@ rgb_to_xyz = lambda c: list(color_conversions.convert_color(color_objects.sRGBCo
 xyz_to_rgb = lambda c: list(color_conversions.convert_color(color_objects.XYZColor(*c[:3]), color_objects.sRGBColor).get_value_tuple()) + c[3:]
 
 # Converts hex to an colour.
-hex2Colour = lambda h: verifyColour(hex2Bytes(h))
+hex2colour = lambda h: verify_colour(hex2bytes(h))
 
 # Computes luma (observed brightness) of a colour.
 luma = lambda c: 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
 
 # Verifies a colour is valid.
-def verifyColour(c):
+def verify_colour(c):
     if type(c) is not list:
         c = list(c)
     for i in range(len(c)):
@@ -2059,7 +2236,7 @@ def verifyColour(c):
     return c
 
 # Generates a 3 colour tuple filled with a single value.
-def fillColour(a):
+def fill_colour(a):
     if type(a) is complex:
         a = a.real
     a = round(a)
@@ -2070,20 +2247,20 @@ def fillColour(a):
     return [a, a, a]
 
 # Returns a black or white background for a certain colour, using the luma value to determine which one to use.
-def negColour(c, t=127):
+def neg_colour(c, t=127):
     i = luma(c)
     if i > t:
-        return fillColour(0)
-    return fillColour(255)
+        return fill_colour(0)
+    return fill_colour(255)
 
 # Inverts a colour.
-invColour = lambda c: [255 - i for i in c]
+inv_colour = lambda c: [255 - i for i in c]
 
 # Adjusts a colour with optional settings.
-def adjColour(colour, brightness=0, intensity=1, hue=0, bits=0, scale=False):
+def adj_colour(colour, brightness=0, intensity=1, hue=0, bits=0, scale=False):
     if hue != 0:
         h = list(colorsys.rgb_to_hsv(*(array(colour) / 255)))
-        c = adjColour(colorsys.hsv_to_rgb((h[0] + hue) % 1, h[1], h[2]), intensity=255)
+        c = adj_colour(colorsys.hsv_to_rgb((h[0] + hue) % 1, h[1], h[2]), intensity=255)
     else:
         c = list(colour)
     for i in range(len(c)):
@@ -2095,12 +2272,12 @@ def adjColour(colour, brightness=0, intensity=1, hue=0, bits=0, scale=False):
                     if i != j:
                         c[j] += c[i] - 255
                 c[i] = 255
-    c = bitCrush(c, bits)
-    return verifyColour(c)
+    c = bit_crush(c, bits)
+    return verify_colour(c)
 
 
 # Reduces a number's bit precision.
-def bitCrush(dest, b=0, f=round):
+def bit_crush(dest, b=0, f=round):
     try:
         a = 1 << b
     except (TypeError, ValueError):
@@ -2116,7 +2293,7 @@ def bitCrush(dest, b=0, f=round):
 
 
 # Returns the permutations of values in a list.
-def listPermutation(dest):
+def list_permutation(dest):
     order = np.zeros(len(dest))
     for i in range(len(dest)):
         for j in range(i, len(dest)):
@@ -2125,35 +2302,6 @@ def listPermutation(dest):
             elif dest[i] < dest[j]:
                 order[j] += 1
     return order
-
-
-# Evaluates an operation on multiple vectors or scalars.
-def multiVectorScalarOp(dest, operator):
-    expression = "a" + operator + "b"
-    function = eval("lambda a,b: " + expression)
-    output = []
-    for i in range(len(dest[0])):
-        s = 0
-        for j in range(len(dest)):
-            s = function(s, dest[j][i])
-        output.append(s)
-    return output
-
-# Evaluates an operation on two vectors.
-def vectorVectorOp(dest, source, operator):
-    expression = "dest[i]" + operator + "source[i]"
-    function = eval("lambda dest,source,i: " + expression)
-    for i in range(len(source)):
-        dest[i] = function(dest, source, i)
-    return dest
-
-# Evaluates an operation on a vector and a scalar.
-def vectorScalarOp(dest, source, operator):
-    expression = "dest[i]" + operator + str(source)
-    function = eval("lambda dest,i: " + expression)
-    for i in range(len(dest)):
-        dest[i] = function(dest, i)
-    return dest
 
 
 # Uses an optional interpolation mode to get a certain position in an iterable.
@@ -2177,14 +2325,16 @@ def product(*nums):
     return p
 
 # Compues dot product of one or multiple 1 dimensional values.
-def dotProduct(*vects):
+def dot_product(*vects):
     if len(vects) > 1:
         return sum(product(*(array(v) for v in vects)))
     return sum((i ** 2 for i in vects[-1]))
 
+dot = dot_product
+
 
 # Clips the values in the source iterable to the values in the destination value.
-def limitList(source, dest, direction=False):
+def clip_list(source, dest, direction=False):
     for i in range(len(source)):
         if direction:
             if source[i] < dest[i]:
@@ -2196,26 +2346,26 @@ def limitList(source, dest, direction=False):
 
 
 # Generates a random polar coordinate on a circle of radius x.
-randomPolarCoord = lambda x=1: polarCoords(frand(x), frand(tau))
+rand_circum_pos = lambda x=1: pol2cart(frand(x), frand(tau))
 
 # Converts polar coordinates to cartesian coordinates.
-def polarCoords(dist, angle, pos=None):
-    p = dist * array([math.cos(angle), math.sin(angle)])
+def pol2cart(dist, angle, pos=None):
+    p = array(x * dist for x in (math.cos(angle), math.sin(angle)))
     if pos is None:
         return p
     return p + pos
 
 # Converts cartesian coordinates to polar coordinates.
-def cartesianCoords(x, y, pos=None):
+def cart2pol(x, y, pos=None):
     if pos is None:
-        d = array(x, y)
+        d = (x, y)
     else:
-        d = array(x, y) - array(pos)
+        d = (x - pos[0], y - pos[1])
     return array([hypot(*d), atan2(*reversed(d))])
 
 
 # Computes a rect object using another, with an offset from each side.
-def convertRect(rect, edge=0):
+def convert_rect(rect, edge=0):
     dest_rect = [rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3]]
     if dest_rect[0] > dest_rect[2]:
         dest_rect[0], dest_rect[2] = dest_rect[2], dest_rect[0]
@@ -2228,8 +2378,8 @@ def convertRect(rect, edge=0):
     return dest_rect
 
 # Checks whether a point is within a rect.
-def inRect(pos, rect, edge=0):
-    dest_rect = convertRect(rect, edge)
+def in_rect(pos, rect, edge=0):
+    dest_rect = convert_rect(rect, edge)
     if pos[0] - dest_rect[0] <= 0:
         return False
     if pos[1] - dest_rect[1] <= 0:
@@ -2241,11 +2391,11 @@ def inRect(pos, rect, edge=0):
     return True
 
 # Moves a position into a rect based on the position it should be in.
-def toRect(pos, rect, edge=0):
+def move_to_rect(pos, rect, edge=0):
     p = list(pos)
-    if not all(isValid(i) for i in pos):
+    if not all(is_finite(i) for i in pos):
         return p, True, True
-    dest_rect = convertRect(rect, 0)
+    dest_rect = convert_rect(rect, 0)
     lr, ud = False, False
     for _ in loop(4):
         diff = p[0] - dest_rect[0] - edge
@@ -2271,42 +2421,42 @@ def toRect(pos, rect, edge=0):
     return p, lr, ud
 
 # Moves a position into a circle around the centre of a rect if it is outside.
-def rdRect(pos, rect, edge=0):
-    dest_rect = convertRect(rect, edge)
-    if not inRect(pos, rect, edge):
+def round_to_rect(pos, rect, edge=0):
+    dest_rect = convert_rect(rect, edge)
+    if not in_rect(pos, rect, edge):
         s = array(dest_rect[:2])
         t = array(pos)
         p = array(dest_rect[2:]) - s
         m = p / 2
         diff = t - s - m
         angle = atan2(*reversed(diff))
-        vel = polarCoords(hypot(*m), angle)
+        vel = pol2cart(hypot(*m), angle)
         pos = vel + s + m
     return pos
 
 
 # Returns the predicted position of an object with given velocity and decay at a certain time.
-def diffExpD(r, s, t):
+def time2disp(r, s, t):
     if r == 1:
         return s * t
     return log(s * (r ** t - 1), r)
 
 # Returns the predicted time taken for an object with given velocity and decay to reach a certain position.
-def diffExpT(r, s, d):
+def disp2time(r, s, d):
     coeff = d * log(r) / s + 1
     if coeff < 0:
         return inf
     return log(coeff, r)
 
 # Computes approximate intercept angle for a particle, with speed and optional decay values.
-def predictTrajectory(src, dest, vel, spd, dec=1, boundary=None, edge=0):
+def predict_trajectory(src, dest, vel, spd, dec=1, boundary=None, edge=0):
     pos = array(dest)
     dist = hypot(*(src - dest))
     for _ in loop(64):
-        time = diffExpT(dec, spd, dist)
+        time = disp2time(dec, spd, dist)
         new_pos = dest + vel * min(time, 1 << 32)
         if boundary:
-            new_pos = array(toRect(new_pos, boundary, edge)[0])
+            new_pos = array(move_to_rect(new_pos, boundary, edge)[0])
         new_dist = hypot(*(new_pos - pos))
         pos = new_pos
         dist = hypot(*(src - pos))
@@ -2316,16 +2466,16 @@ def predictTrajectory(src, dest, vel, spd, dec=1, boundary=None, edge=0):
 
 
 # A elastic circle collision function that takes into account masses and radii.
-def collisionCheck(pos1, pos2, vel1, vel2, mass1, mass2, radius1, radius2):
+def process_collision(pos1, pos2, vel1, vel2, mass1, mass2, radius1, radius2):
     diff = pos1 - pos2
-    dist = frameDistance(pos1, pos2, -vel1, -vel2)
+    dist = frame_dist(pos1, pos2, -vel1, -vel2)
     mindist = radius1 + radius2
     if dist < mindist:
         pos1, pos2 = array(pos1), array(pos2)
         vel1, vel2 = array(vel1), array(vel2)
         dist -= 1
         angle = atan2(*reversed(diff))
-        mov = polarCoords(mindist - dist + 1, angle)
+        mov = pol2cart(mindist - dist + 1, angle)
         p1 = mass1 * hypot(*vel1)
         p2 = mass2 * hypot(*vel2)
         r = p1 / max((p1 + p2), 0.1)
@@ -2340,8 +2490,8 @@ def collisionCheck(pos1, pos2, vel1, vel2, mass1, mass2, radius1, radius2):
         pos2 += v2
         veld1 = vel1 - vel2
         veld2 = -veld1
-        arg1 = dotProduct(veld1, vect1) / dotProduct(vect1)
-        arg2 = dotProduct(veld2, vect2) / dotProduct(vect2)
+        arg1 = dot(veld1, vect1) / dot(vect1)
+        arg2 = dot(veld2, vect2) / dot(vect2)
         vect1 *= coeff1 * arg1
         vect2 *= coeff2 * arg2
         vel1 -= vect1
@@ -2353,7 +2503,7 @@ def collisionCheck(pos1, pos2, vel1, vel2, mass1, mass2, radius1, radius2):
 
 
 # Returns the difference between two angles.
-def angleDifference(angle1, angle2, unit=tau):
+def angle_diff(angle1, angle2, unit=tau):
     angle1 %= unit
     angle2 %= unit
     if angle1 > angle2:
@@ -2363,7 +2513,7 @@ def angleDifference(angle1, angle2, unit=tau):
     return min(a, b)
 
 # Returns the distance between two angles.
-def angleDistance(angle1, angle2, unit=tau):
+def angle_dist(angle1, angle2, unit=tau):
     angle1 %= unit
     angle2 %= unit
     a = angle2 - angle1
@@ -2372,25 +2522,26 @@ def angleDistance(angle1, angle2, unit=tau):
     return sorted((a, b, c), key=lambda x: abs(x))[0]
 
 
-# Returns the closest approach distance between two objects with constant velocity, over a certain time interval.
-def frameDistance(pos1, pos2, vel1, vel2):
+# Returns the closest approach distance between two objects with constant velocity, over a certain time frame.
+def frame_dist(pos1, pos2, vel1, vel2):
     line1 = [pos1 - vel1, pos1]
     line2 = [pos2 - vel2, pos2]
-    return intervalIntervalDist(line1, line2)
+    return interval_interval_dist(line1, line2)
 
 # Returns the distance between two intervals.
-def intervalIntervalDist(line1, line2):
-    if intervalsIntersect(line1, line2):
+def interval_interval_dist(line1, line2):
+    if intervals_intersect(line1, line2):
         return 0
-    distances = [
-        pointIntervalDist(line1[0], line2),
-        pointIntervalDist(line1[1], line2),
-        pointIntervalDist(line2[0], line1),
-        pointIntervalDist(line2[1], line1)]
+    distances = (
+        point_interval_dist(line1[0], line2),
+        point_interval_dist(line1[1], line2),
+        point_interval_dist(line2[0], line1),
+        point_interval_dist(line2[1], line1),
+    )
     return min(distances)
 
 # Returns the distance between a point and an interval.
-def pointIntervalDist(point, line):
+def point_interval_dist(point, line):
     px, py = point
     x1, x2 = line[0][0], line[1][0]
     y1, y2 = line[0][1], line[1][1]
@@ -2411,7 +2562,7 @@ def pointIntervalDist(point, line):
     return hypot(dx, dy)
 
 # Checks if two intervals intersect at a point.
-def intervalsIntersect(line1, line2):
+def intervals_intersect(line1, line2):
     x11, y11 = line1[0]
     x12, y12 = line1[1]
     x21, y21 = line2[0]
@@ -2429,14 +2580,14 @@ def intervalsIntersect(line1, line2):
 
 
 # Evaluates an expression along a domain of input values.
-def func2Array(func, size=4096):
+def func2array(func, size=4096):
     function = eval("lambda x: " + str(func))
     period = 2 * pi
     array = function(np.arange(0, period, 1 / (size + 1) * period))
     return array
 
 # Computes harmonics (Fourier Transform) of an array.
-def array2Harmonics(data, precision=1024):
+def array2harmonics(data, precision=1024):
     output = []
     T = len(data)
     t = np.arange(T)
@@ -2454,7 +2605,7 @@ def array2Harmonics(data, precision=1024):
     return np.array(output[1 : precision + 1])
 
 # Computes an array (Inverse Fourier Transform) of an array.
-def harmonics2Array(period, harmonics, func="sin(x)"):
+def harmonics2array(period, harmonics, func="sin(x)"):
     expression = func
     function = eval("lambda x: " + expression)
     result = 0
@@ -2465,7 +2616,7 @@ def harmonics2Array(period, harmonics, func="sin(x)"):
 
 
 # Limits a string to an amount of lines.
-def limLine(s, lim):
+def lim_line(s, lim):
     curr = s
     if len(curr) > lim:
         temp = curr.split(" ")
@@ -2481,7 +2632,7 @@ def limLine(s, lim):
 
 
 # Removes an argument from a string, separated by spaces.
-def strGetRem(s, arg):
+def remove_str(s, arg):
     if arg + " " in s:
         s = s.replace(arg + " ", "")
         return s, True
@@ -2492,7 +2643,7 @@ def strGetRem(s, arg):
 
 
 # Returns a string representation of an iterable, with options.
-def strIter(it, key=None, limit=1728, offset=0, left="[", right="]"):
+def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]"):
     try:
         try:
             len(it)
@@ -2524,11 +2675,11 @@ def strIter(it, key=None, limit=1728, offset=0, left="[", right="]"):
         else:
             s += str(key(it[k]))
         i += 1
-    return limStr(s, limit)
+    return lim_str(s, limit)
 
 
 # Returns a copy of a mapping object, with keys cast to integers where possible.
-def intKey(d):
+def int_key(d):
     c = d.__class__(d)
     for k in tuple(d):
         try:
@@ -2538,7 +2689,7 @@ def intKey(d):
         with suppress(TypeError, ValueError):
             k = int(k)
         if type(t) is dict:
-            t = intKey(t)
+            t = int_key(t)
         c[k] = t
     return c
 
@@ -2571,8 +2722,8 @@ TIMEUNITS = {
 }
 
 # Converts a time input in seconds to a list of time intervals.
-def timeConv(s):
-    if not isValid(s):
+def time_convert(s):
+    if not is_finite(s):
         high = "galactic years"
         return [str(s) + " " + high]
     r = s < 0
@@ -2594,17 +2745,17 @@ def timeConv(s):
                     i = m[1]
                 else:
                     i += "s"
-            taken.append("-" * r + str(roundMin(a)) + " " + str(i))
+            taken.append("-" * r + str(round_min(a)) + " " + str(i))
     if not len(taken):
-        return [str(roundMin(s)) + " seconds"]
+        return [str(round_min(s)) + " seconds"]
     return taken
 
 # Returns the string representation of a time value in seconds, in word form.
-sec2Time = lambda s: " ".join(timeConv(s))
+sec2time = lambda s: " ".join(time_convert(s))
 
 # Returns a representation of a time interval using days:hours:minutes:seconds.
-def dhms(s):
-    if not isValid(s):
+def time_disp(s):
+    if not is_finite(s):
         return str(s)
     s = round(s)
     output = str(s % 60)
@@ -2627,7 +2778,7 @@ def dhms(s):
     return output
 
 # Converts a time interval represented using days:hours:minutes:seconds, to a value in seconds.
-def rdhms(ts):
+def time_parse(ts):
     data = ts.split(":")
     t = 0
     mult = 1
@@ -2644,16 +2795,16 @@ def rdhms(ts):
 
 
 __sptrans = re.compile("  +")
-singleSpace = lambda s: re.sub(__sptrans, " ", s)
+single_space = lambda s: re.sub(__sptrans, " ", s)
 
 # Experimental invisible Zero-Width character encoder.
-zeroEnc = "\xad\u061c\u180e\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\u2064\u2065\u2066\u2067\u2068\u2069\u206a\u206b\u206c\u206d\u206e\u206f\ufeff\x0c"
-zeroEncoder = demap({chr(i + 97): c for i, c in enumerate(zeroEnc)})
-zeroEncode = "".maketrans(dict(zeroEncoder.a))
-zeroDecode = "".maketrans(dict(zeroEncoder.b))
-isZeroEnc = lambda s: (s[0] in zeroEnc) if s else None
-zwencode = lambda s: (s if type(s) is str else str(s)).casefold().translate(zeroEncode)
-zwdecode = lambda s: (s if type(s) is str else str(s)).casefold().translate(zeroDecode)
+ZeroEnc = "\xad\u061c\u180e\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\u2064\u2065\u2066\u2067\u2068\u2069\u206a\u206b\u206c\u206d\u206e\u206f\ufeff\x0c"
+__zeroEncoder = demap({chr(i + 97): c for i, c in enumerate(ZeroEnc)})
+__zeroEncode = "".maketrans(dict(__zeroEncoder.a))
+__zeroDecode = "".maketrans(dict(__zeroEncoder.b))
+is_zero_enc = lambda s: (s[0] in ZeroEnc) if s else None
+zwencode = lambda s: (s if type(s) is str else str(s)).casefold().translate(__zeroEncode)
+zwdecode = lambda s: (s if type(s) is str else str(s)).casefold().translate(__zeroDecode)
 
 
 # Unicode fonts for alphanumeric characters.
@@ -2729,30 +2880,67 @@ DIACRITICS = {
 }
 for i, k in DIACRITICS.items():
     __umap.update({c: k for c in i})
-__umap.update({c: "" for c in zeroEnc})
+__umap.update({c: "" for c in ZeroEnc})
 __umap["\u200a"] = ""
 for c in tuple(__umap):
     if c in UNIFMTS[-1]:
         __umap.pop(c)
 __trans = "".maketrans(__umap)
-__trans.update({n: "" for n in numpy.concatenate([numpy.arange(11) + 7616, numpy.arange(4) + 65056, numpy.arange(112) + 768])})
+__trans.update({n: "" for n in np.concatenate([np.arange(11) + 7616, np.arange(4) + 65056, np.arange(112) + 768])})
 __unitrans = ["".maketrans({UNIFMTS[-1][x]: UNIFMTS[i][x] for x in range(len(UNIFMTS[-1]))}) for i in range(len(UNIFMTS) - 1)]
 
 # Translates all alphanumeric characters in a string to their corresponding character in the desired font.
-def uniStr(s, fmt=0):
+def uni_str(s, fmt=0):
     if type(s) is not str:
         s = str(s)
     return s.translate(__unitrans[fmt])
 
 # Translates all alphanumeric characters in unicode fonts to their respective ascii counterparts.
-def reconstitute(s):
+def unicode_prune(s):
     if type(s) is not str:
         s = str(s)
     return s.translate(__trans)
 
+full_prune = lambda s: unicode_prune(s).casefold()
+
+
+# A fuzzy substring search that returns the ratio of characters matched between two strings.
+def fuzzy_substring(sub, s, match_start=False):
+    match = 0
+    if not match_start or sub and s.startswith(sub[0]):
+        found = [0] * len(s)
+        x = 0
+        for i, c in enumerate(sub):
+            temp = s[x:]
+            if temp.startswith(c):
+                if found[x] < 1:
+                    match += 1
+                    found[x] = 1
+                x += 1
+            elif c in temp:
+                y = temp.index(c)
+                x += y
+                if found[x] < 1:
+                    found[x] = 1
+                    match += 1 - y / len(s)
+                x += 1
+            else:
+                temp = s[:x]
+                if c in temp:
+                    y = temp.rindex(c)
+                    if found[y] < 1:
+                        match += 1 - (x - y) / len(s)
+                        found[y] = 1
+                    x = y + 1
+        if len(sub) > len(s):
+            match *= len(s) / len(sub)
+    # ratio = match / len(s)
+    ratio = max(0, min(1, match / len(s)))
+    return ratio
+
 
 # Converts a bytes object to a hex string.
-def bytes2Hex(b, space=True):
+def bytes2hex(b, space=True):
     if type(b) is str:
         b = b.encode("utf-8")
     if space:
@@ -2760,10 +2948,10 @@ def bytes2Hex(b, space=True):
     return b.hex().upper()
 
 # Converts a hex string to a bytes object.
-hex2Bytes = lambda b: bytes.fromhex(b if type(b) is str else b.decode("utf-8", "replace"))
+hex2bytes = lambda b: bytes.fromhex(b if type(b) is str else b.decode("utf-8", "replace"))
 
 # Converts a bytes object to a base64 string.
-def bytes2B64(b, alt_char_set=False):
+def bytes2b64(b, alt_char_set=False):
     if type(b) is str:
         b = b.encode("utf-8")
     b = base64.b64encode(b)
@@ -2772,7 +2960,7 @@ def bytes2B64(b, alt_char_set=False):
     return b
 
 # Converts a base 64 string to a bytes object.
-def b642Bytes(b, alt_char_set=False):
+def b642bytes(b, alt_char_set=False):
     if type(b) is str:
         b = b.encode("utf-8")
     if alt_char_set:
@@ -2783,7 +2971,7 @@ def b642Bytes(b, alt_char_set=False):
 
 # SHA256 operations: base64 and base16.
 shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).replace(b"/", b"-").decode("utf-8", "replace")
-hhash = lambda s: bytes2Hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
+hhash = lambda s: bytes2hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
 
 
 # Manages a dict object and uses pickle to save and load it.
@@ -2791,15 +2979,19 @@ class pickled(collections.abc.Callable):
 
     def __init__(self, obj=None, ignore=()):
         self.data = obj
-        self.ignores = {}
+        self.ignores = set(ignore)
         self.__str__ = obj.__str__
-        self.__dict__.update(getattr(obj, "__dict__", {}))
+    
+    def __getattr__(self, key):
+        with suppress(AttributeError):
+            return self.__getattribute__(key)
+        return getattr(self.__getattribute__("data"), key)
 
     def __call__(self):
         return self
 
     def ignore(self, item):
-        self.ignores[item] = True
+        self.ignores.add(item)
 
     def __repr__(self):
         c = dict(self.data)
@@ -2810,6 +3002,6 @@ class pickled(collections.abc.Callable):
             return "None"
         return (
             "pickled(pickle.loads(hex2Bytes('''"
-            + bytes2Hex(d, space=False)
+            + bytes2hex(d, space=False)
             + "''')))"
         )

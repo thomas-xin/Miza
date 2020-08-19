@@ -26,20 +26,20 @@ class ND2048(collections.abc.MutableSequence):
         flags = int(spl[i - 1])
         spl = spl[i + 1:]
         self = cls(flags=flags)
-        self.data = np.frombuffer(b642Bytes(spl.pop(0), 1), dtype=np.int8).reshape(shape)
+        self.data = np.frombuffer(b642bytes(spl.pop(0), 1), dtype=np.int8).reshape(shape)
         if not self.data.flags.writeable:
             self.data = self.data.copy()
         if self.flags & 1:
             self.history = deque(maxlen=max(1, int(800 / np.prod(self.data.size) - 1)))
             while spl:
-                self.history.append(np.frombuffer(b642Bytes(spl.pop(0), 1), dtype=np.int8).reshape(shape))
+                self.history.append(np.frombuffer(b642bytes(spl.pop(0), 1), dtype=np.int8).reshape(shape))
         return self
 
     # Serializes gamestate data to base64
     def serialize(self):
-        s = (self.spl.join(str(i).encode("utf-8") for i in self.data.shape)) + self.spl + str(self.flags).encode("utf-8") + self.spl * 2 + bytes2B64(self.data.tobytes(), 1)
+        s = (self.spl.join(str(i).encode("utf-8") for i in self.data.shape)) + self.spl + str(self.flags).encode("utf-8") + self.spl * 2 + bytes2b64(self.data.tobytes(), 1)
         if self.flags & 1 and self.history:
-            s += self.spl + self.spl.join(bytes2B64(b.tobytes(), 1) for b in self.history)
+            s += self.spl + self.spl.join(bytes2b64(b.tobytes(), 1) for b in self.history)
         return s
 
     # Initializes new game
@@ -306,11 +306,11 @@ class Text2048(Command):
                 u = user
             else:
                 u = bot.get_user(u_id, replace=True)
-            emb = discord.Embed(colour=randColour())
+            emb = discord.Embed(colour=rand_colour())
             if u is None:
                 emb.set_author(name="@everyone", icon_url=bot.discord_icon)
             else:
-                emb.set_author(name=str(u), icon_url=bestURL(u))
+                emb.set_author(name=str(u), icon_url=best_url(u))
             content = "*```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + data.decode("utf-8") + "\nPlaying 2048...```*"
             emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
             emb.set_footer(text="Score: " + str(g.score()))
@@ -322,16 +322,16 @@ class Text2048(Command):
             size = [4, 4]
         else:
             if "x" in argv:
-                size = await recursive_coro([bot.evalMath(i, user) for i in argv.split("x")])
+                size = await recursive_coro([bot.eval_math(i, user) for i in argv.split("x")])
             else:
                 if len(args) > 1:
                     dims = args.pop(-1)
-                    dims = await bot.evalMath(dims, user)
+                    dims = await bot.eval_math(dims, user)
                 else:
                     dims = 2
                 if dims <= 0:
                     raise ValueError("Invalid amount of dimensions specified.")
-                width = await bot.evalMath(" ".join(args), user)
+                width = await bot.eval_math(" ".join(args), user)
                 size = list(repeat(width, dims))
         if len(size) > 8:
             raise OverflowError("Board size too large.")
@@ -370,12 +370,12 @@ class MimicConfig(Command):
     async def __call__(self, bot, user, message, perm, flags, args, **void):
         update = self.data.mimics.update
         mimicdb = bot.data.mimics
-        m_id = "&" + str(verifyID(args.pop(0)))
+        m_id = "&" + str(verify_id(args.pop(0)))
         if m_id not in mimicdb:
             raise LookupError("Target mimic ID not found.")
         # Users are not allowed to modify mimics they do not control
         if not isnan(perm):
-            mimics = setDict(mimicdb, user.id, {})
+            mimics = set_dict(mimicdb, user.id, {})
             found = 0
             for prefix in mimics:
                 found += mimics[prefix].count(m_id)
@@ -386,7 +386,7 @@ class MimicConfig(Command):
             found = True
         mimic = mimicdb[m_id]
         opt = args.pop(0).casefold()
-        args.extend(bestURL(a) for a in message.attachments)
+        args.extend(best_url(a) for a in message.attachments)
         if args:
             new = " ".join(args)
         else:
@@ -404,10 +404,7 @@ class MimicConfig(Command):
         else:
             raise TypeError("Invalid target attribute.")
         if new is None:
-            return (
-                "```ini\nCurrent " + setting + " for [" 
-                + noHighlight(mimic.name) + "]: [" + noHighlight(mimic[setting]) + "].```"
-            )
+            return ini_md(f"Current {setting} for {sqr_md(mimic.name)}: {sqr_md(mimic[setting])}.")
         if setting == "birthday":
             new = utc_ts(tzparse(new))
         # This limit is actually to comply with webhook usernames
@@ -426,7 +423,7 @@ class MimicConfig(Command):
             else:
                 mimics[new] = [m_id]
         elif setting == "url":
-            urls = await bot.followURL(new, best=True)
+            urls = await bot.follow_url(new, best=True)
             new = urls[0]
         # May assign a user to the mimic
         elif setting == "auto":
@@ -435,7 +432,7 @@ class MimicConfig(Command):
             else:
                 mim = None
                 try:
-                    mim = verifyID(new)
+                    mim = verify_id(new)
                     user = await bot.fetch_user(mim)
                     if user is None:
                         raise EOFError
@@ -452,10 +449,7 @@ class MimicConfig(Command):
         name = mimic.name
         mimic[setting] = new
         update()
-        return (
-            "```css\nChanged " + setting + " for [" 
-            + noHighlight(name) + "] to [" + noHighlight(new) + "].```"
-        )
+        return css_md(f"Changed {setting} for {sqr_md(name)} to {sqr_md(new)}.")
 
 
 class Mimic(Command):
@@ -471,25 +465,18 @@ class Mimic(Command):
     async def __call__(self, bot, message, user, perm, flags, args, argv, **void):
         update = self.data.mimics.update
         mimicdb = bot.data.mimics
-        args.extend(bestURL(a) for a in reversed(message.attachments))
+        args.extend(best_url(a) for a in reversed(message.attachments))
         if len(args) == 1 and "d" not in flags:
-            user = await bot.fetch_user(verifyID(argv))
-        mimics = setDict(mimicdb, user.id, {})
+            user = await bot.fetch_user(verify_id(argv))
+        mimics = set_dict(mimicdb, user.id, {})
         if not argv or (len(args) == 1 and "d" not in flags):
             if "d" in flags:
                 # This deletes all mimics for the current user
                 if "f" not in flags:
-                    response = uniStr(
-                        "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
-                        + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
-                    )
-                    return ("**```asciidoc\n[" + response + "]```**")
+                    return bot.dangerous_command
                 mimicdb.pop(user.id)
                 update()
-                return (
-                    "*```css\nSuccessfully removed all webhook mimics for ["
-                    + noHighlight(user) + "].```*"
-                )
+                return italics(css_md(f"Successfully removed all webhook mimics for {sqr_md(user)}."))
             # Set callback message for scrollable list
             return (
                 "*```" + "\n" * ("z" in flags) + "callback-game-mimic-"
@@ -525,10 +512,7 @@ class Mimic(Command):
                         mimics[prefix].remove(m_id)
                 mimicdb.pop(mimic.id)
             update()
-            return (
-                "*```css\nSuccessfully removed webhook mimic [" + mimic.name
-                + "] for [" + noHighlight(user) + "].```*"
-            )
+            return italics(css_md(f"Successfully removed webhook mimic {sqr_md(mimic.name)} for {sqr_md(user)}."))
         if not prefix:
             raise IndexError("Prefix must not be empty.")
         if len(prefix) > 16:
@@ -537,11 +521,7 @@ class Mimic(Command):
             raise TypeError("Prefix must not contain spaces.")
         # This limit is ridiculous. I like it.
         if sum(len(i) for i in iter(mimics.values())) >= 32768:
-            raise OverflowError(
-                "Mimic list for " + str(user)
-                + " has reached the maximum of 32768 items. "
-                + "Please remove an item to add another."
-            )
+            raise OverflowError(f"Mimic list for {user} has reached the maximum of 32768 items. Please remove an item to add another.")
         dop = None
         utcn = utc_dt()
         mid = discord.utils.time_snowflake(utcn)
@@ -551,19 +531,19 @@ class Mimic(Command):
         # Attempt to create a new mimic, a mimic from a user, or a copy of an existing mimic.
         if len(args):
             if len(args) > 1:
-                urls = await bot.followURL(args[-1], best=True)
+                urls = await bot.follow_url(args[-1], best=True)
                 url = urls[0]
                 name = " ".join(args[:-1])
             else:
                 mim = 0
                 try:
-                    mim = verifyID(args[-1])
+                    mim = verify_id(args[-1])
                     user = await bot.fetch_user(mim)
                     if user is None:
                         raise EOFError
                     dop = user.id
                     name = user.name
-                    url = bestURL(user)
+                    url = best_url(user)
                 except:
                     try:
                         mimi = bot.get_mimic(mim, user)
@@ -580,7 +560,7 @@ class Mimic(Command):
                         url = "https://cdn.discordapp.com/embed/avatars/0.png"
         else:
             name = user.name
-            url = bestURL(user)
+            url = best_url(user)
         # This limit is actually to comply with webhook usernames
         if len(name) > 80:
             raise OverflowError("Name must be 80 or fewer in length.")
@@ -608,11 +588,10 @@ class Mimic(Command):
         else:
             mimics[prefix] = [m_id]
         update()
-        return (
-            "```css\nSuccessfully added webhook mimic [" + mimic.name
-            + "] with prefix [" + mimic.prefix + "] and ID [" + mimic.id + "]"
-            + (", bound to user [<" + "@" * (type(dop) is int) + str(dop) + ">]") * (dop is not None) + ".```"
-        )
+        out = f"Successfully added webhook mimic {sqr_md(mimic.name)} with prefix {sqr_md(mimic.prefix)} and ID {sqr_md(mimic.id)}"
+        if dop is not None:
+            out += f", bound to user [{user_mention(dop) if type(dop) is int else f'<{dop}>'}]"
+        return css_md(out)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_")]
@@ -654,23 +633,21 @@ class Mimic(Command):
             + "-\n"
         )
         if not mimics:
-            content += "No currently enabled webhook mimics for " + str(user).replace("`", "") + ".```*"
+            content += f"No currently enabled webhook mimics for {str(user).replace('`', '')}.```*"
             msg = ""
         else:
-            content += str(len(mimics)) + " currently enabled webhook mimics for " + str(user).replace("`", "") + ":```*"
-            key = lambda x: limStr("⟨" + ", ".join(i + ": " + (str(noHighlight(mimicdb[i].name)), "[<@" + str(getattr(mimicdb[i], "auto", "None")) + ">]")[bool(getattr(mimicdb[i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
-            msg = "```ini\n" + strIter({k: mimics[k] for k in sorted(mimics)[pos:pos + page]}, key=key) + "```"
+            content += f"{len(mimics)} currently enabled webhook mimics for {str(user).replace('`', '')}:```*"
+            key = lambda x: lim_str("⟨" + ", ".join(i + ": " + (str(no_md(mimicdb[i].name)), "[<@" + str(getattr(mimicdb[i], "auto", "None")) + ">]")[bool(getattr(mimicdb[i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
+            msg = ini_md(iter2str({k: mimics[k] for k in sorted(mimics)[pos:pos + page]}, key=key))
         emb = discord.Embed(
             description=content + msg,
-            colour=randColour(),
+            colour=rand_colour(),
         )
-        url = bestURL(user)
+        url = best_url(user)
         emb.set_author(name=str(user), url=url, icon_url=url)
         more = len(mimics) - pos - page
         if more > 0:
-            emb.set_footer(
-                text=uniStr("And ", 1) + str(more) + uniStr(" more...", 1),
-            )
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
@@ -689,23 +666,22 @@ class MimicSend(Command):
     async def __call__(self, bot, channel, message, user, perm, args, **void):
         update = self.data.mimics.update
         mimicdb = bot.data.mimics
-        mimics = setDict(mimicdb, user.id, {})
+        mimics = set_dict(mimicdb, user.id, {})
         prefix = args.pop(0)
-        c_id = verifyID(args.pop(0))
+        c_id = verify_id(args.pop(0))
         channel = await bot.fetch_channel(c_id)
         guild = channel.guild
-        w = await bot.ensureWebhook(channel)
         msg = " ".join(args)
         if not msg:
             raise IndexError("Message is empty.")
-        perm = bot.getPerms(user.id, guild)
+        perm = bot.get_perms(user.id, guild)
         try:
             mlist = mimics[prefix]
             if mlist is None:
                 raise KeyError
-            m = [bot.get_mimic(verifyID(p)) for p in mlist]
+            m = [bot.get_mimic(verify_id(p)) for p in mlist]
         except KeyError:
-            mimic = bot.get_mimic(verifyID(prefix))
+            mimic = bot.get_mimic(verify_id(prefix))
             m = [mimic]
         admin = not inf > perm
         try:
@@ -726,11 +702,7 @@ class MimicSend(Command):
                 await bot.database.mimics.updateMimic(mimic, guild)
                 name = mimic.name
                 url = mimic.url
-                try:
-                    await waitOnNone(w.send(msg, username=name, avatar_url=url, tts=tts))
-                except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
-                    w = await bot.ensureWebhook(channel, force=True)
-                    await waitOnNone(w.send(msg, username=name, avatar_url=url, tts=tts))
+                await wait_on_none(bot.send_as_webhook(channel, msg, username=name, avatar_url=url, tts=tts))
                 mimic.count += 1
                 mimic.total += len(msg)
             create_task(message.add_reaction("👀"))
@@ -746,7 +718,7 @@ class UpdateMimics(Database):
         user = message.author
         if user.id in self.data:
             bot = self.bot
-            perm = bot.getPerms(user.id, message.guild)
+            perm = bot.get_perms(user.id, message.guild)
             if perm < 0:
                 return
             admin = not inf > perm
@@ -761,7 +733,7 @@ class UpdateMimics(Database):
             if admin or "game" in enabled:
                 database = self.data[user.id]
                 msg = message.content
-                try:
+                async with ExceptionSender(message.channel, Exception):
                     # Stack multiple messages to send, may be separated by newlines
                     sending = hlist()
                     channel = message.channel
@@ -783,8 +755,7 @@ class UpdateMimics(Database):
                         if not found:
                             sending[-1].msg += "\n" + line
                     if sending:
-                        create_task(bot.silentDelete(message))
-                        w = await bot.ensureWebhook(channel)
+                        create_task(bot.silent_delete(message))
                         for k in sending:
                             mimic = self.data[k.m_id]
                             await self.updateMimic(mimic, guild=message.guild)
@@ -796,22 +767,16 @@ class UpdateMimics(Database):
                                 tts = True
                             else:
                                 tts = False
-                            try:
-                                await waitOnNone(w.send(msg, username=name, avatar_url=url, tts=tts))
-                            except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
-                                w = await bot.ensureWebhook(channel, force=True)
-                                await waitOnNone(w.send(msg, username=name, avatar_url=url, tts=tts))
+                            await wait_on_none(bot.send_as_webhook(channel, msg, username=name, avatar_url=url, tts=tts))
                             mimic.count += 1
                             mimic.total += len(k.msg)
-                except Exception as ex:
-                    await sendReact(channel, "```py\n" + repr(ex) + "```", reacts="❎")
 
     async def updateMimic(self, mimic, guild=None, it=None):
-        if setDict(mimic, "auto", None):
+        if set_dict(mimic, "auto", None):
             bot = self.bot
             mim = 0
             try:
-                mim = verifyID(mimic.auto)
+                mim = verify_id(mimic.auto)
                 if guild is not None:
                     user = guild.get_member(mim)
                 if user is None:
@@ -819,7 +784,7 @@ class UpdateMimics(Database):
                 if user is None:
                     raise LookupError
                 mimic.name = user.display_name
-                mimic.url = bestURL(user)
+                mimic.url = best_url(user)
             except (discord.NotFound, LookupError):
                 try:
                     mimi = bot.get_mimic(mim)

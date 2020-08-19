@@ -17,27 +17,23 @@ class Restart(Command):
         client = bot.client
         await message.add_reaction("❗")
         if name == "reload":
-            argv = argv.upper()
-            s = " " + argv if argv else ""
-            await channel.send("Reloading" + s.lower() + "...")
-            await create_future(bot.reload, argv, priority=True)
-            return "Successfully reloaded" + s.lower() + "."
+            await channel.send(f"Reloading {argv.lower()}...")
+            await create_future(bot.reload, argv.upper(), priority=True)
+            return f"Successfully reloaded {argv.lower()}."
         if name == "unload":
-            argv = argv.upper()
-            s = " " + argv if argv else ""
-            await channel.send("Unloading" + s.lower() + "...")
+            await channel.send(f"Unloading {argv.lower()}...")
             await create_future(bot.unload, argv, priority=True)
-            return "Successfully unloaded" + s.lower() + "."
+            return f"Successfully unloaded {argv.lower()}."
         if argv:
             # Restart announcements for when a time input is specified
             if "in" in argv:
                 argv = argv[argv.rindex("in") + 2:]
-            delay = await bot.evalTime(argv, user)
-            await channel.send("*Preparing to " + name + " in " + sec2Time(delay) + "...*")
+            delay = await bot.eval_time(argv, user)
+            await channel.send("*Preparing to " + name + " in " + sec2time(delay) + "...*")
             emb = discord.Embed(colour=discord.Colour(1))
-            emb.set_author(name=str(client.user), url=bot.website, icon_url=bestURL(client.user))
-            emb.description = "```ini\n[I will be " + ("restarting", "shutting down")[name == "shutdown"] + " in " + sec2Time(delay) + ", apologies for any inconvenience.]```"
-            await bot.event("_announce_", embed=emb)
+            emb.set_author(name=str(client.user), url=bot.website, icon_url=best_url(client.user))
+            emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(delay)}, apologies for any inconvenience..."
+            await bot.send_event("_announce_", embed=emb)
             if delay > 0:
                 await asyncio.sleep(delay)
         elif name == "shutdown":
@@ -49,7 +45,7 @@ class Restart(Command):
                 PRINT.close()
             t = time.time()
             # Call _destroy_ bot event to indicate to all databases the imminent shutdown
-            await bot.event("_destroy_")
+            await bot.send_event("_destroy_")
             # Save any database that has not already been autosaved
             await create_future(bot.update, priority=True)
             # Disconnect as many voice clients as possible
@@ -66,13 +62,11 @@ class Restart(Command):
         with suppress():
             await client.close()
         if name.casefold() == "shutdown":
-            with open(bot.shutdown, "wb"):
-                pass
+            touch(bot.shutdown)
         else:
-            with open(bot.restart, "wb"):
-                pass
+            touch(bot.restart)
         with tracebacksuppressor:
-            await aretry(os.remove, "log.txt", attempts=8, delay=0.1)
+            retry(os.remove, "log.txt", attempts=8, delay=0.1)
         if time.time() - t < 1:
             await asyncio.sleep(1)
         bot.close()
@@ -118,10 +112,7 @@ class Execute(Command):
             # Test bitwise flags for enabled terminals
             out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec[channel.id]))
             create_task(message.add_reaction("❗"))
-            return (
-                "```css\n[" + out + "] terminal now enabled in [#"
-                + noHighlight(channel.name) + "].```"
-            )
+            return css_md(f"{out} terminal now enabled in {sqr_md(channel)}.")
         elif "d" in flags:
             with suppress(KeyError):
                 if num == 0:
@@ -132,13 +123,9 @@ class Execute(Command):
                     if not bot.data.exec[channel.id]:
                         bot.data.exec.pop(channel.id)
             update()
-            return (
-                "```css\nSuccessfully removed [" + out + "] terminal.```"
-            )
-        return (
-            "```css\nTerminals currently set to "
-            + noHighlight(bot.data.exec) + ".```"
-        )
+            return css_md(f"Successfully removed {sqr_md(out)} terminal.")
+        out = iter2str({k: ", ".join(self.terminal_types.get(1 << i) for i in bits(v) for k, v in bot.data.exec.items())})
+        return css_md(f"Terminals currently set to {out}")
 
 
 class UpdateExec(Database):
@@ -166,7 +153,7 @@ class UpdateExec(Database):
     qtrans = "".maketrans(qmap)
 
     # Custom print function to send a message instead
-    _print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: self.bot.embedSender(channel, embed=discord.Embed(colour=discord.Colour(1), description=limStr("```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2048)))
+    _print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: self.bot.send_embeds(channel, embed=discord.Embed(colour=discord.Colour(1), description=lim_str("```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2048)))
     def _input(self, *args, channel=None, **kwargs):
         self._print(*args, channel=channel, **kwargs)
         self.listeners.__setitem__(channel.id, None)
@@ -208,8 +195,8 @@ class UpdateExec(Database):
         # Autodeletes after a delay
         channel = await self.bot.fetch_channel(c_id)
         message = await channel.send(**kwargs)
-        if isValid(delete_after):
-            create_task(self.bot.silentDelete(message, no_log=True, delay=delete_after))
+        if is_finite(delete_after):
+            create_task(self.bot.silent_delete(message, no_log=True, delay=delete_after))
 
     async def _typing_(self, user, channel, **void):
         # Typing indicator for DM channels
@@ -217,9 +204,9 @@ class UpdateExec(Database):
         if user.id == bot.client.user.id:
             return
         if not hasattr(channel, "guild") or channel.guild is None:
-            emb = discord.Embed(colour=randColour())
-            emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=bestURL(user))
-            emb.description = "*```ini\n[typing...]```*"
+            emb = discord.Embed(colour=rand_colour())
+            emb.set_author(name=f"{user} ({user.id})", icon_url=best_url(user))
+            emb.description = italics(ini_md("typing..."))
             for c_id, flag in self.data.items():
                 if flag & 2:
                     create_task(self.sendDeleteID(c_id, embed=emb))
@@ -228,14 +215,14 @@ class UpdateExec(Database):
         if type(s) is not str:
             s = str(s)
         if s:
-            return limStr("```" + fmt + "\n" + s + "```", lim)
+            return lim_str("```" + fmt + "\n" + s + "```", lim)
         return "``` ```"
 
     # Only process messages that were not treated as commands
     async def _nocommand_(self, message, **void):
         bot = self.bot
         channel = message.channel
-        if message.author.id in self.bot.owners and channel.id in self.data:
+        if bot.is_owner(message.author.id) and channel.id in self.data:
             flag = self.data[channel.id]
             # Both main and virtual terminals may be active simultaneously
             for f in (flag & 1, flag & 4):
@@ -265,25 +252,25 @@ class UpdateExec(Database):
                             await channel.send(self.prepare_string(output, fmt=""))
                         except:
                             # print_exc()
-                            await sendReact(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
+                            await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
         # Relay DM messages
         elif message.guild is None:
             if bot.isBlacklisted(message.author.id):
-                return await sendReact(channel,
+                return await send_with_react(channel,
                     "Your message could not be delivered because you don't share a server with the recipient or you disabled direct messages on your shared server, "
                     + "recipient is only accepting direct messages from friends, or you were blocked by the recipient.",
                     reacts="❎"
                 )
             user = message.author
             emb = discord.Embed(colour=discord.Colour(16777214))
-            emb.set_author(name=str(user) + " (" + str(user.id) + ")", icon_url=bestURL(user))
-            emb.description = strMessage(message)
+            emb.set_author(name=f"{user} ({user.id})", icon_url=best_url(user))
+            emb.description = message_repr(message)
             invalid = deque()
             for c_id, flag in self.data.items():
                 if flag & 2:
                     channel = self.bot.cache.channels.get(c_id)
                     if channel is not None:
-                        self.bot.embedSender(channel, embed=emb)
+                        self.bot.send_embeds(channel, embed=emb)
 
     # All logs that normally print to stdout/stderr now send to the assigned log channels
     def _log_(self, msg, **void):
@@ -305,7 +292,7 @@ class UpdateExec(Database):
                     if new:
                         msgs.append(new)
                 else:
-                    msg = limStr(msg, 6000)
+                    msg = lim_str(msg, 6000)
                     msgs = [msg[:2000], msg[2000:4000], msg[4000:]]
             else:
                 msgs = [msg]
@@ -320,10 +307,10 @@ class UpdateExec(Database):
                     if channel is None:
                         invalid.append(c_id)
                     else:
-                        self.bot.embedSender(channel, embeds=embs)
+                        self.bot.send_embeds(channel, embeds=embs)
             [self.data.pop(i) for i in invalid]                        
 
-    def __load__(self):
+    def _ready_(self, **void):
         with suppress(AttributeError):
             PRINT.funcs.append(lambda *args: self._log_(*args))
 
@@ -338,13 +325,9 @@ class DownloadServer(Command):
     
     async def __call__(self, bot, argv, flags, channel, guild, **void):
         if "f" not in flags:
-            response = uniStr(
-                "WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. "
-                + "REPEAT COMMAND WITH \"?F\" FLAG TO CONFIRM."
-            )
-            return ("**```asciidoc\n[" + response + "]```**")
+            return bot.dangerous_command
         if argv:
-            g_id = verifyID(argv)
+            g_id = verify_id(argv)
             guild = await bot.fetch_guild(g_id)
         with discord.context_managers.Typing(channel):
             send = channel.send
@@ -354,7 +337,7 @@ class DownloadServer(Command):
                 b = bytes()
                 fn = str(channel) + " (" + str(channel.id) + ")"
                 for i, message in enumerate(messages, 1):
-                    temp = ("\n\n" + strMessage(message, username=True)).encode("utf-8")
+                    temp = ("\n\n" + message_repr(message, username=True)).encode("utf-8")
                     if len(temp) + len(b) > 8388608:
                         await send(file=discord.File(io.BytesIO(b), filename=fn + ".txt"))
                         fn += "_"
@@ -370,8 +353,8 @@ class DownloadServer(Command):
                     await send(file=discord.File(io.BytesIO(b), filename=fn + ".txt"))
 
             await self.bot.database.counts.getGuildHistory(guild, callback=callback)
-        response = uniStr("Download Complete.")
-        return ("**```ini\n[" + response + "]```**")
+        response = uni_str("Download Complete.")
+        return bold(ini_md(sqr_md(response)))
 
 
 class Trust(Command):
@@ -387,7 +370,7 @@ class Trust(Command):
             guilds = bot.client.guilds
         else:
             if argv:
-                g_id = verifyID(argv)
+                g_id = verify_id(argv)
                 guild = cdict(id=g_id)
             guilds = [guild]
         if "e" in flags:
@@ -395,22 +378,14 @@ class Trust(Command):
             for guild in guilds:
                 bot.data.trusted[guild.id] = True
             update()
-            return (
-                "```css\nSuccessfully added ["
-                + ", ".join(noHighlight(guild) for guild in guilds) + "] to trusted list.```"
-            )
+            return css_md(f"Successfully added {sqr_md(', '.join(str(guild) for guild in guilds))} to trusted list.")
         elif "d" in flags:
             create_task(message.add_reaction("❗"))
             for guild in guilds:
                 bot.data.trusted.pop(guild.id, None)
             update()
-            return (
-                "```fix\nSuccessfully removed server from trusted list.```"
-            )
-        return (
-            "```css\nTrusted server list "
-            + str(list(noHighlight(bot.cache.guilds.get(g, g)) for g in bot.data.trusted)) + ".```"
-        )
+            return fix_md(f"Successfully removed {sqr_md(guild)} from trusted list.")
+        return css_md(f"Trusted server list: {list(no_md(bot.cache.guilds.get(g, g)) for g in bot.data.trusted)}.")
 
 
 class UpdateTrusted(Database):
@@ -427,25 +402,16 @@ class Suspend(Command):
         update = self.data.blacklist.update
         if len(args) < 2:
             if len(args) >= 1:
-                user = await bot.fetch_user(verifyID(args[0]))
+                user = await bot.fetch_user(verify_id(args[0]))
             susp = bot.data.blacklist.get(user.id, None)
-            return (
-                "```css\nCurrent blacklist status of [" + noHighlight(user.name) + "]: ["
-                + noHighlight(susp) + "].```"
-            )
+            return css_md(f"{sqr_md(user)} is currently {'not' if not susp else ''} blacklisted.")
         else:
-            user = await bot.fetch_user(verifyID(args.pop(0)))
-            new = await bot.evalMath(" ".join(args), user.id, bot.data.blacklist.get(user.id, 0))
+            user = await bot.fetch_user(verify_id(args.pop(0)))
+            new = await bot.eval_math(" ".join(args), user.id, bot.data.blacklist.get(user.id, 0))
             bot.data.blacklist[user.id] = new
             update()
-            return (
-                "```css\nChanged blacklist status of [" + noHighlight(user.name) + "] to ["
-                + noHighlight(new) + "].```"
-            )
-        return (
-            "```css\nUser blacklist "
-            + str(list(noHighlight(bot.cache.users.get(u, u)) for u in bot.data.blacklist)) + ".```"
-        )
+            return css_md(f"Changed blacklist status of {sqr_md(user)} to {sqr_md(new)}.")
+        return css_md(f"User blacklist: {no_md(list(bot.cache.users.get(u, u) for u in bot.data.blacklist))}")
 
 
 class UpdateBlacklist(Database):

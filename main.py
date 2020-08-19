@@ -59,7 +59,7 @@ while not os.path.exists(sd):
     proc = psutil.Popen([python, "bot.py"], shell=True)
     start = time.time()
     print("Bot started with PID \033[1;34;40m" + str(proc.pid) + "\033[1;37;40m.")
-    time.sleep(8)
+    time.sleep(12)
     if not proc.is_running():
         print("\033[1;31;40mBot closed without shutdown signal, restarting...\033[1;37;40m")
         continue

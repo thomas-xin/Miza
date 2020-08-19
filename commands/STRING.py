@@ -19,7 +19,7 @@ class PapagoTrans:
         if dest == source:
             raise ValueError("Source language is the same as destination.")
         url = "https://openapi.naver.com/v1/papago/n2mt"
-        enc = verifyURL(string)
+        enc = verify_url(string)
         url += "?source=" + source + "&target=" + dest + "&text=" + enc
         headers = {
             "X-Naver-Client-Id": self.id,
@@ -84,11 +84,11 @@ class Translate(Command):
                 trans = trans[::-1]
             if "v" in flags:
                 count = 2
-                end = "\nDetected language: **" + str(source) + "**"
+                end = f"\nDetected language: {bold(source)}"
             else:
                 count = 1
                 end = ""
-            response = "**" + str(user) + "**:"
+            response = bold(user) + ":"
             print(string, dest, source)
             # Attempt to use all available translators if possible
             for i in range(count):
@@ -98,8 +98,8 @@ class Translate(Command):
                         try:
                             output = resp.text
                         except AttributeError:
-                            output = str(resp)
-                        response += "\n" + output + "  `" + t + "`"
+                            output = resp
+                        response += f"\n{output} `{t}`"
                         source, dest = dest, source
                         break
                     except:
@@ -110,7 +110,7 @@ class Translate(Command):
 
 class Math(Command):
     _timeout_ = 4
-    name = ["PY", "Sympy", "M", "Calc"]
+    name = ["M", "PY", "Sympy", "Plot", "Calc"]
     min_level = 0
     description = "Evaluates a math formula."
     usage = "<function> <verbose(?v)> <rationalize(?r)>"
@@ -118,20 +118,23 @@ class Math(Command):
     rate_limit = 0.5
     typing = True
 
-    async def __call__(self, bot, argv, channel, flags, user, **void):
+    async def __call__(self, bot, argv, name, channel, flags, user, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         r = "r" in flags
         p = flags.get("v", 0) * 2 + 1 << 6
-        resp = await bot.solveMath(argv, user, p, r, timeout=24)
+        if name == "plot" and not argv.lower().startswith("plot"):
+            argv = f"plot({argv})"
+        resp = await bot.solve_math(argv, user, p, r, timeout=24)
         # Determine whether output is a direct answer or a file
         if type(resp) is dict and "file" in resp:
             await channel.trigger_typing()
             fn = resp["file"]
             f = discord.File(fn)
-            await sendFile(channel, "", f, filename=fn, best=True)
+            await send_with_file(channel, "", f, filename=fn, best=True)
             return
-        return "```py\n" + str(argv) + " = " + "\n".join(str(i) for i in resp) + "```"
+        answer = "\n".join(str(i) for i in resp)
+        return py_md(f"{argv} = {answer}")
 
 
 class Uni2Hex(Command):
@@ -145,7 +148,7 @@ class Uni2Hex(Command):
         if not argv:
             raise ArgumentError("Input string is empty.")
         b = bytes(argv, "utf-8")
-        return "*```fix\n" + bytes2Hex(b) + "```*"
+        return fix_md(bytes2hex(b))
 
 
 class Hex2Uni(Command):
@@ -158,7 +161,7 @@ class Hex2Uni(Command):
         if not argv:
             raise ArgumentError("Input string is empty.")
         b = hex2Bytes(argv.replace("0x", "").replace(" ", ""))
-        return "```fix\n" + b.decode("utf-8", "replace") + "```"
+        return fix_md(b.decode("utf-8", "replace"))
 
 
 class ID2Time(Command):
@@ -170,8 +173,8 @@ class ID2Time(Command):
     def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        argv = verifyID(argv)
-        return "```fix\n" + str(snowflake_time(argv)) + "```"
+        argv = verify_id(argv)
+        return fix_md(snowflake_time(argv))
 
 
 class Time2ID(Command):
@@ -184,7 +187,7 @@ class Time2ID(Command):
         if not argv:
             raise ArgumentError("Input string is empty.")
         argv = tzparse(argv)
-        return "```fix\n" + str(time_snowflake(argv)) + "```"
+        return fix_md(time_snowflake(argv))
 
 
 class SHA256(Command):
@@ -196,8 +199,8 @@ class SHA256(Command):
     def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        argv = bytes2Hex(hashlib.sha256(argv.encode("utf-8")).digest())
-        return "```fix\n" + argv + "```"
+        result = bytes2hex(hashlib.sha256(argv.encode("utf-8")).digest())
+        return fix_md(result)
 
 
 class Fancy(Command):
@@ -210,16 +213,16 @@ class Fancy(Command):
     def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        emb = discord.Embed(colour=randColour())
+        emb = discord.Embed(colour=rand_colour())
         emb.set_author(name=argv)
         for i in range(len(UNIFMTS) - 1):
-            s = uniStr(argv, i)
+            s = uni_str(argv, i)
             if i == len(UNIFMTS) - 2:
                 s = s[::-1]
-            emb.add_field(name="Font " + str(i + 1), value="```" + "fix" * (i & 1) + "\n" + s + "```")
+            emb.add_field(name=f"Font {i + 1}", value=(fix_md if i & 1 else code_md)(s))
         # Only return embed if it can be sent
         if len(emb) > 6000:
-            return "\n\n".join(f.name + "\n" + noCodeBox(f.value) for f in emb.fields)
+            return "\n\n".join(f"{f.name}\n{strip_code_box(f.value)}" for f in emb.fields)
         return dict(embed=emb)
 
 
@@ -238,15 +241,15 @@ class Zalgo(Command):
     async def __call__(self, channel, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        emb = discord.Embed(colour=randColour())
+        emb = discord.Embed(colour=rand_colour())
         emb.set_author(name=argv)
-        for i in (1, 2, 3, 4, 5, 6, 7, 8):
-            emb.add_field(name="Level " + str(i), value="```" + "fix" * (i & 1) + "\n" + self.zalgo(argv, i) + "```")
+        for i in range(1, 9):
+            emb.add_field(name=f"Level {i}", value=(fix_md if i & 1 else code_md)(self.zalgo(argv, i)))
         # Discord often removes combining characters past a limit, so messages longer than 6000 characters may be sent, test this by attempting to send
         try:
             await channel.send(embed=emb)
         except discord.HTTPException:
-            return "\n\n".join(f.name + "\n" + noCodeBox(f.value) for f in emb.fields)
+            return "\n\n".join(f"{f.name}\n{strip_code_box(f.value)}" for f in emb.fields)
 
 
 class OwOify(Command):
@@ -300,7 +303,7 @@ class OwOify(Command):
                             elif "th" in w:
                                 spl[i] = w.replace("th", "ff")
                         out = c.join(spl)
-        return "```fix\n" + out + "```"
+        return fix_md(out)
 
 
 class AltCaps(Command):
@@ -320,7 +323,7 @@ class AltCaps(Command):
             a = a[:-1]
         else:
             c = ""
-        return "```fix\n" + "".join(i[0] + i[1] for i in zip(a, b)) + c + "```"
+        return fix_md("".join(i[0] + i[1] for i in zip(a, b)) + c)
 
 
 class Time(Command):
@@ -354,20 +357,17 @@ class Time(Command):
             s = TIMEZONES.get(name, 0)
         t = utc_dt()
         if argv:
-            h = await self.bot.evalMath(argv, user)
+            h = await self.bot.eval_math(argv, user)
         else:
             h = 0
         if h or s:
             t += datetime.timedelta(hours=h, seconds=s)
-        hrs = roundMin(h + s / 3600)
+        hrs = round_min(h + s / 3600)
         if hrs >= 0:
             hrs = "+" + str(hrs)
         else:
             hrs = str(hrs)
-        return (
-            "```ini\nCurrent time at UTC/GMT" + hrs
-            + ": [" + str(t) + "].```"
-        )
+        return ini_md(f"Current time at UTC/GMT+{hrs}: {sqr_md(t)}.")
 
 
 class TimeCalc(Command):
@@ -389,23 +389,65 @@ class TimeCalc(Command):
                 spl = [argv]
             timestamps = [utc_ts(tzparse(t)) for t in spl]
         if len(timestamps) == 1:
-            out = str(roundMin(timestamps[0])) + " (" + str(datetime.datetime.utcfromtimestamp(timestamps[0])) + " UTC)"
+            out = str(round_min(timestamps[0])) + " (" + str(datetime.datetime.utcfromtimestamp(timestamps[0])) + " UTC)"
         else:
-            out = sec2Time(max(timestamps) - min(timestamps))
-        return "```\n" + out + "```"
+            out = sec2time(max(timestamps) - min(timestamps))
+        return code_md(out)
 
 
 class Follow(Command):
-    name = ["FollowURL", "Redirect"]
+    name = ["follow_url", "Redirect"]
     min_level = 0
     description = "Follows a discord message link and/or finds URLs in a string."
-    rate_limit = 0.125
+    rate_limit = 1
     
     async def __call__(self, argv, **void):
-        urls = await self.bot.followURL(argv, allow=True)
-        if not urls:
+        urls = find_urls(argv)
+        out = deque()
+        for url in urls:
+            if is_discord_message_link(url):
+                temp = await self.bot.follow_url(url, allow=True)
+            else:
+                data = await Request(url, decode=True, aio=True)
+                temp = find_urls(data)
+            out.extend(temp)
+        if not out:
             raise FileNotFoundError("No valid URLs detected.")
-        return "\n".join(urls)
+        return f"`Detected {len(urls)} + url{'s' if len(urls) != 1 else ''}:`\n" + "\n".join(urls)
+
+
+class Match(Command):
+    name = ["RE", "RegEx", "RexExp", "GREP"]
+    min_level = 0
+    description = "matches two strings using Linux-style RegExp, or computes the match ratio of two strings."
+    rate_limit = 0.125
+    
+    async def __call__(self, args, name, **void):
+        if len(args) < 2:
+            raise ArgumentError("Please enter two or more strings to match.")
+        if name == "match":
+            regex = None
+            for i in (1, -1):
+                s = args[i]
+                if len(s) >= 2 and s[0] == s[1] == "/":
+                    if regex:
+                        raise ArgumentError("Cannot match two Regular Expressions.")
+                    regex = s[1:-1]
+                    args.pop(i)
+        else:
+            regex = args.pop(0)
+        if regex:
+            temp = await create_future(re.findall, regex, " ".join(args))
+            match = "\n".join(sqr_md(i) for i in temp)
+        else:
+            search = args.pop(0)
+            s = " ".join(args)
+            match = (
+                sqr_md(round_min(round(fuzzy_substring(search, s) * 100, 6))) + "% literal match,\n"
+                + sqr_md(round_min(round(fuzzy_substring(search.casefold(), s.casefold()) * 100, 6))) + "% case-insensitive match,\n"
+                + sqr_md(round_min(round(fuzzy_substring(full_prune(search), full_prune(s)) * 100, 6))) + "% unicode mapping match."
+            )
+        return ini_md(match)
 
 
 class UrbanDictionary(Command):
@@ -432,15 +474,15 @@ class UrbanDictionary(Command):
             d = eval_json(s)
             l = d["list"]
             if not l:
-                raise LookupError("No results for " + argv + ".")
+                raise LookupError(f"No results for {argv}.")
             l.sort(
                 key=lambda e: scaleRatio(e.get("thumbs_up", 0), e.get("thumbs_down", 0)),
                 reverse=True,
             )
             if "v" in flags:
                 output = (
-                    "```ini\n[" + noHighlight(argv) + "]\n"
-                    + clrHighlight("\n".join(
+                    "```ini\n[" + no_md(argv) + "]\n"
+                    + clr_md("\n".join(
                         "[" + str(i + 1) + "] " + l[i].get(
                             "definition", "",
                         ).replace("\n", " ").replace("\r", "") for i in range(
@@ -451,7 +493,7 @@ class UrbanDictionary(Command):
                 )
             else:
                 output = (
-                    "```ini\n[" + noHighlight(argv) + "]\n"
-                    + clrHighlight(l[0].get("definition", "")).replace("#", "♯") + "```"
+                    "```ini\n[" + no_md(argv) + "]\n"
+                    + clr_md(l[0].get("definition", "")).replace("#", "♯") + "```"
                 )
         return output

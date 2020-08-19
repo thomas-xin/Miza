@@ -101,7 +101,7 @@ async def searchForums(query):
         curr["description"] = s[:j]
         for elem in curr:
             temp = curr[elem].replace('<em class="textHighlight">', "").replace('</em>', "")
-            temp = htmlDecode(temp)
+            temp = html_decode(temp)
             curr[elem] = temp
         output.append(curr)
     return output
@@ -241,9 +241,9 @@ class CS_mem2flag(Command):
 
     async def __call__(self, bot, args, user, **void):
         if len(args) < 2:
-            return "```css\n" + _m2f(args[0], 1) + "```"
-        num = await bot.evalMath(" ".join(args[1:]), user)
-        return "```css\n" + _m2f(args[0], num) + "```"
+            return css_md(_m2f(args[0], 1))
+        num = await bot.eval_math(" ".join(args[1:]), user)
+        return css_md(_m2f(args[0], num))
 
 
 class CS_hex2xml(Command):
@@ -314,7 +314,7 @@ class CS_hex2xml(Command):
         data = await create_future(bytes, output, "utf-8", timeout=8)
         b = io.BytesIO(data)
         f = discord.File(b, filename="patch.xml")
-        create_task(sendFile(channel, "Patch successfully converted!", f))
+        create_task(send_with_file(channel, "Patch successfully converted!", f))
 
 
 class CS_npc(Command):
@@ -341,7 +341,7 @@ class CS_npc(Command):
                 table.add_row(line)
             output = str(table)
             if len(output) < 20000 and len(output) > 1900:
-                response = ["Search results for **" + argv + "**:"]
+                response = [f"Search results for {bold(argv)}:"]
                 lines = output.split("\n")
                 curr = "```\n"
                 for line in lines:
@@ -352,10 +352,8 @@ class CS_npc(Command):
                         curr += line + "\n"
                 response.append(curr + "```")
                 return response
-            else:
-                return "Search results for **" + argv + "**:\n```\n" + output + "```"
-        else:
-            raise LookupError("No results found for " + argv + ".")
+            return f"Search results for {bold(argv)}:\n{code_md(output)}"
+        raise LookupError(f"No results for {argv}.")
 
 
 class CS_tsc(Command):
@@ -381,7 +379,7 @@ class CS_tsc(Command):
                 table.add_row(line)
             output = str(table)
             if len(output) < 20000 and len(output) > 1900:
-                response = ["Search results for **" + argv + "**:"]
+                response = [f"Search results for {bold(argv)}:"]
                 lines = output.split("\n")
                 curr = "```\n"
                 for line in lines:
@@ -392,10 +390,8 @@ class CS_tsc(Command):
                         curr += line + "\n"
                 response.append(curr + "```")
                 return response
-            else:
-                return "Search results for **" + argv + "**:\n```\n" + output + "```"
-        else:
-            raise LookupError("No results found for " + argv + ".")
+            return f"Search results for {bold(argv)}:\n{code_md(output)}"
+        raise LookupError(f"No results for {argv}.")
 
 
 class CS_mod(Command):
@@ -413,13 +409,13 @@ class CS_mod(Command):
         data += await create_future(douclub.search, argv, timeout=8)
         # Sends multiple messages up to 20000 characters total
         if len(data):
-            response = "Search results for **" + argv + "**:\n"
+            response = f"Search results for {bold(argv)}:\n"
             for l in data:
                 line = (
                     "\n<" + str(l["url"]) + ">\n"
-                    + "```css\nName: [" + noHighlight(l["name"])
-                    + "]\nAuthor: [" + noHighlight(l["author"].strip(" "))
-                    + "]\n" + limStr(l["description"].replace("\n", " "), 128)
+                    + "```css\nName: [" + no_md(l["name"])
+                    + "]\nAuthor: [" + no_md(l["author"].strip(" "))
+                    + "]\n" + lim_str(l["description"].replace("\n", " "), 128)
                     + "```\r"
                 )
                 response += line
@@ -434,8 +430,7 @@ class CS_mod(Command):
                     else:
                         curr += line
             return response
-        else:
-            raise LookupError("No results found for " + argv + ".")
+        raise LookupError(f"No results for {argv}.")
 
 
 class CS_Database(Database):
@@ -465,16 +460,14 @@ class Dogpile(Command):
             if guild.id in following:
                 following.pop(guild.id)
                 update()
-            return "```css\nDisabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
-        elif "e" in flags or "a" in flags:
+            return css_md(f"Disabled dogpile imitating for {sqr_md(guild)}.")
+        if "e" in flags or "a" in flags:
             following[guild.id] = True
             update()
-            return "```css\nEnabled dogpile imitating for [" + noHighlight(guild.name) + "].```"
-        else:
-            return (
-                "```ini\nDogpile imitating is currently " + "not " * (not curr)
-                + "enabled in [" + noHighlight(guild.name) + "].```"
-            )
+            return css_md(f"Enabled dogpile imitating for {sqr_md(guild)}.")
+        if curr:
+            return ini_md(f"Dogpile imitating is currently enabled in {sqr_md(guild)}.")
+        return ini_md(f"Dogpile imitating is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
 
 
 class UpdateDogpiles(Database):
@@ -523,19 +516,19 @@ class MathQuiz(Command):
     rate_limit = 3
 
     async def __call__(self, channel, guild, flags, argv, **void):
-        if not self.bot.isTrusted(guild.id):
+        if not self.bot.is_trusted(guild.id):
             raise PermissionError("Must be in a trusted server to perform this command.")
         mathdb = self.bot.database.mathtest
         if "d" in flags:
             if channel.id in mathdb.data:
                 mathdb.data.pop(channel.id)
-            return "*```css\nDisabled math quizzes for " + sbHighlight(channel) + ".```*"
+            return italics(css_md(f"Disabled math quizzes for {sqr_md(channel)}."))
         if not argv:
             argv = "easy"
         elif argv not in ("easy", "hard"):
             raise TypeError("Invalid quiz mode.")
         mathdb.data[channel.id] = cdict(mode=argv, answer=None)
-        return "*```css\nEnabled " + argv + " math quiz for " + sbHighlight(channel) + ".```*"
+        return italics(css_md(f"Enabled {argv} math quiz for {sqr_md(channel)}."))
 
 
 class UpdateMathTest(Database):
@@ -718,7 +711,7 @@ class UpdateMathTest(Database):
             if st and i[0] not in "+-":
                 st += "+"
             st += i
-        ans = await self.bot.solveMath(st, xrand(2147483648), 0, 1)
+        ans = await self.bot.solve_math(st, xrand(2147483648), 0, 1)
         a = ans[0]
         q = self.eqtrans(a)
         if xrand(2):
@@ -798,7 +791,7 @@ class UpdateMathTest(Database):
                 if msg.startswith("#") or msg.startswith("//") or msg.startswith("\\"):
                     return
                 try:
-                    x = await bot.solveMath(msg, message.author, 0, 1)
+                    x = await bot.solve_math(msg, message.author, 0, 1)
                     x = await create_future(sympy.sympify, x[0], timeout=6)
                 except:
                     return
@@ -831,19 +824,19 @@ class DeviantArt(Command):
     rate_limit = 4
 
     async def __call__(self, argv, flags, channel, guild, bot, **void):
-        if not bot.isTrusted(guild.id):
+        if not bot.is_trusted(guild.id):
             raise PermissionError("Must be in a trusted server to perform this command.")
         data = bot.data.deviantart
         update = bot.database.deviantart.update
         if not argv:
             assigned = data.get(channel.id, ())
             if not assigned:
-                return "```ini\nNo currently subscribed DeviantArt Galleries for [#" + noHighlight(channel) + "].```"
+                return ini_md(f"No currently subscribed DeviantArt Galleries for {sqr_md(channel)}.")
             if "d" in flags:
-                data.pop(channel.id)
-                return "```css\nSuccessfully removed all DeviantArt Gallery subscriptions from [#" + noHighlight(channel) + "].```"
-            return "Currently subscribed DeviantArt Galleries for [#" + noHighlight(channel) + "]:```ini" + strIter(assigned, key=lambda x: x["user"]) + "```"
-        urls = await bot.followURL(argv, allow=True)
+                data.pop(channel.id, None)
+                return css_md(f"Successfully removed all DeviantArt Gallery subscriptions from {sqr_md(channel)}.")
+            return f"Currently subscribed DeviantArt Galleries for {sqr_md(channel)}:{ini_md(iter2str(assigned, key=lambda x: x['user']))}"
+        urls = await bot.follow_url(argv, allow=True)
         if not urls:
             raise ArgumentError("Please input a valid URL.")
         url = urls[0]
@@ -856,7 +849,7 @@ class DeviantArt(Command):
         if spl[1] != "gallery":
             raise ArgumentError("Please input a DeviantArt Gallery URL.")
         content = spl[2].split("&")[0]
-        folder = noHighlight(spl[-1].split("&")[0])
+        folder = no_md(spl[-1].split("&")[0])
         # Gallery may be an ID or "all"
         try:
             content = int(content)
@@ -866,20 +859,23 @@ class DeviantArt(Command):
             else:
                 raise TypeError("Invalid Gallery type.")
         if content in self.data.get(channel.id, {}):
-            raise KeyError("Already subscribed to " + user + ": " + folder)
+            raise KeyError(f"Already subscribed to {user}: {folder}")
         if "d" in flags:
             try:
                 data.get(channel.id).pop(content)
             except KeyError:
-                raise KeyError("Not currently subscribed to " + user + ": " + folder)
+                raise KeyError(f"Not currently subscribed to {user}: {folder}")
             else:
                 if channel.id in data and not data[channel.id]:
                     data.pop(channel.id)
                 update()
-                return "```css\nSuccessfully unsubscribed from " + sbHighlight(user) + ": " + sbHighlight(folder) + ".```"
-        setDict(data, channel.id, {}).__setitem__(content, {"user": user, "type": "gallery", "reversed": ("r" in flags), "entries": {}})
+                return css_md(f"Successfully unsubscribed from {sqr_md(user)}: {sqr_md(folder)}.")
+        set_dict(data, channel.id, {}).__setitem__(content, {"user": user, "type": "gallery", "reversed": ("r" in flags), "entries": {}})
         update()
-        return "```css\nSuccessfully subscribed to " + sbHighlight(user) + ": " + sbHighlight(folder) + ", posting in reverse order" * ("r" in flags) + ".```"
+        out = f"Successfully subscribed to {sqr_md(user)}: {sqr_md(folder)}"
+        if "r" in flags:
+            out += ", posting in reverse order"
+        return css_md(out + ".")
 
 
 class UpdateDeviantArt(Database):
@@ -889,7 +885,7 @@ class UpdateDeviantArt(Database):
         bot = self.bot
         try:
             channel = await bot.fetch_channel(c_id)
-            if not bot.isTrusted(channel.guild.id):
+            if not bot.is_trusted(channel.guild.id):
                 raise LookupError
         except LookupError:
             self.data.pop(c_id, None)
@@ -926,10 +922,10 @@ class UpdateDeviantArt(Database):
         except:
             print_exc()
         else:
-            bot.embedSender(channel, embs)
+            bot.send_embeds(channel, embs)
 
     async def __call__(self):
-        t = setDict(self.__dict__, "time", 0)
+        t = set_dict(self.__dict__, "time", 0)
         # Fetches once every 5 minutes
         if utc() - t < 300:
             return
