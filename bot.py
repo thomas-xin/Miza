@@ -308,6 +308,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         u_id,
                         qkey=userQuery3,
                         ikey=userIter3,
+                    )
+                with suppress(LookupError):
+                    return await str_lookup(
+                        members,
+                        u_id,
+                        qkey=userQuery4,
+                        ikey=userIter4,
                         fuzzy=1 / 3,
                     )
                 try:
@@ -2343,21 +2350,29 @@ def userIter1(x):
     yield str(x)
 
 def userQuery2(x):
-    yield x
-    yield full_prune(x)
+    yield str(x).casefold()
 
 def userIter2(x):
     yield str(x)
-    yield str(x).casefold()
-    yield full_prune(x.name)
-    yield full_prune(x.display_name)
+    yield str(x.name).casefold()
+    if getattr(x, "nick", None):
+        yield str(x.nick).casefold()
 
 def userQuery3(x):
-    yield to_alphanumeric(x).replace(" ", "").casefold()
+    yield full_prune(x)
 
 def userIter3(x):
+    yield full_prune(x.name)
+    if getattr(x, "nick", None):
+        yield full_prune(x.nick)
+
+def userQuery4(x):
+    yield to_alphanumeric(x).replace(" ", "").casefold()
+
+def userIter4(x):
     yield to_alphanumeric(x.name).replace(" ", "").casefold()
-    yield to_alphanumeric(x.display_name).replace(" ", "").casefold()
+    if getattr(x, "nick", None):
+        yield to_alphanumeric(x.nick).replace(" ", "").casefold()
 
 
 # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
