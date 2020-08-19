@@ -421,6 +421,7 @@ class Match(Command):
     min_level = 0
     description = "matches two strings using Linux-style RegExp, or computes the match ratio of two strings."
     rate_limit = 0.125
+    no_parse = True
     
     async def __call__(self, args, name, **void):
         if len(args) < 2:
