@@ -102,11 +102,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         with suppress(AttributeError):
             return self.__getattribute__(key)
         with suppress(AttributeError):
+            return getattr(self.__getattribute__("_state"), key)
+        with suppress(AttributeError):
             return getattr(self.__getattribute__("user"), key)
         return getattr(self.__getattribute__("proc"), key)
 
     def __dir__(self):
         data = set(object.__dir__(self))
+        data.update(dir(self._state))
         data.update(dir(self.user))
         data.update(dir(self.proc))
         return data
