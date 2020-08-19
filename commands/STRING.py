@@ -389,7 +389,7 @@ class TimeCalc(Command):
                 spl = [argv]
             timestamps = [utc_ts(tzparse(t)) for t in spl]
         if len(timestamps) == 1:
-            out = str(round_min(timestamps[0])) + " (" + str(datetime.datetime.utcfromtimestamp(timestamps[0])) + " UTC)"
+            out = f"{round_min(timestamps[0])} ({datetime.datetime.utcfromtimestamp(timestamps[0])} UTC)"
         else:
             out = sec2time(max(timestamps) - min(timestamps))
         return code_md(out)

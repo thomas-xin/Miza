@@ -1359,7 +1359,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             try:
                 enabled = self.data.enabled[c_id]
             except KeyError:
-                enabled = {"main", "string", "admin"}
+                enabled = ("main", "string", "admin")
         else:
             enabled = frozenset(self.categories)
         u_perm = self.get_perms(u_id, guild)
@@ -1379,11 +1379,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # Respond to blacklisted users attempting to use a command, or when mentioned without a command.
         if (u_perm <= -inf and op) or msg in self.mention:
             if not u_perm < 0 and not u_perm <= -inf:
-                create_task(send_with_react(
-                    channel,
-                    f"I have been summoned! Use `{prefix}?` or `{prefix}help` for help!",
-                    reacts="❎",
-                ))
+                if xrand(2):
+                    f"I have been summoned! Use `{prefix}?` or `{prefix}help` for help!"
+                else:
+                    f"Hey there! Name's {bot.name}! Use `{prefix}?` or `{prefix}help` for help!"
+                create_task(send_with_react(channel, out, reacts="❎"))
             else:
                 print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
                 create_task(send_with_react(
@@ -1413,7 +1413,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 # Multiple commands may have the same alias, run all of them
                 for command in bot.commands[check]:
                     # Make sure command is enabled, administrators bypass this
-                    if command.catg in enabled or admin:
+                    if full_prune(command.catg) in enabled or admin:
                         # argv is the raw parsed argument data
                         argv = comm[i:].strip()
                         run = True

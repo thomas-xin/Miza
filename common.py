@@ -1213,11 +1213,9 @@ class __logPrinter:
     
     def update_print(self):
         if self.file is None:
-            outfunc = sys.__stdout__.write
-            enc = lambda x: x
-        else:
-            outfunc = lambda s: (sys.__stdout__.buffer.write(s), self.file_print(self.file, s))
-            enc = lambda x: bytes(x, "utf-8")
+            return
+        outfunc = lambda s: self.file_print(self.file, s)
+        enc = lambda x: bytes(x, "utf-8")
         while True:
             with delay(1):
                 try:
@@ -1225,7 +1223,7 @@ class __logPrinter:
                         if not self.data[f]:
                             self.data.pop(f)
                             continue
-                        out = lim_str(self.data[f], 8192)
+                        out = lim_str(self.data[f], 65536)
                         self.data[f] = ""
                         data = enc(out)
                         if self.funcs:
@@ -1248,6 +1246,7 @@ class __logPrinter:
         if file not in self.data:
             self.data[file] = ""
         self.data[file] += out
+        return sys.__stdout__.write(out)
 
     def write(self, *args, end="", **kwargs):
         args2 = [arg if type(arg) is str else arg.decode("utf-8", "replace") for arg in args]
