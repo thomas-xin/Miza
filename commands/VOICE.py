@@ -236,6 +236,14 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             return getattr(self.__getattribute__("queue"), key)
         return getattr(self.__getattribute__("channel"), key)
 
+    def __dir__(self):
+        data = set(object.__dir__(self))
+        data.update(dir(self.source))
+        data.update(dir(self.vc))
+        data.update(dir(self.queue))
+        data.update(dir(self.channel))
+        return data
+
     def get_dump(self, position, js=False):
         lim = 32768
         if len(self.queue) > lim:

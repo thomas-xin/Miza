@@ -105,6 +105,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             return getattr(self.__getattribute__("user"), key)
         return getattr(self.__getattribute__("proc"), key)
 
+    def __dir__(self):
+        data = set(object.__dir__(self))
+        data.update(dir(self.user))
+        data.update(dir(self.proc))
+        return data
+
     # Waits an amount of seconds and shuts down.
     def setshutdown(self, delay=None, force=False):
         if delay:
@@ -1840,7 +1846,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 def __init__(self, channel, **void):
                     self.channel = channel
 
+                def __dir__(self):
+                    data = set(object.__dir__(self))
+                    data.update(dir(self.channel))
+                    return data
+
                 def __getattr__(self, key):
+                    with suppress(AttributeError):
+                        return self.__getattribute__(key)
                     return getattr(self.__getattribute__("channel"), key)
 
                 def fetch_message(self, id):
@@ -1865,7 +1878,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 self.fetch_member = bot.fetch_user
                 self.voice_client = None
 
+            def __dir__(self):
+                data = set(object.__dir__(self))
+                data.update(dir(self.channel))
+                return data
+
             def __getattr__(self, key):
+                with suppress(AttributeError):
+                    return self.__getattribute__(key)
                 return getattr(self.__getattribute__("channel"), key)
 
             filesize_limit = 8388608

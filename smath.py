@@ -294,6 +294,11 @@ custom list-like data structure that incorporates the functionality of numpy arr
             return self.__getattribute__(k)
         return getattr(self.__getattribute__("view"), k)
 
+    def __dir__(self):
+        data = set(object.__dir__(self))
+        data.update(dir(self.view))
+        return data
+
     # Returns a numpy array representing the items currently "in" the list.
     @property
     def view(self):
@@ -1239,6 +1244,11 @@ class cdict(dict):
         if k.startswith("__") and k.endswith("__"):
             return object.__setattr__(self, k, v)
         return self.__setitem__(k, v)
+
+    def __dir__(self):
+        data = set(object.__dir__(self))
+        data.update(self)
+        return data
 
     @property
     def __dict__(self):
@@ -2986,6 +2996,11 @@ class pickled(collections.abc.Callable):
         with suppress(AttributeError):
             return self.__getattribute__(key)
         return getattr(self.__getattribute__("data"), key)
+    
+    def __dir__(self):
+        data = set(object.__dir__(self))
+        data.update(dir(self.data))
+        return data
 
     def __call__(self):
         return self
