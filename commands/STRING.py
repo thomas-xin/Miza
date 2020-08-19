@@ -403,17 +403,17 @@ class Follow(Command):
     
     async def __call__(self, argv, **void):
         urls = find_urls(argv)
-        out = deque()
+        out = set()
         for url in urls:
             if is_discord_message_link(url):
                 temp = await self.bot.follow_url(url, allow=True)
             else:
                 data = await Request(url, decode=True, aio=True)
                 temp = find_urls(data)
-            out.extend(temp)
+            out.update(temp)
         if not out:
             raise FileNotFoundError("No valid URLs detected.")
-        return f"`Detected {len(urls)} + url{'s' if len(urls) != 1 else ''}:`\n" + "\n".join(urls)
+        return f"`Detected {len(out)} url{'s' if len(out) != 1 else ''}:`\n" + "\n".join(out)
 
 
 class Match(Command):
