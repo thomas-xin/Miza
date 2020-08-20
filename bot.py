@@ -18,7 +18,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     restart = "restart.tmp"
     shutdown = "shutdown.tmp"
     authdata = "auth.json"
-    caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "deleted")
+    caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "deleted", "banned")
     statuses = (discord.Status.online, discord.Status.idle, discord.Status.dnd)
     # Default command prefix
     prefix = "~"
@@ -304,7 +304,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         return temp
                 return user
             return self.fetch_member(u_id, guild, find_others=True)
-        return self.fetch_member_ex(u_id, guild)
+        return await self.fetch_member_ex(u_id, guild)
 
     async def get_full_members(self, guild):
         members = guild._members.values()
@@ -814,6 +814,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             self.cache.deleted.pop(message.id, None)
             if exc:
                 raise
+    
+    async def verified_ban(self, user, guild):
+        await guild.ban(user, delete_message_days=0)
+        self.cache.banned[(guild.id, user.id)] = utc()
+        self.limit_cache("banned", 4096)
+        return member
+    
+    async def recently_banned(self, user, guild, duration=20):
+        return utc() - self.cache.banned.get((verify_id(guild), verify_id(user)), 0) < duration
 
     # Checks if a user is an owner of the bot.
     is_owner = lambda self, user: verify_id(user) in self.owners

@@ -208,7 +208,7 @@ class Ban(Command):
                     await channel.send(msg)
                 return
         async with ExceptionSender(channel):
-            await guild.ban(user, reason=reason, delete_message_days=0)
+            await bot.verified_ban(user, guild)
             with suppress(LookupError):
                 banlist.remove(user.id, key=lambda x: x["u"])
             with suppress(LookupError):
@@ -771,16 +771,17 @@ class ServerProtector(Database):
                     create_task(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
 
     async def _ban_(self, user, guild, **void):
-        if self.bot.is_trusted(guild.id):
-            audits = await guild.audit_logs(limit=13, action=discord.AuditLogAction.ban).flatten()
-            ts = utc()
-            cnt = {}
-            for log in audits:
-                if ts - utc_ts(log.created_at) < 10:
-                    add_dict(cnt, {log.user.id: 1})
-            for u_id in cnt:
-                if cnt[u_id] > 5:
-                    create_task(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
+        if not self.bot.recently_banned(user, guild):
+            if self.bot.is_trusted(guild.id):
+                audits = await guild.audit_logs(limit=13, action=discord.AuditLogAction.ban).flatten()
+                ts = utc()
+                cnt = {}
+                for log in audits:
+                    if ts - utc_ts(log.created_at) < 10:
+                        add_dict(cnt, {log.user.id: 1})
+                for u_id in cnt:
+                    if cnt[u_id] > 5:
+                        create_task(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
 
 
 class UpdateUserLogs(Database):

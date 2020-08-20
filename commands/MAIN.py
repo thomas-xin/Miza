@@ -788,7 +788,7 @@ class Invite(Command):
         user = self.bot.user
         url = best_url(user)
         emb.set_author(name=str(user), icon_url=url, url=url)
-        emb.description = f"[Homepage]({self.bot.website})\n[Invite](https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord.id}&scope=bot)"
+        emb.description = f"[Homepage]({self.bot.website})\n[Invite](https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord_id}&scope=bot)"
         return dict(embed=emb)
 
 
