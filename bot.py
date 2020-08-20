@@ -281,7 +281,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             users = {}
             for u_id in argl:
                 u = await self.fetch_user_member(u_id, guild)
-                users[user.id] = u
+                users[u.id] = u
             return users.values()
         u_id = verify_id(args.pop(0))
         if type(u_id) is int:

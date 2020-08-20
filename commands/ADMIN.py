@@ -99,7 +99,7 @@ class Ban(Command):
         with discord.context_managers.Typing(channel):
             bans, glob = await self.getBans(guild)
             users = await bot.find_users(argl, args, user, guild)
-        if not args or name == "unban":
+        if not args and not argl or name == "unban":
             user = users[0]
             try:
                 ban = bans[user.id]
