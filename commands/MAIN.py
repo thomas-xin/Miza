@@ -105,7 +105,8 @@ class Perms(Command):
     async def __call__(self, bot, args, argl, user, perm, channel, guild, flags, **void):
         # Get target user from first argument
         users = await bot.find_users(argl, args, user, guild)
-        print(users)
+        if not users:
+            raise LookupError("No results found.")
         for t_user in users:
             t_perm = round_min(bot.get_perms(t_user.id, guild))
             # If permission level is given, attempt to change permission level, otherwise get current permission level

@@ -99,12 +99,15 @@ class Ban(Command):
         with discord.context_managers.Typing(channel):
             bans, glob = await self.getBans(guild)
             users = await bot.find_users(argl, args, user, guild)
+        if not users:
+            raise LookupError("No results found.")
         if not args or name == "unban":
             for user in users:
                 try:
                     ban = bans[user.id]
                 except LookupError:
                     create_task(channel.send(ini_md(f"{sqr_md(user)} is currently not banned from {sqr_md(guild)}.")))
+                    continue
                 if name == "unban":
                     await guild.unban(user)
                     try:
@@ -120,6 +123,7 @@ class Ban(Command):
                                 bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
                         update()
                     create_task(channel.send(css_md(f"Successfully unbanned {sqr_md(user)} from {sqr_md(guild)}.")))
+                    continue
                 create_task(channel.send(italics(ini_md(f"Current ban for {sqr_md(user)} from {sqr_md(guild)}: {sqr_md(sec2time(ban['t'] - ts))}."))))
             return
         # This parser is a mess too
@@ -209,7 +213,7 @@ class Ban(Command):
                     await channel.send(msg)
                 return
         async with ExceptionSender(channel):
-            await bot.verified_ban(user, guild)
+            await bot.verified_ban(user, guild, reason)
             with suppress(LookupError):
                 banlist.remove(user.id, key=lambda x: x["u"])
             with suppress(LookupError):

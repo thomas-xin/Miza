@@ -820,13 +820,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if exc:
                 raise
     
-    async def verified_ban(self, user, guild):
-        await guild.ban(user, delete_message_days=0)
+    async def verified_ban(self, user, guild, reason=None):
+        self.cache.banned[(guild.id, user.id)] = utc()
+        try:
+            await guild.ban(user, delete_message_days=0, reason=reason)
+        except:
+            self.cache.banned.pop((guild.id, user.id), None)
+            raise
         self.cache.banned[(guild.id, user.id)] = utc()
         self.limit_cache("banned", 4096)
-        return member
     
-    async def recently_banned(self, user, guild, duration=20):
+    def recently_banned(self, user, guild, duration=20):
         return utc() - self.cache.banned.get((verify_id(guild), verify_id(user)), 0) < duration
 
     # Checks if a user is an owner of the bot.
