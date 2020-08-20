@@ -162,7 +162,7 @@ class SheetPull:
         if not mode:
             for l in self.data[0]:
                 if l[0] == query:
-                    temp = [limLine(e, lim) for e in l]
+                    temp = [lim_line(e, lim) for e in l]
                     output.append(temp)
         else:
             qlist = query.split(" ")
@@ -174,7 +174,7 @@ class SheetPull:
                             if q in i.casefold():
                                 found = True
                         if found:
-                            temp = [limLine(e, lim) for e in l]
+                            temp = [lim_line(e, lim) for e in l]
                             if temp[2].replace(" ", ""):
                                 output.append(temp)
         return output

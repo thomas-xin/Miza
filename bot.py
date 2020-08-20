@@ -95,17 +95,23 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         globals().update(self.cache)
         self.get_modules()
 
+    __str__ = lambda self: str(self.user)
+    __repr__ = lambda self: repr(self.user)
+
     __call__ = lambda self: self
     __exit__ = lambda self, *args, **kwargs: self.close()
 
     def __getattr__(self, key):
         with suppress(AttributeError):
-            return self.__getattribute__(key)
+            return object.__getattribute__(self, key)
+        this = super().user._state
         with suppress(AttributeError):
-            return getattr(self.__getattribute__("_state"), key)
+            return getattr(this, key)
+        this = super().user
         with suppress(AttributeError):
-            return getattr(self.__getattribute__("user"), key)
-        return getattr(self.__getattribute__("proc"), key)
+            return getattr(this, key)
+        this = self.__getattribute__("proc")
+        return getattr(this, key)
 
     def __dir__(self):
         data = set(object.__dir__(self))
@@ -268,6 +274,50 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.limit_cache("users")
         return user
 
+    async def find_users(self, argl, args, user, guild):
+        if not argl and not args:
+            return (user,)
+        if argl:
+            users = {}
+            for u_id in argl:
+                u = await self.fetch_user_member(u_id, guild)
+                users[user.id] = u
+            return users.values()
+        u_id = verify_id(args.pop(0))
+        if type(u_id) is int:
+            role = guild.get_role(u_id)
+            if role is not None:
+                return role.members
+        if "@" in u_id and ("everyone" in u_id or "here" in u_id):
+            return await self.get_full_members(guild)
+        u = await self.fetch_user_member(u_id, guild)
+        return (u,)
+
+    async def fetch_user_member(self, u_id, guild=None):
+        u_id = verify_id(u_id)
+        if type(u_id) is int:
+            with suppress():
+                user = await self.fetch_user(u_id)
+                if guild:
+                    temp = guild.get_member(user.id)
+                    if temp is not None:
+                        return temp
+                return user
+            return self.fetch_member(u_id, guild, find_others=True)
+        return self.fetch_member_ex(u_id, guild)
+
+    async def get_full_members(self, guild):
+        members = guild._members.values()
+        if "bans" in self.data:
+            members = set(members)
+            for b in self.data.bans.get(guild.id, ()):
+                try:
+                    user = await self.fetch_user(b.get("u", self.deleted_user))
+                except LookupError:
+                    user = self.cache.users[self.deleted_user]
+                members.add(user)
+        return members
+
     # Fetches a member in the target server by ID or name lookup.
     async def fetch_member_ex(self, u_id, guild=None, allow_banned=True):
         if type(u_id) is not int:
@@ -281,14 +331,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 with suppress(LookupError):
                     member = await self.fetch_member(u_id, guild)
             if member is None:
-                if allow_banned and "bans" in self.data:
-                    members = deque(guild.members)
-                    for b in self.data.bans.get(guild.id, ()):
-                        try:
-                            user = await self.fetch_user(b.get("u", self.deleted_user))
-                        except LookupError:
-                            user = self.cache.users[self.deleted_user]
-                    members = list(members)
+                if allow_banned:
+                    members = await self.get_full_members(guild)
                 else:
                     members = guild.members
                 if not members:
@@ -1401,7 +1445,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     reacts="❎",
                 ))
             return
-        delay = 0
+        remaining = 0
         run = False
         if op:
             # Special case: the ? alias for the ~help command, since ? is an argument flag indicator and will otherwise be parsed as one.
@@ -1442,7 +1486,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 if x:
                                     if issubclass(type(x), collections.abc.Sequence):
                                         x = x[not self.is_trusted(getattr(guild, "id", 0))]
-                                    delay += x
+                                    remaining += x
                                     d = command.used
                                     t = d.get(u_id, -inf)
                                     wait = utc() - t - x
@@ -1504,15 +1548,38 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                                             break
                             if argv:
                                 argv = argv.strip()
+                            argl = None
                             # args is a list of arguments parsed from argv, using shlex syntax when possible.
                             if not argv:
                                 args = []
                             else:
-                                argv2 = single_space(argv.replace("\n", " ").replace("\r", "").replace("\t", " "))
-                                try:
-                                    args = shlex.split(argv2)
-                                except ValueError:
-                                    args = argv2.split()
+                                # Used as a goto lol
+                                with suppress(StopIteration):
+                                    brackets = {"<": ">", "(": ")", "[": "]", "{": "}"}
+                                    for x, y in brackets.items():
+                                        if x in argv and y in argv:
+                                            xi = argv.index(x)
+                                            yi = argv.rindex(y)
+                                            if xi < yi:
+                                                if hasattr(command, "multi"):
+                                                    argv2 = single_space((argv[:xi] + " " + argv[yi + 1:]).replace("\n", " ").replace(",", "").replace("\t", " ")).strip()
+                                                    argv3 = single_space(argv[xi + 1:yi].replace("\n", " ").replace(",", "").replace("\t", " ")).strip()
+                                                    try:
+                                                        argl = shlex.split(argv3)
+                                                    except ValueError:
+                                                        argl = argv3.split()
+                                                else:
+                                                    argv2 = single_space((argv[:xi] + " " + argv[xi + 1:yi] + " " + argv[yi + 1:]).replace("\n", " ").replace(",", "").replace("\t", " ")).strip()
+                                                try:
+                                                    args = shlex.split(argv2)
+                                                except ValueError:
+                                                    args = argv2.split()
+                                                raise StopIteration
+                                    argv2 = single_space(argv.replace("\n", " ").replace("\t", " "))
+                                    try:
+                                        args = shlex.split(argv2)
+                                    except ValueError:
+                                        args = argv2.split()
                             # Assign "guild" as an object that mimics the discord.py guild if there is none
                             if guild is None:
                                 guild = self.UserGuild(
@@ -1536,6 +1603,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 bot=bot,                        # for interfacing with bot's database
                                 argv=argv,                      # raw text argument
                                 args=args,                      # split text arguments
+                                argl=argl,                      # inputted array of arguments
                                 flags=flags,                    # special flags
                                 perm=u_perm,                    # permission level
                                 user=user,                      # user that invoked the command
@@ -1621,7 +1689,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             temp = to_alphanumeric(cpy).casefold()
             await self.send_event("_nocommand_", text=temp, edit=edit, orig=orig, message=message, perm=u_perm)
         # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
-        return delay
+        return remaining
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
@@ -1727,7 +1795,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Adds embeds to the embed sender, waiting for the next update event.
     def send_embeds(self, channel, embeds=None, embed=None):
-        if embeds is not None and not issubclass(type(embeds), collections.abc.Sequence):
+        if embeds is not None and not issubclass(type(embeds), collections.abc.Collection):
             embeds = (embeds,)
         if embed is not None:
             if embeds is not None:
@@ -1831,7 +1899,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     with suppress(discord.NotFound):
                         await self.silent_delete(message, exc=True)
 
-    # Handles a new sent message, calls processMessage and sends an error if an exception occurs.
+    # Handles a new sent message, calls process_message and sends an error if an exception occurs.
     async def handle_message(self, message, edit=True):
         cpy = msg = message.content
         async with ExceptionSender(message.channel):

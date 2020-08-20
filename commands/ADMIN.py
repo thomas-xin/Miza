@@ -12,36 +12,21 @@ class Purge(Command):
     name = ["Del", "Delete"]
     min_level = 3
     description = "Deletes a number of messages from a certain user in current channel."
-    usage = "<1:user{bot}> <everyone(?a)> <0:count[1]> <hide(?h)>"
+    usage = "<1:*users{bot}{everyone(?a)}> <0:count[1]> <hide(?h)>"
     flags = "aeh"
     rate_limit = 2
+    multi = True
 
-    async def __call__(self, bot, argv, args, channel, name, flags, perm, guild, **void):
-        t_user = -1
-        if "a" in flags or "e" in flags or "@" in argv and ("everyone" in argv or "here" in argv):
-            t_user = None
-        if len(args) < 2:
-            if t_user == -1:
-                t_user = bot.user
-            if len(args) < 1:
-                count = 1
-            else:
-                num = await bot.eval_math(args[0], guild.id)
-                count = round(num)
+    async def __call__(self, bot, args, argl, channel, name, flags, perm, guild, **void):
+        if args:
+            count = await bot.eval_math(args.pop(0), guild.id)
         else:
-            a1 = args[0]
-            a2 = " ".join(args[1:])
-            num = await bot.eval_math(a2, guild.id)
-            count = round(num)
-            if t_user == -1:
-                u_id = verify_id(a1)
-                try:
-                    t_user = await bot.fetch_user(u_id)
-                except (TypeError, discord.NotFound):
-                    try:
-                        t_user = await bot.fetch_member_ex(u_id, guild)
-                    except LookupError:
-                        t_user = cdict(id=u_id)
+            count = 1
+        if not argl and not args:
+            uset = None
+        else:
+            users = await bot.find_users(argl, args, user, guild)
+            uset = {u.id for u in users}
         if count <= 0:
             raise ValueError("Please enter a valid amount of messages to delete.")
         dt = None
@@ -49,14 +34,10 @@ class Purge(Command):
         deleted = 0
         # Keep going until finding required amount of messages or reaching the end of the channel
         while count > 0:
-            lim = count * 2 + 16
-            if not lim < inf:
-                lim = None
+            lim = count * 2 + 16 if count < inf else None
             hist = await channel.history(limit=lim, before=dt).flatten()
-            isbot = t_user is not None and t_user.id == bot.user.id
-            for i in range(len(hist)):
-                m = hist[i]
-                if t_user is None or isbot and m.author.bot or m.author.id == t_user.id:
+            for i, m in enumerate(hist):
+                if uset is None and m.author.bot or m.author.id in uset:
                     delD[m.id] = m
                     count -= 1
                     if count <= 0:
@@ -96,13 +77,14 @@ class Ban(Command):
     min_level = 3
     min_display = "3+"
     description = "Bans a user for a certain amount of time, with an optional reason."
-    usage = "<0:user> <1:time[]> <2:reason[]> <hide(?h)> <debug(?z)>"
+    usage = "<0:*users> <1:time[]> <2:reason[]> <hide(?h)> <debug(?z)>"
     flags = "hz"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = 2
+    multi = True
 
-    async def __call__(self, bot, args, message, channel, guild, flags, perm, user, name, **void):
-        if not args:
+    async def __call__(self, bot, args, argl, message, channel, guild, flags, perm, user, name, **void):
+        if not args and not argl:
             # Set callback message for scrollable list
             return (
                 "*```" + "\n" * ("z" in flags) + "callback-admin-ban-"
@@ -116,17 +98,7 @@ class Ban(Command):
             banlist = bot.data.bans[guild.id] = hlist(banlist)
         with discord.context_managers.Typing(channel):
             bans, glob = await self.getBans(guild)
-        u_id = verify_id(args.pop(0))
-        try:
-            user = await bot.fetch_user(u_id)
-            users = [user]
-        except (TypeError, discord.NotFound):
-            try:
-                member = await bot.fetch_member_ex(u_id, guild)
-                users = [member]
-            except LookupError:
-                role = await bot.fetch_role(u_id, guild)
-                users = role.members
+            users = await bot.find_users(argl, args, user, guild)
         if not args or name == "unban":
             user = users[0]
             try:

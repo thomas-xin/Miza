@@ -262,13 +262,26 @@ __emap2 = "".maketrans(ESCAPE_T2)
 no_md = lambda s: str(s).translate(__emap)
 clr_md = lambda s: str(s).translate(__emap2)
 sqr_md = lambda s: f"[{no_md(s)}]" if not issubclass(type(s), discord.abc.GuildChannel) else f"[#{no_md(s)}]"
-italics = lambda s: f"*{s}*"
-bold = lambda s: f"**{s}**"
+
+def italics(s):
+    if type(s) is not str:
+        s = str(s)
+    if "*" not in s:
+        s = f"*{s}*"
+    return s
+
+def bold(s):
+    if type(s) is not str:
+        s = str(s)
+    if "**" not in s:
+        s = f"**{s}**"
+    return s
+
 single_md = lambda s: f"`{s}`"
 code_md = lambda s: f"```\n{s}```"
 py_md = lambda s: f"```py\n{s}```"
 ini_md = lambda s: f"```ini\n{s}```"
-css_md = lambda s: f"```css\n{s}```"
+css_md = lambda s: f"```css\n{s}```".replace("'", "\u2019").replace('"', "\u201d")
 fix_md = lambda s: f"```fix\n{s}```"
 
 # Discord object mention formatting
@@ -978,7 +991,7 @@ def is_dst(dt=None, timezone="UTC"):
 
 def get_timezone(tz):
     s = TIMEZONES[tz]
-    if issubclass(type(s), collections.abc.Sequence):
+    if issubclass(type(s), collections.abc.Collection):
         return s[is_dst(timezone=tz.upper())]
     return s
 

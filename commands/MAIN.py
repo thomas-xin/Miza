@@ -98,55 +98,42 @@ class Perms(Command):
     server_only = True
     name = ["ChangePerms", "Perm", "ChangePerm", "Permissions"]
     description = "Shows or changes a user's permission level."
-    usage = "<0:user{self}> <1:level[]> <hide(?h)>"
+    usage = "<0:*users{self}> <1:level[]> <hide(?h)>"
     flags = "fh"
+    multi = True
 
-    async def __call__(self, bot, args, user, perm, guild, flags, **void):
+    async def __call__(self, bot, args, argl, user, perm, channel, guild, flags, **void):
         # Get target user from first argument
-        if len(args) < 1:
-            t_user = user
-        else:
-            check = args[0].casefold()
-            if "@" in args[0] and ("everyone" in check or "here" in check):
-                args[0] = guild.id
-            u_id = verify_id(args[0])
-            try:
-                t_user = await bot.fetch_user(u_id)
-            except (TypeError, discord.NotFound):
-                try:
-                    t_user = await bot.fetch_member_ex(u_id, guild)
-                except LookupError:
-                    t_user = guild.get_role(u_id)
-                    if t_user is None:
-                        raise LookupError(f"No results for {u_id}.")
-        print(t_user)
-        t_perm = round_min(bot.get_perms(t_user.id, guild))
-        # If permission level is given, attempt to change permission level, otherwise get current permission level
-        if len(args) > 1:
-            name = str(t_user)
-            orig = t_perm
-            expr = " ".join(args[1:])
-            num = await bot.eval_math(expr, user, orig)
-            c_perm = round_min(num)
-            if t_perm is nan or isnan(c_perm):
-                m_perm = nan
-            else:
-                # Required permission to change is absolute level + 1, with a minimum of 3
-                m_perm = max(abs(t_perm), abs(c_perm), 2) + 1
-            if not perm < m_perm and not isnan(m_perm):
-                if not m_perm < inf and guild.owner_id != user.id and not isnan(perm):
-                    raise PermissionError("Must be server owner to assign non-finite permission level.")
-                if t_user is None:
-                    for u in guild.members:
-                        bot.setPerms(u.id, guild, c_perm)
+        users = await bot.find_users(argl, args, user, guild)
+        print(users)
+        for t_user in users:
+            t_perm = round_min(bot.get_perms(t_user.id, guild))
+            # If permission level is given, attempt to change permission level, otherwise get current permission level
+            if args:
+                name = str(t_user)
+                orig = t_perm
+                expr = " ".join(args)
+                num = await bot.eval_math(expr, user, orig)
+                c_perm = round_min(num)
+                if t_perm is nan or isnan(c_perm):
+                    m_perm = nan
                 else:
-                    bot.setPerms(t_user.id, guild, c_perm)
-                if "h" in flags:
-                    return
-                return css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to {sqr_md(c_perm)}.")
-            reason = f"to change permissions for {name} in {guild} from {t_perm} to {c_perm}"
-            raise self.perm_error(perm, m_perm, reason)
-        return css_md(f"Current permissions for {sqr_md(t_user)} in {sqr_md(guild)}: {sqr_md(t_perm)}.")
+                    # Required permission to change is absolute level + 1, with a minimum of 3
+                    m_perm = max(abs(t_perm), abs(c_perm), 2) + 1
+                if not perm < m_perm and not isnan(m_perm):
+                    if not m_perm < inf and guild.owner_id != user.id and not isnan(perm):
+                        raise PermissionError("Must be server owner to assign non-finite permission level.")
+                    if t_user is None:
+                        for u in guild.members:
+                            bot.setPerms(u.id, guild, c_perm)
+                    else:
+                        bot.setPerms(t_user.id, guild, c_perm)
+                    if "h" in flags:
+                        return
+                    create_task(channel.send(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to {sqr_md(c_perm)}.")))
+                reason = f"to change permissions for {name} in {guild} from {t_perm} to {c_perm}"
+                raise self.perm_error(perm, m_perm, reason)
+            create_task(channel.send(css_md(f"Current permissions for {sqr_md(t_user)} in {sqr_md(guild)}: {sqr_md(t_perm)}.")))
 
 
 class EnabledCommands(Command):
@@ -320,7 +307,8 @@ class Avatar(Command):
     name = ["PFP", "Icon"]
     min_level = 0
     description = "Sends a link to the avatar of a user or server."
-    usage = "<user>"
+    usage = "<*objects>"
+    multi = True
 
     async def getGuildData(self, g):
         # Gets icon display of a server and returns as an embed.
@@ -331,7 +319,7 @@ class Avatar(Command):
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         emb.description = f"{sqr_md(name)}({url})"
-        return dict(embed=emb)
+        return emb
 
     def getMimicData(self, p):
         # Gets icon display of a mimic and returns as an embed.
@@ -342,74 +330,75 @@ class Avatar(Command):
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         emb.description = f"{sqr_md(name)}({url})"
-        return dict(embed=emb)
+        return emb
 
-    async def __call__(self, argv, guild, bot, user, **void):
-        g, guild = guild, None
-        # This is a mess 🙃
-        if argv:
-            try:
-                u_id = verify_id(argv)
-            except:
-                u_id = argv
-            try:
-                p = bot.get_mimic(u_id, user)
-                return self.getMimicData(p)
-            except:
-                try:
-                    u = await bot.fetch_member_ex(u_id, g)
-                except:
-                    try:
-                        u = await bot.fetch_member(u_id, g)
-                    except:
-                        try:
-                            u = await bot.fetch_user(u_id)
-                        except:
+    async def __call__(self, argv, argl, channel, guild, bot, user, **void):
+        iterator = argl if argl else (argv,)
+        embs = set()
+        for argv in iterator:
+            async with ExceptionSender(channel):
+                with suppress(StopIteration):
+                    if argv:
+                        u_id = argv
+                        with suppress():
+                            u_id = verify_id(u_id)
+                        u = guild.get_member(u_id)
+                        g = None
+                        while u is None and g is None:
+                            with suppress():
+                                u = await bot.fetch_member(u_id, guild, find_others=True)
+                                break
+                            with suppress():
+                                u = await bot.fetch_user(u_id)
+                                break
                             if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
-                                guild = g
+                                g = guild
+                                break
+                            try:
+                                p = bot.get_mimic(u_id, user)
+                                embs.add(self.getMimicData(p, flags))
+                            except:
+                                pass
                             else:
-                                try:
-                                    guild = bot.cache.guilds[u_id]
-                                except:
-                                    try:
-                                        channel = bot.cache.channels[u_id]
-                                    except:
-                                        u = None
-                                        if g.id in bot.data.counts:
-                                            if u_id in bot.data.counts[g.id]["counts"]:
-                                                u = bot.ghostUser()
-                                                u.id = u_id
-                                        if u is None:
-                                            raise LookupError(f"No results for {argv}.")
-                                    try:
-                                        guild = channel.guild
-                                    except NameError:
-                                        pass
-                                    except (AttributeError, KeyError):
-                                        guild = None
-                                        u = channel.recipient
-                            if guild is not None:
-                                return await self.getGuildData(guild)                        
-        else:
-            u = user
-        guild = g
-        name = str(u)
-        url = best_url(u)
-        emb = discord.Embed(colour=rand_colour())
-        emb.set_thumbnail(url=url)
-        emb.set_image(url=url)
-        emb.set_author(name=name, icon_url=url, url=url)
-        emb.description = f"{sqr_md(name)}({url})"
-        return dict(embed=emb)
+                                raise StopIteration
+                            with suppress():
+                                g = bot.cache.guilds[u_id]
+                                break
+                            with suppress():
+                                g = bot.cache.roles[u_id].guild
+                                break
+                            with suppress():
+                                g = bot.cache.channels[u_id].guild
+                            with suppress():
+                                u = await bot.fetch_member_ex(u_id, guild)
+                                break
+                            raise LookupError(f"No results for {argv}.")     
+                        if g:
+                            emb = await self.getGuildData(g, flags)    
+                            embs.add(emb)   
+                            raise StopIteration         
+                    else:
+                        u = user
+                    guild = g
+                    name = str(u)
+                    url = best_url(u)
+                    emb = discord.Embed(colour=rand_colour())
+                    emb.set_thumbnail(url=url)
+                    emb.set_image(url=url)
+                    emb.set_author(name=name, icon_url=url, url=url)
+                    emb.description = f"{sqr_md(name)}({url})"
+                    embs.add(emb)
+        bot.send_embeds(channel, embeds=embs)
 
 
 class Info(Command):
     name = ["UserInfo", "ServerInfo", "WhoIs", "Profile"]
     min_level = 0
     description = "Shows information about the target user or server."
-    usage = "<user> <verbose(?v)>"
+    usage = "<*objects> <verbose(?v)>"
     flags = "v"
     rate_limit = 1
+    multi = True
 
     async def getGuildData(self, g, flags={}):
         bot = self.bot
@@ -465,7 +454,7 @@ class Info(Command):
                 emb.add_field(name="Average post length", value=str(round(pavg, 9)), inline=1)
         if top is not None:
             emb.add_field(name="Top users", value=top, inline=0)
-        return dict(embed=emb)
+        return emb
 
     def getMimicData(self, p, flags={}):
         url = to_png(p.url)
@@ -500,214 +489,225 @@ class Info(Command):
             emb.add_field(name="Post count", value=str(pcnt), inline=1)
             if "v" in flags:
                 emb.add_field(name="Average post length", value=str(round(pavg, 9)), inline=1)
-        return dict(embed=emb)
+        return emb
 
-    async def __call__(self, argv, name, guild, channel, bot, user, flags, **void):
-        member = True
-        g, guild = guild, None
-        # This is a mess 🙃
-        if argv:
-            try:
-                u_id = verify_id(argv)
-            except:
-                u_id = argv
-            try:
-                p = bot.get_mimic(u_id, user)
-                return self.getMimicData(p, flags)
-            except:
-                try:
-                    u = await bot.fetch_member_ex(u_id, g)
-                except:
-                    try:
-                        u = await bot.fetch_member(u_id, g, find_others=True)
-                        member = False
-                    except:
-                        try:
-                            u = await bot.fetch_user(u_id)
-                            member = False
-                        except:
+    async def __call__(self, argv, argl, name, guild, channel, bot, user, flags, **void):
+        iterator = argl if argl else (argv,)
+        embs = set()
+        for argv in iterator:
+            with ExceptionSender(channel):
+                with suppress(StopIteration):
+                    if argv:
+                        u_id = argv
+                        with suppress():
+                            u_id = verify_id(u_id)
+                        u = guild.get_member(u_id)
+                        g = None
+                        while u is None and g is None:
+                            with suppress():
+                                u = await bot.fetch_member(u_id, guild, find_others=True)
+                                break
+                            with suppress():
+                                u = await bot.fetch_user(u_id)
+                                break
                             if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
-                                guild = g
+                                g = guild
+                                break
+                            if "server" in name:
+                                with suppress():
+                                    g = await bot.fetch_guild(u_id)
+                                    break
+                                with suppress():
+                                    role = await bot.fetch_role(u_id, g)
+                                    g = role.guild
+                                    break
+                                with suppress():
+                                    channel = await bot.fetch_channel(u_id)
+                                    g = channel.guild
+                                    break
+                            try:
+                                p = bot.get_mimic(u_id, user)
+                                embs.add(self.getMimicData(p, flags))
+                            except:
+                                pass
                             else:
-                                try:
-                                    guild = bot.cache.guilds[u_id]
-                                except:
-                                    try:
-                                        channel = bot.cache.channels[u_id]
-                                    except:
-                                        u = None
-                                        if g.id in bot.data.counts:
-                                            if u_id in bot.data.counts[g.id]["counts"]:
-                                                u = bot.ghostUser()
-                                                u.id = u_id
-                                        if u is None:
-                                            raise LookupError(f"No results for {argv}.")
-                                    try:
-                                        guild = channel.guild
-                                    except NameError:
-                                        pass
-                                    except (AttributeError, KeyError):
-                                        guild = None
-                                        u = channel.recipient
-                            if guild is not None:
-                                return await self.getGuildData(guild, flags)
-        elif not name.startswith("server"):
-            u = user
-        else:
-            return await self.getGuildData(g, flags)
-        guild = g
-        name = str(u)
-        dname = u.display_name * (u.display_name != u.name) if member else None
-        url = best_url(u)
-        try:
-            is_sys = u.system
-        except (AttributeError, KeyError):
-            is_sys = False
-        is_bot = u.bot
-        is_self = u.id == bot.user.id
-        is_self_owner = bot.is_owner(u.id)
-        is_guild_owner = u.id == guild.owner_id
-        if member:
-            joined = getattr(u, "joined_at", None)
-        else:
-            joined = None
-        created = u.created_at
-        activity = "\n".join(activity_repr(i) for i in getattr(u, "activities", ()))
-        status = None
-        if hasattr(u, "status"):
-            # Show up to 3 different statuses based on the user's desktop, web and mobile status.
-            if not is_self:
-                status_items = [(u.desktop_status, "🖥️"), (u.web_status, "🕸️"), (u.mobile_status, "📱")]
-            else:
-                status_items = [(bot.statuses[(i + bot.status_iter) % 3], x) for i, x in enumerate(("🖥️", "🕸️", "📱"))]
-            for s, i in sorted(status_items, key=lambda x: status_order.index(x[0])):
-                icon = status_icon[s]
-                if not status:
-                    status = status_text[s] + " `" + icon
-                if s not in (discord.Status.offline, discord.Status.invisible):
-                    if icon not in status:
-                        status += icon
-                    status += i
-            if status:
-                status += "`"
-                if len(status) >= 16:
-                    status = status.replace(" ", "\n")
-        if member:
-            rolelist = [role_mention(i.id) for i in reversed(getattr(u, "roles", ())) if not i.is_default()]
-            role = ", ".join(rolelist)
-        else:
-            role = None
-        coms = seen = msgs = avgs = gmsg = old = 0
-        fav = None
-        pos = None
-        with suppress(LookupError):
-            ts = utc()
-            ls = bot.data.users[u.id]["last_seen"]
-            la = bot.data.users[u.id].get("last_action")
-            if type(ls) is str:
-                seen = ls
-            else:
-                seen = f"{sec2time(max(0, ts - ls))} ago"
-            if la:
-                seen = f"{la}, {seen}"
-        with suppress(LookupError):
-            old = bot.data.counts.get(guild.id, {})["oldest"][u.id]
-            old = snowflake_time(old)
-        if "v" in flags:
-            with suppress(LookupError):
-                if is_self:
-                    # Count total commands used by all users
-                    c = {}
-                    for i, v in enumerate(tuple(bot.data.users.values()), 1):
-                        with suppress(KeyError):
-                            add_dict(c, v["commands"])
-                        if not i & 8191:
-                            await asyncio.sleep(0.2)
-                else:
-                    c = bot.data.users[u.id]["commands"]
-                coms = iter_sum(c)
-                if type(c) is dict:
-                    with suppress(IndexError):
-                        comfreq = deque(sort(c, reverse=True).keys())
-                        while fav is None:
-                            fav = comfreq.popleft()
-            with suppress(LookupError):
-                gmsg = bot.database.counts.getUserGlobalMessageCount(u)
-                msgs = await bot.database.counts.getUserMessages(u, guild)
-                avgs = await bot.database.counts.getUserAverage(u, guild)
-        with suppress(LookupError):
-            if not hasattr(guild, "ghost"):
-                us = await bot.database.counts.getGuildMessages(guild)
-                if type(us) is str:
-                    pos = us
-                else:
-                    ul = sorted(
-                        us,
-                        key=lambda k: us[k],
-                        reverse=True,
-                    )
+                                raise StopIteration
+                            with suppress():
+                                g = bot.cache.guilds[u_id]
+                                break
+                            with suppress():
+                                g = bot.cache.roles[u_id].guild
+                                break
+                            with suppress():
+                                g = bot.cache.channels[u_id].guild
+                            with suppress():
+                                u = await bot.fetch_member_ex(u_id, guild)
+                                break
+                            raise LookupError(f"No results for {argv}.")
+                        if g:
+                            emb = await self.getGuildData(g, flags)
+                            embs.add(emb)
+                            raise StopIteration
+                    elif not name.startswith("server"):
+                        u = user
+                    else:
+                        emb = await self.getGuildData(guild, flags)
+                        embs.add(emb)
+                        raise StopIteration
+                    member = guild.get_member(u.id)
+                    name = str(u)
+                    url = best_url(u)
                     try:
-                        i = ul.index(u.id)
-                        while i >= 1 and us[ul[i - 1]] == us[ul[i]]:
-                            i -= 1
-                        pos = i + 1
-                    except ValueError:
-                        if joined:
-                            pos = len(ul) + 1
-        if is_self and bot.website is not None:
-            url2 = bot.website
-        else:
-            url2 = url
-        emb = discord.Embed(colour=rand_colour())
-        emb.set_thumbnail(url=url)
-        emb.set_author(name=name, icon_url=url, url=url2)
-        d = user_mention(u.id)
-        if activity:
-            d += italics(code_md(activity))
-        if any((is_sys, is_bot, is_self, is_self_owner, is_guild_owner)):
-            if d[-1] == "*":
-                d += " "
-            d += "**```css\n"
-            if is_sys:
-                d += "[Discord staff ⚠️]\n"
-            if is_bot:
-                d += "[Bot 🤖]\n"
-            if is_self:
-                d += "[Myself :3]\n"
-            if is_self_owner:
-                d += "[My owner ❤️]\n"
-            if is_guild_owner and not hasattr(guild, "isDM"):
-                d += "[Server owner 👀]\n"
-            d = d.strip("\n")
-            d += "```**"
-        emb.description = d
-        emb.add_field(name="User ID", value="`" + str(u.id) + "`", inline=0)
-        emb.add_field(name="Creation time", value=str(created), inline=1)
-        if joined:
-            emb.add_field(name="Join time", value=str(joined), inline=1)
-        if old:
-            emb.add_field(name="Oldest post time", value=str(old), inline=1)
-        if status:
-            emb.add_field(name="Status", value=str(status), inline=1)
-        if seen:
-            emb.add_field(name="Last seen", value=str(seen), inline=1)
-        if coms:
-            emb.add_field(name="Commands used", value=str(coms), inline=1)
-        if fav:
-            emb.add_field(name="Favourite command", value=str(fav), inline=1)
-        if dname:
-            emb.add_field(name="Nickname", value=dname, inline=1)
-        if gmsg:
-            emb.add_field(name="Global post count", value=str(gmsg), inline=1)
-        if msgs:
-            emb.add_field(name="Post count", value=str(msgs), inline=1)
-        if avgs:
-            emb.add_field(name="Average post length", value=str(round(avgs, 9)), inline=1)
-        if pos:
-            emb.add_field(name="Server rank", value=str(pos), inline=1)
-        if role:
-            emb.add_field(name=f"Roles ({len(rolelist)})", value=role, inline=0)
-        return dict(embed=emb)
+                        is_sys = u.system
+                    except (AttributeError, KeyError):
+                        is_sys = False
+                    is_bot = u.bot
+                    is_self = u.id == bot.user.id
+                    is_self_owner = bot.is_owner(u.id)
+                    is_guild_owner = u.id == guild.owner_id
+                    dname = getattr(member, "nick", None)
+                    if member:
+                        joined = getattr(u, "joined_at", None)
+                    else:
+                        joined = None
+                    created = u.created_at
+                    activity = "\n".join(activity_repr(i) for i in getattr(u, "activities", ()))
+                    status = None
+                    if getattr(u, "status", None):
+                        # Show up to 3 different statuses based on the user's desktop, web and mobile status.
+                        if not is_self:
+                            status_items = [(u.desktop_status, "🖥️"), (u.web_status, "🕸️"), (u.mobile_status, "📱")]
+                        else:
+                            status_items = [(bot.statuses[(i + bot.status_iter) % 3], x) for i, x in enumerate(("🖥️", "🕸️", "📱"))]
+                        for s, i in sorted(status_items, key=lambda x: status_order.index(x[0])):
+                            icon = status_icon[s]
+                            if not status:
+                                status = status_text[s] + " `" + icon
+                            if s not in (discord.Status.offline, discord.Status.invisible):
+                                if icon not in status:
+                                    status += icon
+                                status += i
+                        if status:
+                            status += "`"
+                            if len(status) >= 16:
+                                status = status.replace(" ", "\n")
+                    if member:
+                        rolelist = [role_mention(i.id) for i in reversed(getattr(u, "roles", ())) if not i.is_default()]
+                        role = ", ".join(rolelist)
+                    else:
+                        role = None
+                    coms = seen = msgs = avgs = gmsg = old = 0
+                    fav = None
+                    pos = None
+                    with suppress(LookupError):
+                        ts = utc()
+                        ls = bot.data.users[u.id]["last_seen"]
+                        la = bot.data.users[u.id].get("last_action")
+                        if type(ls) is str:
+                            seen = ls
+                        else:
+                            seen = f"{sec2time(max(0, ts - ls))} ago"
+                        if la:
+                            seen = f"{la}, {seen}"
+                    with suppress(LookupError):
+                        old = bot.data.counts.get(guild.id, {})["oldest"][u.id]
+                        old = snowflake_time(old)
+                    if "v" in flags:
+                        with suppress(LookupError):
+                            if is_self:
+                                # Count total commands used by all users
+                                c = {}
+                                for i, v in enumerate(tuple(bot.data.users.values()), 1):
+                                    with suppress(KeyError):
+                                        add_dict(c, v["commands"])
+                                    if not i & 8191:
+                                        await asyncio.sleep(0.2)
+                            else:
+                                c = bot.data.users[u.id]["commands"]
+                            coms = iter_sum(c)
+                            if type(c) is dict:
+                                with suppress(IndexError):
+                                    comfreq = deque(sort(c, reverse=True).keys())
+                                    while fav is None:
+                                        fav = comfreq.popleft()
+                        with suppress(LookupError):
+                            gmsg = bot.database.counts.getUserGlobalMessageCount(u)
+                            msgs = await bot.database.counts.getUserMessages(u, guild)
+                            avgs = await bot.database.counts.getUserAverage(u, guild)
+                    with suppress(LookupError):
+                        if not hasattr(guild, "ghost"):
+                            us = await bot.database.counts.getGuildMessages(guild)
+                            if type(us) is str:
+                                pos = us
+                            else:
+                                ul = sorted(
+                                    us,
+                                    key=lambda k: us[k],
+                                    reverse=True,
+                                )
+                                try:
+                                    i = ul.index(u.id)
+                                    while i >= 1 and us[ul[i - 1]] == us[ul[i]]:
+                                        i -= 1
+                                    pos = i + 1
+                                except ValueError:
+                                    if joined:
+                                        pos = len(ul) + 1
+                    if is_self and bot.website is not None:
+                        url2 = bot.website
+                    else:
+                        url2 = url
+                    emb = discord.Embed(colour=rand_colour())
+                    emb.set_thumbnail(url=url)
+                    emb.set_author(name=name, icon_url=url, url=url2)
+                    d = user_mention(u.id)
+                    if activity:
+                        d += "\n" + italics(code_md(activity))
+                    if any((is_sys, is_bot, is_self, is_self_owner, is_guild_owner)):
+                        if d[-1] == "*":
+                            d += " "
+                        d += " **```css\n"
+                        if is_sys:
+                            d += "[Discord staff ⚠️]\n"
+                        if is_bot:
+                            d += "[Bot 🤖]\n"
+                        if is_self:
+                            d += "[Myself :3]\n"
+                        if is_self_owner:
+                            d += "[My owner ❤️]\n"
+                        if is_guild_owner and not hasattr(guild, "isDM"):
+                            d += "[Server owner 👀]\n"
+                        d = d.strip("\n")
+                        d += "```**"
+                    emb.description = d
+                    emb.add_field(name="User ID", value="`" + str(u.id) + "`", inline=0)
+                    emb.add_field(name="Creation time", value=str(created), inline=1)
+                    if joined:
+                        emb.add_field(name="Join time", value=str(joined), inline=1)
+                    if old:
+                        emb.add_field(name="Oldest post time", value=str(old), inline=1)
+                    if status:
+                        emb.add_field(name="Status", value=str(status), inline=1)
+                    if seen:
+                        emb.add_field(name="Last seen", value=str(seen), inline=1)
+                    if coms:
+                        emb.add_field(name="Commands used", value=str(coms), inline=1)
+                    if fav:
+                        emb.add_field(name="Favourite command", value=str(fav), inline=1)
+                    if dname:
+                        emb.add_field(name="Nickname", value=dname, inline=1)
+                    if gmsg:
+                        emb.add_field(name="Global post count", value=str(gmsg), inline=1)
+                    if msgs:
+                        emb.add_field(name="Post count", value=str(msgs), inline=1)
+                    if avgs:
+                        emb.add_field(name="Average post length", value=str(round(avgs, 9)), inline=1)
+                    if pos:
+                        emb.add_field(name="Server rank", value=str(pos), inline=1)
+                    if role:
+                        emb.add_field(name=f"Roles ({len(rolelist)})", value=role, inline=0)
+                    embs.add(emb)
+        bot.send_embeds(channel, embeds=embs)
 
 
 class Activity(Command):

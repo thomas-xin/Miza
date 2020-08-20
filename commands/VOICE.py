@@ -1805,7 +1805,7 @@ class Queue(Command):
     alias = name + ["LS"]
     min_level = 0
     description = "Shows the music queue, or plays a song in voice."
-    usage = "<search_link[]> <verbose(?v)> <hide(?h)> <force(?f)> <budge(?b)> <debug(?z)>"
+    usage = "<*search_links[]> <verbose(?v)> <hide(?h)> <force(?f)> <budge(?b)> <debug(?z)>"
     flags = "hvfbz"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -3678,7 +3678,7 @@ class UpdateAudio(Database):
         for auds in tuple(self.players.values()):
             d = await create_future(auds.get_dump, True)
             self.data[auds.vc.channel.id] = {"dump": d, "channel": auds.channel.id}
-            await create_future(auds.kill)
+            await create_future(auds.kill, reason="")
         for file in tuple(ytdl.cache.values()):
             if not file.loaded:
                 await create_future(file.destroy)

@@ -216,6 +216,29 @@ def sort(it, key=None, reverse=False):
             raise TypeError(f"Sorting {type(it)} is not supported.")
 
 
+class UniversalSet(collections.abc.Set):
+
+    __str__ = lambda self: "ξ"
+    __repr__ = lambda self: f"{self.__class__.__name__}()"
+    __contains__ = lambda key: True
+    __iter__ = lambda: repeat(None)
+    __len__ = lambda: inf
+    __le__ = lambda self, other: type(self) is type(other)
+    __lt__ = lambda self, other: False
+    __eq__ = lambda self, other: type(self) is type(other)
+    __ne__ = lambda self, other: type(self) is not type(other)
+    __gt__ = lambda self, other: type(self) is not type(other)
+    __ge__ = lambda self, other: True
+    __and__ = lambda self, other: other
+    __or__ = lambda self, other: self
+    __sub__ = lambda self, other: self
+    __xor__ = lambda self, other: self
+    index = lambda self, obj: 0
+    isdisjoint = lambda self, other: False
+
+universal_set = UniversalSet()
+
+
 class hlist(collections.abc.MutableSequence, collections.abc.Callable):
 
     """
