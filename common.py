@@ -513,12 +513,14 @@ __urlMatch = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
 __urlDiscord = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/")
 __urlTenor = re.compile("^https?:\\/\\/tenor.com(?:\\/view)?/[a-zA-Z0-9\\-_]+-[0-9]+")
 __urlImgur = re.compile("^https?:\\/\\/(?:[a-z]\\.)?imgur.com/[a-zA-Z0-9\\-_]+")
+__urlGiphy = re.compile("^https?:\\/\\/giphy.com/gifs/[a-zA-Z0-9\\-_]+")
 # This reminds me of Perl - Smudge
 find_urls = lambda url: re.findall(__urlFind, url)
 is_url = lambda url: re.search(__urlMatch, url)
 is_discord_url = lambda url: re.search(__urlDiscord, url)
 is_tenor_url = lambda url: re.search(__urlTenor, url)
 is_imgur_url = lambda url: re.search(__urlImgur, url)
+is_giphy_url = lambda url: re.search(__urlGiphy, url)
 
 def is_discord_message_link(url):
     check = url[:64]

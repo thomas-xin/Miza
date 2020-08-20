@@ -625,13 +625,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 first = url.split("?")[0]
                 if not first.endswith(".jpg"):
                     first += ".jpg"
-                lost.append(first)
+                out.append(first)
+            elif images and is_giphy_url(url):
+                first = url.split("?")[0]
+                item = first[first.rindex("/") + 1:]
+                out.append(f"https://media2.giphy.com/media/{item}/giphy.gif")
             elif images and is_tenor_url(url):
                 s = await Request(url, decode=True, aio=True)
                 search ='<meta class="dynamic" property="og:image" content="'
                 s = s[s.index(search) + len(search):]
                 s = s[:s.index('"')]
-                lost.append(s)
+                out.append(s)
             else:
                 out.append(url)
         if lost:
@@ -1655,7 +1659,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                     # Process list as a sequence of messages to send
                                     if type(response) is list:
                                         for r in response:
-                                            async with delay(1):
+                                            async with delay(1 / 3):
                                                 create_task(channel.send(r))
                                     # Process dict as kwargs for a message send
                                     elif issubclass(type(response), collections.abc.Mapping):
