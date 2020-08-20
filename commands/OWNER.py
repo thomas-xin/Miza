@@ -201,7 +201,7 @@ class UpdateExec(Database):
     async def _typing_(self, user, channel, **void):
         # Typing indicator for DM channels
         bot = self.bot
-        if user.id == bot.client.user.id:
+        if user.id == bot.client.user.id or bot.is_blacklisted(user.id):
             return
         if not hasattr(channel, "guild") or channel.guild is None:
             emb = discord.Embed(colour=rand_colour())
@@ -255,7 +255,7 @@ class UpdateExec(Database):
                             await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
         # Relay DM messages
         elif message.guild is None:
-            if bot.isBlacklisted(message.author.id):
+            if bot.is_blacklisted(message.author.id):
                 return await send_with_react(channel,
                     "Your message could not be delivered because you don't share a server with the recipient or you disabled direct messages on your shared server, "
                     + "recipient is only accepting direct messages from friends, or you were blocked by the recipient.",
