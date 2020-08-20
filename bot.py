@@ -170,7 +170,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     if d is not None:
                         continue
                 print(f"Deleting {key} from {repr(obj)}...")
-                data.pop(key)
+                data.pop(key, None)
                 obj.update()
             if random.random() > .99:
                 await asyncio.sleep(0.2)
@@ -288,7 +288,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             role = guild.get_role(u_id)
             if role is not None:
                 return role.members
-        if "@" in u_id and ("everyone" in u_id or "here" in u_id):
+        elif "@" in u_id and ("everyone" in u_id or "here" in u_id):
             return await self.get_full_members(guild)
         u = await self.fetch_user_member(u_id, guild)
         return (u,)
