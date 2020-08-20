@@ -246,13 +246,10 @@ class UpdateExec(Database):
                             return
                         proc = proc.translate(self.qtrans)
                         output = None
-                        try:
+                        async with ExceptionSender(channel):
                             create_task(message.add_reaction("❗"))
                             output = await self.procFunc(proc, channel, bot, term=f)
                             await channel.send(self.prepare_string(output, fmt=""))
-                        except:
-                            # print_exc()
-                            await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
         # Relay DM messages
         elif message.guild is None:
             if bot.is_blacklisted(message.author.id):
@@ -312,7 +309,11 @@ class UpdateExec(Database):
 
     def _ready_(self, **void):
         with suppress(AttributeError):
-            PRINT.funcs.append(lambda *args: self._log_(*args))
+            PRINT.funcs.append(self._log_)
+
+    def _destroy_(self, **void):
+        with suppress(LookupError, AttributeError):
+            PRINT.funcs.remove(self._log_)
 
 
 class DownloadServer(Command):

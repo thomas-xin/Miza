@@ -380,7 +380,6 @@ class Avatar(Command):
                             raise StopIteration         
                     else:
                         u = user
-                    guild = g
                     name = str(u)
                     url = best_url(u)
                     emb = discord.Embed(colour=rand_colour())
@@ -819,7 +818,7 @@ class Reminder(Command):
         if "announce" in name:
             req = 2
             if req > perm:
-                raise self.perm_error(perm, req, "for command " + name)
+                raise self.perm_error(perm, req, f"for command {name}")
             sendable = message.channel
             word = "announcements"
         else:

@@ -1455,9 +1455,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if (u_perm <= -inf and op) or msg in self.mention:
             if not u_perm < 0 and not u_perm <= -inf:
                 if xrand(2):
-                    f"I have been summoned! Use `{prefix}?` or `{prefix}help` for help!"
+                    out = f"I have been summoned! Use `{prefix}?` or `{prefix}help` for help!"
                 else:
-                    f"Hey there! Name's {bot.name}! Use `{prefix}?` or `{prefix}help` for help!"
+                    out = f"Hey there! Name's {bot.name}! Use `{prefix}?` or `{prefix}help` for help!"
                 create_task(send_with_react(channel, out, reacts="❎"))
             else:
                 print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
@@ -2158,6 +2158,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             print("New server: " + str(guild))
             g = await self.fetch_guild(guild.id)
             m = guild.get_member(self.user.id)
+            await self.send_event("_join_", user=m, guild=g)
             channel = await self.get_first_sendable(g, m)
             emb = discord.Embed(colour=discord.Colour(8364031))
             url = to_png(self.user.avatar_url)
@@ -2171,7 +2172,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         user = e.user
                         break
             if user is not None:
-                emb.description += f", {user_mention(self.user.id)}"
+                emb.description += f", {user_mention(user.id)}"
             emb.description += (
                 f"!\nMy default prefix is `{self.prefix}`, which can be changed as desired on a per-server basis. Mentioning me also serves as an alias for all prefixes.\n"
                 + f"For more information, use the `{self.prefix}help` command, and my source code is available at {self.website} for those who are interested.\n"

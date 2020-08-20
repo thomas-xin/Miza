@@ -19,7 +19,7 @@ class Purge(Command):
 
     async def __call__(self, bot, args, argl, channel, name, flags, perm, guild, **void):
         if args:
-            count = await bot.eval_math(args.pop(0), guild.id)
+            count = await bot.eval_math(args.pop(-1), guild.id)
         else:
             count = 1
         if not argl and not args:
