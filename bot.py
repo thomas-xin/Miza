@@ -296,14 +296,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     async def fetch_user_member(self, u_id, guild=None):
         u_id = verify_id(u_id)
         if type(u_id) is int:
-            with suppress():
+            try:
                 user = await self.fetch_user(u_id)
+            except discord.HTTPException:
+                print(u_id)
+                raise
+            with suppress():
                 if guild:
                     temp = guild.get_member(user.id)
                     if temp is not None:
                         return temp
-                return user
-            return self.fetch_member(u_id, guild, find_others=True)
+            with suppress():
+                return await self.fetch_member(u_id, guild, find_others=True)
+            return user
         return await self.fetch_member_ex(u_id, guild)
 
     async def get_full_members(self, guild):
@@ -377,7 +382,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     else:
                         raise LookupError
                 except (T0, T1, LookupError):
-                    raise LookupError("Unable to find member data.")
+                    raise LookupError(f"No results for {u_id}.")
         return member
 
     # Fetches the first seen instance of the target user as a member in any shared server.
@@ -1571,14 +1576,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                             yi = argv.rindex(y)
                                             if xi < yi:
                                                 if hasattr(command, "multi"):
-                                                    argv2 = single_space((argv[:xi] + " " + argv[yi + 1:]).replace("\n", " ").replace(",", "").replace("\t", " ")).strip()
-                                                    argv3 = single_space(argv[xi + 1:yi].replace("\n", " ").replace(",", "").replace("\t", " ")).strip()
+                                                    argv2 = single_space((argv[:xi] + " " + argv[yi + 1:]).replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
+                                                    argv3 = single_space(argv[xi + 1:yi].replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
                                                     try:
                                                         argl = shlex.split(argv3)
                                                     except ValueError:
                                                         argl = argv3.split()
                                                 else:
-                                                    argv2 = single_space((argv[:xi] + " " + argv[xi + 1:yi] + " " + argv[yi + 1:]).replace("\n", " ").replace(",", "").replace("\t", " ")).strip()
+                                                    argv2 = single_space(argv[:xi].replace("\n", " ").replace("\t", " ") + " " + (argv[xi + 1:yi]).replace("\n", " ").replace(",", " ").replace("\t", " ") + " " + argv[yi + 1:].replace("\n", " ").replace("\t", " "))
                                                 try:
                                                     args = shlex.split(argv2)
                                                 except ValueError:
@@ -1740,7 +1745,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             except discord.HTTPException:
                 print_exc()
                 await asyncio.sleep(10)
-                webhooks = await aretry(get_webhooks, guild, attempts=5, delay=15, exc=(discord.Forbidden,))
+                webhooks = await aretry(self.get_webhooks, guild, attempts=5, delay=15, exc=(discord.Forbidden,))
             return deque(self.add_webhook(w) for w in webhooks)
 
     # Gets a valid webhook for the target channel, creating a new one when necessary.

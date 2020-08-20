@@ -99,28 +99,29 @@ class Ban(Command):
         with discord.context_managers.Typing(channel):
             bans, glob = await self.getBans(guild)
             users = await bot.find_users(argl, args, user, guild)
-        if not args and not argl or name == "unban":
-            user = users[0]
-            try:
-                ban = bans[user.id]
-            except LookupError:
-                return ini_md(f"{sqr_md(user)} is currently not banned from {sqr_md(guild)}.")
-            if name == "unban":
-                await guild.unban(user)
+        if not args or name == "unban":
+            for user in users:
                 try:
-                    ind = banlist.search(user.id, key=lambda b: b["u"])
+                    ban = bans[user.id]
                 except LookupError:
-                    pass
-                else:
-                    banlist.pops(ind)["u"]
-                    if 0 in ind:
-                        with suppress(LookupError):
-                            bot.database.bans.listed.remove(guild.id, key=lambda x: x[-1])
-                        if banlist:
-                            bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
-                    update()
-                return css_md(f"Successfully unbanned {sqr_md(user)} from {sqr_md(guild)}.")
-            return italics(ini_md(f"Current ban for {sqr_md(user)} from {sqr_md(guild)}: {sqr_md(sec2time(ban['t'] - ts))}."))
+                    create_task(channel.send(ini_md(f"{sqr_md(user)} is currently not banned from {sqr_md(guild)}.")))
+                if name == "unban":
+                    await guild.unban(user)
+                    try:
+                        ind = banlist.search(user.id, key=lambda b: b["u"])
+                    except LookupError:
+                        pass
+                    else:
+                        banlist.pops(ind)["u"]
+                        if 0 in ind:
+                            with suppress(LookupError):
+                                bot.database.bans.listed.remove(guild.id, key=lambda x: x[-1])
+                            if banlist:
+                                bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
+                        update()
+                    create_task(channel.send(css_md(f"Successfully unbanned {sqr_md(user)} from {sqr_md(guild)}.")))
+                create_task(channel.send(italics(ini_md(f"Current ban for {sqr_md(user)} from {sqr_md(guild)}: {sqr_md(sec2time(ban['t'] - ts))}."))))
+            return
         # This parser is a mess too
         bantype = " ".join(args)
         if bantype.startswith("for "):
