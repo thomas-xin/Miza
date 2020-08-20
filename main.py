@@ -60,45 +60,43 @@ while not os.path.exists(sd):
     start = time.time()
     print("Bot started with PID \033[1;34;40m" + str(proc.pid) + "\033[1;37;40m.")
     time.sleep(12)
-    if not proc.is_running():
-        print("\033[1;31;40mBot closed without shutdown signal, restarting...\033[1;37;40m")
-        continue
     try:
-        print("\033[1;32;40mHeartbeat started\033[1;37;40m.")
-        alive = True
-        while alive:
-            with open(hb, "wb"):
-                pass
-            print(
-                "\033[1;36;40m Heartbeat at "
-                + str(datetime.datetime.now())
-                + "\033[1;37;40m."
-            )
-            for i in range(16):
-                time.sleep(0.5)
-                ld = os.listdir()
-                if rs in ld or sd in ld:
+        if proc.is_running():
+            print("\033[1;32;40mHeartbeat started\033[1;37;40m.")
+            alive = True
+            while alive:
+                with open(hb, "wb"):
+                    pass
+                print(
+                    "\033[1;36;40m Heartbeat at "
+                    + str(datetime.datetime.now())
+                    + "\033[1;37;40m."
+                )
+                for i in range(16):
+                    time.sleep(0.5)
+                    ld = os.listdir()
+                    if rs in ld or sd in ld:
+                        alive = False
+                        break
+                if not alive or os.path.exists(hb):
                     alive = False
                     break
-            if not alive or os.path.exists(hb):
-                alive = False
+            found = True
+            while found:
+                found = False
+                try:
+                    for child in proc.children():
+                        child.kill()
+                        found = True
+                except psutil.NoSuchProcess:
+                    break
+            while True:
+                try:
+                    proc.kill()
+                except psutil.NoSuchProcess:
+                    break
+            if os.path.exists(sd):
                 break
-        found = True
-        while found:
-            found = False
-            try:
-                for child in proc.children():
-                    child.kill()
-                    found = True
-            except psutil.NoSuchProcess:
-                break
-        while True:
-            try:
-                proc.kill()
-            except psutil.NoSuchProcess:
-                break
-        if os.path.exists(sd):
-            break
         if time.time() - start < 30:
             att += 1
         else:
