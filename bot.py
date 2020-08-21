@@ -38,15 +38,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.closed = False
         self.loaded = False
         # Base cache: contains all other caches
-        self.cache = fcdict({c: cdict() for c in self.caches})
+        self.cache = fcdict({c: {} for c in self.caches})
         # Channel-Webhook cache: for accessing all webhooks for a channel.
         self.cw_cache = cdict()
         self.events = mdict()
         self.react_sem = cdict()
         self.mention = ()
-        self.semaphore = Semaphore(2, 1)
-        self.ready_semaphore = Semaphore(1, 256)
-        self.guild_semaphore = Semaphore(8, inf)
+        self.semaphore = Semaphore(2, 1, delay=0.5)
+        self.ready_semaphore = Semaphore(1, inf, delay=1)
+        self.guild_semaphore = Semaphore(8, inf, delay=1)
         print("Time:", datetime.datetime.now())
         print("Initializing...")
         # O(1) time complexity for searching directory

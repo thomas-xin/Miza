@@ -272,10 +272,12 @@ class OwOify(Command):
             raise ArgumentError("Input string is empty.")
         out = argv.translate(self.otrans)
         temp = None
+        if "a" in flags:
+            out = out.replace("v", "w").replace("V", "W")
         if "a" in flags or "b" not in flags:
             temp = list(out)
             for i, c in enumerate(out):
-                if i > 0 and c in "yY" and out[i - 1].casefold() not in "aeiouyw \n\t":
+                if i > 0 and c in "yY" and out[i - 1].casefold() not in "aeioucdhvwy \n\t":
                     if c.isupper():
                         temp[i] = "W" + c.casefold()
                     else:
@@ -286,7 +288,7 @@ class OwOify(Command):
                 out = "".join(temp)
                 temp = list(out)
                 for i, c in enumerate(out):
-                    if i > 0 and c.casefold() in "aeiou" and out[i - 1].casefold() not in "aeiouyw \n\t":
+                    if i > 0 and c.casefold() in "aeiou" and out[i - 1].casefold() not in "aeioucdhvwy \n\t":
                         if c.isupper():
                             temp[i] = "W" + c.casefold()
                         else:

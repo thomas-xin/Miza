@@ -928,7 +928,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
     async def _init_(self):
         self.session = aiohttp.ClientSession(loop=eloop)
-        self.semaphore = Semaphore(512, 256)
+        self.semaphore = Semaphore(512, 256, delay=0.25)
 
     async def aio_call(self, url, headers, data, method, decode):
         async with self.semaphore:
@@ -946,16 +946,17 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             headers["user-agent"] = f"Mozilla/5.{xrand(1, 10)}"
         if aio:
             return create_task(asyncio.wait_for(self.aio_call(url, headers, data, method, decode), timeout=timeout))
-        with getattr(requests, method)(url, headers=headers, data=data, stream=True, timeout=timeout) as resp:
-            if resp.status_code >= 400:
-                raise ConnectionError(f"Error {resp.status_code}: {resp.text}")
-            if raw:
-                data = resp.raw.read()
-            else:
-                data = resp.content
-            if decode:
-                return data.decode("utf-8", "replace")
-            return data
+        with self.semaphore:
+            with getattr(requests, method)(url, headers=headers, data=data, stream=True, timeout=timeout) as resp:
+                if resp.status_code >= 400:
+                    raise ConnectionError(f"Error {resp.status_code}: {resp.text}")
+                if raw:
+                    data = resp.raw.read()
+                else:
+                    data = resp.content
+                if decode:
+                    return data.decode("utf-8", "replace")
+                return data
 
     def __exit__(self, *args):
         self.session.close()
@@ -1140,7 +1141,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
         bot.database[name] = self
         self.catg = catg
         self.bot = bot
-        self.semaphore = Semaphore(1, 1)
+        self.semaphore = Semaphore(1, 1, delay=0.5)
         self.checking = False
         self._globals = globals()
         f = getattr(self, "__load__", None)

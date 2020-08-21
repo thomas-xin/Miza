@@ -941,7 +941,7 @@ class AudioFile:
         self.loaded = False
         self.readers = cdict()
         self.assign = deque()
-        self.semaphore = Semaphore(1, 1)
+        self.semaphore = Semaphore(1, 1, delay=5)
         self.ensure_time()
 
     def __str__(self):
@@ -1245,7 +1245,7 @@ class AudioDownloader:
         self.downloading = cdict()
         self.cache = cdict()
         self.searched = cdict()
-        self.semaphore = Semaphore(4, 128)
+        self.semaphore = Semaphore(4, 128, delay=0.25)
         self.update_dl()
         self.setup_pages()
 

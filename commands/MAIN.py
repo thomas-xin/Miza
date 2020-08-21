@@ -1329,7 +1329,7 @@ class UpdateMessageCount(Database):
 
     def __load__(self):
         self.scanned = False
-        self.semaphore = Semaphore(12, 256)
+        self.semaphore = Semaphore(12, 256, delay=5)
 
     async def __call__(self):
         if self.scanned:
@@ -1397,7 +1397,7 @@ class UpdateUsers(Database):
     mentionspam = re.compile("<@[!&]?[0-9]+>")
 
     def __load__(self):
-        self.semaphore = Semaphore(3, 2)
+        self.semaphore = Semaphore(3, 2, delay=0.5)
         self.flavour_buffer = deque()
         self.flavour_set = set()
         self.flavour = ()
@@ -1597,12 +1597,12 @@ class UpdateUsers(Database):
                 elif count < 16 or random.random() > math.atan(count / 8 - 2) / 4:
                     # General messages
                     if (count < 6 or not self.mentionspam.sub("", msg).strip()) and random.random() < 0.5:
-                        out = random.choice((f"'sup, {user.display_name}?", f"There you are, {user.name}!", "Oh yeah!", "Right back at ya!"))
+                        out = random.choice((f"'sup, {user.display_name}?", f"There you are, {user.name}!", "Oh yeah!", "Right back at ya!", f"Hey, {user.display_name}!"))
                     else:
                         out = ""
                 elif count < 24:
                     # Occasional late message
-                    if random.random() < 1 / 2:
+                    if random.random() < 0.4:
                         out = "You seem rather bored... I may only be as good as my programming allows me to be, but I'll try my best to fix that!"
                     else:
                         out = ""
