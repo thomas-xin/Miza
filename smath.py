@@ -1261,6 +1261,8 @@ class cdict(dict):
         with suppress(AttributeError):
             return self.__getattribute__(k)
         if not k.startswith("__") or not k.endswith("__"):
+            with suppress(AttributeError):
+                return super().__getitem__(k)
             return self.__getitem__(k)
         raise AttributeError(k)
 

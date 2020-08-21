@@ -124,11 +124,7 @@ class Perms(Command):
                 if not perm < m_perm and not isnan(m_perm):
                     if not m_perm < inf and guild.owner_id != user.id and not isnan(perm):
                         raise PermissionError("Must be server owner to assign non-finite permission level.")
-                    if t_user is None:
-                        for u in guild.members:
-                            bot.setPerms(u.id, guild, c_perm)
-                    else:
-                        bot.setPerms(t_user.id, guild, c_perm)
+                    bot.set_perms(t_user.id, guild, c_perm)
                     if "h" in flags:
                         return
                     create_task(channel.send(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to {sqr_md(c_perm)}.")))
@@ -1398,6 +1394,7 @@ class UpdateUsers(Database):
 
     def __load__(self):
         self.semaphore = Semaphore(3, 2, delay=0.5)
+        self.fortunes = None
         self.flavour_buffer = deque()
         self.flavour_set = set()
         self.flavour = ()
@@ -1551,7 +1548,7 @@ class UpdateUsers(Database):
     # User executed command, add to activity database
     def _command_(self, user, command, **void):
         self.send_event(user.id, "command")
-        add_dict(self.data, {user.id: {"commands": {str(command): 1}}})
+        add_dict(self.data, {user.id: {"commands": {command.__name__: 1}}})
         self.data[user.id]["last_used"] = utc()
         self.data.get(user.id, EMPTY).pop("last_mention", None)
         self.update()
