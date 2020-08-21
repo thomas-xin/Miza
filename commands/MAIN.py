@@ -1394,68 +1394,16 @@ class UpdateUsers(Database):
 
     def __load__(self):
         self.semaphore = Semaphore(3, 2, delay=0.5)
-        self.fortunes = None
+        self.facts = None
         self.flavour_buffer = deque()
         self.flavour_set = set()
         self.flavour = ()
+        self.useless = ()
+        with open("misc/facts.txt", "r", encoding="utf-8") as f:
+            self.facts = f.read().split("\n")
 
     async def _bot_ready_(self, **void):
-        fortunes = (
-            "art",
-            "ascii-art",
-            "computers",
-            "cookie",
-            "debian",
-            "definitions",
-            "disclaimer",
-            "drugs",
-            "education",
-            "ethnic",
-            "food",
-            "fortunes",
-            "goedel",
-            "humorists",
-            "kids",
-            "knghtbrd",
-            "law",
-            "linux",
-            "linuxcookie",
-            "literature",
-            "love",
-            "magic",
-            "medicine",
-            "men-women",
-            "miscellaneous",
-            "news",
-            "paradoxum",
-            "people",
-            "perl",
-            "pets",
-            "platitudes",
-            "politics",
-            "pratchett",
-            "riddles",
-            "science",
-            "songs-poems",
-            "sports",
-            "startrek",
-            "tao",
-            "translate-me",
-            "wisdom",
-            "work",
-            "zippy",
-        )
-        self.fortunes = cdict()
-        fortune_items = cdict()
-        for i, fortune in enumerate(fortunes, 1):
-            fortune_items[fortune] = Request(f"https://raw.githubusercontent.com/sarah256/fortune-api/master/datfiles/{fortune}", decode=True, timeout=32, aio=True)
-            if not i % 5:
-                await asyncio.sleep(2)
-        for k, v in fortune_items.items():
-            with tracebacksuppressor:
-                text = await v
-                self.fortunes[k] = tuple(item.replace("`", "").strip() for item in text.split("%") if item)
-        await self()
+        return await self()
 
     def clear_events(self, data, minimum):
         for hour in tuple(data):
@@ -1503,15 +1451,12 @@ class UpdateUsers(Database):
                 changed = False
                 while len(self.flavour_buffer) < 10:
                     out = None
-                    i = xrand(4)
-                    if i == 0:
+                    i = xrand(5)
+                    if i == 0 and self.facts:
                         with tracebacksuppressor:
-                            data = await Request("https://uselessfacts.jsph.pl/random.json?language=en", aio=True)
-                            text = eval_json(data)["text"].replace("`", "")
-                            if xrand(2):
-                                out = f"\nFun fact: `{text}`"
-                            else:
-                                out = f"\nDid you know? `{text}`"
+                            text = random.choice(self.facts)
+                            fact = random.choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
+                            out = f"\n{fact} `{text}`"
                     elif i == 1:
                         with tracebacksuppressor:
                             data = await Request("https://www.affirmations.dev/", aio=True)
@@ -1522,20 +1467,24 @@ class UpdateUsers(Database):
                             data = await Request("https://geek-jokes.sameerkumar.website/api", aio=True)
                             text = eval_json(data).replace("`", "")
                             out = f"\nGeek joke: `{text}`"
-                    elif self.fortunes:
+                    else:
                         with tracebacksuppressor:
-                            text = random.choice(random.choice(tuple(self.fortunes.values())))
-                            if "\n" in text:
-                                text = "\n" + text
-                            if xrand(2):
-                                out = f"\nRandom fortune: `{text}`"
-                            else:
-                                out = f"\nFlavour text: `{text}`"
+                            if len(self.useless) < 128 and (not self.useless or random.random() > 0.75):
+                                data = await Request("https://www.uselessfacts.net/api/posts?d=" + str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date()), aio=True)
+                                factlist = [fact["title"].replace("`", "") for fact in eval_json(data) if "title" in fact]
+                                random.shuffle(factlist)
+                                self.useless = deque()
+                                for text in factlist:
+                                    fact = random.choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
+                                    out = f"\n{fact} `{text}`"
+                                    self.useless.append(out)
+                            out = self.useless.popleft()
                     if out:
                         self.flavour_buffer.append(out)
                         self.flavour_set.add(out)
                         changed = True
-                if changed:
+                amount = len(self.flavour_set)
+                if changed and (not amount & amount - 1):
                     self.flavour = tuple(self.flavour_set)
 
     # User seen, add event to activity database
@@ -1600,7 +1549,10 @@ class UpdateUsers(Database):
                 elif count < 24:
                     # Occasional late message
                     if random.random() < 0.4:
-                        out = "You seem rather bored... I may only be as good as my programming allows me to be, but I'll try my best to fix that!"
+                        out = random.choice((
+                            "You seem rather bored... I may only be as good as my programming allows me to be, but I'll try my best to fix that!",
+                            "You must be bored, allow me to entertain you!",
+                        ))
                     else:
                         out = ""
                 else:
