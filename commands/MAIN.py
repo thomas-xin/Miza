@@ -1100,7 +1100,7 @@ class UpdateReminders(Database):
         # This exists so that checking next scheduled item is O(1)
         self.listed = hlist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str), key=lambda x: x[0]))
 
-    # Fast call: runs 96 times per second
+    # Fast call: runs 24 times per second
     async def _call_(self):
         t = utc()
         while self.listed:
@@ -1394,7 +1394,7 @@ class UpdateUsers(Database):
     hours = 168
     interval = 900
     scale = 3600 // interval
-    mentionspam = re.compile("<@!?[0-9]+>")
+    mentionspam = re.compile("<@[!&]?[0-9]+>")
 
     def __load__(self):
         self.semaphore = Semaphore(3, 2)
@@ -1581,10 +1581,12 @@ class UpdateUsers(Database):
             send = message.channel.send
             out = None
             count = self.data.get(user.id, EMPTY).get("last_talk", 0)
+            # Simulates a randomized conversation
             if count < 5:
                 create_task(message.add_reaction("👀"))
             if count:
                 if count < 2 or count == 2 and xrand(2):
+                    # Starts conversations
                     out = random.choice((
                         f"So, {user.display_name}, how's your day been?",
                         f"How do you do, {user.name}?",
@@ -1593,29 +1595,35 @@ class UpdateUsers(Database):
                         "Can I entertain you with a little something today?",
                     ))
                 elif count < 16 or random.random() > math.atan(count / 8 - 2) / 4:
-                    if count < 6 and random.random() < 0.5:
+                    # General messages
+                    if (count < 6 or not self.mentionspam.sub("", msg).strip()) and random.random() < 0.5:
                         out = random.choice((f"'sup, {user.display_name}?", f"There you are, {user.name}!", "Oh yeah!", "Right back at ya!"))
                     else:
                         out = ""
                 elif count < 24:
-                    if random.random() < 1 / 3:
+                    # Occasional late message
+                    if random.random() < 1 / 2:
                         out = "You seem rather bored... I may only be as good as my programming allows me to be, but I'll try my best to fix that!"
                     else:
                         out = ""
                 else:
+                    # Late conversation messages
                     out = random.choice((
                         "It's been a fun conversation, but don't you have anything better to do?",
                         "This is what I was made for, I can do it forever, but you're only a human, take a break!",
                         f"Woah, have you checked the time? We've been talking for {count + 1} messages!"
                     ))
-            elif utc() - self.data.get(user.id, EMPTY).get("last_used", inf) > 259200:
+            elif utc() - self.data.get(user.id, EMPTY).get("last_used", inf) >= 259200:
+                # Triggers for users not seen in 3 days or longer
                 out = random.choice((f"Long time no see, {user.name}!", f"Great to see you again, {user.display_name}!", f"It's been a while, {user.name}!"))
             if out is not None:
+                # Add randomized flavour text if in conversation
                 if self.flavour_buffer:
                     out += self.flavour_buffer.popleft()
                 else:
                     out += random.choice(self.flavour)
             else:
+                # Help message greetings
                 i = xrand(6)
                 if i == 0:
                     out = "I have been summoned!"
@@ -1632,8 +1640,7 @@ class UpdateUsers(Database):
                 prefix = self.bot.get_prefix(message.guild)
                 out += f" Use `{prefix}?` or `{prefix}help` for help!"
                 send = lambda *args, **kwargs: send_with_react(message.channel, *args, **kwargs, reacts="❎")
-            add_dict(self.data, {user.id: {"last_talk": 1}})
-            add_dict(self.data, {user.id: {"last_mention": 1}})
+            add_dict(self.data, {user.id: {"last_talk": 1, "last_mention": 1}})
             print(f"Talking to {user}:", self.data.get(user.id, EMPTY).get("last_talk", 0))
             await send(out)
             await bot.seen(user, event="misc", raw="Talking to me")

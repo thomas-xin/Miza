@@ -477,7 +477,7 @@ class UrbanDictionary(Command):
             if not l:
                 raise LookupError(f"No results for {argv}.")
             l.sort(
-                key=lambda e: scaleRatio(e.get("thumbs_up", 0), e.get("thumbs_down", 0)),
+                key=lambda e: scale_ratio(e.get("thumbs_up", 0), e.get("thumbs_down", 0)),
                 reverse=True,
             )
             if "v" in flags:

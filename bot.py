@@ -1883,7 +1883,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             sent = True
         return sent
 
-    # The fast update loop that runs 96 times per second. Used for events where timing is important.
+    # The fast update loop that runs 24 times per second. Used for events where timing is important.
     def fast_loop(self):
 
         async def event_call(freq):
@@ -1891,7 +1891,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 async with delay(1 / freq):
                     await self.send_event("_call_")
 
-        freq = 96
+        freq = 24
         sent = 0
         while not self.closed:
             with tracebacksuppressor:

@@ -3326,31 +3326,36 @@ class Lyrics(Command):
         if "v" not in flags and len(s) <= 2000:
             return s
         title = f"Lyrics for {name}:"
-        if len(text) > 6000:
+        if len(text) > 54000:
             return (title + "\n\n" + text).strip()
-        emb = discord.Embed(colour=rand_colour())
-        emb.set_author(name=title)
-        # Separate lyrics into paragraphs and attempt to add them one at a time, adding extra embed fields when necessary
-        iterations = 0
+        col = 1024
+        embs = deque()
+        # Separate lyrics into paragraphs and attempt to add them one at a time, adding extra embeds when necessary
         curr = ""
-        paragraphs = [p + "\n\n" for p in text.split("\n\n")]
+        emb = discord.Embed(colour=colour2raw(hue2colour(col)))
+        paragraphs = hlist(p + "\n\n" for p in text.split("\n\n"))
         while paragraphs:
-            para = paragraphs.pop(0)
-            if not emb.description and len(curr) + len(para) > 2000:
+            para = paragraphs.popleft()
+            if len(para) > 2048:
+                temp = para[:2048]
+                try:
+                    i = temp.rindex("\n")
+                except ValueError:
+                    try:
+                        i = temp.rindex(" ")
+                    except ValueError:
+                        i = 2047
+                paragraphs.appendleft(para[i + 1:])
+                paragraphs.appendleft(para[:i])
+            col += 128
+            if not embs:
+                emb.set_author(name=title)
+            if len(curr) + len(para) > 2000:
                 if len(para) <= 2000:
                     emb.description = ini_md(curr.strip())
                     curr = para
-                else:
-                    p = [i + "\n" for i in para.split("\n")]
-                    if len(p) <= 1:
-                        p = [i + "" for i in para.split()]
-                        if len(p) <= 1:
-                            p = list(para)
-                    paragraphs = p + paragraphs
-            elif emb.description and len(curr) + len(para) > 1000:
-                if len(para) <= 1000:
-                    emb.add_field(name=f"Page {len(emb.fields) + 2}", value=ini_md(curr.strip()), inline=False)
-                    curr = para
+                    embs.append(emb)
+                    emb = discord.Embed(colour=colour2raw(hue2colour(col)))
                 else:
                     p = [i + "\n" for i in para.split("\n")]
                     if len(p) <= 1:
@@ -3360,22 +3365,10 @@ class Lyrics(Command):
                     paragraphs = p + paragraphs
             else:
                 curr += para
-            iterations += 1
-            if iterations > 256:
-                break
         if curr:
-            if emb.description:
-                emb.add_field(name=f"Page {len(emb.fields) + 2}", value=ini_md(curr.strip()), inline=False)
-            else:
-                emb.description = ini_md(curr.strip())
-        try:
-            if len(emb) > 6000:
-                raise OverflowError
-            bot.send_embeds(channel, emb)
-        except (OverflowError, discord.HTTPException):
-            # Lyrics result was too long for embed, send a file instead
-            print_exc()
-            return (title + "\n\n" + emb.description + "\n\n".join(strip_code_box(f.value) for f in emb.fields)).strip()
+            emb.description = ini_md(curr.strip())
+            embs.append(emb)
+        bot.send_embeds(channel, embeds=embs)
 
 
 class Download(Command):
