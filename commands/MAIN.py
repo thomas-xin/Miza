@@ -1575,7 +1575,7 @@ class UpdateUsers(Database):
     async def _nocommand_(self, message, msg, **void):
         bot = self.bot
         user = message.author
-        if self.bot.get_perms(u_id, guild) <= -inf:
+        if self.bot.get_perms(user.id, guild) <= -inf:
             return
         if self.bot.is_mentioned(message, self.bot, message.guild):
             send = message.channel.send
