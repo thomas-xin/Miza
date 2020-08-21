@@ -1934,7 +1934,7 @@ class Queue(Command):
         else:
             names = f"{len(names)} items"
         if "h" not in flags:
-            return css_md(f"🎶 Added {names} to the queue! Estimated time until playing: {sqr_md(sec2time(total_duration))}. 🎶"), 1
+            return css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(sec2time(total_duration))}. 🎶"), 1
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos, v = [int(i) for i in vals.split("_")]
