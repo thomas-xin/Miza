@@ -1394,6 +1394,71 @@ class UpdateUsers(Database):
     hours = 168
     interval = 900
     scale = 3600 // interval
+    mentionspam = re.compile("<@!?[0-9]+>")
+
+    def __load__(self):
+        self.semaphore = Semaphore(3, 2)
+        self.flavour_buffer = deque()
+        self.flavour_set = set()
+        self.flavour = ()
+
+    async def _bot_ready_(self, **void):
+        fortunes = (
+            "art",
+            "ascii-art",
+            "computers",
+            "cookie",
+            "debian",
+            "definitions",
+            "disclaimer",
+            "drugs",
+            "education",
+            "ethnic",
+            "food",
+            "fortunes",
+            "goedel",
+            "humorists",
+            "kids",
+            "knghtbrd",
+            "law",
+            "linux",
+            "linuxcookie",
+            "literature",
+            "love",
+            "magic",
+            "medicine",
+            "men-women",
+            "miscellaneous",
+            "news",
+            "paradoxum",
+            "people",
+            "perl",
+            "pets",
+            "platitudes",
+            "politics",
+            "pratchett",
+            "riddles",
+            "science",
+            "songs-poems",
+            "sports",
+            "startrek",
+            "tao",
+            "translate-me",
+            "wisdom",
+            "work",
+            "zippy",
+        )
+        self.fortunes = cdict()
+        fortune_items = cdict()
+        for i, fortune in enumerate(fortunes, 1):
+            fortune_items[fortune] = Request(f"https://raw.githubusercontent.com/sarah256/fortune-api/master/datfiles/{fortune}", decode=True, timeout=32, aio=True)
+            if not i % 5:
+                await asyncio.sleep(2)
+        for k, v in fortune_items.items():
+            with tracebacksuppressor:
+                text = await v
+                self.fortunes[k] = tuple(item.replace("`", "").strip() for item in text.split("%") if item)
+        await self()
 
     def clear_events(self, data, minimum):
         for hour in tuple(data):
@@ -1435,6 +1500,47 @@ class UpdateUsers(Database):
             out = [sum(out[i:i + factor]) for i in range(0, len(out), factor)]
         return out
 
+    async def __call__(self):
+        with suppress(SemaphoreOverflowError):
+            async with self.semaphore:
+                changed = False
+                while len(self.flavour_buffer) < 10:
+                    out = None
+                    i = xrand(4)
+                    if i == 0:
+                        with tracebacksuppressor:
+                            data = await Request("https://uselessfacts.jsph.pl/random.json?language=en", aio=True)
+                            text = eval_json(data)["text"].replace("`", "")
+                            if xrand(2):
+                                out = f"\nFun fact: `{text}`"
+                            else:
+                                out = f"\nDid you know? `{text}`"
+                    elif i == 1:
+                        with tracebacksuppressor:
+                            data = await Request("https://www.affirmations.dev/", aio=True)
+                            text = eval_json(data)["affirmation"].replace("`", "")
+                            out = f"\nAffirmation: `{text}`"
+                    elif i == 2:
+                        with tracebacksuppressor:
+                            data = await Request("https://geek-jokes.sameerkumar.website/api", aio=True)
+                            text = eval_json(data).replace("`", "")
+                            out = f"\nGeek joke: `{text}`"
+                    elif self.fortunes:
+                        with tracebacksuppressor:
+                            text = random.choice(random.choice(tuple(self.fortunes.values())))
+                            if "\n" in text:
+                                text = "\n" + text
+                            if xrand(2):
+                                out = f"\nRandom fortune: `{text}`"
+                            else:
+                                out = f"\nFlavour text: `{text}`"
+                    if out:
+                        self.flavour_buffer.append(out)
+                        self.flavour_set.add(out)
+                        changed = True
+                if changed:
+                    self.flavour = tuple(self.flavour_set)
+
     # User seen, add event to activity database
     def _seen_(self, user, delay, event, count=1, raw=None, **void):
         self.send_event(user.id, event, count=count)
@@ -1446,4 +1552,89 @@ class UpdateUsers(Database):
     def _command_(self, user, command, **void):
         self.send_event(user.id, "command")
         add_dict(self.data, {user.id: {"commands": {str(command): 1}}})
+        self.data[user.id]["last_used"] = utc()
+        self.data.get(user.id, EMPTY).pop("last_mention", None)
         self.update()
+
+    async def _mention_(self, user, message, msg, **void):
+        bot = self.bot
+        mentions = self.mentionspam.findall(msg)
+        t = utc()
+        set_dict(self.data, user.id, {})["last_used"] = t
+        out = None
+        if len(mentions) >= 10 and self.data.get(user.id, EMPTY).get("last_mention", 0) > 3:
+            out = f"{random.choice('🥴😣😪😢')} please calm down a second, I'm only here to help..."
+        elif len(mentions) >= 3 and self.data.get(user.id, EMPTY).get("last_mention", 0) > 2:
+            out = f"{random.choice('😟😦😓')} oh, that's a lot of mentions, is everything okay?"
+        if out:
+            create_task(send_with_react(message.channel, out, reacts="❎"))
+            await bot.seen(user, event="misc", raw="Being naughty")
+            add_dict(self.data, {user.id: {"last_mention": 1}})
+            raise StopIteration
+
+    async def _nocommand_(self, message, msg, **void):
+        bot = self.bot
+        user = message.author
+        if self.bot.is_mentioned(message, self.bot, message.guild):
+            send = message.channel.send
+            out = None
+            count = self.data.get(user.id, EMPTY).get("last_talk", 0)
+            if count < 5:
+                create_task(message.add_reaction("👀"))
+            if count:
+                if count < 2 or count == 2 and xrand(2):
+                    out = random.choice((
+                        f"So, {user.display_name}, how's your day been?",
+                        f"How do you do, {user.name}?",
+                        f"How are you today, {user.name}?",
+                        "What's up?",
+                        "Can I entertain you with a little something today?",
+                    ))
+                elif count < 16 or random.random() > math.atan(count / 8 - 2) / 4:
+                    if count < 6 and random.random() < 0.5:
+                        out = random.choice((f"'sup, {user.display_name}?", f"There you are, {user.name}!", "Oh yeah!", "Right back at ya!"))
+                    else:
+                        out = ""
+                elif count < 24:
+                    if random.random() < 1 / 3:
+                        out = "You seem rather bored... I may only be as good as my programming allows me to be, but I'll try my best to fix that!"
+                    else:
+                        out = ""
+                else:
+                    out = random.choice((
+                        "It's been a fun conversation, but don't you have anything better to do?",
+                        "This is what I was made for, I can do it forever, but you're only a human, take a break!",
+                        f"Woah, have you checked the time? We've been talking for {count + 1} messages!"
+                    ))
+            elif utc() - self.data.get(user.id, EMPTY).get("last_used", inf) > 259200:
+                out = random.choice((f"Long time no see, {user.name}!", f"Great to see you again, {user.display_name}!", f"It's been a while, {user.name}!"))
+            if out is not None:
+                if self.flavour_buffer:
+                    out += self.flavour_buffer.popleft()
+                else:
+                    out += random.choice(self.flavour)
+            else:
+                i = xrand(6)
+                if i == 0:
+                    out = "I have been summoned!"
+                elif i == 1:
+                    out = f"Hey there! Name's {bot.name}!"
+                elif i == 2:
+                    out = f"Hello {user.name}, nice to see you! Can I help you?"
+                elif i == 3:
+                    out = f"Howdy, {user.display_name}!"
+                elif i == 4:
+                    out = f"Greetings, {user.name}! May I be of service?"
+                else:
+                    out = f"Yo, what's good, {user.display_name}? Need me for anything?"
+                prefix = self.bot.get_prefix(message.guild)
+                out += f" Use `{prefix}?` or `{prefix}help` for help!"
+                send = lambda *args, **kwargs: send_with_react(message.channel, *args, **kwargs, reacts="❎")
+            add_dict(self.data, {user.id: {"last_talk": 1}})
+            add_dict(self.data, {user.id: {"last_mention": 1}})
+            print(f"Talking to {user}:", self.data.get(user.id, EMPTY).get("last_talk", 0))
+            await send(out)
+            await bot.seen(user, event="misc", raw="Talking to me")
+        else:
+            self.data.get(user.id, EMPTY).pop("last_talk", None)
+            self.data.get(user.id, EMPTY).pop("last_mention", None)

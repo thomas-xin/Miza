@@ -17,13 +17,13 @@ class Purge(Command):
     rate_limit = 2
     multi = True
 
-    async def __call__(self, bot, args, argl, channel, name, flags, perm, guild, **void):
+    async def __call__(self, bot, args, argl, user, channel, name, flags, perm, guild, **void):
         if args:
             count = await bot.eval_math(args.pop(-1), guild.id)
         else:
             count = 1
         if not argl and not args:
-            uset = None
+            uset = None if "a" not in flags else universal_set
         else:
             users = await bot.find_users(argl, args, user, guild)
             uset = {u.id for u in users}
@@ -37,7 +37,7 @@ class Purge(Command):
             lim = count * 2 + 16 if count < inf else None
             hist = await channel.history(limit=lim, before=dt).flatten()
             for i, m in enumerate(hist):
-                if uset is None and m.author.bot or m.author.id in uset:
+                if uset is None and m.author.bot or uset and m.author.id in uset:
                     delD[m.id] = m
                     count -= 1
                     if count <= 0:

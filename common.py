@@ -1044,11 +1044,11 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
     description = ""
     usage = ""
 
-    def permError(self, perm, req=None, reason=None):
+    def perm_error(self, perm, req=None, reason=None):
         if req is None:
             req = self.min_level
         if reason is None:
-            reason = "for command " + self.name[-1]
+            reason = f"for command {self.name[-1]}"
         return PermissionError(f"Insufficient priviliges {reason}. Required level: {req}, Current level: {perm}.")
 
     def __init__(self, bot, catg):
@@ -1154,7 +1154,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
 
     __hash__ = lambda self: hash(self.__name__)
     __str__ = lambda self: f"Database <{self.__name__}>"
-    __call__ = lambda self, **void: None
+    __call__ = lambda self: None
 
     def update(self, force=False):
         if not hasattr(self, "updated"):

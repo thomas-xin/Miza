@@ -941,6 +941,7 @@ class AudioFile:
         self.loaded = False
         self.readers = cdict()
         self.assign = deque()
+        self.semaphore = Semaphore(1, 1)
         self.ensure_time()
 
     def __str__(self):
@@ -1065,10 +1066,12 @@ class AudioFile:
         if self.proc.is_running():
             with suppress():
                 self.proc.kill()
-        retry(os.remove, "cache/" + self.file, attempts=8, delay=5)
-        # File is removed from cache data
-        ytdl.cache.pop(self.file, None)
-        # print(self.file, "deleted.")
+        with suppress():
+            with self.semaphore:
+                retry(os.remove, "cache/" + self.file, attempts=8, delay=5, exc=(FileNotFoundError,))
+                # File is removed from cache data
+                ytdl.cache.pop(self.file, None)
+                # print(self.file, "deleted.")
 
     # Creates a reader, selecting from direct opus file, single piped FFmpeg, or double piped FFmpeg.
     def create_reader(self, pos=0, auds=None):
@@ -1273,7 +1276,7 @@ class AudioDownloader:
                     raise youtube_dl.DownloadError("Not a youtube link.")
                 url = f"https://www.youtube.com/watch?v={url}"
         try:
-            resp = retry(pytube.YouTube, url, attempts=3, exc={pytube.exceptions.RegexMatchError})
+            resp = retry(pytube.YouTube, url, attempts=3, exc=(pytube.exceptions.RegexMatchError,))
         except pytube.exceptions.RegexMatchError:
             raise youtube_dl.DownloadError("Invalid single youtube link.")
         entry = {

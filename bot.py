@@ -177,18 +177,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         obj.checking = utc() + 10
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
-    async def send_event(self, ev, *args, **kwargs):
+    async def send_event(self, ev, *args, exc=False, **kwargs):
         if self.closed:
             return
+        ctx = emptyctx if exc else tracebacksuppressor
         events = self.events.get(ev, ())
         if len(events) == 1:
-            with tracebacksuppressor:
+            with ctx:
                 return await create_future(events[0](*args, **kwargs))
             return
         futs = [create_future(func(*args, **kwargs)) for func in events]
         out = deque()
         for fut in futs:
-            with tracebacksuppressor:
+            with ctx:
                 res = await fut
                 out.append(res)
         return out
@@ -837,6 +838,23 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def recently_banned(self, user, guild, duration=20):
         return utc() - self.cache.banned.get((verify_id(guild), verify_id(user)), 0) < duration
 
+    def is_mentioned(self, message, user, guild=None):
+        u_id = verify_id(user)
+        if u_id in (member.id for member in message.mentions):
+            return True
+        if guild is None:
+            return False
+        member = guild.get_member(u_id)
+        if member is None:
+            return False
+        if message.content.count("`") > 1:
+            return False
+        for role in member.roles:
+            if not role.mentionable:
+                if role.mention in message.content:
+                    return True
+        return False
+
     # Checks if a user is an owner of the bot.
     is_owner = lambda self, user: verify_id(user) in self.owners
 
@@ -1440,33 +1458,36 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         u_perm = self.get_perms(u_id, guild)
         admin = not inf > u_perm
         # Gets prefix for current guild.
-        if u_id == self.user.id:
+        if u_id == self.id:
             prefix = self.prefix
         else:
             prefix = self.get_prefix(guild)
         op = False
         comm = msg
         # Mentioning the bot serves as an alias for the prefix.
-        for check in (*self.mention, prefix):
+        for check in self.mention:
             if comm.startswith(check):
+                prefix = self.prefix
                 comm = comm[len(check):].strip()
                 op = True
+                break
+        if comm.startswith(prefix):
+            comm = comm[len(prefix):].strip()
+            op = True
         # Respond to blacklisted users attempting to use a command, or when mentioned without a command.
-        if (u_perm <= -inf and op) or msg in self.mention:
-            if not u_perm < 0 and not u_perm <= -inf:
-                if xrand(2):
-                    out = f"I have been summoned! Use `{prefix}?` or `{prefix}help` for help!"
-                else:
-                    out = f"Hey there! Name's {bot.name}! Use `{prefix}?` or `{prefix}help` for help!"
-                create_task(send_with_react(channel, out, reacts="❎"))
-            else:
-                print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
-                create_task(send_with_react(
-                    channel,
-                    "Sorry, you are currently not permitted to request my services.",
-                    reacts="❎",
-                ))
+        if (u_perm <= -inf and op):
+            print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
+            create_task(send_with_react(
+                channel,
+                "Sorry, you are currently not permitted to request my services.",
+                reacts="❎",
+            ))
             return
+        if self.id in (member.id for member in message.mentions):
+            try:
+                await self.send_event("_mention_", user=user, message=message, msg=msg, exc=True)
+            except (RuntimeError, StopIteration):
+                return
         remaining = 0
         run = False
         if op:
@@ -1709,7 +1730,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
         if not run and u_id != bot.user.id:
             temp = to_alphanumeric(cpy).casefold()
-            await self.send_event("_nocommand_", text=temp, edit=edit, orig=orig, message=message, perm=u_perm)
+            await self.send_event("_nocommand_", text=temp, edit=edit, orig=orig, msg=msg, message=message, perm=u_perm)
         # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
         return remaining
 

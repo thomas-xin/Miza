@@ -246,10 +246,12 @@ class UpdateExec(Database):
                             return
                         proc = proc.translate(self.qtrans)
                         output = None
-                        async with ExceptionSender(channel):
+                        try:
                             create_task(message.add_reaction("❗"))
                             output = await self.procFunc(proc, channel, bot, term=f)
                             await channel.send(self.prepare_string(output, fmt=""))
+                        except:
+                            await channel.send(self.prepare_string(traceback.format_exc()))
         # Relay DM messages
         elif message.guild is None:
             if bot.is_blacklisted(message.author.id):
