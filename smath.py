@@ -1261,8 +1261,6 @@ class cdict(dict):
         with suppress(AttributeError):
             return self.__getattribute__(k)
         if not k.startswith("__") or not k.endswith("__"):
-            with suppress(AttributeError):
-                return super().__getitem__(k)
             return self.__getitem__(k)
         raise AttributeError(k)
 
@@ -1293,7 +1291,16 @@ class fcdict(cdict):
     __init__ = lambda self, *args, **kwargs: super().__init__({full_prune(k): v for k, v in dict(*args, **kwargs).items()})
     __setitem__ = lambda self, k, v: super().__setitem__(full_prune(k), v)
     __getitem__ = lambda self, k: super().__getitem__(full_prune(k))
-    __contains__ = lambda self, k: super().__contains__(full_prune(k))
+    __contains__ = lambda self, k: super().__contains__(k) or super().__contains__(full_prune(k))
+
+    def __getattr__(self, k):
+        with suppress(AttributeError):
+            return self.__getattribute__(k)
+        if not k.startswith("__") or not k.endswith("__"):
+            with suppress(KeyError):
+                return super().__getitem__(k)
+            return self.__getitem__(k)
+        raise AttributeError(k)
 
     def pop(self, k, default=Dummy):
         try:
