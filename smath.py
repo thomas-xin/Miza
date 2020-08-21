@@ -220,9 +220,10 @@ class UniversalSet(collections.abc.Set):
 
     __str__ = lambda self: "ξ"
     __repr__ = lambda self: f"{self.__class__.__name__}()"
-    __contains__ = lambda key: True
-    __iter__ = lambda: repeat(None)
-    __len__ = lambda: inf
+    __contains__ = lambda self, key: True
+    __bool__ = lambda self: True
+    __iter__ = lambda self: repeat(None)
+    __len__ = lambda self: inf
     __le__ = lambda self, other: type(self) is type(other)
     __lt__ = lambda self, other: False
     __eq__ = lambda self, other: type(self) is type(other)
