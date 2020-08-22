@@ -1542,7 +1542,7 @@ class UpdateUsers(Database):
                     ))
                 elif count < 16 or random.random() > math.atan(count / 8 - 2) / 4:
                     # General messages
-                    if (count < 6 or not self.mentionspam.sub("", msg).strip()) and random.random() < 0.5:
+                    if (count < 6 or self.mentionspam.sub("", msg).strip()) and random.random() < 0.5:
                         out = random.choice((f"'sup, {user.display_name}?", f"There you are, {user.name}!", "Oh yeah!", "Right back at ya!", f"Hey, {user.display_name}!"))
                     else:
                         out = ""
@@ -1573,7 +1573,7 @@ class UpdateUsers(Database):
                     out += random.choice(self.flavour)
             else:
                 # Help message greetings
-                i = xrand(6)
+                i = xrand(7)
                 if i == 0:
                     out = "I have been summoned!"
                 elif i == 1:
@@ -1584,6 +1584,8 @@ class UpdateUsers(Database):
                     out = f"Howdy, {user.display_name}!"
                 elif i == 4:
                     out = f"Greetings, {user.name}! May I be of service?"
+                elif i == 5:
+                    out = f"Hi, {user.name}! What can I do for you today?"
                 else:
                     out = f"Yo, what's good, {user.display_name}? Need me for anything?"
                 prefix = self.bot.get_prefix(message.guild)
