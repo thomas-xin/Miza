@@ -942,7 +942,7 @@ class Fill(Command):
                     else:
                         raise ValueError("invalid non-integer input value.")
             else:
-                value = 0
+                value = 255
             if not args:
                 args = "rgb"
             # Try and find a good name for the output image
