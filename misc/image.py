@@ -52,6 +52,7 @@ from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), 
 
 
 sizecheck = re.compile("[1-9][0-9]*x[0-9]+")
+fpscheck = re.compile("[0-9]+ fps")
 
 def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=None):
     direct = any((size is None, dur is None, orig_fps is None))
@@ -102,10 +103,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
             else:
                 d = s
             if orig_fps is None:
-                i = d.index(" fps")
-                f = d[i - 5:i]
-                while f[0] < "0" or f[0] > "9":
-                    f = f[1:]
+                f = re.findall(fpscheck, d)[0][:-4]
                 orig_fps = float(f)
             if size is None:
                 sfind = re.finditer(sizecheck, d)

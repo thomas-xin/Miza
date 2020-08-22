@@ -1528,7 +1528,7 @@ class UpdateUsers(Database):
             await bot.seen(user, event="misc", raw="Being naughty")
             add_dict(self.data, {user.id: {"last_mention": 1}})
             self.data[user.id]["last_used"] = t
-            raise StopIteration
+            raise CommandCancelledError
 
     async def _nocommand_(self, message, msg, **void):
         bot = self.bot

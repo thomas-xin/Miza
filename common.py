@@ -203,6 +203,9 @@ class ArgumentError(LookupError):
 class TooManyRequests(PermissionError):
     __slots__ = ()
 
+class CommandCancelledError(StopIteration):
+    __slots__ = ()
+
 
 # Safer than raw eval, more powerful than json.decode
 def eval_json(s):
