@@ -1506,7 +1506,6 @@ class UpdateUsers(Database):
         bot = self.bot
         mentions = self.mentionspam.findall(msg)
         t = utc()
-        set_dict(self.data, user.id, {})["last_used"] = t
         out = None
         if len(mentions) >= 10 and self.data.get(user.id, EMPTY).get("last_mention", 0) > 3:
             out = f"{random.choice('🥴😣😪😢')} please calm down a second, I'm only here to help..."
@@ -1516,6 +1515,7 @@ class UpdateUsers(Database):
             create_task(send_with_react(message.channel, out, reacts="❎"))
             await bot.seen(user, event="misc", raw="Being naughty")
             add_dict(self.data, {user.id: {"last_mention": 1}})
+            self.data[user.id]["last_used"] = t
             raise StopIteration
 
     async def _nocommand_(self, message, msg, **void):
@@ -1592,6 +1592,7 @@ class UpdateUsers(Database):
                 out += f" Use `{prefix}?` or `{prefix}help` for help!"
                 send = lambda *args, **kwargs: send_with_react(message.channel, *args, **kwargs, reacts="❎")
             add_dict(self.data, {user.id: {"last_talk": 1, "last_mention": 1}})
+            self.data[user.id]["last_used"] = utc()
             print(f"Talking to {user}:", self.data.get(user.id, EMPTY).get("last_talk", 0))
             await send(out)
             await bot.seen(user, event="misc", raw="Talking to me")
