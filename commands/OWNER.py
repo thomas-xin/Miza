@@ -215,7 +215,9 @@ class UpdateExec(Database):
         if type(s) is not str:
             s = str(s)
         if s:
-            return lim_str("```" + fmt + "\n" + s + "```", lim)
+            if not s.startswith("```") or not s.endswith("```"):
+                return lim_str("```" + fmt + "\n" + s + "```", lim)
+            return lim_str(s, lim)
         return "``` ```"
 
     # Only process messages that were not treated as commands

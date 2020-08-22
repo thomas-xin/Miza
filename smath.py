@@ -2696,28 +2696,20 @@ def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]"):
         it = hlist(it)
     if issubclass(type(it), collections.abc.Mapping):
         keys = it.keys()
-        add = None
+        values = iter(it.values())
     else:
-        keys = range(len(it))
-        add = offset
+        keys = range(offset, offset + len(it))
+        values = iter(it)
+    spacing = int(math.log10(len(it) + offset))
     s = ""
-    i = offset
-    for k in keys:
-        s += "\n" + left
-        if type(k) is not str:
-            s += " " * (int(math.log10(len(it))) - int(math.log10(max(1, i))))
-            if add is not None:
-                s += str(k + add)
+    with suppress(StopIteration):
+        for k in keys:
+            index = k if type(k) is str else " " * (spacing - int(math.log10(max(1, k)))) + str(k)
+            s += f"\n{left}{index}{right} "
+            if key is None:
+                s += str(next(values))
             else:
-                s += str(k)
-        else:
-            s += k
-        s += right + " "
-        if key is None:
-            s += str(it[k])
-        else:
-            s += str(key(it[k]))
-        i += 1
+                s += str(key(next(values)))
     return lim_str(s, limit)
 
 
