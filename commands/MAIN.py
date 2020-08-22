@@ -346,9 +346,15 @@ class Avatar(Command):
                                 u = await bot.fetch_member(u_id, guild, find_others=True)
                                 break
                             with suppress():
-                                u = await bot.fetch_user(u_id)
+                                try:
+                                    u = bot.get_user(u_id)
+                                except:
+                                    if not bot.in_cache(u_id):
+                                        u = await bot.fetch_user(u_id)
+                                    else:
+                                        raise
                                 break
-                            if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
+                            if type(u_id) is str and "@" in u_id and ("everyone" in u_id or "here" in u_id):
                                 g = guild
                                 break
                             try:
@@ -504,9 +510,15 @@ class Info(Command):
                                 u = await bot.fetch_member(u_id, guild, find_others=True)
                                 break
                             with suppress():
-                                u = await bot.fetch_user(u_id)
+                                try:
+                                    u = bot.get_user(u_id)
+                                except:
+                                    if not bot.in_cache(u_id):
+                                        u = await bot.fetch_user(u_id)
+                                    else:
+                                        raise
                                 break
-                            if type(u_id) is str and ("everyone" in u_id or "here" in u_id):
+                            if type(u_id) is str and "@" in u_id and ("everyone" in u_id or "here" in u_id):
                                 g = guild
                                 break
                             if "server" in name:

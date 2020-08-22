@@ -789,9 +789,11 @@ custom list-like data structure that incorporates the functionality of numpy arr
             if abs(len(self.data) // 3 - self.offs) > self.maxoff:
                 self.reconstitute(force=True)
             return False
-        self.offs = 0
-        self.size = 0
-        self.data = None
+        if len(self.data) > 4096:
+            self.data = None
+            self.offs = 0
+        else:
+            self.offs = len(self.data) // 3
         return True
 
     # For compatibility with dict.get

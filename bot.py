@@ -212,6 +212,22 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     return guild.owner
         return channel
 
+    # Returns a discord object if it is in any of the internal cache.
+    def in_cache(self, o_id):
+        cache = self.cache
+        with suppress(KeyError):
+            return self.cache.users[o_id]
+        with suppress(KeyError):
+            return self.cache.channels[o_id]
+        with suppress(KeyError):
+            return self.cache.guilds[o_id]
+        with suppress(KeyError):
+            return self.cache.roles[o_id]
+        with suppress(KeyError):
+            return self.cache.emojis[o_id]
+        with suppress(KeyError):
+            return self.data.mimics[o_id]
+
     # Fetches either a user or channel object from ID, using the bot cache when possible.
     async def fetch_messageable(self, s_id):
         if type(s_id) is not int:
@@ -266,7 +282,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             try:
                 user = super().get_user(u_id)
                 if user is None:
-                    raise TypeError
+                    raise LookupError
             except:
                 if replace:
                     return self.get_user(self.deleted_user)
@@ -541,16 +557,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     
     # Searches the bot database for a webhook mimic from ID.
     def get_mimic(self, m_id, user=None):
-        with suppress(KeyError):
-            with suppress(ValueError, TypeError):
-                m_id = "&" + str(int(m_id))
-            mimic = self.data.mimics[m_id]
-            return mimic
-        if user is not None:
+        if "mimics" in self.data:
             with suppress(KeyError):
-                mimics = self.data.mimics[user.id]
-                mlist = mimics[m_id]
-                return self.get_mimic(random.choice(mlist))
+                with suppress(ValueError, TypeError):
+                    m_id = "&" + str(int(m_id))
+                mimic = self.data.mimics[m_id]
+                return mimic
+            if user is not None:
+                with suppress(KeyError):
+                    mimics = self.data.mimics[user.id]
+                    mlist = mimics[m_id]
+                    return self.get_mimic(random.choice(mlist))
         raise LookupError("Unable to find target mimic.")
 
     # Gets the DM channel for the target user, creating a new one if none exists.
