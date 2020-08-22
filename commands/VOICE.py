@@ -1766,7 +1766,7 @@ class AudioDownloader:
             if utc() - self.searched[item].t < 18000:
                 it = self.searched[item].data[0]
                 i.name = it.name
-                i.duration = it.duration
+                i.duration = it.get("duration")
                 i.url = it.url
                 return True
             else:
