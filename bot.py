@@ -1870,7 +1870,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             embs = set_dict(self.embed_senders, c_id, [])
             embs.extend(embeds)
 
-    def send_as_embeds(self, channel, description=None, fields=None, md=nop, author=None, footer=None, colour=None):
+    def send_as_embeds(self, channel, description=None, fields=None, md=nofunc, author=None, footer=None, colour=None):
         if not description and not fields:
             return
         col = 0 if colour is None else colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
@@ -2060,7 +2060,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 self.owner_id = bot.user.id
                 self.owner = bot.user
                 self.fetch_member = bot.fetch_user
-                self.get_member = bot.cache.users.get
+                self.get_member = lambda *void1, **void2: None
                 self.voice_client = None
 
             def __dir__(self):

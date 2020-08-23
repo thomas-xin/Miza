@@ -611,7 +611,7 @@ def proc_update():
     for pname, ptype in SUBS.items():
         procs = ptype.procs
         b = len(ptype.busy)
-        count = sum(1 for proc in procs if utc() >= proc.sem)
+        count = sum(1 for proc in procs if utc() >= proc.sem.last)
         if count > 16:
             return
         if b + 1 > count:
