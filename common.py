@@ -22,14 +22,18 @@ snowflake_time = discord.utils.snowflake_time
 # Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks.
 class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
+    __slots__ = ("limit", "buffer", "delay", "active", "passive", "last")
+
     def __init__(self, limit=256, buffer=32, delay=0.05):
         self.limit = limit
         self.buffer = buffer
         self.delay = delay
         self.active = 0
         self.passive = 0
+        self.last = utc()
     
     def __enter__(self):
+        self.last = utc()
         if self.active >= self.limit:
             if self.passive >= self.buffer:
                 raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
@@ -41,6 +45,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         return self
     
     async def __aenter__(self):
+        self.last = utc()
         if self.active >= self.limit:
             if self.passive >= self.buffer:
                 raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
@@ -53,13 +58,18 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     
     def __exit__(self, *args):
         self.active -= 1
+        self.last = utc()
 
     async def __aexit__(self, *args):
         self.active -= 1
+        self.last = utc()
 
     async def __call__(self):
         while self.value >= self.limit:
             await asyncio.sleep(self.delay)
+        
+    def is_busy(self):
+        return self.active or self.passive
 
 class SemaphoreOverflowError(RuntimeError):
     __slots__ = ()
@@ -601,7 +611,7 @@ def proc_update():
     for pname, ptype in SUBS.items():
         procs = ptype.procs
         b = len(ptype.busy)
-        count = sum(1 for proc in procs if utc() > proc.busy)
+        count = sum(1 for proc in procs if utc() >= proc.sem)
         if count > 16:
             return
         if b + 1 > count:
@@ -621,23 +631,23 @@ def proc_update():
                 )
             else:
                 raise TypeError(f"invalid subpool {pname}.")
-            proc.busy = nan
-            x = bytes(random.randint(0, 255) for _ in loop(32))
-            if random.randint(0, 1):
-                x = hashlib.sha256(x).digest()
-            x = base64.b64encode(x)
-            proc.stdin.write(bytes(repr(x) + "\n", "utf-8"))
-            proc.key = x.decode("utf-8", "replace")
-            proc.busy = utc()
+            proc.sem = Semaphore(1, 3)
+            with proc.sem:
+                x = bytes(random.randint(0, 255) for _ in loop(32))
+                if random.randint(0, 1):
+                    x = hashlib.sha256(x).digest()
+                x = base64.b64encode(x)
+                proc.stdin.write(bytes(repr(x) + "\n", "utf-8"))
+                proc.key = x.decode("utf-8", "replace")
             print(proc, "initialized with key", proc.key)
             procs.append(proc)
         att = 0
-        while count > b + 2:
+        while count >= b + 5:
             found = False
             for p, proc in enumerate(procs):
                 # Busy variable indicates when the last operation finished;
                 # processes that are idle longer than 1 hour are automatically terminated
-                if utc() - proc.busy > 3600:
+                if utc() - proc.sem.last > 3600:
                     force_kill(proc)
                     procs.pop(p)
                     found = True
@@ -659,46 +669,37 @@ async def process_math(expr, prec=64, rat=False, key=None, timeout=12, authorize
         if key is None:
             key = random.random()
         else:
-            try:
-                key = int(key)
-            except (TypeError, ValueError):
-                key = key.id
+            key = verify_id(key)
     procs, busy = SUBS.math.procs, SUBS.math.busy
-    while utc() - busy.get(key, 0) < 60:
-        await asyncio.sleep(0.5)
-    with suppress(StopIteration):
-        while True:
-            for p in range(len(procs)):
-                if p < len(procs):
-                    proc = procs[p]
-                    if utc() > proc.busy:
+    sem = set_dict(busy, key, Semaphore(2, 3, delay=0.1))
+    async with sem:
+        with suppress(StopIteration):
+            while True:
+                for proc in procs:
+                    if utc() > proc.sem.last:
                         raise StopIteration
-                else:
-                    break
-            await create_future(proc_update, priority=True)
-            await asyncio.sleep(0.5)
-    if authorize:
-        args = (expr, prec, rat, proc.key)
-    else:
-        args = (expr, prec, rat)
-    d = repr(bytes("`".join(i if type(i) is str else str(i) for i in args), "utf-8")).encode("utf-8") + b"\n"
-    try:
-        proc.busy = inf
-        busy[key] = utc()
-        await create_future(proc_update, priority=True)
-        await create_future(proc.stdin.write, d)
-        await create_future(proc.stdin.flush, timeout=timeout)
-        resp = await create_future(proc.stdout.readline, timeout=timeout)
-        proc.busy = utc()
-    except (T0, T1, T2):
-        create_future_ex(force_kill, proc, priority=True)
-        procs.pop(p, None)
+                await create_future(proc_update, priority=True)
+                await asyncio.sleep(0.5)
+        if authorize:
+            args = (expr, prec, rat, proc.key)
+        else:
+            args = (expr, prec, rat)
+        d = repr(bytes("`".join(i if type(i) is str else str(i) for i in args), "utf-8")).encode("utf-8") + b"\n"
+        try:
+            with proc.sem:
+                await create_future(proc_update, priority=True)
+                await create_future(proc.stdin.write, d)
+                await create_future(proc.stdin.flush, timeout=timeout)
+                resp = await create_future(proc.stdout.readline, timeout=timeout)
+        except (T0, T1, T2):
+            create_future_ex(force_kill, proc, priority=True)
+            procs.remove(proc)
+            busy.pop(key, None)
+            create_future_ex(proc_update, priority=True)
+            raise
         busy.pop(key, None)
-        create_future_ex(proc_update, priority=True)
-        raise
-    busy.pop(key, None)
-    output = evalEX(evalEX(resp))
-    return output
+        output = evalEX(evalEX(resp))
+        return output
 
 # Sends an operation to the image subprocess pool.
 async def process_image(image, operation, args, key=None, timeout=24):
@@ -706,42 +707,33 @@ async def process_image(image, operation, args, key=None, timeout=24):
         if key is None:
             key = random.random()
         else:
-            try:
-                key = int(key)
-            except (TypeError, ValueError):
-                key = key.id
+            key = verify_id(key)
     procs, busy = SUBS.image.procs, SUBS.image.busy
-    while utc() - busy.get(key, 0) < 60:
-        await asyncio.sleep(0.5)
-    with suppress(StopIteration):
-        while True:
-            for p in range(len(procs)):
-                if p < len(procs):
-                    proc = procs[p]
-                    if utc() > proc.busy:
+    sem = set_dict(busy, key, Semaphore(2, 3, delay=0.1))
+    async with sem:
+        with suppress(StopIteration):
+            while True:
+                for proc in procs:
+                    if utc() > proc.sem.last:
                         raise StopIteration
-                else:
-                    break
-            await create_future(proc_update)
-            await asyncio.sleep(0.5)
-    d = repr(bytes("`".join(str(i) for i in (image, operation, args)), "utf-8")).encode("utf-8") + b"\n"
-    try:
-        proc.busy = inf
-        busy[key] = utc()
-        await create_future(proc_update, priority=True)
-        await create_future(proc.stdin.write, d)
-        await create_future(proc.stdin.flush, timeout=timeout)
-        resp = await create_future(proc.stdout.readline, timeout=timeout)
-        proc.busy = utc()
-    except (T0, T1, T2):
-        create_future_ex(force_kill, proc, priority=True)
-        procs.pop(p, None)
+                await create_future(proc_update)
+                await asyncio.sleep(0.5)
+        d = repr(bytes("`".join(str(i) for i in (image, operation, args)), "utf-8")).encode("utf-8") + b"\n"
+        try:
+            with proc.sem:
+                await create_future(proc_update, priority=True)
+                await create_future(proc.stdin.write, d)
+                await create_future(proc.stdin.flush, timeout=timeout)
+                resp = await create_future(proc.stdout.readline, timeout=timeout)
+        except (T0, T1, T2):
+            create_future_ex(force_kill, proc, priority=True)
+            procs.remove(proc)
+            busy.pop(key, None)
+            create_future_ex(proc_update, priority=True)
+            raise
         busy.pop(key, None)
-        create_future_ex(proc_update, priority=True)
-        raise
-    busy.pop(key, None)
-    output = evalEX(evalEX(resp))
-    return output
+        output = evalEX(evalEX(resp))
+        return output
 
 
 # Evaluates an an expression, raising it if it is an exception.
@@ -796,7 +788,7 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
         if not self.pools:
             self._update()
         self.position = (self.position + 1) % len(self.pools)
-        random.choice(self.pools).submit(self._update)
+        choice(self.pools).submit(self._update)
 
     def map(self, func, *args, **kwargs):
         self.update()

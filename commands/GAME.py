@@ -126,7 +126,7 @@ class ND2048(collections.abc.MutableSequence):
                     choices[i + 1] = neg
                     neg += 1
             # Select a list from possible spawns and distribute them into random empty locations on the game board
-            spawned = deque(random.choice(choices) for i in range(count))
+            spawned = deque(choice(choices) for i in range(count))
             fi = self.data.flat
             empty = [i for i in range(self.data.size) if not fi[i]]
             random.shuffle(empty)

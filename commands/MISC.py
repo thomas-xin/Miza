@@ -630,7 +630,7 @@ class UpdateMathTest(Database):
 
     # Like division but may result in a finite decimal
     def fraction(self):
-        y = random.choice([2, 4, 5, 10])
+        y = choice([2, 4, 5, 10])
         x = xrand(3, 20)
         mult = xrand(4) + 1
         y *= mult
@@ -705,7 +705,7 @@ class UpdateMathTest(Database):
                 if xrand(2):
                     a = -a
                 op = ["sin", "cos", "tan", "sec", "csc", "cot", "log"]
-                s.append(str(a) + "*" + random.choice(op) + "(x)")
+                s.append(str(a) + "*" + choice(op) + "(x)")
         st = ""
         for i in s:
             if st and i[0] not in "+-":
@@ -745,7 +745,7 @@ class UpdateMathTest(Database):
             self.calculus,
         )
         modes = {"easy": easy, "hard": hard}
-        qa = random.choice(modes[mode])()
+        qa = choice(modes[mode])()
         if awaitable(qa):
             return await qa
         return qa

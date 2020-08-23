@@ -104,10 +104,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def __getattr__(self, key):
         with suppress(AttributeError):
             return object.__getattribute__(self, key)
-        this = super().user._state
+        this = self._connection
         with suppress(AttributeError):
             return getattr(this, key)
-        this = super().user
+        this = self.user
         with suppress(AttributeError):
             return getattr(this, key)
         this = self.__getattribute__("proc")
@@ -115,7 +115,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     def __dir__(self):
         data = set(object.__dir__(self))
-        data.update(dir(self._state))
+        data.update(dir(self._connection))
         data.update(dir(self.user))
         data.update(dir(self.proc))
         return data
@@ -130,7 +130,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Starts up client.
     def run(self):
-        print(f"Attempting to authorize with token {self.token}:")
+        print(f"Logging in...")
         with closing(get_event_loop()):
             with suppress():
                 get_event_loop().run_until_complete(self.start(self.token))
@@ -567,7 +567,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 with suppress(KeyError):
                     mimics = self.data.mimics[user.id]
                     mlist = mimics[m_id]
-                    return self.get_mimic(random.choice(mlist))
+                    return self.get_mimic(choice(mlist))
         raise LookupError("Unable to find target mimic.")
 
     # Gets the DM channel for the target user, creating a new one if none exists.
@@ -1809,7 +1809,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             w = await channel.create_webhook(name=self.user.name, reason="Auto Webhook")
             self.add_webhook(w)
         else:
-            w = random.choice(wlist)
+            w = choice(wlist)
         return w
 
     async def send_with_webhook(self, channel, *args, **kwargs):
@@ -1821,12 +1821,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             await w.send(*args, **kwargs)
         await self.seen(self.user, event="message", count=len(kwargs.get("embeds", (None,))), raw="Sending a message")
 
-    # Sends a list of embeds to the target channel, using a webhook when possible.
-    async def _send_embeds(self, channel, embeds):
-        async with ExceptionSender(channel):
+    # Sends a list of embeds to the target sendable, using a webhook when possible.
+    async def _send_embeds(self, sendable, embeds):
+        s_id = verify_id(sendable)
+        sendable = await self.fetch_messageable(s_id)
+        async with ExceptionSender(sendable):
             if not embeds:
                 return
-            guild = getattr(channel, "guild", None)
+            guild = getattr(sendable, "guild", None)
             # Determine whether to send embeds individually or as blocks of up to 10, based on whether it is possible to use webhooks
             single = False
             if guild is None or hasattr(guild, "ghost") or len(embeds) == 1:
@@ -1844,14 +1846,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         single = True
             if single:
                 for emb in embeds:
-                    async with delay(1):
-                        create_task(channel.send(embed=emb))
+                    async with delay(1 / 3):
+                        create_task(sendable.send(embed=emb))
                 return
-            await self.send_with_webhook(channel, embeds=embeds, username=m.display_name, avatar_url=best_url(m))
-    
-    async def send_embeds_to(self, s_id, embs):
-        sendable = await self.fetch_messageable(s_id)
-        await self._send_embeds(sendable, embs)
+            await self.send_with_webhook(sendable, embeds=embeds, username=m.display_name, avatar_url=best_url(m))
 
     # Adds embeds to the embed sender, waiting for the next update event.
     def send_embeds(self, channel, embeds=None, embed=None):
@@ -1864,14 +1862,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 embeds = (embed,)
         elif not embeds:
             return
-        for e in embeds:
-            if len(e) > 6000:
-                print(e.to_dict())
-                raise OverflowError
-        try:
-            c_id = int(channel)
-        except (TypeError, ValueError):
-            c_id = channel.id
+        c_id = verify_id(channel)
         user = self.cache.users.get(c_id)
         if user is not None:
             create_task(self._send_embeds(user, embeds))
@@ -1879,12 +1870,74 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             embs = set_dict(self.embed_senders, c_id, [])
             embs.extend(embeds)
 
+    def send_as_embeds(self, channel, description=None, fields=None, md=nop, author=None, footer=None, colour=None):
+        if not description and not fields:
+            return
+        col = 0 if colour is None else colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
+        off = 128 if not issubclass(type(colour), collections.abc.Sequence) else colour[1]
+        embs = deque()
+        emb = discord.Embed(colour=colour2raw(hue2colour(col)))
+        if description:
+            # Separate text into paragraphs, then lines, then words, then characters and attempt to add them one at a time, adding extra embeds when necessary
+            curr = ""
+            paragraphs = hlist(p + "\n\n" for p in description.split("\n\n"))
+            while paragraphs:
+                para = paragraphs.popleft()
+                if len(para) > 2000:
+                    temp = para[:2000]
+                    try:
+                        i = temp.rindex("\n")
+                        s = "\n"
+                    except ValueError:
+                        try:
+                            i = temp.rindex(" ")
+                            s = " "
+                        except ValueError:
+                            paragraphs.appendleft(para[2000:])
+                            paragraphs.appendleft(temp)
+                            continue
+                    paragraphs.appendleft(para[i + 1:])
+                    paragraphs.appendleft(para[:i] + s)
+                    continue
+                if not embs:
+                    if author:
+                        emb.set_author(**author)
+                if len(curr) + len(para) > 2000:
+                    emb.description = md(curr.strip())
+                    curr = para
+                    embs.append(emb)
+                    col += 128
+                    emb = discord.Embed(colour=colour2raw(hue2colour(col)))
+                else:
+                    curr += para
+            if curr:
+                emb.description = md(curr.strip())
+        if fields:
+            for field in fields:
+                if issubclass(type(field), collections.abc.Mapping):
+                    field = tuple(field.values())
+                elif not issubclass(type(field), collections.abc.Sequence):
+                    field = tuple(field)
+                n = lim_str(field[0], 256)
+                v = lim_str(md(field[1]), 1024)
+                i = True if len(field) < 3 else field[2]
+                if len(emb) + len(n) + len(v) > 6000 or len(emb.fields) > 24:
+                    embs.append(emb)
+                    col += 128
+                    emb = discord.Embed(colour=colour2raw(hue2colour(col)))
+                emb.add_field(name=n, value=v if v else "\u200b", inline=i)
+        if len(emb):
+            embs.append(emb)
+        if footer and embs:
+            embs[-1].add_footer(**footer)
+        self.send_embeds(channel, embeds=embs)
+
     # Updates all embed senders.
     def update_embeds(self):
         if not self.ready:
             return
         sent = False
-        for s_id in tuple(self.embed_senders):
+        for s_id in self.embed_senders:
             embeds = self.embed_senders[s_id]
             embs = deque()
             for emb in embeds:
@@ -1896,7 +1949,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             self.embed_senders[s_id] = embeds = embeds[len(embs):]
             if not embeds:
                 self.embed_senders.pop(s_id)
-            create_task(self.send_embeds_to(s_id, embs))
+            create_task(self._send_embeds(s_id, embs))
             sent = True
         return sent
 
@@ -1941,22 +1994,22 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     # Deletes own messages if any of the "X" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot.
     async def check_to_delete(self, message, reaction, user):
         if message.author.id == self.user.id:
-            u_perm = self.get_perms(user.id, message.guild)
-            check = False
-            if not u_perm < 3:
-                check = True
-            else:
-                for react in message.reactions:
-                    if str(reaction) == str(react):
-                        users = await react.users().flatten()
-                        for u in users:
-                            if u.id == self.user.id:
-                                check = True
-                                break
-            if check and user.id != self.user.id:
-                s = str(reaction)
-                if s in "❌✖️🇽❎":
-                    with suppress(discord.NotFound):
+            with suppress(discord.NotFound):
+                u_perm = self.get_perms(user.id, message.guild)
+                check = False
+                if not u_perm < 3:
+                    check = True
+                else:
+                    for react in message.reactions:
+                        if str(reaction) == str(react):
+                            users = await react.users().flatten()
+                            for u in users:
+                                if u.id == self.user.id:
+                                    check = True
+                                    break
+                if check and user.id != self.user.id:
+                    s = str(reaction)
+                    if s in "❌✖️🇽❎":
                         await self.silent_delete(message, exc=True)
 
     # Handles a new sent message, calls process_message and sends an error if an exception occurs.
@@ -2007,6 +2060,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 self.owner_id = bot.user.id
                 self.owner = bot.user
                 self.fetch_member = bot.fetch_user
+                self.get_member = bot.cache.users.get
                 self.voice_client = None
 
             def __dir__(self):
@@ -2026,7 +2080,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             description = ""
             max_members = 2
             unavailable = False
-            isDM = True
             ghost = True
 
         # Represents a deleted/not found user.

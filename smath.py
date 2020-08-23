@@ -116,7 +116,21 @@ TRUE, FALSE = True, False
 true, false = True, False
 
 
-nop = lambda *void1, **void2: None
+nop = lambda arg, *void1, **void2: arg
+
+
+def choice(it):
+    if not issubclass(type(it), collections.abc.Sequence):
+        if not issubclass(type(it), collections.abc.Sized):
+            it = tuple(it)
+        else:
+            size = len(it)
+            it = iter(it)
+            i = xrand(size)
+            for _ in loop(i):
+                next(it)
+            return next(it)
+    return random.choice(it)
 
 
 # Shuffles an iterable, in-place if possible, returning it.
@@ -216,7 +230,13 @@ def sort(it, key=None, reverse=False):
             raise TypeError(f"Sorting {type(it)} is not supported.")
 
 
+exclusive_range = lambda range, *excluded: tuple(i for i in range if i not in frozenset(excluded))
+exclusive_set = lambda range, *excluded: frozenset(i for i in range if i not in frozenset(excluded))
+
+
 class UniversalSet(collections.abc.Set):
+
+    __slots__ = ()
 
     __str__ = lambda self: "ξ"
     __repr__ = lambda self: f"{self.__class__.__name__}()"
@@ -2857,6 +2877,7 @@ UNIFMTS = [
     "0123456789🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉",
     "0123456789🅰🅱🅲🅳🅴🅵🅶🅷🅸🅹🅺🅻🅼🅽🅾🅿🆀🆁🆂🆃🆄🆅🆆🆇🆈🆉🅰🅱🅲🅳🅴🅵🅶🅷🅸🅹🅺🅻🅼🅽🅾🅿🆀🆁🆂🆃🆄🆅🆆🆇🆈🆉",
     "⓪①②③④⑤⑥⑦⑧⑨ⓐⓑⓒⓓⓔⓕⓖⓗⓘⓙⓚⓛⓜⓝⓞⓟⓠⓡⓢⓣⓤⓥⓦⓧⓨⓩⒶⒷⒸⒹⒺⒻⒼⒽⒾⒿⓀⓁⓂⓃⓄⓅⓆⓇⓈⓉⓊⓋⓌⓍⓎⓏ",
+    "⓿➊➋➌➍➎➏➐➑➒🅐🅑🅒🅓🅔🅕🅖🅗🅘🅙🅚🅛🅜🅝🅞🅟🅠🅡🅢🅣🅤🅥🅦🅧🅨🅩🅐🅑🅒🅓🅔🅕🅖🅗🅘🅙🅚🅛🅜🅝🅞🅟🅠🅡🅢🅣🅤🅥🅦🅧🅨🅩",
     "0123456789𝘢𝘣𝘤𝘥𝘦𝘧𝘨𝘩𝘪𝘫𝘬𝘭𝘮𝘯𝘰𝘱𝘲𝘳𝘴𝘵𝘶𝘷𝘸𝘹𝘺𝘻𝘈𝘉𝘊𝘋𝘌𝘍𝘎𝘏𝘐𝘑𝘒𝘓𝘔𝘕𝘖𝘗𝘘𝘙𝘚𝘛𝘜𝘝𝘞𝘟𝘠𝘡",
     "𝟎𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗𝙖𝙗𝙘𝙙𝙚𝙛𝙜𝙝𝙞𝙟𝙠𝙡𝙢𝙣𝙤𝙥𝙦𝙧𝙨𝙩𝙪𝙫𝙬𝙭𝙮𝙯𝘼𝘽𝘾𝘿𝙀𝙁𝙂𝙃𝙄𝙅𝙆𝙇𝙈𝙉𝙊𝙋𝙌𝙍𝙎𝙏𝙐𝙑𝙒𝙓𝙔𝙕",
     "𝟶𝟷𝟸𝟹𝟺𝟻𝟼𝟽𝟾𝟿𝚊𝚋𝚌𝚍𝚎𝚏𝚐𝚑𝚒𝚓𝚔𝚕𝚖𝚗𝚘𝚙𝚚𝚛𝚜𝚝𝚞𝚟𝚠𝚡𝚢𝚣𝙰𝙱𝙲𝙳𝙴𝙵𝙶𝙷𝙸𝙹𝙺𝙻𝙼𝙽𝙾𝙿𝚀𝚁𝚂𝚃𝚄𝚅𝚆𝚇𝚈𝚉",
@@ -2866,6 +2887,9 @@ UNIFMTS = [
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
 ]
 __umap = {UNIFMTS[k][i]: UNIFMTS[-1][i] for k in range(len(UNIFMTS) - 1) for i in range(len(UNIFMTS[k]))}
+
+__unfont = "".maketrans(__umap)
+unfont = lambda s: str(s).translate(__unfont)
 
 DIACRITICS = {
     "ÀÁÂÃÄÅĀĂĄ": "A",
@@ -2923,7 +2947,23 @@ for c in tuple(__umap):
     if c in UNIFMTS[-1]:
         __umap.pop(c)
 __trans = "".maketrans(__umap)
-__trans.update({n: "" for n in np.concatenate([np.arange(11) + 7616, np.arange(4) + 65056, np.arange(112) + 768])})
+extra_zalgos = (
+    range(768, 880),
+    range(1155, 1162),
+    exclusive_range(range(1425, 1478), 1470, 1472, 1475),
+    range(1552, 1560),
+    range(1619, 1632),
+    exclusive_range(range(1750, 1774), 1757, 1758, 1765, 1766, 1769),
+    exclusive_range(range(2260, 2304), 2274),
+    range(7616, 7627),
+    (8432,),
+    range(11744, 11776),
+    (42607,), range(42612, 42622), (42654, 42655),
+    range(65056, 65060),
+)
+zalgo_array = np.concatenate(extra_zalgos)
+zalgo_map = {n: "" for n in zalgo_array}
+__trans.update(zalgo_map)
 __unitrans = ["".maketrans({UNIFMTS[-1][x]: UNIFMTS[i][x] for x in range(len(UNIFMTS[-1]))}) for i in range(len(UNIFMTS) - 1)]
 
 # Translates all alphanumeric characters in a string to their corresponding character in the desired font.

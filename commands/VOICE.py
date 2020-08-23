@@ -788,7 +788,7 @@ class AudioQueue(hlist):
                 d = None
                 # Make up to 64 attempts to select an item from the default playlist
                 for _ in loop(64):
-                    p = random.choice(t)
+                    p = choice(t)
                     # Do not pick entries that match the previously played song if possible
                     if len(t) > 1 and p["url"] == self.prev:
                         continue
@@ -3328,47 +3328,7 @@ class Lyrics(Command):
         title = f"Lyrics for {name}:"
         if len(text) > 54000:
             return (title + "\n\n" + text).strip()
-        col = 1024
-        embs = deque()
-        # Separate lyrics into paragraphs and attempt to add them one at a time, adding extra embeds when necessary
-        curr = ""
-        emb = discord.Embed(colour=colour2raw(hue2colour(col)))
-        paragraphs = hlist(p + "\n\n" for p in text.split("\n\n"))
-        while paragraphs:
-            para = paragraphs.popleft()
-            if len(para) > 2048:
-                temp = para[:2048]
-                try:
-                    i = temp.rindex("\n")
-                except ValueError:
-                    try:
-                        i = temp.rindex(" ")
-                    except ValueError:
-                        i = 2047
-                paragraphs.appendleft(para[i + 1:])
-                paragraphs.appendleft(para[:i])
-            col += 128
-            if not embs:
-                emb.set_author(name=title)
-            if len(curr) + len(para) > 2000:
-                if len(para) <= 2000:
-                    emb.description = ini_md(curr.strip())
-                    curr = para
-                    embs.append(emb)
-                    emb = discord.Embed(colour=colour2raw(hue2colour(col)))
-                else:
-                    p = [i + "\n" for i in para.split("\n")]
-                    if len(p) <= 1:
-                        p = [i + "" for i in para.split()]
-                        if len(p) <= 1:
-                            p = list(para)
-                    paragraphs = p + paragraphs
-            else:
-                curr += para
-        if curr:
-            emb.description = ini_md(curr.strip())
-            embs.append(emb)
-        bot.send_embeds(channel, embeds=embs)
+        bot.send_as_embeds(channel, author=dict(name=title), colour=(1024, 128), md=ini_md)
 
 
 class Download(Command):

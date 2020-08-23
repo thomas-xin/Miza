@@ -115,10 +115,10 @@ class IMG(Command):
                 sources.append(images[t])
         r = flags.get("r", 0)
         for _ in loop(r):
-            sources.append(random.choice(tuple(images)))
+            sources.append(choice(tuple(images)))
         if not len(sources):
             raise LookupError(f"Target image {argv} not found. Use img for list.")
-        url = random.choice(sources)
+        url = choice(sources)
         if "v" in flags:
             return url
         emb = discord.Embed(
@@ -1089,7 +1089,7 @@ class Cat(Command):
                 resp = await Request("https://api.thecatapi.com/v1/images/search", aio=True)
             d = eval_json(resp)
             if type(d) is list:
-                d = random.choice(d)
+                d = choice(d)
             url = d["file" if x == 1 else "url"]
         return url
 
@@ -1117,7 +1117,7 @@ class Cat(Command):
                 self.refilling = True
                 create_task(self.refill_buffer(amount << 1))
             if len(self.found) >= 4096:
-                return random.choice(tuple(self.found))
+                return choice(tuple(self.found))
             if not self.buffer:
                 return await create_future(nekos.cat, timeout=8)
         url = self.buffer.popleft()
@@ -1167,7 +1167,7 @@ class Dog(Command):
                 resp = await Request("https://dog.ceo/api/breeds/image/random", aio=True)
             d = eval_json(resp)
             if type(d) is list:
-                d = random.choice(d)
+                d = choice(d)
             url = d["file" if x == 1 else "message"]
             url = url.replace("\\", "/")
             while "///" in url:
@@ -1198,7 +1198,7 @@ class Dog(Command):
                 self.refilling = True
                 create_task(self.refill_buffer(amount << 1))
             if len(self.found) >= 4096:
-                return random.choice(tuple(self.found))
+                return choice(tuple(self.found))
             if not self.buffer:
                 return await create_future(nekos.img, "woof", timeout=8)
         url = self.buffer.popleft()
@@ -1250,7 +1250,7 @@ class _8Ball(Command):
                 self.refilling = True
                 create_future_ex(self.refill_buffer, amount << 1)
             if not self.buffer:
-                return random.choice(tuple(self.found))
+                return choice(tuple(self.found))
         url = self.buffer.popleft()
         self.found[url] = True
         return url

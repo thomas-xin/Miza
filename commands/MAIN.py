@@ -128,6 +128,7 @@ class Perms(Command):
                     if "h" in flags:
                         return
                     create_task(channel.send(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to {sqr_md(c_perm)}.")))
+                    continue
                 reason = f"to change permissions for {name} in {guild} from {t_perm} to {c_perm}"
                 raise self.perm_error(perm, m_perm, reason)
             create_task(channel.send(css_md(f"Current permissions for {sqr_md(t_user)} in {sqr_md(guild)}: {sqr_md(t_perm)}.")))
@@ -683,7 +684,7 @@ class Info(Command):
                             d += "[Myself :3]\n"
                         if is_self_owner:
                             d += "[My owner ❤️]\n"
-                        if is_guild_owner and not hasattr(guild, "isDM"):
+                        if is_guild_owner and not hasattr(guild, "ghost"):
                             d += "[Server owner 👀]\n"
                         d = d.strip("\n")
                         d += "```**"
@@ -1200,7 +1201,7 @@ class UpdateMessageCount(Database):
     async def getUserMessages(self, user, guild):
         if self.scanned == -1:
             c_id = self.bot.user.id
-            if guild is None or hasattr(guild, "isDM"):
+            if guild is None or hasattr(guild, "ghost"):
                 channel = user.dm_channel
                 if channel is None:
                     return 0
@@ -1232,7 +1233,7 @@ class UpdateMessageCount(Database):
     async def getUserAverage(self, user, guild):
         if self.scanned == -1:
             c_id = self.bot.user.id
-            if guild is None or hasattr(guild, "isDM"):
+            if guild is None or hasattr(guild, "ghost"):
                 channel = user.dm_channel
                 if channel is None:
                     return 0
@@ -1466,8 +1467,8 @@ class UpdateUsers(Database):
                     i = xrand(5)
                     if i == 0 and self.facts:
                         with tracebacksuppressor:
-                            text = random.choice(self.facts)
-                            fact = random.choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
+                            text = choice(self.facts)
+                            fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
                             out = f"\n{fact} `{text}`"
                     elif i == 1:
                         with tracebacksuppressor:
@@ -1487,7 +1488,7 @@ class UpdateUsers(Database):
                                 random.shuffle(factlist)
                                 self.useless = deque()
                                 for text in factlist:
-                                    fact = random.choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
+                                    fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
                                     out = f"\n{fact} `{text}`"
                                     self.useless.append(out)
                             out = self.useless.popleft()
@@ -1520,9 +1521,9 @@ class UpdateUsers(Database):
         t = utc()
         out = None
         if len(mentions) >= 10 and self.data.get(user.id, EMPTY).get("last_mention", 0) > 3:
-            out = f"{random.choice('🥴😣😪😢')} please calm down a second, I'm only here to help..."
+            out = f"{choice('🥴😣😪😢')} please calm down a second, I'm only here to help..."
         elif len(mentions) >= 3 and self.data.get(user.id, EMPTY).get("last_mention", 0) > 2:
-            out = f"{random.choice('😟😦😓')} oh, that's a lot of mentions, is everything okay?"
+            out = f"{choice('😟😦😓')} oh, that's a lot of mentions, is everything okay?"
         if out:
             create_task(send_with_react(message.channel, out, reacts="❎"))
             await bot.seen(user, event="misc", raw="Being naughty")
@@ -1545,7 +1546,7 @@ class UpdateUsers(Database):
             if count:
                 if count < 2 or count == 2 and xrand(2):
                     # Starts conversations
-                    out = random.choice((
+                    out = choice((
                         f"So, {user.display_name}, how's your day been?",
                         f"How do you do, {user.name}?",
                         f"How are you today, {user.name}?",
@@ -1555,13 +1556,13 @@ class UpdateUsers(Database):
                 elif count < 16 or random.random() > math.atan(count / 8 - 2) / 4:
                     # General messages
                     if (count < 6 or self.mentionspam.sub("", msg).strip()) and random.random() < 0.5:
-                        out = random.choice((f"'sup, {user.display_name}?", f"There you are, {user.name}!", "Oh yeah!", "Right back at ya!", f"Hey, {user.display_name}!"))
+                        out = choice((f"'sup, {user.display_name}?", f"There you are, {user.name}!", "Oh yeah!", "Right back at ya!", f"Hey, {user.display_name}!"))
                     else:
                         out = ""
                 elif count < 24:
                     # Occasional late message
                     if random.random() < 0.4:
-                        out = random.choice((
+                        out = choice((
                             "You seem rather bored... I may only be as good as my programming allows me to be, but I'll try my best to fix that!",
                             "You must be bored, allow me to entertain you!",
                         ))
@@ -1569,20 +1570,20 @@ class UpdateUsers(Database):
                         out = ""
                 else:
                     # Late conversation messages
-                    out = random.choice((
+                    out = choice((
                         "It's been a fun conversation, but don't you have anything better to do?",
                         "This is what I was made for, I can do it forever, but you're only a human, take a break!",
                         f"Woah, have you checked the time? We've been talking for {count + 1} messages!"
                     ))
             elif utc() - self.data.get(user.id, EMPTY).get("last_used", inf) >= 259200:
                 # Triggers for users not seen in 3 days or longer
-                out = random.choice((f"Long time no see, {user.name}!", f"Great to see you again, {user.display_name}!", f"It's been a while, {user.name}!"))
+                out = choice((f"Long time no see, {user.name}!", f"Great to see you again, {user.display_name}!", f"It's been a while, {user.name}!"))
             if out is not None:
                 # Add randomized flavour text if in conversation
                 if self.flavour_buffer:
                     out += self.flavour_buffer.popleft()
                 else:
-                    out += random.choice(self.flavour)
+                    out += choice(self.flavour)
             else:
                 # Help message greetings
                 i = xrand(7)
@@ -1609,5 +1610,6 @@ class UpdateUsers(Database):
             await send(out)
             await bot.seen(user, event="misc", raw="Talking to me")
         else:
-            self.data.get(user.id, EMPTY).pop("last_talk", None)
+            if not self.data.get(user.id, EMPTY).get("last_mention") and random.random() > 0.6:
+                self.data.get(user.id, EMPTY).pop("last_talk", None)
             self.data.get(user.id, EMPTY).pop("last_mention", None)

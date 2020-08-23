@@ -76,7 +76,7 @@ def pull_e621(argv, delay=5):
 
 
 def pull_booru(argv, delay=5):
-    client = pybooru.Moebooru(random.choice(tuple(booruSites)))
+    client = pybooru.Moebooru(choice(tuple(booruSites)))
     try:
         posts = client.post_list(tags=argv, random=True, limit=16)
         if not posts:
@@ -202,7 +202,7 @@ async def searchRandomNSFW(argv, delay=10):
     data = [i for i in data if i]
     if not data:
         raise LookupError(f"No results for {argv}.")
-    item = random.choice(data)
+    item = choice(data)
     return item
 
 

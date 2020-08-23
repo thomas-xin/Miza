@@ -50,7 +50,7 @@ class Purge(Command):
         delM = hlist(delD.values())
         while len(delM):
             try:
-                if hasattr(channel, "delete_messages"):
+                if hasattr(channel, "delete_messages") and channel.permissions_for(channel.guild.get_member(bot.user.id)).manage_messages:
                     dels = delM[:100]
                     # bot.logDelete(dels[-1], -1)
                     await channel.delete_messages(dels)
@@ -458,7 +458,7 @@ class AutoRole(Command):
                 with discord.context_managers.Typing(channel):
                     i = 1
                     for member in guild.members:
-                        role = random.choice(roles)
+                        role = choice(roles)
                         if role not in member.roles:
                             create_task(member.add_roles(role, reason="InstaRole", atomic=True))
                             if not i % 5:
@@ -1190,12 +1190,13 @@ class UpdateRolegivers(Database):
                         continue
                     if role in user.roles:
                         continue
-                    await user.add_roles(
-                        role,
-                        reason=f'Keyword "{k}" found in message "{message.content}".',
-                        atomic=True,
-                    )
-                    print(f"RoleGiver: Granted {role} to {user} in {guild}.")
+                    async with ExceptionSender(message.channel):
+                        await user.add_roles(
+                            role,
+                            reason=f'Keyword "{k}" found in message "{message.content}".',
+                            atomic=True,
+                        )
+                        print(f"RoleGiver: Granted {role} to {user} in {guild}.")
                 if alist[1]:
                     await bot.silent_delete(message)
 
@@ -1213,7 +1214,7 @@ class UpdateAutoRoles(Database):
             assigned = self.data[guild.id]
             for rolelist in assigned:
                 with tracebacksuppressor:
-                    role = await self.bot.fetch_role(random.choice(rolelist), guild)
+                    role = await self.bot.fetch_role(choice(rolelist), guild)
                     roles.append(role)
             print(f"AutoRole: Granted {roles} to {user} in {guild}.")
             # Attempt to add all roles in one API call

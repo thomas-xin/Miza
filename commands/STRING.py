@@ -210,46 +210,71 @@ class Fancy(Command):
     usage = "<string>"
     no_parse = True
 
-    def __call__(self, argv, **void):
+    def __call__(self, channel, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        emb = discord.Embed(colour=rand_colour())
-        emb.set_author(name=argv)
+        fields = deque()
         for i in range(len(UNIFMTS) - 1):
             s = uni_str(argv, i)
             if i == len(UNIFMTS) - 2:
                 s = s[::-1]
-            emb.add_field(name=f"Font {i + 1}", value=(fix_md if i & 1 else code_md)(s))
-        # Only return embed if it can be sent
-        if len(emb) > 6000:
-            return "\n\n".join(f"{f.name}\n{strip_code_box(f.value)}" for f in emb.fields)
-        return dict(embed=emb)
+            fields.append((f"Font {i + 1}", s + "\n"))
+        self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)))
 
 
 class Zalgo(Command):
-    name = ["ZalgoText"]
+    name = ["Chaos", "ZalgoText"]
     min_level = 0
     description = "Generates random combining accent symbols between characters in a string."
     usage = "<string>"
     no_parse = True
-    # This is a bit unintuitive with the character IDs
-    nums = numpy.concatenate([numpy.arange(11) + 7616, numpy.arange(4) + 65056, numpy.arange(112) + 768])
-    chrs = [chr(n) for n in nums]
-    randz = lambda self: random.choice(self.chrs)
-    zalgo = lambda self, s, x: "".join("".join(self.randz() + "\u200b" for i in range(x + 1 >> 1)) + c + "\u200a" + "".join(self.randz() + "\u200b" for i in range(x >> 1)) for c in s)
+    chrs = [chr(n) for n in zalgo_map]
+    randz = lambda self: choice(self.chrs)
+    def zalgo(self, s, x):
+        if unfont(s) != s:
+            return "".join(c + self.randz() for c in s)
+        return s[0] + "".join("".join(self.randz() + "\u200b" for i in range(x + 1 >> 1)) + c + "\u200a" + "".join(self.randz() + "\u200b" for i in range(x >> 1)) for c in s[1:])
 
     async def __call__(self, channel, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        emb = discord.Embed(colour=rand_colour())
-        emb.set_author(name=argv)
+        fields = deque()
         for i in range(1, 9):
-            emb.add_field(name=f"Level {i}", value=(fix_md if i & 1 else code_md)(self.zalgo(argv, i)))
-        # Discord often removes combining characters past a limit, so messages longer than 6000 characters may be sent, test this by attempting to send
-        try:
-            await channel.send(embed=emb)
-        except discord.HTTPException:
-            return "\n\n".join(f"{f.name}\n{strip_code_box(f.value)}" for f in emb.fields)
+            s = self.zalgo(argv, i)
+            fields.append((f"Level {i}", s + "\n"))
+        self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)))
+
+
+class Format(Command):
+    name = ["FormatText"]
+    min_level = 0
+    description = "Creates neatly fomatted text using combining unicode characters."
+    usage = "<string>"
+    no_parse = True
+    formats = "".join(chr(i) for i in (0x30a, 0x325, 0x303, 0x330, 0x30c, 0x32d, 0x33d, 0x353, 0x35b, 0x20f0))
+
+    def __call__(self, channel, argv, **void):
+        if not argv:
+            raise ArgumentError("Input string is empty.")
+        fields = deque()
+        for i, f in enumerate(self.formats):
+            s = "".join(c + f for c in argv)
+            fields.append((f"Format {i}", s + "\n"))
+        s = "".join("_" if c in " _" else c if c in "gjpqy" else c + chr(818) for c in argv)
+        fields.append((f"Format {i + 1}", s))
+        self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)))
+
+
+class UnFancy(Command):
+    name = ["UnFormat", "UnZalgo"]
+    min_level = 0
+    description = "Removes unicode formatting and diacritic characters from inputted text."
+    usage = "<string>"
+
+    def __call__(self, argv, **void):
+        if not argv:
+            raise ArgumentError("Input string is empty.")
+        return fix_md(argv)
 
 
 class OwOify(Command):

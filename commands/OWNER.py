@@ -112,7 +112,7 @@ class Execute(Command):
             # Test bitwise flags for enabled terminals
             out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec[channel.id]))
             create_task(message.add_reaction("❗"))
-            return css_md(f"{out} terminal now enabled in {sqr_md(channel)}.")
+            return css_md(f"{sqr_md(out)} terminal now enabled in {sqr_md(channel)}.")
         elif "d" in flags:
             with suppress(KeyError):
                 if num == 0:
@@ -125,7 +125,7 @@ class Execute(Command):
             update()
             return css_md(f"Successfully removed {sqr_md(out)} terminal.")
         out = iter2str({k: ", ".join(self.terminal_types.get(1 << i) for i in bits(v) for k, v in bot.data.exec.items())})
-        return css_md(f"Terminals currently set to {out}")
+        return ini_md(f"Terminals currently set to {sqr_md(out)}")
 
 
 class UpdateExec(Database):
@@ -181,11 +181,23 @@ class UpdateExec(Database):
                 proc = proc[6:]
         # Run concurrently to avoid blocking bot itself
         # Attempt eval first, then exec
-        try:
+        code = None
+        with suppress(SyntaxError):
             code = await create_future(compile, proc, "<terminal>", "eval", optimize=2, priority=True)
-        except SyntaxError:
-            code = await create_future(compile, proc, "<terminal>", "exec", optimize=2, priority=True)
-        output = await create_future(eval, code, glob, priority=True)
+        if code is None:
+            with suppress(SyntaxError):
+                code = await create_future(compile, proc, "<terminal>", "exec", optimize=2, priority=True)
+        if code is not None:
+            output = await create_future(eval, code, glob, priority=True)
+        elif "await" in proc:
+            _ = glob.get("_")
+            func = "async def _():\n\tlocals().update(globals())\n"
+            func += "\n".join("\t" + line for line in proc.split("\n"))
+            func += "\n\tglobals().update(locals())"
+            code = await create_future(compile, func, "<terminal>", "exec", optimize=2, priority=True)
+            await create_future(eval, code, glob, priority=True)
+            output = await glob["_"]()
+            glob["_"] = _
         # Output sent to "_" variable if used
         if output is not None:
             glob["_"] = output 
@@ -253,7 +265,7 @@ class UpdateExec(Database):
                             output = await self.procFunc(proc, channel, bot, term=f)
                             await channel.send(self.prepare_string(output, fmt=""))
                         except:
-                            await channel.send(self.prepare_string(traceback.format_exc()))
+                            await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
         # Relay DM messages
         elif message.guild is None:
             if bot.is_blacklisted(message.author.id):
@@ -277,39 +289,17 @@ class UpdateExec(Database):
     def _log_(self, msg, **void):
         while not self.bot.ready:
             time.sleep(2)
+        msg = msg.strip()
         if msg:
-            if len(msg) > 2041:
-                if "\n" in msg:
-                    msgs = deque()
-                    new = ""
-                    for line in msg.split("\n"):
-                        if new:
-                            line = "\n" + line
-                        if len(new) + len(line) > 2048:
-                            msgs.append(new)
-                            new = line
-                        else:
-                            new += line
-                    if new:
-                        msgs.append(new)
-                else:
-                    msg = lim_str(msg, 6000)
-                    msgs = [msg[:2000], msg[2000:4000], msg[4000:]]
-            else:
-                msgs = [msg]
-            embs = deque()
-            for msg in msgs:
-                if msg:
-                    embs.append(discord.Embed(colour=discord.Colour(16711680), description=self.prepare_string(msg, lim=2048, fmt="")))
-            invalid = deque()
+            invalid = set()
             for c_id, flag in self.data.items():
                 if flag & 8:
                     channel = self.bot.cache.channels.get(c_id)
                     if channel is None:
-                        invalid.append(c_id)
+                        invalid.add(c_id)
                     else:
-                        self.bot.send_embeds(channel, embeds=embs)
-            [self.data.pop(i) for i in invalid]                        
+                        self.bot.send_as_embeds(channel, msg, colour=(xrand(6) * 256), md=code_md)
+            [self.data.pop(i) for i in invalid]              
 
     def _ready_(self, **void):
         with suppress(AttributeError):
