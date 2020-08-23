@@ -254,7 +254,7 @@ class CS_hex2xml(Command):
     usage = "<hex_data>"
     rate_limit = (3, 5)
 
-    async def __call__(self, client, argv, channel, **void):
+    async def __call__(self, bot, argv, channel, **void):
         hacks = {}
         hack = argv.replace(" ", "").replace("`", "").strip("\n")
         while len(hack):
@@ -288,7 +288,7 @@ class CS_hex2xml(Command):
             + '\t\t<panel title="Description">\n'
             + '\t\t</panel>\n'
             + '\t\t<field type="info">\n'
-            + '\t\t\tHex patch converted by ' + client.user.name + '.\n'
+            + '\t\t\tHex patch converted by ' + bot.user.name + '.\n'
             + '\t\t</field>\n'
             + '\t\t<panel title="Data">\n'
             + '\t\t</panel>\n'
@@ -783,7 +783,7 @@ class UpdateMathTest(Database):
         bot = self.bot
         channel = message.channel
         if channel.id in self.data:
-            if message.author.id != bot.client.user.id:
+            if message.author.id != bot.user.id:
                 msg = message.content.strip("|").strip("`")
                 if not msg or msg.casefold() != msg:
                     return

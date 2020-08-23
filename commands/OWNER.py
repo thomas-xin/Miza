@@ -302,7 +302,7 @@ class UpdateExec(Database):
                         invalid.add(c_id)
                     else:
                         self.bot.send_as_embeds(channel, msg, colour=(xrand(6) * 256), md=code_md)
-            [self.data.pop(i) for i in invalid]              
+            [self.data.pop(i) for i in invalid]
 
     def _ready_(self, **void):
         with suppress(AttributeError):
