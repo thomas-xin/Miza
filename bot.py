@@ -1876,7 +1876,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 else:
                     embs.append(emb)
                 reacts = None
-                break
             await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=best_url(m), reacts=reacts)
 
     # Adds embeds to the embed sender, waiting for the next update event.
