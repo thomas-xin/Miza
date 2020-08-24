@@ -1807,7 +1807,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         wlist = await self.load_channel_webhooks(channel, force=force)
         if not wlist:
             w = await channel.create_webhook(name=self.user.name, reason="Auto Webhook")
-            self.add_webhook(w)
+            w = self.add_webhook(w)
         else:
             w = choice(wlist)
         return w
