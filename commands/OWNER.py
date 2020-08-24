@@ -188,17 +188,14 @@ class UpdateExec(Database):
             try:
                 code = await create_future(compile, proc, "<terminal>", "exec", optimize=2, priority=True)
             except SyntaxError:
-                if "await" in proc:
-                    _ = glob.get("_")
-                    func = "async def _():\n\tlocals().update(globals())\n"
-                    func += "\n".join("\t" + line for line in proc.split("\n"))
-                    func += "\n\tglobals().update(locals())"
-                    code2 = await create_future(compile, func, "<terminal>", "exec", optimize=2, priority=True)
-                    await create_future(eval, code2, glob, priority=True)
-                    output = await glob["_"]()
-                    glob["_"] = _
-                else:
-                    raise
+                _ = glob.get("_")
+                func = "async def _():\n\tlocals().update(globals())\n"
+                func += "\n".join("\t" + line for line in proc.split("\n"))
+                func += "\n\tglobals().update(locals())"
+                code2 = await create_future(compile, func, "<terminal>", "exec", optimize=2, priority=True)
+                await create_future(eval, code2, glob, priority=True)
+                output = await glob["_"]()
+                glob["_"] = _
         if code is not None:
             output = await create_future(eval, code, glob, priority=True)
         # Output sent to "_" variable if used
