@@ -1797,7 +1797,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     webhooks = await self.fetch_webhooks(guild)
             except (PermissionError, discord.Forbidden, discord.NotFound):
                 for channel in guild.text_channels:
-                    with suppress(discord.Forbidden, discord.NotFound):
+                    with suppress(PermissionError, discord.Forbidden, discord.NotFound):
                         await self.load_channel_webhooks(channel)
             else:
                 return [self.add_webhook(w) for w in webhooks]

@@ -1280,7 +1280,8 @@ class __logPrinter:
             return
         elif self.counts.get(file):
             count = self.counts.pop(file)
-            self.data[file] += f"<Last message repeated {count} times>\n"
+            times = "s" if count != 1 else ""
+            out = f"<Last message repeated {count} time{times}>\n{out}"
         else:
             self.history[file] = out
         self.data[file] += out
