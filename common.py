@@ -41,7 +41,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     
     def __enter__(self):
         self.last = utc()
-        if self.active >= self.limit or len(self.rate_bin) >= self.limit::
+        if self.active >= self.limit or len(self.rate_bin) >= self.limit:
             if self.passive >= self.buffer:
                 raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
             self.passive += 1
