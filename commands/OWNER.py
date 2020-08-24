@@ -31,7 +31,7 @@ class Restart(Command):
             delay = await bot.eval_time(argv, user)
             await channel.send("*Preparing to " + name + " in " + sec2time(delay) + "...*")
             emb = discord.Embed(colour=discord.Colour(1))
-            emb.set_author(name=str(client.user), url=bot.website, icon_url=best_url(client.user))
+            emb.set_author(name=str(bot.user), url=bot.website, icon_url=best_url(bot.user))
             emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(delay)}, apologies for any inconvenience..."
             await bot.send_event("_announce_", embed=emb)
             if delay > 0:
@@ -290,8 +290,6 @@ class UpdateExec(Database):
 
     # All logs that normally print to stdout/stderr now send to the assigned log channels
     def _log_(self, msg, **void):
-        while not self.bot.ready:
-            time.sleep(2)
         msg = msg.strip()
         if msg:
             invalid = set()
@@ -304,7 +302,7 @@ class UpdateExec(Database):
                         self.bot.send_as_embeds(channel, msg, colour=(xrand(6) * 256), md=code_md)
             [self.data.pop(i) for i in invalid]
 
-    def _ready_(self, **void):
+    def _bot_ready_(self, **void):
         with suppress(AttributeError):
             PRINT.funcs.append(self._log_)
 

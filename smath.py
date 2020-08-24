@@ -2856,7 +2856,7 @@ __sptrans = re.compile("  +")
 single_space = lambda s: re.sub(__sptrans, " ", s)
 
 # Experimental invisible Zero-Width character encoder.
-ZeroEnc = "\xad\u061c\u180e\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\u2064\u2065\u2066\u2067\u2068\u2069\u206a\u206b\u206c\u206d\u206e\u206f\ufeff\x0c"
+ZeroEnc = "\xad\u061c\u180e\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\u2064\u2065\u2066\u2067\u2068\u2069\u206a\u206b\u206c\u206d\u206e\u206f\ufe0f\ufeff"
 __zeroEncoder = demap({chr(i + 97): c for i, c in enumerate(ZeroEnc)})
 __zeroEncode = "".maketrans(dict(__zeroEncoder.a))
 __zeroDecode = "".maketrans(dict(__zeroEncoder.b))

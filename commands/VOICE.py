@@ -416,6 +416,9 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         await channel.guild.get_member(self.bot.user.id).edit(mute=False, deafen=False)
 
     async def smart_connect(self, channel=None):
+        if self.dead:
+            self.bot.database.audio.connecting.pop(channel.guild.id, None)
+            return
         if not self.vc.is_connected():
             guild = channel.guild
             member = guild.get_member(self.bot.user.id)
@@ -436,7 +439,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         if channel is None:
             return self.vc
         try:
-            return await aretry(channel.connect, timeout=6, reconnect=True, attempts=5, delay=2, exc={ConnectionError, ConnectionResetError, discord.Forbidden, discord.ClientException})
+            return await aretry(channel.connect, timeout=6, reconnect=True, attempts=5, delay=2, exc={ConnectionError, ConnectionResetError, discord.NotFound, discord.Forbidden, discord.ClientException})
         except:
             self.dead = True
             raise
@@ -2014,8 +2017,7 @@ class Queue(Command):
             description=content + info + countstr,
             colour=rand_colour(),
         )
-        url = best_url(user)
-        emb.set_author(name=str(user), url=url, icon_url=url)
+        emb.set_author(**get_author(user))
         if q:
             icon = q[0].get("icon", "")
         else:
@@ -2188,8 +2190,7 @@ class Playlist(Command):
             description=content + msg,
             colour=rand_colour(),
         )
-        url = best_url(user)
-        emb.set_author(name=str(user), url=url, icon_url=url)
+        emb.set_author(**get_author(user))
         more = len(pl) - pos - page
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
@@ -3441,8 +3442,7 @@ class Download(Command):
             + "_" + str(len(res)) + "_" + fmt + "_" + str(int(bool(a))) + "-" + url_enc + "\n" + end
         )
         emb = discord.Embed(colour=rand_colour())
-        url = best_url(user)
-        emb.set_author(name=str(user), url=url, icon_url=url)
+        emb.set_author(**get_author(user))
         emb.description = "\n".join((f"`【{i}】` [{escape_markdown(e['name'])}]({ensure_url(e['url'])})" for i in range(len(res)) for e in [res[i]]))
         sent = await channel.send(msg, embed=emb)
         # Add reaction numbers corresponding to search results

@@ -310,7 +310,7 @@ class Text2048(Command):
             if u is None:
                 emb.set_author(name="@everyone", icon_url=bot.discord_icon)
             else:
-                emb.set_author(name=str(u), icon_url=best_url(u))
+                emb.set_author(**get_author(u))
             content = "*```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + data.decode("utf-8") + "\nPlaying 2048...```*"
             emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
             emb.set_footer(text="Score: " + str(g.score()))
@@ -643,8 +643,7 @@ class Mimic(Command):
             description=content + msg,
             colour=rand_colour(),
         )
-        url = best_url(user)
-        emb.set_author(name=str(user), url=url, icon_url=url)
+        emb.set_author(**get_author(user))
         more = len(mimics) - pos - page
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")

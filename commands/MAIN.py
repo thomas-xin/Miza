@@ -82,7 +82,9 @@ class Help(Command):
             if bot.categories:
                 s = bold(ini_md(' '.join((sqr_md(c) for c in standard_commands if c in bot.categories))))
                 emb.add_field(name="Command category list", value=s)
-        return dict(embed=emb), 1
+        emb = emb.to_dict()
+        emb["reacts"] = "❎"
+        bot.send_embeds(channel, embed=emb)
 
 
 class Hello(Command):
@@ -790,15 +792,13 @@ class Invite(Command):
     min_level = 0
     description = "Sends a link to ⟨MIZA⟩'s homepage and invite code."
     
-    def __call__(self, **void):
+    def __call__(self, channel, **void):
         if discord_id is None:
             raise FileNotFoundError("Unable to locate bot's Client ID.")
         emb = discord.Embed(colour=rand_colour())
-        user = self.bot.user
-        url = best_url(user)
-        emb.set_author(name=str(user), icon_url=url, url=url)
+        emb.set_author(**get_author(self.bot.user))
         emb.description = f"[Homepage]({self.bot.website})\n[Invite](https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord_id}&scope=bot)"
-        return dict(embed=emb)
+        self.bot.send_embeds(channel, embed=emb)
 
 
 class Reminder(Command):
@@ -1085,9 +1085,7 @@ class Reminder(Command):
         emb = discord.Embed(
             description=content + msg,
             colour=rand_colour(),
-        )
-        url = best_url(user)
-        emb.set_author(name=str(user), url=url, icon_url=url)
+        ).set_author(**get_author(user))
         more = len(rems) - pos - page
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
@@ -1146,7 +1144,7 @@ class UpdateReminders(Database):
                 u = self.bot.get_user(x["user"], replace=True)
             except KeyError:
                 u = x
-            emb.set_author(name=u.name, url=best_url(u), icon_url=best_url(u))
+            emb.set_author(**get_author(u))
             self.bot.send_embeds(ch, emb)
             self.update()
 
@@ -1172,7 +1170,7 @@ class UpdateReminders(Database):
                                 u = self.bot.get_user(x["user"], replace=True)
                             except KeyError:
                                 u = cdict(x)
-                            emb.set_author(name=u.name, url=best_url(u), icon_url=best_url(u))
+                            emb.set_author(**get_author(u))
                             self.bot.send_embeds(ch, emb)
                             pops.add(len(rems) - i)
                         elif is_finite(x["t"]):

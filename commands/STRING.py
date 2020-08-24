@@ -88,7 +88,7 @@ class Translate(Command):
             else:
                 count = 1
                 end = ""
-            response = bold(user) + ":"
+            response = ""
             print(string, dest, source)
             # Attempt to use all available translators if possible
             for i in range(count):
@@ -105,7 +105,7 @@ class Translate(Command):
                     except:
                         if t == trans[-1] and i == count - 1:
                             raise
-        return response + end    
+        self.bot.send_as_embeds(channel, response + end, author=get_author(user))
 
 
 class Math(Command):
@@ -353,6 +353,121 @@ class AltCaps(Command):
         return fix_md("".join(i[0] + i[1] for i in zip(a, b)) + c)
 
 
+# Char2Emoj, a simple script to convert a string into a block of text
+def _c2e(string, em1, em2):
+    chars = {
+        " ": [0, 0, 0, 0, 0],
+        "_": [0, 0, 0, 0, 7],
+        "!": [2, 2, 2, 0, 2],
+        '"': [5, 5, 0, 0, 0],
+        ":": [0, 2, 0, 2, 0],
+        ";": [0, 2, 0, 2, 4],
+        "~": [0, 5, 7, 2, 0],
+        "#": [10, 31, 10, 31, 10],
+        "$": [7, 10, 6, 5, 14],
+        "?": [6, 1, 2, 0, 2],
+        "%": [5, 1, 2, 4, 5],
+        "&": [4, 10, 4, 10, 7],
+        "'": [2, 2, 0, 0, 0],
+        "(": [2, 4, 4, 4, 2],
+        ")": [2, 1, 1, 1, 2],
+        "[": [6, 4, 4, 4, 6],
+        "]": [3, 1, 1, 1, 3],
+        "|": [2, 2, 2, 2, 2],
+        "*": [21, 14, 4, 14, 21],
+        "+": [0, 2, 7, 2, 0],
+        "=": [0, 7, 0, 7, 0],
+        ",": [0, 0, 3, 3, 4],
+        "-": [0, 0, 7, 0, 0],
+        ".": [0, 0, 3, 3, 0],
+        "/": [1, 1, 2, 4, 4],
+        "\\": [4, 4, 2, 1, 1],
+        "@": [14, 17, 17, 17, 14],
+        "0": [7, 5, 5, 5, 7],
+        "1": [3, 1, 1, 1, 1],
+        "2": [7, 1, 7, 4, 7],
+        "3": [7, 1, 7, 1, 7],
+        "4": [5, 5, 7, 1, 1],
+        "5": [7, 4, 7, 1, 7],
+        "6": [7, 4, 7, 5, 7],
+        "7": [7, 5, 1, 1, 1],
+        "8": [7, 5, 7, 5, 7],
+        "9": [7, 5, 7, 1, 7],
+        "A": [2, 5, 7, 5, 5],
+        "B": [6, 5, 7, 5, 6],
+        "C": [3, 4, 4, 4, 3],
+        "D": [6, 5, 5, 5, 6],
+        "E": [7, 4, 7, 4, 7],
+        "F": [7, 4, 7, 4, 4],
+        "G": [7, 4, 5, 5, 7],
+        "H": [5, 5, 7, 5, 5],
+        "I": [7, 2, 2, 2, 7],
+        "J": [7, 1, 1, 5, 7],
+        "K": [5, 5, 6, 5, 5],
+        "L": [4, 4, 4, 4, 7],
+        "M": [17, 27, 21, 17, 17],
+        "N": [9, 13, 15, 11, 9],
+        "O": [2, 5, 5, 5, 2],
+        "P": [7, 5, 7, 4, 4],
+        "Q": [4, 10, 10, 10, 5],
+        "R": [6, 5, 7, 6, 5],
+        "S": [3, 4, 7, 1, 6],
+        "T": [7, 2, 2, 2, 2],
+        "U": [5, 5, 5, 5, 7],
+        "V": [5, 5, 5, 5, 2],
+        "W": [17, 17, 21, 21, 10],
+        "X": [5, 5, 2, 5, 5],
+        "Y": [5, 5, 2, 2, 2],
+        "Z": [7, 1, 2, 4, 7],
+    }
+    # I don't quite remember how this algorithm worked lol
+    printed = [""] * 7
+    string = string.upper()
+    for i in range(len(string)):
+        curr = string[i]
+        data = chars.get(curr, [15] * 5)
+        size = max(1, max(data))
+        lim = max(2, int(log(size, 2))) + 1
+        printed[0] += em2 * (lim + 1)
+        printed[6] += em2 * (lim + 1)
+        if len(data) == 5:
+            for y in range(5):
+                printed[y + 1] += em2
+                for p in range(lim):
+                    if data[y] & (1 << (lim - 1 - p)):
+                        printed[y + 1] += em1
+                    else:
+                        printed[y + 1] += em2
+        for x in range(len(printed)):
+            printed[x] += em2
+    output = "\n".join(printed)
+    print("[" + em1 + "]", "[" + em2 + "]")
+    if len(em1) + len(em2) > 2 and ":" in em1 + em2:
+        return output
+    return fix_md(output)
+
+
+class Char2Emoj(Command):
+    name = ["C2E"]
+    min_level = 0
+    description = "Makes emoji blocks using a string."
+    usage = "<0:string> <1:emoji_1> <2:emoji_2>"
+
+    def __call__(self, args, **extra):
+        try:
+            if len(args) != 3:
+                raise IndexError
+            for i in range(1, 3):
+                if args[i][0] == ":" and args[i][-1] != ":":
+                    args[i] = "<" + args[i] + ">"
+            return _c2e(*args[:3])
+        except IndexError:
+            raise ArgumentError(
+                "Exactly 3 arguments are required for this command.\n"
+                + "Place quotes around arguments containing spaces as required."
+            )
+
+
 class Time(Command):
     name = ["UTC", "GMT", "T"]
     min_level = 0
@@ -392,9 +507,7 @@ class Time(Command):
         hrs = round_min(h + s / 3600)
         if hrs >= 0:
             hrs = "+" + str(hrs)
-        else:
-            hrs = str(hrs)
-        return ini_md(f"Current time at UTC/GMT+{hrs}: {sqr_md(t)}.")
+        return ini_md(f"Current time at UTC/GMT{hrs}: {sqr_md(t)}.")
 
 
 class TimeCalc(Command):

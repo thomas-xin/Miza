@@ -269,8 +269,7 @@ class Ban(Command):
             content += f"{len(bans)} users currently banned from {str(guild).replace('`', '')}:```*"
         emb = discord.Embed(colour=discord.Colour(1))
         emb.description = content
-        url = best_url(user)
-        emb.set_author(name=str(user), url=url, icon_url=url)
+        emb.set_author(**get_author(user))
         for i, ban in enumerate(sorted(bans.values(), key=lambda x: x["t"])[pos:pos + page]):
             try:
                 user = await bot.fetch_user(ban["u"])
@@ -889,8 +888,7 @@ class UpdateUserLogs(Database):
                 return
             # Colour: White
             emb = discord.Embed(colour=16777214)
-            url = best_url(user)
-            emb.set_author(name=str(user), icon_url=url, url=url)
+            emb.set_author(**get_author(user))
             emb.description = f"{user_mention(user.id)} has joined the server."
             self.bot.send_embeds(channel, emb)
     
@@ -906,8 +904,7 @@ class UpdateUserLogs(Database):
                 return
             # Colour: Black
             emb = discord.Embed(colour=1)
-            url = best_url(user)
-            emb.set_author(name=str(user), icon_url=url, url=url)
+            emb.set_author(**get_author(user))
             # Check audit log to find whether user left or was kicked/banned
             prune = None
             kick = None
@@ -989,9 +986,8 @@ class UpdateMessageLogs(Database):
                     self.update()
                     return
                 u = before.author
-                url = best_url(u)
                 emb = discord.Embed(colour=colour2raw(0, 0, 255))
-                emb.set_author(name=str(u), icon_url=url, url=url)
+                emb.set_author(**get_author(u))
                 emb.description = f"**Message edited in** {channel_mention(before.channel.id)}:"
                 emb.add_field(name="Before", value=message_repr(before))
                 emb.add_field(name="After", value=message_repr(after))
@@ -1121,9 +1117,8 @@ class UpdateMessageLogs(Database):
             embs = deque([emb])
             for message in messages:
                 u = message.author
-                url = best_url(u)
                 emb = discord.Embed(colour=colour2raw(127, 0, 127))
-                emb.set_author(name=str(u), icon_url=url, url=url)
+                emb.set_author(**get_author(u))
                 emb.description = message_repr(message, limit=2048)
                 embs.append(emb)
             self.bot.send_embeds(channel, embs)

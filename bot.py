@@ -45,8 +45,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.react_sem = cdict()
         self.mention = ()
         self.semaphore = Semaphore(2, 1, delay=0.5)
-        self.ready_semaphore = Semaphore(1, inf, delay=1)
-        self.guild_semaphore = Semaphore(8, inf, delay=1)
+        self.ready_semaphore = Semaphore(1, inf, delay=0.5)
+        self.guild_semaphore = Semaphore(5, inf, delay=1, rate_limit=5)
         print("Time:", datetime.datetime.now())
         print("Initializing...")
         # O(1) time complexity for searching directory
@@ -1768,43 +1768,43 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.limit_cache("users")
         if w.token:
             webhooks = set_dict(self.cw_cache, w.channel.id, cdict())
-            webhooks[w.id] = w
+            webhooks[w.id] = user
+            user.semaphore = Semaphore(5, 256, delay=0.3, rate_limit=5)
         return user
 
-    async def get_webhooks(self, guild):
-        with suppress(discord.PermissionError):
-            return await guild.webhooks()
-        return []
+    async def fetch_webhooks(self, guild):
+        member = guild.get_member(self.user.id)
+        if member and member.guild_permissions.manage_webhooks:
+            return await aretry(guild.webhooks, attempts=3, delay=15, exc=(discord.Forbidden, discord.NotFound))
+        raise PermissionError
+
+    # Loads all webhooks in the target channel.
+    async def load_channel_webhooks(self, channel, force=False):
+        if channel.id in self.cw_cache and not force:
+            return self.cw_cache[channel.id].values()
+        async with self.guild_semaphore:
+            self.cw_cache.pop(channel.id, None)
+            if not channel.permissions_for(channel.guild.get_member(self.user.id)).manage_webhooks:
+                raise PermissionError("Not permitted to create webhooks in channel.")
+            webhooks = await aretry(channel.webhooks, attempts=5, delay=15, exc=(discord.Forbidden, discord.NotFound))
+        return [self.add_webhook(w) for w in webhooks]
 
     # Loads all webhooks in the target guild.
-    async def load_webhooks(self, guild):
-        async with self.guild_semaphore:
+    async def load_guild_webhooks(self, guild):
+        with tracebacksuppressor:
             try:
-                webhooks = await guild.webhooks()
-            except discord.Forbidden:
-                webhooks = deque()
-                futs = [channel.webhooks() for channel in guild.text_channels]
-                for fut in futs:
-                    with tracebacksuppressor(discord.Forbidden):
-                        temp = await fut
-                        webhooks.extend(temp)
-            except discord.HTTPException:
-                print_exc()
-                await asyncio.sleep(10)
-                webhooks = await aretry(self.get_webhooks, guild, attempts=5, delay=15, exc=(discord.Forbidden,))
-            return deque(self.add_webhook(w) for w in webhooks)
+                async with self.guild_semaphore:
+                    webhooks = await self.fetch_webhooks(guild)
+            except (PermissionError, discord.Forbidden, discord.NotFound):
+                for channel in guild.text_channels:
+                    with suppress(discord.Forbidden, discord.NotFound):
+                        await self.load_channel_webhooks(channel)
+            else:
+                return [self.add_webhook(w) for w in webhooks]
 
     # Gets a valid webhook for the target channel, creating a new one when necessary.
     async def ensure_webhook(self, channel, force=False):
-        async with self.ready_semaphore:
-            while not self.ready:
-                await asyncio.sleep(2)
-        wlist = None
-        if channel.id in self.cw_cache:
-            if force:
-                self.cw_cache.pop(channel.id)
-            else:
-                wlist = list(self.cw_cache[channel.id].values())
+        wlist = await self.load_channel_webhooks(channel, force=force)
         if not wlist:
             w = await channel.create_webhook(name=self.user.name, reason="Auto Webhook")
             self.add_webhook(w)
@@ -1812,14 +1812,24 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             w = choice(wlist)
         return w
 
-    async def send_with_webhook(self, channel, *args, **kwargs):
+    # Sends a message to the target channel, using a random webhook from that channel.
+    async def send_as_webhook(self, channel, *args, **kwargs):
         w = await self.ensure_webhook(channel)
+        kwargs.pop("wait", None)
+        reacts = kwargs.pop("reacts", None)
         try:
-            await w.send(*args, **kwargs)
+            async with w.semaphore:
+                message = await w.send(*args, wait=True, **kwargs)
         except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
             w = await self.ensure_webhook(channel, force=True)
-            await w.send(*args, **kwargs)
+            async with w.semaphore:
+                message = await w.send(*args, wait=True, **kwargs)
         await self.seen(self.user, event="message", count=len(kwargs.get("embeds", (None,))), raw="Sending a message")
+        if reacts:
+            for react in reacts:
+                async with delay(1 / 3):
+                    create_task(message.add_reaction(react))
+        return message
 
     # Sends a list of embeds to the target sendable, using a webhook when possible.
     async def _send_embeds(self, sendable, embeds):
@@ -1834,10 +1844,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if guild is None or hasattr(guild, "ghost") or len(embeds) == 1:
                 single = True
             else:
-                try:
-                    m = guild.get_member(self.user.id)
-                except (AttributeError, LookupError):
-                    m = None
+                m = guild.get_member(self.user.id)
                 if m is None:
                     m = self.user
                     single = True
@@ -1847,9 +1854,30 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if single:
                 for emb in embeds:
                     async with delay(1 / 3):
-                        create_task(sendable.send(embed=emb))
+                        reacts = None
+                        if type(emb) is not discord.Embed:
+                            reacts = emb.get("reacts")
+                            emb = discord.Embed.from_dict(emb)
+                        if reacts:
+                            create_task(send_with_react(sendable, embed=emb, reacts=reacts))
+                        else:
+                            create_task(sendable.send(embed=emb))
                 return
-            await self.send_with_webhook(sendable, embeds=embeds, username=m.display_name, avatar_url=best_url(m))
+            embs = deque()
+            reacts = discord.Embed.Empty
+            for emb in embeds:
+                if type(emb) is not discord.Embed:
+                    embs.append(discord.Embed.from_dict(emb))
+                    r = emb.get("reacts")
+                    if reacts == discord.Embed.Empty:
+                        reacts = r
+                    if r == reacts:
+                        continue
+                else:
+                    embs.append(emb)
+                reacts = None
+                break
+            await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=best_url(m), reacts=reacts)
 
     # Adds embeds to the embed sender, waiting for the next update event.
     def send_embeds(self, channel, embeds=None, embed=None):
@@ -1993,7 +2021,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Deletes own messages if any of the "X" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot.
     async def check_to_delete(self, message, reaction, user):
-        if message.author.id == self.user.id:
+        if message.author.id == self.user.id or message.author.id in self.cw_cache.get(message.channel.id, ()):
             with suppress(discord.NotFound):
                 u_perm = self.get_perms(user.id, message.guild)
                 check = False
@@ -2226,7 +2254,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     create_thread(self.fast_loop)
                     print("Update loops initiated.")
                     # Load all webhooks from cached guilds.
-                    futs = deque(create_task(self.load_webhooks(guild)) for guild in self.guilds)
+                    futs = deque(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
                     print("Bot ready.")
                     # Send bot_ready event to all databases.
                     await self.send_event("_bot_ready_", bot=self)
@@ -2245,15 +2273,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # Server join message
         @self.event
         async def on_guild_join(guild):
-            create_task(self.load_webhooks(guild))
+            create_task(self.load_guild_webhooks(guild))
             print("New server: " + str(guild))
             g = await self.fetch_guild(guild.id)
             m = guild.get_member(self.user.id)
             await self.send_event("_join_", user=m, guild=g)
             channel = await self.get_first_sendable(g, m)
             emb = discord.Embed(colour=discord.Colour(8364031))
-            url = to_png(self.user.avatar_url)
-            emb.set_author(name=self.user.name, url=url, icon_url=url)
+            emb.set_author(**get_author(self.user))
             emb.description = f"Hi there! I'm {self.user.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
             user = None
             with suppress(discord.Forbidden):

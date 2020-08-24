@@ -24,13 +24,20 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 
     __slots__ = ("limit", "buffer", "delay", "active", "passive", "last")
 
-    def __init__(self, limit=256, buffer=32, delay=0.05):
+    def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None):
         self.limit = limit
         self.buffer = buffer
         self.delay = delay
         self.active = 0
         self.passive = 0
+        self.rate_limit = rate_limit
+        self.rate_bin = hlist()
         self.last = utc()
+
+    def _update_bin(self):
+        while self.rate_bin and utc() - self.rate_bin[0] >= self.rate_limit:
+            self.rate_bin.popleft()
+        return self.rate_bin
     
     def __enter__(self):
         self.last = utc()
@@ -38,9 +45,12 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
             if self.passive >= self.buffer:
                 raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
             self.passive += 1
-            while self.active >= self.limit:
+            while self.active >= self.limit or len(self.rate_bin) >= self.limit:
                 time.sleep(self.delay)
+                self._update_bin()
             self.passive -= 1
+        if self.rate_limit:
+            self.rate_bin.append(utc())
         self.active += 1
         return self
     
@@ -50,9 +60,12 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
             if self.passive >= self.buffer:
                 raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
             self.passive += 1
-            while self.active >= self.limit:
+            while self.active >= self.limit or len(self.rate_bin) >= self.limit:
                 await asyncio.sleep(self.delay)
+                self._update_bin()
             self.passive -= 1
+        if self.rate_limit:
+            self.rate_bin.append(utc())
         self.active += 1
         return self
     
@@ -352,7 +365,8 @@ async def send_with_react(channel, *args, reacts=(), **kwargs):
     with tracebacksuppressor:
         sent = await channel.send(*args, **kwargs)
         for react in reacts:
-            await sent.add_reaction(react)
+            async with delay(1 / 3):
+                create_task(sent.add_reaction(react))
 
 # Sends a message to a channel, then edits to add links to all attached files.
 async def send_with_file(channel, msg, file, filename=None, best=False):
@@ -374,6 +388,9 @@ typing = lambda self: create_task(self.trigger_typing())
 
 # Finds the best URL for a discord object's icon.
 best_url = lambda obj: obj if type(obj) is str else (to_png(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if obj.proxy_url else obj.url))
+
+
+get_author = lambda user, u_id=None: cdict(name=f"{user}" + "" if not u_id else f" ({user.id})", icon_url=best_url(user), url=best_url(user))
 
 
 # Finds emojis and user mentions in a string.
@@ -1198,6 +1215,8 @@ class __logPrinter:
     def __init__(self, file=None):
         self.buffer = self
         self.data = {}
+        self.history = {}
+        self.counts = {}
         self.funcs = hlist()
         self.file = file
         self.closed = True
@@ -1256,6 +1275,14 @@ class __logPrinter:
             file = self.file
         if file not in self.data:
             self.data[file] = ""
+        if self.history.get(file) == out:
+            add_dict(self.counts, {file:1})
+            return
+        elif self.counts.get(file):
+            count = self.counts.pop(file)
+            self.data[file] += f"<Last message repeated {count} times>\n"
+        else:
+            self.history[file] = out
         self.data[file] += out
         return sys.__stdout__.write(out)
 
