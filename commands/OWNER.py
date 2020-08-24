@@ -185,9 +185,9 @@ class UpdateExec(Database):
         with suppress(SyntaxError):
             code = await create_future(compile, proc, "<terminal>", "eval", optimize=2, priority=True)
         if code is None:
-            try:
+            with suppress(SyntaxError):
                 code = await create_future(compile, proc, "<terminal>", "exec", optimize=2, priority=True)
-            except SyntaxError:
+            if code is None:
                 _ = glob.get("_")
                 func = "async def _():\n\tlocals().update(globals())\n"
                 func += "\n".join("\t" + line for line in proc.split("\n"))

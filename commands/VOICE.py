@@ -416,7 +416,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         await channel.guild.get_member(self.bot.user.id).edit(mute=False, deafen=False)
 
     async def smart_connect(self, channel=None):
-        if self.dead:
+        if hasattr(self, "dead"):
             self.bot.database.audio.connecting.pop(channel.guild.id, None)
             return
         if not self.vc.is_connected():
