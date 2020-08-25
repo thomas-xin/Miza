@@ -571,7 +571,8 @@ class Info(Command):
                             embs.add(emb)
                             raise StopIteration
                         u = bot.user
-                    member = await bot.fetch_user_member(u.id, guild)
+                    u = await bot.fetch_user_member(u.id, guild)
+                    member = guild.get_member(u.id)
                     name = str(u)
                     url = best_url(u)
                     try:

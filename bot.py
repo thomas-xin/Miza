@@ -1251,6 +1251,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         func = getattr(db, e, None)
                         if callable(func):
                             await_fut(create_future(func, bot=self, priority=True), priority=True)
+            print(f"Successfully loaded module {module}...")
 
     def unload(self, mod=None):
         if mod is None:
