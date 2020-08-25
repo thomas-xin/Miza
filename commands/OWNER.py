@@ -175,7 +175,8 @@ class UpdateExec(Database):
                 glob.update(dict(
                     print=lambda *args, **kwargs: self._print(*args, channel=channel, **kwargs),
                     input=lambda *args, **kwargs: self._input(*args, channel=channel, **kwargs),
-                    channel=channel
+                    channel=channel,
+                    guild=channel.guild,
                 ))
         if "\n" not in proc:
             if proc.startswith("await "):

@@ -1526,10 +1526,12 @@ class UpdateUsers(Database):
         mentions = self.mentionspam.findall(msg)
         t = utc()
         out = None
-        if len(mentions) >= 10 and self.data.get(user.id, EMPTY).get("last_mention", 0) > 3:
+        if len(mentions) >= xrand(8, 12) and self.data.get(user.id, EMPTY).get("last_mention", 0) > 3:
             out = f"{choice('🥴😣😪😢')} please calm down a second, I'm only here to help..."
-        elif len(mentions) >= 3 and self.data.get(user.id, EMPTY).get("last_mention", 0) > 2:
+        elif len(mentions) >= 3 and (self.data.get(user.id, EMPTY).get("last_mention", 0) > 2 or random.random() >= 2 / 3):
             out = f"{choice('😟😦😓')} oh, that's a lot of mentions, is everything okay?"
+        elif len(mentions) >= 2 and self.data.get(user.id, EMPTY).get("last_mention", 0) > 0 and random.random() >= 0.75:
+            out = "One mention is enough, but I appreciate your enthusiasm 🙂"
         if out:
             create_task(send_with_react(message.channel, out, reacts="❎"))
             await bot.seen(user, event="misc", raw="Being naughty")
@@ -1559,27 +1561,27 @@ class UpdateUsers(Database):
                         "What's up?",
                         "Can I entertain you with a little something today?",
                     ))
-                elif count < 16 or random.random() > math.atan(count / 8 - 2) / 4:
+                elif count < 16 or random.random() > math.atan(count / 8 - 3) / 4:
                     # General messages
                     if (count < 6 or self.mentionspam.sub("", msg).strip()) and random.random() < 0.5:
-                        out = choice((f"'sup, {user.display_name}?", f"There you are, {user.name}!", "Oh yeah!", "Right back at ya!", f"Hey, {user.display_name}!"))
+                        out = choice((f"'sup, {user.display_name}?", f"There you are, {user.name}!", "Oh yeah!", "👋", f"Hey, {user.display_name}!"))
                     else:
                         out = ""
                 elif count < 24:
                     # Occasional late message
                     if random.random() < 0.4:
                         out = choice((
-                            "You seem rather bored... I may only be as good as my programming allows me to be, but I'll try my best to fix that!",
-                            "You must be bored, allow me to entertain you!",
+                            "You seem rather bored... I may only be as good as my programming allows me to be, but I'll try my best to fix that! 🎆",
+                            "You must be bored, allow me to entertain you! 🍿",
                         ))
                     else:
                         out = ""
                 else:
                     # Late conversation messages
                     out = choice((
-                        "It's been a fun conversation, but don't you have anything better to do?",
-                        "This is what I was made for, I can do it forever, but you're only a human, take a break!",
-                        f"Woah, have you checked the time? We've been talking for {count + 1} messages!"
+                        "It's been a fun conversation, but don't you have anything better to do? 🌞",
+                        "This is what I was made for, I can do it forever, but you're only a human, take a break! 😅",
+                        f"Woah, have you checked the time? We've been talking for {count + 1} messages! 😮"
                     ))
             elif utc() - self.data.get(user.id, EMPTY).get("last_used", inf) >= 259200:
                 # Triggers for users not seen in 3 days or longer
