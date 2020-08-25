@@ -84,10 +84,11 @@ class Translate(Command):
                 trans = trans[::-1]
             if "v" in flags:
                 count = 2
-                end = f"\nDetected language: {bold(source)}"
+                end = f"Detected language: {bold(source)}"
             else:
                 count = 1
-                end = ""
+                end = None
+            used = None
             response = ""
             print(string, dest, source)
             # Attempt to use all available translators if possible
@@ -99,13 +100,21 @@ class Translate(Command):
                             output = resp.text
                         except AttributeError:
                             output = resp
-                        response += f"\n{output} `{t}`"
+                        if not used:
+                            used = t
+                        response += f"\n{output}"
                         source, dest = dest, source
                         break
                     except:
                         if t == trans[-1] and i == count - 1:
                             raise
-        self.bot.send_as_embeds(channel, response + end, author=get_author(user))
+            if end:
+                footer = dict(text=f"{used}\n{end}")
+            elif used:
+                footer = dict(text=used)
+            else:
+                footer = None
+        self.bot.send_as_embeds(channel, response, author=get_author(user), footer=footer)
 
 
 class Math(Command):

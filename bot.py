@@ -1199,7 +1199,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def get_module(self, module):
         with tracebacksuppressor:
             f = module
-            f = ".".join(f.split(".")[:-1])
+            if "." in f:
+                f = f[:f.rindex(".")]
             path, module = module, f
             new = False
             if module in self._globals:

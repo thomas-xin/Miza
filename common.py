@@ -1068,6 +1068,8 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
         self.used = {}
         if not hasattr(self, "data"):
             self.data = cdict()
+        if not hasattr(self, "min_display"):
+            self.min_display = self.min_level
         if not hasattr(self, "name"):
             self.name = []
         self.__name__ = self.__class__.__name__
@@ -1076,8 +1078,6 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
         else:
             self.alias.append(self.__name__)
         self.name.append(self.__name__)
-        if not hasattr(self, "min_display"):
-            self.min_display = self.min_level
         self.aliases = {full_prune(alias).replace("*", "").replace("_", "").replace("||", ""): alias for alias in self.alias}
         self.aliases.pop("", None)
         for a in self.aliases:

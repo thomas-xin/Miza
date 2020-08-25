@@ -1422,6 +1422,24 @@ class UpdateUsers(Database):
             self.facts = f.read().split("\n")
 
     async def _bot_ready_(self, **void):
+        data = {"Command": Command}
+
+        exec(
+            f"class {self.bot.name.replace(' ', '')}(Command):"
+            +"\n\tmin_level = 0"
+            +"\n\tno_parse = True"
+
+            +"\n\tasync def __call__(self, message, argv, **void):"
+            +"\n\t\tawait self.bot.database.users._nocommand_(message, self.bot.user.mention + ' ' + argv, force=True)",
+            data,
+        )
+        mod = __name__
+        for v in data.values():
+            with suppress(TypeError):
+                if issubclass(v, Command) and v != Command:
+                    obj = v(self.bot, mod)
+                    self.bot.categories[mod].append(obj)
+                    print(f"Successfully loaded command {repr(obj)}.")
         return await self()
 
     def clear_events(self, data, minimum):
@@ -1539,12 +1557,12 @@ class UpdateUsers(Database):
             self.data[user.id]["last_used"] = t
             raise CommandCancelledError
 
-    async def _nocommand_(self, message, msg, **void):
+    async def _nocommand_(self, message, msg, force=False, **void):
         bot = self.bot
         user = message.author
         if self.bot.get_perms(user.id, message.guild) <= -inf:
             return
-        if self.bot.is_mentioned(message, self.bot, message.guild):
+        if force or self.bot.is_mentioned(message, self.bot, message.guild):
             send = message.channel.send
             out = None
             count = self.data.get(user.id, EMPTY).get("last_talk", 0)
