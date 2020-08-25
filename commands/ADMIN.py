@@ -50,7 +50,7 @@ class Purge(Command):
         delM = hlist(delD.values())
         while len(delM):
             try:
-                if hasattr(channel, "delete_messages") and channel.permissions_for(channel.guild.get_member(bot.user.id)).manage_messages:
+                if hasattr(channel, "delete_messages") and channel.permissions_for(channel.guild.get_member(bot.id)).manage_messages:
                     dels = delM[:100]
                     # bot.logDelete(dels[-1], -1)
                     await channel.delete_messages(dels)
@@ -517,7 +517,7 @@ class Lockdown(Command):
     async def __call__(self, guild, channel, flags, **void):
         if "f" not in flags:
             return self.bot.dangerous_command
-        u_id = self.bot.user.id
+        u_id = self.bot.id
         for role in guild.roles:
             if len(role.members) != 1 or role.members[-1].id not in (u_id, guild.owner_id):
                 create_task(self.roleLock(role, channel))
@@ -696,7 +696,7 @@ class UpdateBans(Database):
             try:
                 guild = await self.bot.fetch_guild(g_id)
                 user = await self.bot.fetch_user(x.u)
-                m = guild.get_member(self.bot.user.id)
+                m = guild.get_member(self.bot.id)
                 try:
                     channel = await self.bot.fetch_channel(x.c)
                     if not channel.permissions_for(m).send_messages:
@@ -995,7 +995,7 @@ class UpdateMessageLogs(Database):
 
     # Delete events must attempt to find the user who deleted the message
     async def _delete_(self, message, bulk=False, **void):
-        cu_id = self.bot.user.id
+        cu_id = self.bot.id
         if bulk:
             return
         guild = message.guild

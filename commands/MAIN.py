@@ -283,7 +283,7 @@ class Loop(Command):
                 if (
                     (bot.get_prefix(guild) + n).upper() in func.replace(" ", "").upper()
                 ) or (
-                    (str(bot.user.id) + ">" + n).upper() in func.replace(" ", "").upper()
+                    (str(bot.id) + ">" + n).upper() in func.replace(" ", "").upper()
                 ):
                     raise PermissionError("Must be owner to execute nested loop.")
         func2 = " ".join(func2.split(" ")[1:])
@@ -426,33 +426,37 @@ class Info(Command):
         top = None
         try:
             g.region
-            pcount = await bot.database.counts.getUserMessages(None, g)
+            if not hasattr(g, "ghost"):
+                pcount = await bot.database.counts.getUserMessages(None, g)
         except (AttributeError, KeyError):
             pcount = 0
-        with suppress(AttributeError, KeyError):
-            # Top users by message counts
-            pavg = await bot.database.counts.getUserAverage(None, g)
-            users = deque()
-            us = await bot.database.counts.getGuildMessages(g)
-            if type(us) is str:
-                top = us
-            else:
-                ul = sorted(
-                    us,
-                    key=lambda k: us[k],
-                    reverse=True,
-                )
-                for i in range(min(32, flags.get("v", 0) * 5 + 5, len(us))):
-                    u_id = ul[i]
-                    users.append(f"{user_mention(u_id)}: {us[u_id]}")
-                top = "\n".join(users)
+        if not hasattr(g, "ghost"):
+            with suppress(AttributeError, KeyError):
+                # Top users by message counts
+                pavg = await bot.database.counts.getUserAverage(None, g)
+                users = deque()
+                us = await bot.database.counts.getGuildMessages(g)
+                if type(us) is str:
+                    top = us
+                else:
+                    ul = sorted(
+                        us,
+                        key=lambda k: us[k],
+                        reverse=True,
+                    )
+                    for i in range(min(32, flags.get("v", 0) * 5 + 5, len(us))):
+                        u_id = ul[i]
+                        users.append(f"{user_mention(u_id)}: {us[u_id]}")
+                    top = "\n".join(users)
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
         emb.add_field(name="Creation time", value=str(g.created_at), inline=1)
         if "v" in flags:
             with suppress(AttributeError, KeyError):
                 emb.add_field(name="Region", value=str(g.region), inline=1)
                 emb.add_field(name="Nitro boosts", value=str(g.premium_subscription_count), inline=1)
-        emb.add_field(name="User count", value=str(g.member_count), inline=1)
+        emb.add_field(name="Text channels", value=str(len(g.text_channels)), inline=1)
+        emb.add_field(name="Voice channels", value=str(len(g.voice_channels)), inline=1)
+        emb.add_field(name="Member count", value=str(g.member_count), inline=1)
         if pcount:
             emb.add_field(name="Post count", value=str(pcount), inline=1)
             if "v" in flags:
@@ -562,10 +566,12 @@ class Info(Command):
                     elif not name.startswith("server"):
                         u = user
                     else:
-                        emb = await self.getGuildData(guild, flags)
-                        embs.add(emb)
-                        raise StopIteration
-                    member = guild.get_member(u.id)
+                        if not hasattr(guild, "ghost"):
+                            emb = await self.getGuildData(guild, flags)
+                            embs.add(emb)
+                            raise StopIteration
+                        u = bot.user
+                    member = await bot.fetch_user_member(u.id, guild)
                     name = str(u)
                     url = best_url(u)
                     try:
@@ -573,7 +579,7 @@ class Info(Command):
                     except (AttributeError, KeyError):
                         is_sys = False
                     is_bot = u.bot
-                    is_self = u.id == bot.user.id
+                    is_self = u.id == bot.id
                     is_self_owner = bot.is_owner(u.id)
                     is_guild_owner = u.id == guild.owner_id
                     dname = getattr(member, "nick", None)
@@ -642,9 +648,10 @@ class Info(Command):
                                     while fav is None:
                                         fav = comfreq.popleft()
                         with suppress(LookupError):
-                            gmsg = bot.database.counts.getUserGlobalMessageCount(u)
-                            msgs = await bot.database.counts.getUserMessages(u, guild)
-                            avgs = await bot.database.counts.getUserAverage(u, guild)
+                            if not hasattr(guild, "ghost"):
+                                gmsg = bot.database.counts.getUserGlobalMessageCount(u)
+                                msgs = await bot.database.counts.getUserMessages(u, guild)
+                                avgs = await bot.database.counts.getUserAverage(u, guild)
                     with suppress(LookupError):
                         if not hasattr(guild, "ghost"):
                             us = await bot.database.counts.getGuildMessages(guild)
@@ -1198,7 +1205,7 @@ class UpdateMessageCount(Database):
 
     async def getUserMessages(self, user, guild):
         if self.scanned == -1:
-            c_id = self.bot.user.id
+            c_id = self.bot.id
             if guild is None or hasattr(guild, "ghost"):
                 channel = user.dm_channel
                 if channel is None:
@@ -1230,7 +1237,7 @@ class UpdateMessageCount(Database):
 
     async def getUserAverage(self, user, guild):
         if self.scanned == -1:
-            c_id = self.bot.user.id
+            c_id = self.bot.id
             if guild is None or hasattr(guild, "ghost"):
                 channel = user.dm_channel
                 if channel is None:

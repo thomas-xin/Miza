@@ -314,10 +314,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         u_id = verify_id(u_id)
         if type(u_id) is int:
             try:
+                user = self.cache.users[u_id]
+            except KeyError:
                 user = await self.fetch_user(u_id)
-            except discord.HTTPException:
-                print(u_id)
-                raise
             with suppress():
                 if guild:
                     temp = guild.get_member(user.id)
@@ -713,10 +712,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     
     # Updates bot cache from the discord.py client cache.
     def update_from_client(self):
-        self.cache.guilds.update(self._connection._guilds)
-        self.cache.emojis.update(self._connection._emojis)
-        self.cache.users.update(self._connection._users)
-        self.cache.channels.update(self._connection._private_channels)
+        self.cache.guilds.update(self._guilds)
+        self.cache.emojis.update(self._emojis)
+        self.cache.users.update(self._users)
+        self.cache.channels.update(self._private_channels)
 
     # Updates bot cache from the discord.py guild objects.
     def update_from_guilds(self):
@@ -749,7 +748,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             return nan
         if self.is_blacklisted(u_id):
             return -inf
-        if u_id == self.user.id:
+        if u_id == self.id:
             return inf
         if guild is None or hasattr(guild, "ghost"):
             return inf
@@ -886,7 +885,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     # Checks if a user is blacklisted from the bot.
     def is_blacklisted(self, user):
         u_id = verify_id(user)
-        if self.is_owner(u_id) or u_id == self.user.id:
+        if self.is_owner(u_id) or u_id == self.id:
             return False
         with suppress(KeyError):
             return self.data.blacklist.get(u_id, False)
@@ -1314,7 +1313,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Operates on reactions on special messages, calling the _callback_ methods of commands when necessary.
     async def react_callback(self, message, reaction, user):
-        if message.author.id == self.user.id:
+        if message.author.id == self.id:
             if self.closed:
                 return
             u_perm = self.get_perms(user.id, message.guild)
@@ -1745,7 +1744,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             print_exc()
                             create_task(send_exception(channel, ex))
         # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
-        if not run and u_id != bot.user.id:
+        if not run and u_id != bot.id:
             temp = to_alphanumeric(cpy).casefold()
             await self.send_event("_nocommand_", text=temp, edit=edit, orig=orig, msg=msg, message=message, perm=u_perm)
         # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
@@ -1773,18 +1772,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return user
 
     async def fetch_webhooks(self, guild):
-        member = guild.get_member(self.user.id)
+        member = guild.get_member(self.id)
         if member and member.guild_permissions.manage_webhooks:
             return await aretry(guild.webhooks, attempts=3, delay=15, exc=(discord.Forbidden, discord.NotFound))
         raise PermissionError
 
     # Loads all webhooks in the target channel.
-    async def load_channel_webhooks(self, channel, force=False):
+    async def load_channel_webhooks(self, channel, force=False, bypass=False):
         if channel.id in self.cw_cache and not force:
             return self.cw_cache[channel.id].values()
-        async with self.guild_semaphore:
+        async with self.guild_semaphore if not bypass else emptyctx:
             self.cw_cache.pop(channel.id, None)
-            if not channel.permissions_for(channel.guild.get_member(self.user.id)).manage_webhooks:
+            if not channel.permissions_for(channel.guild.get_member(self.id)).manage_webhooks:
                 raise PermissionError("Not permitted to create webhooks in channel.")
             webhooks = await aretry(channel.webhooks, attempts=5, delay=15, exc=(discord.Forbidden, discord.NotFound))
         return [self.add_webhook(w) for w in webhooks]
@@ -1803,10 +1802,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 return [self.add_webhook(w) for w in webhooks]
 
     # Gets a valid webhook for the target channel, creating a new one when necessary.
-    async def ensure_webhook(self, channel, force=False):
-        wlist = await self.load_channel_webhooks(channel, force=force)
+    async def ensure_webhook(self, channel, force=False, bypass=False):
+        wlist = await self.load_channel_webhooks(channel, force=force, bypass=bypass)
         if not wlist:
-            w = await channel.create_webhook(name=self.user.name, reason="Auto Webhook")
+            w = await channel.create_webhook(name=self.name, reason="Auto Webhook")
             w = self.add_webhook(w)
         else:
             w = choice(wlist)
@@ -1814,7 +1813,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Sends a message to the target channel, using a random webhook from that channel.
     async def send_as_webhook(self, channel, *args, **kwargs):
-        w = await self.ensure_webhook(channel)
+        w = await self.ensure_webhook(channel, bypass=True)
         kwargs.pop("wait", None)
         reacts = kwargs.pop("reacts", None)
         try:
@@ -1844,7 +1843,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if guild is None or hasattr(guild, "ghost") or len(embeds) == 1:
                 single = True
             else:
-                m = guild.get_member(self.user.id)
+                m = guild.get_member(self.id)
                 if m is None:
                     m = self.user
                     single = True
@@ -1961,8 +1960,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Updates all embed senders.
     def update_embeds(self):
-        if not self.ready:
-            return
         sent = False
         for s_id in self.embed_senders:
             embeds = self.embed_senders[s_id]
@@ -2020,7 +2017,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Deletes own messages if any of the "X" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot.
     async def check_to_delete(self, message, reaction, user):
-        if message.author.id == self.user.id or message.author.id in self.cw_cache.get(message.channel.id, ()):
+        if message.author.id == self.id or message.author.id in self.cw_cache.get(message.channel.id, ()):
             with suppress(discord.NotFound):
                 u_perm = self.get_perms(user.id, message.guild)
                 check = False
@@ -2031,10 +2028,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         if str(reaction) == str(react):
                             users = await react.users().flatten()
                             for u in users:
-                                if u.id == self.user.id:
+                                if u.id == self.id:
                                     check = True
                                     break
-                if check and user.id != self.user.id:
+                if check and user.id != self.id:
                     s = str(reaction)
                     if s in "❌✖️🇽❎":
                         await self.silent_delete(message, exc=True)
@@ -2084,7 +2081,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 self.roles = []
                 self.emojis = []
                 self.get_channel = lambda *void1, **void2: self.channel
-                self.owner_id = bot.user.id
+                self.owner_id = bot.id
                 self.owner = bot.user
                 self.fetch_member = bot.fetch_user
                 self.get_member = lambda *void1, **void2: None
@@ -2203,7 +2200,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         @self.event
         async def on_ready():
             print("Successfully connected as " + str(self.user))
-            self.mention = (user_mention(self.user.id), user_pc_mention(self.user.id))
+            self.mention = (user_mention(self.id), user_pc_mention(self.id))
             with tracebacksuppressor:
                 futs = set()
                 futs.add(create_task(self.get_state()))
@@ -2275,17 +2272,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             create_task(self.load_guild_webhooks(guild))
             print("New server: " + str(guild))
             g = await self.fetch_guild(guild.id)
-            m = guild.get_member(self.user.id)
+            m = guild.get_member(self.id)
             await self.send_event("_join_", user=m, guild=g)
             channel = await self.get_first_sendable(g, m)
             emb = discord.Embed(colour=discord.Colour(8364031))
             emb.set_author(**get_author(self.user))
-            emb.description = f"Hi there! I'm {self.user.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
+            emb.description = f"Hi there! I'm {self.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
             user = None
             with suppress(discord.Forbidden):
                 a = await guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add).flatten()
                 for e in a:
-                    if e.target.id == self.user.id:
+                    if e.target.id == self.id:
                         user = e.user
                         break
             if user is not None:
@@ -2312,7 +2309,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             except discord.NotFound:
                 return
             await self.seen(user, event="reaction", raw="Adding a reaction")
-            if user.id != self.user.id:
+            if user.id != self.id:
                 reaction = str(payload.emoji)
                 await self.react_callback(message, reaction, user)
                 await self.check_to_delete(message, reaction, user)
@@ -2327,7 +2324,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             except discord.NotFound:
                 return
             await self.seen(user, event="reaction", raw="Removing a reaction")
-            if user.id != self.user.id:
+            if user.id != self.id:
                 reaction = str(payload.emoji)
                 await self.react_callback(message, reaction, user)
                 await self.check_to_delete(message, reaction, user)
@@ -2335,7 +2332,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # Voice state update event: automatically unmutes self if server muted, calls _seen_ bot database event.
         @self.event
         async def on_voice_state_update(member, before, after):
-            if member.id == self.user.id:
+            if member.id == self.id:
                 after = member.voice
                 if after is not None:
                     if after.mute or after.deaf:

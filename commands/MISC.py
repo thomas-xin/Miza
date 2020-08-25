@@ -783,7 +783,7 @@ class UpdateMathTest(Database):
         bot = self.bot
         channel = message.channel
         if channel.id in self.data:
-            if message.author.id != bot.user.id:
+            if message.author.id != bot.id:
                 msg = message.content.strip("|").strip("`")
                 if not msg or msg.casefold() != msg:
                     return
