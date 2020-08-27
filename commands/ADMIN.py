@@ -126,7 +126,7 @@ class Ban(Command):
         if not users:
             raise LookupError("No results found.")
         if len(users) > 1 and "f" not in flags:
-            return bold(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0)))
+            return bold(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0)))
         if not args or name == "unban":
             for user in users:
                 try:
