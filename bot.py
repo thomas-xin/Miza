@@ -812,6 +812,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         g_perm.update({u_id: round_min(value)})
         self.database.perms.update()
 
+    # Checks whether a member's status was changed.
+    def status_changed(self, before, after):
+        if before.activity != after.activity:
+            return True
+        for attr in ("desktop_status", "web_status", "mobile_status"):
+            b, a = getattr(before, attr), getattr(after, attr)
+            if b == discord.Status.online and a == discord.Status.idle:
+                if utc() - self.data.users.get(after.id, {}).get("last_seen", 0) < 900:
+                    return False
+            elif b != discord.Status.offline and a == discord.Status.offline:
+                return False
+            elif b == a:
+                return False
+        return True
+
     # Checks if a message has been flagged as deleted by the deleted cache.
     def is_deleted(self, message):
         try:
@@ -888,7 +903,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if self.is_owner(u_id) or u_id == self.id:
             return False
         with suppress(KeyError):
-            return self.data.blacklist.get(u_id, False)
+            return u_id in self.data.blacklist
         return True
 
     dangerous_command = bold(css_md(uni_str('[WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. REPEAT COMMAND WITH "?f" FLAG TO CONFIRM.]')))
@@ -1424,7 +1439,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             self.guild_count = guild_count
                             self.status_iter = (self.status_iter + 1) % 3
                             with suppress(discord.NotFound):
-                                u = await self.fetch_user(tuple(self.owners)[0])
+                                u = await self.fetch_user(next(iter(self.owners)))
                                 n = u.name
                                 text = f"live to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {uni_str(n)}'{'s' if n[-1] != 's' else ''} place!"
                                 activity = discord.Streaming(name=text, url=self.website)
@@ -1494,7 +1509,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             op = True
         # Respond to blacklisted users attempting to use a command, or when mentioned without a command.
         if (u_perm <= -inf and (op or self.id in (member.id for member in message.mentions))):
-            print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
+            # print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
             create_task(send_with_react(
                 channel,
                 "Sorry, you are currently not permitted to request my services.",
@@ -1572,7 +1587,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                     argv = unicode_prune(argv)
                                 argv = argv.strip()
                                 # Parse command flags (this is a bit of a mess)
-                                if hasattr(command, "flags"):
+                                if getattr(command, "flags", None):
                                     flaglist = command.flags
                                     for q in "?-+":
                                         if q in argv:
@@ -1641,6 +1656,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                         args = shlex.split(argv2)
                                     except ValueError:
                                         args = argv2.split()
+                                    if args and getattr(command, "flags", None):
+                                        if not ("a" in flags or "e" in flags or "d" in flags):
+                                            if "a" in command.flags and "e" in command.flags and "d" in command.flags:
+                                                if args[0] in ("add", "enable", "set"):
+                                                    args.pop(0)
+                                                    add_dict(flags, {"a": 1})
+                                                elif args[0] in ("rem", "disable", "remove", "unset"):
+                                                    args.pop(0)
+                                                    add_dict(flags, {"d": 1})
                             # Assign "guild" as an object that mimics the discord.py guild if there is none
                             if guild is None:
                                 guild = self.UserGuild(
@@ -1957,7 +1981,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if len(emb):
             embs.append(emb)
         if footer and embs:
-            embs[-1].add_footer(**footer)
+            embs[-1].set_footer(**footer)
         self.send_embeds(channel, embeds=embs)
 
     # Updates all embed senders.
@@ -2078,6 +2102,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             def __init__(self, user, channel, **void):
                 self.channel = self.system_channel = self.rules_channel = self.UserChannel(channel)
                 self.members = [user, bot.user]
+                self._members = {m.id: m for m in self.members}
                 self.channels = self.text_channels = [self.channel]
                 self.voice_channels = []
                 self.roles = []
@@ -2261,7 +2286,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     self.ready = True
                     # Send ready event to all databases.
                     await self.send_event("_ready_", bot=self)
-                    PRINT.start()
                     print("Initialization complete.")
                 else:
                     for fut in futs:
@@ -2487,7 +2511,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         @self.event
         async def on_member_update(before, after):
             await self.send_event("_member_update_", before=before, after=after)
-            if any((getattr(before, attr) != getattr(after, attr) for attr in ("desktop_status", "web_status", "mobile_status", "activity"))):
+            if self.status_changed(before, after):
                 # A little bit of a trick to make sure this part is only called once per user event.
                 # This is necessary because on_member_update is called once for every member object.
                 # By fetching the first instance of a matching member object,
@@ -2622,6 +2646,7 @@ if __name__ == "__main__":
     _print = print
     with contextlib.redirect_stdout(PRINT):
         with contextlib.redirect_stderr(PRINT):
+            PRINT.start()
             sys.stdout = sys.stderr = print = PRINT
             print("Logging started.")
             proc_start()

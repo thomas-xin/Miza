@@ -153,7 +153,7 @@ class UpdateExec(Database):
     qtrans = "".maketrans(qmap)
 
     # Custom print function to send a message instead
-    _print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: self.bot.send_embeds(channel, embed=discord.Embed(colour=discord.Colour(1), description=lim_str("```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```", 2048)))
+    _print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: self.bot.send_as_embeds(channel, "```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```")
     def _input(self, *args, channel=None, **kwargs):
         self._print(*args, channel=channel, **kwargs)
         self.listeners.__setitem__(channel.id, None)
@@ -391,24 +391,31 @@ class Suspend(Command):
     name = ["Block", "Blacklist"]
     min_level = nan
     description = "Prevents a user from accessing ⟨MIZA⟩'s commands. Overrides <perms>."
-    usage = "<0:user> <1:value[]>"
+    usage = "<0:user> <disable(?d)>"
+    flags = "aed"
 
-    async def __call__(self, bot, user, guild, args, **void):
+    async def __call__(self, bot, user, guild, args, flags, **void):
         update = self.data.blacklist.update
-        if len(args) < 2:
-            if len(args) >= 1:
-                user = await bot.fetch_user(verify_id(args[0]))
-            susp = bot.data.blacklist.get(user.id, None)
+        if len(args) >= 1:
+            user = await bot.fetch_user(verify_id(args[0]))
+            if "d" in flags:
+                bot.data.blacklist.discard(user.id)
+                update()
+                return css_md(f"{sqr_md(user)} has been removed from the blacklist.")
+            if "a" in flags or "e" in flags:
+                bot.data.blacklist.add(user.id)
+                update()
+                return css_md(f"{sqr_md(user)} has been added to the blacklist.")
+            susp = bot.is_blacklisted(user.id)
             return css_md(f"{sqr_md(user)} is currently {'not' if not susp else ''} blacklisted.")
-        else:
-            user = await bot.fetch_user(verify_id(args.pop(0)))
-            new = await bot.eval_math(" ".join(args), user.id, bot.data.blacklist.get(user.id, 0))
-            bot.data.blacklist[user.id] = new
-            update()
-            return css_md(f"Changed blacklist status of {sqr_md(user)} to {sqr_md(new)}.")
         return css_md(f"User blacklist: {no_md(list(bot.cache.users.get(u, u) for u in bot.data.blacklist))}")
 
 
 class UpdateBlacklist(Database):
     name = "blacklist"
-    user = True
+    no_delete = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if type(self.data) is not set:
+            self.bot.data[self.name] = self.data = set(self.data)

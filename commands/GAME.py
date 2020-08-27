@@ -472,11 +472,11 @@ class Mimic(Command):
         if not argv or (len(args) == 1 and "d" not in flags):
             if "d" in flags:
                 # This deletes all mimics for the current user
-                if "f" not in flags:
-                    return bot.dangerous_command
+                if "f" not in flags and len(mimics) > 1:
+                    return css_md(sqr_md(f"WARNING: {len(mimics)} MIMICS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
                 mimicdb.pop(user.id)
                 update()
-                return italics(css_md(f"Successfully removed all webhook mimics for {sqr_md(user)}."))
+                return italics(css_md(f"Successfully removed all {sqr_md(len(mimics))} webhook mimics for {sqr_md(user)}."))
             # Set callback message for scrollable list
             return (
                 "*```" + "\n" * ("z" in flags) + "callback-game-mimic-"

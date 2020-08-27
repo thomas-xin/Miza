@@ -160,13 +160,13 @@ class EnabledCommands(Command):
                 return css_md(f"Standard command categories:\n{standard_commands}")
             if "e" in flags or "a" in flags:
                 categories = set(standard_commands)
-                enabled[channel.id] = categories
+                enabled[channel.id] = categories.union(enabled[channel.id])
                 update()
                 if "h" in flags:
                     return
                 return css_md(f"Enabled all standard command categories in {sqr_md(channel)}.")
             if "d" in flags:
-                enabled[channel.id].clear()
+                enabled[channel.id] = set()
                 update()
                 if "h" in flags:
                     return
@@ -189,14 +189,14 @@ class EnabledCommands(Command):
         curr = set_dict(enabled, channel.id, set(default_commands))
         for catg in args:
             if "d" not in flags:
-                if catg not in enabled:
+                if catg not in curr:
                     if type(curr) is set:
                         curr.add(catg)
                     else:
                         curr.append(catg)
                     update()
-            if "d" in flags:
-                if catg in enabled:
+            else:
+                if catg in curr:
                     curr.remove(catg)
                     update()
         check = curr if type(curr) is set else frozenset(curr)
@@ -206,7 +206,7 @@ class EnabledCommands(Command):
         if "h" in flags:
             return
         category = "category" if len(args) == 1 else "categories"
-        action = "Enabled" if "e" in flags else "Disabled"
+        action = "Enabled" if "d" not in flags else "Disabled"
         return css_md(f"{action} command {category} {sqr_md(', '.join(args))} in {sqr_md(channel)}.")
 
 
@@ -570,7 +570,8 @@ class Info(Command):
                             emb = await self.getGuildData(guild, flags)
                             embs.add(emb)
                             raise StopIteration
-                        u = bot.user
+                        else:
+                            u = bot.user
                     u = await bot.fetch_user_member(u.id, guild)
                     member = guild.get_member(u.id)
                     name = str(u)
@@ -617,6 +618,7 @@ class Info(Command):
                     coms = seen = msgs = avgs = gmsg = old = 0
                     fav = None
                     pos = None
+                    zone = None
                     with suppress(LookupError):
                         ts = utc()
                         ls = bot.data.users[u.id]["last_seen"]
@@ -627,6 +629,11 @@ class Info(Command):
                             seen = f"{sec2time(max(0, ts - ls))} ago"
                         if la:
                             seen = f"{la}, {seen}"
+                        tz = bot.database.users.estimate_timezone(u.id)
+                        if tz >= 0:
+                            zone = f"GMT+{tz}"
+                        else:
+                            zone = f"GMT{tz}"
                     with suppress(LookupError):
                         old = bot.data.counts.get(guild.id, {})["oldest"][u.id]
                         old = snowflake_time(old)
@@ -707,6 +714,8 @@ class Info(Command):
                         emb.add_field(name="Oldest post time", value=str(old), inline=1)
                     if status:
                         emb.add_field(name="Status", value=str(status), inline=1)
+                    if zone:
+                        emb.add_field(name="Estimated timezone", value=str(zone), inline=1)
                     if seen:
                         emb.add_field(name="Last seen", value=str(seen), inline=1)
                     if coms:
@@ -1113,7 +1122,7 @@ class UpdateReminders(Database):
     def __load__(self):
         d = self.data
         # This exists so that checking next scheduled item is O(1)
-        self.listed = hlist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str), key=lambda x: x[0]))
+        self.listed = hlist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str and d[i]), key=lambda x: x[0]))
 
     # Fast call: runs 24 times per second
     async def _call_(self):
@@ -1423,7 +1432,6 @@ class UpdateUsers(Database):
 
     async def _bot_ready_(self, **void):
         data = {"Command": Command}
-
         exec(
             f"class {self.bot.name.replace(' ', '')}(Command):"
             +"\n\tmin_level = 0"
@@ -1470,7 +1478,6 @@ class UpdateUsers(Database):
         if not data:
             return list(repeat(0, round(self.hours / self.interval * interval)))
         hour = round_min(round(utc() // self.interval) / self.scale)
-        # print(hour)
         self.clear_events(data, hour - self.hours)
         start = hour - self.hours
         if event is None:
@@ -1481,6 +1488,66 @@ class UpdateUsers(Database):
             factor = ceil(interval / self.interval)
             out = [sum(out[i:i + factor]) for i in range(0, len(out), factor)]
         return out
+
+    def estimate_timezone(self, u_id):
+        data = self.data.get(u_id, EMPTY).get("recent")
+        if not data:
+            return 0
+        hour = round_min(round(utc() // self.interval) / self.scale)
+        self.clear_events(data, hour - self.hours)
+        start = hour - self.hours
+        out = [sum(data.get(i / self.scale + start, EMPTY).values()) for i in range(self.hours * self.scale)]
+        factor = ceil(3600 / self.interval)
+        activity = [sum(out[i:i + factor]) for i in range(0, len(out), factor)]
+        inactive = hlist()
+        def register(curr):
+            if inactive:
+                last = inactive[-1]
+            if not inactive or curr[0] - last[0] >= 24:
+                curr[1] += 1
+                inactive.append(curr[:2])
+                curr[2] = curr[0]
+            elif curr[0] - last[0] - last[1] < 2:
+                last[1] += curr[0] + curr[1] - last[0] - last[1]
+                curr[2] = curr[0]
+            elif last[1] <= curr[1] * 1.5:
+                curr[1] += 1
+                if curr[0] - curr[2] >= 18:
+                    inactive.append(curr[:2])
+                    curr[2] = curr[0]
+                else:
+                    inactive[-1] = curr[:2]
+            curr[0] = None
+            curr[1] = 0
+        m = min(activity) * 4
+        curr = [None, 0, 0]
+        for i, x in enumerate(activity):
+            if x <= m:
+                if curr[0] is None:
+                    curr[0] = i
+                curr[1] += 1
+            else:
+                if curr[0] is not None:
+                    register(curr)
+        if curr[0] is not None:
+            register(curr)
+        total = 0
+        if inactive:
+            for i, curr in enumerate(inactive):
+                t = (curr[0] + curr[1] / 2) % 24
+                if i:
+                    if total / i - t > 12:
+                        total += 24
+                    elif total / i - t < -12:
+                        total -= 24
+                total += t
+            estimated = round(2.5 - utc_dt().hour - total / len(inactive)) % 24
+            if estimated > 12:
+                estimated -= 24
+        else:
+            estimated = 0
+        # print(estimated, inactive, activity)
+        return estimated
 
     async def __call__(self):
         with suppress(SemaphoreOverflowError):

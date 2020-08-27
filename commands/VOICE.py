@@ -439,7 +439,13 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         if channel is None:
             return self.vc
         try:
-            return await aretry(channel.connect, timeout=6, reconnect=True, attempts=5, delay=2, exc={ConnectionError, ConnectionResetError, discord.NotFound, discord.Forbidden, discord.ClientException})
+            for i in range(5):
+                if hasattr(self, "dead"):
+                    break
+                with suppress(asyncio.TimeoutError):
+                    return await channel.connect(timeout=6, reconnect=False)
+                await asyncio.sleep(2)
+            raise TimeoutError
         except:
             self.dead = True
             raise
@@ -2100,12 +2106,12 @@ class Playlist(Command):
         if not argv:
             if "d" in flags:
                 # This deletes all default playlist entries for the current guild
-                if "f" not in flags:
-                    return bot.dangerous_command
+                if "f" not in flags and len(pl) > 1:
+                    return css_md(sqr_md(f"WARNING: {len(pl)} ENTRIES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
                 pl[guild.id].clear()
                 pl.pop(guild.id)
                 update()
-                return italics(css_md(f"Removed all entries from the default playlist for {sqr_md(guild)}."))
+                return italics(css_md(f"Successfully removed all {sqr_md(len(pl))} entries from the default playlist for {sqr_md(guild)}."))
             # Set callback message for scrollable list
             return (
                 "*```" + "\n" * ("z" in flags) + "callback-voice-playlist-"
@@ -2404,7 +2410,7 @@ class Skip(Command):
         # Calculate required vote count based on amount of non-bot members in voice
         members = sum(1 for m in auds.vc.channel.members if not m.bot)
         required = 1 + members >> 1
-        response = "```css\n"
+        response = ""
         i = 1
         for pos in elems:
             pos = float(pos)
@@ -2476,7 +2482,7 @@ class Skip(Command):
         if "h" not in flags:
             if count >= 4:
                 return italics(css_md(f"{count} items have been removed from the queue."))
-            return response + "```", 1
+            return css_md(response), 1
 
 
 class Pause(Command):

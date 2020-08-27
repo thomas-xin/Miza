@@ -91,11 +91,11 @@ class IMG(Command):
                     return css_md(f"Successfully added {sqr_md(key)} to the image list for {sqr_md(guild)}.")
             if not args:
                 # This deletes all images for the current guild
-                if "f" not in flags:
-                    return bot.dangerous_command
+                if "f" not in flags and len(images) > 1:
+                    return css_md(sqr_md(f"WARNING: {len(images)} IMAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
                 imglists[guild.id] = {}
                 update()
-                return italics(css_md(f"Successfully removed all images from the image list for {sqr_md(guild)}."))
+                return italics(css_md(f"Successfully removed all {sqr_md(len(images))} images from the image list for {sqr_md(guild)}."))
             key = argv.casefold()
             images.pop(key)
             imglists[guild.id] = images
@@ -203,12 +203,12 @@ class React(Command):
         if not argv:
             if "d" in flags:
                 # This deletes all auto reacts for the current guild
-                if "f" not in flags:
-                    return bot.dangerous_command
+                if "f" not in flags and len(curr) > 1:
+                    return css_md(sqr_md(f"WARNING: {len(curr)} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
                 if guild.id in following:
                     following.pop(guild.id)
                     update()
-                return italics(css_md(f"Successfully removed all auto reacts for {sqr_md(guild)}."))
+                return italics(css_md(f"Successfully removed all {sqr_md(len(curr))} auto reacts for {sqr_md(guild)}."))
             # Set callback message for scrollable list
             return (
                 "*```" + "\n" * ("z" in flags) + "callback-image-react-"

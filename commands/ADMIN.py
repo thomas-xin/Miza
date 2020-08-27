@@ -9,17 +9,26 @@ except ModuleNotFoundError:
 class Purge(Command):
     time_consuming = True
     _timeout_ = 16
-    name = ["Del", "Delete"]
+    name = ["Del", "Delete", "Purge_Range"]
     min_level = 3
     description = "Deletes a number of messages from a certain user in current channel."
-    usage = "<1:*users{bot}{everyone(?a)}> <0:count[1]> <hide(?h)>"
-    flags = "aeh"
+    usage = "<1:*users{bot}{everyone(?a)}> <0:count[1]> <range(?r)> <hide(?h)>"
+    flags = "faehr"
     rate_limit = 2
     multi = True
 
     async def __call__(self, bot, args, argl, user, channel, name, flags, perm, guild, **void):
+        print(self, bot, args, argl, user, channel, name, flags, perm, guild, void)
+        end = None
         if args:
             count = await bot.eval_math(args.pop(-1), guild.id)
+            if args and "r" in flags or "range" in name:
+                start = safe_eval(args.pop(-1))
+                end = count
+                if end < count:
+                    start, end = end, start
+                start -= 1
+                end += 1
         else:
             count = 1
         if not argl and not args:
@@ -27,26 +36,41 @@ class Purge(Command):
         else:
             users = await bot.find_users(argl, args, user, guild)
             uset = {u.id for u in users}
-        if count <= 0:
+        if end is None and count <= 0:
             raise ValueError("Please enter a valid amount of messages to delete.")
-        dt = None
+        if end is None:
+            print(count)
+        else:
+            print(start, end)
         delD = {}
-        deleted = 0
-        # Keep going until finding required amount of messages or reaching the end of the channel
-        while count > 0:
-            lim = count * 2 + 16 if count < inf else None
-            hist = await channel.history(limit=lim, before=dt).flatten()
-            for i, m in enumerate(hist):
-                if uset is None and m.author.bot or uset and m.author.id in uset:
-                    delD[m.id] = m
-                    count -= 1
-                    if count <= 0:
-                        break
-                if i == len(hist) - 1:
-                    dt = m.created_at
-            if lim is None or not hist:
-                break
+        if end is None:
+            dt = None
+            # Keep going until finding required amount of messages or reaching the end of the channel
+            while count > 0:
+                lim = count * 2 + 16 if count < inf else None
+                after = utc_dt() - datetime.datetime.timedelta(days=14)
+                found = False
+                if dt is None or dt > after:
+                    async with bot.guild_semaphore:
+                        async for m in channel.history(limit=lim, before=dt, after=after):
+                            found = True
+                            dt = m.created_at
+                            if uset is None and m.author.bot or uset and m.author.id in uset:
+                                delD[m.id] = m
+                                count -= 1
+                                if count <= 0:
+                                    break
+                if lim is None or not found:
+                    break
+        else:
+            async with bot.guild_semaphore:
+                async for m in channel.history(limit=None, before=cdict(id=end), after=cdict(id=start)):
+                    if uset is None and m.author.bot or uset and m.author.id in uset:
+                        delD[m.id] = m
+        if len(delD) > 512 and "f" not in flags:
+            return bold(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} MESSAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0)))
         # attempt to bulk delete up to 100 at a time, otherwise delete 1 at a time
+        deleted = 0
         delM = hlist(delD.values())
         while len(delM):
             try:
@@ -78,7 +102,7 @@ class Ban(Command):
     min_display = "3+"
     description = "Bans a user for a certain amount of time, with an optional reason."
     usage = "<0:*users> <1:time[]> <2:reason[]> <hide(?h)> <debug(?z)>"
-    flags = "hz"
+    flags = "fhz"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = 2
     multi = True
@@ -101,6 +125,8 @@ class Ban(Command):
             users = await bot.find_users(argl, args, user, guild)
         if not users:
             raise LookupError("No results found.")
+        if len(users) > 1 and "f" not in flags:
+            return bold(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0)))
         if not args or name == "unban":
             for user in users:
                 try:
@@ -736,11 +762,11 @@ class ServerProtector(Database):
             )
 
     async def targetWarn(self, u_id, guild, msg):
-        print("Channel Deletion warning by <@" + str(u_id) + "> in " + str(guild) + ".")
+        print(f"Channel Deletion warning by {user_mention(u_id)} in {guild}.")
         user = self.bot.user
         owner = guild.owner
         if owner.id == user.id:
-            owner = await self.bot.fetch_user(tuple(self.owners)[0])
+            owner = await self.bot.fetch_user(next(iter(self.bot.owners)))
         if u_id == guild.owner.id:
             if u_id == user.id:
                 return

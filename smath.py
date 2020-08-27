@@ -9,10 +9,10 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
 
     def __init__(self, glob=None):
         self.glob = glob
+        self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
+        self.out = {}
 
     def __enter__(self):
-        self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=8)
-        self.out = {}
         return self
 
     def __import__(self, *modules):
@@ -38,12 +38,6 @@ from dateutil import parser as tparser
 from sympy.parsing.sympy_parser import parse_expr
 from itertools import repeat
 from colormath import color_objects, color_conversions
-
-
-class EmptyContext(contextlib.AbstractContextManager):
-    __exit__ = lambda *args: None
-
-emptyctx = EmptyContext()
 
 
 suppress = lambda *args, **kwargs: contextlib.suppress(BaseException) if not args and not kwargs else contextlib.suppress(*args + tuple(kwargs.values()))
@@ -88,7 +82,7 @@ eval_const = {
 }
 
 # Not completely safe, but much safer than regular eval
-safe_eval = lambda s: eval(s, {}, eval_const)
+safe_eval = lambda s: eval(s.replace("__", ""), {}, eval_const)
 
 null = None
 i = I = j = J = 1j
@@ -1794,9 +1788,9 @@ def iter_max(it):
     if issubclass(type(it), collections.abc.Mapping):
         keys, values = tuple(it.keys()), tuple(it.values())
         m = max(values)
-        for i in keys:
-            if it[i] >= m:
-                return i
+        for k in keys:
+            if it[k] >= m:
+                return k
     with suppress(TypeError):
         return max(iter(it))
     return it
@@ -2723,7 +2717,7 @@ def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]"):
     else:
         keys = range(offset, offset + len(it))
         values = iter(it)
-    spacing = int(math.log10(len(it) + offset))
+    spacing = int(math.log10(len(it) + offset - 1))
     s = ""
     with suppress(StopIteration):
         for k in keys:

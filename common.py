@@ -19,12 +19,24 @@ time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time
 
 
+class EmptyContext(contextlib.AbstractContextManager):
+    __enter__ = lambda self, *args: self
+    __exit__ = lambda *args: None
+
+    async def __aenter__(*args):
+        pass
+    async def __aexit__(*args):
+        pass
+
+emptyctx = EmptyContext()
+
+
 # Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks.
 class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
-    __slots__ = ("limit", "buffer", "delay", "active", "passive", "last")
+    __slots__ = ("limit", "buffer", "delay", "active", "passive", "last", "ratio")
 
-    def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None):
+    def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None, randomize_ratio=2):
         self.limit = limit
         self.buffer = buffer
         self.delay = delay
@@ -33,6 +45,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self.rate_limit = rate_limit
         self.rate_bin = hlist()
         self.last = utc()
+        self.ratio = randomize_ratio
 
     def _update_bin(self):
         while self.rate_bin and utc() - self.rate_bin[0] >= self.rate_limit:
@@ -46,7 +59,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
                 raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
             self.passive += 1
             while self.active >= self.limit or len(self.rate_bin) >= self.limit:
-                time.sleep(self.delay)
+                time.sleep(self.delay if not self.ratio else (random.random() * self.ratio + 1) * self.delay)
                 self._update_bin()
             self.passive -= 1
         if self.rate_limit:
