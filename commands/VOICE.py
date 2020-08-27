@@ -2481,7 +2481,7 @@ class Skip(Command):
                 count += 1
         if "h" not in flags:
             if count >= 4:
-                return italics(css_md(f"{count} items have been removed from the queue."))
+                return italics(css_md(f"{sqr_md(count)} items have been removed from the queue."))
             return css_md(response), 1
 
 
