@@ -68,7 +68,7 @@ class Purge(Command):
                     if uset is None and m.author.bot or uset and m.author.id in uset:
                         delD[m.id] = m
         if len(delD) >= 64 and "f" not in flags:
-            return bold(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} MESSAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0)))
+            return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} MESSAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0))
         # attempt to bulk delete up to 100 at a time, otherwise delete 1 at a time
         deleted = 0
         delM = hlist(delD.values())
@@ -126,7 +126,7 @@ class Ban(Command):
         if not users:
             raise LookupError("No results found.")
         if len(users) > 1 and "f" not in flags:
-            return bold(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0)))
+            return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0))
         if not args or name == "unban":
             for user in users:
                 try:
