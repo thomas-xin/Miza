@@ -48,11 +48,11 @@ class Purge(Command):
             # Keep going until finding required amount of messages or reaching the end of the channel
             while count > 0:
                 lim = count * 2 + 16 if count < inf else None
-                after = utc_dt() - datetime.datetime.timedelta(days=14)
+                after = utc_dt() - datetime.timedelta(days=14)
                 found = False
                 if dt is None or dt > after:
                     async with bot.guild_semaphore:
-                        async for m in channel.history(limit=lim, before=dt, after=after):
+                        async for m in channel.history(limit=lim, before=dt, after=after, oldest_first=False):
                             found = True
                             dt = m.created_at
                             if uset is None and m.author.bot or uset and m.author.id in uset:
@@ -64,10 +64,10 @@ class Purge(Command):
                     break
         else:
             async with bot.guild_semaphore:
-                async for m in channel.history(limit=None, before=cdict(id=end), after=cdict(id=start)):
+                async for m in channel.history(limit=None, before=cdict(id=end), after=cdict(id=start), oldest_first=False):
                     if uset is None and m.author.bot or uset and m.author.id in uset:
                         delD[m.id] = m
-        if len(delD) > 512 and "f" not in flags:
+        if len(delD) >= 64 and "f" not in flags:
             return bold(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} MESSAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0)))
         # attempt to bulk delete up to 100 at a time, otherwise delete 1 at a time
         deleted = 0
