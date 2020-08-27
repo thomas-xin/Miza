@@ -629,11 +629,12 @@ class Info(Command):
                             seen = f"{sec2time(max(0, ts - ls))} ago"
                         if la:
                             seen = f"{la}, {seen}"
-                        tz = bot.database.users.estimate_timezone(u.id)
-                        if tz >= 0:
-                            zone = f"GMT+{tz}"
-                        else:
-                            zone = f"GMT{tz}"
+                        if "v" in flags:
+                            tz = bot.database.users.estimate_timezone(u.id)
+                            if tz >= 0:
+                                zone = f"GMT+{tz}"
+                            else:
+                                zone = f"GMT{tz}"
                     with suppress(LookupError):
                         old = bot.data.counts.get(guild.id, {})["oldest"][u.id]
                         old = snowflake_time(old)
