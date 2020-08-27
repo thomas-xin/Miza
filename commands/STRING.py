@@ -240,7 +240,7 @@ class Zalgo(Command):
     chrs = [chr(n) for n in zalgo_map]
     randz = lambda self: choice(self.chrs)
     def zalgo(self, s, x):
-        if unfont(s) != s:
+        if unfont(s) == s:
             return "".join(c + self.randz() for c in s)
         return s[0] + "".join("".join(self.randz() + "\u200b" for i in range(x + 1 >> 1)) + c + "\u200a" + "".join(self.randz() + "\u200b" for i in range(x >> 1)) for c in s[1:])
 
