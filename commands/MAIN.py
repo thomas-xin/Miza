@@ -1464,14 +1464,11 @@ class UpdateMessages(Database):
     async def _destroy_(self, **void):
         self.closed = True
         msg = "Offline 😔"
-        t = utc()
         for c_id, data in self.data.items():
             with tracebacksuppressor:
                 channel = await self.bot.fetch_channel(c_id)
                 for m_id, v in data.items():
-                    if t - v.t >= 12:
-                        v.t = t
-                        await self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id, msg=msg))
+                    await self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id, msg=msg))
 
 
 EMPTY = {}
