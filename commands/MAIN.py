@@ -1759,7 +1759,7 @@ class UpdateUsers(Database):
                         out += f"\nServer insights: `{member} has been active here since {curr}!`"
                     elif i == 2:
                         events = bot.database.users.get_events(member.id, interval=900)
-                        out += f"\nServer insights: `{member} has performed {sum(events)} discord actions in the last two weeks!`"
+                        out += f"\nServer insights: `{member} has performed {sum(events)} discord actions in the past 7 days!`"
                     else:
                         i = xrand(4)
                         if i == 0:
