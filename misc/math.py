@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
 
-plt.rcParams["figure.figsize"] = (6.4, 4.8)
 
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
 
@@ -152,32 +151,6 @@ class dice(sympy.Basic):
     __str__ = __repr__
 
 
-special_colours = {
-    "message": (0, 0, 1),
-    "typing": (0, 1, 0),
-    "command": (0, 1, 1),
-    "reaction": (1, 1, 0),
-    "misc": (1, 0, 0),
-}
-
-# For the ~activity command.
-def plt_special(d, user, **void):
-    plt.rcParams["figure.dpi"] = 256
-    temp = numpy.zeros(len(next(iter(d.values()))))
-    hours = 168
-    width = hours / len(temp)
-    domain = width * numpy.arange(-len(temp), 0)
-    for k, v in d.items():
-        plt.bar(domain, v, bottom=temp, color=special_colours.get(k, "k"), edgecolor="black", width=width, label=k)
-        temp += numpy.array(v)
-    plt.bar(list(range(-hours, 0)), numpy.ones(hours) * max(temp) / 512, edgecolor="black", color="k")
-    plt.title("Recent Discord Activity for " + user)
-    plt.xlabel("Time (Hours)")
-    plt.ylabel("Action Count")
-    plt.legend(loc="upper left")
-    return plt
-
-
 # Sympy plotting functions
 def plotArgs(args):
     if type(args[0]) in (tuple, list):
@@ -292,20 +265,6 @@ def rounder(x):
         pass
     return x
 
-locked = True
-
-# eval is dangerous to use when taking arbitrary input from users, but they won't guess the SHA256 key, will they? :3
-def _eval(func, glob=None, loc=None, key=None, **void):
-    if glob is None:
-        glob = globals()
-    if locked and key != globals()["key"]:
-        raise PermissionError("Nice try, but this is locked behind a randomized SHA256 key :3")
-    try:
-        return eval(func, glob, loc)
-    except SyntaxError:
-        pass
-    return exec(func, glob, loc)
-
 
 # Allowed functions for ~math
 _globals = dict(sympy.__dict__)
@@ -329,7 +288,6 @@ plots = (
 for i in plots:
     _globals[i] = globals()[i]
 _globals.update({
-    "eval": _eval,
     "bf": _bf,
     "brainfuck": _bf,
     "random": dice,
@@ -550,7 +508,6 @@ def evalSym(f, prec=64, r=False):
 def procResp(resp):
     # Return file path if necessary
     if isinstance(resp[0], Plot):
-        plt.rcParams["figure.dpi"] = 256
         ts = round(time.time() * 1000)
         name = f"{ts}.png"
         fn = "cache/" + name
@@ -562,7 +519,6 @@ def procResp(resp):
         plt.clf()
         s = "{'file':'" + fn + "'}\n"
     elif resp[0] == plt:
-        plt.rcParams["figure.dpi"] = 256
         ts = round(time.time() * 1000)
         name = f"{ts}.png"
         fn = "cache/" + name
@@ -581,16 +537,9 @@ def procResp(resp):
 
 
 if __name__ == "__main__":
-    # SHA256 key always taken on startup
-    key = eval(sys.stdin.readline()).decode("utf-8", "replace").strip()
     while True:
         try:
-            locked = True
             args = eval(sys.stdin.readline()).decode("utf-8", "replace").strip().split("`")
-            if len(args) > 3:
-                args, key_in = args[:3], args[-1]
-                if key_in == key:
-                    locked = False
             resp = evalSym(*args)
             b = procResp(resp)
             if len(b) > 8388608:

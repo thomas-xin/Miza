@@ -1857,6 +1857,7 @@ class Queue(Command):
         # Get audio player as fast as possible, scheduling it to join asynchronously if necessary
         try:
             auds = bot.database.audio.players[guild.id]
+            auds.channel = channel
             future = None
         except KeyError:
             future = create_task(auto_join(guild, channel, user, bot, preparing=True))
@@ -1978,7 +1979,7 @@ class Queue(Command):
             + str(u_id) + "_" + str(pos) + "_" + str(int(v))
             + "-\nQueue for " + guild.name.replace("`", "") + ":\n"
         )
-        elapsed = auds.stats.position
+        elapsed = auds.stats.position if q else 0
         startTime = 0
         if not q:
             totalTime = 0
@@ -2350,6 +2351,7 @@ class Skip(Command):
         if guild.id not in bot.database.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.database.audio.players[guild.id]
+        auds.channel = message.channel
         # ~clear is an alias for ~skip -f inf
         if name.startswith("c"):
             argv = "inf"
@@ -2750,7 +2752,7 @@ class AudioSettings(Command):
                 d = dict(auds.stats)
                 d.pop("position", None)
                 return f"Current audio settings for **{escape_markdown(guild.name)}**:\n{ini_md(iter2str(d, key=key))}"
-            orig = bot.database.audio.players[guild.id].stats[op]
+            orig = auds.stats[op]
             num = round(100 * orig, 9)
             return css_md(f"Current audio {op} setting in {sqr_md(guild)}: [{num}].")
         if not is_alone(auds, user) and perm < 1:
@@ -2776,7 +2778,7 @@ class AudioSettings(Command):
         for op in ops:
             # These audio settings automatically invert when used
             if type(op) is str and op in "loop repeat shuffle quiet stay" and not argv:
-                argv = str(not bot.database.audio.players[guild.id].stats[op])
+                argv = str(not auds.stats[op])
             # This disables one or more audio settings
             if disable:
                 val = auds.defaults[op]
@@ -2784,7 +2786,7 @@ class AudioSettings(Command):
                     val *= 100
                 argv = str(val)
             # Values should be scaled by 100 to indicate percentage
-            origStats = bot.database.audio.players[guild.id].stats
+            origStats = auds.stats
             orig = round(origStats[op] * 100, 9)
             num = await bot.eval_math(argv, user, orig)
             val = round_min(float(num / 100))

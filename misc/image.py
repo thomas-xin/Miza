@@ -3,6 +3,7 @@
 import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, numpy, requests, blend_modes
 import PIL
 from PIL import Image, ImageChops, ImageEnhance, ImageMath, ImageStat
+import matplotlib.pyplot as plt
 
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=2)
@@ -628,6 +629,39 @@ def hue_shift(image, value):
     return image
 
 
+# For the ~activity command.
+special_colours = {
+    "message": (0, 0, 1),
+    "typing": (0, 1, 0),
+    "command": (0, 1, 1),
+    "reaction": (1, 1, 0),
+    "misc": (1, 0, 0),
+}
+
+def plt_special(d, user=None, **void):
+    hours = 168
+    plt.rcParams["figure.figsize"] = (16, 9)
+    plt.rcParams["figure.dpi"] = 128
+    plt.xlim(-hours, 0)
+    temp = numpy.zeros(len(next(iter(d.values()))))
+    width = hours / len(temp)
+    domain = width * numpy.arange(-len(temp), 0)
+    for k, v in d.items():
+        plt.bar(domain, v, bottom=temp, color=special_colours.get(k, "k"), edgecolor="black", width=width, label=k)
+        temp += numpy.array(v)
+    plt.bar(list(range(-hours, 0)), numpy.ones(hours) * max(temp) / 512, edgecolor="black", color="k")
+    if user:
+        plt.title("Recent Discord Activity for " + user)
+    plt.xlabel("Time (Hours)")
+    plt.ylabel("Action Count")
+    plt.legend(loc="upper left")
+    ts = round(time.time() * 1000)
+    out = "cache/" + str(ts) + ".png"
+    plt.savefig(out)
+    plt.clf()
+    return "$" + out
+
+
 def get_image(url, out):
     if issubclass(type(url), Image.Image):
         return url
@@ -751,8 +785,6 @@ def evalImg(url, operation, args):
 
 
 if __name__ == "__main__":
-    # SHA256 key always taken on startup
-    key = eval(sys.stdin.readline()).decode("utf-8", "replace").strip()
     while True:
         try:
             args = eval(sys.stdin.readline()).decode("utf-8", "replace").strip().split("`")

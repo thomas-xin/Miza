@@ -662,14 +662,7 @@ def proc_update():
             else:
                 raise TypeError(f"invalid subpool {pname}.")
             proc.sem = Semaphore(1, 3)
-            with proc.sem:
-                x = bytes(random.randint(0, 255) for _ in loop(32))
-                if random.randint(0, 1):
-                    x = hashlib.sha256(x).digest()
-                x = base64.b64encode(x)
-                proc.stdin.write(bytes(repr(x) + "\n", "utf-8"))
-                proc.key = x.decode("utf-8", "replace")
-            print(proc, "initialized with key", proc.key)
+            print(proc)
             procs.append(proc)
         att = 0
         while count >= b + 5:
@@ -694,7 +687,7 @@ def proc_start():
 
 
 # Sends an operation to the math subprocess pool.
-async def process_math(expr, prec=64, rat=False, key=None, timeout=12, authorize=False):
+async def process_math(expr, prec=64, rat=False, key=None, timeout=12):
     if type(key) is not int:
         if key is None:
             key = random.random()
@@ -710,10 +703,7 @@ async def process_math(expr, prec=64, rat=False, key=None, timeout=12, authorize
                         raise StopIteration
                 await create_future(proc_update, priority=True)
                 await asyncio.sleep(0.5)
-        if authorize:
-            args = (expr, prec, rat, proc.key)
-        else:
-            args = (expr, prec, rat)
+        args = (expr, prec, rat)
         d = repr(bytes("`".join(i if type(i) is str else str(i) for i in args), "utf-8")).encode("utf-8") + b"\n"
         try:
             with proc.sem:

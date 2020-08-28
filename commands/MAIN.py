@@ -295,7 +295,7 @@ class Loop(Command):
         for i in range(iters):
             loop = i < iters - 1
             t = utc()
-            # Calls processMessage with the argument containing the looped command.
+            # Calls process_message with the argument containing the looped command.
             delay = await callback(message, func, cb_argv=func2, loop=loop)
             # Must abide by command rate limit rules
             delay = delay + t - utc()
@@ -757,9 +757,9 @@ class Activity(Command):
                 user = await bot.fetch_member_ex(u_id, guild)
         data = await create_future(bot.database.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=12)
         with discord.context_managers.Typing(channel):
-            resp = await bot.solve_math("eval(\"plt_special(" + repr(data).replace('"', "'") + ", user='" + str(user) + "')\")", guild, 0, 1, authorize=True)
-            fn = resp["file"]
-            f = discord.File(fn)
+            resp = await process_image("plt_special", "$", (data, str(user)), guild)
+            fn = resp[0]
+            f = discord.File(fn, filename=f"activity_{user.id}.png")
         return dict(file=f, filename=fn, best=True)
 
 

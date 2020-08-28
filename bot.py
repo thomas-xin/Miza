@@ -1059,7 +1059,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return round_min(float(x))
 
     # Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
-    async def solve_math(self, f, obj, prec, r, timeout=12, authorize=False):
+    async def solve_math(self, f, obj, prec, r, timeout=12):
         f = f.strip()
         try:
             if obj is None:
@@ -1073,7 +1073,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # Bot owners have no semaphore limit
         if self.is_owner(key):
             key = None
-        return await process_math(f, int(prec), int(r), key, timeout=12, authorize=authorize)
+        return await process_math(f, int(prec), int(r), key, timeout=12)
 
     TimeChecks = {
         "galactic year": ("gy", "galactic year", "galactic years"),
