@@ -1618,18 +1618,18 @@ class UpdateUsers(Database):
                 changed = False
                 while len(self.flavour_buffer) < 10:
                     out = None
-                    i = xrand(5)
-                    if i == 0 and self.facts:
+                    i = xrand(7)
+                    if i <= 1 and self.facts:
                         with tracebacksuppressor:
                             text = choice(self.facts)
                             fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
                             out = f"\n{fact} `{text}`"
-                    elif i == 1:
+                    elif i == 2:
                         with tracebacksuppressor:
                             data = await Request("https://www.affirmations.dev/", aio=True)
                             text = eval_json(data)["affirmation"].replace("`", "")
                             out = f"\nAffirmation: `{text}`"
-                    elif i == 2:
+                    elif i == 3:
                         with tracebacksuppressor:
                             data = await Request("https://geek-jokes.sameerkumar.website/api", aio=True)
                             text = eval_json(data).replace("`", "")
@@ -1747,7 +1747,7 @@ class UpdateUsers(Database):
                     member = random.choice(guild.members)
                     if i == 0:
                         count = await bot.database.counts.getUserMessages(member, guild)
-                        out += f"\nServer insights: {member} has posted {count} messages in total!"
+                        out += f"\nServer insights: `{member} has posted {count} messages in total!`"
                     elif i == 1:
                         curr = member.joined_at
                         old = None
@@ -1756,16 +1756,16 @@ class UpdateUsers(Database):
                             old = snowflake_time(old)
                         if old is not None and old < curr:
                             curr = old
-                        out += f"\nServer insights: {member} has been active here since {curr}!"
+                        out += f"\nServer insights: `{member} has been active here since {curr}!`"
                     elif i == 2:
                         events = bot.database.users.get_events(member.id, interval=900)
-                        out += f"\nServer insights: {member} has performed {sum(events)} discord actions in the last two weeks!"
+                        out += f"\nServer insights: `{member} has performed {sum(events)} discord actions in the last two weeks!`"
                     else:
                         i = xrand(4)
                         if i == 0:
                             users = set(bot.data.counts.get(guild.id, {})["totals"])
                             users.update(guild._members)
-                            out += f"\nServer insights: {len(users)} have set their footprint into this server!"
+                            out += f"\nServer insights: `{len(users)} have set their footprint into this server!`"
                         elif i == 1:
                             totals = bot.data.counts.get(guild.id, {})["totals"]
                             u_id = iter_max(totals)
@@ -1774,7 +1774,7 @@ class UpdateUsers(Database):
                             except:
                                 u = await bot.get_user(u_id, replace=True)
                             total = totals[u_id]
-                            out += f"\nServer insights: {u} has posted the most text, with {total} total characters!"
+                            out += f"\nServer insights: `{u} has posted the most text, with {total} total characters!`"
                         elif i == 2:
                             counts = bot.data.counts.get(guild.id, {})["counts"]
                             u_id = iter_max(counts)
@@ -1783,7 +1783,7 @@ class UpdateUsers(Database):
                             except:
                                 u = await bot.get_user(u_id, replace=True)
                             count = counts[u_id]
-                            out += f"\nServer insights: {u} has posted the most messages, with {count} in total!"
+                            out += f"\nServer insights: `{u} has posted the most messages, with {count} in total!`"
                         elif i == 3:
                             found = member
                             highest = 0
@@ -1796,7 +1796,7 @@ class UpdateUsers(Database):
                                     if mutual > highest:
                                         highest = mutual
                                         found = guild.get_member(u_id)
-                            out += f"\nServer insights: {found} shares the highest number of mutual servers with me, with {highest}!"
+                            out += f"\nServer insights: `{found} shares the highest number of mutual servers with me, with {highest}!`"
             else:
                 # Help message greetings
                 i = xrand(7)
