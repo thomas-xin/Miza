@@ -50,7 +50,7 @@ class Help(Command):
                 if com.__name__ in found:
                     found[com.__name__].append(com)
                 else:
-                    found[com.__name__] = hlist((com,))
+                    found[com.__name__] = alist((com,))
         if found:
             # Display list of found commands in an embed
             i = 0
@@ -759,7 +759,7 @@ class Activity(Command):
         with discord.context_managers.Typing(channel):
             resp = await process_image("plt_special", "$", (data, str(user)), guild)
             fn = resp[0]
-            f = discord.File(fn, filename=f"activity_{user.id}.png")
+            f = discord.File(fn, filename=f"{user.id}.png")
         return dict(file=f, filename=fn, best=True)
 
 
@@ -1154,7 +1154,7 @@ class UpdateReminders(Database):
     def __load__(self):
         d = self.data
         # This exists so that checking next scheduled item is O(1)
-        self.listed = hlist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str and d[i]), key=lambda x: x[0]))
+        self.listed = alist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str and d[i]), key=lambda x: x[0]))
 
     # Fast call: runs 24 times per second
     async def _call_(self):
@@ -1562,7 +1562,7 @@ class UpdateUsers(Database):
         out = [sum(data.get(i / self.scale + start, EMPTY).values()) for i in range(self.hours * self.scale)]
         factor = ceil(3600 / self.interval)
         activity = [sum(out[i:i + factor]) for i in range(0, len(out), factor)]
-        inactive = hlist()
+        inactive = alist()
         def register(curr):
             if inactive:
                 last = inactive[-1]

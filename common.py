@@ -23,9 +23,9 @@ class EmptyContext(contextlib.AbstractContextManager):
     __enter__ = lambda self, *args: self
     __exit__ = lambda *args: None
 
-    async def __aenter__(*args):
+    async def __aenter__(self, *args):
         pass
-    async def __aexit__(*args):
+    async def __aexit__(self, *args):
         pass
 
 emptyctx = EmptyContext()
@@ -43,7 +43,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self.active = 0
         self.passive = 0
         self.rate_limit = rate_limit
-        self.rate_bin = hlist()
+        self.rate_bin = alist()
         self.last = utc()
         self.ratio = randomize_ratio
 
@@ -334,7 +334,7 @@ role_mention = lambda r_id: f"<@&{r_id}>"
 def line_count(fn):
     with open(fn, "r", encoding="utf-8") as f:
         data = f.read()
-        return hlist((len(data), data.count("\n") + 1))
+        return alist((len(data), data.count("\n") + 1))
 
 
 # Checks if a file is a python code file using its filename extension.
@@ -607,7 +607,7 @@ status_order = tuple(status_text)
 
 
 # Subprocess pool for resource-consuming operations.
-SUBS = cdict(math=cdict(procs=hlist(), busy=cdict()), image=cdict(procs=hlist(), busy=cdict()))
+SUBS = cdict(math=cdict(procs=alist(), busy=cdict()), image=cdict(procs=alist(), busy=cdict()))
 
 # Gets amount of processes running in pool.
 sub_count = lambda: sum(1 for ptype in SUBS.values() for proc in ptype.procs if proc.is_running())
@@ -784,7 +784,7 @@ __setloop__ = lambda: asyncio.set_event_loop(eloop)
 class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 
     def __init__(self, pool_count=1, thread_count=8, initializer=None):
-        self.pools = hlist()
+        self.pools = alist()
         self.pool_count = max(1, pool_count)
         self.thread_count = max(1, thread_count)
         self.initializer = initializer
@@ -1087,7 +1087,7 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
             if a in bot.commands:
                 bot.commands[a].append(self)
             else:
-                bot.commands[a] = hlist((self,))
+                bot.commands[a] = alist((self,))
         self.catg = catg
         self.bot = bot
         self._globals = bot._globals
@@ -1220,7 +1220,7 @@ class __logPrinter:
         self.data = {}
         self.history = {}
         self.counts = {}
-        self.funcs = hlist()
+        self.funcs = alist()
         self.file = file
         self.closed = True
 

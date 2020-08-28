@@ -89,7 +89,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.stat_timer = 0
         self.last_check = 0
         self.status_iter = xrand(3)
-        self.curr_state = hzero(3)
+        self.curr_state = azero(3)
         self.embed_senders = cdict()
         # Assign bot cache to global variables for convenience
         globals().update(self.cache)
@@ -339,6 +339,45 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 members.add(user)
         return members
 
+    async def query_members(self, members, query):
+        if type(query) is not str:
+            query = str(query)
+        with suppress(LookupError):
+            return await str_lookup(
+                members,
+                query,
+                qkey=userQuery1,
+                ikey=userIter1,
+                loose=False,
+            )
+        with suppress(LookupError):
+            return await str_lookup(
+                members,
+                query,
+                qkey=userQuery2,
+                ikey=userIter2,
+            )
+        with suppress(LookupError):
+            return await str_lookup(
+                members,
+                query,
+                qkey=userQuery3,
+                ikey=userIter3,
+            )
+        with suppress(LookupError):
+            return await str_lookup(
+                members,
+                query,
+                qkey=userQuery4,
+                ikey=userIter4,
+                fuzzy=1 / 3,
+            )
+        try:
+            members = await guild.query_members(query, limit=1)
+            return members[0]
+        except (AttributeError, T0, T1):
+            raise LookupError(f"No results for {query}.")
+
     # Fetches a member in the target server by ID or name lookup.
     async def fetch_member_ex(self, u_id, guild=None, allow_banned=True):
         if type(u_id) is not int:
@@ -359,46 +398,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if not members:
                     members = guild.members = await guild.fetch_members(limit=None)
                     guild._members.update({m.id: m for m in members})
-                if type(u_id) is not str:
-                    u_id = str(u_id)
-                with suppress(LookupError):
-                    return await str_lookup(
-                        members,
-                        u_id,
-                        qkey=userQuery1,
-                        ikey=userIter1,
-                        loose=False,
-                    )
-                with suppress(LookupError):
-                    return await str_lookup(
-                        members,
-                        u_id,
-                        qkey=userQuery2,
-                        ikey=userIter2,
-                    )
-                with suppress(LookupError):
-                    return await str_lookup(
-                        members,
-                        u_id,
-                        qkey=userQuery3,
-                        ikey=userIter3,
-                    )
-                with suppress(LookupError):
-                    return await str_lookup(
-                        members,
-                        u_id,
-                        qkey=userQuery4,
-                        ikey=userIter4,
-                        fuzzy=1 / 3,
-                    )
-                try:
-                    if type(u_id) is str:
-                        members = await guild.query_members(u_id, limit=1)
-                        return members[0]
-                    else:
-                        raise LookupError
-                except (T0, T1, LookupError):
-                    raise LookupError(f"No results for {u_id}.")
+                return await self.query_members(members, u_id)
         return member
 
     # Fetches the first seen instance of the target user as a member in any shared server.
@@ -999,7 +999,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     mtrans = "".maketrans(mmap)
 
     cmap = {
-        "<": "hlist((",
+        "<": "alist((",
         ">": "))",
     }
     ctrans = "".maketrans(cmap)
@@ -1196,7 +1196,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         procs = 2 + sum(1 for c in self.proc.children(True))
         thrds = self.proc.num_threads()
         coros = sum(1 for i in asyncio.all_tasks())
-        return hlist((procs, thrds, coros))
+        return alist((procs, thrds, coros))
 
     # Gets the CPU and memory usage of a process over a period of 1 second.
     async def get_proc_state(self, proc):
@@ -1213,7 +1213,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Gets the status of the bot.
     async def get_state(self):
-        stats = hzero(3)
+        stats = azero(3)
         procs = await create_future(self.proc.children, recursive=True, priority=True)
         procs.append(self.proc)
         tasks = [self.get_proc_state(p) for p in procs]
@@ -1254,8 +1254,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 new = True
                 mod = __import__(module)
             self._globals[module] = mod
-            commands = hlist()
-            dataitems = hlist()
+            commands = alist()
+            dataitems = alist()
             items = mod.__dict__
             for var in items.values():
                 if callable(var) and var not in (Command, Database):
@@ -1342,7 +1342,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     # Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
     def update(self):
         self.update_embeds()
-        saved = hlist()
+        saved = alist()
         with tracebacksuppressor:
             for i in self.database:
                 u = self.database[i]
@@ -1958,7 +1958,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if description:
             # Separate text into paragraphs, then lines, then words, then characters and attempt to add them one at a time, adding extra embeds when necessary
             curr = ""
-            paragraphs = hlist(p + "\n\n" for p in description.split("\n\n"))
+            paragraphs = alist(p + "\n\n" for p in description.split("\n\n"))
             while paragraphs:
                 para = paragraphs.popleft()
                 if len(para) > 2000:
@@ -2096,7 +2096,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 cpy = msg[1:]
             await self.process_message(message, cpy, edit, msg)
 
-    def set_classes(bot):
+    def set_classes(self):
+        bot = self
 
         # For compatibility with guild objects, takes a user and DM channel.
         class UserGuild(discord.Object):

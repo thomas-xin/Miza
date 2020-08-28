@@ -108,7 +108,7 @@ class IMG(Command):
                 + str(user.id) + "_0"
                 + "-\nLoading Image database...```*"
             )
-        sources = hlist()
+        sources = alist()
         for tag in args:
             t = tag.casefold()
             if t in images:

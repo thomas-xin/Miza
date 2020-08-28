@@ -147,7 +147,15 @@ async def auto_join(guild, channel, user, bot, preparing=False, vc=None):
 copy_entry = lambda item: {"name": item.name, "url": item.url, "duration": item.duration}
 
 
-async def disconnect_members(members):
+async def disconnect_members(bot, guild, members, channel=None):
+    if bot.id in (member.id for member in members):
+        with suppress(KeyError):
+            auds = bot.database.audio.players[guild.id]
+            if channel is not None:
+                auds.channel = channel
+            auds.dead = True
+            bot.database.audio.connecting.pop(guild.id, None)
+            await bot.database.audio(guild=guild)
     futs = [create_task(member.move_to(None)) for member in members]
     for fut in futs:
         await fut
@@ -722,7 +730,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
 
 
 # Manages the audio queue. Has optimized insertion/removal on both ends, and linear time lookup. One instance of this class is created per audio player.
-class AudioQueue(hlist):
+class AudioQueue(alist):
 
     maxitems = 131072
         
@@ -1938,7 +1946,7 @@ class Queue(Command):
         if not names:
             raise LookupError(f"No results for {argv}.")
         if "v" in flags:
-            names = no_md(hlist(i.name + ": " + time_disp(e_dur(i.duration)) for i in added))
+            names = no_md(alist(i.name + ": " + time_disp(e_dur(i.duration)) for i in added))
         elif len(names) == 1:
             names = names[0]
         else:
@@ -2266,25 +2274,27 @@ class Connect(Command):
         # If no voice channel is selected, perform disconnect
         if vc_ is None:
             if argv:
+                if perm < 2:
+                    raise self.perm_error(perm, 2, f"for command {self.name} in {guild}")
                 u_id = verify_id(argv)
                 try:
-                    t_user = await bot.fetch_user(u_id)
-                except (TypeError, discord.NotFound):
-                    try:
-                        t_user = await bot.fetch_member_ex(u_id, guild)
-                    except LookupError:
-                        t_role = guild.get_role(u_id)
-                        if t_role is None:
-                            raise LookupError(f"No results for {u_id}.")
-                        members = [member for member in t_role.members if member.voice is not None]
-                        if not members:
-                            return code_md("No members to disconnect.")
-                        await disconnect_members(members)
-                        if len(members) == 1:
-                            return ini_md(f"Disconnected {sqr_md(members[0])} from {sqr_md(vc_)}."), 1
-                        return ini_md(f"Disconnected {sqr_md(str(members) + ' members')} from {sqr_md(vc_)}."), 1
-                await member.move_to(None)
-                return ini_md(f"Disconnected {sqr_md(member)} from {sqr_md(vc_)}."), 1
+                    t_user = await bot.fetch_user_member(u_id, guild)
+                except (LookupError):
+                    t_role = guild.get_role(u_id)
+                    if t_role is None:
+                        raise LookupError(f"No results for {u_id}.")
+                    members = [member for member in t_role.members if member.voice is not None]
+                    if not members:
+                        return code_md("No members to disconnect.")
+                    await disconnect_members(bot, guild, members)
+                    if len(members) == 1:
+                        return ini_md(f"Disconnected {sqr_md(members[0])} from {sqr_md(guild)}."), 1
+                    return ini_md(f"Disconnected {sqr_md(str(members) + ' members')} from {sqr_md(guild)}."), 1
+                member = guild.get_member(t_user.id)
+                if not member or member.voice is None:
+                    return code_md("No members to disconnect.")
+                await disconnect_members(bot, guild, (member,))
+                return ini_md(f"Disconnected {sqr_md(member)} from {sqr_md(guild)}."), 1
             try:
                 auds = bot.database.audio.players[guild.id]
             except KeyError:
@@ -2706,7 +2716,7 @@ class AudioSettings(Command):
 
     async def __call__(self, bot, channel, user, guild, flags, name, argv, perm, **void):
         auds = await auto_join(guild, channel, user, bot)
-        ops = hlist()
+        ops = alist()
         op1 = self.map[name]
         if op1 == "reset":
             flags.clear()
@@ -2921,7 +2931,7 @@ class VoiceNuke(Command):
                 if user.id != self.bot.id:
                     if user.voice is not None:
                         connected.add(user)
-        await disconnect_members(connected)
+        await disconnect_members(self.bot, guild, connected)
         if "h" not in flags:
             return italics(css_md(f"Successfully removed all users from voice channels in {sqr_md(guild)}.")), 1
 

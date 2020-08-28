@@ -734,7 +734,7 @@ class UpdateMimics(Database):
                 msg = message.content
                 async with ExceptionSender(message.channel, Exception):
                     # Stack multiple messages to send, may be separated by newlines
-                    sending = hlist()
+                    sending = alist()
                     channel = message.channel
                     for line in msg.split("\n"):
                         found = False

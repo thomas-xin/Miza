@@ -149,7 +149,7 @@ def shuffle(it):
         it = list(it)
         random.shuffle(it)
         return deque(it)
-    elif isinstance(it, hlist):
+    elif isinstance(it, alist):
         temp = it.shuffle()
         it.data = temp.data
         it.offs = temp.offs
@@ -180,7 +180,7 @@ def reverse(it):
         return it
     elif type(it) is deque:
         return deque(reversed(it))
-    elif isinstance(it, hlist):
+    elif isinstance(it, alist):
         temp = it.reverse()
         it.data = temp.data
         it.offs = temp.offs
@@ -212,7 +212,7 @@ def sort(it, key=None, reverse=False):
     elif type(it) is deque:
         it = sorted(it, key=key, reverse=reverse)
         return deque(it)
-    elif isinstance(it, hlist):
+    elif isinstance(it, alist):
         it.__init__(sorted(it, key=key, reverse=reverse))
         it.hash = None
         return it
@@ -255,7 +255,7 @@ class UniversalSet(collections.abc.Set):
 universal_set = UniversalSet()
 
 
-class hlist(collections.abc.MutableSequence, collections.abc.Callable):
+class alist(collections.abc.MutableSequence, collections.abc.Callable):
 
     """
 custom list-like data structure that incorporates the functionality of numpy arrays but allocates more space on the ends in order to have faster insertion."""
@@ -265,25 +265,27 @@ custom list-like data structure that incorporates the functionality of numpy arr
     __slots__ = ("hash", "block", "offs", "size", "data", "frozenset")
 
     # For thread-safety: Waits until the list is not busy performing an operation.
-    def waiting(func):
+    def waiting(self):
+        func = self
         def call(self, *args, force=False, **kwargs):
             if not force:
-                t = time.time()
+                t = utc()
                 while self.block:
                     time.sleep(0.001)
-                    if time.time() - t > 1:
+                    if utc() - t > 1:
                         raise TimeoutError("Request timed out.")
             return func(self, *args, **kwargs)
         return call
 
     # For thread-safety: Blocks the list until the operation is complete.
-    def blocking(func):
+    def blocking(self):
+        func = self
         def call(self, *args, force=False, **kwargs):
             if not force:
-                t = time.time()
+                t = utc()
                 while self.block:
                     time.sleep(0.001)
-                    if time.time() - t > 1:
+                    if utc() - t > 1:
                         raise TimeoutError("Request timed out.")
             self.block = True
             self.hash = None
@@ -1259,9 +1261,11 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     pops = delitems
 
-hrange = lambda a, b=None, c=None: hlist(xrange(a, b, c))
+hlist = alist
 
-hzero = lambda size: hlist(repeat(0, size))
+arange = lambda a, b=None, c=None: alist(xrange(a, b, c))
+
+azero = lambda size: alist(repeat(0, size))
 
 
 # Class-based dictionary, with attributes corresponding to keys.
@@ -1339,11 +1343,11 @@ class mdict(cdict):
         try:
             values = super().__getitem__(k)
         except KeyError:
-            return super().__setitem__(k, hlist(v).uniq(sorted=False))
+            return super().__setitem__(k, alist(v).uniq(sorted=False))
         return values.extend(v).uniq(sorted=False)
 
     def append(self, k, v):
-        values = set_dict(super(), k, hlist())
+        values = set_dict(super(), k, alist())
         if v not in values:
             values.append(v)
 
@@ -1756,7 +1760,7 @@ def is_prime(n):
 
 # Generates a number of prime numbers between a and b.
 def generate_primes(a=2, b=inf, c=1):
-    primes = hlist()
+    primes = alist()
     a = round(a)
     b = round(b)
     if b is None:
@@ -2708,9 +2712,9 @@ def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]"):
         try:
             len(it)
         except TypeError:
-            it = hlist(i for i in it)
+            it = alist(i for i in it)
     except:
-        it = hlist(it)
+        it = alist(it)
     if issubclass(type(it), collections.abc.Mapping):
         keys = it.keys()
         values = iter(it.values())

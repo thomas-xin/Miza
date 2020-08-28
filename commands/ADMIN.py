@@ -71,7 +71,7 @@ class Purge(Command):
             return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} MESSAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0))
         # attempt to bulk delete up to 100 at a time, otherwise delete 1 at a time
         deleted = 0
-        delM = hlist(delD.values())
+        delM = alist(delD.values())
         while len(delM):
             try:
                 if hasattr(channel, "delete_messages") and channel.permissions_for(channel.guild.get_member(bot.id)).manage_messages:
@@ -117,9 +117,9 @@ class Ban(Command):
             )
         update = self.bot.database.bans.update
         ts = utc()
-        banlist = bot.data.bans.get(guild.id, hlist())
-        if type(banlist) is not hlist:
-            banlist = bot.data.bans[guild.id] = hlist(banlist)
+        banlist = bot.data.bans.get(guild.id, alist())
+        if type(banlist) is not alist:
+            banlist = bot.data.bans[guild.id] = alist(banlist)
         with discord.context_managers.Typing(channel):
             bans, glob = await self.getBans(guild)
             users = await bot.find_users(argl, args, user, guild)
@@ -217,7 +217,7 @@ class Ban(Command):
     async def createBan(self, guild, user, reason, length, channel, bans, glob):
         ts = utc()
         bot = self.bot
-        banlist = set_dict(bot.data.bans, guild.id, hlist())
+        banlist = set_dict(bot.data.bans, guild.id, alist())
         update = bot.database.bans.update
         for b in glob:
             u = b.user
@@ -433,11 +433,11 @@ class AutoRole(Command):
                 data.pop(guild.id)
                 update()
             return italics(css_md(f"Removed all items from the autorole list for {sqr_md(guild)}."))
-        assigned = set_dict(data, guild.id, hlist())
+        assigned = set_dict(data, guild.id, alist())
         if not argv:
-            rlist = hlist()
+            rlist = alist()
             for roles in assigned:
-                new = hlist()
+                new = alist()
                 for r in roles:
                     role = await bot.fetch_role(r, guild)
                     new.append(role)
@@ -447,7 +447,7 @@ class AutoRole(Command):
             return f"Currently active autoroles for {bold(escape_markdown(guild.name))}:\n{ini_md(iter2str(rlist))}"
         if sum(len(alist) for alist in assigned) >= 8:
             raise OverflowError(f"Autorole list for #{channel} has reached the maximum of 8 items. Please remove an item to add another.")
-        roles = hlist()
+        roles = alist()
         rolenames = (verify_id(i) for i in args)
         if len(guild.roles) <= 1:
             guild.roles = await guild.fetch_roles()
@@ -473,7 +473,7 @@ class AutoRole(Command):
                 if memb.top_role <= role:
                     raise PermissionError("Target role is higher than your highest role.")
             roles.append(role)
-        new = hlist(role.id for role in roles)
+        new = alist(role.id for role in roles)
         if new not in assigned:
             assigned.append(new)
             update()
@@ -693,7 +693,7 @@ class UpdateBans(Database):
 
     def __load__(self):
         d = self.data
-        self.listed = hlist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
+        self.listed = alist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
 
     async def _call_(self):
         t = utc()
@@ -870,8 +870,8 @@ class UpdateUserLogs(Database):
                     change = True
                     colour[0] += 255
                 if hash(tuple(r.id for r in before.roles)) != hash(tuple(r.id for r in after.roles)):
-                    sub = hlist()
-                    add = hlist()
+                    sub = alist()
+                    add = alist()
                     for r in before.roles:
                         if r not in after.roles:
                             sub.append(r)
