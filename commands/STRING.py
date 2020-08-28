@@ -532,8 +532,6 @@ class TimeCalc(Command):
         else:
             if "," in argv:
                 spl = argv.split(",")
-            elif "-" in argv:
-                spl = argv.split("-")
             else:
                 spl = [argv]
             timestamps = [utc_ts(tzparse(t)) for t in spl]

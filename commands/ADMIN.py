@@ -364,7 +364,7 @@ class RoleGiver(Command):
                     role = i
                     break
         else:
-            role = await strLookup(
+            role = await str_lookup(
                 rolelist,
                 r,
                 qkey=lambda x: [str(x), unicode_prune(x).replace(" ", "").casefold()],
@@ -460,7 +460,7 @@ class AutoRole(Command):
                         role = i
                         break
             else:
-                role = await strLookup(
+                role = await str_lookup(
                     rolelist,
                     r,
                     qkey=lambda x: [str(x), unicode_prune(x).replace(" ", "").casefold()],

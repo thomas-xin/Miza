@@ -2717,7 +2717,7 @@ def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]"):
     else:
         keys = range(offset, offset + len(it))
         values = iter(it)
-    spacing = int(math.log10(len(it) + offset - 1))
+    spacing = int(math.log10(max(1, len(it) + offset - 1)))
     s = ""
     with suppress(StopIteration):
         for k in keys:

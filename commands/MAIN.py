@@ -346,7 +346,7 @@ class Avatar(Command):
                         g = None
                         while u is None and g is None:
                             with suppress():
-                                u = await bot.fetch_member(u_id, guild, find_others=True)
+                                u = bot.get_member(u_id, guild)
                                 break
                             with suppress():
                                 try:
@@ -514,7 +514,7 @@ class Info(Command):
                         g = None
                         while u is None and g is None:
                             with suppress():
-                                u = await bot.fetch_member(u_id, guild, find_others=True)
+                                u = bot.get_member(u_id, guild)
                                 break
                             with suppress():
                                 try:
@@ -767,10 +767,23 @@ class Status(Command):
     name = ["State", "Ping"]
     min_level = 0
     description = "Shows the bot's current internal program state."
+    usage = "<enable(?e)> <disable(?d)>"
+    flags = "aed"
 
-    async def __call__(self, flags, bot, **void):
+    async def __call__(self, flags, channel, bot, **void):
+        if "d" in flags:
+            bot.data.messages.pop(channel.id)
+            bot.database.messages.update()
+            return fix_md("Successfully disabled status updates.")
+        elif "a" not in flags and "e" not in flags:
+            return await self._callback2_(channel)
+        message = await channel.send(italics(code_md("Loading bot status...")))
+        set_dict(bot.data.messages, channel.id, {})[message.id] = cdict(t=0, command="bot.commands.status[0]")
+        bot.database.messages.update()
+    
+    async def _callback2_(self, channel, m_id=None, **void):
+        bot = self.bot
         active = bot.get_active()
-        latency = sec2time(bot.latency)
         try:
             shards = len(bot.latencies)
         except AttributeError:
@@ -778,31 +791,64 @@ class Status(Command):
         size = sum(bot.size.values()) + sum(bot.size2.values())
         stats = bot.curr_state
         cache = await create_future(os.listdir, "cache/", timeout=12)
-        return italics(ini_md(
-            "Loaded users: " + sqr_md(len(bot.cache.users))
-            + ", Loaded servers: " + sqr_md(len(bot.guilds))
-            + ", Loaded shards: " + sqr_md(shards)
-            
-            + ".\nActive processes: " + sqr_md(active[0])
-            + ", Active threads: " + sqr_md(active[1])
-            + ", Active coroutines: " + sqr_md(active[2])
-            
-            + ".\nConnected voice channels: " + sqr_md(len(bot.voice_clients))
-            
-            + ".\nCached files: " + sqr_md(len(cache))
-            
-            + ".\nCode size: " + sqr_md(size[0]) + " bytes"
-            + ", " + sqr_md(size[1]) + " lines"
+        emb = discord.Embed(colour=rand_colour())
 
-            + ".\nSystem time: " + sqr_md(datetime.datetime.now())
-            + ".\nPing latency: " + sqr_md(latency)
-            + ".\nPublic IP address: " + sqr_md(bot.ip)
-            
-            + ".\nCPU usage: " + sqr_md(round(stats[0], 3)) + "%"
-            + ", RAM usage: " + sqr_md(round(stats[1] / 1048576, 3)) + " MB"
-            + ", Disk usage: " + sqr_md(round(stats[2] / 1048576, 3)) + " MB"
-            + "."
-        ))
+        bot_info = (
+            f"Process count\n`{active[0]}`\nThread count\n`{active[1]}`\nCoroutine count\n`{active[2]}`\n"
+            + f"CPU usage\n`{round(stats[0], 3)}%`\nRAM usage\n`{round(stats[1] / 1048576, 3)} MB`\nDisk usage\n`{round(stats[2] / 1048576, 3)} MB`"
+        )
+        emb.add_field(name="Bot info", value=bot_info)
+
+        discord_info = (
+            f"Shard count\n`{shards}`\nServer count\n`{len(bot.guilds)}`\nUser count\n`{len(bot.cache.users)}`\n"
+            + f"Channel count\n`{len(bot.cache.channels)}`\nRole count\n`{len(bot.cache.roles)}`\nEmoji count\n`{len(bot.cache.emojis)}`"
+        )
+        emb.add_field(name="Discord info", value=discord_info)
+
+        misc_info = (
+            f"Cached messages\n`{len(bot.cache.messages)}`\nCached files\n`{len(cache)}`\nConnected voice channels\n`{len(bot.voice_clients)}`\n"
+            + f"System time\n`{datetime.datetime.now()}`\nPing latency\n`{sec2time(bot.latency)}`\nPublic IP address\n`{bot.ip}`"
+        )
+        emb.add_field(name="Misc info", value=misc_info)
+        emb.add_field(name="Code size", value=f"[`{size[0]} bytes, {size[1]} lines`]({bot.website})")
+
+        # emb.add_field(name="Shard count", value=shards, inline=False)
+        # emb.add_field(name="Server count", value=len(bot.guilds), inline=False)
+        # emb.add_field(name="User count", value=len(bot.cache.users), inline=False)
+        # emb.add_field(name="Channel count", value=len(bot.cache.channels), inline=False)
+        # emb.add_field(name="Role count", value=len(bot.cache.roles), inline=False)
+        # emb.add_field(name="Emoji count", value=len(bot.cache.emojis), inline=False)
+
+        # emb.add_field(name="Connected voice channels", value=len(bot.voice_clients), inline=False)
+        # emb.add_field(name="Cached files", value=len(cache), inline=False)
+        # emb.add_field(name="Cached messages", value=len(bot.cache.messages), inline=False)
+
+        # emb.add_field(name="Code size", value=f"{size[0]} bytes, {size[1]} lines", inline=False)
+        # emb.add_field(name="System time", value=datetime.datetime.now(), inline=False)
+        # emb.add_field(name="Ping latency", value=sec2time(bot.latency), inline=False)
+        # emb.add_field(name="Public IP address", value=bot.ip, inline=False)
+
+        # emb.add_field(name="CPU usage", value=f"{round(stats[0], 3)}%", inline=False)
+        # emb.add_field(name="RAM usage", value=f"{round(stats[1] / 1048576, 3)} MB", inline=False)
+        # emb.add_field(name="Disk usage", value=f"{round(stats[2] / 1048576, 3)} MB", inline=False)
+
+        emb.set_author(name="Status", url=bot.website, icon_url=best_url(bot.user))
+        emb.timestamp = utc_dt()
+        func = channel.send
+        if m_id is not None:
+            with tracebacksuppressor:
+                message = bot.cache.messages.get(m_id)
+                if message is None:
+                    message = await aretry(channel.fetch_message, m_id, attempts=6, delay=2, exc=(discord.NotFound, discord.Forbidden))
+                if message.id != channel.last_message_id:
+                    hist = await channel.history(limit=1).flatten()
+                    if message.id != hist[0].id:
+                        create_task(bot.silent_delete(message))
+                        raise StopIteration
+                func = lambda *args, **kwargs: message.edit(*args, content=None, **kwargs)
+        message = await func(embed=emb)
+        if message is not None:
+            bot.data.messages[channel.id] = {message.id: cdict(t=utc(), command="bot.commands.status[0]")}
 
 
 class Invite(Command):
@@ -815,7 +861,7 @@ class Invite(Command):
             raise FileNotFoundError("Unable to locate bot's Client ID.")
         emb = discord.Embed(colour=rand_colour())
         emb.set_author(**get_author(self.bot.user))
-        emb.description = f"[Homepage]({self.bot.website})\n[Invite](https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord_id}&scope=bot)"
+        emb.description = f"[**`Homepage`**]({self.bot.website}) [**`Invite`**](https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord_id}&scope=bot)"
         self.bot.send_embeds(channel, embed=emb)
 
 
@@ -998,11 +1044,8 @@ class Reminder(Command):
             t = await bot.eval_time(args[-1], user)
             break
         if keyed:
-            try:
-                u = await bot.fetch_user(t)
-            except (TypeError, discord.NotFound):
-                member = await bot.fetch_member_ex(t, guild)
-                t = member.id
+            u = await bot.fetch_user_member(t, guild)
+            t = u.id
         msg = msg.strip(" ")
         if not msg:
             if "announce" in name:
@@ -1409,6 +1452,26 @@ class UpdateEnabled(Database):
     name = "enabled"
 
 
+class UpdateMessages(Database):
+    name = "messages"
+    semaphore = Semaphore(64, 128, rate_limit=120)
+
+    async def wrap_semaphore(self, fut):
+        with tracebacksuppressor:
+            async with self.semaphore:
+                return await fut
+
+    async def __call__(self, **void):
+        t = utc()
+        for c_id, data in self.data.items():
+            with tracebacksuppressor:
+                channel = await self.bot.fetch_channel(c_id)
+                for m_id, v in data.items():
+                    if t - v.t >= 12:
+                        v.t = t
+                        create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id)))
+
+
 EMPTY = {}
 
 # This database takes up a lot of space, storing so many events from users
@@ -1673,11 +1736,68 @@ class UpdateUsers(Database):
                 # Triggers for users not seen in 3 days or longer
                 out = choice((f"Long time no see, {user.name}!", f"Great to see you again, {user.display_name}!", f"It's been a while, {user.name}!"))
             if out is not None:
+                guild = message.guild
                 # Add randomized flavour text if in conversation
-                if self.flavour_buffer:
-                    out += self.flavour_buffer.popleft()
+                if xrand(4) or guild is None:
+                    if self.flavour_buffer:
+                        out += self.flavour_buffer.popleft()
+                    else:
+                        out += choice(self.flavour)
                 else:
-                    out += choice(self.flavour)
+                    i = xrand(4)
+                    member = random.choice(guild.members)
+                    if i == 0:
+                        count = await bot.database.counts.getUserMessages(member, guild)
+                        out += f"\nServer insights: {memeber} has posted {count} messages in total!"
+                    elif i == 1:
+                        curr = member.joined_at
+                        old = None
+                        with suppress(LookupError):
+                            old = bot.data.counts.get(guild.id, {})["oldest"][member.id]
+                            old = snowflake_time(old)
+                        if old is not None and old < curr:
+                            curr = old
+                        out += f"\nServer insights: {member} has been active here since {curr}!"
+                    elif i == 2:
+                        events = bot.database.users.get_events(member.id, interval=900)
+                        out += f"\nServer insights: {member} has performed {sum(events)} discord actions in the last two weeks!"
+                    else:
+                        i = xrand(4)
+                        if i == 0:
+                            users = set(bot.data.counts.get(guild.id, {})["totals"])
+                            users.update(guild._members)
+                            out += f"\nServer insights: {len(users)} have set their footprint into this server!"
+                        elif i == 1:
+                            totals = bot.data.counts.get(guild.id, {})["totals"]
+                            u_id = iter_max(totals)
+                            try:
+                                u = await bot.fetch_user(u_id)
+                            except:
+                                u = await bot.get_user(u_id, replace=True)
+                            total = totals[u_id]
+                            out += f"\nServer insights: {u} has posted the most text, with {total} total characters!"
+                        elif i == 2:
+                            counts = bot.data.counts.get(guild.id, {})["counts"]
+                            u_id = iter_max(counts)
+                            try:
+                                u = await bot.fetch_user(u_id)
+                            except:
+                                u = await bot.get_user(u_id, replace=True)
+                            count = counts[u_id]
+                            out += f"\nServer insights: {u} has posted the most messages, with {count} in total!"
+                        elif i == 3:
+                            found = member
+                            highest = 0
+                            for u_id in guild._members:
+                                if u_id != bot.id:
+                                    mutual = 0
+                                    for g in bot.guilds:
+                                        if u_id in g._members:
+                                            mutual += 1
+                                    if mutual > highest:
+                                        highest = mutual
+                                        found = guild.get_member(u_id)
+                            out += f"\nServer insights: {found} shares the highest number of mutual servers with me, with {highest}!"
             else:
                 # Help message greetings
                 i = xrand(7)

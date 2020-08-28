@@ -323,7 +323,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     if temp is not None:
                         return temp
             with suppress():
-                return await self.fetch_member(u_id, guild, find_others=True)
+                return self.get_member(u_id, guild)
             return user
         return await self.fetch_member_ex(u_id, guild)
 
@@ -413,16 +413,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 member = self.cache.members[u_id].guild.get_member(u_id)
                 if member is None:
                     raise LookupError
-                if member.guild.get_member(u_id) is None:
-                    raise LookupError
                 return member
         g = bot.cache.guilds
         if guild is None:
             guilds = deque(bot.cache.guilds.values())
         else:
             if find_others:
-                guilds = [g[i] for i in g if g[i].id != guild.id]
-                guilds.insert(0, guild)
+                guilds = deque(g[i] for i in g if g[i].id != guild.id)
+                guilds.appendleft(guild)
             else:
                 guilds = [guild]
         member = None
@@ -432,6 +430,34 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 break
             if not i & 4095:
                 await asyncio.sleep(0.2)
+        if member is None:
+            raise LookupError("Unable to find member data.")
+        self.cache.members[u_id] = member
+        self.limit_cache("members")
+        return member
+
+    def get_member(self, u_id, guild=None):
+        if type(u_id) is not int:
+            try:
+                u_id = int(u_id)
+            except (ValueError, TypeError):
+                raise TypeError(f"Invalid user identifier: {u_id}")
+        with suppress(LookupError):
+            member = self.cache.members[u_id].guild.get_member(u_id)
+            if member is None:
+                raise LookupError
+            return member
+        g = bot.cache.guilds
+        if guild is None:
+            guilds = deque(bot.cache.guilds.values())
+        else:
+            guilds = deque(g[i] for i in g if g[i].id != guild.id)
+            guilds.appendleft(guild)
+        member = None
+        for guild in guilds:
+            member = guild.get_member(u_id)
+            if member is not None:
+                break
         if member is None:
             raise LookupError("Unable to find member data.")
         self.cache.members[u_id] = member
@@ -1267,7 +1293,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         func = getattr(db, e, None)
                         if callable(func):
                             await_fut(create_future(func, bot=self, priority=True), priority=True)
-            print(f"Successfully loaded module {module}...")
+            print(f"Successfully loaded module {module}.")
 
     def unload(self, mod=None):
         if mod is None:
@@ -1587,7 +1613,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                     argv = unicode_prune(argv)
                                 argv = argv.strip()
                                 # Parse command flags (this is a bit of a mess)
-                                if getattr(command, "flags", None):
+                                if hasattr(command, "flags"):
                                     flaglist = command.flags
                                     for q in "?-+":
                                         if q in argv:
@@ -2517,7 +2543,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 # By fetching the first instance of a matching member object,
                 # this ensures the event will not be called multiple times if the user shares multiple guilds with the bot.
                 try:
-                    member = await self.fetch_member(after.id, find_others=True)
+                    member = self.get_member(after.id)
                 except LookupError:
                     member = None
                 if member is None or member.guild == after.guild:
