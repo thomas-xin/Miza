@@ -785,59 +785,41 @@ class Status(Command):
         set_dict(bot.data.messages, channel.id, {})[message.id] = cdict(t=0, command="bot.commands.status[0]")
         bot.database.messages.update()
     
-    async def _callback2_(self, channel, m_id=None, **void):
+    async def _callback2_(self, channel, m_id=None, msg=None, **void):
         bot = self.bot
-        active = bot.get_active()
-        try:
-            shards = len(bot.latencies)
-        except AttributeError:
-            shards = 1
-        size = sum(bot.size.values()) + sum(bot.size2.values())
-        stats = bot.curr_state
-        cache = await create_future(os.listdir, "cache/", timeout=12)
         emb = discord.Embed(colour=rand_colour())
-
-        bot_info = (
-            f"Process count\n`{active[0]}`\nThread count\n`{active[1]}`\nCoroutine count\n`{active[2]}`\n"
-            + f"CPU usage\n`{round(stats[0], 3)}%`\nRAM usage\n`{round(stats[1] / 1048576, 3)} MB`\nDisk usage\n`{round(stats[2] / 1048576, 3)} MB`"
-        )
-        emb.add_field(name="Bot info", value=bot_info)
-
-        discord_info = (
-            f"Shard count\n`{shards}`\nServer count\n`{len(bot.guilds)}`\nUser count\n`{len(bot.cache.users)}`\n"
-            + f"Channel count\n`{len(bot.cache.channels)}`\nRole count\n`{len(bot.cache.roles)}`\nEmoji count\n`{len(bot.cache.emojis)}`"
-        )
-        emb.add_field(name="Discord info", value=discord_info)
-
-        misc_info = (
-            f"Cached messages\n`{len(bot.cache.messages)}`\nCached files\n`{len(cache)}`\nConnected voice channels\n`{len(bot.voice_clients)}`\n"
-            + f"System time\n`{datetime.datetime.now()}`\nPing latency\n`{sec2time(bot.latency)}`\nPublic IP address\n`{bot.ip}`"
-        )
-        emb.add_field(name="Misc info", value=misc_info)
-        emb.add_field(name="Code info", value=f"[`{size[0]} bytes, {size[1]} lines`]({bot.website})")
-
-        # emb.add_field(name="Shard count", value=shards, inline=False)
-        # emb.add_field(name="Server count", value=len(bot.guilds), inline=False)
-        # emb.add_field(name="User count", value=len(bot.cache.users), inline=False)
-        # emb.add_field(name="Channel count", value=len(bot.cache.channels), inline=False)
-        # emb.add_field(name="Role count", value=len(bot.cache.roles), inline=False)
-        # emb.add_field(name="Emoji count", value=len(bot.cache.emojis), inline=False)
-
-        # emb.add_field(name="Connected voice channels", value=len(bot.voice_clients), inline=False)
-        # emb.add_field(name="Cached files", value=len(cache), inline=False)
-        # emb.add_field(name="Cached messages", value=len(bot.cache.messages), inline=False)
-
-        # emb.add_field(name="Code size", value=f"{size[0]} bytes, {size[1]} lines", inline=False)
-        # emb.add_field(name="System time", value=datetime.datetime.now(), inline=False)
-        # emb.add_field(name="Ping latency", value=sec2time(bot.latency), inline=False)
-        # emb.add_field(name="Public IP address", value=bot.ip, inline=False)
-
-        # emb.add_field(name="CPU usage", value=f"{round(stats[0], 3)}%", inline=False)
-        # emb.add_field(name="RAM usage", value=f"{round(stats[1] / 1048576, 3)} MB", inline=False)
-        # emb.add_field(name="Disk usage", value=f"{round(stats[2] / 1048576, 3)} MB", inline=False)
-
         emb.set_author(name="Status", url=bot.website, icon_url=best_url(bot.user))
         emb.timestamp = utc_dt()
+        if msg is None:
+            active = bot.get_active()
+            try:
+                shards = len(bot.latencies)
+            except AttributeError:
+                shards = 1
+            size = sum(bot.size.values()) + sum(bot.size2.values())
+            stats = bot.curr_state
+            cache = await create_future(os.listdir, "cache/", timeout=12)
+
+            bot_info = (
+                f"Process count\n`{active[0]}`\nThread count\n`{active[1]}`\nCoroutine count\n`{active[2]}`\n"
+                + f"CPU usage\n`{round(stats[0], 3)}%`\nRAM usage\n`{round(stats[1] / 1048576, 3)} MB`\nDisk usage\n`{round(stats[2] / 1048576, 3)} MB`"
+            )
+            emb.add_field(name="Bot info", value=bot_info)
+
+            discord_info = (
+                f"Shard count\n`{shards}`\nServer count\n`{len(bot.guilds)}`\nUser count\n`{len(bot.cache.users)}`\n"
+                + f"Channel count\n`{len(bot.cache.channels)}`\nRole count\n`{len(bot.cache.roles)}`\nEmoji count\n`{len(bot.cache.emojis)}`"
+            )
+            emb.add_field(name="Discord info", value=discord_info)
+
+            misc_info = (
+                f"Cached messages\n`{len(bot.cache.messages)}`\nCached files\n`{len(cache)}`\nConnected voice channels\n`{len(bot.voice_clients)}`\n"
+                + f"System time\n`{datetime.datetime.now()}`\nPing latency\n`{sec2time(bot.latency)}`\nPublic IP address\n`{bot.ip}`"
+            )
+            emb.add_field(name="Misc info", value=misc_info)
+            emb.add_field(name="Code info", value=f"[`{size[0]} bytes, {size[1]} lines`]({bot.website})")
+        else:
+            emb.description = msg
         func = channel.send
         if m_id is not None:
             with tracebacksuppressor:
@@ -854,6 +836,7 @@ class Status(Command):
         message = await func(embed=emb)
         if m_id is not None and message is not None:
             bot.data.messages[channel.id] = {message.id: cdict(t=utc(), command="bot.commands.status[0]")}
+            bot.database.messages.update()
 
 
 class Invite(Command):
@@ -1460,6 +1443,7 @@ class UpdateEnabled(Database):
 class UpdateMessages(Database):
     name = "messages"
     semaphore = Semaphore(64, 128, rate_limit=120)
+    closed = False
 
     async def wrap_semaphore(self, fut):
         with tracebacksuppressor:
@@ -1467,6 +1451,19 @@ class UpdateMessages(Database):
                 return await fut
 
     async def __call__(self, **void):
+        if not self.closed:
+            t = utc()
+            for c_id, data in self.data.items():
+                with tracebacksuppressor:
+                    channel = await self.bot.fetch_channel(c_id)
+                    for m_id, v in data.items():
+                        if t - v.t >= 12:
+                            v.t = t
+                            create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id)))
+    
+    async def _destroy_(self, **void):
+        self.closed = True
+        msg = "Offline 😔"
         t = utc()
         for c_id, data in self.data.items():
             with tracebacksuppressor:
@@ -1474,7 +1471,7 @@ class UpdateMessages(Database):
                 for m_id, v in data.items():
                     if t - v.t >= 12:
                         v.t = t
-                        create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id)))
+                        await self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id, msg=msg))
 
 
 EMPTY = {}
