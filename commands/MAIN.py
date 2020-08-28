@@ -770,13 +770,17 @@ class Status(Command):
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, flags, channel, bot, **void):
+    async def __call__(self, perm, flags, channel, bot, **void):
         if "d" in flags:
+            if perm < 2:
+                raise PermissionError("Permission level 2 or higher required to unset auto-updating status.")
             bot.data.messages.pop(channel.id)
             bot.database.messages.update()
             return fix_md("Successfully disabled status updates.")
         elif "a" not in flags and "e" not in flags:
             return await self._callback2_(channel)
+        if perm < 2:
+            raise PermissionError("Permission level 2 or higher required to set auto-updating status.")
         message = await channel.send(italics(code_md("Loading bot status...")))
         set_dict(bot.data.messages, channel.id, {})[message.id] = cdict(t=0, command="bot.commands.status[0]")
         bot.database.messages.update()
@@ -810,7 +814,7 @@ class Status(Command):
             + f"System time\n`{datetime.datetime.now()}`\nPing latency\n`{sec2time(bot.latency)}`\nPublic IP address\n`{bot.ip}`"
         )
         emb.add_field(name="Misc info", value=misc_info)
-        emb.add_field(name="Code size", value=f"[`{size[0]} bytes, {size[1]} lines`]({bot.website})")
+        emb.add_field(name="Code info", value=f"[`{size[0]} bytes, {size[1]} lines`]({bot.website})")
 
         # emb.add_field(name="Shard count", value=shards, inline=False)
         # emb.add_field(name="Server count", value=len(bot.guilds), inline=False)
@@ -842,12 +846,13 @@ class Status(Command):
                     message = await aretry(channel.fetch_message, m_id, attempts=6, delay=2, exc=(discord.NotFound, discord.Forbidden))
                 if message.id != channel.last_message_id:
                     hist = await channel.history(limit=1).flatten()
+                    channel.last_message_id = hist[0].id
                     if message.id != hist[0].id:
                         create_task(bot.silent_delete(message))
                         raise StopIteration
                 func = lambda *args, **kwargs: message.edit(*args, content=None, **kwargs)
         message = await func(embed=emb)
-        if message is not None:
+        if m_id is not None and message is not None:
             bot.data.messages[channel.id] = {message.id: cdict(t=utc(), command="bot.commands.status[0]")}
 
 
