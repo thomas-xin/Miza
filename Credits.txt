@@ -31,6 +31,12 @@ https://www.djtech.net/humor/useless_facts.htm
 https://github.com/sameerkumar18/useless-facts-api
 -Used by the fun facts flavour text generator
 
+https://github.com/Quihico/handy.stuff/blob/master/yt.pagetokens.x10
+-Used for the fast YouTube playlist scraper
+
+https://github.com/pocmo/Python-Brainfuck
+-Used for the ~math Brainfuck interpreter.
+
 
 MISC:
 

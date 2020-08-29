@@ -346,6 +346,8 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             if reason:
                 self.announce(reason)
         self.stop()
+        with tracebacksuppressor:
+            self.vc.stop()
 
     # Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
     def update(self, *void1, **void2):
@@ -1268,20 +1270,19 @@ class AudioDownloader:
 
     # Fetches youtube playlist page codes, split into pages of 50 items
     def setup_pages(self):
-        resp = Request("https://raw.githubusercontent.com/Quihico/handy.stuff/master/yt.pagetokens.x10", timeout=64, decode=True)
-        page10 = resp.split("\n")
+        with open("misc/page_tokens.txt", "r", encoding="utf-8") as f:
+            s = f.read()
+        page10 = s.split("\n")
         self.yt_pages = [page10[i] for i in range(0, len(page10), 5)]
 
     # Initializes youtube_dl object as well as spotify tokens, every 720 seconds.
     def update_dl(self):
         if utc() - self.lastclear > 720:
             self.lastclear = utc()
-            self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
-            self.spotify_headers = []
             with tracebacksuppressor:
-                tokens = [aretry(lambda: Request("https://open.spotify.com/get_access_token", attempts=8, delay=0.5, aio=True)) for _ in loop(8)]
-                tokens = await_fut(recursive_coro(tokens))
-                self.spotify_headers = deque({"authorization": f"Bearer {json.loads(token[:512])['accessToken']}"} for token in tokens if type(token) is str)
+                self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
+                token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=0.5))
+                self.spotify_header = {"authorization": f"Bearer {json.loads(token[:512])['accessToken']}"}
 
     # Gets data from pytube and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def from_pytube(self, url):
@@ -1333,9 +1334,10 @@ class AudioDownloader:
     # Returns part of a spotify playlist.
     def get_spotify_part(self, url):
         out = deque()
-        self.spotify_headers.rotate()
-        resp = Request(url, headers=self.spotify_headers[0])
+        resp = Request(url, headers=self.spotify_header)
         d = eval_json(resp)
+        with suppress(KeyError):
+            d = d["tracks"]
         try:
             items = d["items"]
             total = d.get("total", 0)
@@ -1363,7 +1365,7 @@ class AudioDownloader:
                 dur /= 1000
             temp = cdict(
                 name=name,
-                url=f"ytsearch:{name} ~ {artists}".replace(":", "-"),
+                url="ytsearch:" + f"{name} ~ {artists}".replace(":", "-"),
                 duration=dur,
                 research=True,
             )
@@ -1492,6 +1494,7 @@ class AudioDownloader:
                                 break
                             search = f"{url}&pageToken={self.yt_pages[i]}"
                             fut = create_future_ex(self.get_youtube_part, search, timeout=90)
+                            print("Sent 1 youtube search.")
                             futs.append(fut)
                             if not math.log2(i + 4) % 1 or not 4 + i & 15:
                                 while futs:
@@ -1542,6 +1545,7 @@ class AudioDownloader:
                                 break
                             search = url + "&offset=" + str(curr) + "&limit=" + str(page)
                             fut = create_future_ex(self.get_spotify_part, search, timeout=90)
+                            print("Sent 1 spotify search.")
                             futs.append(fut)
                             if not math.log2(i + 1) % 1 or not i & 7:
                                 while futs:
