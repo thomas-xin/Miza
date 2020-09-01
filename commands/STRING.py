@@ -84,7 +84,7 @@ class Translate(Command):
                 trans = trans[::-1]
             if "v" in flags:
                 count = 2
-                end = f"Detected language: {bold(source)}"
+                end = f"Detected language: {source}"
             else:
                 count = 1
                 end = None
