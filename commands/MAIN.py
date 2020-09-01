@@ -160,7 +160,8 @@ class EnabledCommands(Command):
                 return css_md(f"Standard command categories:\n{standard_commands}")
             if "e" in flags or "a" in flags:
                 categories = set(standard_commands)
-                enabled[channel.id] = categories.union(enabled[channel.id])
+                if channel.id in enabled:
+                    enabled[channel.id] = categories.union(enabled[channel.id])
                 update()
                 if "h" in flags:
                     return
@@ -1756,7 +1757,7 @@ class UpdateUsers(Database):
                             old = snowflake_time(old)
                         if old is not None and old < curr:
                             curr = old
-                        out += f"\nServer insights: `{member} has been active here since {curr}!`"
+                        out += f"\nServer insights: `{member} has been active here for {time_disp(utc() - curr.timestamp())}!`"
                     elif i == 2:
                         events = bot.database.users.get_events(member.id, interval=900)
                         out += f"\nServer insights: `{member} has performed {sum(events)} discord actions in the past 7 days!`"
