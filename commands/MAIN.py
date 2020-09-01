@@ -599,10 +599,17 @@ class Info(Command):
                             status_items = [(u.desktop_status, "🖥️"), (u.web_status, "🕸️"), (u.mobile_status, "📱")]
                         else:
                             status_items = [(bot.statuses[(i + bot.status_iter) % 3], x) for i, x in enumerate(("🖥️", "🕸️", "📱"))]
-                        for s, i in sorted(status_items, key=lambda x: status_order.index(x[0])):
+                        ordered = sorted(status_items, key=lambda x: status_order.index(x[0]))
+                        for s, i in ordered:
                             icon = status_icon[s]
                             if not status:
-                                status = status_text[s] + " `" + icon
+                                s_ = u.status
+                                if s != s_:
+                                    status = status_text[s_]  + " `" + status_icon[s_] + "❓"
+                                    if s not in (discord.Status.offline, discord.Status.invisible):
+                                        status += icon
+                                else:
+                                    status = status_text[s] + " `" + icon
                             if s not in (discord.Status.offline, discord.Status.invisible):
                                 if icon not in status:
                                     status += icon

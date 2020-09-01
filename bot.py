@@ -842,7 +842,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def status_changed(self, before, after):
         if before.activity != after.activity:
             return True
-        for attr in ("desktop_status", "web_status", "mobile_status"):
+        for attr in ("status", "desktop_status", "web_status", "mobile_status"):
             b, a = getattr(before, attr), getattr(after, attr)
             if b == discord.Status.online and a == discord.Status.idle:
                 if utc() - self.data.users.get(after.id, {}).get("last_seen", 0) < 900:
