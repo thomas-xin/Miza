@@ -1465,7 +1465,7 @@ class UpdateMessages(Database):
                 with tracebacksuppressor:
                     channel = await self.bot.fetch_channel(c_id)
                     for m_id, v in data.items():
-                        if t - v.t >= 12:
+                        if t - v.t >= 5:
                             v.t = t
                             create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id)))
     
@@ -1752,7 +1752,7 @@ class UpdateUsers(Database):
                         out += choice(self.flavour)
                 else:
                     i = xrand(4)
-                    member = random.choice(guild.members)
+                    member = choics(guild.members)
                     if i == 0:
                         count = await bot.database.counts.getUserMessages(member, guild)
                         out += f"\nServer insights: `{member} has posted {count} messages in total!`"
@@ -1764,7 +1764,7 @@ class UpdateUsers(Database):
                             old = snowflake_time(old)
                         if old is not None and old < curr:
                             curr = old
-                        out += f"\nServer insights: `{member} has been active here for {time_disp(utc() - curr.timestamp())}!`"
+                        out += f"\nServer insights: `{member} has been active here for {sec2time(utc() - curr.timestamp())}!`"
                     elif i == 2:
                         events = bot.database.users.get_events(member.id, interval=900)
                         out += f"\nServer insights: `{member} has performed {sum(events)} discord actions in the past 7 days!`"

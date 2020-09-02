@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
 
+deque = collections.deque
+
 
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
 
@@ -46,7 +48,7 @@ def TryWrapper(func):
 # Copyright 2011 Sebastian Kaspari
 
 def evaluate(code):
-    out = collections.deque()
+    out = deque()
     code = cleanup(list(code))
     bracemap = buildbracemap(code)
     cells, codeptr, cellptr = [0], 0, 0
@@ -69,14 +71,14 @@ def evaluate(code):
         if command == ".":
             out.append(chr(cells[cellptr]))
         if command == ",":
-            cells[cellptr] = ord(getch.getch())
+            cells[cellptr] = ord("")
         codeptr += 1
     return "".join(out)
 
 cleanup = lambda code: "".join(filter(lambda x: x in ".,[]<>+-", code))
 
 def buildbracemap(code):
-    temp_bracestack, bracemap = collections.deque(), {}
+    temp_bracestack, bracemap = deque(), {}
     for position, command in enumerate(code):
         if command == "[": temp_bracestack.append(position)
         if command == "]":
@@ -87,9 +89,14 @@ def buildbracemap(code):
 
 
 BF_ALIAS = ("bf", "brainfuck")
+alphanumeric = frozenset("abcdefghijklmnopqrstuvwxyz" + "abcdefghijklmnopqrstuvwxyz".upper() + "0123456789" + "_")
 
-# Enclose in string if possible
+
+# Enclose string in brackets if possible
 def bf_parse(s):
+    if "'" in s or '"' in s:
+        return s
+    s = s.replace("\n", " ").replace("\t", " ")
     for a in BF_ALIAS:
         try:
             i = s.index(a) + len(a)
@@ -100,10 +107,20 @@ def bf_parse(s):
                 i += 1
             if s[i] == "(":
                 i += 1
-                if s[i] not in "'\"":
-                    v, s = s[:i], s[i:]
-                    e = s.index(")")
-                    s = v + '"' + s[:e] + '"' + s[e:]
+                v, s = s[:i], s[i:]
+                e = s.index(")")
+                s = v + '"' + s[:e] + '"' + s[e:]
+    if " " in s:
+        i = len(s)
+        while i:
+            try:
+                i = s[:i].rindex(" ")
+            except ValueError:
+                break
+            else:
+                if i > 0 and i < len(s) - 1:
+                    if s[i - 1] in alphanumeric and s[i + 1] in alphanumeric:
+                        s = s[:i] + "(" + s[i + 1:] + ")"
     return s
 
 _bf = lambda s: evaluate(s)
@@ -153,6 +170,8 @@ class dice(sympy.Basic):
 
 # Sympy plotting functions
 def plotArgs(args):
+    if not args:
+        return
     if type(args[0]) in (tuple, list):
         args = list(args)
         args[0] = sympy.interpolating_spline(
@@ -299,6 +318,9 @@ _globals.update({
     "factors": _factorint,
     "factorize": factorize,
     "factor": factorize,
+    "abs": sympy.Abs,
+    "solve": sympy.solve,
+    "simplify": sympy.simplify,
     "intg": integrate,
     "integral": integrate,
     "integrate": integrate,
@@ -418,6 +440,19 @@ def prettyAns(f):
 # Main math equation solver
 @logging
 def evalSym(f, prec=64, r=False):
+    if f.lower() == "help":
+        lines = deque()
+        line = deque()
+        items = set(_globals)
+        while items:
+            temp = items.pop()
+            if not temp or temp.startswith("__") and temp[-2:] == "__":
+                continue
+            line.append(temp)
+            if len(line) >= 8:
+                lines.append("\t".join(line))
+                line.clear()
+        return ["\n".join(lines)]
     global BF_PREC
     BF_PREC = sympy.ceiling(int(prec) * 1.25)
     r = int(r)

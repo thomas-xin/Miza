@@ -261,11 +261,17 @@ class UpdateExec(Database):
                         if not proc:
                             return
                         proc = proc.translate(self.qtrans)
-                        output = None
                         try:
                             create_task(message.add_reaction("❗"))
-                            output = await self.procFunc(proc, channel, bot, term=f)
-                            await channel.send(self.prepare_string(output, fmt=""))
+                            result = await self.procFunc(proc, channel, bot, term=f)
+                            output = str(result)
+                            if len(output) > 54000:
+                                f = discord.File(io.BytesIO(output.encode("utf-8")), filename="message.txt")
+                                await send_with_file(channel, "Response over 54,000 characters.", file=f, filename="message.txt")
+                            elif len(output) > 1993:
+                                bot.send_as_embeds(channel, output, md=code_md)
+                            else:
+                                await channel.send(self.prepare_string(output, fmt=""))
                         except:
                             await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
         # Relay DM messages

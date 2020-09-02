@@ -28,10 +28,11 @@ if not os.path.exists("auth.json"):
 import time, datetime, psutil
 
 # Required on Windows to display terminal colour codes? 🤔
-try:
-    os.system("color")
-except:
-    traceback.print_exc()
+if os.name == "nt":
+    try:
+        os.system("color")
+    except:
+        traceback.print_exc()
 
 
 # Repeatedly attempts to delete a file, waiting 1 second between attempts.

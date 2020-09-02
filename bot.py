@@ -1091,7 +1091,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     num_words = "(?:(?:(?:[0-9]+|[a-z]{1,}illion)|thousand|hundred|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|zero|one|two|three|four|five|six|seven|eight|nine)\\s*)"
     numericals = re.compile("^(?:" + num_words + "|(?:a|an)\\s*)(?:" + num_words + ")*", re.I)
     connectors = re.compile("\\s(?:and|at)\\s", re.I)
-    alphabet = "abcdefghijklmnopqrstuvwxyz"
+    alphabet = frozenset("abcdefghijklmnopqrstuvwxyz")
 
     # Evaluates a time input, using a math process from the subprocess pool when necessary.
     async def eval_time(self, expr, obj=None, default=0, op=True):
@@ -1875,7 +1875,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             w = await self.ensure_webhook(channel, force=True)
             async with w.semaphore:
                 message = await w.send(*args, wait=True, **kwargs)
-        await self.seen(self.user, event="message", count=len(kwargs.get("embeds", (None,))), raw="Sending a message")
+        await self.seen(self.user, event="message", count=len(kwargs.get("embeds", (None,))), raw=f"Sending a message, {channel.guild}")
         if reacts:
             for react in reacts:
                 async with delay(1 / 3):
@@ -1949,6 +1949,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             embs.extend(embeds)
 
     def send_as_embeds(self, channel, description=None, fields=None, md=nofunc, author=None, footer=None, colour=None):
+        if description is not None and type(description) is not str:
+            if type(description) in (bytes, bytearray):
+                description = description.decode("utf-8", "replace")
+            else:
+                description = str(description)
         if not description and not fields:
             return
         col = 0 if colour is None else colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
@@ -1958,7 +1963,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if description:
             # Separate text into paragraphs, then lines, then words, then characters and attempt to add them one at a time, adding extra embeds when necessary
             curr = ""
-            paragraphs = alist(p + "\n\n" for p in description.split("\n\n"))
+            if "\n\n" in description:
+                paragraphs = alist(p + "\n\n" for p in description.split("\n\n"))
+            else:
+                paragraphs = alist((description,))
             while paragraphs:
                 para = paragraphs.popleft()
                 if len(para) > 2000:
@@ -2361,7 +2369,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 message = await self.fetch_message(payload.message_id, channel=channel)
             except discord.NotFound:
                 return
-            await self.seen(user, event="reaction", raw="Adding a reaction")
+            raw = "Adding a reaction"
+            if getattr(channel, "guild", None) is not None:
+                raw += f", {channel.guild}"
+            await self.seen(user, event="reaction", raw=raw)
             if user.id != self.id:
                 reaction = str(payload.emoji)
                 await self.react_callback(message, reaction, user)
@@ -2376,7 +2387,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 message = await self.fetch_message(payload.message_id, channel=channel)
             except discord.NotFound:
                 return
-            await self.seen(user, event="reaction", raw="Removing a reaction")
+            raw = "Adding a reaction"
+            if getattr(channel, "guild", None) is not None:
+                raw += f", {channel.guild}"
+            await self.seen(user, event="reaction", raw=raw)
             if user.id != self.id:
                 reaction = str(payload.emoji)
                 await self.react_callback(message, reaction, user)
@@ -2395,15 +2409,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             # Check for users with a voice state.
             if after is not None and not after.afk:
                 if before is None:
-                    await self.seen(member, event="misc", raw="Joining a voice channel")
+                    await self.seen(member, event="misc", raw=f"Joining a voice channel, {member.guild}")
                 elif any((getattr(before, attr) != getattr(after, attr) for attr in ("self_mute", "self_deaf", "self_stream", "self_video"))):
-                    await self.seen(member, event="misc", raw="Updating their voice settings")
+                    await self.seen(member, event="misc", raw=f"Updating their voice settings, {member.guild}")
 
         # Typing event: calls _typing_ and _seen_ bot database events.
         @self.event
         async def on_typing(channel, user, when):
             await self.send_event("_typing_", channel=channel, user=user)
-            await self.seen(user, delay=10, event="typing", raw="Typing")
+            raw = "Typing"
+            if getattr(channel, "guild", None) is not None:
+                raw += f", {channel.guild}"
+            await self.seen(user, delay=10, event="typing", raw=raw)
 
         # Message send event: processes new message. calls _send_ and _seen_ bot database events.
         @self.event
@@ -2412,7 +2429,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             guild = message.guild
             if guild:
                 create_task(self.send_event("_send_", message=message))
-            await self.seen(message.author, event="message", raw="Sending a message")
+            raw = "Sending a message"
+            if message.guild is not None:
+                raw += f", {message.guild}"
+            await self.seen(message.author, event="message", raw=raw)
             await self.react_callback(message, None, message.author)
             await self.handle_message(message, False)
 
@@ -2466,7 +2486,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 await self.handle_message(after)
                 if getattr(after, "guild", None):
                     create_task(self.send_event("_edit_", before=before, after=after))
-                await self.seen(after.author, event="message", raw="Editing a message")
+                raw = "Editing a message"
+                if after.guild is not None:
+                    raw += f", {after.guild}"
+                await self.seen(after.author, event="message", raw=raw)
 
         # Message delete event: uses raw payloads rather than discord.py message cache. calls _delete_ bot database event.
         @self.event
@@ -2554,7 +2577,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         @self.event
         async def on_member_join(member):
             await self.send_event("_join_", user=member, guild=member.guild)
-            await self.seen(member, event="misc", raw="Joining a server")
+            await self.seen(member, event="misc", raw=f"Joining a server, {member.guild}")
 
         # Member leave event: calls _leave_ bot database event.
         @self.event

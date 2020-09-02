@@ -711,7 +711,7 @@ async def process_math(expr, prec=64, rat=False, key=None, timeout=12):
                 await create_future(proc.stdin.write, d)
                 await create_future(proc.stdin.flush, timeout=timeout)
                 resp = await create_future(proc.stdout.readline, timeout=timeout)
-        except (T0, T1, T2):
+        except (T0, T1, T2, OSError):
             create_future_ex(force_kill, proc, priority=True)
             procs.remove(proc)
             busy.pop(key, None)
@@ -745,7 +745,7 @@ async def process_image(image, operation, args, key=None, timeout=24):
                 await create_future(proc.stdin.write, d)
                 await create_future(proc.stdin.flush, timeout=timeout)
                 resp = await create_future(proc.stdout.readline, timeout=timeout)
-        except (T0, T1, T2):
+        except (T0, T1, T2, OSError):
             create_future_ex(force_kill, proc, priority=True)
             procs.remove(proc)
             busy.pop(key, None)

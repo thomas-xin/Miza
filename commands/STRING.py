@@ -120,6 +120,7 @@ class Translate(Command):
 class Math(Command):
     _timeout_ = 4
     name = ["M", "PY", "Sympy", "Plot", "Calc"]
+    alias = name + ["Plot3d"]
     min_level = 0
     description = "Evaluates a math formula."
     usage = "<function> <verbose(?v)> <rationalize(?r)>"
@@ -127,13 +128,13 @@ class Math(Command):
     rate_limit = 0.5
     typing = True
 
-    async def __call__(self, bot, argv, name, channel, flags, user, **void):
+    async def __call__(self, bot, argv, name, channel, guild, flags, user, **void):
         if not argv:
-            raise ArgumentError("Input string is empty.")
+            raise ArgumentError(f"Input string is empty. Use {bot.get_prefix(guild)}math help for help.")
         r = "r" in flags
         p = flags.get("v", 0) * 2 + 1 << 6
-        if name == "plot" and not argv.lower().startswith("plot"):
-            argv = f"plot({argv})"
+        if "plot" in name and not argv.lower().startswith("plot"):
+            argv = f"{name}({argv})"
         resp = await bot.solve_math(argv, user, p, r, timeout=24)
         # Determine whether output is a direct answer or a file
         if type(resp) is dict and "file" in resp:
@@ -143,6 +144,8 @@ class Math(Command):
             await send_with_file(channel, "", f, filename=fn, best=True)
             return
         answer = "\n".join(str(i) for i in resp)
+        if argv.lower() == "help":
+            return answer
         return py_md(f"{argv} = {answer}")
 
 
@@ -548,7 +551,7 @@ class Follow(Command):
     description = "Follows a discord message link and/or finds URLs in a string."
     rate_limit = 1
     
-    async def __call__(self, argv, **void):
+    async def __call__(self, channel, argv, **void):
         urls = find_urls(argv)
         out = set()
         for url in urls:
@@ -560,7 +563,11 @@ class Follow(Command):
             out.update(temp)
         if not out:
             raise FileNotFoundError("No valid URLs detected.")
-        return f"`Detected {len(out)} url{'s' if len(out) != 1 else ''}:`\n" + "\n".join(out)
+        output = f"`Detected {len(out)} url{'s' if len(out) != 1 else ''}:`\n" + "\n".join(out)
+        if len(output) > 2000 and len(output) < 54000:
+            self.bot.send_as_embeds(channel, output)
+        else:
+            return output
 
 
 class Match(Command):
