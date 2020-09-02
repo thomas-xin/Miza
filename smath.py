@@ -225,8 +225,13 @@ def sort(it, key=None, reverse=False):
             raise TypeError(f"Sorting {type(it)} is not supported.")
 
 
-exclusive_range = lambda range, *excluded: tuple(i for i in range if i not in frozenset(excluded))
-exclusive_set = lambda range, *excluded: frozenset(i for i in range if i not in frozenset(excluded))
+def exclusive_range(range, *excluded):
+    ex = frozenset(excluded)
+    return tuple(i for i in range if i not in ex)
+
+def exclusive_set(range, *excluded):
+    ex = frozenset(excluded)
+    return frozenset(i for i in range if i not in ex)
 
 
 class UniversalSet(collections.abc.Set):
@@ -262,7 +267,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     maxoff = (1 << 24) - 1
     minsize = 256
-    __slots__ = ("hash", "block", "offs", "size", "data", "frozenset")
+    __slots__ = ("hash", "block", "offs", "size", "data", "frozenset", "queries")
 
     # For thread-safety: Waits until the list is not busy performing an operation.
     def waiting(self):
@@ -290,6 +295,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
             self.block = True
             self.hash = None
             self.frozenset = None
+            self.queries = 0
             try:
                 output = func(self, *args, **kwargs)
                 self.block = False
@@ -303,6 +309,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     def __init__(self, *args, **void):
         self.block = True if not getattr(self, "block", None) else 2
         self.hash = None
+        self.queries = 0
         if not args:
             self.offs = 0
             self.size = 0
@@ -736,6 +743,11 @@ custom list-like data structure that incorporates the functionality of numpy arr
         return bytes(round(i) & 255 for i in self.view)
 
     def __contains__(self, item):
+        if self.queries >= 8:
+            return item in self.to_frozenset()
+        if self.frozenset is not None:
+            return item in self.frozenset
+        self.queries += 1
         return item in self.view
 
     __copy__ = lambda self: self.copy()
