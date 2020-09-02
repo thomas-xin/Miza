@@ -443,10 +443,11 @@ def evalSym(f, prec=64, r=False):
     if f.lower() == "help":
         lines = deque()
         line = deque()
+        lines.append("Available functions/variables:")
         items = set(_globals)
         while items:
             temp = items.pop()
-            if not temp or temp.startswith("__") and temp[-2:] == "__":
+            if not temp or temp.startswith("__"):
                 continue
             line.append(temp)
             if len(line) >= 8:

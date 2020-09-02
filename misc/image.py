@@ -3,6 +3,8 @@
 import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, numpy, requests, blend_modes
 import PIL
 from PIL import Image, ImageChops, ImageEnhance, ImageMath, ImageStat
+from svglib.svglib import svg2rlg
+from reportlab.graphics import renderPM
 import matplotlib.pyplot as plt
 
 
@@ -662,6 +664,17 @@ def plt_special(d, user=None, **void):
     return "$" + out
 
 
+def from_bytes(b):
+    if b[:4] == b"<svg":
+        drawing = svg2rlg(io.BytesIO(b))
+        out = io.BytesIO()
+        renderPM.drawToFile(drawing, out, fmt="PNG")
+        out.seek(0)
+    else:
+        out = io.BytesIO(b)
+    return Image.open(out)
+
+
 def get_image(url, out):
     if issubclass(type(url), Image.Image):
         return url
@@ -683,12 +696,12 @@ def get_image(url, out):
                     os.remove(url)
                 except:
                     pass
-        image = Image.open(io.BytesIO(data))
+        image = from_bytes(data)
         CACHE[url] = image
     else:
         if len(url) > 67108864:
             raise OverflowError("Max file size to load is 64MB.")
-        image = Image.open(io.BytesIO(url))
+        image = from_bytes(url)
     return image
 
 
