@@ -1759,7 +1759,7 @@ class UpdateUsers(Database):
                         out += choice(self.flavour)
                 else:
                     i = xrand(4)
-                    member = choics(guild.members)
+                    member = choice(guild.members)
                     if i == 0:
                         count = await bot.database.counts.getUserMessages(member, guild)
                         out += f"\nServer insights: `{member} has posted {count} messages in total!`"
