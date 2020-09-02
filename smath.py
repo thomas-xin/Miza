@@ -309,6 +309,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     def __init__(self, *args, **void):
         self.block = True if not getattr(self, "block", None) else 2
         self.hash = None
+        self.frozenset = None
         self.queries = 0
         if not args:
             self.offs = 0
