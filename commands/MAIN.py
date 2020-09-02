@@ -564,7 +564,7 @@ class Info(Command):
                             emb = await self.getGuildData(g, flags)
                             embs.add(emb)
                             raise StopIteration
-                    elif not name.startswith("server"):
+                    elif "server" not in name:
                         u = user
                     else:
                         if not hasattr(guild, "ghost"):
@@ -601,10 +601,14 @@ class Info(Command):
                             status_items = [(bot.statuses[(i + bot.status_iter) % 3], x) for i, x in enumerate(("🖥️", "🕸️", "📱"))]
                         ordered = sorted(status_items, key=lambda x: status_order.index(x[0]))
                         for s, i in ordered:
+                            if s == discord.Status.offline:
+                                ls = bot.data.users.get(u.id, {}).get("last_seen", 0)
+                                if utc() - ls < 300 and ls > bot.data.users.get(u.id, {}).get("last_offline", 0):
+                                    s = discord.Status.invisible
                             icon = status_icon[s]
                             if not status:
                                 s_ = u.status
-                                if s != s_:
+                                if s != s_ and s == discord.Status.offline:
                                     status = status_text[s_]  + " `" + status_icon[s_] + "❓"
                                     if s not in (discord.Status.offline, discord.Status.invisible):
                                         status += icon
@@ -1661,6 +1665,9 @@ class UpdateUsers(Database):
                 amount = len(self.flavour_set)
                 if changed and (not amount & amount - 1):
                     self.flavour = tuple(self.flavour_set)
+
+    def _offline_(self, user, **void):
+        set_dict(self.data, user.id, {})["last_offline"] = utc()
 
     # User seen, add event to activity database
     def _seen_(self, user, delay, event, count=1, raw=None, **void):

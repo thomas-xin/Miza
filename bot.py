@@ -844,10 +844,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             return True
         for attr in ("status", "desktop_status", "web_status", "mobile_status"):
             b, a = getattr(before, attr), getattr(after, attr)
+            if b == a:
+                return False
+        return True
+    
+    # Checks whether a member's status was updated by themselves.
+    def status_updated(self, before, after):
+        if before.activity != after.activity:
+            return True
+        for attr in ("status", "desktop_status", "web_status", "mobile_status"):
+            b, a = getattr(before, attr), getattr(after, attr)
             if b == discord.Status.online and a == discord.Status.idle:
                 if utc() - self.data.users.get(after.id, {}).get("last_seen", 0) < 900:
                     return False
-            elif b != discord.Status.offline and a == discord.Status.offline:
+            elif a == discord.Status.offline:
                 return False
             elif b == a:
                 return False
@@ -1552,7 +1562,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if op:
             # Special case: the ? alias for the ~help command, since ? is an argument flag indicator and will otherwise be parsed as one.
             if len(comm) and comm[0] == "?":
-                check = comm[0]
+                command_check = comm[0]
                 i = 1
             else:
                 # Parse message to find command.
@@ -1562,11 +1572,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         i2 = comm.index(end)
                         if i2 < i:
                             i = i2
-                check = full_prune(comm[:i]).replace("*", "").replace("_", "").replace("||", "")
+                command_check = full_prune(comm[:i]).replace("*", "").replace("_", "").replace("||", "")
             # Hash table lookup for target command: O(1) average time complexity.
-            if check in bot.commands:
+            if command_check in bot.commands:
                 # Multiple commands may have the same alias, run all of them
-                for command in bot.commands[check]:
+                for command in bot.commands[command_check]:
                     # Make sure command is enabled, administrators bypass this
                     if full_prune(command.catg) in enabled or admin:
                         # argv is the raw parsed argument data
@@ -1583,7 +1593,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             # Make sure target has permission to use the target command, rate limit the command if necessary.
                             if u_perm is not nan:
                                 if not u_perm >= req:
-                                    raise command.perm_error(u_perm, req, "for command " + check)
+                                    raise command.perm_error(u_perm, req, "for command " + command_check)
                                 x = command.rate_limit
                                 if x:
                                     if issubclass(type(x), collections.abc.Sequence):
@@ -1721,7 +1731,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 message=message,                # message data
                                 channel=channel,                # channel data
                                 guild=guild,                    # guild data
-                                name=check,                     # alias the command was called as
+                                name=command_check,                     # alias the command was called as
                                 callback=self.process_message,  # function that called the command
                                 timeout=timeout,                # timeout delay for the command
                             )
@@ -2571,7 +2581,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 except LookupError:
                     member = None
                 if member is None or member.guild == after.guild:
-                    await self.seen(after, event="misc", raw="Changing their status")
+                    if self.status_updated(before, after):
+                        await self.seen(after, event="misc", raw="Changing their status")
+                    elif after.status == discord.Status.offline:
+                        await self.send_event("_offline_", user=after)
 
         # Member join event: calls _join_ and _seen_ bot database events.
         @self.event
