@@ -297,7 +297,7 @@ class OwOify(Command):
         "L": "W",
     }
     otrans = "".maketrans(omap)
-    name = ["UwU", "OwO", "UWUify"]
+    name = ["UwU", "OwO", "UwUify"]
     min_level = 0
     description = "Applies the owo/uwu text filter to a string."
     usage = "<string> <aggressive(?a)> <basic(?b)>"

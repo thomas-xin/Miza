@@ -766,7 +766,7 @@ class Magik(Command):
             if not name.endswith(".png"):
                 name += ".png"
             # Site only allows cdn.discord URLs, reupload images to discord temporarily for all other image links
-            if "cdn.discord" not in url[:32] or url[-4:] not in (".png", "webm", ".jpg", "jpeg"):
+            if "cdn.discord" not in url[:32] or url.split("?")[0][-4:] not in (".png", "webm", ".jpg", "jpeg"):
                 resp = await process_image(url, "resize_max", ["-nogif", 512, "hamming"], user)
                 fn = resp[0]
                 f = discord.File(fn, filename=name)
