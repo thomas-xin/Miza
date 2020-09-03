@@ -733,16 +733,19 @@ def evalImg(url, operation, args):
     out = "cache/" + str(ts) + ".png"
     args = eval(args)
     if operation != "$":
-        if args[-1] == "$%RAW%$":
+        if args[-1] == "-raw":
             args.pop(-1)
             image = requests.get(url, timeout=8).content
         else:
             image = get_image(url, out)
         # $%GIF%$ is a special case where the output is always a .gif image
-        if args[-1] == "$%GIF%$":
+        if args[-1] == "-gif":
             new = eval(operation)(image, *args[:-1])
         else:
             try:
+                if args[0] == "-nogif":
+                    args = args[1:]
+                    raise EOFError
                 image.seek(1)
             except EOFError:
                 new = None
