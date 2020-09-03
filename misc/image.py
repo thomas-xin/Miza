@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, numpy, requests, blend_modes
+import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, numpy, requests, blend_modes, pdf2image
 import PIL
 from PIL import Image, ImageChops, ImageEnhance, ImageMath, ImageStat
 from svglib.svglib import svg2rlg
@@ -670,9 +670,29 @@ def from_bytes(b):
         out = io.BytesIO()
         renderPM.drawToFile(drawing, out, fmt="PNG")
         out.seek(0)
+    elif b[:4] == b"%PDF":
+        return ImageSequence(*pdf2image.convert_from_bytes(b, poppler_path="misc/poppler", use_pdftocairo=True))
     else:
         out = io.BytesIO(b)
     return Image.open(out)
+
+
+class ImageSequence(Image.Image):
+
+    def __init__(self, *images):
+        self._images = [image.copy() for image in images]
+        self._position = 0
+
+    def seek(self, position):
+        if position >= len(self._images):
+            raise EOFError
+        self._position = position
+    
+    def __getattr__(self, key):
+        try:
+            return self.__getattribute__(key)
+        except AttributeError:
+            return getattr(self._images[self._position], key)
 
 
 def get_image(url, out):

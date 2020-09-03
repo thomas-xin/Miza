@@ -707,7 +707,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             s = s[3:]
             i = s.index(":")
             e_id = s[i + 1:s.rindex(">")]
-            out.append(f"https://cdn.discordapp.com/emojis/{e_id}.png?v=1")
+            try:
+                out.append(self.emojis[e_id].url)
+            except KeyError:
+                url = f"https://cdn.discordapp.com/emojis/{e_id}.gif"
+                with requests.get(url, stream=True) as resp:
+                    if resp.status_code >= 400:
+                        url = url[:-3] + "png"
+            out.append(url)
         return out
 
     # Inserts a message into the bot cache, discarding existing ones if full.
