@@ -1788,7 +1788,7 @@ class AudioDownloader:
         with open(fn, "rb") as f:
             resp = Request("https://cts.ofoct.com/upload.php", method="post", files={"myfile": ("temp.ogg", f)}, timeout=32, decode=True)
             resp_fn = ast.literal_eval(resp)[0]
-        url = f"https://cts.ofoct.com/convert-file_v2.php?cid=audio2midi&output=MID&tmpfpath={resp_fn}&row=file1&sourcename=temp.ogg&&rowid=file1"
+        url = f"https://cts.ofoct.com/convert-file_v2.php?cid=audio2midi&output=MID&tmpfpath={resp_fn}&row=file1&sourcename=temp.ogg&rowid=file1"
         print(url)
         with suppress():
             os.remove(fn)
@@ -3434,7 +3434,7 @@ class Download(Command):
                 for r in range(2):
                     returns.append(create_future(
                         ytdl.downloader.extract_info,
-                        f"{searches[r]}:{argv}.replace(':', '~')",
+                        f"{searches[r]}:{argv.replace(':', '~')}",
                         download=False,
                         process=r,
                         timeout=18,
