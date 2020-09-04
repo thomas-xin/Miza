@@ -1788,9 +1788,11 @@ class AudioDownloader:
         with open(fn, "rb") as f:
             resp = Request("https://cts.ofoct.com/upload.php", method="post", files={"myfile": ("temp.ogg", f)}, timeout=32, decode=True)
             resp_fn = ast.literal_eval(resp)[0]
+        url = f"https://cts.ofoct.com/convert-file_v2.php?cid=audio2midi&output=MID&tmpfpath={resp_fn}&row=file1&sourcename=temp.ogg&&rowid=file1"
+        print(url)
         with suppress():
             os.remove(fn)
-        resp = Request(f"https://cts.ofoct.com/convert-file_v2.php?cid=audio2midi&output=MID&tmpfpath={resp_fn}&row=file1&sourcename=temp.ogg&&rowid=file1", timeout=240)
+        resp = Request(url, timeout=360)
         out = Request(f"https://cts.ofoct.com/get-file.php?type=get&genfpath=/tmp/{resp_fn}.mid", timeout=24)
         return io.BytesIO(out), f"{info['name']}.mid"
 
@@ -3438,6 +3440,7 @@ class Download(Command):
                         timeout=18,
                     ))
                 returns = await recursive_coro(returns)
+                print(returns)
                 # Attempt to find data for results, adjusting if they are incomplete
                 for r in returns:
                     with tracebacksuppressor:
