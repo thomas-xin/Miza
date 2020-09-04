@@ -27,6 +27,9 @@ Fabrice Bellard, Michael Niedermayer and others
 Dario Alpern
 -Integer factorization calculator: {https://github.com/alpertron/calculators}
 
+https://www.ofoct.com/audio-converter/convert-wav-or-mp3-ogg-aac-wma-to-midi.html
+-Used by the audio to midi converter
+
 https://www.djtech.net/humor/useless_facts.htm
 https://github.com/sameerkumar18/useless-facts-api
 -Used by the fun facts flavour text generator

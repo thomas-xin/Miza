@@ -19,7 +19,7 @@ except:
 
 # Default and standard command categories to enable.
 default_commands = frozenset(("main", "string", "admin"))
-standard_commands = default_commands.union(("voice", "image", "game"))
+standard_commands = default_commands.union(("voice", "image", "fun"))
 
 
 class Help(Command):

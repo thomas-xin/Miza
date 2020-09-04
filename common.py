@@ -945,7 +945,9 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         self.session = aiohttp.ClientSession(loop=eloop)
         self.semaphore = Semaphore(512, 256, delay=0.25)
 
-    async def aio_call(self, url, headers, data, method, decode):
+    async def aio_call(self, url, headers, files, data, method, decode):
+        if files is not None:
+            raise NotImplementedError("Unable to send multipart files asynchronously.")
         async with self.semaphore:
             async with getattr(self.session, method)(url, headers=headers, data=data) as resp:
                 if resp.status >= 400:
@@ -956,13 +958,16 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                     return data.decode("utf-8", "replace")
                 return data
 
-    def __call__(self, url, headers={}, data=None, raw=False, timeout=8, method="get", bypass=True, decode=False, aio=False):
-        if bypass and "user-agent" not in headers:
-            headers["user-agent"] = f"Mozilla/5.{xrand(1, 10)}"
+    def __call__(self, url, headers={}, files=None, data=None, raw=False, timeout=8, method="get", decode=False, bypass=True, aio=False):
+        if bypass:
+            if "user-agent" not in headers:
+                headers["user-agent"] = f"Mozilla/5.{xrand(1, 10)}"
+            headers["DNT"] = "1"
+        method = method.casefold()
         if aio:
-            return create_task(asyncio.wait_for(self.aio_call(url, headers, data, method, decode), timeout=timeout))
+            return create_task(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode), timeout=timeout))
         with self.semaphore:
-            with getattr(requests, method)(url, headers=headers, data=data, stream=True, timeout=timeout) as resp:
+            with getattr(requests, method)(url, headers=headers, files=files, data=data, stream=True, timeout=timeout) as resp:
                 if resp.status_code >= 400:
                     raise ConnectionError(f"Error {resp.status_code}: {resp.text}")
                 if raw:

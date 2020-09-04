@@ -1738,6 +1738,11 @@ class AudioDownloader:
     # For ~download
     def download_file(self, url, fmt="ogg", auds=None, fl=8388608):
         # Select a filename based on current time to avoid conflicts
+        if fmt[:3] == "mid":
+            mid = True
+            fmt = "ogg"
+        else:
+            mid = False
         fn = f"cache/&{time_snowflake(utc_dt())}.{fmt}"
         info = self.extract(url)[0]
         self.get_stream(info, force=True, download=False)
@@ -1763,22 +1768,31 @@ class AudioDownloader:
             subprocess.check_output(args)
         except subprocess.CalledProcessError:
             # Attempt to convert file from org if FFmpeg failed
-            with suppress(ValueError):
+            try:
                 xm = org2xm(stream)
-                # Re-estimate duration if file was successfully converted from org
-                args[8] = xm
-                dur = get_duration(xm)
-                if dur:
-                    if auds:
-                        dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
-                    br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
-                    args[-4] = str(br)
-                subprocess.check_output(args)
-                with suppress():
-                    os.remove(xm)
-                return fn, f"{info['name']}.{fmt}"
-            raise
-        return fn, f"{info['name']}.{fmt}"
+            except ValueError:
+                raise
+            # Re-estimate duration if file was successfully converted from org
+            args[8] = xm
+            dur = get_duration(xm)
+            if dur:
+                if auds:
+                    dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
+                br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
+                args[-4] = str(br)
+            subprocess.check_output(args)
+            with suppress():
+                os.remove(xm)
+        if not mid:
+            return fn, f"{info['name']}.{fmt}"
+        with open(fn, "rb") as f:
+            resp = Request("https://cts.ofoct.com/upload.php", method="post", files={"myfile": ("temp.ogg", f)}, timeout=32, decode=True)
+            resp_fn = ast.literal_eval(resp)[0]
+        with suppress():
+            os.remove(fn)
+        resp = Request(f"https://cts.ofoct.com/convert-file_v2.php?cid=audio2midi&output=MID&tmpfpath={resp_fn}&row=file1&sourcename=temp.ogg&&rowid=file1", timeout=240)
+        out = Request(f"https://cts.ofoct.com/get-file.php?type=get&genfpath=/tmp/{resp_fn}.mid", timeout=24)
+        return io.BytesIO(out), f"{info['name']}.mid"
 
     # Extracts full data for a single entry. Uses cached results for optimization.
     def extract_single(self, i):
@@ -3393,7 +3407,7 @@ class Download(Command):
                     fmt = spl[-1]
                     if fmt.startswith("."):
                         fmt = fmt[1:]
-                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "webm", "wav"):
+                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "webm", "wav", "mid", "midi"):
                         fmt = "ogg"
                     else:
                         argv = " ".join(spl[:-1])

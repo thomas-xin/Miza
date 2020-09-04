@@ -1527,6 +1527,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if g_id:
             try:
                 enabled = self.data.enabled[c_id]
+                if "game" in enabled:
+                    if type(enabled) is not set:
+                        enabled = set(enabled)
+                    enabled.remove("game")
+                    enabled.add("fun")
+                    self.data.enabled[c_id] = enabled
             except KeyError:
                 enabled = ("main", "string", "admin")
         else:
