@@ -3372,7 +3372,7 @@ class Lyrics(Command):
 
 class Download(Command):
     time_consuming = True
-    _timeout_ = 8
+    _timeout_ = 20
     name = ["Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "ConvertORG", "Org2xm", "Convert"]
     min_level = 0
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
