@@ -1766,12 +1766,12 @@ class AudioDownloader:
         args.extend(("-ar", str(SAMPLE_RATE), "-b:a", str(br), "-fs", str(fs), fn))
         try:
             subprocess.check_output(args)
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as ex:
             # Attempt to convert file from org if FFmpeg failed
             try:
                 xm = org2xm(stream)
             except ValueError:
-                raise
+                raise ex
             # Re-estimate duration if file was successfully converted from org
             args[8] = xm
             dur = get_duration(xm)
@@ -1792,7 +1792,7 @@ class AudioDownloader:
         print(url)
         with suppress():
             os.remove(fn)
-        resp = Request(url, timeout=360)
+        resp = Request(url, timeout=420)
         out = Request(f"https://cts.ofoct.com/get-file.php?type=get&genfpath=/tmp/{resp_fn}.mid", timeout=24)
         return io.BytesIO(out), f"{info['name']}.mid"
 
@@ -3529,7 +3529,7 @@ class Download(Command):
                             fmt=spl[2],
                             auds=auds,
                             fl=fl,
-                            timeout=180,
+                            timeout=540,
                         )
                         f = discord.File(fn, out)
                         create_task(message.edit(
