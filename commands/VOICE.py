@@ -3434,13 +3434,12 @@ class Download(Command):
                 for r in range(2):
                     returns.append(create_future(
                         ytdl.downloader.extract_info,
-                        f"{searches[r]}:{argv}".replace(":", "~"),
+                        f"{searches[r]}:{argv}.replace(':', '~')",
                         download=False,
                         process=r,
                         timeout=18,
                     ))
                 returns = await recursive_coro(returns)
-                print(returns)
                 # Attempt to find data for results, adjusting if they are incomplete
                 for r in returns:
                     with tracebacksuppressor:
