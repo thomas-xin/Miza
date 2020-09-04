@@ -1890,7 +1890,7 @@ class Queue(Command):
         except KeyError:
             future = create_task(auto_join(guild, channel, user, bot, preparing=True))
         # Start typing event asynchronously to avoid delays
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             # Perform search concurrently, may contain multiple URLs
             out = None
             urls = await bot.follow_url(argv, allow=True, images=False)
@@ -2160,7 +2160,7 @@ class Playlist(Command):
         urls = await bot.follow_url(argv, allow=True, images=False)
         if urls:
             argv = urls[0]
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
         # Unlike ~queue this command only supports a single URL/search
             resp = await create_future(ytdl.search, argv, timeout=180)
         if type(resp) is str:
@@ -2605,7 +2605,7 @@ class Dump(Command):
         if argv == "" and not message.attachments or name == "save":
             if name == "load":
                 raise ArgumentError("Please input a file, URL or json data to load.")
-            with discord.context_managers.Typing(channel):
+            async with discord.context_managers.Typing(channel):
                 resp = await create_future(auds.get_dump, "x" in flags, js=True, timeout=18)
                 f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
             create_task(send_with_file(channel, f"Queue data for {bold(str(guild))}:", f))
@@ -2632,7 +2632,7 @@ class Dump(Command):
             # Queue may already be in dict form if loaded from database
             d = argv
         q = d["queue"]
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             # Copy items and cast to cdict queue entries
             for i, e in enumerate(q):
                 if type(e) is not cdict:

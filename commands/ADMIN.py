@@ -120,7 +120,7 @@ class Ban(Command):
         banlist = bot.data.bans.get(guild.id, alist())
         if type(banlist) is not alist:
             banlist = bot.data.bans[guild.id] = alist(banlist)
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             bans, glob = await self.getBans(guild)
             users = await bot.find_users(argl, args, user, guild)
         if not users:
@@ -480,7 +480,7 @@ class AutoRole(Command):
         # Update all users by adding roles
         if "x" in flags or name == "instarole":
             if roles:
-                with discord.context_managers.Typing(channel):
+                async with discord.context_managers.Typing(channel):
                     i = 1
                     for member in guild.members:
                         role = choice(roles)
