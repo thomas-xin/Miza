@@ -3412,6 +3412,8 @@ class Download(Command):
                     if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "webm", "wav", "mid", "midi"):
                         fmt = "ogg"
                     else:
+                        if spl[-2] in ("as", "to"):
+                            spl.pop(-1)
                         argv = " ".join(spl[:-1])
                 else:
                     fmt = "ogg"
@@ -3511,7 +3513,7 @@ class Download(Command):
                     # Perform all these tasks asynchronously to save time
                     with discord.context_managers.Typing(channel):
                         create_task(message.edit(
-                            content=ini_md(f"Downloading {sqr_md(ensure_url(url))}..."),
+                            content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
                             embed=None,
                         ))
                         try:
