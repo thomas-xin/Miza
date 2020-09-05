@@ -2092,6 +2092,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         await asyncio.sleep(1)
                     await self.handle_update()
     
+    # The slow update loop that runs once every 5 seconds.
     async def slow_loop(self):
         while not self.closed:
             async with delay(5):
@@ -2099,7 +2100,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     net = psutil.net_io_counters()
                     net_bytes = net.bytes_sent + net.bytes_recv
                     if not hasattr(self, "net_bytes"):
-                        self.net_bytes = deque(maxlen=12)
+                        self.net_bytes = deque(maxlen=3)
                         if os.path.exists("saves/status.json"):
                             try:
                                 with open("saves/status.json", "rb") as f:
