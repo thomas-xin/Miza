@@ -1471,7 +1471,7 @@ class UpdateMessages(Database):
                 with tracebacksuppressor:
                     channel = await self.bot.fetch_channel(c_id)
                     for m_id, v in data.items():
-                        if t - v.t >= 5:
+                        if t - v.t >= 1:
                             v.t = t
                             create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id)))
     
