@@ -1904,6 +1904,7 @@ class Queue(Command):
             else:
                 resp = deque()
                 for fut in out:
+                    temp = await fut
                     # Ignore errors when searching with multiple URLs
                     if type(temp) not in (str, bytes):
                         resp.extend(temp)
