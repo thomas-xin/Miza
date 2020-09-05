@@ -2083,6 +2083,26 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     with delay(1 / freq):
                         await_fut(self.send_event("_call_"), delay=0.002, priority=True)
 
+    # The slow update loop that runs once every 1 second.
+    async def slow_loop(self):
+        while not self.closed:
+            async with delay(1):
+                async with tracebacksuppressor:
+                    net = psutil.net_io_counters()
+                    net_bytes = net.bytes_sent + net.bytes_recv
+                    if not hasattr(self, "net_bytes"):
+                        self.net_bytes = deque(maxlen=3)
+                        self.start_bytes = 0
+                        if os.path.exists("saves/status.json"):
+                            with tracebacksuppressor:
+                                with open("saves/status.json", "rb") as f:
+                                    data = await create_future(f.read)
+                                    status = eval(data)
+                                self.start_bytes = max(0, status["net_bytes"] - net_bytes)
+                    self.net_bytes.append(net_bytes)
+                    self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes)
+                    self.total_bytes = self.net_bytes[-1] + self.start_bytes
+
     # The lazy update loop that runs once every 2-4 seconds.
     async def lazy_loop(self):
         while not self.closed:
@@ -2093,30 +2113,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         self.blocked -= 1
                         await asyncio.sleep(1)
                     await self.handle_update()
-    
-    # The slow update loop that runs once every 5 seconds.
-    async def slow_loop(self):
-        while not self.closed:
-            async with delay(5):
-                async with tracebacksuppressor:
-                    net = psutil.net_io_counters()
-                    net_bytes = net.bytes_sent + net.bytes_recv
-                    if not hasattr(self, "net_bytes"):
-                        self.net_bytes = deque(maxlen=3)
-                        if os.path.exists("saves/status.json"):
-                            try:
-                                with open("saves/status.json", "rb") as f:
-                                    data = await create_future(f.read)
-                                    status = eval(data)
-                                self.start_bytes = max(0, status["net_bytes"] - net_bytes)
-                            except:
-                                print_exc()
-                                self.start_bytes = 0
-                        else:
-                            self.start_bytes = 0
-                    self.net_bytes.append(net_bytes)
-                    self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes) / 5
-                    self.total_bytes = self.net_bytes[-1] + self.start_bytes
                     await create_future(self.update_from_client, priority=True)
 
     # The slowest update loop that runs once a minute. Used for slow operations, such as the bot database autosave event.
