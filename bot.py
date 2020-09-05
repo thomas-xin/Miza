@@ -1366,8 +1366,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if getattr(u, "update", None) is not None:
                     if u.update(True):
                         saved.append(i)
+        with tracebacksuppressor:
+            s = "{'net_bytes': " + str(self.total_bytes) + "}"
             with open("saves/status.json", "w") as f:
-                f.write("{'net_bytes': " + str(self.total_bytes) + "}")
+                f.write(s)
         # if saved:
         #     print("Autosaved " + str(saved) + ".")
 
