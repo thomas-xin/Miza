@@ -2105,7 +2105,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 with open("saves/status.json", "rb") as f:
                                     data = await create_future(f.read)
                                     status = eval(data)
-                                self.start_bytes = status["net_bytes"] - net_bytes
+                                self.start_bytes = max(0, status["net_bytes"] - net_bytes)
                             except:
                                 print_exc()
                                 self.start_bytes = 0
