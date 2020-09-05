@@ -1254,6 +1254,20 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @waiting
     def mpf(self):
         return self.__class__(mpf(i.real) for i in self.view)
+
+    @waiting
+    def sum(self):
+        return np.sum(self.view)
+
+    @waiting
+    def mean(self):
+        return np.mean(self.view)
+    
+    @waiting
+    def product(self):
+        return np.prod(self.view)
+    
+    prod = product
         
     # Reallocates list.
     @blocking
@@ -2191,17 +2205,17 @@ def num_parse(s):
     return out
 
 
-# Limits a string to a maximum length, cutting from the middle and replacing with ".." when possible.
-def lim_str(s, maxlen=10):
-    if maxlen is None:
-        return s
-    if type(s) is not str:
-        s = str(s)
-    over = (len(s) - maxlen) / 2
-    if over > 0:
-        half = len(s) / 2
-        s = s[:ceil(half - over - 1)] + ".." + s[ceil(half + over + 1):]
-    return s
+__scales = ("", "K", "M", "G", "T", "P", "E", "Z", "Y")
+
+def byte_scale(n):
+    e = 0
+    while n > 1024:
+        n /= 1024
+        e += 1
+        if e >= len(__scales) - 1:
+            break
+    return f"{round(n, 3)} {__scales[e]}"
+
 
 
 # Returns a string representation of a number with a limited amount of characters, using scientific notation when required.
@@ -2253,6 +2267,19 @@ def round_at(num, prec):
             s += "." + "0" * prec
         return s
     return str(round(num.real))
+
+
+# Limits a string to a maximum length, cutting from the middle and replacing with ".." when possible.
+def lim_str(s, maxlen=10):
+    if maxlen is None:
+        return s
+    if type(s) is not str:
+        s = str(s)
+    over = (len(s) - maxlen) / 2
+    if over > 0:
+        half = len(s) / 2
+        s = s[:ceil(half - over - 1)] + ".." + s[ceil(half + over + 1):]
+    return s
 
 
 # Attempts to convert an iterable to a string if it isn't already
@@ -2396,10 +2423,13 @@ def get(v, i, mode=1):
 
 # Computes product of values in an iterable.
 def product(*nums):
-    p = 1
-    for i in nums:
-        p *= i
-    return p
+    try:
+        return np.prod(nums)
+    except:
+        p = 1
+        for i in nums:
+            p *= i
+        return p
 
 # Compues dot product of one or multiple 1 dimensional values.
 def dot_product(*vects):

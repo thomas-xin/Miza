@@ -157,11 +157,13 @@ class EnabledCommands(Command):
                 raise self.perm_error(perm, req, reason)
         if not args:
             if "l" in flags:
-                return css_md(f"Standard command categories:\n{standard_commands}")
+                return css_md(f"Standard command categories:\n[{', '.join(standard_commands)}]")
             if "e" in flags or "a" in flags:
                 categories = set(standard_commands)
                 if channel.id in enabled:
                     enabled[channel.id] = categories.union(enabled[channel.id])
+                else:
+                    enabled[channel.id] = categories
                 update()
                 if "h" in flags:
                     return
@@ -814,7 +816,7 @@ class Status(Command):
 
             bot_info = (
                 f"Process count\n`{active[0]}`\nThread count\n`{active[1]}`\nCoroutine count\n`{active[2]}`\n"
-                + f"CPU usage\n`{round(stats[0], 3)}%`\nRAM usage\n`{round(stats[1] / 1048576, 3)} MB`\nDisk usage\n`{round(stats[2] / 1048576, 3)} MB`"
+                + f"CPU usage\n`{round(stats[0], 3)}%`\nRAM usage\n`{byte_scale(stats[1])}B`\nDisk usage\n`{byte_scale(stats[2])}B`\nNetwork usage\n`{byte_scale(bot.bitrate)}bps`"
             )
             emb.add_field(name="Bot info", value=bot_info)
 
@@ -825,11 +827,11 @@ class Status(Command):
             emb.add_field(name="Discord info", value=discord_info)
 
             misc_info = (
-                f"Cached messages\n`{len(bot.cache.messages)}`\nCached files\n`{len(cache)}`\nConnected voice channels\n`{len(bot.voice_clients)}`\n"
+                f"Cached messages\n`{len(bot.cache.messages)}`\nCached files\n`{len(cache)}`\nConnected voice channels\n`{len(bot.voice_clients)}`\nTotal data sent/received\n`{byte_scale(bot.total_bytes)}B`\n"
                 + f"System time\n`{datetime.datetime.now()}`\nPing latency\n`{sec2time(bot.latency)}`\nPublic IP address\n`{bot.ip}`"
             )
             emb.add_field(name="Misc info", value=misc_info)
-            emb.add_field(name="Code info", value=f"[`{size[0]} bytes, {size[1]} lines`]({bot.website})")
+            emb.add_field(name="Code info", value=f"[`{byte_scale(size[0])}B, {size[1]} lines`]({bot.website})")
         else:
             emb.description = msg
         func = channel.send

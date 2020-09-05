@@ -755,7 +755,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         for i, guild in enumerate(self.guilds, 1):
             self.cache.channels.update(guild._channels)
             self.cache.roles.update(guild._roles)
-            if not i & 63:
+            if not i & 127:
                 time.sleep(0.2)
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
@@ -1366,6 +1366,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if getattr(u, "update", None) is not None:
                     if u.update(True):
                         saved.append(i)
+            with open("saves/status.json", "w") as f:
+                f.write("{'net_bytes': " + str(self.total_bytes) + "}")
         # if saved:
         #     print("Autosaved " + str(saved) + ".")
 
@@ -2077,23 +2079,50 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     await_fut(event_call(freq), delay=0.005, priority=True)
                 else:
                     with delay(1 / freq):
-                        await_fut(self.send_event("_call_"), delay=0.001, priority=True)
+                        await_fut(self.send_event("_call_"), delay=0.002, priority=True)
 
-    # The lazy update loop that runs once every 2-4 seconds. Calls the bot database autosave event once every ~60 seconds.
-    async def slow_loop(self):
-        autosave = 0
+    # The lazy update loop that runs once every 2-4 seconds.
+    async def lazy_loop(self):
         while not self.closed:
             async with delay(frand(2) + 2):
                 async with tracebacksuppressor:
-                    if utc() - autosave > 60:
-                        autosave = utc()
-                        await create_future(self.update, priority=True)
-                        await create_future(self.update_from_client, priority=True)
                     while self.blocked > 0:
                         print("Update event blocked.")
                         self.blocked -= 1
                         await asyncio.sleep(1)
                     await self.handle_update()
+    
+    async def slow_loop(self):
+        while not self.closed:
+            async with delay(5):
+                async with tracebacksuppressor:
+                    net = psutil.net_io_counters()
+                    net_bytes = net.bytes_sent + net.bytes_recv
+                    if not hasattr(self, "net_bytes"):
+                        self.net_bytes = deque(maxlen=12)
+                        if os.path.exists("saves/status.json"):
+                            try:
+                                with open("saves/status.json", "rb") as f:
+                                    data = await create_future(f.read)
+                                    status = eval(data)
+                                self.start_bytes = status["net_bytes"] - net_bytes
+                            except:
+                                print_exc()
+                                self.start_bytes = 0
+                        else:
+                            self.start_bytes = 0
+                    self.net_bytes.append(net_bytes)
+                    self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes) / 5
+                    self.total_bytes = self.net_bytes[-1] + self.start_bytes
+                    await create_future(self.update_from_client, priority=True)
+
+    # The slowest update loop that runs once a minute. Used for slow operations, such as the bot database autosave event.
+    async def minute_loop(self):
+        while not self.closed:
+            async with delay(60):
+                async with tracebacksuppressor:
+                    await create_future(self.update, priority=True)
+                    await create_future(self.update_from_guilds, priority=True)
 
     # User seen event
     seen = lambda self, user, delay=0, event=None, **kwargs: create_task(self.send_event("_seen_", user=user, delay=delay, event=event, **kwargs))
@@ -2331,7 +2360,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         await self.user.edit(avatar=b)
                         await self.seen(self.user, event="misc", raw="Editing their profile")
                         touch("misc/init.tmp")
+                    create_task(self.minute_loop())
                     create_task(self.slow_loop())
+                    create_task(self.lazy_loop())
                     create_thread(self.fast_loop)
                     print("Update loops initiated.")
                     # Load all webhooks from cached guilds.

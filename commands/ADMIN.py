@@ -31,8 +31,10 @@ class Purge(Command):
                 end += 1
         else:
             count = 1
-        if not argl and not args:
-            uset = None if "a" not in flags else universal_set
+        if "a" in flags:
+            uset = universal_set
+        elif not argl and not args:
+            uset = None
         else:
             users = await bot.find_users(argl, args, user, guild)
             uset = {u.id for u in users}
