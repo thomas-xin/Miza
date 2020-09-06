@@ -3062,12 +3062,13 @@ def fuzzy_substring(sub, s, match_start=False):
 
 
 def replace_map(s, mapping):
-    temps = demap({chr(65536 - i): k for i, k in enumerate(mapping.keys())})
-    for key in mapping.keys():
-        s = s.replace(key, temps[key])
+    temps = {k: chr(65536 - i) for i, k in enumerate(mapping.keys())}
+    trans = "".maketrans({chr(65536 - i): mapping[k] for i, k in enumerate(mapping.keys())})
+    for key, value in temps.items():
+        s = s.replace(key, value)
     for key, value in mapping.items():
         s = s.replace(value, key)
-    return s.translate("".maketrans(dict(tuple(temps))))
+    return s.translate(trans)
 
 
 # Converts a bytes object to a hex string.

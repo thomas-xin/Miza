@@ -659,7 +659,7 @@ class Ask(Command):
                     return
                 resp = await bot.solve_math(f"factorize {num}", user, timeout=20)
                 factors = safe_eval(resp[0])
-                out = f"{num}'s factors are {', '.join(str(i) for i in factors)}. If you'd like more information, try {bot.get_prefix(guild)}math!"
+                out = f"{num}'s factors are `{', '.join(str(i) for i in factors)}`. If you'd like more information, try {bot.get_prefix(guild)}math!"
         elif q.startswith("who's ") or q.startswith("whos ") or q.startswith("who is "):
             q = q[4:]
             q = q[q.index(" ") + 1:]
