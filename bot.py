@@ -1495,7 +1495,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 await self.change_presence(activity=activity, status=status)
                                 # Member update events are not sent through for the current user, so manually send a _seen_ event
                                 await self.seen(self.user, event="misc", raw="Changing their status")
-                    if self.ready:
+                    if self.bot_ready:
                         # Update databases
                         for u in self.database.values():
                             if utc() - u.used > u.rate_limit or force:
@@ -2361,6 +2361,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     print("Update loops initiated.")
                     # Load all webhooks from cached guilds.
                     futs = deque(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
+                    self.bot_ready = True
                     print("Bot ready.")
                     # Send bot_ready event to all databases.
                     await self.send_event("_bot_ready_", bot=self)
