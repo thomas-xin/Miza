@@ -1457,7 +1457,7 @@ class UpdateMessages(Database):
     closed = False
 
     async def wrap_semaphore(self, func, *args, **kwargs):
-        with tracebacksuppressor:
+        with tracebacksuppressor(SemaphoreOverflowError):
             async with self.semaphore:
                 return await func(*args, **kwargs)
 
@@ -1476,7 +1476,7 @@ class UpdateMessages(Database):
         self.closed = True
         msg = "Offline 😔"
         for c_id, data in self.data.items():
-            with tracebacksuppressor:
+            with tracebacksuppressor(SemaphoreOverflowError):
                 channel = await self.bot.fetch_channel(c_id)
                 for m_id, v in data.items():
                     async with self.semaphore:
