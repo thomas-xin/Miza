@@ -84,6 +84,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.guild_count = 0
         self.updated = False
         self.started = False
+        self.bot_ready = False
         self.ready = False
         self.stat_timer = 0
         self.last_check = 0
