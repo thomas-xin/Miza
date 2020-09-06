@@ -311,7 +311,7 @@ class Text2048(Command):
                 emb.set_author(name="@everyone", icon_url=bot.discord_icon)
             else:
                 emb.set_author(**get_author(u))
-            content = "*```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + data.decode("utf-8") + "\nPlaying 2048...```*"
+            content = "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + data.decode("utf-8") + "\nPlaying 2048...```*"
             emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
             emb.set_footer(text="Score: " + str(g.score()))
             await message.edit(content=content, embed=emb)
@@ -353,7 +353,7 @@ class Text2048(Command):
             mode |= 2
         if "e" in flags:
             mode |= 1
-        return "*```callback-game-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "\nStarting Game...```*"
+        return "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "\nStarting Game...```*"
 
 
 class MimicConfig(Command):
@@ -479,7 +479,7 @@ class Mimic(Command):
                 return italics(css_md(f"Successfully removed all {sqr_md(len(mimics))} webhook mimics for {sqr_md(user)}."))
             # Set callback message for scrollable list
             return (
-                "*```" + "\n" * ("z" in flags) + "callback-game-mimic-"
+                "*```" + "\n" * ("z" in flags) + "callback-fun-mimic-"
                 + str(user.id) + "_0"
                 + "-\nLoading Mimic database...```*"
             )
@@ -628,7 +628,7 @@ class Mimic(Command):
             content = message.embeds[0].description
         i = content.index("callback")
         content = "*```" + "\n" * ("\n" in content[:i]) + (
-            "callback-game-mimic-"
+            "callback-fun-mimic-"
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )
@@ -688,7 +688,7 @@ class MimicSend(Command):
         except KeyError:
             enabled = ()
         # Because this command operates across channels and servers, we need to make sure these cannot be sent to channels without this command enabled
-        if not admin and "game" not in enabled:
+        if not admin and "fun" not in enabled:
             raise PermissionError("Not permitted to send into target channel.")
         if m:
             msg = escape_everyone(msg)
@@ -729,7 +729,7 @@ class UpdateMimics(Database):
             else:
                 enabled = list(bot.categories)
             # User must have permission to use ~mimicsend in order to invoke by prefix
-            if admin or "game" in enabled:
+            if admin or "fun" in enabled:
                 database = self.data[user.id]
                 msg = message.content
                 async with ExceptionSender(message.channel, Exception):

@@ -513,7 +513,7 @@ class Info(Command):
                         u_id = argv
                         with suppress():
                             u_id = verify_id(u_id)
-                        u = guild.get_member(u_id)
+                        u = guild.get_member(u_id) if type(u_id) is int else None
                         g = None
                         while u is None and g is None:
                             with suppress():
@@ -891,9 +891,6 @@ class Reminder(Command):
         except ValueError:
             args = argv.split(" ")
         if "announce" in name:
-            req = 2
-            if req > perm:
-                raise self.perm_error(perm, req, f"for command {name}")
             sendable = message.channel
             word = "announcements"
         else:
@@ -1707,15 +1704,20 @@ class UpdateUsers(Database):
     async def _nocommand_(self, message, msg, force=False, **void):
         bot = self.bot
         user = message.author
-        if self.bot.get_perms(user.id, message.guild) <= -inf:
+        if bot.get_perms(user.id, message.guild) <= -inf:
             return
-        if force or self.bot.is_mentioned(message, self.bot, message.guild):
+        if force or bot.is_mentioned(message, bot, message.guild):
             send = message.channel.send
             out = None
             count = self.data.get(user.id, EMPTY).get("last_talk", 0)
             # Simulates a randomized conversation
             if count < 5:
                 create_task(message.add_reaction("👀"))
+            if "?" in msg and "ask" in bot.commands and random.random() > math.atan(count / 16) / 4:
+                argv = self.mentionspam.sub("", msg).strip()
+                for ask in bot.commands.ask:
+                    await ask(message.channel, user, argv)
+                return
             if count:
                 if count < 2 or count == 2 and xrand(2):
                     # Starts conversations
@@ -1726,7 +1728,7 @@ class UpdateUsers(Database):
                         "What's up?",
                         "Can I entertain you with a little something today?",
                     ))
-                elif count < 16 or random.random() > math.atan(count / 8 - 3) / 4:
+                elif count < 16 or random.random() > math.atan(max(0, count / 8 - 3)) / 4:
                     # General messages
                     if (count < 6 or self.mentionspam.sub("", msg).strip()) and random.random() < 0.5:
                         out = choice((f"'sup, {user.display_name}?", f"There you are, {user.name}!", "Oh yeah!", "👋", f"Hey, {user.display_name}!"))
@@ -1831,12 +1833,11 @@ class UpdateUsers(Database):
                     out = f"Hi, {user.name}! What can I do for you today?"
                 else:
                     out = f"Yo, what's good, {user.display_name}? Need me for anything?"
-                prefix = self.bot.get_prefix(message.guild)
+                prefix = bot.get_prefix(message.guild)
                 out += f" Use `{prefix}?` or `{prefix}help` for help!"
                 send = lambda *args, **kwargs: send_with_react(message.channel, *args, **kwargs, reacts="❎")
             add_dict(self.data, {user.id: {"last_talk": 1, "last_mention": 1}})
             self.data[user.id]["last_used"] = utc()
-            print(f"Talking to {user}:", self.data.get(user.id, EMPTY).get("last_talk", 0))
             await send(out)
             await bot.seen(user, event="misc", raw="Talking to me")
         else:

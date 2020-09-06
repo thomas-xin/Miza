@@ -526,14 +526,16 @@ class TimeCalc(Command):
     name = ["TimeDifference"]
     min_level = 0
     description = "Computes the difference between two times, or the Unix timestamp of a datetime string."
-    usage = "<0:time1> <1:time2[0]>"
+    usage = "<0:time1> | <1:time2[0]>"
     no_parse = True
 
     def __call__(self, argv, user, **void):
         if not argv:
             timestamps = [utc()]
         else:
-            if "," in argv:
+            if "|" in argv:
+                spl = argv.split("|")
+            elif "," in argv:
                 spl = argv.split(",")
             else:
                 spl = [argv]
@@ -603,6 +605,106 @@ class Match(Command):
                 + sqr_md(round_min(round(fuzzy_substring(full_prune(search), full_prune(s)) * 100, 6))) + "% unicode mapping match."
             )
         return ini_md(match)
+
+
+class Ask(Command):
+    min_level = 0
+    description = "Ask me any question, and I'll answer it!"
+    usage = "<string>"
+    no_parse = True
+    nums = re.compile("[0-9]")
+    how = re.compile("^how[^A-Za-z]")
+
+    async def __call__(self, channel, user, argv, **void):
+        bot = self.bot
+        guild = getattr(channel, "guild", None)
+        q = full_prune(argv).strip("?").strip()
+        if not q:
+            raise ArgumentError(choice("Sorry, didn't see that, was that a question? 🤔", "Ay, speak up, I don't bite! :3"))
+        out = None
+        count = bot.data.users.get(user.id, {}).get("last_talk", 0)
+        add_dict(bot.data.users, {user.id: {"last_talk": 1, "last_mention": 1}})
+        bot.data.users[user.id]["last_used"] = utc()
+        await bot.seen(user, event="misc", raw="Talking to me")
+        if q == "why":
+            out = "Because! :3"
+        elif q == "what":
+            out = "Nothing! 🙃"
+        elif q == "who":
+            out = "Who, me?"
+        elif q == "when":
+            out = "Right now!"
+        elif q == "where":
+            out = "Here, dummy!"
+        elif q == "how" or self.how.search(q):
+            await channel.send("https://imgur.com/gallery/8cfRt")
+            return
+        elif q.startswith("what's ") or q.startswith("whats ") or q.startswith("what is ") and self.nums.search(q):
+            q = q[5:]
+            q = q[q.index(" ") + 1:]
+            try:
+                if 0 <= q.rfind("<") < q.find(">"):
+                    q = verify_id(q[q.rindex("<") + 1:q.index(">")])
+                num = int(q)
+            except ValueError:
+                for _math in bot.commands.math:
+                    answer = await _math(bot, q, "math", channel, guild, {}, user)
+                    if answer:
+                        await channel.send(answer)
+                return
+            else:
+                if bot.in_cache(num) and "info" in bot.commands:
+                    for _info in bot.commands.info:
+                        await _info(num, None, "info", guild, channel, bot, user, "")
+                    return
+                resp = await bot.solve_math(f"factorize {num}", user, timeout=20)
+                factors = safe_eval(resp[0])
+                out = f"{num}'s factors are {', '.join(str(i) for i in factors)}. If you'd like more information, try {bot.get_prefix(guild)}math!"
+        elif q.startswith("who's ") or q.startswith("whos ") or q.startswith("who is "):
+            q = q[4:]
+            q = q[q.index(" ") + 1:]
+            if "info" in bot.commands:
+                for _info in bot.commands.info:
+                    await _info(q, None, "info", guild, channel, bot, user, "")
+                return
+        elif random.random() < math.atan(count / 7) / 4:
+            if guild:
+                bots = [member for member in guild.members if member.bot and member.id != bot.id]
+            answers = ("Ay, I'm busy, ask me later!", "¯\_(ツ)_/¯", "Hm, I dunno, have you tried asking Google?")
+            if bots:
+                answers += (f"🥱 I'm tired... go ask {user_mention(choice(bots).id)}...",)
+            await channel.send(choice(answers))
+            return
+        elif q.startswith("why "):
+            out = alist(
+                "Why not?",
+                "It's obvious, isn't? 😏",
+                "Meh, does it matter?",
+                "Why do you think?",
+            )[ihash(q)]
+        else:
+            out = alist(
+                "Yes :3",
+                "Totally!",
+                "Maybe?",
+                "Definitely!",
+                "Of course!",
+                "Perhaps?",
+                "Maybe not...",
+                "Probably not?",
+                "Nah",
+                "Don't think so...",
+            )[ihash(q)]
+        if not out:
+            raise RuntimeError("Unable to construct a valid response.")
+        q = replace_map(q, {
+            "yourself": "myself",
+            "your": "my",
+            "are you": "am I",
+            "you are": "I am",
+            "you": "I",
+        })
+        await channel.send(f"`{q.capitalize()}`? {out}")
 
 
 class UrbanDictionary(Command):

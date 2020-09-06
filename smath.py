@@ -114,7 +114,10 @@ nop = lambda *void1, **void2: None
 nofunc = lambda arg, *void1, **void2: arg
 
 
-def choice(it):
+def choice(*args):
+    if not args:
+        return
+    it = args if len(args) > 1 or not issubclass(type(args[0]), collections.abc.Sized) else args[0]
     if not issubclass(type(it), collections.abc.Sequence):
         if not issubclass(type(it), collections.abc.Sized):
             it = tuple(it)
@@ -879,7 +882,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         if self.data is None:
             self.__init__((value,))
             return self
-        if index >= len(self.data):
+        if index >= self.size:
             return self.append(value, force=True)
         elif index == 0:
             return self.appendleft(value, force=True)
@@ -1451,12 +1454,12 @@ class demap(collections.abc.Mapping):
         return v
 
     clear = lambda self: (self.a.clear(), self.b.clear())
-    __bool__ = lambda self: self.a.__bool__()
+    __bool__ = lambda self: bool(self.a)
     __iter__ = lambda self: iter(self.a.items())
     __reversed__ = lambda self: reversed(self.a.items())
     __len__ = lambda self: self.b.__len__()
     __str__ = lambda self: self.a.__str__()
-    __repr__ = lambda self: f"{self.__class__.__name__}({self.a.__repr__() if self.b.__bool__() else ''})"
+    __repr__ = lambda self: f"{self.__class__.__name__}({self.a.__repr__() if bool(self.b) else ''})"
     __contains__ = lambda self, k: k in self.a or k in self.b
 
 
@@ -3058,6 +3061,15 @@ def fuzzy_substring(sub, s, match_start=False):
     return ratio
 
 
+def replace_map(s, mapping):
+    temps = demap({chr(65536 - i): k for i, k in enumerate(mapping.keys())})
+    for key in mapping.keys():
+        s = s.replace(key, temps[key])
+    for key, value in mapping.items():
+        s = s.replace(value, key)
+    return s.translate("".maketrans(dict(tuple(temps))))
+
+
 # Converts a bytes object to a hex string.
 def bytes2hex(b, space=True):
     if type(b) is str:
@@ -3091,6 +3103,7 @@ def b642bytes(b, alt_char_set=False):
 # SHA256 operations: base64 and base16.
 shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).replace(b"/", b"-").decode("utf-8", "replace")
 hhash = lambda s: bytes2hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
+ihash = lambda s: int.from_bytes(hashlib.sha256(s.encode("utf-8")).digest(), "little") % 4294967296 - 2147483648
 
 
 # Manages a dict object and uses pickle to save and load it.

@@ -82,7 +82,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # Initialize rest of bot variables
         self.proc = PROC
         self.guild_count = 0
-        self.blocked = 0
         self.updated = False
         self.started = False
         self.ready = False
@@ -97,7 +96,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     __str__ = lambda self: str(self.user)
     __repr__ = lambda self: repr(self.user)
-
     __call__ = lambda self: self
     __exit__ = lambda self, *args, **kwargs: self.close()
 
@@ -1076,7 +1074,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return round_min(float(x))
 
     # Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
-    async def solve_math(self, f, obj, prec, r, timeout=12):
+    async def solve_math(self, f, obj=None, prec=64, r=False, timeout=12):
         f = f.strip()
         try:
             if obj is None:
@@ -1498,25 +1496,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 await self.change_presence(activity=activity, status=status)
                                 # Member update events are not sent through for the current user, so manually send a _seen_ event
                                 await self.seen(self.user, event="misc", raw="Changing their status")
-                    # Update databases
-                    for u in self.database.values():
-                        if utc() - u.used > u.rate_limit or force:
-                            create_future(u, priority=True)
-                            create_task(self.garbage_collect(u))
+                    if self.ready:
+                        # Update databases
+                        for u in self.database.values():
+                            if utc() - u.used > u.rate_limit or force:
+                                create_future(u, priority=True)
+                                create_task(self.garbage_collect(u))
 
     # Processes a message, runs all necessary commands and bot events. May be called from another source.
     async def process_message(self, message, msg, edit=True, orig=None, cb_argv=None, loop=False):
         if self.closed:
             return
         cpy = msg
-        # Strip quote from message.
-        if msg[:2] == "> ":
-            msg = msg[2:]
-        # Strip spoiler from message.
-        elif msg[:2] == "||" and msg[-2:] == "||":
-            msg = msg[2:-2]
-        # Strip code boxes from message.
-        msg = msg.replace("`", "").strip()
         # Get user, channel, guild that the message belongs to
         user = message.author
         guild = message.guild
@@ -1527,6 +1518,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             g_id = guild.id
         else:
             g_id = 0
+        if u_id != self.id:
+            # Strip quote from message.
+            if msg[:2] == "> ":
+                msg = msg[2:]
+            # Strip spoiler from message.
+            elif msg[:2] == "||" and msg[-2:] == "||":
+                msg = msg[2:-2]
+            # Strip code boxes from message.
+            msg = msg.replace("`", "").strip()
         # Get list of enabled commands for the channel.
         if g_id:
             try:
@@ -2108,10 +2108,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         while not self.closed:
             async with delay(frand(2) + 2):
                 async with tracebacksuppressor:
-                    while self.blocked > 0:
-                        print("Update event blocked.")
-                        self.blocked -= 1
-                        await asyncio.sleep(1)
                     await self.handle_update()
                     await create_future(self.update_from_client, priority=True)
 
