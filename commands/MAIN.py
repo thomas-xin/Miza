@@ -1456,10 +1456,10 @@ class UpdateMessages(Database):
     semaphore = Semaphore(64, 128, rate_limit=120)
     closed = False
 
-    async def wrap_semaphore(self, fut):
+    async def wrap_semaphore(self, func, *args, **kwargs):
         with tracebacksuppressor:
             async with self.semaphore:
-                return await fut
+                return await func(*args, **kwargs)
 
     async def __call__(self, **void):
         if not self.closed:
@@ -1470,7 +1470,7 @@ class UpdateMessages(Database):
                     for m_id, v in data.items():
                         if t - v.t >= 1:
                             v.t = t
-                            create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id)))
+                            create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id))
     
     async def _destroy_(self, **void):
         self.closed = True
@@ -1479,7 +1479,8 @@ class UpdateMessages(Database):
             with tracebacksuppressor:
                 channel = await self.bot.fetch_channel(c_id)
                 for m_id, v in data.items():
-                    await self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id, msg=msg))
+                    async with self.semaphore:
+                        await eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id, msg=msg)
 
 
 EMPTY = {}
@@ -1721,13 +1722,13 @@ class UpdateUsers(Database):
             if count:
                 if count < 2 or count == 2 and xrand(2):
                     # Starts conversations
-                    out = choice((
+                    out = choice(
                         f"So, {user.display_name}, how's your day been?",
                         f"How do you do, {user.name}?",
                         f"How are you today, {user.name}?",
                         "What's up?",
                         "Can I entertain you with a little something today?",
-                    ))
+                    )
                 elif count < 16 or random.random() > math.atan(max(0, count / 8 - 3)) / 4:
                     # General messages
                     if (count < 6 or self.mentionspam.sub("", msg).strip()) and random.random() < 0.5:
@@ -1737,19 +1738,19 @@ class UpdateUsers(Database):
                 elif count < 24:
                     # Occasional late message
                     if random.random() < 0.4:
-                        out = choice((
+                        out = choice(
                             "You seem rather bored... I may only be as good as my programming allows me to be, but I'll try my best to fix that! 🎆",
                             "You must be bored, allow me to entertain you! 🍿",
-                        ))
+                        )
                     else:
                         out = ""
                 else:
                     # Late conversation messages
-                    out = choice((
+                    out = choice(
                         "It's been a fun conversation, but don't you have anything better to do? 🌞",
                         "This is what I was made for, I can do it forever, but you're only a human, take a break! 😅",
                         f"Woah, have you checked the time? We've been talking for {count + 1} messages! 😮"
-                    ))
+                    )
             elif utc() - self.data.get(user.id, EMPTY).get("last_used", inf) >= 259200:
                 # Triggers for users not seen in 3 days or longer
                 out = choice((f"Long time no see, {user.name}!", f"Great to see you again, {user.display_name}!", f"It's been a while, {user.name}!"))

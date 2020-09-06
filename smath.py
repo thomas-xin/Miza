@@ -2896,8 +2896,23 @@ def time_parse(ts):
     return t
 
 
-__sptrans = re.compile("  +")
-single_space = lambda s: re.sub(__sptrans, " ", s)
+RE = cdict()
+
+def regexp(s, flags=0):
+    global RE
+    if issubclass(type(s), re.Pattern):
+        return s
+    elif type(s) is not str:
+        s = s.decode("utf-8", "replace")
+    t = (s, flags)
+    try:
+        return RE[t]
+    except KeyError:
+        RE[t] = re.compile(s, flags)
+        return RE[t]
+
+
+single_space = lambda s: regexp("  +").sub(" ", s)
 
 # Experimental invisible Zero-Width character encoder.
 ZeroEnc = "\xad\u061c\u180e\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\u2064\u2065\u2066\u2067\u2068\u2069\u206a\u206b\u206c\u206d\u206e\u206f\ufe0f\ufeff"
@@ -3062,8 +3077,8 @@ def fuzzy_substring(sub, s, match_start=False):
 
 
 def replace_map(s, mapping):
-    temps = {k: chr(65536 - i) for i, k in enumerate(mapping.keys())}
-    trans = "".maketrans({chr(65536 - i): mapping[k] for i, k in enumerate(mapping.keys())})
+    temps = {k: chr(65535 - i) for i, k in enumerate(mapping.keys())}
+    trans = "".maketrans({chr(65535 - i): mapping[k] for i, k in enumerate(mapping.keys())})
     for key, value in temps.items():
         s = s.replace(key, value)
     for key, value in mapping.items():

@@ -612,13 +612,11 @@ class Ask(Command):
     description = "Ask me any question, and I'll answer it!"
     usage = "<string>"
     no_parse = True
-    nums = re.compile("[0-9]")
-    how = re.compile("^how[^A-Za-z]")
 
     async def __call__(self, channel, user, argv, **void):
         bot = self.bot
         guild = getattr(channel, "guild", None)
-        q = full_prune(argv).strip("?").strip()
+        q = single_space(full_prune(argv.replace("?", ""))).strip()
         if not q:
             raise ArgumentError(choice("Sorry, didn't see that, was that a question? 🤔", "Ay, speak up, I don't bite! :3"))
         out = None
@@ -636,10 +634,10 @@ class Ask(Command):
             out = "Right now!"
         elif q == "where":
             out = "Here, dummy!"
-        elif q == "how" or self.how.search(q):
+        elif q == "how" or regexp("^how[^A-Za-z]").search(q):
             await channel.send("https://imgur.com/gallery/8cfRt")
             return
-        elif q.startswith("what's ") or q.startswith("whats ") or q.startswith("what is ") and self.nums.search(q):
+        elif q.startswith("what's ") or q.startswith("whats ") or q.startswith("what is ") and regexp("[0-9]").search(q):
             q = q[5:]
             q = q[q.index(" ") + 1:]
             try:
@@ -700,11 +698,11 @@ class Ask(Command):
         q = replace_map(q, {
             "yourself": "myself",
             "your": "my",
-            "are you": "am I",
-            "you are": "I am",
-            "you": "I",
-        })
-        await channel.send(f"`{q.capitalize()}`? {out}")
+            "are you": "am i",
+            "you are": "i am",
+            "you": "i",
+        }, words=True)
+        await channel.send(f"\xad{q.capitalize()}? {out}")
 
 
 class UrbanDictionary(Command):

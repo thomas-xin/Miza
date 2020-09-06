@@ -407,10 +407,8 @@ get_author = lambda user, u_id=None: cdict(name=f"{user}" + "" if not u_id else 
 
 
 # Finds emojis and user mentions in a string.
-__emojiFind = re.compile("<.?:[^<>:]+:[0-9]+>")
-__userFind = re.compile("<@!?[0-9]+>")
-find_emojis = lambda s: re.findall(__emojiFind, s)
-find_users = lambda s: re.findall(__userFind, s)
+find_emojis = lambda s: regexp("<.?:[^<>:]+:[0-9]+>").findall(s)
+find_users = lambda s: regexp("<@!?[0-9]+>").findall(s)
 
 
 # Returns a string representation of a message object.
@@ -450,11 +448,9 @@ def activity_repr(activity):
 
 
 # Alphanumeric string regular expression.
-__atrans = re.compile("[^a-z 0-9]", re.I)
-__ntrans = re.compile("[0-9]", re.I)
-is_alphanumeric = lambda string: not re.search(__atrans, string)
-to_alphanumeric = lambda string: single_space(re.sub(__atrans, " ", unicode_prune(string)))
-is_numeric = lambda string: re.search(__ntrans, string)
+is_alphanumeric = lambda string: not regexp("[^a-z 0-9]", re.I).search(string)
+to_alphanumeric = lambda string: single_space(regexp("[^a-z 0-9]", re.I).sub(" ", unicode_prune(string)))
+is_numeric = lambda string: regexp("[0-9]", re.I).search(string)
 
 
 # Strips code box from the start and end of a message.
@@ -551,19 +547,13 @@ def strip_acc(url):
 __smap = {"|": "", "*": ""}
 __strans = "".maketrans(__smap)
 verify_search = lambda f: strip_acc(single_space(f.strip().translate(__strans)))
-__urlFind = re.compile("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+")
-__urlMatch = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
-__urlDiscord = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/")
-__urlTenor = re.compile("^https?:\\/\\/tenor.com(?:\\/view)?/[a-zA-Z0-9\\-_]+-[0-9]+")
-__urlImgur = re.compile("^https?:\\/\\/(?:[a-z]\\.)?imgur.com/[a-zA-Z0-9\\-_]+")
-__urlGiphy = re.compile("^https?:\\/\\/giphy.com/gifs/[a-zA-Z0-9\\-_]+")
 # This reminds me of Perl - Smudge
-find_urls = lambda url: re.findall(__urlFind, url)
-is_url = lambda url: re.search(__urlMatch, url)
-is_discord_url = lambda url: re.search(__urlDiscord, url)
-is_tenor_url = lambda url: re.search(__urlTenor, url)
-is_imgur_url = lambda url: re.search(__urlImgur, url)
-is_giphy_url = lambda url: re.search(__urlGiphy, url)
+find_urls = lambda url: regexp("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+").finall(url)
+is_url = lambda url: regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$").findall(url)
+is_discord_url = lambda url: regexp("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/").findall(url)
+is_tenor_url = lambda url: regexp("^https?:\\/\\/tenor.com(?:\\/view)?/[a-zA-Z0-9\\-_]+-[0-9]+").findall(url)
+is_imgur_url = lambda url: regexp("^https?:\\/\\/(?:[a-z]\\.)?imgur.com/[a-zA-Z0-9\\-_]+").findall(url)
+is_giphy_url = lambda url: regexp("^https?:\\/\\/giphy.com/gifs/[a-zA-Z0-9\\-_]+").findall(url)
 
 def is_discord_message_link(url):
     check = url[:64]

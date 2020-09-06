@@ -1396,9 +1396,6 @@ class AudioDownloader:
             out.append(temp)
         return out, total
 
-    # Valid spotify URLs
-    spotifyFind = re.compile("(play|open|api)\\.spotify\\.com")
-
     # Repeatedly makes calls to youtube-dl until there is no more data to be collected.
     def extract_true(self, url):
         while not is_url(url):
@@ -1509,7 +1506,7 @@ class AudioDownloader:
                                     output += res[0]
                     while futs:
                         output.extend(futs.popleft().result()[0])
-            if re.search(self.spotifyFind, item):
+            if regexp("(play|open|api)\\.spotify\\.com").search(item):
                 # Spotify playlist searches contain up to 100 items each
                 if "playlist" in item:
                     url = item[item.index("playlist"):]
@@ -2376,7 +2373,6 @@ class Skip(Command):
     usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
     flags = "fhv"
     rate_limit = (0.5, 1.5)
-    ellipsis = re.compile("\\.{3,}")
 
     async def __call__(self, bot, user, perm, name, args, argv, guild, flags, message, **void):
         if guild.id not in bot.database.audio.players:
@@ -2400,7 +2396,7 @@ class Skip(Command):
         # Accept range/slice inputs
         elif ":" in argv or ".." in argv:
             while "..." in argv:
-                argv = re.sub(self.ellipsis, "..", argv)
+                argv = regexp("\\.{3,}").sub("..", argv)
             l = argv.replace("..", ":").split(":")
             it = None
             if len(l) > 3:

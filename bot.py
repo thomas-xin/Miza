@@ -1152,7 +1152,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             raise TypeError("Too many time arguments.")
                 else:
                     # Otherwise move on to main parser
-                    f = single_space(re.sub(self.connectors, " ", expr.replace(",", " "))).casefold()
+                    f = single_space(self.connectors.sub(" ", expr.replace(",", " "))).casefold()
                     for tc in self.TimeChecks:
                         for check in reversed(self.TimeChecks[tc]):
                             if check in f:
@@ -1162,13 +1162,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                     continue
                                 temp = f[:i]
                                 f = f[i + len(check):].strip()
-                                match = re.search(self.numericals, temp)
+                                match = self.numericals.search(temp)
                                 if match:
                                     i = match.end()
                                     n = num_parse(temp[:i])
                                     temp = temp[i:].strip()
                                     if temp:
-                                        f = temp + " " + f
+                                        f = f"{temp} {f}"
                                 else:
                                     n = await self.eval_math(temp, obj)
                                 s = TIMEUNITS[tc]
@@ -1177,13 +1177,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 t += s * n
                     temp = f.strip()
                     if temp:
-                        match = re.search(self.numericals, temp)
+                        match = self.numericals.search(temp)
                         if match:
                             i = match.end()
                             n = num_parse(temp[:i])
                             temp = temp[i:].strip()
                             if temp:
-                                n = await self.eval_math(str(n) + " " + temp, obj)
+                                n = await self.eval_math(f"{n} {temp}", obj)
                         else:
                             n = await self.eval_math(temp, obj)
                         t += n
@@ -1194,11 +1194,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             t = float(t)
         return t
 
-    ip_check = re.compile("^([0-9]{1,3}\\.){3}[0-9]{1,3}$")
-
     # Updates the bot's stored external IP address.
     def update_ip(self, ip):
-        if re.search(self.ip_check, ip):
+        if regexp("^([0-9]{1,3}\\.){3}[0-9]{1,3}$").search(ip):
             self.ip = ip
 
     # Gets the external IP address from api.ipify.org
@@ -1364,10 +1362,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if getattr(u, "update", None) is not None:
                     if u.update(True):
                         saved.append(i)
-        with tracebacksuppressor:
-            s = "{'net_bytes': " + str(self.total_bytes) + "}"
-            with open("saves/status.json", "w") as f:
-                f.write(s)
+        if hasattr(self, "total_bytes"):
+            with tracebacksuppressor:
+                s = "{'net_bytes': " + str(self.total_bytes) + "}"
+                with open("saves/status.json", "w") as f:
+                    f.write(s)
         # if saved:
         #     print("Autosaved " + str(saved) + ".")
 
