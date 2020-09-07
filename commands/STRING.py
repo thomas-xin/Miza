@@ -698,11 +698,11 @@ class Ask(Command):
         q = replace_map(q, {
             "yourself": "myself",
             "your": "my",
-            "are you": "am i",
-            "you are": "i am",
-            "you": "I",
-        })
-        q = "".join(alist(q).replace("i", "you")).lower()
+            "are you": "am I",
+            "you are": "I am",
+            "you're": "i'm",
+        }).replace("you", "I")
+        q = " ".join(alist(q.split()).replace("i", "you").replace("me", "you"))
         await channel.send(f"\xad{q.capitalize()}? {out}")
 
 

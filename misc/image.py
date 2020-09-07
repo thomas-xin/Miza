@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, numpy, requests, blend_modes, pdf2image
+import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image
+import numpy as np
 import PIL
-from PIL import Image, ImageChops, ImageEnhance, ImageMath, ImageStat
+from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageEnhance, ImageMath, ImageStat
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 import matplotlib.pyplot as plt
@@ -51,7 +52,7 @@ url_match = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
 is_url = lambda url: re.search(url_match, url)
 
 
-from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), tuple(colour)) #Image.fromarray(numpy.tile(numpy.array(colour, dtype=numpy.uint8), (size, size, 1)))
+from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), tuple(colour)) #Image.fromarray(np.tile(np.array(colour, dtype=np.uint8), (size, size, 1)))
 
 
 sizecheck = re.compile("[1-9][0-9]*x[0-9]+")
@@ -255,19 +256,159 @@ def rainbow_gif(image, duration):
     return dict(duration=1000 / fps * len(out), frames=out)
 
 
-# def magik(image):
-#     w = wand.image.Image(file=image)
-#     w.format = "png"
-#     w.alpha_channel = True
-#     if w.size >= (2048, 2048):
-#         raise OverflowError("image size too large.")
-#     w.transform(resize='512x512>')
-#     w.liquid_rescale(width=int(w.width * 0.5), height=int(w.height * 0.5), delta_x=1, rigidity=0)
-#     w.liquid_rescale(width=int(w.width * 1.5), height=int(w.height * 1.5), delta_x=2, rigidity=0)
-#     out = io.BytesIO()
-#     w.save(file=out)
-#     out.seek(0)
-#     list_imgs.append(out)
+def spin_gif2(image, duration):
+    out = collections.deque()
+    total = 0
+    for f in range(2147483648):
+        try:
+            image.seek(f)
+        except EOFError:
+            break
+        total += image.info.get("duration", 1 / 60)
+    length = f
+    loops = total / duration / 1000
+    scale = 1
+    while abs(loops * scale) < 1:
+        scale *= 2
+        if length * scale >= 64:
+            loops = 1 if loops >= 0 else -1
+            break
+    loops = round(loops * scale) / scale
+    if not loops:
+        loops = 1 if loops >= 0 else -1
+    maxsize = int(min(512, 32768 / (length * scale ** 0.5) ** 0.5))
+    size = list(max_size(*image.size, maxsize))
+    for f in range(length * scale):
+        image.seek(f % length)
+        temp = image
+        if temp.size[0] != size[0] or temp.size[1] != size[1]:
+            temp = temp.resize(size, Image.HAMMING)
+        temp = to_circle(temp.rotate(f * 360 / length / scale / loops))
+        out.append(temp)
+    return dict(duration=total * scale, frames=out)
+
+
+def spin_gif(image, duration):
+    try:
+        image.seek(1)
+    except EOFError:
+        image.seek(0)
+    else:
+        return spin_gif2(image, duration)
+    ts = round(time.time() * 1000)
+    image = resize_max(image, 512, resample=Image.HAMMING)
+    size = list(image.size)
+    if duration == 0:
+        fps = 0
+    else:
+        fps = round(32 / abs(duration))
+    rate = 8
+    while fps > 24 and rate < 32:
+        fps >>= 1
+        rate <<= 1
+    if fps <= 0:
+        raise ValueError("Invalid framerate value.")
+    if duration < 0:
+        rate = -rate
+    out = collections.deque()
+    # Repeatedly hueshift image and return copies
+    for i in range(0, 256, abs(rate)):
+        if i:
+            im = image.rotate(i * 360 / 256)
+        else:
+            im = image
+        out.append(to_circle(im))
+    return dict(duration=1000 / fps * len(out), frames=out)
+
+
+CIRCLE_CACHE = {}
+
+def to_circle(image):
+    global CIRCLE_CACHE
+    if str(image.mode) != "RGBA":
+        image = image.convert("RGBA")
+    try:
+        image_map = CIRCLE_CACHE[image.size]
+    except KeyError:
+        image_map = Image.new("1", image.size)
+        draw = ImageDraw.Draw(image_map)
+        draw.ellipse((0, 0, *image.size), outline=1, fill=1, width=0)
+        CIRCLE_CACHE[image.size] = image_map
+    return ImageChops.multiply(image, image_map)
+
+
+def quad_as_rect(quad):
+    if quad[0] != quad[2]: return False
+    if quad[1] != quad[7]: return False
+    if quad[4] != quad[6]: return False
+    if quad[3] != quad[5]: return False
+    return True
+
+def quad_to_rect(quad):
+    assert(len(quad) == 8)
+    assert(quad_as_rect(quad))
+    return (quad[0], quad[1], quad[4], quad[3])
+
+def rect_to_quad(rect):
+    assert(len(rect) == 4)
+    return (rect[0], rect[1], rect[0], rect[3], rect[2], rect[3], rect[2], rect[1])
+
+def shape_to_rect(shape):
+    assert(len(shape) == 2)
+    return (0, 0, shape[0], shape[1])
+
+def griddify(rect, w_div, h_div):
+    w = rect[2] - rect[0]
+    h = rect[3] - rect[1]
+    x_step = w / float(w_div)
+    y_step = h / float(h_div)
+    y = rect[1]
+    grid_vertex_matrix = []
+    for _ in range(h_div + 1):
+        grid_vertex_matrix.append([])
+        x = rect[0]
+        for _ in range(w_div + 1):
+            grid_vertex_matrix[-1].append([int(x), int(y)])
+            x += x_step
+        y += y_step
+    grid = np.array(grid_vertex_matrix)
+    return grid
+
+def distort_grid(org_grid, max_shift):
+    new_grid = np.copy(org_grid)
+    x_min = np.min(new_grid[:, :, 0])
+    y_min = np.min(new_grid[:, :, 1])
+    x_max = np.max(new_grid[:, :, 0])
+    y_max = np.max(new_grid[:, :, 1])
+    new_grid += np.random.randint(- max_shift, max_shift + 1, new_grid.shape)
+    new_grid[:, :, 0] = np.maximum(x_min, new_grid[:, :, 0])
+    new_grid[:, :, 1] = np.maximum(y_min, new_grid[:, :, 1])
+    new_grid[:, :, 0] = np.minimum(x_max, new_grid[:, :, 0])
+    new_grid[:, :, 1] = np.minimum(y_max, new_grid[:, :, 1])
+    return new_grid
+
+def grid_to_mesh(src_grid, dst_grid):
+    assert(src_grid.shape == dst_grid.shape)
+    mesh = []
+    for i in range(src_grid.shape[0] - 1):
+        for j in range(src_grid.shape[1] - 1):
+            src_quad = [src_grid[i    , j    , 0], src_grid[i    , j    , 1],
+                        src_grid[i + 1, j    , 0], src_grid[i + 1, j    , 1],
+                        src_grid[i + 1, j + 1, 0], src_grid[i + 1, j + 1, 1],
+                        src_grid[i    , j + 1, 0], src_grid[i    , j + 1, 1]]
+            dst_quad = [dst_grid[i    , j    , 0], dst_grid[i    , j    , 1],
+                        dst_grid[i + 1, j    , 0], dst_grid[i + 1, j    , 1],
+                        dst_grid[i + 1, j + 1, 0], dst_grid[i + 1, j + 1, 1],
+                        dst_grid[i    , j + 1, 0], dst_grid[i    , j + 1, 1]]
+            dst_rect = quad_to_rect(dst_quad)
+            mesh.append([dst_rect, src_quad])
+    return mesh
+
+def magik(image):
+    dst_grid = griddify(shape_to_rect(image.size), 7, 7)
+    src_grid = distort_grid(dst_grid, 22)
+    mesh = grid_to_mesh(src_grid, dst_grid)
+    return image.transform(image.size, Image.MESH, mesh)
 
 
 # Autodetect max image size, keeping aspect ratio
@@ -334,6 +475,12 @@ def resize_to(image, w, h, operation="auto"):
             filt = Image.BILINEAR
     else:
         raise TypeError(f'Invalid image operation: "{op}"')
+    if w < 0:
+        w = -w
+        image = ImageOps.mirror(image)
+    if h < 0:
+        h = -h
+        image = ImageOps.flip(image)
     return image.resize([w, h], filt)
 
 
@@ -536,9 +683,9 @@ def blend_op(image, url, operation, amount, recursive=True):
             image = image.convert("RGBA")
         if str(image2.mode) != "RGBA":
             image2 = image2.convert("RGBA")
-        imgA = numpy.array(image).astype(float)
-        imgB = numpy.array(image2).astype(float)
-        out = Image.fromarray(numpy.uint8(filt(imgA, imgB, amount)))
+        imgA = np.array(image).astype(float)
+        imgB = np.array(image2).astype(float)
+        out = Image.fromarray(np.uint8(filt(imgA, imgB, amount)))
     else:
         # Basic blend, use second image
         if filt == "blend":
@@ -645,13 +792,13 @@ def plt_special(d, user=None, **void):
     plt.rcParams["figure.figsize"] = (16, 9)
     plt.rcParams["figure.dpi"] = 128
     plt.xlim(-hours, 0)
-    temp = numpy.zeros(len(next(iter(d.values()))))
+    temp = np.zeros(len(next(iter(d.values()))))
     width = hours / len(temp)
-    domain = width * numpy.arange(-len(temp), 0)
+    domain = width * np.arange(-len(temp), 0)
     for k, v in d.items():
         plt.bar(domain, v, bottom=temp, color=special_colours.get(k, "k"), edgecolor="black", width=width, label=k)
-        temp += numpy.array(v)
-    plt.bar(list(range(-hours, 0)), numpy.ones(hours) * max(temp) / 512, edgecolor="black", color="k")
+        temp += np.array(v)
+    plt.bar(list(range(-hours, 0)), np.ones(hours) * max(temp) / 512, edgecolor="black", color="k")
     if user:
         plt.title("Recent Discord Activity for " + user)
     plt.xlabel("Time (Hours)")
@@ -733,17 +880,17 @@ def evalImg(url, operation, args):
     out = "cache/" + str(ts) + ".png"
     args = eval(args)
     if operation != "$":
-        if args[-1] == "-raw":
+        if args and args[-1] == "-raw":
             args.pop(-1)
             image = requests.get(url, timeout=8).content
         else:
             image = get_image(url, out)
         # $%GIF%$ is a special case where the output is always a .gif image
-        if args[-1] == "-gif":
+        if args and args[-1] == "-gif":
             new = eval(operation)(image, *args[:-1])
         else:
             try:
-                if args[0] == "-nogif":
+                if args and args[0] == "-nogif":
                     args = args[1:]
                     raise EOFError
                 image.seek(1)
@@ -755,6 +902,7 @@ def evalImg(url, operation, args):
                 globals()["ANIM"] = True
             # Attempt to perform operation on all individual frames of .gif images
             for f in range(2147483648):
+                np.random.seed(ts & 4294967295)
                 globals()["CURRENT_FRAME"] = f
                 try:
                     image.seek(f)
@@ -801,7 +949,7 @@ def evalImg(url, operation, args):
                     if str(frame.mode) != "RGBA":
                         frame = frame.convert("RGBA")
                     b = frame.tobytes()
-                    # arr = numpy.array(frame)
+                    # arr = np.array(frame)
                     # b = arr.tobytes()
                 elif type(frame) is io.BytesIO:
                     b = frame.read()

@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sympy, time, os, sys, subprocess, traceback, random, numpy, collections
+import sympy, time, os, sys, subprocess, traceback, random, collections
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
 import matplotlib.pyplot as plt

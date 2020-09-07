@@ -517,6 +517,77 @@ class HueShift(Command):
         await send_with_file(message.channel, "", f, filename=fn)
 
 
+class Invert(Command):
+    name = ["Negate"]
+    min_level = 0
+    description = "Inverts supplied image."
+    usage = "<0:url{attached_file}>"
+    no_parse = True
+    rate_limit = (2, 3)
+    _timeout_ = 3
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, **void):
+        name, value, url = await get_image(bot, user, message, args, argv)
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "ImageOps.invert", [], user, timeout=24)
+            fn = resp[0]
+            if fn.endswith(".gif"):
+                if not name.endswith(".gif"):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += ".gif"
+            f = discord.File(fn, filename=name)
+        await send_with_file(message.channel, "", f, filename=fn)
+
+
+class GreyScale(Command):
+    name = ["GrayScale"]
+    min_level = 0
+    description = "Greyscales supplied image."
+    usage = "<0:url{attached_file}>"
+    no_parse = True
+    rate_limit = (2, 3)
+    _timeout_ = 3
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, **void):
+        name, value, url = await get_image(bot, user, message, args, argv)
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "ImageOps.grayscale", [], user, timeout=24)
+            fn = resp[0]
+            if fn.endswith(".gif"):
+                if not name.endswith(".gif"):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += ".gif"
+            f = discord.File(fn, filename=name)
+        await send_with_file(message.channel, "", f, filename=fn)
+
+
+class Magik(Command):
+    min_level = 0
+    description = "Applies the Magik image filter to supplied image."
+    usage = "<0:url{attached_file}>"
+    no_parse = True
+    rate_limit = (3, 4)
+    _timeout_ = 4
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, **void):
+        name, value, url = await get_image(bot, user, message, args, argv)
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "magik", [], user, timeout=40)
+            fn = resp[0]
+            if fn.endswith(".gif"):
+                if not name.endswith(".gif"):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += ".gif"
+            f = discord.File(fn, filename=name)
+        await send_with_file(message.channel, "", f, filename=fn)
+
+
 class Colour(Command):
     name = ["RGB", "HSV", "CMY", "LAB", "LUV", "XYZ", "Color"]
     min_level = 0
@@ -593,6 +664,26 @@ class Rainbow(Command):
         with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "rainbow_gif", [value, "-gif"], user, timeout=40)
+            fn = resp[0]
+            f = discord.File(fn, filename=name)
+        await send_with_file(message.channel, "", f, filename=fn)
+
+
+class Spin(Command):
+    name = ["RainbowGIF"]
+    min_level = 0
+    description = "Creates a .gif image from repeatedly rotating supplied image."
+    usage = "<0:url{attached_file}> <1:duration[2]>"
+    no_parse = True
+    rate_limit = (5, 8)
+    _timeout_ = 4
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, **void):
+        name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
+        with discord.context_managers.Typing(channel):
+            # -gif signals to image subprocess that the output is always a .gif image
+            resp = await process_image(url, "spin_gif", [value, "-gif"], user, timeout=40)
             fn = resp[0]
             f = discord.File(fn, filename=name)
         await send_with_file(message.channel, "", f, filename=fn)
@@ -727,68 +818,6 @@ class Resize(Command):
         await send_with_file(message.channel, "", f, filename=fn)
 
 
-class Magik(Command):
-    name = ["ImageMagik", "IMGMagik"]
-    min_level = 0
-    description = "Applies the Magik filter to an image."
-    usage = "<0:url{attached_file}>"
-    no_parse = True
-    rate_limit = (4, 6)
-    _timeout_ = 3
-    typing = True
-
-    async def __call__(self, bot, user, guild, channel, message, args, argv, **void):
-        # Take input from any attachments, or otherwise the message contents
-        if message.attachments:
-            args = [a.url for a in message.attachments] + args
-            argv = " ".join(a.url for a in message.attachments) + " " * bool(argv) + argv
-        if not args:
-            raise ArgumentError("Please input an image by URL or attachment.")
-        with discord.context_managers.Typing(channel):
-            url = args.pop(0)
-            urls = await bot.follow_url(url, best=False, allow=True, limit=1)
-            if not urls:
-                urls = await bot.follow_to_image(argv)
-                if not urls:
-                    urls = await bot.follow_to_image(url)
-                    if not urls:
-                        raise ArgumentError("Please input an image by URL or attachment.")
-            url = urls[0]
-            # Try and find a good name for the output image
-            try:
-                name = url[url.rindex("/") + 1:]
-                if not name:
-                    raise ValueError
-                if "." in name:
-                    name = name[:name.rindex(".")]
-            except ValueError:
-                name = "unknown"
-            if not name.endswith(".png"):
-                name += ".png"
-            # Site only allows cdn.discord URLs, reupload images to discord temporarily for all other image links
-            if "cdn.discord" not in url[:32] or url.split("?")[0][-4:] not in (".png", "webm", ".jpg", "jpeg"):
-                resp = await process_image(url, "resize_max", ["-nogif", 512, "hamming"], user)
-                fn = resp[0]
-                f = discord.File(fn, filename=name)
-                msg = await channel.send(file=f)
-                url = msg.attachments[0].url
-                with suppress():
-                    os.remove(fn)
-            else:
-                msg = None
-            try:
-                resp = await Request(f"https://api.alexflipnote.dev/filter/magik?image={url}", timeout=48, aio=True)
-            except:
-                if msg is not None:
-                    await bot.silent_delete(msg)
-                raise
-            if msg is not None:
-                create_task(bot.silent_delete(msg))
-            b = resp
-            f = discord.File(io.BytesIO(b), filename=name)
-        await send_with_file(message.channel, "", f)
-
-
 class Fill(Command):
     name = ["ImageFill", "FillChannel", "FillImage"]
     min_level = 0
@@ -854,7 +883,7 @@ class Blend(Command):
     name = ["ImageBlend", "ImageOP"]
     min_level = 0
     description = "Combines the two supplied images, using an optional blend operation."
-    usage = "<0:url1{attached_file}> <1:url2{attached_file}> <2:operation[replace](?l)> <3:opacity[1]>"
+    usage = "<0:url1{attached_file}> <1:url2{attached_file}> <2:operation[replace](?l)> <3:opacity[0.5][1]>"
     no_parse = True
     rate_limit = (3, 5)
     flags = "l"
@@ -902,7 +931,7 @@ class Blend(Command):
             else:
                 value = " ".join(args).strip()
             if not value:
-                opacity = 1
+                opacity = 0.5
                 operation = "replace"
             else:
                 try:
