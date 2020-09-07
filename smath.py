@@ -329,7 +329,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
             self.size = iterable.size
             self.data = iterable.data.copy()
         else:
-            if not issubclass(type(iterable), collections.abc.Sequence) or issubclass(type(iterable), collections.abc.Mapping) or type(iterable) is str:
+            if not issubclass(type(iterable), collections.abc.Sequence) or issubclass(type(iterable), collections.abc.Mapping) or type(iterable) in (str, bytes):
                 try:
                     iterable = deque(iterable)
                 except TypeError:
