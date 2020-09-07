@@ -90,6 +90,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.last_check = 0
         self.status_iter = xrand(3)
         self.curr_state = azero(3)
+        self.ip = None
         self.embed_senders = cdict()
         # Assign bot cache to global variables for convenience
         globals().update(self.cache)

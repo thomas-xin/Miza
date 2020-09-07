@@ -1767,7 +1767,7 @@ class UpdateUsers(Database):
                     member = choice(guild.members)
                     if i == 0:
                         count = await bot.database.counts.getUserMessages(member, guild)
-                        out += f"\nServer insights: `{member} has posted {count} messages in total!`"
+                        out += f"\nServer insights: `{member} has posted {count} message{'s' if count != 1 else ''} in total!`"
                     elif i == 1:
                         curr = member.joined_at
                         old = None
