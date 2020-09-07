@@ -149,28 +149,29 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     async def garbage_collect(self, obj):
         if not self.ready or hasattr(obj, "no_delete"):
             return
-        async with obj._garbage_semaphore:
-            data = obj.data
-            for key in tuple(data):
-                if key != 0 and type(key) is not str:
-                    with suppress():
-                        # Database keys may be user, guild, or channel IDs
-                        if getattr(obj, "user", None):
-                            d = await self.fetch_user(key)
-                        else:
-                            if not data[key] and not started:
-                                raise LookupError
-                            with suppress(KeyError):
-                                d = self.cache.guilds[key]
+        with tracebacksuppressor(SemaphoreOverflowError):
+            async with obj._garbage_semaphore:
+                data = obj.data
+                for key in tuple(data):
+                    if key != 0 and type(key) is not str:
+                        with suppress():
+                            # Database keys may be user, guild, or channel IDs
+                            if getattr(obj, "user", None):
+                                d = await self.fetch_user(key)
+                            else:
+                                if not data[key] and not started:
+                                    raise LookupError
+                                with suppress(KeyError):
+                                    d = self.cache.guilds[key]
+                                    continue
+                                d = await self.fetch_messageable(key)
+                            if d is not None:
                                 continue
-                            d = await self.fetch_messageable(key)
-                        if d is not None:
-                            continue
-                    print(f"Deleting {key} from {repr(obj)}...")
-                    data.pop(key, None)
-                    obj.update()
-                if random.random() > 0.99:
-                    await asyncio.sleep(0.2)
+                        print(f"Deleting {key} from {repr(obj)}...")
+                        data.pop(key, None)
+                        obj.update()
+                    if random.random() > 0.99:
+                        await asyncio.sleep(0.2)
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
     async def send_event(self, ev, *args, exc=False, **kwargs):
