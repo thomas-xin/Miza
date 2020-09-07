@@ -1453,7 +1453,7 @@ class UpdateEnabled(Database):
 
 class UpdateMessages(Database):
     name = "messages"
-    semaphore = Semaphore(64, 1, delay=1, rate_limit=64)
+    semaphore = Semaphore(80, 1, delay=1, rate_limit=16)
     closed = False
 
     async def wrap_semaphore(self, func, *args, **kwargs):

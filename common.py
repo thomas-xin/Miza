@@ -1155,7 +1155,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
         self.catg = catg
         self.bot = bot
         self._semaphore = Semaphore(1, 1, delay=0.5, rate_limit=self.rate_limit)
-        self._garbage_semaphore = Semaphore(1, 1, delay=3, rate_limit=self.rate_limit)
+        self._garbage_semaphore = Semaphore(1, 0, delay=3, rate_limit=self.rate_limit + 20)
         self._globals = globals()
         f = getattr(self, "__load__", None)
         if callable(f):
