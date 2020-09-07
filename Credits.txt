@@ -1,4 +1,4 @@
-﻿Python Libraries:
+﻿Python:
 
 Meurer A, Smith CP, Paprocki M, Čertík O, Kirpichev SB, Rocklin M, Kumar A, Ivanov S, Moore JK, Singh S, Rathnayake T, Vig S, Granger BE, Muller RP, Bonazzi F, Gupta H, Vats S, Johansson F, Pedregosa F, Curry MJ, Terrel AR, Roučka Š, Saboo A, Fernando I, Kulal S, Cimrman R, Scopatz A.
 -SymPy: symbolic computing in Python. PeerJ Computer Science 3:e103 {https://doi.org/10.7717/peerj-cs.103}
@@ -14,6 +14,10 @@ Rapptz and others
 
 Sergey M. and others
 -youtube_dl: Command-line program to download videos from YouTube.com and other video sites {https://github.com/ytdl-org/youtube-dl}
+
+
+https://stackoverflow.com/a/37350619
+-Used for the image transform filter
 
 
 OTHERS:
