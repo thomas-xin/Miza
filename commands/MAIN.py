@@ -1453,7 +1453,7 @@ class UpdateEnabled(Database):
 
 class UpdateMessages(Database):
     name = "messages"
-    semaphore = Semaphore(64, 128, rate_limit=120)
+    semaphore = Semaphore(64, 1, delay=1, rate_limit=64)
     closed = False
 
     async def wrap_semaphore(self, func, *args, **kwargs):
@@ -1465,7 +1465,7 @@ class UpdateMessages(Database):
         if not self.closed:
             t = utc()
             for c_id, data in self.data.items():
-                with tracebacksuppressor:
+                with tracebacksuppressor():
                     channel = await self.bot.fetch_channel(c_id)
                     for m_id, v in data.items():
                         if t - v.t >= 1:

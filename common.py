@@ -97,6 +97,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     def is_busy(self):
         return self.active or self.passive
 
+    @property
+    def busy(self):
+        return self.is_busy()
+
 class SemaphoreOverflowError(RuntimeError):
     __slots__ = ()
 
@@ -1118,7 +1122,6 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
     name = "data"
 
     def __init__(self, bot, catg):
-        self.used = utc()
         name = self.name
         self.__name__ = self.__class__.__name__
         if not getattr(self, "no_file", False):
@@ -1151,8 +1154,8 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
         bot.database[name] = self
         self.catg = catg
         self.bot = bot
-        self.semaphore = Semaphore(1, 1, delay=0.5)
-        self.checking = False
+        self._semaphore = Semaphore(1, 1, delay=0.5, rate_limit=self.rate_limit)
+        self._garbage_semaphore = Semaphore(1, 1, delay=3, rate_limit=self.rate_limit)
         self._globals = globals()
         f = getattr(self, "__load__", None)
         if callable(f):

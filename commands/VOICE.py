@@ -3613,7 +3613,7 @@ class UpdateAudio(Database):
         bot = self.bot
         bot = bot
         with tracebacksuppressor(SemaphoreOverflowError):
-            async with self.semaphore:
+            async with self._semaphore:
                 # Ensure all voice clients are not muted, disconnect ones without matching audio players
                 if guild is not None:
                     g = guild

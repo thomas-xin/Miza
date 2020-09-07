@@ -148,32 +148,28 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     async def garbage_collect(self, obj):
         if not self.ready or hasattr(obj, "no_delete"):
             return
-        if obj.checking > utc():
-            return
-        obj.checking = utc() + 30
-        data = obj.data
-        for key in tuple(data):
-            if key != 0 and type(key) is not str:
-                with suppress():
-                    # Database keys may be user, guild, or channel IDs
-                    if getattr(obj, "user", None):
-                        d = await self.fetch_user(key)
-                    else:
-                        if not data[key] and not started:
-                            raise LookupError
-                        with suppress():
-                            d = await self.fetch_guild(key)
-                            if d is not None:
+        async with obj._garbage_semaphore:
+            data = obj.data
+            for key in tuple(data):
+                if key != 0 and type(key) is not str:
+                    with suppress():
+                        # Database keys may be user, guild, or channel IDs
+                        if getattr(obj, "user", None):
+                            d = await self.fetch_user(key)
+                        else:
+                            if not data[key] and not started:
+                                raise LookupError
+                            with suppress(KeyError):
+                                d = self.cache.guilds[key]
                                 continue
-                        d = await self.fetch_channel(key)
-                    if d is not None:
-                        continue
-                print(f"Deleting {key} from {repr(obj)}...")
-                data.pop(key, None)
-                obj.update()
-            if random.random() > .99:
-                await asyncio.sleep(0.2)
-        obj.checking = utc() + 10
+                            d = await self.fetch_messageable(key)
+                        if d is not None:
+                            continue
+                    print(f"Deleting {key} from {repr(obj)}...")
+                    data.pop(key, None)
+                    obj.update()
+                if random.random() > 0.99:
+                    await asyncio.sleep(0.2)
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
     async def send_event(self, ev, *args, exc=False, **kwargs):
@@ -1499,8 +1495,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     if self.bot_ready:
                         # Update databases
                         for u in self.database.values():
-                            if utc() - u.used > u.rate_limit or force:
+                            if not u._semaphore.busy:
                                 create_future(u, priority=True)
+                            if not u._garbage_semaphore.busy:
                                 create_task(self.garbage_collect(u))
 
     # Processes a message, runs all necessary commands and bot events. May be called from another source.

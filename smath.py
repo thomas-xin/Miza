@@ -329,7 +329,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
             self.size = iterable.size
             self.data = iterable.data.copy()
         else:
-            if not issubclass(type(iterable), collections.abc.Sequence) or issubclass(type(iterable), collections.abc.Mapping):
+            if not issubclass(type(iterable), collections.abc.Sequence) or issubclass(type(iterable), collections.abc.Mapping) or type(iterable) is str:
                 try:
                     iterable = deque(iterable)
                 except TypeError:
@@ -1114,10 +1114,20 @@ custom list-like data structure that incorporates the functionality of numpy arr
                 temp.extend(self.view)
         return self.__class__(temp)
 
+    # Similar to str.replace().
+    @blocking
+    def replace(self, original, new):
+        view = self.view
+        for i, v in enumerate(view):
+            if v == original:
+                view[i] = new
+        return self
+
     # Fills list with value(s).
     @blocking
     def fill(self, value):
         self.view[:] = value
+        return self
 
     # For compatibility with dict() attributes.
     keys = lambda self: range(len(self))
@@ -1184,6 +1194,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
             self.extend(other, force=True)
         if uniq:
             self.uniq(False, force=True)
+        return self
 
     @blocking
     def intersection_update(self, *others, uniq=True):
@@ -1199,6 +1210,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         self.pops(pops)
         if uniq:
             self.uniq(False, force=True)
+        return self
 
     @blocking
     def difference_update(self, *others, uniq=True):
@@ -1214,6 +1226,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         self.pops(pops)
         if uniq:
             self.uniq(False, force=True)
+        return self
 
     @blocking
     def symmetric_difference_update(self, other):
@@ -1224,6 +1237,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
             other = frozenset(other)
         data.symmetric_difference_update(other)
         self.__init__(data)
+        return self
 
     # Clips all values in list to input boundaries.
     @blocking
@@ -3076,6 +3090,7 @@ def fuzzy_substring(sub, s, match_start=False):
     return ratio
 
 
+# Replaces words in a string from a mapping similar to str.replace, but performs operation both ways.
 def replace_map(s, mapping):
     temps = {k: chr(65535 - i) for i, k in enumerate(mapping.keys())}
     trans = "".maketrans({chr(65535 - i): mapping[k] for i, k in enumerate(mapping.keys())})

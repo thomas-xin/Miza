@@ -700,8 +700,9 @@ class Ask(Command):
             "your": "my",
             "are you": "am i",
             "you are": "i am",
-            "you": "i",
-        }, words=True)
+            "you": "I",
+        })
+        q = "".join(alist(q).replace("i", "you")).lower()
         await channel.send(f"\xad{q.capitalize()}? {out}")
 
 
