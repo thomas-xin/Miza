@@ -121,7 +121,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         # Adjust FPS if duration is too long
         fps = min(fps, 256 * 65536 / w / h / dur)
         while fps < 8:
-            fps *= 2
+            fps *= 4
             w >>= 1
             h >>= 1
         vf = ""
