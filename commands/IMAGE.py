@@ -721,7 +721,7 @@ class Liquefy(Command):
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "magik_gif", [abs(value), 3, "-gif"], user, timeout=40)
+            resp = await process_image(url, "magik_gif", [abs(value), 2, 2, "-gif"], user, timeout=40)
             fn = resp[0]
             f = discord.File(fn, filename=name)
         await send_with_file(message.channel, "", f, filename=fn)

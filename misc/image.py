@@ -348,7 +348,7 @@ def to_circle(image):
     return ImageChops.multiply(image, image_map)
 
 
-def magik_gif2(image, cell_size=7):
+def magik_gif2(image, cell_size=7, grid_distance, iterations):
     out = deque()
     total = 0
     for f in range(2147483648):
@@ -375,30 +375,31 @@ def magik_gif2(image, cell_size=7):
         temp = image
         if temp.size[0] != size[0] or temp.size[1] != size[1]:
             temp = temp.resize(size, Image.HAMMING)
-        for _ in range(int(f / length / scale)):
+        for _ in range(int(iterations * f / length / scale)):
             dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
-            src_grid = distort_grid(dst_grid, max(1, round(160 / cell_size)))
+            src_grid = distort_grid(dst_grid, grid_distance)
             mesh = grid_to_mesh(src_grid, dst_grid)
             temp = temp.transform(temp.size, Image.MESH, mesh)
         out.append(temp)
     return dict(duration=total * scale, frames=out)
 
 
-def magik_gif(image, cell_size=7, grid_distance=23):
+def magik_gif(image, cell_size=7, grid_distance=23, iterations=1):
     try:
         image.seek(1)
     except EOFError:
         image.seek(0)
     else:
-        return magik_gif2(image, cell_size)
+        return magik_gif2(image, cell_size, grid_distance, iterations)
     ts = round(time.time() * 1000)
     image = resize_max(image, 512, resample=Image.HAMMING)
     out = deque((image,))
     for _ in range(31):
-        dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
-        src_grid = distort_grid(dst_grid, grid_distance)
-        mesh = grid_to_mesh(src_grid, dst_grid)
-        image = image.transform(image.size, Image.MESH, mesh)
+        for _ in range(iterations):
+            dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
+            src_grid = distort_grid(dst_grid, grid_distance)
+            mesh = grid_to_mesh(src_grid, dst_grid)
+            image = image.transform(image.size, Image.MESH, mesh)
         out.append(image)
     return dict(duration=2, frames=out)
 
