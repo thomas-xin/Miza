@@ -504,9 +504,33 @@ class HueShift(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
-        name, value, url = await get_image(bot, user, message, args, argv)
+        name, value, url = await get_image(bot, user, message, args, argv, default=0.5)
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "hue_shift", [value], user, timeout=32)
+            fn = resp[0]
+            if fn.endswith(".gif"):
+                if not name.endswith(".gif"):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += ".gif"
+            f = discord.File(fn, filename=name)
+        await send_with_file(message.channel, "", f, filename=fn)
+
+
+class Blur(Command):
+    name = ["Gaussian", "GaussianBlur"]
+    min_level = 0
+    description = "Applies Gaussian Blur to supplied image."
+    usage = "<0:url{attached_file}> <1:radius[8]>"
+    no_parse = True
+    rate_limit = (2, 3)
+    _timeout_ = 3
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, **void):
+        name, value, url = await get_image(bot, user, message, args, argv, default=8)
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "blur", ["gaussian", value], user, timeout=32)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):

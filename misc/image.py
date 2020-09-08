@@ -3,7 +3,7 @@
 import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image
 import numpy as np
 import PIL
-from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageEnhance, ImageMath, ImageStat
+from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 import matplotlib.pyplot as plt
@@ -379,7 +379,7 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
             dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
             src_grid = distort_grid(dst_grid, grid_distance)
             mesh = grid_to_mesh(src_grid, dst_grid)
-            temp = temp.transform(temp.size, Image.MESH, mesh)
+            temp = temp.transform(temp.size, Image.MESH, mesh, resample=Image.BILINEAR)
         out.append(temp)
     return dict(duration=total * scale, frames=out)
 
@@ -399,7 +399,7 @@ def magik_gif(image, cell_size=7, grid_distance=23, iterations=1):
             dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
             src_grid = distort_grid(dst_grid, grid_distance)
             mesh = grid_to_mesh(src_grid, dst_grid)
-            image = image.transform(image.size, Image.MESH, mesh)
+            image = image.transform(image.size, Image.MESH, mesh, resample=Image.BILINEAR)
         out.append(image)
     return dict(duration=2, frames=out)
 
@@ -475,7 +475,22 @@ def magik(image, cell_size=7):
     dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
     src_grid = distort_grid(dst_grid, max(1, round(160 / cell_size)))
     mesh = grid_to_mesh(src_grid, dst_grid)
-    return image.transform(image.size, Image.MESH, mesh)
+    return image.transform(image.size, Image.MESH, mesh, resample=Image.BILINEAR)
+
+
+blurs = {
+    "box": ImageFilter.BoxBlur,
+    "boxblur": ImageFilter.BoxBlur,
+    "gaussian": ImageFilter.GaussianBlur,
+    "gaussianblur": ImageFilter.GaussianBlur,
+}
+
+def blur(image, filt="box", radius=2):
+    try:
+        _filt = blurs[filt.replace("_", "").casefold()]
+    except KeyError:
+        raise TypeError(f'Invalid image operation: "{filt}"')
+    return image.filter(_filt(radius))
 
 
 # Autodetect max image size, keeping aspect ratio
