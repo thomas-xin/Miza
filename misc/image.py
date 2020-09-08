@@ -114,12 +114,16 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
                 sfind = re.finditer(sizecheck, d)
                 sizestr = next(sfind).group()
                 size = [int(i) for i in sizestr.split("x")]
-        # Adjust FPS if duration is too long
-        fps = min(fps, 256 / dur)
         fn2 = fn + ".gif"
         f_in = fn if direct else url
         command = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-fs", str(8388608 - 262144), "-an", "-vf"]
         w, h = max_size(*size, maxsize)
+        # Adjust FPS if duration is too long
+        fps = min(fps, 256 * 65536 / w / h / dur)
+        while fps < 8:
+            fps <<= 1
+            w >>= 1
+            h >>= 1
         vf = ""
         if w != size[0]:
             vf += "scale=" + str(w) + ":-1:flags=lanczos,"
@@ -181,7 +185,7 @@ def rainbow_gif2(image, duration):
             image.seek(f)
         except EOFError:
             break
-        total += image.info.get("duration", 1 / 60)
+        total += max(image.info.get("duration", 0), 1 / 60)
     length = f
     loops = total / duration / 1000
     scale = 1
@@ -265,7 +269,7 @@ def spin_gif2(image, duration):
             image.seek(f)
         except EOFError:
             break
-        total += image.info.get("duration", 1 / 60)
+        total += max(image.info.get("duration", 0), 1 / 60)
     length = f
     loops = total / duration / 1000
     scale = 1
@@ -356,7 +360,7 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
             image.seek(f)
         except EOFError:
             break
-        total += image.info.get("duration", 1 / 60)
+        total += max(image.info.get("duration", 0), 1 / 60)
     length = f
     loops = total / 2 / 1000
     scale = 1
@@ -1007,7 +1011,7 @@ def evalImg(url, operation, args):
                 else:
                     temp = image
                 if new is not None:
-                    new["duration"] += temp.info.get("duration", 1 / 60)
+                    new["duration"] += max(temp.info.get("duration", 0), 1 / 60)
                 func = getattr(temp, operation, None)
                 if func is None:
                     res = eval(operation)(temp, *args)
