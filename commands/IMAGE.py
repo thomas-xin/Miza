@@ -360,7 +360,7 @@ class CreateEmoji(Command):
         return css_md(f"Successfully created emoji {sqr_md(emoji)} for {sqr_md(guild)}.")
 
 
-async def get_image(bot, user, message, args, argv, ext="png"):
+async def get_image(bot, user, message, args, argv, default=2, ext="png"):
     # Take input from any attachments, or otherwise the message contents
     if message.attachments:
         args = [best_url(a) for a in message.attachments] + args
@@ -378,7 +378,7 @@ async def get_image(bot, user, message, args, argv, ext="png"):
     url = urls[0]
     value = " ".join(args).strip()
     if not value:
-        value = 2
+        value = default
     else:
         value = await bot.eval_math(value, user)
         if not abs(value) <= 64:
@@ -568,16 +568,16 @@ class GreyScale(Command):
 class Magik(Command):
     min_level = 0
     description = "Applies the Magik image filter to supplied image."
-    usage = "<0:url{attached_file}>"
+    usage = "<0:url{attached_file}> <cell_size[7]>"
     no_parse = True
     rate_limit = (3, 4)
     _timeout_ = 4
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, **void):
-        name, value, url = await get_image(bot, user, message, args, argv)
+        name, value, url = await get_image(bot, user, message, args, argv, default=7)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "magik", [], user, timeout=40)
+            resp = await process_image(url, "magik", [value], user, timeout=40)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -670,7 +670,7 @@ class Rainbow(Command):
 
 
 class Spin(Command):
-    name = ["RainbowGIF"]
+    name = ["SpinGIF"]
     min_level = 0
     description = "Creates a .gif image from repeatedly rotating supplied image."
     usage = "<0:url{attached_file}> <1:duration[2]>"
@@ -684,6 +684,44 @@ class Spin(Command):
         with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "spin_gif", [value, "-gif"], user, timeout=40)
+            fn = resp[0]
+            f = discord.File(fn, filename=name)
+        await send_with_file(message.channel, "", f, filename=fn)
+
+
+class GMagik(Command):
+    name = ["MagikGIF"]
+    min_level = 0
+    description = "Repeatedly applies the Magik image filter to supplied image."
+    usage = "<0:url{attached_file}> <cell_size[7]>"
+    no_parse = True
+    rate_limit = (7, 11)
+    _timeout_ = 4
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, **void):
+        name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "magik_gif", [abs(value), max(1, round(160 / abs(value))), "-gif"], user, timeout=40)
+            fn = resp[0]
+            f = discord.File(fn, filename=name)
+        await send_with_file(message.channel, "", f, filename=fn)
+
+
+class Liquefy(Command):
+    name = ["LiquidGIF"]
+    min_level = 0
+    description = "Repeatedly applies slight distortion to supplied image."
+    usage = "<0:url{attached_file}> <cell_size[12]>"
+    no_parse = True
+    rate_limit = (7, 11)
+    _timeout_ = 4
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, **void):
+        name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "magik_gif", [abs(value), 3, "-gif"], user, timeout=40)
             fn = resp[0]
             f = discord.File(fn, filename=name)
         await send_with_file(message.channel, "", f, filename=fn)

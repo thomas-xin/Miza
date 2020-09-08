@@ -8,6 +8,7 @@ from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 import matplotlib.pyplot as plt
 
+deque = collections.deque
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 start = time.time()
@@ -145,7 +146,7 @@ def create_gif(in_type, args, delay):
     images = args
     maxsize = int(min(maxsize, 32768 / len(images) ** 0.5))
     # Detect if an image sequence or video is being inputted
-    imgs = collections.deque()
+    imgs = deque()
     for url in images:
         with requests.get(url, stream=True, timeout=8) as resp:
             data = resp.content
@@ -173,7 +174,7 @@ def create_gif(in_type, args, delay):
     return dict(duration=delay * len(imgs), frames=imgs)
 
 def rainbow_gif2(image, duration):
-    out = collections.deque()
+    out = deque()
     total = 0
     for f in range(2147483648):
         try:
@@ -243,7 +244,7 @@ def rainbow_gif(image, duration):
     channels = list(curr.split())
     if duration < 0:
         rate = -rate
-    out = collections.deque()
+    out = deque()
     # Repeatedly hueshift image and return copies
     func = lambda x: (x + rate) & 255
     for i in range(0, 256, abs(rate)):
@@ -257,7 +258,7 @@ def rainbow_gif(image, duration):
 
 
 def spin_gif2(image, duration):
-    out = collections.deque()
+    out = deque()
     total = 0
     for f in range(2147483648):
         try:
@@ -283,7 +284,7 @@ def spin_gif2(image, duration):
         temp = image
         if temp.size[0] != size[0] or temp.size[1] != size[1]:
             temp = temp.resize(size, Image.HAMMING)
-        temp = to_circle(temp.rotate(f * 360 / length / scale / loops))
+        temp = to_circle(temp.rotate(f * 360 / length / scale * loops))
         out.append(temp)
     return dict(duration=total * scale, frames=out)
 
@@ -310,8 +311,8 @@ def spin_gif(image, duration):
         raise ValueError("Invalid framerate value.")
     if duration < 0:
         rate = -rate
-    out = collections.deque()
-    # Repeatedly hueshift image and return copies
+    out = deque()
+    # Repeatedly rotate image and return copies
     for i in range(0, 256, abs(rate)):
         if i:
             im = image.rotate(i * 360 / 256)
@@ -321,20 +322,85 @@ def spin_gif(image, duration):
     return dict(duration=1000 / fps * len(out), frames=out)
 
 
+def to_square(image):
+    w, h = image.size
+    d = w - h
+    if not d:
+        return image
+    if d > 0:
+        return image.crop((d >> 1, w - (1 + d >> 1), 0, h))
+    return image.crop((0, w, -d >> 1, h - (1 - d >> 1)))
+
+
 CIRCLE_CACHE = {}
 
 def to_circle(image):
     global CIRCLE_CACHE
     if str(image.mode) != "RGBA":
-        image = image.convert("RGBA")
+        image = to_square(image).convert("RGBA")
     try:
         image_map = CIRCLE_CACHE[image.size]
     except KeyError:
-        image_map = Image.new("1", image.size)
+        image_map = Image.new("RGBA", image.size)
         draw = ImageDraw.Draw(image_map)
-        draw.ellipse((0, 0, *image.size), outline=1, fill=1, width=0)
+        draw.ellipse((0, 0, *image.size), outline=0, fill=(255,) * 4, width=0)
         CIRCLE_CACHE[image.size] = image_map
     return ImageChops.multiply(image, image_map)
+
+
+def magik_gif2(image, cell_size=7):
+    out = deque()
+    total = 0
+    for f in range(2147483648):
+        try:
+            image.seek(f)
+        except EOFError:
+            break
+        total += image.info.get("duration", 1 / 60)
+    length = f
+    loops = total / 2 / 1000
+    scale = 1
+    while abs(loops * scale) < 1:
+        scale *= 2
+        if length * scale >= 32:
+            loops = 1 if loops >= 0 else -1
+            break
+    loops = round(loops * scale) / scale
+    if not loops:
+        loops = 1 if loops >= 0 else -1
+    maxsize = int(min(512, 32768 / (length * scale ** 0.5) ** 0.5))
+    size = list(max_size(*image.size, maxsize))
+    for f in range(length * scale):
+        image.seek(f % length)
+        temp = image
+        if temp.size[0] != size[0] or temp.size[1] != size[1]:
+            temp = temp.resize(size, Image.HAMMING)
+        for _ in range(int(f / length / scale)):
+            dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
+            src_grid = distort_grid(dst_grid, max(1, round(160 / cell_size)))
+            mesh = grid_to_mesh(src_grid, dst_grid)
+            temp = temp.transform(temp.size, Image.MESH, mesh)
+        out.append(temp)
+    return dict(duration=total * scale, frames=out)
+
+
+def magik_gif(image, cell_size=7, grid_distance=23):
+    try:
+        image.seek(1)
+    except EOFError:
+        image.seek(0)
+    else:
+        return magik_gif2(image, cell_size)
+    ts = round(time.time() * 1000)
+    image = resize_max(image, 512, resample=Image.HAMMING)
+    out = deque((image,))
+    for _ in range(31):
+        dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
+        src_grid = distort_grid(dst_grid, grid_distance)
+        mesh = grid_to_mesh(src_grid, dst_grid)
+        image = image.transform(image.size, Image.MESH, mesh)
+        out.append(image)
+    return dict(duration=2, frames=out)
 
 
 def quad_as_rect(quad):
@@ -363,9 +429,9 @@ def griddify(rect, w_div, h_div):
     x_step = w / float(w_div)
     y_step = h / float(h_div)
     y = rect[1]
-    grid_vertex_matrix = []
+    grid_vertex_matrix = deque()
     for _ in range(h_div + 1):
-        grid_vertex_matrix.append([])
+        grid_vertex_matrix.append(deque())
         x = rect[0]
         for _ in range(w_div + 1):
             grid_vertex_matrix[-1].append([int(x), int(y)])
@@ -380,7 +446,7 @@ def distort_grid(org_grid, max_shift):
     y_min = np.min(new_grid[:, :, 1])
     x_max = np.max(new_grid[:, :, 0])
     y_max = np.max(new_grid[:, :, 1])
-    new_grid += np.random.randint(- max_shift, max_shift + 1, new_grid.shape)
+    new_grid += np.random.randint(-max_shift, max_shift + 1, new_grid.shape)
     new_grid[:, :, 0] = np.maximum(x_min, new_grid[:, :, 0])
     new_grid[:, :, 1] = np.maximum(y_min, new_grid[:, :, 1])
     new_grid[:, :, 0] = np.minimum(x_max, new_grid[:, :, 0])
@@ -389,7 +455,7 @@ def distort_grid(org_grid, max_shift):
 
 def grid_to_mesh(src_grid, dst_grid):
     assert(src_grid.shape == dst_grid.shape)
-    mesh = []
+    mesh = deque()
     for i in range(src_grid.shape[0] - 1):
         for j in range(src_grid.shape[1] - 1):
             src_quad = [src_grid[i    , j    , 0], src_grid[i    , j    , 1],
@@ -402,11 +468,11 @@ def grid_to_mesh(src_grid, dst_grid):
                         dst_grid[i    , j + 1, 0], dst_grid[i    , j + 1, 1]]
             dst_rect = quad_to_rect(dst_quad)
             mesh.append([dst_rect, src_quad])
-    return mesh
+    return list(mesh)
 
-def magik(image):
-    dst_grid = griddify(shape_to_rect(image.size), 7, 7)
-    src_grid = distort_grid(dst_grid, 22)
+def magik(image, cell_size=7):
+    dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
+    src_grid = distort_grid(dst_grid, max(1, round(160 / cell_size)))
     mesh = grid_to_mesh(src_grid, dst_grid)
     return image.transform(image.size, Image.MESH, mesh)
 
@@ -653,7 +719,7 @@ def blend_op(image, url, operation, amount, recursive=True):
             except EOFError:
                 image2.seek(0)
             else:
-                out = collections.deque()
+                out = deque()
                 for f in range(2147483648):
                     try:
                         image2.seek(f)
@@ -898,7 +964,7 @@ def evalImg(url, operation, args):
                 new = None
                 globals()["ANIM"] = False
             else:
-                new = dict(frames=collections.deque(), duration=0)
+                new = dict(frames=deque(), duration=0)
                 globals()["ANIM"] = True
             # Attempt to perform operation on all individual frames of .gif images
             for f in range(2147483648):
