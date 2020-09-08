@@ -1230,8 +1230,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
         cpu = await create_future(psutil.cpu_count, priority=True)
         mem = await create_future(psutil.virtual_memory, priority=True)
-        disk = await create_future(get_folder_size("cache"), priority=True)
-        disk += await create_future(get_folder_size("saves"), priority=True)
+        disk = await create_future(get_folder_size, "cache", priority=True)
+        disk += await create_future(get_folder_size, "saves", priority=True)
         # CPU is totalled across all cores
         stats[0] /= cpu
         # Memory is in %
