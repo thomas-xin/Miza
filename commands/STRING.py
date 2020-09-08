@@ -616,7 +616,7 @@ class Ask(Command):
     async def __call__(self, channel, user, argv, **void):
         bot = self.bot
         guild = getattr(channel, "guild", None)
-        q = single_space(full_prune(argv.replace("?", ""))).strip()
+        q = single_space(full_prune(argv.replace("?", ""))).strip().translate(bot.mtrans)
         if not q:
             raise ArgumentError(choice("Sorry, didn't see that, was that a question? 🤔", "Ay, speak up, I don't bite! :3"))
         out = None
