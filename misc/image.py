@@ -328,8 +328,8 @@ def to_square(image):
     if not d:
         return image
     if d > 0:
-        return image.crop((d >> 1, w - (1 + d >> 1), 0, h))
-    return image.crop((0, w, -d >> 1, h - (1 - d >> 1)))
+        return image.crop((d >> 1, 0, w - (1 + d >> 1), h))
+    return image.crop((0, -d >> 1, w, h - (1 - d >> 1)))
 
 
 CIRCLE_CACHE = {}
@@ -379,7 +379,7 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
             dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
             src_grid = distort_grid(dst_grid, grid_distance)
             mesh = grid_to_mesh(src_grid, dst_grid)
-            temp = temp.transform(temp.size, Image.MESH, mesh, resample=Image.BILINEAR)
+            temp = temp.transform(temp.size, Image.MESH, mesh, resample=Image.NEAREST)
         out.append(temp)
     return dict(duration=total * scale, frames=out)
 
@@ -399,7 +399,7 @@ def magik_gif(image, cell_size=7, grid_distance=23, iterations=1):
             dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
             src_grid = distort_grid(dst_grid, grid_distance)
             mesh = grid_to_mesh(src_grid, dst_grid)
-            image = image.transform(image.size, Image.MESH, mesh, resample=Image.BILINEAR)
+            image = image.transform(image.size, Image.MESH, mesh, resample=Image.NEAREST)
         out.append(image)
     return dict(duration=2, frames=out)
 
@@ -475,7 +475,7 @@ def magik(image, cell_size=7):
     dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
     src_grid = distort_grid(dst_grid, max(1, round(160 / cell_size)))
     mesh = grid_to_mesh(src_grid, dst_grid)
-    return image.transform(image.size, Image.MESH, mesh, resample=Image.BILINEAR)
+    return image.transform(image.size, Image.MESH, mesh, resample=Image.NEAREST)
 
 
 blurs = {

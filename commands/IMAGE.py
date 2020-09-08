@@ -312,8 +312,8 @@ class CreateEmoji(Command):
     async def __call__(self, bot, user, guild, channel, message, args, argv, **void):
         # Take input from any attachments, or otherwise the message contents
         if message.attachments:
-            args = [best_url(a) for a in message.attachments] + args
-            argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
+            args.extend(best_url(a) for a in message.attachments)
+            argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
         if not args:
             raise ArgumentError("Please enter URL, emoji, or attached file to add.")
         with discord.context_managers.Typing(channel):
