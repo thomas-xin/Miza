@@ -349,6 +349,15 @@ def touch(file):
         pass
 
 
+def get_folder_size(folder):
+    folder = folder.strip("/") + "/"
+    size = 0
+    for file in os.listdir(folder):
+        with suppress(FileNotFoundError, PermissionError):
+            size += os.path.getsize(folder + file)
+    return size
+
+
 # Checks if an object can be used in "await" operations.
 awaitable = lambda obj: hasattr(obj, "__await__") or issubclass(type(obj), asyncio.Future) or issubclass(type(obj), asyncio.Task) or inspect.isawaitable(obj)
 
