@@ -554,7 +554,7 @@ class Invert(Command):
     async def __call__(self, bot, user, channel, message, args, argv, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "ImageOps.invert", [], user, timeout=24)
+            resp = await process_image(url, "invert", [], user, timeout=24)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):

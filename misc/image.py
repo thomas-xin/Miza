@@ -493,6 +493,18 @@ def blur(image, filt="box", radius=2):
     return image.filter(_filt(radius))
 
 
+def invert(image):
+    if str(image.mode) == "RGBA":
+        A = image.getchannel("A")
+        image = image.convert("RGB")
+    else:
+        A = None
+    image = ImageOps.invert(image)
+    if A is not None:
+        image.putalpha(A)
+    return image
+
+
 # Autodetect max image size, keeping aspect ratio
 def max_size(w, h, maxsize):
     s = w * h
