@@ -348,7 +348,7 @@ def to_circle(image):
     return ImageChops.multiply(image, image_map)
 
 
-def magik_gif2(image, cell_size=7, grid_distance, iterations):
+def magik_gif2(image, cell_size, grid_distance, iterations):
     out = deque()
     total = 0
     for f in range(2147483648):
