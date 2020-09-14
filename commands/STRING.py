@@ -703,8 +703,8 @@ class Ask(Command):
             "you are": "I am",
             "you're": "i'm",
             "you'll": "i'll",
-        }).replace("you", "I")
-        q = " ".join(alist(q.split()).replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
+        })
+        q = " ".join(alist(q.split()).replace("you", "I").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
         await channel.send(f"\xad{q[0].upper() + q[1:]}? {out}")
 
 
