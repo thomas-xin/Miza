@@ -81,9 +81,9 @@ def pull_booru(argv, delay=5):
         posts = client.post_list(tags=argv, random=True, limit=16)
         if not posts:
             raise EOFError
-        choice = xrand(len(posts))
-        url = posts[choice]["file_url"]
-        return [url, 1, choice + 1]
+        i = xrand(len(posts))
+        url = posts[i]["file_url"]
+        return [url, 1, i + 1]
     except:
         if LOG:
             print_exc()
@@ -197,12 +197,16 @@ async def searchRandomNSFW(argv, delay=10):
         pull_e621,
     ]
     data = [create_future(f, argv, delay - 3) for f in funcs]
-    data = await recursive_coro(data)
-    print(data)
-    data = [i for i in data if i]
-    if not data:
+    out = deque()
+    for fut in data:
+        with tracebacksuppressor:
+            temp = await fut
+            if temp:
+                out.append(temp)
+    print(out)
+    if not out:
         raise LookupError(f"No results for {argv}.")
-    item = choice(data)
+    item = choice(out)
     return item
 
 
