@@ -774,8 +774,8 @@ class UpdateMathTest(Database):
             "Bullseye!",
         ],
         incorrect=[
-            "Oops, not quite, try again!",
             "Aw, close, keep trying!",
+            "Oops, not quite, try again!",
         ],
     )
 
