@@ -339,7 +339,7 @@ class Neko(Command):
             text = "Pulled from " + url
             return text
         emb = discord.Embed(
-            url=url,
+            description=url,
             colour=rand_colour(),
         )
         emb.set_image(url=url)
@@ -372,7 +372,7 @@ class Lewd(Command):
             )
             return text
         emb = discord.Embed(
-            url=url,
+            description=url,
             colour=rand_colour(),
         )
         emb.set_image(url=url)

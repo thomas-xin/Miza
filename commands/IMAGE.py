@@ -122,7 +122,7 @@ class IMG(Command):
         if "v" in flags:
             return url
         emb = discord.Embed(
-            url=url,
+            description=url,
             colour=rand_colour(),
         )
         emb.set_image(url=url)
@@ -1104,7 +1104,7 @@ class Cat(Command):
             text = "Pulled from " + url
             return text
         emb = discord.Embed(
-            url=url,
+            description=url,
             colour=rand_colour(),
         )
         emb.set_image(url=url)
@@ -1185,7 +1185,7 @@ class Dog(Command):
             text = "Pulled from " + url
             return text
         emb = discord.Embed(
-            url=url,
+            description=url,
             colour=rand_colour(),
         )
         emb.set_image(url=url)
@@ -1232,7 +1232,7 @@ class _8Ball(Command):
     def __call__(self, channel, **void):
         url = self.get_buffer(64)
         emb = discord.Embed(
-            url=url,
+            description=url,
             colour=rand_colour(),
         )
         emb.set_image(url=url)

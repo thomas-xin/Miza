@@ -810,7 +810,7 @@ class UpdateMathTest(Database):
                     pull = self.messages.correct
                 else:
                     pull = self.messages.incorrect
-                high = len(messages) ** 2
+                high = len(self.messages) ** 2
                 i = isqrt(random.randint(0, high))
                 await channel.send(pull[i])
 
