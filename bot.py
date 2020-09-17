@@ -132,9 +132,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def run(self):
         print(f"Logging in...")
         with closing(get_event_loop()):
-            with suppress():
+            with tracebacksuppressor():
                 get_event_loop().run_until_complete(self.start(self.token))
-            with suppress():
+            with tracebacksuppressor():
                 get_event_loop().run_until_complete(self.close())
         self.setshutdown()
 
@@ -1359,7 +1359,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if getattr(u, "update", None) is not None:
                     if u.update(True):
                         saved.append(i)
-        if hasattr(self, "total_bytes"):
+        if not self.closed and hasattr(self, "total_bytes"):
             with tracebacksuppressor:
                 s = "{'net_bytes': " + str(self.total_bytes) + "}"
                 with open("saves/status.json", "w") as f:
