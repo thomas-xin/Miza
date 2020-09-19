@@ -369,11 +369,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 ikey=userIter4,
                 fuzzy=1 / 3,
             )
-        try:
-            members = await guild.query_members(query, limit=1)
-            return members[0]
-        except (AttributeError, T0, T1):
-            raise LookupError(f"No results for {query}.")
+        raise LookupError(f"No results for {query}.")
 
     # Fetches a member in the target server by ID or name lookup.
     async def fetch_member_ex(self, u_id, guild=None, allow_banned=True):
@@ -1706,15 +1702,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                         args = shlex.split(argv2)
                                     except ValueError:
                                         args = argv2.split()
-                                    if args and getattr(command, "flags", None):
-                                        if not ("a" in flags or "e" in flags or "d" in flags):
-                                            if "a" in command.flags and "e" in command.flags and "d" in command.flags:
-                                                if args[0] in ("add", "enable", "set"):
-                                                    args.pop(0)
-                                                    add_dict(flags, {"a": 1})
-                                                elif args[0] in ("rem", "disable", "remove", "unset"):
-                                                    args.pop(0)
-                                                    add_dict(flags, {"d": 1})
+                                if args and getattr(command, "flags", None):
+                                    if not ("a" in flags or "e" in flags or "d" in flags):
+                                        if "a" in command.flags and "e" in command.flags and "d" in command.flags:
+                                            if args[0].lower() in ("add", "enable", "set", "create", "append"):
+                                                args.pop(0)
+                                                add_dict(flags, {"a": 1})
+                                            elif args[0].lower() in ("rem", "disable", "remove", "unset", "delete"):
+                                                args.pop(0)
+                                                add_dict(flags, {"d": 1})
                             # Assign "guild" as an object that mimics the discord.py guild if there is none
                             if guild is None:
                                 guild = self.UserGuild(

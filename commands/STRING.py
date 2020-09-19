@@ -569,7 +569,7 @@ class Follow(Command):
         if len(output) > 2000 and len(output) < 54000:
             self.bot.send_as_embeds(channel, output)
         else:
-            return output
+            return escape_everyone(output)
 
 
 class Match(Command):
@@ -705,7 +705,7 @@ class Ask(Command):
             "you'll": "i'll",
         })
         q = " ".join(alist(q.split()).replace("you", "I").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
-        await channel.send(f"\xad{q[0].upper() + q[1:]}? {out}")
+        await channel.send(escape_everyone(f"\xad{q[0].upper() + q[1:]}? {out}"))
 
 
 class UrbanDictionary(Command):

@@ -14,6 +14,7 @@ import urllib.request, urllib.parse
 python = ("python3", "python")[os.name == "nt"]
 url_parse = urllib.parse.quote
 escape_markdown = discord.utils.escape_markdown
+escape_mentions = discord.utils.escape_mentions
 escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere").replace("<@&", "<@\xad&")
 time_snowflake = discord.utils.time_snowflake
 snowflake_time = discord.utils.snowflake_time

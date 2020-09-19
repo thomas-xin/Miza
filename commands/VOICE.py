@@ -1506,6 +1506,17 @@ class AudioDownloader:
                                     output += res[0]
                     while futs:
                         output.extend(futs.popleft().result()[0])
+                    v_id = None
+                    for x in ("?v=", "&v="):
+                        if x in item:
+                            v_id = item[item.index(x) + len(x):]
+                            v_id = v_id.split("&")[0]
+                            break
+                    if v_id:
+                        for i, e in enumerate(output):
+                            if v_id in e.url:
+                                output.rotate(-i)
+                                break
             if regexp("(play|open|api)\\.spotify\\.com").search(item):
                 # Spotify playlist searches contain up to 100 items each
                 if "playlist" in item:
@@ -1557,6 +1568,17 @@ class AudioDownloader:
                                     output += res[0]
                     while futs:
                         output.extend(futs.popleft().result()[0])
+                    v_id = None
+                    for x in ("?highlight=spotify:track:", "&highlight=spotify:track:"):
+                        if x in item:
+                            v_id = item[item.index(x) + len(x):]
+                            v_id = v_id.split("&")[0]
+                            break
+                    if v_id:
+                        for i, e in enumerate(output):
+                            if v_id in e.url:
+                                output.rotate(-i)
+                                break
             # Only proceed if no items have already been found (from playlists in this case)
             if not len(output):
                 # Allow loading of files output by ~dump
