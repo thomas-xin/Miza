@@ -52,7 +52,7 @@ class Purge(Command):
                 lim = count * 2 + 16 if count < inf else None
                 after = utc_dt() - datetime.timedelta(days=14) if "i" not in flags else None
                 found = False
-                if dt is None or dt > after:
+                if dt is None or after is None or dt > after:
                     async with bot.guild_semaphore:
                         async for m in channel.history(limit=lim, before=dt, after=after, oldest_first=False):
                             found = True
