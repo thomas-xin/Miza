@@ -12,8 +12,8 @@ class Purge(Command):
     name = ["Del", "Delete", "Purge_Range"]
     min_level = 3
     description = "Deletes a number of messages from a certain user in current channel."
-    usage = "<1:*users{bot}{everyone(?a)}> <0:count[1]> <range(?r)> <hide(?h)>"
-    flags = "faehr"
+    usage = "<1:*users{bot}{everyone(?a)}> <0:count[1]> <ignore(?i)> <range(?r)> <hide(?h)>"
+    flags = "fiaehr"
     rate_limit = 2
     multi = True
 
@@ -50,7 +50,7 @@ class Purge(Command):
             # Keep going until finding required amount of messages or reaching the end of the channel
             while count > 0:
                 lim = count * 2 + 16 if count < inf else None
-                after = utc_dt() - datetime.timedelta(days=14)
+                after = utc_dt() - datetime.timedelta(days=14) if "i" not in flags else None
                 found = False
                 if dt is None or dt > after:
                     async with bot.guild_semaphore:
