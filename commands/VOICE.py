@@ -1507,6 +1507,7 @@ class AudioDownloader:
                                     output += res[0]
                     while futs:
                         output.extend(futs.popleft().result()[0])
+                    # Scroll to highlighted entry if possible
                     v_id = None
                     for x in ("?v=", "&v="):
                         if x in item:
@@ -1552,7 +1553,7 @@ class AudioDownloader:
                         with delay(0.125):
                             if curr >= maxitems:
                                 break
-                            search = url + "&offset=" + str(curr) + "&limit=" + str(page)
+                            search = f"{url}&offset={curr}&limit={page}"
                             fut = create_future_ex(self.get_spotify_part, search, timeout=90)
                             print("Sent 1 spotify search.")
                             futs.append(fut)
@@ -1569,6 +1570,7 @@ class AudioDownloader:
                                     output += res[0]
                     while futs:
                         output.extend(futs.popleft().result()[0])
+                    # Scroll to highlighted entry if possible
                     v_id = None
                     for x in ("?highlight=spotify:track:", "&highlight=spotify:track:"):
                         if x in item:
@@ -1577,7 +1579,7 @@ class AudioDownloader:
                             break
                     if v_id:
                         for i, e in enumerate(output):
-                            if v_id == e.get("id", None):
+                            if v_id == e.get("id"):
                                 output.rotate(-i)
                                 break
             # Only proceed if no items have already been found (from playlists in this case)
