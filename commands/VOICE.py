@@ -1366,6 +1366,7 @@ class AudioDownloader:
             temp = cdict(
                 name=name,
                 url="ytsearch:" + f"{name} ~ {artists}".replace(":", "-"),
+                id=track["id"],
                 duration=dur,
                 research=True,
             )
@@ -1576,7 +1577,7 @@ class AudioDownloader:
                             break
                     if v_id:
                         for i, e in enumerate(output):
-                            if v_id in e.url:
+                            if v_id == e.get("id", None):
                                 output.rotate(-i)
                                 break
             # Only proceed if no items have already been found (from playlists in this case)
@@ -3601,6 +3602,7 @@ class UpdateAudio(Database):
                         e.pop("research", None)
                         print_exc()
                         break
+                    e.pop("id", None)
                 if not i & 7:
                     await asyncio.sleep(0.4)
         auds.searching = max(auds.searching - 1, 0)
