@@ -706,7 +706,7 @@ class Ask(Command):
             "you'll": "i'll",
         })
         q = " ".join(alist(q.split()).replace("you", "I").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
-        await channel.send(escape_everyone(f"\xad{q[0].upper() + q[1:]}? {out}"))
+        await channel.send(escape_everyone(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\u200b", "")))
 
 
 class UrbanDictionary(Command):
