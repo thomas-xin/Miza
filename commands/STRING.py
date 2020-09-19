@@ -696,6 +696,7 @@ class Ask(Command):
             )[ihash(q)]
         if not out:
             raise RuntimeError("Unable to construct a valid response.")
+        q = q.replace("am i", "are y\u200bou").replace("i am", "y\u200bou are")
         q = replace_map(q, {
             "yourself": "myself",
             "your": "my",
