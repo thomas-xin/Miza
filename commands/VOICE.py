@@ -2898,7 +2898,7 @@ class Shuffle(Command):
     min_display = "0~1"
     description = "Shuffles the audio queue."
     usage = "<force(?f)> <hide(?h)>"
-    flags = "h"
+    flags = "fh"
     rate_limit = 5
 
     async def __call__(self, perm, flags, guild, channel, user, bot, **void):
