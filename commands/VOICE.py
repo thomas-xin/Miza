@@ -13,6 +13,12 @@ getattr(youtube_dl, "__builtins__", {})["print"] = print
 # Audio sample rate for both converting and playing
 SAMPLE_RATE = 48000
 
+try:
+    subprocess.check_output("ffmpeg")
+except subprocess.CalledProcessError:
+    pass
+except FileNotFoundError:
+    print("WARNING: FFmpeg not found. Required for voice commands.")
 
 with open("auth.json") as f:
     auth = ast.literal_eval(f.read())
@@ -2058,19 +2064,15 @@ class Queue(Command):
             duration = 0
         else:
             duration = e_dur(q[0].duration)
-        sym = "⬜⬛"
-        barsize = 23
-        if not elapsed or not duration:
-            r = 0
-        else:
-            r = round(min(1, elapsed / duration) * barsize)
-        bar = sym[0] * r + sym[1] * (barsize - r)
+        if duration == 0:
+            elapsed = 0
+            duration = 0.0001
+        bar = await bot.create_progress_bar(18, elapsed / duration)
         if not q:
             countstr = "Queue is currently empty.\n"
         else:
-            countstr = f"Currently playing {sqr_md(q[0].name)}({q[0].url})\n"
-        countstr += f"`({uni_str(time_disp(elapsed))}/{uni_str(time_disp(duration))}) "
-        countstr += bar + "`\n"
+            countstr = f"Currently playing {sqr_md(q[0].name)}({q[0].url})"
+        countstr += f"`({uni_str(time_disp(elapsed))}/{uni_str(time_disp(duration))})`\n{bar}\n"
         emb = discord.Embed(
             description=content + info + countstr,
             colour=rand_colour(),

@@ -425,3 +425,41 @@ class UpdateBlacklist(Database):
         super().__init__(*args, **kwargs)
         if type(self.data) is not set:
             self.bot.data[self.name] = self.data = set(self.data)
+
+
+class UpdateEmojis(Database):
+    name = "emojis"
+    no_delete = True
+
+    def get(self, name):
+        while not self.bot.bot_ready:
+            time.sleep(2)
+        with suppress(KeyError):
+            return self.bot.cache.emojis[self.data[name]]
+        guild = self.bot.get_available_guild()
+        with open(f"misc/emojis/{name}", "rb") as f:
+            emoji = await_fut(guild.create_custom_emoji(name="_m", image=f.read()))
+            self.data[name] = emoji.id
+            self.update()
+        self.bot.cache.emojis[emoji.id] = emoji
+        return emoji
+
+    def create_progress_bar(self, length, ratio):
+        start_bar = deque(str(self.get(f"start_bar_{i}.gif")) for i in range(5))
+        mid_bar = deque(str(self.get(f"mid_bar_{i}.gif")) for i in range(5))
+        end_bar = deque(str(self.get(f"end_bar_{i}.gif")) for i in range(5))
+        high = length * 4
+        position = min(high, round(ratio * high))
+        items = deque()
+        new = min(4, position)
+        items.append(start_bar[new])
+        position -= new
+        for i in range(length - 1):
+            new = min(4, position)
+            if i >= length - 2:
+                bar = end_bar
+            else:
+                bar = mid_bar
+            items.append(bar[new])
+            position -= new
+        return "".join(items)

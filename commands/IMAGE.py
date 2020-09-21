@@ -121,12 +121,7 @@ class IMG(Command):
         url = choice(sources)
         if "v" in flags:
             return url
-        emb = discord.Embed(
-            description=url,
-            colour=rand_colour(),
-        )
-        emb.set_image(url=url)
-        bot.send_embeds(channel, embed=emb)
+        bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_")]
@@ -1101,14 +1096,8 @@ class Cat(Command):
     async def __call__(self, channel, flags, **void):
         url = await self.get_buffer(64)
         if "v" in flags:
-            text = "Pulled from " + url
-            return text
-        emb = discord.Embed(
-            description=url,
-            colour=rand_colour(),
-        )
-        emb.set_image(url=url)
-        self.bot.send_embeds(channel, embed=emb)
+            return url
+        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
 
 class Dog(Command):
@@ -1182,14 +1171,8 @@ class Dog(Command):
     async def __call__(self, channel, flags, **void):
         url = await self.get_buffer(64)
         if "v" in flags:
-            text = "Pulled from " + url
-            return text
-        emb = discord.Embed(
-            description=url,
-            colour=rand_colour(),
-        )
-        emb.set_image(url=url)
-        self.bot.send_embeds(channel, embed=emb)
+            return url
+        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
 
 class _8Ball(Command):
@@ -1231,12 +1214,9 @@ class _8Ball(Command):
 
     def __call__(self, channel, **void):
         url = self.get_buffer(64)
-        emb = discord.Embed(
-            description=url,
-            colour=rand_colour(),
-        )
-        emb.set_image(url=url)
-        self.bot.send_embeds(channel, embed=emb)
+        if "v" in flags:
+            return url
+        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
 
 class UpdateImages(Database):

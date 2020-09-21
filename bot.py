@@ -598,6 +598,39 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             channel = await user.create_dm()
         return channel
 
+    def get_available_guild(self, animated=True):
+        found = [{} for _ in loop(3)]
+        for guild in self.guilds:
+            if guild.owner_id == self.id:
+                return guild
+            m = guild.get_member(self.id)
+            if m is not None and m.guild_permissions.manage_emojis:
+                owners_in = self.owners.intersection(guild._members)
+                if owners_in:
+                    x = 0
+                elif m.guild_permissions.administrator and len(deque(member for member in guild.members if not member.bot)) <= 5:
+                    x = 1
+                else:
+                    x = 2
+                if animated:
+                    rem = guild.emoji_limit - len(deque(e for e in guild.emojis if e.animated))
+                    if rem > 0:
+                        found[x][rem] = guild
+                else:
+                    rem = guild.emoji_limit - len(deque(e for e in guild.emojis if not e.animated))
+                    if rem > 0:
+                        found[x][rem] = guild
+        for i, f in enumerate(found):
+            if f:
+                return f[max(f.keys())]
+        raise LookupError("Unable to find suitable guild.")
+
+    async def create_progress_bar(self, length, ratio=0.5):
+        if "emojis" in self.database:
+            return await create_future(self.database.emojis.create_progress_bar, length, ratio)
+        position = min(length, round(length * ratio))
+        return "⬜" * position + "⬛" * length - position
+
     # Finds URLs in a string, following any discord message links found.
     async def follow_url(self, url, it=None, best=False, preserve=True, images=True, allow=False, limit=None):
         if limit is not None and limit <= 0:
@@ -746,6 +779,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     # Updates bot cache from the discord.py guild objects.
     def update_from_guilds(self):
         for i, guild in enumerate(self.guilds, 1):
+            members = self.cache.members
+            members.update({m.id: m for m in guild.members if m.id not in members})
             self.cache.channels.update(guild._channels)
             self.cache.roles.update(guild._roles)
             if not i & 127:
@@ -1968,13 +2003,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             embs = set_dict(self.embed_senders, c_id, [])
             embs.extend(embeds)
 
-    def send_as_embeds(self, channel, description=None, fields=None, md=nofunc, author=None, footer=None, colour=None):
+    def send_as_embeds(self, channel, description=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None):
         if description is not None and type(description) is not str:
             if type(description) in (bytes, bytearray):
                 description = description.decode("utf-8", "replace")
             else:
                 description = str(description)
-        if not description and not fields:
+        if not description and not fields and not thumbnail and not image and not images:
             return
         col = 0 if colour is None else colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
         off = 128 if not issubclass(type(colour), collections.abc.Sequence) else colour[1]
@@ -2034,8 +2069,27 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 emb.add_field(name=n, value=v if v else "\u200b", inline=i)
         if len(emb):
             embs.append(emb)
+        if thumbnail:
+            embs[0].set_thumbnail(url=thumbnail)
         if footer and embs:
             embs[-1].set_footer(**footer)
+        if image:
+            if images:
+                images = deque(images)
+                images.appendleft(image)
+            else:
+                images = (image,)
+        if images:
+            for i, img in enumerate(images):
+                if i >= len(embs):
+                    col += 128
+                    embs.append(discord.Embed(colour=colour2raw(hue2colour(col))))
+                if is_video(img):
+                    embs[i].video = discord.embeds.EmbedProxy(dict(url=img))
+                    embs[i].type = "video"
+                else:
+                    embs[i].set_image(url=img)
+                embs[i].url = img
         self.send_embeds(channel, embeds=embs)
 
     # Updates all embed senders.

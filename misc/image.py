@@ -228,8 +228,8 @@ def rainbow_gif(image, duration):
     if duration == 0:
         fps = 0
     else:
-        fps = round(32 / abs(duration))
-    rate = 8
+        fps = round(128 / abs(duration))
+    rate = 2
     while fps > 24 and rate < 32:
         fps >>= 1
         rate <<= 1

@@ -336,15 +336,8 @@ class Neko(Command):
             else:
                 url = nekos.img(get)
         if "v" in flags:
-            text = "Pulled from " + url
-            return text
-        emb = discord.Embed(
-            description=url,
-            colour=rand_colour(),
-        )
-        emb.set_image(url=url)
-        print(url)
-        self.bot.send_embeds(channel, embed=emb)
+            return url
+        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
 
 class Lewd(Command):
@@ -371,10 +364,4 @@ class Lewd(Command):
                 + "__**"
             )
             return text
-        emb = discord.Embed(
-            description=url,
-            colour=rand_colour(),
-        )
-        emb.set_image(url=url)
-        print(url)
-        self.bot.send_embeds(channel, embed=emb)
+        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))

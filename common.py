@@ -589,8 +589,32 @@ IMAGE_FORMS = {
 def is_image(url):
     if "." in url:
         url = url[url.rindex("."):]
-    url = url.casefold()
-    return IMAGE_FORMS.get(url)
+        url = url.casefold()
+        return IMAGE_FORMS.get(url)
+
+VIDEO_FORMS = {
+    ".webm": True,
+    ".mkv": True,
+    ".flv": True,
+    ".ogv": True,
+    ".ogg": False,
+    ".gif": False,
+    ".gifv": True,
+    ".avi": True,
+    ".mov": True,
+    ".qt": True,
+    ".wmv": True,
+    ".mp4": True,
+    ".m4v": True,
+    ".mpg": True,
+    ".mpeg": True,
+    ".mpv": True,
+}
+def is_video(url):
+    if "." in url:
+        url = url[url.rindex("."):]
+        url = url.casefold()
+        return VIDEO_FORMS.get(url)
 
 
 status_text = {

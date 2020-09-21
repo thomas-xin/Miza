@@ -579,14 +579,56 @@ class Info(Command):
                     member = guild.get_member(u.id)
                     name = str(u)
                     url = best_url(u)
-                    try:
-                        is_sys = u.system
-                    except (AttributeError, KeyError):
-                        is_sys = False
-                    is_bot = u.bot
-                    is_self = u.id == bot.id
-                    is_self_owner = bot.is_owner(u.id)
-                    is_guild_owner = u.id == guild.owner_id
+                    st = deque()
+                    if u.id == bot.id:
+                        st.append("Myself 🙃")
+                        is_self = True
+                    else:
+                        is_self = False
+                    if bot.is_owner(u.id):
+                        st.append("My owner ❤️")
+                    is_sys = False
+                    if getattr(u, "system", None):
+                        st.append("Discord System ⚙️")
+                        is_sys = True
+                    uf = getattr(u, "public_flags", None)
+                    is_bot = False
+                    if uf:
+                        if uf.system and not is_sys:
+                            st.append("Discord System ⚙️")
+                        if uf.staff:
+                            st.append("Discord Staff ⚠️")
+                        if uf.partner:
+                            st.append("Discord Partner 🎀:")
+                        if uf.bug_hunter_level_2:
+                            st.append("Bug Hunter Lv.2 🕷️")
+                        elif uf.bug_hunter:
+                            st.append("Bug Hunter 🐛")
+                        is_hype = False
+                        if uf.hypesquad_bravery:
+                            st.append("Discord HypeSquad Bravery 🛡️")
+                            is_hype = True
+                        if uf.hypesquad_brilliance:
+                            st.append("Discord HypeSquad Brilliance 🌟")
+                            is_hype = True
+                        if uf.hypesquad_balance:
+                            st.append("Discord HypeSquad Balance 💠")
+                            is_hype = True
+                        if uf.hypesquad and not is_hype:
+                            st.append("Discord HypeSquad 👀")
+                        if uf.early_supporter:
+                            st.append("Discord Early Supporter 🌄")
+                        if uf.team_user:
+                            st.append("Discord Team User 🧑‍🤝‍🧑")
+                        if uf.verified_bot:
+                            st.append("Verified Bot 👾")
+                            is_bot = True
+                        if uf.verified_bot_developer:
+                            st.append("Verified Bot Developer 🏆")
+                    if u.bot and not is_bot:
+                        st.append("Bot 🤖")
+                    if u.id == guild.owner_id and not hasattr(guild, "ghost"):
+                        st.append("Server owner 👑")
                     dname = getattr(member, "nick", None)
                     if member:
                         joined = getattr(u, "joined_at", None)
@@ -704,21 +746,12 @@ class Info(Command):
                     d = user_mention(u.id)
                     if activity:
                         d += "\n" + italics(code_md(activity))
-                    if any((is_sys, is_bot, is_self, is_self_owner, is_guild_owner)):
+                    if st:
                         if d[-1] == "*":
                             d += " "
                         d += " **```css\n"
-                        if is_sys:
-                            d += "[Discord staff ⚠️]\n"
-                        if is_bot:
-                            d += "[Bot 🤖]\n"
-                        if is_self:
-                            d += "[Myself :3]\n"
-                        if is_self_owner:
-                            d += "[My owner ❤️]\n"
-                        if is_guild_owner and not hasattr(guild, "ghost"):
-                            d += "[Server owner 👀]\n"
-                        d = d.strip("\n")
+                        if st:
+                            d += "\n".join(st)
                         d += "```**"
                     emb.description = d
                     emb.add_field(name="User ID", value="`" + str(u.id) + "`", inline=0)
