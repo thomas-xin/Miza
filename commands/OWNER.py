@@ -445,9 +445,9 @@ class UpdateEmojis(Database):
         return emoji
 
     def create_progress_bar(self, length, ratio):
-        start_bar = deque(str(self.get(f"start_bar_{i}.gif")) for i in range(5))
-        mid_bar = deque(str(self.get(f"mid_bar_{i}.gif")) for i in range(5))
-        end_bar = deque(str(self.get(f"end_bar_{i}.gif")) for i in range(5))
+        start_bar = [str(self.get(f"start_bar_{i}.gif")) for i in range(5)]
+        mid_bar = [str(self.get(f"mid_bar_{i}.gif")) for i in range(5)]
+        end_bar = [str(self.get(f"end_bar_{i}.gif")) for i in range(5)]
         high = length * 4
         position = min(high, round(ratio * high))
         items = deque()
