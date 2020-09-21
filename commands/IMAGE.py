@@ -120,7 +120,7 @@ class IMG(Command):
             raise LookupError(f"Target image {argv} not found. Use img for list.")
         url = choice(sources)
         if "v" in flags:
-            return url
+            return escape_everyone(url)
         bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
@@ -1096,7 +1096,7 @@ class Cat(Command):
     async def __call__(self, channel, flags, **void):
         url = await self.get_buffer(64)
         if "v" in flags:
-            return url
+            return escape_everyone(url)
         self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
 
@@ -1171,7 +1171,7 @@ class Dog(Command):
     async def __call__(self, channel, flags, **void):
         url = await self.get_buffer(64)
         if "v" in flags:
-            return url
+            return escape_everyone(url)
         self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
 
@@ -1214,8 +1214,6 @@ class _8Ball(Command):
 
     def __call__(self, channel, **void):
         url = self.get_buffer(64)
-        if "v" in flags:
-            return url
         self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
 

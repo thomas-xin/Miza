@@ -2081,15 +2081,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 images = (image,)
         if images:
             for i, img in enumerate(images):
-                if i >= len(embs):
-                    col += 128
-                    embs.append(discord.Embed(colour=colour2raw(hue2colour(col))))
                 if is_video(img):
-                    embs[i].video = discord.embeds.EmbedProxy(dict(url=img))
-                    embs[i].type = "video"
+                    create_task(channel.send(escape_everyone(img)))
                 else:
+                    if i >= len(embs):
+                        col += 128
+                        embs.append(discord.Embed(colour=colour2raw(hue2colour(col))))
                     embs[i].set_image(url=img)
-                embs[i].url = img
+                    embs[i].url = img
         self.send_embeds(channel, embeds=embs)
 
     # Updates all embed senders.
