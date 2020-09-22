@@ -472,7 +472,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         self.bot.database.audio.connecting.pop(voice_client.guild.id, None)
         return voice_client
 
-    # Attempts to reconnect to a voice channel that was removed. Gives up if unable to rejoin within 20 seconds.
+    # Attempts to reconnect to a voice channel that was removed. Gives up if unable to rejoin within 60 seconds.
     async def reconnect(self):
         try:
             if hasattr(self, "dead") or self.vc.is_connected():
@@ -493,7 +493,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             self.att = utc()
         except:
             print_exc()
-            if getattr(self, "att", 0) > 0 and utc() - self.att > 20:
+            if getattr(self, "att", 0) > 0 and utc() - self.att > 60:
                 self.dead = True
         self.bot.database.audio.connecting.pop(self.vc.guild.id, None)
 
