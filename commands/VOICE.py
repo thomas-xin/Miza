@@ -2075,7 +2075,7 @@ class Queue(Command):
         if not q:
             countstr = "Queue is currently empty.\n"
         else:
-            countstr = f'`Currently playing `{"[`" + no_md(q[0].name) + "`]"}({q[0].url})'
+            countstr = f'{"[`" + no_md(q[0].name) + "`]"}({q[0].url})'
         countstr += f"` ({uni_str(time_disp(elapsed))}/{uni_str(time_disp(duration))})`\n{bar}\n"
         emb = discord.Embed(
             description=content + info + countstr,
@@ -2094,7 +2094,7 @@ class Queue(Command):
             e = q[i]
             curr = "`"
             curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
-            curr += f'【{i}】 `{"[`" + no_md(lim_str(no_md(e.name), 64)) + "`]"}({ensure_url(e.url)})` ({time_disp(e_dur(e.duration))})`'
+            curr += f'【{i}】 `{"[`" + no_md(lim_str(no_md(e.name), 48)) + "`]"}({ensure_url(e.url)})` ({time_disp(e_dur(e.duration))})`'
             if v:
                 try:
                     u = bot.cache.users[e.u_id]
