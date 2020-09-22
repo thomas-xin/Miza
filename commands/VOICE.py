@@ -2092,9 +2092,9 @@ class Queue(Command):
         i = pos
         while i < min(pos + 10, len(q)):
             e = q[i]
-            curr = "`"
-            curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
-            curr += f'【{i}】 `{"[`" + no_md(lim_str(no_md(e.name), 48)) + "`]"}({ensure_url(e.url)})` ({time_disp(e_dur(e.duration))})`'
+            space = (int(math.log10(len(q))) - int(math.log10(max(1, i))))
+            curr = "`" + " " * space
+            curr += f'【{i}】 `{"[`" + no_md(lim_str(no_md(e.name), 48 - int(math.log10(len(q))))) + "`]"}({ensure_url(e.url)})` ({time_disp(e_dur(e.duration))})`'
             if v:
                 try:
                     u = bot.cache.users[e.u_id]
