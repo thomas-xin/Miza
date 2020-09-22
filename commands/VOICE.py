@@ -258,6 +258,10 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         data.update(dir(self.channel))
         return data
 
+    def has_options(self):
+        stats = self.stats
+        return stats.volume != 1 or stats.reverb != 0 or stats.pitch != 0 or stats.speed != 1 or stats.pan != 1 or stats.bassboost != 0 or stats.compressor != 0 or stats.chorus != 0 or stats.resample != 0
+
     def get_dump(self, position, js=False):
         lim = 32768
         if len(self.queue) > lim:
@@ -458,7 +462,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             for i in range(5):
                 if hasattr(self, "dead"):
                     break
-                with suppress(asyncio.TimeoutError):
+                with suppress(asyncio.TimeoutError, discord.ConnectionClosed):
                     return await channel.connect(timeout=6, reconnect=False)
                 await asyncio.sleep(2)
             raise TimeoutError
@@ -505,7 +509,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             if curr.type:
                 self.stats.quiet |= 2
             try:
-                if not curr.message.content:
+                if not curr.message.content and not curr.message.embeds:
                     raise EOFError
             except:
                 self.player = None
@@ -2034,7 +2038,7 @@ class Queue(Command):
         content = "*```" + "\n" * ("\n" in content[:i]) + (
             "callback-voice-queue-"
             + str(u_id) + "_" + str(pos) + "_" + str(int(v))
-            + "-\nQueue for " + guild.name.replace("`", "") + ":\n"
+            + "-\nQueue for " + guild.name.replace("`", "") + ": "
         )
         elapsed = auds.stats.position if q else 0
         startTime = 0
@@ -2057,7 +2061,7 @@ class Queue(Command):
                 i += 1
         cnt = len(q)
         info = (
-            str(cnt) + " item" + "s" * (cnt != 1) + ", estimated total duration: "
+            str(cnt) + " item" + "s" * (cnt != 1) + "\nEstimated total duration: "
             + sec2time(totalTime / auds.speed) + "```*"
         )
         if not q:
@@ -2071,8 +2075,8 @@ class Queue(Command):
         if not q:
             countstr = "Queue is currently empty.\n"
         else:
-            countstr = f"Currently playing {sqr_md(q[0].name)}({q[0].url})"
-        countstr += f"`({uni_str(time_disp(elapsed))}/{uni_str(time_disp(duration))})`\n{bar}\n"
+            countstr = f'`Currently playing `{"[`" + no_md(q[0].name) + "`]"}({q[0].url})'
+        countstr += f"` ({uni_str(time_disp(elapsed))}/{uni_str(time_disp(duration))})`\n{bar}\n"
         emb = discord.Embed(
             description=content + info + countstr,
             colour=rand_colour(),
@@ -2090,7 +2094,7 @@ class Queue(Command):
             e = q[i]
             curr = "`"
             curr += " " * (int(math.log10(len(q))) - int(math.log10(max(1, i))))
-            curr += f"【{i}】` {sqr_md(lim_str(no_md(e.name), 64))}({ensure_url(e.url)}) `({time_disp(e_dur(e.duration))})`"
+            curr += f'【{i}】 `{"[`" + no_md(lim_str(no_md(e.name), 64)) + "`]"}({ensure_url(e.url)})` ({time_disp(e_dur(e.duration))})`'
             if v:
                 try:
                     u = bot.cache.users[e.u_id]
@@ -3010,7 +3014,7 @@ class Player(Command):
     flags = "cdez"
     rate_limit = 1
 
-    def showCurr(self, auds):
+    async def showCurr(self, auds):
         q = auds.queue
         if q:
             s = q[0].skips
@@ -3018,8 +3022,7 @@ class Player(Command):
                 skips = len(s)
             else:
                 skips = 0
-            output = "Playing " + no_md(q[0].name) + ", "
-            output += str(len(q)) + " item" + "s" * (len(q) != 1) + " total "
+            output = "Playing " + str(len(q)) + " item" + "s" * (len(q) != 1) + " "
             output += skips * "🚫"
         else:
             output = "Queue is currently empty. "
@@ -3029,54 +3032,15 @@ class Player(Command):
             output += "🔀"
         if auds.stats.quiet:
             output += "🔕"
-        output += "\n"
-        v = abs(auds.stats.volume)
-        if v == 0:
-            output += "🔇"
-        if v <= 0.5:
-            output += "🔉"
-        elif v <= 1:
-            output += "🔊"
-        elif v <= 5:
-            output += "📢"
+        if q:
+            p = [auds.stats.position, e_dur(q[0].duration)]
         else:
-            output += "🌪️"
-        b = auds.stats.bassboost
-        if abs(b) > 1 / 6:
-            if abs(b) > 5:
-                output += "💥"
-            elif b > 0:
-                output += "🥁"
-            else:
-                output += "🎻"
-        r = auds.stats.reverb
-        if r:
-            if abs(r) >= 1:
-                output += "📈"
-            else:
-                output += "📉"
-        u = auds.stats.chorus
-        if u:
-            output += "📊"
-        c = auds.stats.compressor
-        if c:
-            output += "🗜️"
-        e = auds.stats.pan
-        if abs(e - 1) > 0.25:
-            output += "♒"
-        s = auds.stats.speed * 2 ** (auds.stats.resample / 12)
-        if s < 0:
-            output += "⏪"
-        elif s > 1:
-            output += "⏩"
-        elif s > 0 and s < 1:
-            output += "🐌"
-        p = auds.stats.pitch + auds.stats.resample
-        if p > 0:
-            output += "⏫"
-        elif p < 0:
-            output += "⏬"
-        output += "\n"
+            p = [0, 1]
+        output += "```"
+        output += await self.bot.create_progress_bar(18, p[0] / p[1])
+        if q:
+            output += "\n[`" + no_md(q[0].name) + "`](" + ensure_url(q[0].url) + ")"
+        output += "\n`"
         if auds.paused or not auds.stats.speed:
             output += "⏸️"
         elif auds.stats.speed > 0:
@@ -3088,12 +3052,56 @@ class Player(Command):
         else:
             p = [0, 0.25]
         output += (
-            " (" + uni_str(time_disp(p[0]))
-            + "/" + uni_str(time_disp(p[1])) + ") "
+            " (" + time_disp(p[0])
+            + "/" + time_disp(p[1]) + ")`\n"
         )
-        sym = "⬜⬛"
-        r = round(min(1, p[0] / p[1]) * self.barsize)
-        output += sym[0] * r + sym[1] * (self.barsize - r)
+        if auds.has_options():
+            v = abs(auds.stats.volume)
+            if v == 0:
+                output += "🔇"
+            if v <= 0.5:
+                output += "🔉"
+            elif v <= 1:
+                output += "🔊"
+            elif v <= 5:
+                output += "📢"
+            else:
+                output += "🌪️"
+            b = auds.stats.bassboost
+            if abs(b) > 1 / 6:
+                if abs(b) > 5:
+                    output += "💥"
+                elif b > 0:
+                    output += "🥁"
+                else:
+                    output += "🎻"
+            r = auds.stats.reverb
+            if r:
+                if abs(r) >= 1:
+                    output += "📈"
+                else:
+                    output += "📉"
+            u = auds.stats.chorus
+            if u:
+                output += "📊"
+            c = auds.stats.compressor
+            if c:
+                output += "🗜️"
+            e = auds.stats.pan
+            if abs(e - 1) > 0.25:
+                output += "♒"
+            s = auds.stats.speed * 2 ** (auds.stats.resample / 12)
+            if s < 0:
+                output += "⏪"
+            elif s > 1:
+                output += "⏩"
+            elif s > 0 and s < 1:
+                output += "🐌"
+            p = auds.stats.pitch + auds.stats.resample
+            if p > 0:
+                output += "⏫"
+            elif p < 0:
+                output += "⏬"
         return output
 
     async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, **void):
@@ -3119,7 +3127,11 @@ class Player(Command):
             return
         if perm < 1:
             return
-        orig = "\n".join(message.content.split("\n")[:1 + ("\n" == message.content[3])]) + "\n"
+        if message.content:
+            content = message.content
+        else:
+            content = message.embeds[0].description
+        orig = "\n".join(content.split("\n")[:1 + ("\n" == content[3])]) + "\n"
         if reaction is None and auds.player.type:
             for b in self.buttons:
                 async with delay(0.5):
@@ -3206,12 +3218,19 @@ class Player(Command):
                     auds.player = None
                     await bot.silent_delete(message)
                     return
-        text = lim_str(orig + self.showCurr(auds) + "```", 2000)
+        other = await self.showCurr(auds)
+        text = lim_str(orig + other, 2000)
         last = message.channel.last_message
+        emb = discord.Embed(
+            description=text,
+            colour=rand_colour(),
+            timestamp=utc_dt(),
+        ).set_author(**get_author(self.bot.user))
         if last is not None and (auds.player.type or message.id == last.id):
             auds.player.events += 1
             await message.edit(
-                content=text,
+                content=None,
+                embed=emb,
             )
         else:
             auds.player.time = inf
@@ -3219,17 +3238,18 @@ class Player(Command):
             channel = message.channel
             temp = message
             message = await channel.send(
-                content=text,
+                content=None,
+                embed=emb,
             )
             auds.player.message = message
             await bot.silent_delete(temp, no_log=True)
         if auds.queue and not auds.paused & 1:
             maxdel = e_dur(auds.queue[0].duration) - auds.stats.position + 2
             delay = min(maxdel, e_dur(auds.queue[0].duration) / self.barsize / abs(auds.stats.speed))
-            if delay > 20:
-                delay = 20
-            elif delay < 6:
-                delay = 6
+            if delay > 10:
+                delay = 10
+            elif delay < 5:
+                delay = 5
         else:
             delay = inf
         auds.player.time = utc() + delay
