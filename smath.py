@@ -32,16 +32,41 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
         self.exc.shutdown(True)
 
 with MultiThreadedImporter() as importer:
-    importer.__import__("sys", "collections", "traceback", "time", "datetime", "ast", "copy", "pickle", "io", "random", "math", "cmath", "fractions", "mpmath", "sympy", "shlex", "numpy", "colorsys", "re", "hashlib", "base64")
+    importer.__import__(
+        "sys",
+        "collections",
+        "traceback",
+        "time",
+        "datetime",
+        "ast",
+        "copy",
+        "pickle",
+        "io",
+        "random",
+        "math",
+        "cmath",
+        "fractions",
+        "mpmath",
+        "sympy",
+        "shlex",
+        "numpy",
+        "colorsys",
+        "re",
+        "hashlib",
+        "base64",
+        "dateutil",
+        "itertools",
+        "colormath",
+    )
 
 from dateutil import parser as tparser
 from sympy.parsing.sympy_parser import parse_expr
-from itertools import repeat
 from colormath import color_objects, color_conversions
 
 
 suppress = lambda *args, **kwargs: contextlib.suppress(BaseException) if not args and not kwargs else contextlib.suppress(*args + tuple(kwargs.values()))
 closing = contextlib.closing
+repeat = itertools.repeat
 
 
 print_exc = lambda: sys.stdout.write(traceback.format_exc())

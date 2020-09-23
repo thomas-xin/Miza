@@ -2,7 +2,23 @@ import smath
 from smath import *
 
 with MultiThreadedImporter(globals()) as importer:
-    importer.__import__("os", "importlib", "inspect", "tracemalloc", "psutil", "subprocess", "asyncio", "discord", "json", "pytz", "requests", "aiohttp", "psutil", "threading")
+    importer.__import__(
+        "os",
+        "importlib",
+        "inspect",
+        "tracemalloc",
+        "psutil",
+        "subprocess",
+        "asyncio",
+        "discord",
+        "json",
+        "pytz",
+        "requests",
+        "aiohttp",
+        "psutil",
+        "threading",
+        "urllib",
+    )
 
 PROC = psutil.Process()
 quit = lambda *args, **kwargs: PROC.kill()

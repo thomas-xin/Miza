@@ -1529,7 +1529,7 @@ class AudioDownloader:
                             if v_id in e.url:
                                 output.rotate(-i)
                                 break
-            if regexp("(play|open|api)\\.spotify\\.com").search(item):
+            elif regexp("(play|open|api)\\.spotify\\.com").search(item):
                 # Spotify playlist searches contain up to 100 items each
                 if "playlist" in item:
                     url = item[item.index("playlist"):]
