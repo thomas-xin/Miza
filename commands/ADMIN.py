@@ -244,8 +244,11 @@ class Mute(Command):
         async with ExceptionSender(channel):
             role = await self.bot.database.muteroles.get(guild)
             member = guild.get_member(user.id)
-            roles = member.roles[1:]
-            await member.edit(roles=[role], reason=reason)
+            if member is None:
+                roles = ()
+            else:
+                roles = member.roles[1:]
+                await member.edit(roles=[role], reason=reason)
             with suppress(LookupError):
                 mutelist.remove(user.id, key=lambda x: x["u"])
             with suppress(LookupError):
