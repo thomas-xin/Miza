@@ -119,15 +119,18 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         command = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
         w, h = max_size(*size, maxsize)
         # Adjust FPS if duration is too long
-        fps = min(fps, 256 * 65536 / w / h / dur * 60 / fps)
+        fps = min(fps, 256 * 65536 / w / h / dur * 48 / orig_fps)
+        r2 = 2 ** 0.5
         while fps < 8:
-            fps *= 4
-            w >>= 1
-            h >>= 1
+            fps *= 2
+            w /= r2
+            h /= r2
+        w = round(w)
+        h = round(h)
         vf = ""
         if w != size[0]:
             vf += "scale=" + str(w) + ":-1:flags=lanczos,"
-        vf += "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"
+        vf += "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
         command.extend([vf, "-loop", "0", "-r", str(fps), out])
         subprocess.check_output(command)
         if direct:
@@ -1040,7 +1043,7 @@ def evalImg(url, operation, args):
             size = new[0].size
             out = "cache/" + str(ts) + ".gif"
             command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(1000 * len(new) / duration), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
-            command.extend(["-fs", str(8388608 - 262144), "-an", "-vf", "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse", "-loop", "0", out])
+            command.extend(["-an", "-vf", "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle", "-loop", "0", out])
             proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             for frame in new:
                 if issubclass(type(frame), Image.Image):
