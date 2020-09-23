@@ -119,7 +119,7 @@ def bf_parse(s):
                 break
             else:
                 if i > 0 and i < len(s) - 1:
-                    if s[i - 1] in alphanumeric and s[i + 1] in alphanumeric:
+                    if s[i - 1].isalnum() and s[i + 1].isalnum():
                         s = s[:i] + "(" + s[i + 1:] + ")"
     return s
 

@@ -478,7 +478,7 @@ def activity_repr(activity):
 
 
 # Alphanumeric string regular expression.
-is_alphanumeric = lambda string: not regexp("[^a-z 0-9]", re.I).search(string)
+is_alphanumeric = lambda string: string.replace(" ", "").isalnum()
 to_alphanumeric = lambda string: single_space(regexp("[^a-z 0-9]", re.I).sub(" ", unicode_prune(string)))
 is_numeric = lambda string: regexp("[0-9]", re.I).search(string)
 
