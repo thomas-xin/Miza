@@ -116,15 +116,16 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
                 size = [int(i) for i in sizestr.split("x")]
         fn2 = fn + ".gif"
         f_in = fn if direct else url
-        command = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
+        command = ["ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
         w, h = max_size(*size, maxsize)
         # Adjust FPS if duration is too long
-        fps = min(fps, 256 * 65536 / w / h / dur * 48 / orig_fps)
+        fps = min(fps, 256 * 65536 / w / h / dur * 16 / orig_fps)
         r2 = 2 ** 0.5
-        while fps < 8:
-            fps *= 2
-            w /= r2
-            h /= r2
+        rr2 = r2 ** 0.5
+        while fps < 12:
+            fps *= r2
+            w /= rr2
+            h /= rr2
         w = round(w)
         h = round(h)
         vf = ""
@@ -132,6 +133,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
             vf += "scale=" + str(w) + ":-1:flags=lanczos,"
         vf += "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
         command.extend([vf, "-loop", "0", "-r", str(fps), out])
+        file_print(command)
         subprocess.check_output(command)
         if direct:
             os.remove(fn)
@@ -167,6 +169,18 @@ def create_gif(in_type, args, delay):
             else:
                 raise OverflowError("Max file size to load is 256MB.")
         else:
+            length = 0
+            for f in range(2147483648):
+                try:
+                    img.seek(f)
+                    length = f
+                except EOFError:
+                    break
+            if length != 1:
+                maxsize = int(min(maxsize, 32768 / (len(images) + length - 1) ** 0.5))
+                dur = img.info.get("duration")
+                if dur:
+                    delay = dur
             for f in range(2147483648):
                 try:
                     img.seek(f)
@@ -174,10 +188,17 @@ def create_gif(in_type, args, delay):
                     break
                 if not imgs:
                     size = max_size(img.width, img.height, maxsize)
-                img = resize_to(img, *size, operation="hamming")
-                if str(img.mode) != "RGBA":
-                    img = img.convert("RGBA")
-                imgs.append(img)
+                temp = resize_to(img, *size, operation="hamming")
+                if str(temp.mode) != "RGBA":
+                    temp = temp.convert("RGBA")
+                imgs.append(temp)
+    size = list(imgs[0].size)
+    while size[0] * size[1] * len(imgs) > 8388608:
+        size[0] /= 2 ** 0.5
+        size[1] /= 2 ** 0.5
+    size = [round(size[0]), round(size[1])]
+    if imgs[0].size[0] != size[0]:
+        imgs = [resize_to(img, *size, operation="hamming") for img in imgs]
     return dict(duration=delay * len(imgs), frames=imgs)
 
 def rainbow_gif2(image, duration):
@@ -1031,7 +1052,6 @@ def evalImg(url, operation, args):
                     new["frames"].extend(res)
     else:
         new = eval(url)(*args)
-    file_print(new)
     if type(new) is dict:
         duration = new["duration"]
         new = new["frames"]
@@ -1042,8 +1062,10 @@ def evalImg(url, operation, args):
         else:
             size = new[0].size
             out = "cache/" + str(ts) + ".gif"
-            command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(1000 * len(new) / duration), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
+            command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(1000 * len(new) / duration), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
             command.extend(["-an", "-vf", "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle", "-loop", "0", out])
+            file_print(command)
+            file_print(len(new))
             proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             for frame in new:
                 if issubclass(type(frame), Image.Image):

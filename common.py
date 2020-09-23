@@ -419,6 +419,7 @@ async def send_with_file(channel, msg, file, filename=None, best=False):
             create_future_ex(os.remove, filename, priority=True)
     except:
         if filename is not None:
+            print(filename, os.path.getsize(filename))
             create_future_ex(os.remove, filename, priority=True)
         raise
     if message.attachments:
