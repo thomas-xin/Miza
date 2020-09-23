@@ -616,7 +616,7 @@ class Ask(Command):
     async def __call__(self, channel, user, argv, **void):
         bot = self.bot
         guild = getattr(channel, "guild", None)
-        q = single_space(full_prune(argv)).strip().translate(bot.mtrans).replace("?", "\u200b")
+        q = single_space(full_prune(argv)).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         if not q:
             raise ArgumentError(choice("Sorry, didn't see that, was that a question? 🤔", "Ay, speak up, I don't bite! :3"))
         out = None
@@ -705,7 +705,7 @@ class Ask(Command):
             "you're": "i'm",
             "you'll": "i'll",
         })
-        q = " ".join(alist(q.split()).replace("you", "I").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll")).strip("\u200b")
+        q = " ".join(alist(q.split()).replace("you", "I").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
         await channel.send(escape_everyone(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\uf000", "")))
 
 
