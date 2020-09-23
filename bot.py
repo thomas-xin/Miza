@@ -533,7 +533,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             try:
                 r_id = int(r_id)
             except (ValueError, TypeError):
-                raise TypeError("Invalid role identifier: " + str(r_id))
+                raise TypeError(f"Invalid role identifier: {r_id}")
         with suppress(KeyError):
             return self.cache.roles[r_id]
         try:
@@ -557,7 +557,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             try:
                 e_id = int(e_id)
             except (ValueError, TypeError):
-                raise TypeError("Invalid emoji identifier: " + str(e_id))
+                raise TypeError(f"Invalid emoji identifier: {e_id}")
         with suppress(KeyError):
             return self.cache.emojis[e_id]
         try:

@@ -288,7 +288,7 @@ def spin_gif2(image, duration):
         temp = image
         if temp.size[0] != size[0] or temp.size[1] != size[1]:
             temp = temp.resize(size, Image.HAMMING)
-        temp = to_circle(temp.rotate(f * 360 / length / scale * loops))
+        temp = to_circle(temp.rotate(f * 360 / scale * loops))
         out.append(temp)
     return dict(duration=total * scale, frames=out)
 
@@ -379,7 +379,7 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
         temp = image
         if temp.size[0] != size[0] or temp.size[1] != size[1]:
             temp = temp.resize(size, Image.HAMMING)
-        for _ in range(int(iterations * f / length / scale)):
+        for _ in range(int(iterations * f / scale)):
             dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
             src_grid = distort_grid(dst_grid, grid_distance)
             mesh = grid_to_mesh(src_grid, dst_grid)
