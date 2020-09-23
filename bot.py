@@ -25,10 +25,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     # This is a fixed ID apparently
     deleted_user = 456226577798135808
     _globals = globals()
-            
+
     def __init__(self, cache_size=4194304, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
-        super().__init__(max_messages=256, heartbeat_timeout=timeout)
+        super().__init__(max_messages=256, heartbeat_timeout=60, guild_ready_timeout=5)
         self.cache_size = cache_size
         self.timeout = timeout
         self.set_classes()

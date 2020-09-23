@@ -3656,6 +3656,26 @@ class UpdateAudio(Database):
         with tracebacksuppressor(discord.Forbidden):
             await member.move_to(None)
 
+    async def update_vc(self, guild):
+        m = guild.get_member(self.bot.id)
+        if not self.is_connecting(guild.id) and guild.id not in self.players:
+            vc = guild.voice_client
+            if vc is not None:
+                return await vc.disconnect(force=True)
+            if m.voice is not None:
+                return await guild.change_voice_state(channel=None)
+            if m.guild_permissions.move_members:
+                for c in guild.voice_channels:
+                    for m in c.members:
+                        if m.id == self.bot.id:
+                            return await self._dc(m)
+        else:
+            if m.voice is not None:
+                perm = m.permissions_in(m.voice.channel)
+                if perm.mute_members and perm.deafen_members:
+                    if m.voice.deaf or m.voice.mute or m.voice.afk:
+                        return await m.edit(mute=False, deafen=False)
+
     # Updates all voice clients
     async def __call__(self, guild=None, **void):
         bot = self.bot
@@ -3664,32 +3684,9 @@ class UpdateAudio(Database):
             async with self._semaphore:
                 # Ensure all voice clients are not muted, disconnect ones without matching audio players
                 if guild is not None:
-                    g = guild
-                    if not self.is_connecting(g.id) and g.id not in self.players:
-                        for c in g.voice_channels:
-                            for m in c.members:
-                                if m.id == bot.id:
-                                    create_task(self._dc(m))
-                    else:
-                        m = g.get_member(bot.id)
-                        if m.voice is not None:
-                            if m.voice.deaf or m.voice.mute or m.voice.afk:
-                                create_task(m.edit(mute=False, deafen=False))
+                    create_task(self.update_vc(guild))
                 else:
-                    for vc in bot.voice_clients:
-                        if not self.is_connecting(vc.guild.id) and vc.guild.id not in self.players:
-                            create_task(vc.disconnect(force=True))
-                    for g in bot.guilds:
-                        if not self.is_connecting(g.id) and g.id not in self.players:
-                            for c in g.voice_channels:
-                                for m in c.members:
-                                    if m.id == bot.id:
-                                        create_task(self._dc(m))
-                        else:
-                            m = g.get_member(bot.id)
-                            if m.voice is not None:
-                                if m.voice.deaf or m.voice.mute or m.voice.afk:
-                                    create_task(m.edit(mute=False, deafen=False))
+                    [create_task(self.update_vc(g)) for g in bot.cache.guilds.values()]
             # Update audio players
             if guild is not None:
                 if guild.id in self.players:
