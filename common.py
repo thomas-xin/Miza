@@ -1039,7 +1039,7 @@ TIMEZONES = cdict()
 def load_timezones():
     with open("misc/timezones.txt", "rb") as f:
         data = f.read().decode("utf-8", "replace")
-        for line in data.split("\n"):
+        for line in data.splitlines():
             info = line.split("\t")
             abb = info[0].casefold()
             if len(abb) >= 3 and (abb not in TIMEZONES or "(unofficial)" not in info[1]):

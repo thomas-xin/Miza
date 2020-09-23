@@ -753,7 +753,7 @@ class CreateGIF(Command):
     usage = "<0*:urls{attached_files}> <-2:framerate_setting(?r)> <-1:framerate[16]>"
     no_parse = True
     rate_limit = (8, 24)
-    _timeout_ = 5
+    _timeout_ = 10
     flags = "r"
     typing = True
 
@@ -792,9 +792,9 @@ class CreateGIF(Command):
                 args[i] = url
             name = "unknown.gif"
             if video is not None:
-                resp = await process_image("create_gif", "$", ["video", video, delay], user, timeout=96)
+                resp = await process_image("create_gif", "$", ["video", video, delay], user, timeout=232)
             else:
-                resp = await process_image("create_gif", "$", ["image", args, delay], user, timeout=96)
+                resp = await process_image("create_gif", "$", ["image", args, delay], user, timeout=232)
             fn = resp[0]
             f = discord.File(fn, filename=name)
         await send_with_file(message.channel, "", f, filename=fn)

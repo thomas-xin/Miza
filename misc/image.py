@@ -116,10 +116,10 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
                 size = [int(i) for i in sizestr.split("x")]
         fn2 = fn + ".gif"
         f_in = fn if direct else url
-        command = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-fs", str(8388608 - 262144), "-an", "-vf"]
+        command = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
         w, h = max_size(*size, maxsize)
         # Adjust FPS if duration is too long
-        fps = min(fps, 256 * 65536 / w / h / dur)
+        fps = min(fps, 256 * 65536 / w / h / dur * 60 / fps)
         while fps < 8:
             fps *= 4
             w >>= 1
@@ -288,7 +288,7 @@ def spin_gif2(image, duration):
         temp = image
         if temp.size[0] != size[0] or temp.size[1] != size[1]:
             temp = temp.resize(size, Image.HAMMING)
-        temp = to_circle(temp.rotate(f * 360 / scale * loops))
+        temp = to_circle(temp.rotate(f * 360 / length / scale * loops))
         out.append(temp)
     return dict(duration=total * scale, frames=out)
 
@@ -374,12 +374,14 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
         loops = 1 if loops >= 0 else -1
     maxsize = int(min(512, 32768 / (length * scale ** 0.5) ** 0.5))
     size = list(max_size(*image.size, maxsize))
+    ts = round(time.time() * 1000)
     for f in range(length * scale):
+        np.random.seed(ts & 4294967295)
         image.seek(f % length)
         temp = image
         if temp.size[0] != size[0] or temp.size[1] != size[1]:
             temp = temp.resize(size, Image.HAMMING)
-        for _ in range(int(iterations * f / scale)):
+        for _ in range(int(31 * iterations * f / length / scale)):
             dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
             src_grid = distort_grid(dst_grid, grid_distance)
             mesh = grid_to_mesh(src_grid, dst_grid)

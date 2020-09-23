@@ -1282,7 +1282,7 @@ class AudioDownloader:
     def setup_pages(self):
         with open("misc/page_tokens.txt", "r", encoding="utf-8") as f:
             s = f.read()
-        page10 = s.split("\n")
+        page10 = s.splitlines()
         self.yt_pages = [page10[i] for i in range(0, len(page10), 5)]
 
     # Initializes youtube_dl object as well as spotify tokens, every 720 seconds.
@@ -3131,7 +3131,7 @@ class Player(Command):
             content = message.content
         else:
             content = message.embeds[0].description
-        orig = "\n".join(content.split("\n")[:1 + ("\n" == content[3])]) + "\n"
+        orig = "\n".join(content.splitlines()[:1 + ("\n" == content[3])]) + "\n"
         if reaction is None and auds.player.type:
             for b in self.buttons:
                 async with delay(0.5):

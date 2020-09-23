@@ -635,10 +635,10 @@ class Ask(Command):
             out = "Right now!"
         elif q == "where":
             out = "Here, dummy!"
-        elif q == "how" or regexp("^how[^A-Za-z]").search(q):
+        elif q[:3] == "how" and not q[3:4].isalpha():
             await channel.send("https://imgur.com/gallery/8cfRt")
             return
-        elif (q.startswith("what's ") or q.startswith("whats ") or q.startswith("what is ")) and regexp("[0-9]").search(q):
+        elif (q.startswith("what's ") or q.startswith("whats ") or q.startswith("what is ")) and is_numeric(q):
             q = q[5:]
             q = q[q.index(" ") + 1:]
             try:

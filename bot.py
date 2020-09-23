@@ -1462,7 +1462,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 while msg[0] == "\n":
                     msg = msg[1:]
                 check = "callback-"
-                msg = msg.split("\n")[0]
+                msg = msg.splitlines()[0]
                 msg = msg[len(check):]
                 args = msg.split("-")
             catn, func, vals = args[:3]
@@ -2179,8 +2179,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 else:
                     for react in message.reactions:
                         if str(reaction) == str(react):
-                            users = await react.users().flatten()
-                            for u in users:
+                            users = react.users()
+                            async for u in users:
                                 if u.id == self.id:
                                     check = True
                                     break
@@ -2437,8 +2437,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             emb.description = f"Hi there! I'm {self.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
             user = None
             with suppress(discord.Forbidden):
-                a = await guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add).flatten()
-                for e in a:
+                a = guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add)
+                async for e in a:
                     if e.target.id == self.id:
                         user = e.user
                         break

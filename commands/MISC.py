@@ -342,7 +342,7 @@ class CS_npc(Command):
             output = str(table)
             if len(output) < 20000 and len(output) > 1900:
                 response = [f"Search results for {bold(argv)}:"]
-                lines = output.split("\n")
+                lines = output.splitlines()
                 curr = "```\n"
                 for line in lines:
                     if len(curr) + len(line) > 1900:
@@ -380,7 +380,7 @@ class CS_tsc(Command):
             output = str(table)
             if len(output) < 20000 and len(output) > 1900:
                 response = [f"Search results for {bold(argv)}:"]
-                lines = output.split("\n")
+                lines = output.splitlines()
                 curr = "```\n"
                 for line in lines:
                     if len(curr) + len(line) > 1900:

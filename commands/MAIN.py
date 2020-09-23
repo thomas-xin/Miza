@@ -1536,7 +1536,7 @@ class UpdateUsers(Database):
         self.flavour = ()
         self.useless = ()
         with open("misc/facts.txt", "r", encoding="utf-8") as f:
-            self.facts = f.read().split("\n")
+            self.facts = f.read().splitlines()
 
     async def _bot_ready_(self, **void):
         data = {"Command": Command}

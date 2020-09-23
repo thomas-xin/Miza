@@ -736,7 +736,7 @@ class UpdateMimics(Database):
                     # Stack multiple messages to send, may be separated by newlines
                     sending = alist()
                     channel = message.channel
-                    for line in msg.split("\n"):
+                    for line in msg.splitlines():
                         found = False
                         # O(1) time complexity per line regardless of how many mimics a user is assigned
                         if len(line) > 2 and " " in line:
