@@ -699,7 +699,7 @@ class Ask(Command):
         q = q.replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are")
         q = replace_map(q, {
             "yourself": "myself",
-            "your": "my",
+            "your ": "my ",
             "are you": "am I",
             "you are": "I am",
             "you're": "i'm",

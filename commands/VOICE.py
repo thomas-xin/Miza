@@ -2277,7 +2277,6 @@ class Connect(Command):
 
     async def __call__(self, user, channel, name="join", argv="", vc=None, **void):
         bot = self.bot
-        bot = bot
         if name in ("dc", "disconnect", "leave", "fuckoff"):
             vc_ = None
         elif argv or name == "move":
@@ -2293,6 +2292,7 @@ class Connect(Command):
             else:
                 # Otherwise attempt to match user's currently connected voice channel
                 voice = user.voice
+                member = user.guild.get_member(bot.id)
                 if voice is None:
                     # Otherwise attempt to find closest voice channel to current text channel
                     catg = channel.category
@@ -2303,7 +2303,7 @@ class Connect(Command):
                     if not channels:
                         pos = 0 if channel.category is None else channel.category.position
                         # Sort by distance from text channel
-                        channels = sorted(channel.guild.voice_channels, key=lambda channel: (abs(pos - (channel.position if channel.category is None else channel.category.position)), abs(channel.position)))
+                        channels = sorted(tuple(channel for channel in channel.guild.voice_channels if channel.permissions_for(member).connect and channel.permissions_for(member).speak and channel.permissions_for(member).use_voice_activation), key=lambda channel: (abs(pos - (channel.position if channel.category is None else channel.category.position)), abs(channel.position)))
                     if channels:
                         vc_ = channels[0]
                     else:
