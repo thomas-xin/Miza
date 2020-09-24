@@ -745,6 +745,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
         # Sends a message to a channel, then edits to add links to all attached files.
     async def send_with_file(self, channel, msg, file, filename=None, best=False):
+        fp = file.fp
+        fp.seek(0)
+        data = fp.read()
+        fp.seek(0)
         try:
             message = await channel.send(msg, file=file)
             if filename is not None:
@@ -755,9 +759,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 create_future_ex(os.remove, filename, priority=True)
             raise
         if message.attachments:
-            fp = file
-            fp.seek(0)
-            data = fp.read()
             await self.add_attachment(message.attachments[0], data)
             await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
         return message
@@ -810,14 +811,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     
     async def get_attachment(self, url):
         if is_discord_url(url) and "attachments/" in url[:64]:
-            with suppress(ValueError, LookupError):
+            with suppress(ValueError):
                 a_id = int(url.split("?")[0].split("/")[-2])
-                for i in range(30):
-                    data = self.cache.attachments[a_id]
-                    if data is not None:
-                        return data
-                    if i < 29:
-                        await asyncio.sleep(0.25)
+                with suppress(LookupError):
+                    for i in range(30):
+                        data = self.cache.attachments[a_id]
+                        if data is not None:
+                            return data
+                        if i < 29:
+                            await asyncio.sleep(0.25)
                 self.cache.attachments[a_id] = None
                 data = await Request(url, aio=True)
                 self.cache.attachments[a_id] = data
