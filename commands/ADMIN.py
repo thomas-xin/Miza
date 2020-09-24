@@ -232,9 +232,8 @@ class Mute(Command):
                         mutelist.remove(user.id, key=lambda x: x["u"])
                     with suppress(LookupError):
                         bot.database.mutes.listed.remove(guild.id, key=lambda x: x[-1])
-                    if length < inf:
-                        mutelist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": mute.get("r"), "x": mute.get("x")}, key=lambda x: x["t"])
-                        bot.database.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
+                    mutelist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": mute.get("r"), "x": mute.get("x")}, key=lambda x: x["t"])
+                    bot.database.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
                     print(mutelist)
                     print(bot.database.mutes.listed)
                     update()
@@ -253,9 +252,8 @@ class Mute(Command):
                 mutelist.remove(user.id, key=lambda x: x["u"])
             with suppress(LookupError):
                 bot.database.mutes.listed.remove(guild.id, key=lambda x: x[-1])
-            if length < inf:
-                mutelist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": reason, "x": {r.id for r in roles if not r.managed}}, key=lambda x: x["t"])
-                bot.database.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
+            mutelist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": reason, "x": {r.id for r in roles if not r.managed}}, key=lambda x: x["t"])
+            bot.database.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
             print(mutelist)
             print(bot.database.mutes.listed)
             update()
