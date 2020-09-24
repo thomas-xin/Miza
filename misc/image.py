@@ -51,6 +51,22 @@ def time_parse(ts):
 # URL string detector
 url_match = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
 is_url = lambda url: re.search(url_match, url)
+discord_match = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/")
+is_discord_url = lambda url: discord_match.findall(url)
+
+def get_request(url):
+    if is_discord_url(url) and "attachments/" in url[:64]:
+        try:
+            a_id = int(url.split("?")[0].split("/")[-2])
+        except ValueError:
+            pass
+        else:
+            fn = f"../cache/attachment_{attachment.id}.bin"
+            if os.path.exists(fn):
+                with open(fn, "rb") as f:
+                    return f.read()
+    with requests.get(url, stream=True, timeout=12) as resp:
+        return resp.content
 
 
 from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), tuple(colour)) #Image.fromarray(np.tile(np.array(colour, dtype=np.uint8), (size, size, 1)))
@@ -65,8 +81,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
     fn = "cache/" + str(ts)
     if direct:
         if data is None:
-            with requests.get(url, stream=True, timeout=8) as resp:
-                data = resp.content
+            data = get_request(url)
         file = open(fn, "wb")
         try:
             file.write(data)
@@ -157,8 +172,7 @@ def create_gif(in_type, args, delay):
     # Detect if an image sequence or video is being inputted
     imgs = deque()
     for url in images:
-        with requests.get(url, stream=True, timeout=8) as resp:
-            data = resp.content
+        data = get_request(url)
         try:
             img = get_image(data, None)
         except (PIL.UnidentifiedImageError, OverflowError):
@@ -973,8 +987,7 @@ def get_image(url, out):
         if url in CACHE:
             return CACHE[url]
         if is_url(url):
-            with requests.get(url, stream=True, timeout=8) as resp:
-                data = resp.content
+            data = get_request(url)
             if len(data) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")
         else:
@@ -1006,7 +1019,7 @@ def evalImg(url, operation, args):
     if operation != "$":
         if args and args[-1] == "-raw":
             args.pop(-1)
-            image = requests.get(url, timeout=8).content
+            image = get_request(url)
         else:
             image = get_image(url, out)
         # $%GIF%$ is a special case where the output is always a .gif image

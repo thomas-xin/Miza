@@ -1598,7 +1598,7 @@ class AudioDownloader:
                 if is_url(item):
                     url = verify_url(item)
                     if url.endswith(".json") or url.endswith(".txt"):
-                        s = Request(url)
+                        s = await_fut(self.bot.get_request(url))
                         if len(s) > 8388608:
                             raise OverflowError("Playlist entity data too large.")
                         s = s[s.index(b"{"):s.rindex(b"}") + 1]
@@ -2636,7 +2636,7 @@ class Dump(Command):
             async with discord.context_managers.Typing(channel):
                 resp = await create_future(auds.get_dump, "x" in flags, js=True, timeout=18)
                 f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
-            create_task(send_with_file(channel, f"Queue data for {bold(str(guild))}:", f))
+            create_task(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f))
             return
         if not is_alone(auds, user) and perm < 1:
             raise self.perm_error(perm, 1, "to load new queue while other users are in voice")
@@ -2648,7 +2648,7 @@ class Dump(Command):
                     url = argv
                 urls = await bot.follow_url(argv, allow=True, images=False)
                 url = urls[0]
-                s = await Request(url, aio=True)
+                s = await self.bot.get_request(url)
                 s = s[s.index(b"{"):]
                 if s[-4:] == b"\n```":
                     s = s[:-4]
@@ -3581,7 +3581,7 @@ class Download(Command):
                             embed=None,
                         ))
                         create_task(channel.trigger_typing())
-                    await send_with_file(
+                    await bot.send_with_file(
                         channel=channel,
                         msg="",
                         file=f,

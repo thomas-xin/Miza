@@ -141,7 +141,7 @@ class Math(Command):
             await channel.trigger_typing()
             fn = resp["file"]
             f = discord.File(fn)
-            await send_with_file(channel, "", f, filename=fn, best=True)
+            await bot.send_with_file(channel, "", f, filename=fn, best=True)
             return
         answer = "\n".join(str(i) for i in resp)
         if argv.lower() == "help":
@@ -560,8 +560,8 @@ class Follow(Command):
             if is_discord_message_link(url):
                 temp = await self.bot.follow_url(url, allow=True)
             else:
-                data = await Request(url, decode=True, aio=True)
-                temp = find_urls(data)
+                data = await self.bot.get_request(url)
+                temp = find_urls(data.decode("utf-8", "replace"))
             out.update(temp)
         if not out:
             raise FileNotFoundError("No valid URLs detected.")

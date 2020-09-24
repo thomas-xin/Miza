@@ -1539,23 +1539,30 @@ class UpdateFileLogs(Database):
                     self.data.pop(guild.id)
                     self.update()
                     return
-                # Attempt to recover files from their proxy URLs, otherwise send the proxy URLs
-                msg = ""
+                # Attempt to recover files from their proxy URLs, otherwise send the original URLs
+                msg = deque()
                 fils = []
                 for a in message.attachments:
                     try:
                         try:
+                            b = self.bot.cache.attachments[a.id]
+                        except KeyError:
                             b = await a.read(use_cached=True)
-                        except (discord.HTTPException, discord.NotFound):
-                            b = await a.read(use_cached=False)
+                        else:
+                            for i in range(30):
+                                if b is None:
+                                    with delay(1):
+                                        b = self.bot.cache.attachments[a.id]
                         fil = discord.File(io.BytesIO(b), filename=str(a).split("/")[-1])
                         fils.append(fil)
                     except:
-                        msg += best_url(a) + "\n"
+                        msg.append(best_url(a))
                 emb = discord.Embed(colour=rand_colour())
                 emb.description = f"File{'s' if len(fils) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
                 if not msg:
                     msg = None
+                else:
+                    msg = "\n".join(msg)
                 await channel.send(msg, embed=emb, files=fils)
 
 
@@ -1600,8 +1607,7 @@ class UpdateAutoRoles(Database):
         if guild.id in self.data:
             # Do not apply autorole to users who have roles from role preservers
             with suppress(KeyError):
-                if user.id in self.bot.data.rolepreservers[guild.id]:
-                    return
+                return self.bot.data.rolepreservers[guild.id][user.id]
             roles = deque()
             assigned = self.data[guild.id]
             for rolelist in assigned:

@@ -411,20 +411,6 @@ async def send_with_react(channel, *args, reacts=(), **kwargs):
             async with delay(1 / 3):
                 create_task(sent.add_reaction(react))
 
-# Sends a message to a channel, then edits to add links to all attached files.
-async def send_with_file(channel, msg, file, filename=None, best=False):
-    try:
-        message = await channel.send(msg, file=file)
-        if filename is not None:
-            create_future_ex(os.remove, filename, priority=True)
-    except:
-        if filename is not None:
-            print(filename, os.path.getsize(filename))
-            create_future_ex(os.remove, filename, priority=True)
-        raise
-    if message.attachments:
-        await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
-
 
 # Creates and starts a coroutine for typing in a channel.
 typing = lambda self: create_task(self.trigger_typing())

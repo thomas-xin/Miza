@@ -18,7 +18,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     restart = "restart.tmp"
     shutdown = "shutdown.tmp"
     authdata = "auth.json"
-    caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "deleted", "banned")
+    caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "attachments", "deleted", "banned")
     statuses = (discord.Status.online, discord.Status.idle, discord.Status.dnd)
     # Default command prefix
     prefix = "~"
@@ -743,10 +743,34 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             out.append(url)
         return out
 
+        # Sends a message to a channel, then edits to add links to all attached files.
+    async def send_with_file(self, channel, msg, file, filename=None, best=False):
+        try:
+            message = await channel.send(msg, file=file)
+            if filename is not None:
+                create_future_ex(os.remove, filename, priority=True)
+        except:
+            if filename is not None:
+                print(filename, os.path.getsize(filename))
+                create_future_ex(os.remove, filename, priority=True)
+            raise
+        if message.attachments:
+            fp = file
+            fp.seek(0)
+            data = fp.read()
+            await self.add_attachment(message.attachments[0], data)
+            await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
+        return message
+
     # Inserts a message into the bot cache, discarding existing ones if full.
     def add_message(self, message):
         self.cache.messages[message.id] = message
         self.limit_cache("messages")
+        if message.author.id != self.id:
+            if (utc_dt() - message.created_at).total_seconds() < 7200:
+                for attachment in message.attachments:
+                    if getattr(attachment, "size", inf) < 1048576:
+                        create_task(self.add_attachment(attachment))
         return message
 
     # Deletes a message from the bot cache.
@@ -756,6 +780,54 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             s = message_repr(message, username=True)
             ch = f"deleted/{message.channel.id}.txt"
             print(s, file=ch)
+
+    async def add_attachment(self, attachment, data=None):
+        if attachment.id not in self.cache.attachments:
+            self.cache.attachments[attachment.id] = None
+            if data is None:
+                data = await attachment.read()
+            self.cache.attachments[attachment.id] = data
+            fn = f"cache/attachment_{attachment.id}.bin"
+            if not os.path.exists(fn):
+                with open(fn, "wb") as f:
+                    await create_future(f.write, data)
+            while len(self.cache.attachments) > 2048:
+                a_id = next(iter(self.cache.attachments))
+                self.cache.attachments.pop(a_id)
+                fn = f"cache/attachment_{a_id}.bin"
+                if os.path.exists(fn):
+                    with tracebacksuppressor:
+                        await create_future(os.remove, fn)
+        return attachment
+
+    async def attachment_from_file(self, file):
+        a_id = int(file.split(".")[0][11:])
+        self.cache.attachments[a_id] = None
+        with open(f"cache/{file}", "rb") as f:
+            data = await create_future(f.read)
+        self.cache.attachments[a_id] = data
+        return data
+    
+    async def get_attachment(self, url):
+        if is_discord_url(url) and "attachments/" in url[:64]:
+            with suppress(ValueError, LookupError):
+                a_id = int(url.split("?")[0].split("/")[-2])
+                for i in range(30):
+                    data = self.cache.attachments[a_id]
+                    if data is not None:
+                        return data
+                    if i < 29:
+                        await asyncio.sleep(0.25)
+                self.cache.attachments[a_id] = None
+                data = await Request(url, aio=True)
+                self.cache.attachments[a_id] = data
+        return None
+
+    async def get_request(self, url):
+        data = await self.get_attachment(url)
+        if data is not None:
+            return data
+        return await Request(url, aio=True)
 
     # Limits a cache to a certain amount, discarding oldest entries first.
     def limit_cache(self, cache=None, limit=None):
@@ -1808,7 +1880,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                     # Process dict as kwargs for a message send
                                     elif issubclass(type(response), collections.abc.Mapping):
                                         if "file" in response:
-                                            sent = await send_with_file(channel, response.get("content", ""), **response)
+                                            sent = await self.send_with_file(channel, response.get("content", ""), **response)
                                         else:
                                             sent = await channel.send(**response)
                                     else:
@@ -1827,7 +1899,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                             if len(response) <= guild.filesize_limit:
                                                 b = io.BytesIO(response)
                                                 f = discord.File(b, filename="message.txt")
-                                                sent = await send_with_file(channel, filemsg, f)
+                                                sent = await self.send_with_file(channel, filemsg, f)
                                             else:
                                                 raise OverflowError("Response too long for file upload.")
                                     # Add targeted react if there is one
@@ -2371,6 +2443,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 create_task(self.get_ip())
                 if not self.started:
                     self.started = True
+                    for file in os.listdir("cache"):
+                        if file.startswith("attachment_"):
+                            create_task(self.attachment_from_file(file))
                     print("Loading imported modules...")
                     # Wait until all modules have been loaded successfully
                     while self.modload:
