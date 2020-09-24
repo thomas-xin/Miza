@@ -176,8 +176,8 @@ def create_gif(in_type, args, delay):
                     length = f
                 except EOFError:
                     break
-            if length != 1:
-                maxsize = int(min(maxsize, 32768 / (len(images) + length - 1) ** 0.5))
+            if length != 0:
+                maxsize = int(min(maxsize, 32768 / (len(images) + length) ** 0.5))
                 dur = img.info.get("duration")
                 if dur:
                     delay = dur
