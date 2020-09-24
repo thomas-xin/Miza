@@ -816,6 +816,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 with suppress(LookupError):
                     for i in range(30):
                         data = self.cache.attachments[a_id]
+                        print(f"Successfully loaded attachment {a_id} from cache.")
                         if data is not None:
                             return data
                         if i < 29:

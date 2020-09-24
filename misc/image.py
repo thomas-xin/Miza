@@ -61,9 +61,10 @@ def get_request(url):
         except ValueError:
             pass
         else:
-            fn = f"../cache/attachment_{attachment.id}.bin"
+            fn = f"../cache/attachment_{a_id}.bin"
             if os.path.exists(fn):
                 with open(fn, "rb") as f:
+                    file_print(f"Attachment {a_id} loaded from cache.")
                     return f.read()
     with requests.get(url, stream=True, timeout=12) as resp:
         return resp.content
