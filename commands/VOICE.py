@@ -2943,10 +2943,9 @@ class Reverse(Command):
             return italics(css_md(f"Successfully reversed queue for {sqr_md(guild)}.")), 1
 
 
-class Unmute(Command):
+class UnmuteAll(Command):
     server_only = True
     time_consuming = True
-    name = ["Unmuteall"]
     min_level = 3
     description = "Disables server mute for all members."
     usage = "<hide(?h)>"
