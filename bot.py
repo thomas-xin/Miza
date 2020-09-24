@@ -821,9 +821,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             return data
                         if i < 29:
                             await asyncio.sleep(0.25)
-                self.cache.attachments[a_id] = None
                 data = await Request(url, aio=True)
-                return await self.add_attachment(cdict(id=a_id), data=data)
+                await self.add_attachment(cdict(id=a_id), data=data)
+                return data
         return None
 
     async def get_request(self, url):
