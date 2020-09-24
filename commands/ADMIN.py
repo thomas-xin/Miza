@@ -1358,7 +1358,7 @@ class UpdateMessageLogs(Database):
                 self.dc.pop(h)
 
     def _bot_ready_(self, **void):
-        if not self.searched and len(bot.cache.messages) <= 65536:
+        if not self.searched and len(self.bot.cache.messages) <= 65536:
             self.searched = True
             lim = floor(2097152 / len(self.bot.guilds))
             return [create_task(self.bot.database.counts.getGuildHistory(guild, lim, callback=self.callback)) for guild in self.bot.guilds]
