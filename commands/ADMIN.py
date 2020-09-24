@@ -876,8 +876,6 @@ class FileLog(Command):
     rate_limit = 1
 
     async def __call__(self, bot, flags, channel, guild, **void):
-        if not bot.is_trusted(guild.id):
-            raise PermissionError("Must be in a trusted server to log deleted files.")
         data = bot.data.logF
         update = bot.database.logF.update
         if "e" in flags or "a" in flags:
