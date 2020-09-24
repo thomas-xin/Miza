@@ -823,7 +823,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             await asyncio.sleep(0.25)
                 self.cache.attachments[a_id] = None
                 data = await Request(url, aio=True)
-                self.cache.attachments[a_id] = data
+                return await self.add_attachment(cdict(id=a_id), data=data)
         return None
 
     async def get_request(self, url):
