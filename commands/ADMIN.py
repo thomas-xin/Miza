@@ -982,6 +982,10 @@ class UpdateMutes(Database):
             temp = self.data[guild.id]
             for x in temp:
                 if x["u"] == user.id:
+                    if not x.get("x"):
+                        with suppress(KeyError):
+                            x["x"] = self.bot.data.rolepreservers[guild.id][user.id]
+                            self.bot.data.rolepreservers[guild.id].pop(user.id)
                     role = await self.bot.database.muteroles.get(guild)
                     return await user.add_roles(role, reason="Sticky mute")
 
