@@ -54,6 +54,8 @@ is_url = lambda url: re.search(url_match, url)
 discord_match = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/")
 is_discord_url = lambda url: discord_match.findall(url)
 
+fcache = "cache" if os.path.exists("cache") else "../cache"
+
 def get_request(url):
     if is_discord_url(url) and "attachments/" in url[:64]:
         try:
@@ -61,7 +63,7 @@ def get_request(url):
         except ValueError:
             pass
         else:
-            fn = f"../cache/attachment_{a_id}.bin"
+            fn = f"{fcache}/attachment_{a_id}.bin"
             if os.path.exists(fn):
                 with open(fn, "rb") as f:
                     file_print(f"Attachment {a_id} loaded from cache.")
@@ -70,7 +72,7 @@ def get_request(url):
         return resp.content
 
 
-from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), tuple(colour)) #Image.fromarray(np.tile(np.array(colour, dtype=np.uint8), (size, size, 1)))
+from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), tuple(colour))
 
 
 sizecheck = re.compile("[1-9][0-9]*x[0-9]+")
@@ -960,7 +962,11 @@ def from_bytes(b):
         return ImageSequence(*pdf2image.convert_from_bytes(b, poppler_path="misc/poppler", use_pdftocairo=True))
     else:
         out = io.BytesIO(b)
-    return Image.open(out)
+    try:
+        return Image.open(out)
+    except PIL.UnidentifiedImageError:
+        file_print(b[:65536])
+        raise
 
 
 class ImageSequence(Image.Image):
