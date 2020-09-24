@@ -979,8 +979,7 @@ class UpdateMutes(Database):
 
     async def _join_(self, user, guild, **void):
         if guild.id in self.data:
-            temp = self.data[guild.id]
-            for x in temp:
+            for x in self.data[guild.id]:
                 if x["u"] == user.id:
                     if not x.get("x"):
                         with suppress(KeyError):
@@ -1104,8 +1103,7 @@ class UpdateBans(Database):
 
     async def _join_(self, user, guild, **void):
         if guild.id in self.data:
-            temp = self.data[guild.id]
-            for x in temp:
+            for x in self.data[guild.id]:
                 if x["u"] == user.id:
                     return await guild.ban(user, reason="Sticky ban")
 
@@ -1625,22 +1623,23 @@ class UpdateRolePreservers(Database):
     async def _join_(self, user, guild, **void):
         if guild.id in self.data:
             if user.id in self.data[guild.id]:
-                roles = deque()
-                assigned = self.data[guild.id][user.id]
-                for r_id in assigned:
-                    with tracebacksuppressor:
-                        role = await self.bot.fetch_role(r_id, guild)
-                        roles.append(role)
-                print(f"RolePreserver: Granted {roles} to {user} in {guild}.")
-                # Attempt to add all roles in one API call
-                try:
-                    await user.edit(roles=roles, reason="RolePreserver")
-                except discord.Forbidden:
+                if guild.id not in self.bot.data.mutes or user.id not in (x["u"] for x in self.bot.data.mutes[guild.id]):
+                    roles = deque()
+                    assigned = self.data[guild.id][user.id]
+                    for r_id in assigned:
+                        with tracebacksuppressor:
+                            role = await self.bot.fetch_role(r_id, guild)
+                            roles.append(role)
+                    print(f"RolePreserver: Granted {roles} to {user} in {guild}.")
+                    # Attempt to add all roles in one API call
                     try:
-                        await user.add_roles(*roles, reason="RolePreserver", atomic=False)
+                        await user.edit(roles=roles, reason="RolePreserver")
                     except discord.Forbidden:
-                        await user.add_roles(*roles, reason="RolePreserver", atomic=True)
-                self.data[guild.id].pop(user.id)
+                        try:
+                            await user.add_roles(*roles, reason="RolePreserver", atomic=False)
+                        except discord.Forbidden:
+                            await user.add_roles(*roles, reason="RolePreserver", atomic=True)
+                    self.data[guild.id].pop(user.id)
 
     async def _leave_(self, user, guild, **void):
         if guild.id in self.data:
