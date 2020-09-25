@@ -1497,13 +1497,19 @@ class UpdateMessages(Database):
     async def __call__(self, **void):
         if not self.closed:
             t = utc()
-            for c_id, data in self.data.items():
+            for c_id, data in tuple(self.data.items()):
                 with tracebacksuppressor():
-                    channel = await self.bot.fetch_channel(c_id)
-                    for m_id, v in data.items():
-                        if t - v.t >= 1:
-                            v.t = t
-                            create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id))
+                    try:
+                        channel = await self.bot.fetch_channel(c_id)
+                        if hasattr(channel, "guild") and channel.guild not in self.bot.guilds:
+                            raise
+                    except:
+                        self.data.pop(c_id)
+                    else:
+                        for m_id, v in data.items():
+                            if t - v.t >= 1:
+                                v.t = t
+                                create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id))
     
     async def _destroy_(self, **void):
         self.closed = True

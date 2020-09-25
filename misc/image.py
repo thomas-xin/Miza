@@ -1080,10 +1080,18 @@ def evalImg(url, operation, args):
         elif len(new) == 1:
             new = new[0]
         else:
+            fps = 1000 * len(new) / duration
+            while len(new) > 4096 and fps >= 16:
+                new = new[::2]
+                fps = 1000 * len(new) / duration
             size = new[0].size
             out = "cache/" + str(ts) + ".gif"
-            command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(1000 * len(new) / duration), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
-            command.extend(["-an", "-vf", "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle", "-loop", "0", out])
+            command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(fps), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
+            if len(new) > 64:
+                vf = "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
+            else:
+                vf = "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=diff_mode=rectangle"
+            command.extend(["-an", "-vf", vf, "-loop", "0", out])
             file_print(command)
             file_print(len(new))
             proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
