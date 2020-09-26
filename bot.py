@@ -796,17 +796,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 a_id = next(iter(self.cache.attachments))
                 self.cache.attachments.pop(a_id)
                 fn = f"cache/attachment_{a_id}.bin"
-                if os.path.exists(fn):
-                    with tracebacksuppressor:
-                        await create_future(os.remove, fn)
         return attachment
 
-    async def attachment_from_file(self, file):
+    def attachment_from_file(self, file):
         a_id = int(file.split(".")[0][11:])
-        self.cache.attachments[a_id] = None
-        with open(f"cache/{file}", "rb") as f:
-            data = await create_future(f.read)
-        self.cache.attachments[a_id] = data
+        self.cache.attachments[a_id] = a_id
         return data
     
     async def get_attachment(self, url):
@@ -818,6 +812,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         data = self.cache.attachments[a_id]
                         print(f"Successfully loaded attachment {a_id} from cache.")
                         if data is not None:
+                            if type(data) is str:
+                                self.cache.attachments[a_id] = None
+                                try:
+                                    with open(f"cache/{data}", "rb") as f:
+                                        data = await create_future(f.read)
+                                except FileNotFoundError:
+                                    return None
+                                else:
+                                    self.cache.attachments[a_id] = data
                             return data
                         if i < 29:
                             await asyncio.sleep(0.25)
@@ -860,6 +863,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             self.cache.roles.update(guild._roles)
             if not i & 127:
                 time.sleep(0.2)
+        attachments = await create_future(sorted, set(file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: os.path.getmtime(file))
+        attachments = deque(attachments)
+        while len(attachments) > 4096:
+            with tracebacksuppressor:
+                await create_future(os.remove, attachments.popleft())
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def get_prefix(self, guild):
@@ -2446,9 +2454,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 create_task(self.get_ip())
                 if not self.started:
                     self.started = True
-                    for file in os.listdir("cache"):
-                        if file.startswith("attachment_"):
-                            create_task(self.attachment_from_file(file))
+                    for file in attachments:
+                        self.attachment_from_file(file)
                     print("Loading imported modules...")
                     # Wait until all modules have been loaded successfully
                     while self.modload:
