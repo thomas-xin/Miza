@@ -935,13 +935,13 @@ def colour_deficiency(image, operation, value=None):
         else:
             value = 0.9
     if operation == "protan":
-        redscale = [1 - 200 / 458 * value, 200 / 458 * value, 0]
-        greenscale = [258 / 458 * value, 1 - 258 / 458 * value, 0]
-        bluescale = [0, 142 / 458 * value, 1 - 142 / 458 * value]
-    elif operation == "deutan":
         redscale = [1 - 183 / 516 * value, 183 / 516 * value, 0]
         greenscale = [333 / 516 * value, 1 - 333 / 516 * value, 0]
         bluescale = [0, 125 / 516 * value, 1 - 125 / 516 * value]
+    elif operation == "deutan":
+        redscale = [1 - 200 / 458 * value, 200 / 458 * value, 0]
+        greenscale = [258 / 458 * value, 1 - 258 / 458 * value, 0]
+        bluescale = [0, 142 / 458 * value, 1 - 142 / 458 * value]
     elif operation == "tritan":
         redscale = [1 - 33 / 450 * value, 33 / 450 * value, 0]
         greenscale = [0, 1 - 267 / 450 * value, 267 / 450 * value]

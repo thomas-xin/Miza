@@ -535,7 +535,7 @@ class Blur(Command):
         await bot.send_with_file(message.channel, "", f, filename=fn)
 
 class ColourDeficiency(Command):
-    name = ["ColorBlindness", "ColourBlindness", "ColorDeficiency"]
+    name = ["ColorBlind", "ColourBlind", "ColorBlindness", "ColourBlindness", "ColorDeficiency"]
     alias = name + ["Protanopia", "Protanomaly", "Deuteranopia", "Deuteranomaly", "Tritanopia", "Tritanomaly", "Achromatopsia", "Achromatonomaly"]
     min_level = 0
     description = "Applies a colourblindness filter to the target image."
