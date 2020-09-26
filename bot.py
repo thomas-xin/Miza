@@ -792,10 +792,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if not os.path.exists(fn):
                 with open(fn, "wb") as f:
                     await create_future(f.write, data)
-            while len([a for a in self.cache.attachments.values() if type(a) is bytes]) > 2048:
-                a_id = next(iter(self.cache.attachments))
+            attachments = {k: v for k, v in self.cache.attachments.items() if type(v) is bytes}
+            while len(attachments) > 2048:
+                a_id = next(iter(attachments))
                 self.cache.attachments[a_id] = a_id
-                self.cache.attachments.pop(a_id)
+                attachments.pop(a_id)
+                self.cache.attachments.pop(a_id, None)
                 fn = f"cache/attachment_{a_id}.bin"
         return attachment
 
@@ -811,17 +813,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 with suppress(LookupError):
                     for i in range(30):
                         data = self.cache.attachments[a_id]
-                        print(f"Successfully loaded attachment {a_id} from cache.")
                         if data is not None:
                             if type(data) is not bytes:
                                 self.cache.attachments[a_id] = None
                                 try:
-                                    with open(f"cache/{data}", "rb") as f:
+                                    with open(f"cache/attachment_{data}.bin", "rb") as f:
                                         data = await create_future(f.read)
                                 except FileNotFoundError:
                                     return None
                                 else:
                                     self.cache.attachments[a_id] = data
+                            print(f"Successfully loaded attachment {a_id} from cache.")
                             return data
                         if i < 29:
                             await asyncio.sleep(0.25)
