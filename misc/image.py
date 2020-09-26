@@ -759,6 +759,8 @@ blenders = {
     "lighten": "lighter",
     "darker": "darker",
     "darken": "darker",
+    "plusdarker": "OP_X+Y-255",
+    "plusdarken": "OP_X+Y-255",
     "extract": blend_modes.grain_extract,
     "grainextract": blend_modes.grain_extract,
     "merge": blend_modes.grain_merge,
@@ -776,6 +778,8 @@ blenders = {
     "saturation": "SP_SAT",
     "lum": "SP_LUM",
     "luminosity": "SP_LUM",
+    "color": "SP_COL",
+    "colour": "SP_COL",
 }
 
 def blend_op(image, url, operation, amount, recursive=True):
@@ -870,6 +874,8 @@ def blend_op(image, url, operation, amount, recursive=True):
                 channels = [channels[0], channels2[1], channels[2]]
             elif f == "LUM":
                 channels = [channels[0], channels[1], channels2[2]]
+            elif f == "COL":
+                channels = [channels2[0], channels2[1], channels[2]]
             out = Image.merge("HSV", channels).convert("RGB")
             if A1 or A2:
                 if not A1:
@@ -897,8 +903,68 @@ def blend_op(image, url, operation, amount, recursive=True):
         out = ImageChops.blend(image, out, amount)
     return out
 
-# def ColourDeficiency(image, operation, value):
-#     pass
+def colour_deficiency(image, operation, value=None):
+    if value is None:
+        if operation == "protanopia":
+            operation = "protan"
+            value = 0.991
+        elif operation == "protanomaly":
+            operation = "protan"
+            value = 0.516
+        if operation == "deuteranopia":
+            operation = "deutan"
+            value = 0.93
+        elif operation == "deuteranomaly":
+            operation = "deutan"
+            value = 0.458
+        elif operation == "tritanopia":
+            operation = "tritan"
+            value = 0.96
+        elif operation == "tritanomaly":
+            operation = "tritan"
+            value = 0.45
+        elif operation == "monochromacy":
+            operation = "achro"
+            value = 1
+        elif operation == "achromatopsia":
+            operation = "achro"
+            value = 1
+        elif operation == "achromatonomaly":
+            operation = "achro"
+            value = 0.645
+        else:
+            value = 0.9
+    if operation == "protan":
+        redscale = [1 - 200 / 458 * value, 200 / 458 * value, 0]
+        greenscale = [258 / 458 * value, 1 - 258 / 458 * value, 0]
+        bluescale = [0, 142 / 458 * value, 1 - 142 / 458 * value]
+    elif operation == "deutan":
+        redscale = [1 - 183 / 516 * value, 183 / 516 * value, 0]
+        greenscale = [333 / 516 * value, 1 - 333 / 516 * value, 0]
+        bluescale = [0, 125 / 516 * value, 1 - 125 / 516 * value]
+    elif operation == "tritan":
+        redscale = [1 - 33 / 450 * value, 33 / 450 * value, 0]
+        greenscale = [0, 1 - 267 / 450 * value, 267 / 450 * value]
+        bluescale = [0, 183 / 450 * value, 1 - 183 / 450 * value]
+    elif operation == "achro":
+        redscale = [1 - 701 / 1000 * value, 587 / 1000 * value, 114 / 1000 * value]
+        greenscale = [299 / 1000 * value, 1 - 413 / 1000 * value, 114 / 1000 * value]
+        bluescale = [299 / 1000 * value, 587 / 1000 * value, 1 - 886 / 1000 * value]
+    else:
+        raise TypeError(f"Invalid filter {operation}.")
+    ratios = [redscale, greenscale, bluescale]
+    channels = list(image.split())
+    out = [None] * len(channels)
+    if len(out) == 4:
+        out[-1] = channels[-1]
+    for i_ratio, ratio in enumerate(ratios):
+        for i_colour in range(3):
+            if ratio[i_colour] != 0:
+                if out[i_ratio] is None:
+                    out[i_ratio] = channels[i_colour].point(lambda x: x * ratio[i_colour])
+                else:
+                    out[i_ratio] = ImageChops.add(out[i_ratio], channels[i_colour].point(lambda x: x * ratio[i_colour]))
+    return Image.merge(image.mode, out)
 
 Enhance = lambda image, operation, value: getattr(ImageEnhance, operation)(image).enhance(value)
 

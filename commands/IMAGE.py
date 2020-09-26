@@ -534,6 +534,69 @@ class Blur(Command):
             f = discord.File(fn, filename=name)
         await bot.send_with_file(message.channel, "", f, filename=fn)
 
+class ColourDeficiency(Command):
+    name = ["ColorBlindness", "ColourBlindness", "ColorDeficiency"]
+    alias = name + ["Protanopia", "Protanomaly", "Deuteranopia", "Deuteranomaly", "Tritanopia", "Tritanomaly", "Achromatopsia", "Achromatonomaly"]
+    min_level = 0
+    description = "Applies a colourblindness filter to the target image."
+    usage = "<0:url{attached_file}> <type[deuteranomaly]> <1:ratio[0.9]>"
+    no_parse = True
+    rate_limit = (3, 4.5)
+    _timeout_ = 3.5
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, name, args, argv, **void):
+        # Take input from any attachments, or otherwise the message contents
+        if message.attachments:
+            args = [best_url(a) for a in message.attachments] + args
+            argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
+        if not args:
+            raise ArgumentError("Please input an image by URL or attachment.")
+        url = args.pop(0)
+        urls = await bot.follow_url(url, best=True, allow=True, limit=1)
+        if not urls:
+            urls = await bot.follow_to_image(argv)
+            if not urls:
+                urls = await bot.follow_to_image(url)
+                if not urls:
+                    raise ArgumentError("Please input an image by URL or attachment.")
+        url = urls[0]
+        if "color" not in name and "colour" not in name:
+            operation = name
+        elif args:
+            operation = args.pop(0).casefold()
+        else:
+            operation = "deuteranomaly"
+        value = " ".join(args).strip()
+        if not value:
+            value = None
+        else:
+            value = await bot.eval_math(value, user)
+            if not abs(value) <= 2:
+                raise OverflowError("Maximum multiplier input is 2.")
+        # Try and find a good name for the output image
+        try:
+            name = url[url.rindex("/") + 1:]
+            if not name:
+                raise ValueError
+            if "." in name:
+                name = name[:name.rindex(".")]
+        except ValueError:
+            name = "unknown"
+        ext = "png"
+        if not name.endswith("." + ext):
+            name += "." + ext
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "colour_deficiency", [operation, value], user, timeout=32)
+            fn = resp[0]
+            if fn.endswith(".gif"):
+                if not name.endswith(".gif"):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += ".gif"
+            f = discord.File(fn, filename=name)
+        await bot.send_with_file(message.channel, "", f, filename=fn)
+
 
 class Invert(Command):
     name = ["Negate"]
@@ -939,7 +1002,7 @@ class Blend(Command):
     name = ["ImageBlend", "ImageOP"]
     min_level = 0
     description = "Combines the two supplied images, using an optional blend operation."
-    usage = "<0:url1{attached_file}> <1:url2{attached_file}> <2:operation[replace](?l)> <3:opacity[0.5][1]>"
+    usage = "<0:url1{attached_file}> <1:url2{attached_file}> <2:operation[blend](?l)> <3:opacity[0.5][1]>"
     no_parse = True
     rate_limit = (3, 5)
     flags = "l"
@@ -956,8 +1019,8 @@ class Blend(Command):
                 return ini_md(
                     "Available blend operations: ["
                     + "replace, add, sub, mul, div, mod, and, or, xor, nand, nor, xnor, "
-                    + "difference, overlay, screen, soft, hard, lighten, darken, "
-                    + "burn, linearburn, dodge, lineardodge, hue, sat, lum, extract, merge]"
+                    + "difference, overlay, screen, soft, hard, lighten, darken, plusdarken, "
+                    + "burn, linearburn, dodge, lineardodge, hue, sat, lum, colour, extract, merge]"
                 )
             raise ArgumentError("Please input an image by URL or attachment.")
         with discord.context_managers.Typing(channel):
