@@ -867,7 +867,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         attachments = deque(attachments)
         while len(attachments) > 4096:
             with tracebacksuppressor:
-                await create_future(os.remove, attachments.popleft())
+                os.remove(attachments.popleft())
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def get_prefix(self, guild):
