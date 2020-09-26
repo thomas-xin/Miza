@@ -792,13 +792,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if not os.path.exists(fn):
                 with open(fn, "wb") as f:
                     await create_future(f.write, data)
-            attachments = {k: v for k, v in self.cache.attachments.items() if type(v) is bytes}
-            while len(attachments) > 2048:
-                a_id = next(iter(attachments))
-                self.cache.attachments[a_id] = a_id
-                attachments.pop(a_id)
-                self.cache.attachments.pop(a_id, None)
-                fn = f"cache/attachment_{a_id}.bin"
         return attachment
 
     def attachment_from_file(self, file):
@@ -873,6 +866,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 file = "cache/" + attachments.popleft()
                 if os.path.exists(file):
                     os.remove(file)
+        attachments = {k: v for k, v in self.cache.attachments.items() if type(v) is bytes}
+        while len(attachments) > 2048:
+            a_id = next(iter(attachments))
+            self.cache.attachments[a_id] = a_id
+            attachments.pop(a_id)
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def get_prefix(self, guild):
