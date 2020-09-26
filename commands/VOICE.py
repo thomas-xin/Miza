@@ -1430,7 +1430,8 @@ class AudioDownloader:
         try:
             return self.downloader.extract_info(url, download=False, process=True)
         except youtube_dl.DownloadError as ex:
-            if "403" in str(ex):
+            s = str(ex)
+            if "403" in s or "No video formats found" in s or "Unable to extract video data" in s:
                 try:
                     return self.from_pytube(url)
                 except youtube_dl.DownloadError:
@@ -1447,7 +1448,8 @@ class AudioDownloader:
         try:
             return self.downloader.extract_info(url, download=False, process=False)
         except youtube_dl.DownloadError as ex:
-            if "403" in str(ex):
+            s = str(ex)
+            if "403" in s or "No video formats found" in s or "Unable to extract video data" in s:
                 if is_url(url):
                     try:
                         return self.from_pytube(url)
