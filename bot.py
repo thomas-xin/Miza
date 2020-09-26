@@ -863,7 +863,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             self.cache.roles.update(guild._roles)
             if not i & 127:
                 time.sleep(0.2)
-        attachments = await create_future(sorted, set(file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: os.path.getmtime(file))
+        attachments = sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: os.path.getmtime(file))
         attachments = deque(attachments)
         while len(attachments) > 4096:
             with tracebacksuppressor:
