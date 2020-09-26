@@ -792,8 +792,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if not os.path.exists(fn):
                 with open(fn, "wb") as f:
                     await create_future(f.write, data)
-            while len(self.cache.attachments) > 2048:
+            while len([a for a in self.cache.attachments.values() if type(a) is bytes]) > 2048:
                 a_id = next(iter(self.cache.attachments))
+                self.cache.attachments[a_id] = a_id
                 self.cache.attachments.pop(a_id)
                 fn = f"cache/attachment_{a_id}.bin"
         return attachment
@@ -812,7 +813,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         data = self.cache.attachments[a_id]
                         print(f"Successfully loaded attachment {a_id} from cache.")
                         if data is not None:
-                            if type(data) is str:
+                            if type(data) is not bytes:
                                 self.cache.attachments[a_id] = None
                                 try:
                                     with open(f"cache/{data}", "rb") as f:
@@ -863,11 +864,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             self.cache.roles.update(guild._roles)
             if not i & 127:
                 time.sleep(0.2)
-        attachments = sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: os.path.getmtime(file))
+        attachments = sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: os.path.getmtime("cache/" + file))
         attachments = deque(attachments)
         while len(attachments) > 4096:
             with tracebacksuppressor:
-                os.remove(attachments.popleft())
+                file = "cache/" + attachments.popleft()
+                if os.path.exists(file):
+                    os.remove(file)
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def get_prefix(self, guild):
