@@ -1252,6 +1252,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         t = -get_timezone(tz)
                         expr = expr.replace(a, "")
                         break
+            day = None
             try:
                 # Try to evaluate time inputs
                 if ":" in expr:
@@ -1269,6 +1270,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 else:
                     # Otherwise move on to main parser
                     f = single_space(self.connectors.sub(" ", expr.replace(",", " "))).casefold()
+                    if "today" in f:
+                        day = 0
+                        f = f.replace("today", "")
+                    elif "tomorrow" in f:
+                        day = 1
+                        f = f.replace("tomorrow", "")
+                    elif "yesterday" in f:
+                        day = -1
+                        f = f.replace("yesterday", "")
                     for tc in self.TimeChecks:
                         for check in reversed(self.TimeChecks[tc]):
                             if check in f:
@@ -1306,6 +1316,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             except:
                 # Use datetime parser if regular parser fails
                 t = utc_ts(tzparse(f if f else expr)) - utc_ts(tparser.parse("0s"))
+            if day is not None:
+                curr = utc() + day * 86400
+                while t < curr:
+                    t += 86400
+                while t - curr > 86400:
+                    t -= 86400
         if type(t) is not float:
             t = float(t)
         return t

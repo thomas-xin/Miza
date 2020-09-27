@@ -1062,6 +1062,16 @@ def tzparse(expr):
         s = float(expr)
     except ValueError:
         expr = expr.strip()
+        day = None
+        if "today" in expr:
+            day = 0
+            expr = expr.replace("today", "")
+        elif "tomorrow" in expr:
+            day = 1
+            expr = expr.replace("tomorrow", "")
+        elif "yesterday" in expr:
+            day = -1
+            expr = expr.replace("yesterday", "")
         if " " in expr:
             t = 0
             try:
@@ -1084,8 +1094,16 @@ def tzparse(expr):
                     expr = expr.replace(arg, "")
                     break
                 h = 0
-            return parse_with_now(expr) - datetime.timedelta(hours=h, seconds=t)
-        return parse_with_now(expr)
+            t = parse_with_now(expr) - datetime.timedelta(hours=h, seconds=t)
+        else:
+            t = parse_with_now(expr)
+        if day is not None:
+            curr = utc() + day * 86400
+            while t < curr:
+                t += 86400
+            while t - curr > 86400:
+                t -= 86400
+        return t
     return datetime.datetime.utcfromtimestamp(s)
 
 
@@ -1322,6 +1340,7 @@ class __logPrinter:
             out = f"<Last message repeated {count} time{times}>\n{out}"
         else:
             self.history[file] = out
+            self.counts.clear()
         self.data[file] += out
         return sys.__stdout__.write(out)
 
