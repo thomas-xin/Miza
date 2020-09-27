@@ -1098,11 +1098,12 @@ def tzparse(expr):
         else:
             t = parse_with_now(expr)
         if day is not None:
-            curr = utc() + day * 86400
+            curr = utc_dt() + datetime.timedelta(days=day)
+            one_day = datetime.timedelta(days=1)
             while t < curr:
-                t += 86400
-            while t - curr > 86400:
-                t -= 86400
+                t += one_day
+            while t - curr > one_day:
+                t -= one_day
         return t
     return datetime.datetime.utcfromtimestamp(s)
 

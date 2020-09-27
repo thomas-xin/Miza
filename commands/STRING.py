@@ -624,7 +624,7 @@ class Ask(Command):
         add_dict(bot.data.users, {user.id: {"last_talk": 1, "last_mention": 1}})
         bot.data.users[user.id]["last_used"] = utc()
         await bot.seen(user, event="misc", raw="Talking to me")
-        print(user, q)
+        # print(user, q)
         if q == "why":
             out = "Because! :3"
         elif q == "what":

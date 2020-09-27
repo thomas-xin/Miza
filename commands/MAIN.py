@@ -1042,6 +1042,40 @@ class Reminder(Command):
                     msg = " on ".join(spl[:-1])
                     t = utc_ts(tzparse(spl[-1])) - utc()
                     break
+            if "today" in argv or "tomorrow" in argv or "yesterday" in argv:
+                t = 0
+                if " " in argv:
+                    try:
+                        args = shlex.split(argv)
+                    except ValueError:
+                        args = argv.split()
+                    for arg in (args[0], args[-1]):
+                        a = arg
+                        h = 0
+                        for op in "+-":
+                            try:
+                                i = arg.index(op)
+                            except ValueError:
+                                continue
+                            a = arg[:i]
+                            h += float(arg[i:])
+                        tz = a.casefold()
+                        if tz in TIMEZONES:
+                            t = get_timezone(tz)
+                            argv = argv.replace(arg, "")
+                            break
+                        h = 0
+                    t += h * 3600
+                match = re.search(self.timefind, argv)
+                if match:
+                    i = match.start()
+                    spl = [argv[:i], argv[i:]]
+                    msg = spl[0]
+                    t += utc_ts(tzparse(spl[1])) - utc()
+                    break
+                msg = " ".join(args[:-1])
+                t = utc_ts(tzparse(args[-1])) - utc()
+                break
             t = 0
             if " " in argv:
                 try:

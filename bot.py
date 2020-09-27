@@ -1279,6 +1279,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     elif "yesterday" in f:
                         day = -1
                         f = f.replace("yesterday", "")
+                    if day is not None:
+                        raise StopIteration
                     for tc in self.TimeChecks:
                         for check in reversed(self.TimeChecks[tc]):
                             if check in f:
@@ -1315,13 +1317,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         t += n
             except:
                 # Use datetime parser if regular parser fails
-                t = utc_ts(tzparse(f if f else expr)) - utc_ts(tparser.parse("0s"))
-            if day is not None:
-                curr = utc() + day * 86400
-                while t < curr:
-                    t += 86400
-                while t - curr > 86400:
-                    t -= 86400
+                raw = tzparse(f if f else expr)
+                if day is not None:
+                    curr = utc() + day * 86400
+                    while raw < curr:
+                        raw += 86400
+                    while raw - curr > 86400:
+                        raw -= 86400
+                t = utc_ts(raw) - utc_ts(tparser.parse("0s"))
         if type(t) is not float:
             t = float(t)
         return t
