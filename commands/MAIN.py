@@ -959,6 +959,7 @@ class Reminder(Command):
         # This parser is so unnecessarily long for what it does...
         keyed = False
         while True:
+            argv = argv.replace("tomorrow at", "at tomorrow").replace("today at", "at today").replace("yesterday at", "at yesterday")
             temp = argv.casefold()
             if name == "remind" and temp.startswith("me "):
                 argv = argv[3:]

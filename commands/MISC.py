@@ -35,7 +35,7 @@ class DouClub:
         query = query.casefold()
         for l in self.data:
             found = True
-            qlist = query.split(" ")
+            qlist = set(query.split())
             for q in qlist:
                 tag = False
                 for k in l:
@@ -165,18 +165,23 @@ class SheetPull:
                     temp = [lim_line(e, lim) for e in l]
                     output.append(temp)
         else:
-            qlist = query.split(" ")
-            for q in qlist:
-                for l in self.data[0]:
-                    if len(l) >= 3:
-                        found = False
+            qlist = set(query.split())
+            for l in self.data[0]:
+                if len(l) >= 3:
+                    found = True
+                    for q in qlist:
+                        tag = False
                         for i in l:
                             if q in i.casefold():
-                                found = True
-                        if found:
-                            temp = [lim_line(e, lim) for e in l]
-                            if temp[2].replace(" ", ""):
-                                output.append(temp)
+                                tag = True
+                                break
+                        if not tag:
+                            found = False
+                            break
+                    if found:
+                        temp = [lim_line(e, lim) for e in l]
+                        if temp[2].replace(" ", ""):
+                            output.append(temp)
         return output
 
 
