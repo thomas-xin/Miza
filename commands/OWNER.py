@@ -200,8 +200,6 @@ class UpdateExec(Database):
                 glob["_"] = _
         if code is not None:
             output = await create_future(eval, code, glob, priority=True)
-        else:
-            output = None
         # Output sent to "_" variable if used
         if output is not None:
             glob["_"] = output 
