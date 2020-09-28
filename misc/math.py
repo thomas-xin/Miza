@@ -345,8 +345,15 @@ _globals.update({
     "i": sympy.I,
     "j": sympy.I,
     "e": sympy.E,
-    "C": 299792458,
-    "G": 6.6743015e-11,
+    "k": 1 << 10,
+    "M": 1 << 20,
+    "G": 1 << 30,
+    "T": 1 << 40,
+    "P": 1 << 50,
+    "E": 1 << 60,
+    "Z": 1 << 70,
+    "Y": 1 << 80,
+    "c": 299792458,
 })
 pop = (
     "input",
@@ -440,7 +447,14 @@ def prettyAns(f):
 
 # Main math equation solver
 @logging
-def evalSym(f, prec=64, r=False):
+def evalSym(f, prec=64, r=False, variables=None):
+    if variables is None:
+        env = _globals
+    else:
+        env = dict(_globals)
+        envd = eval(variables, {}, {})
+        envs = {k: sympy.sympify(v) for k, v in envd.items()}
+        env.update(envs)
     if f.lower() == "help":
         lines = deque()
         line = deque()
@@ -469,7 +483,7 @@ def evalSym(f, prec=64, r=False):
         f = parser.parse_expr(
             bf_parse(f),
             local_dict=None,
-            global_dict=_globals,
+            global_dict=env,
             transformations=sym_tr,
             evaluate=True,
         )

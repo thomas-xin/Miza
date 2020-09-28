@@ -198,6 +198,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         "compressor": 0,
         "chorus": 0,
         "resample": 0,
+        "bitrate": 1966.08,
         "loop": False,
         "repeat": False,
         "shuffle": False,
@@ -1079,8 +1080,14 @@ class AudioFile:
             raise ProcessLookupError
         f = open("cache/" + self.file, "rb")
         it = discord.oggparse.OggStream(f).iter_packets()
+
+        def read():
+            with suppress(StopIteration):
+                return next(it)
+            raise EOFError
+
         # For compatibility with other audio readers
-        reader = cdict(file=f, read=lambda: next(it), _read = f.read, closed=False, advanced=False, is_opus=lambda: True)
+        reader = cdict(file=f, read=read, _read = f.read, closed=False, advanced=False, is_opus=lambda: True)
 
         def close():
             reader.closed = True
@@ -1116,7 +1123,7 @@ class AudioFile:
             raise OverflowError("Speed setting out of range.")
         # Construct FFmpeg options
         options = auds.construct_options(full=False)
-        if options or auds.reverse or pos:
+        if options or auds.reverse or pos or auds.stats.bitrate != 1966.08:
             args = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
             if pos:
                 arg = "-to" if auds.reverse else "-ss"
@@ -1129,9 +1136,17 @@ class AudioFile:
             else:
                 buff = True
                 args.append("pipe:0")
-            if options:
-                options.extend(("-f", "opus", "-c:a", "libopus", "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "-bufsize", "8192"))
-                args.extend(options)
+            if options or auds.stats.bitrate != 1966.08:
+                br = 100 * auds.stats.bitrate
+                sr = SAMPLE_RATE
+                while br < 4096:
+                    br *= 2
+                    sr >>= 1
+                if sr < 8000:
+                    sr = 8000
+                options.extend(("-f", "opus", "-c:a", "libopus", "-ar", str(sr), "-ac", "2", "-b:a", str(round_min(br)), "-bufsize", "8192"))
+                if options:
+                    args.extend(options)
             else:
                 args.extend(("-f", "opus", "-c:a", "copy"))
             args.append("pipe:1")
@@ -2375,6 +2390,10 @@ class Connect(Command):
         if not joined:
             if not vc_.permissions_for(guild.me).connect:
                 raise ConnectionError("Insufficient permissions to connect to voice channel.")
+            if vc_.permissions_for(guild.me).manage_channels:
+                bitrate = min(auds.stats.bitrate, guild.bitrate_limit)
+                if vc_.bitrate < bitrate:
+                    await vc_.edit(bitrate=bitrate, reason="I deliver maximum quality audio only! :3")
             create_task(auds.set_voice_client(vc_))
             check_if_connected = lambda: create_future(True if guild.me.voice else exec('raise ConnectionError("Connection timed out.")'))
             try:
@@ -2720,6 +2739,8 @@ class AudioSettings(Command):
         "Chorus": "chorus",
         "NightCore": "resample",
         "Resample": "resample",
+        "Bitrate": "bitrate",
+        "Rate": "bitrate",
         "LoopQueue": "loop",
         "Repeat": "repeat",
         "ShuffleQueue": "shuffle",
@@ -2741,6 +2762,7 @@ class AudioSettings(Command):
         "CO": "compressor",
         "CH": "chorus",
         "NC": "resample",
+        "BR": "bitrate",
         "LQ": "loop",
         "LoopOne": "repeat",
         "L1": "repeat",
@@ -2757,7 +2779,7 @@ class AudioSettings(Command):
         self.description = "Changes the current audio settings for this server."
         self.usage = (
             "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <pan(?e)> <bassboost(?b)> <reverb(?r)> <compressor(?c)>"
-            + " <chorus(?u)> <nightcore(?n)> <loop(?l)> <repeat(?1)> <shuffle(?x)> <quiet(?q)> <stay(?t)> <disable_all(?d)> <hide(?h)>"
+            + " <chorus(?u)> <nightcore(?n)> <bitrate(?i)> <loop(?l)> <repeat(?1)> <shuffle(?x)> <quiet(?q)> <stay(?t)> <disable_all(?d)> <hide(?h)>"
         )
         self.flags = "vspbrcnlxqdh"
         self.map = {k.casefold(): self.aliasMap[k] for k in self.aliasMap}
@@ -2793,6 +2815,8 @@ class AudioSettings(Command):
             ops.append("chorus")
         if "n" in flags:
             ops.append("resample")
+        if "i" in flags:
+            ops.append("bitrate")
         if "l" in flags:
             ops.append("loop")
         if "1" in flags:
@@ -2855,6 +2879,10 @@ class AudioSettings(Command):
                 origStats[op] = new = bool(val)
                 orig = bool(orig)
             else:
+                if op == "bitrate":
+                    bitrate_limit = 393216 if bot.is_trusted(guild) else 196608
+                    if val * 100 > bitrate_limit:
+                        raise PermissionError(f"Maximum allowed bitrate for this server is {bitrate_limit}.")
                 origStats[op] = val
             if auds.queue:
                 if type(op) is str and op not in "loop repeat shuffle quiet stay":

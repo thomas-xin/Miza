@@ -18,12 +18,16 @@ class Restart(Command):
         await message.add_reaction("❗")
         if name == "reload":
             await channel.send(f"Reloading {argv.lower()}...")
-            await create_future(bot.reload, argv.upper(), priority=True)
-            return f"Successfully reloaded {argv.lower()}."
+            succ = await create_future(bot.reload, argv.upper(), priority=True)
+            if succ:
+                return f"Successfully reloaded {argv.lower()}."
+            return f"Error reloading {argv.lower()}. Please see log for more info."
         if name == "unload":
             await channel.send(f"Unloading {argv.lower()}...")
-            await create_future(bot.unload, argv, priority=True)
-            return f"Successfully unloaded {argv.lower()}."
+            succ = await create_future(bot.unload, argv, priority=True)
+            if succ:
+                return f"Successfully unloaded {argv.lower()}."
+            return f"Error unloading {argv.lower()}. Please see log for more info."
         if argv:
             # Restart announcements for when a time input is specified
             if "in" in argv:

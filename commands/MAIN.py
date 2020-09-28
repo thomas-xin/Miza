@@ -1562,7 +1562,6 @@ EMPTY = {}
 # This database takes up a lot of space, storing so many events from users
 class UpdateUsers(Database):
     name = "users"
-    suspected = "users.json"
     user = True
     hours = 168
     interval = 900

@@ -260,7 +260,7 @@ class ArgumentError(LookupError):
 class TooManyRequests(PermissionError):
     __slots__ = ()
 
-class CommandCancelledError(StopIteration):
+class CommandCancelledError(RuntimeError):
     __slots__ = ()
 
 
@@ -718,7 +718,7 @@ def proc_start():
 
 
 # Sends an operation to the math subprocess pool.
-async def process_math(expr, prec=64, rat=False, key=None, timeout=12):
+async def process_math(expr, prec=64, rat=False, key=None, timeout=12, variables=None):
     if type(key) is not int:
         if key is None:
             key = random.random()
@@ -734,7 +734,10 @@ async def process_math(expr, prec=64, rat=False, key=None, timeout=12):
                         raise StopIteration
                 await create_future(proc_update, priority=True)
                 await asyncio.sleep(0.5)
-        args = (expr, prec, rat)
+        if variables:
+            args = (expr, prec, rat, variables)
+        else:
+            args = (expr, prec, rat)
         d = repr(bytes("`".join(i if type(i) is str else str(i) for i in args), "utf-8")).encode("utf-8") + b"\n"
         try:
             with proc.sem:
@@ -1168,7 +1171,7 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
                 coms.remove(self)
                 print("unloaded", alias, "from", self)
             if not coms:
-                bot.commands.pop(alias)
+                bot.commands.pop(alias, None)
 
 
 # Basic inheritable class for all bot databases.

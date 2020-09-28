@@ -1190,7 +1190,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return round_min(float(x))
 
     # Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
-    async def solve_math(self, f, obj=None, prec=64, r=False, timeout=12):
+    async def solve_math(self, f, obj=None, prec=64, r=False, timeout=12, variables=None):
         f = f.strip()
         try:
             if obj is None:
@@ -1204,7 +1204,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # Bot owners have no semaphore limit
         if self.is_owner(key):
             key = None
-        return await process_math(f, int(prec), int(r), key, timeout=12)
+        return await process_math(f, int(prec), int(r), key, timeout=12, variables=variables)
 
     TimeChecks = {
         "galactic year": ("gy", "galactic year", "galactic years"),
@@ -1440,23 +1440,26 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         if callable(func):
                             await_fut(create_future(func, bot=self, priority=True), priority=True)
             print(f"Successfully loaded module {module}.")
+            return True
 
     def unload(self, mod=None):
-        if mod is None:
-            mods = deque(self.categories)
-        else:
-            mod = mod.casefold()
-            if mod not in self.categories:
-                raise KeyError
-            mods = [mod]
-        for mod in mods:
-            for command in self.categories[mod]:
-                command.unload()
-            for database in self.dbitems[mod]:
-                database.unload()
-            self.categories.pop(mod)
-            self.dbitems.pop(mod)
-            self.size.pop(mod)
+        with tracebacksuppressor:
+            if mod is None:
+                mods = deque(self.categories)
+            else:
+                mod = mod.casefold()
+                if mod not in self.categories:
+                    raise KeyError
+                mods = [mod]
+            for mod in mods:
+                for command in self.categories[mod]:
+                    command.unload()
+                for database in self.dbitems[mod]:
+                    database.unload()
+                self.categories.pop(mod)
+                self.dbitems.pop(mod)
+                self.size.pop(mod)
+            return True
 
     def reload(self, mod=None):
         if not mod:
@@ -1465,7 +1468,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             files = [i for i in os.listdir("commands") if is_code(i)]
             for f in files:
                 modload.append(create_future_ex(self.get_module, f, priority=True))
-            return [fut.result() for fut in modload]           
+            return all(fut.result() for fut in modload)
         return self.get_module(mod + ".py")
 
     # Loads all modules in the commands folder and initializes bot commands and databases.
@@ -1705,7 +1708,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if self.id in (member.id for member in message.mentions):
             try:
                 await self.send_event("_mention_", user=user, message=message, msg=msg, exc=True)
-            except (RuntimeError, StopIteration):
+            except RuntimeError:
                 return
         remaining = 0
         run = False

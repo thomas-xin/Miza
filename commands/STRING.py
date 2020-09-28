@@ -123,19 +123,41 @@ class Math(Command):
     alias = name + ["Plot3d"]
     min_level = 0
     description = "Evaluates a math formula."
-    usage = "<function> <verbose(?v)> <rationalize(?r)>"
-    flags = "rv"
+    usage = "<function> <verbose(?v)> <rationalize(?r)> <show_variables(?l)> <clear_variables(?c)>"
+    flags = "rvlcd"
     rate_limit = 0.5
     typing = True
 
     async def __call__(self, bot, argv, name, channel, guild, flags, user, **void):
+        if "l" in flags:
+            return f"Currently assigned variables for {user}:\n" + ini_md(iter2str(bot.data.variables.get(user.id, {})))
+        if "c" in flags or "d" in flags:
+            bot.data.variables.pop(user.id, None)
+            return css_md(f"Successfully cleared all variables for {sqr_md(user)}.")
         if not argv:
             raise ArgumentError(f"Input string is empty. Use {bot.get_prefix(guild)}math help for help.")
         r = "r" in flags
         p = flags.get("v", 0) * 2 + 1 << 6
+        var = None
         if "plot" in name and not argv.lower().startswith("plot"):
             argv = f"{name}({argv})"
-        resp = await bot.solve_math(argv, user, p, r, timeout=24)
+        elif name.startswith("m"):
+            for equals in ("=", ":="):
+                if equals in argv:
+                    ii = argv.index(equals)
+                    for i, c in enumerate(argv):
+                        if i >= ii:
+                            temp = argv[i + len(equals):]
+                            if temp.startswith("="):
+                                break
+                            var = argv[:i].strip()
+                            argv = temp.strip()
+                            break
+                        elif not (c.isalnum() or c in " _"):
+                            break
+                    if var is not None:
+                        break
+        resp = await bot.solve_math(argv, user, p, r, timeout=24, variables=bot.data.variables.get(user.id))
         # Determine whether output is a direct answer or a file
         if type(resp) is dict and "file" in resp:
             await channel.trigger_typing()
@@ -144,9 +166,21 @@ class Math(Command):
             await bot.send_with_file(channel, "", f, filename=fn, best=True)
             return
         answer = "\n".join(str(i) for i in resp)
+        if var is not None:
+            env = bot.data.variables.setdefault(user.id, {})
+            env[var] = resp[0]
+            while len(env) > 64:
+                env.pop(next(iter(env)))
+            bot.database.variables.update()
+            return css_md(f"Variable {sqr_md(var)} set to {sqr_md(resp[0])}.")
         if argv.lower() == "help":
             return answer
         return py_md(f"{argv} = {answer}")
+
+
+class UpdateVariables(Database):
+    name = "variables"
+    user = True
 
 
 class Uni2Hex(Command):
@@ -647,7 +681,7 @@ class Ask(Command):
                 num = int(q)
             except ValueError:
                 for _math in bot.commands.math:
-                    answer = await _math(bot, q, "math", channel, guild, {}, user)
+                    answer = await _math(bot, q, "ask", channel, guild, {}, user)
                     if answer:
                         await channel.send(answer)
                 return
