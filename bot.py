@@ -1,4 +1,4 @@
-# Smudge invaded, on the 1st August 2020 this become my territory *places flag* B3
+# Smudge invaded, on the 1st August 2020 this became my territory *places flag* B3
 
 #!/usr/bin/python3
 
