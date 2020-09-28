@@ -130,11 +130,14 @@ class Math(Command):
 
     async def __call__(self, bot, argv, name, channel, guild, flags, user, **void):
         if "l" in flags:
-            return f"Currently assigned variables for {user}:\n" + ini_md(iter2str(bot.data.variables.get(user.id, {})))
+            var = bot.data.variables.get(user.id, {})
+            if not var:
+                return ini_md(f"No currently assigned variables for {sqr_md(user)}.")
+            return f"Currently assigned variables for {user}:\n" + ini_md(iter2str(var))
         if "c" in flags or "d" in flags:
             bot.data.variables.pop(user.id, None)
             bot.database.variables.update()
-            return css_md(f"Successfully cleared all variables for {sqr_md(user)}.")
+            return italics(css_md(f"Successfully cleared all variables for {sqr_md(user)}."))
         if not argv:
             raise ArgumentError(f"Input string is empty. Use {bot.get_prefix(guild)}math help for help.")
         r = "r" in flags

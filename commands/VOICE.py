@@ -2883,6 +2883,8 @@ class AudioSettings(Command):
                     bitrate_limit = 393216 if bot.is_trusted(guild) else 196608
                     if val * 100 > bitrate_limit:
                         raise PermissionError(f"Maximum allowed bitrate for this server is {bitrate_limit}.")
+                    elif val < 5.12:
+                        raise ValueError(f"Bitrate must be equal to or above 512.")
                 origStats[op] = val
             if auds.queue:
                 if type(op) is str and op not in "loop repeat shuffle quiet stay":
