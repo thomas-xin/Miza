@@ -133,6 +133,7 @@ class Math(Command):
             return f"Currently assigned variables for {user}:\n" + ini_md(iter2str(bot.data.variables.get(user.id, {})))
         if "c" in flags or "d" in flags:
             bot.data.variables.pop(user.id, None)
+            bot.database.variables.update()
             return css_md(f"Successfully cleared all variables for {sqr_md(user)}.")
         if not argv:
             raise ArgumentError(f"Input string is empty. Use {bot.get_prefix(guild)}math help for help.")
@@ -150,7 +151,10 @@ class Math(Command):
                             temp = argv[i + len(equals):]
                             if temp.startswith("="):
                                 break
-                            var = argv[:i].strip()
+                            check = argv[:i].strip().replace(" ", "")
+                            if check.isnumeric():
+                                break
+                            var = check
                             argv = temp.strip()
                             break
                         elif not (c.isalnum() or c in " _"):
