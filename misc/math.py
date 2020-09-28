@@ -363,7 +363,7 @@ sym_tr += (
 
 # Mathematical symbols
 translators = {
-    "√": "sqrt ",
+    "√": "sqrt 0+",
     "°": " deg",
     "÷": "/",
     "–": "-",
@@ -379,10 +379,10 @@ translators = {
     "・": "*",
     "ꞏ": "*",
     "･": "*",
-    "Σ": "Sum ",
-    "∑": "Sum ",
-    "∫": "intg ",
-    "Γ": "gamma ",
+    "Σ": "Sum 0+",
+    "∑": "Sum 0+",
+    "∫": "intg 0+",
+    "Γ": "gamma 0+",
     "α": "alpha",
     "β": "beta",
     "γ": "gamma",
@@ -418,6 +418,7 @@ replacers = {
     "FALSE": "False",
     "coo": "zoo",
     "cinf": "zoo",
+    "Dₓ": "diff 0+",
 }
 
 ftrans = "".maketrans(translators)
