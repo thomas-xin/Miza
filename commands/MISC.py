@@ -357,7 +357,7 @@ class CS_npc(Command):
                         curr += line + "\n"
                 response.append(curr + "```")
                 return response
-            return f"Search results for `{argv}:\n{code_md(output)}"
+            return f"Search results for `{argv}`:\n{code_md(output)}"
         raise LookupError(f"No results for {argv}.")
 
 
