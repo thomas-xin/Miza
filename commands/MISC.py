@@ -346,7 +346,7 @@ class CS_npc(Command):
                 table.add_row(line)
             output = str(table)
             if len(output) < 20000 and len(output) > 1900:
-                response = [f"Search results for {bold(argv)}:"]
+                response = [f"Search results for `{argv}`:"]
                 lines = output.splitlines()
                 curr = "```\n"
                 for line in lines:
@@ -357,7 +357,7 @@ class CS_npc(Command):
                         curr += line + "\n"
                 response.append(curr + "```")
                 return response
-            return f"Search results for {bold(argv)}:\n{code_md(output)}"
+            return f"Search results for `{argv}:\n{code_md(output)}"
         raise LookupError(f"No results for {argv}.")
 
 
@@ -384,7 +384,7 @@ class CS_tsc(Command):
                 table.add_row(line)
             output = str(table)
             if len(output) < 20000 and len(output) > 1900:
-                response = [f"Search results for {bold(argv)}:"]
+                response = [f"Search results for `{argv}`:"]
                 lines = output.splitlines()
                 curr = "```\n"
                 for line in lines:
@@ -395,7 +395,7 @@ class CS_tsc(Command):
                         curr += line + "\n"
                 response.append(curr + "```")
                 return response
-            return f"Search results for {bold(argv)}:\n{code_md(output)}"
+            return f"Search results for `{argv}`:\n{code_md(output)}"
         raise LookupError(f"No results for {argv}.")
 
 
@@ -414,7 +414,7 @@ class CS_mod(Command):
         data += await create_future(douclub.search, argv, timeout=8)
         # Sends multiple messages up to 20000 characters total
         if len(data):
-            response = f"Search results for {bold(argv)}:\n"
+            response = f"Search results for `{argv}`:\n"
             for l in data:
                 line = (
                     "\n<" + str(l["url"]) + ">\n"
