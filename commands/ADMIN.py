@@ -76,7 +76,7 @@ class Purge(Command):
         delM = alist(delD.values())
         while len(delM):
             try:
-                if hasattr(channel, "delete_messages") and channel.permissions_for(channel.guild.get_member(bot.id)).manage_messages:
+                if hasattr(channel, "delete_messages") and channel.permissions_for(channel.guild.me).manage_messages:
                     dels = delM[:100]
                     # bot.logDelete(dels[-1], -1)
                     await channel.delete_messages(dels)
@@ -944,7 +944,7 @@ class UpdateMutes(Database):
             with tracebacksuppressor:
                 guild = await self.bot.fetch_guild(g_id)
                 user = await self.bot.fetch_user(x.u)
-                m = guild.get_member(self.bot.id)
+                m = guild.me
                 try:
                     channel = await self.bot.fetch_channel(x.c)
                     if not channel.permissions_for(m).send_messages:
@@ -1084,7 +1084,7 @@ class UpdateBans(Database):
             with tracebacksuppressor:
                 guild = await self.bot.fetch_guild(g_id)
                 user = await self.bot.fetch_user(x.u)
-                m = guild.get_member(self.bot.id)
+                m = guild.me
                 try:
                     channel = await self.bot.fetch_channel(x.c)
                     if not channel.permissions_for(m).send_messages:

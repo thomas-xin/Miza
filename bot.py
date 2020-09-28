@@ -603,7 +603,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         for guild in self.guilds:
             if guild.owner_id == self.id:
                 return guild
-            m = guild.get_member(self.id)
+            m = guild.me
             if m is not None and m.guild_permissions.manage_emojis:
                 owners_in = self.owners.intersection(guild._members)
                 if owners_in:
@@ -1984,7 +1984,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return user
 
     async def fetch_webhooks(self, guild):
-        member = guild.get_member(self.id)
+        member = guild.me
         if member and member.guild_permissions.manage_webhooks:
             return await aretry(guild.webhooks, attempts=3, delay=15, exc=(discord.Forbidden, discord.NotFound))
         raise PermissionError
@@ -1995,7 +1995,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             return self.cw_cache[channel.id].values()
         async with self.guild_semaphore if not bypass else emptyctx:
             self.cw_cache.pop(channel.id, None)
-            if not channel.permissions_for(channel.guild.get_member(self.id)).manage_webhooks:
+            if not channel.permissions_for(channel.guild.me).manage_webhooks:
                 raise PermissionError("Not permitted to create webhooks in channel.")
             webhooks = await aretry(channel.webhooks, attempts=5, delay=15, exc=(discord.Forbidden, discord.NotFound))
         return [self.add_webhook(w) for w in webhooks]
@@ -2055,7 +2055,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if guild is None or hasattr(guild, "ghost") or len(embeds) == 1:
                 single = True
             else:
-                m = guild.get_member(self.id)
+                m = guild.me
                 if m is None:
                     m = self.user
                     single = True
@@ -2536,7 +2536,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             create_task(self.load_guild_webhooks(guild))
             print("New server: " + str(guild))
             g = await self.fetch_guild(guild.id)
-            m = guild.get_member(self.id)
+            m = guild.me
             await self.send_event("_join_", user=m, guild=g)
             channel = await self.get_first_sendable(g, m)
             emb = discord.Embed(colour=discord.Colour(8364031))

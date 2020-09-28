@@ -200,6 +200,8 @@ class UpdateExec(Database):
                 glob["_"] = _
         if code is not None:
             output = await create_future(eval, code, glob, priority=True)
+        else:
+            output = None
         # Output sent to "_" variable if used
         if output is not None:
             glob["_"] = output 
@@ -249,6 +251,12 @@ class UpdateExec(Database):
                         if proc.startswith("//") or proc.startswith("||") or proc.startswith("\\") or proc.startswith("#"):
                             return
                         if proc.startswith("`") and proc.endswith("`"):
+                            if proc.startswith("```"):
+                                proc = proc[3:]
+                                spl = proc.splitlines()
+                                if spl[0].isalnum():
+                                    spl.pop(0)
+                                proc = "\n".join(spl)
                             proc = proc.strip("`")
                         if not proc:
                             return

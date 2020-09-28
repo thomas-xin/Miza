@@ -371,7 +371,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         if not hasattr(vc, "channel"):
             self.dead = True
             return
-        m = guild.get_member(self.bot.id)
+        m = guild.me
         if m is None:
             self.dead = True
             return
@@ -433,7 +433,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
     # Moves to the target channel, unmuting self afterwards.
     async def move_unmute(self, vc, channel):
         await vc.move_to(channel)
-        await channel.guild.get_member(self.bot.id).edit(mute=False, deafen=False)
+        await channel.guild.me.edit(mute=False, deafen=False)
 
     async def smart_connect(self, channel=None):
         if hasattr(self, "dead"):
@@ -441,7 +441,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             return
         if not self.vc.is_connected():
             guild = channel.guild
-            member = guild.get_member(self.bot.id)
+            member = guild.me
             if member is None:
                 self.dead = True
                 raise RuntimeError("Audio player not associated with guild.")
@@ -485,7 +485,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             if getattr(self, "att", 0) <= 0:
                 self.att = utc()
             self.vc = await self.smart_connect(self.vc.channel)
-            user = self.vc.guild.get_member(self.bot.id)
+            user = self.vc.guild.me
             if getattr(user, "voice", None) is not None:
                 if user.voice.deaf or user.voice.mute or user.voice.afk:
                     create_task(user.edit(mute=False, deafen=False))
@@ -2294,7 +2294,7 @@ class Connect(Command):
             else:
                 # Otherwise attempt to match user's currently connected voice channel
                 voice = user.voice
-                member = user.guild.get_member(bot.id)
+                member = user.guild.me
                 if voice is None:
                     # Otherwise attempt to find closest voice channel to current text channel
                     catg = channel.category
@@ -2373,10 +2373,10 @@ class Connect(Command):
         if guild.id not in bot.database.audio.players:
             bot.database.audio.players[guild.id] = auds = CustomAudio(bot, vc, channel)
         if not joined:
-            if not vc_.permissions_for(guild.get_member(bot.id)).connect:
+            if not vc_.permissions_for(guild.me).connect:
                 raise ConnectionError("Insufficient permissions to connect to voice channel.")
             create_task(auds.set_voice_client(vc_))
-            check_if_connected = lambda: create_future(True if guild.get_member(bot.id).voice else exec('raise ConnectionError("Connection timed out.")'))
+            check_if_connected = lambda: create_future(True if guild.me.voice else exec('raise ConnectionError("Connection timed out.")'))
             try:
                 await aretry(check_if_connected, attempts=16, delay=0.125)
             except:
@@ -2387,7 +2387,7 @@ class Connect(Command):
         if vc.is_connected():
             # Unset connecting tag
             connecting.pop(guild.id, None)
-        member = guild.get_member(bot.id)
+        member = guild.me
         if getattr(member, "voice", None) is not None:
             if member.voice.deaf or member.voice.mute or member.voice.afk:
                 create_task(member.edit(mute=False, deafen=False))
@@ -3658,7 +3658,7 @@ class UpdateAudio(Database):
             await member.move_to(None)
 
     async def update_vc(self, guild):
-        m = guild.get_member(self.bot.id)
+        m = guild.me
         if not self.is_connecting(guild.id) and guild.id not in self.players:
             vc = guild.voice_client
             if vc is not None:
