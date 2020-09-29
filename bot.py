@@ -301,7 +301,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if type(u_id) is int:
             role = guild.get_role(u_id)
             if roles:
-                return role
+                return (role,)
             if role is not None:
                 return role.members
         elif "@" in u_id and ("everyone" in u_id or "here" in u_id):
