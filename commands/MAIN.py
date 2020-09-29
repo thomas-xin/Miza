@@ -100,13 +100,13 @@ class Perms(Command):
     server_only = True
     name = ["ChangePerms", "Perm", "ChangePerm", "Permissions"]
     description = "Shows or changes a user's permission level."
-    usage = "<0:*users{self}> <1:level[]> <hide(?h)>"
-    flags = "fh"
+    usage = "<0:*users{self}> <1:level[]> <hide(?h)> <default(?d)>"
+    flags = "fhd"
     multi = True
 
     async def __call__(self, bot, args, argl, user, perm, channel, guild, flags, **void):
         # Get target user from first argument
-        users = await bot.find_users(argl, args, user, guild)
+        users = await bot.find_users(argl, args, user, guild, roles=True)
         if not users:
             raise LookupError("No results found.")
         for t_user in users:
@@ -114,6 +114,15 @@ class Perms(Command):
             # If permission level is given, attempt to change permission level, otherwise get current permission level
             if args:
                 name = str(t_user)
+                if "d" in flags:
+                    bot.remove_perms(t_user.id, guild)
+                    c_perm = round_min(bot.get_perms(user.id, guild))
+                    m_perm = max(abs(t_perm), abs(c_perm), 2) + 1
+                    if not perm < m_perm and not isnan(m_perm):
+                        create_task(channel.send(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to the default value of {sqr_md(c_perm)}.")))
+                        continue
+                    reason = f"to change permissions for {name} in {guild} from {t_perm} to {c_perm}"
+                    raise self.perm_error(perm, m_perm, reason)
                 orig = t_perm
                 expr = " ".join(args)
                 num = await bot.eval_math(expr, user, orig)

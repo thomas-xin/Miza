@@ -288,7 +288,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.limit_cache("users")
         return user
 
-    async def find_users(self, argl, args, user, guild):
+    async def find_users(self, argl, args, user, guild, roles=False):
         if not argl and not args:
             return (user,)
         if argl:
@@ -300,6 +300,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         u_id = verify_id(args.pop(0))
         if type(u_id) is int:
             role = guild.get_role(u_id)
+            if roles:
+                return role
             if role is not None:
                 return role.members
         elif "@" in u_id and ("everyone" in u_id or "here" in u_id):
@@ -957,6 +959,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             u_id = user
         g_perm = set_dict(perms, guild.id, {})
         g_perm.update({u_id: round_min(value)})
+        self.database.perms.update()
+    
+    # Sets the permission value for a snowflake in a guild to a value.
+    def remove_perms(self, user, guild):
+        perms = self.data.perms
+        try:
+            u_id = user.id
+        except AttributeError:
+            u_id = user
+        g_perm = set_dict(perms, guild.id, {})
+        g_perm.pop(u_id, None)
         self.database.perms.update()
 
     # Checks whether a member's status was changed.

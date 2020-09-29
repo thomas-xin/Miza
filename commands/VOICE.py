@@ -2880,9 +2880,8 @@ class AudioSettings(Command):
                 orig = bool(orig)
             else:
                 if op == "bitrate":
-                    bitrate_limit = 393216 if bot.is_trusted(guild) else 196608
-                    if val * 100 > bitrate_limit:
-                        raise PermissionError(f"Maximum allowed bitrate for this server is {bitrate_limit}.")
+                    if val > 1966.08:
+                        raise PermissionError(f"Maximum allowed bitrate is 196608.")
                     elif val < 5.12:
                         raise ValueError(f"Bitrate must be equal to or above 512.")
                 origStats[op] = val
