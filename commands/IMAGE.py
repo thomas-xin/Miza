@@ -328,7 +328,7 @@ class CreateEmoji(Command):
             image = resp = await bot.get_request(url)
             if len(image) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")
-            if len(image) > 262144:
+            if len(image) > 262144 or not is_image(url):
                 path = "cache/" + str(guild.id)
                 f = await create_future(open, path, "wb", timeout=18)
                 await create_future(f.write, image, timeout=18)
@@ -534,6 +534,7 @@ class Blur(Command):
             f = discord.File(fn, filename=name)
         await bot.send_with_file(message.channel, "", f, filename=fn)
 
+
 class ColourDeficiency(Command):
     name = ["ColorBlind", "ColourBlind", "ColorBlindness", "ColourBlindness", "ColorDeficiency"]
     alias = name + ["Protanopia", "Protanomaly", "Deuteranopia", "Deuteranomaly", "Tritanopia", "Tritanomaly", "Achromatopsia", "Achromatonomaly"]
@@ -588,6 +589,57 @@ class ColourDeficiency(Command):
             name += "." + ext
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "colour_deficiency", [operation, value], user, timeout=32)
+            fn = resp[0]
+            if fn.endswith(".gif"):
+                if not name.endswith(".gif"):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += ".gif"
+            f = discord.File(fn, filename=name)
+        await bot.send_with_file(message.channel, "", f, filename=fn)
+
+
+class RemoveMatte(Command):
+    name = ["RemoveColor", "RemoveColour"]
+    min_level = 0
+    description = "Removes a colour from the supplied image."
+    usage = "<0:url{attached_file}> <colour[255, 255, 255]>"
+    no_parse = True
+    rate_limit = (4, 6)
+    _timeout_ = 4.5
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, name, args, argv, **void):
+        # Take input from any attachments, or otherwise the message contents
+        if message.attachments:
+            args = [best_url(a) for a in message.attachments] + args
+            argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
+        if not args:
+            raise ArgumentError("Please input an image by URL or attachment.")
+        url = args.pop(0)
+        urls = await bot.follow_url(url, best=True, allow=True, limit=1)
+        if not urls:
+            urls = await bot.follow_to_image(argv)
+            if not urls:
+                urls = await bot.follow_to_image(url)
+                if not urls:
+                    raise ArgumentError("Please input an image by URL or attachment.")
+        url = urls[0]
+        colour = parse_colour(" ".join(args), default=(255,) * 3)
+        # Try and find a good name for the output image
+        try:
+            name = url[url.rindex("/") + 1:]
+            if not name:
+                raise ValueError
+            if "." in name:
+                name = name[:name.rindex(".")]
+        except ValueError:
+            name = "unknown"
+        ext = "png"
+        if not name.endswith("." + ext):
+            name += "." + ext
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "remove_matte", [colour], user, timeout=40)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -687,24 +739,7 @@ class Colour(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, name, argv, **void):
-        argv = single_space(argv.replace("#", "").replace(",", " ")).strip()
-        # Try to parse as colour tuple first
-        if " " in argv:
-            channels = [min(255, max(0, int(round(float(i.strip()))))) for i in argv.split(" ")[:5] if i]
-            if len(channels) not in (3, 4):
-                raise ArgumentError("Please input 3 or 4 channels for colour input.")
-        else:
-            # Try to parse as hex colour value
-            try:
-                raw = int(argv, 16)
-                if len(argv) <= 6:
-                    channels = [raw >> 16 & 255, raw >> 8 & 255, raw & 255]
-                elif len(argv) <= 8:
-                    channels = [raw >> 16 & 255, raw >> 8 & 255, raw & 255, raw >> 24 & 255]
-                else:
-                    raise ValueError
-            except ValueError:
-                raise ArgumentError("Please input a valid hex colour.")
+        channels = parse_colour(argv)
         if name in self.trans:
             if name in "lab luv":
                 adj = channels

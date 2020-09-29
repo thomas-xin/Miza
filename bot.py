@@ -734,9 +734,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         for s in emojis:
             s = s[3:]
             i = s.index(":")
-            e_id = s[i + 1:s.rindex(">")]
+            e_id = int(s[i + 1:s.rindex(">")])
             try:
-                out.append(self.emojis[e_id].url)
+                out.append(str(self.cache.emojis[e_id].url))
             except KeyError:
                 url = f"https://cdn.discordapp.com/emojis/{e_id}.gif"
                 with requests.get(url, stream=True) as resp:

@@ -66,8 +66,9 @@ while not os.path.exists(sd):
             print("\033[1;32;40mHeartbeat started\033[1;37;40m.")
             alive = True
             while alive:
-                with open(hb, "wb"):
-                    pass
+                if not os.path.exists(hb):
+                    with open(hb, "wb"):
+                        pass
                 print(
                     "\033[1;36;40m Heartbeat at "
                     + str(datetime.datetime.now())
@@ -82,20 +83,15 @@ while not os.path.exists(sd):
                 if not alive or os.path.exists(hb):
                     alive = False
                     break
-            found = True
-            while found:
-                found = False
+            for child in proc.children():
                 try:
-                    for child in proc.children():
-                        child.kill()
-                        found = True
-                except psutil.NoSuchProcess:
-                    break
-            while True:
-                try:
-                    proc.kill()
-                except psutil.NoSuchProcess:
-                    break
+                    child.kill()
+                except:
+                    traceback.print_exc()
+            try:
+                proc.kill()
+            except psutil.NoSuchProcess:
+                pass
             if os.path.exists(sd):
                 break
         if time.time() - start < 30:
@@ -117,9 +113,9 @@ if proc.is_running():
     try:
         for child in proc.children():
             child.kill()
-        proc.kill()
     except:
-        pass
+        traceback.print_exc()
+    proc.kill()
     
 delete(sd)
 delete(rs)

@@ -903,6 +903,28 @@ def blend_op(image, url, operation, amount, recursive=True):
         out = ImageChops.blend(image, out, amount)
     return out
 
+
+def remove_matte(image, colour):
+    if str(image.mode) != "RGBA":
+        image = image.convert("RGBA")
+    arr = np.array(image).astype(np.float32)
+    col = np.array(colour)
+    t = len(col)
+    for row in arr:
+        for cell in row:
+            r = min(1, np.min(cell[:t] / col))
+            if r > 0:
+                col = cell[:t] - r * col
+                if max(col) > 0:
+                    ratio = sum(cell) / max(col)
+                    cell[:t] = col
+                    cell[3] /= ratio
+                else:
+                    cell[3] *= 1 - r
+    image = Image.fromarray(arr.astype(np.uint8))
+    return image
+
+
 def colour_deficiency(image, operation, value=None):
     if value is None:
         if operation == "protanopia":

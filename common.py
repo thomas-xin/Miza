@@ -520,6 +520,31 @@ async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]
 # Generates a random colour across the spectrum, in intervals of 128.
 rand_colour = lambda: colour2raw(hue2colour(xrand(12) * 128))
 
+def parse_colour(s, default=None):
+    s = single_space(s.replace("#", "").replace(",", " ")).strip()
+    # Try to parse as colour tuple first
+    if not s:
+        if default is None:
+            raise ArgumentError("Missing required colour argument.")
+        return default
+    if " " in s:
+        channels = [min(255, max(0, int(round(float(i.strip()))))) for i in s.split(" ")[:5] if i]
+        if len(channels) not in (3, 4):
+            raise ArgumentError("Please input 3 or 4 channels for colour input.")
+    else:
+        # Try to parse as hex colour value
+        try:
+            raw = int(s, 16)
+            if len(s) <= 6:
+                channels = [raw >> 16 & 255, raw >> 8 & 255, raw & 255]
+            elif len(s) <= 8:
+                channels = [raw >> 16 & 255, raw >> 8 & 255, raw & 255, raw >> 24 & 255]
+            else:
+                raise ValueError
+        except ValueError:
+            raise ArgumentError("Please input a valid hex colour.")
+    return channels
+
 
 # Gets the string representation of a url object with the maximum allowed image size for discord, replacing webp with png format when possible.
 def to_png(url):
