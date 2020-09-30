@@ -1056,7 +1056,7 @@ def load_emojis():
     with tracebacksuppressor:
         resp = Request("https://raw.githubusercontent.com/BreadMoirai/DiscordEmoji/master/src/main/java/com/github/breadmoirai/Emoji.java", decode=True, timeout=None)
         e_resp = [line.strip()[:-1] for line in resp[resp.index("public enum Emoji {") + len("public enum Emoji {"):resp.index("private static final Emoji[] SORTED;")].strip().split("\n")]
-        e_data = {safe_eval(words[0]).encode("utf-16", "surrogatepass").decode("utf-16"): safe_eval(words[2][:-1]) for emoji in e_resp for words in (emoji.strip(";")[emoji.index("\\u") - 1:].split(","),) if words[2][:-1].strip() != "null"}
+        e_data = {safe_eval(words[0]).encode("utf-16", "surrogatepass").decode("utf-16"): f" {safe_eval(words[2][:-1])} " for emoji in e_resp for words in (emoji.strip(";")[emoji.index("\\u") - 1:].split(","),) if words[2][:-1].strip() != "null"}
         emoji_translate = {k: v for k, v in e_data.items() if len(k) == 1}
         emoji_replace = {k: v for k, v in e_data.items() if len(k) > 1}
         em_trans = "".maketrans(emoji_translate)
@@ -1074,7 +1074,10 @@ def find_emojis_ex(s):
     out = deque()
     for emoji, url in emoji_replace.items():
         if emoji in s:
-            out.append(url)
+            out.append(url[1:-1])
+    for emoji, url in emoji_translate.items():
+        if emoji in s:
+            out.append(url[1:-1])
     return list(set(out))
 
 create_future_ex(load_emojis, priority=True)

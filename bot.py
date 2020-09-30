@@ -719,7 +719,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Follows a message link, replacing emojis and user mentions with their icon URLs.
     async def follow_to_image(self, url):
-        temp = find_urls(translate_emojis(url))
+        temp = find_urls(url)
         if temp:
             return temp
         users = find_users(url)
@@ -744,7 +744,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         url = url[:-3] + "png"
             out.append(url)
         if not out:
-            return find_emojis_ex(url)
+            out = find_urls(translate_emojis(replace_emojis(url)))
         return out
 
         # Sends a message to a channel, then edits to add links to all attached files.
