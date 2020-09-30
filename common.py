@@ -1075,7 +1075,7 @@ def find_emojis_ex(s):
     for emoji, url in emoji_replace.items():
         if emoji in s:
             out.append(url)
-    return set(out)
+    return list(set(out))
 
 create_future_ex(load_emojis, priority=True)
 
