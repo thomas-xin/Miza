@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image
+import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile
 import numpy as np
 import PIL
 from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
@@ -1049,7 +1049,7 @@ def plt_special(d, user=None, **void):
 def from_bytes(b):
     if b[:4] == b"<svg" or b[:5] == b"<?xml":
         resp = requests.post("https://www.svgtopng.me/api/svgtopng/upload-file", headers=header(), files={"files": ("temp.svg", b, "image/svg+xml"), "format": (None, "PNG"), "forceTransparentWhite": (None, "true"), "jpegQuality": (None, "256")})
-        z = ZipFile(io.BytesIO(resp.content))
+        z = ZipFile(io.BytesIO(resp.content), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
         out = io.BytesIO(z.open("temp.png").read())
         z.close()
     elif b[:4] == b"%PDF":

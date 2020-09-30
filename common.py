@@ -1257,7 +1257,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                 b = io.BytesIO(s)
                 if zipfile.is_zipfile(b):
                     b.seek(0)
-                    z = ZipFile(b)
+                    z = ZipFile(b, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
                     s = z.open("DATA").read()
                     z.close()
                 data = None
@@ -1316,7 +1316,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                         s = pickle.dumps(self.data)
                         if len(s) > 1048576:
                             b = io.BytesIO()
-                            z = ZipFile(b, "w", compression=zipfile.ZIP_DEFLATED)
+                            z = ZipFile(b, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
                             z.writestr("DATA", data=s)
                             z.close()
                             b.seek(0)

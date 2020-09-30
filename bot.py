@@ -1517,8 +1517,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 s = "{'net_bytes': " + str(self.total_bytes) + "}"
                 with open("saves/status.json", "w") as f:
                     f.write(s)
-        # if saved:
-        #     print("Autosaved " + str(saved) + ".")
+        if not os.path.exists("backup"):
+            os.mkdir("backup")
+        fn = f"backup/saves.{datetime.datetime.utcnow().date()}.zip"
+        if not os.path.exists(fn):
+            z = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
+            for file in os.listdir("saves"):
+                z.write(f"saves/{file}", f"saves/{file}")
+            z.close()
+            print("Backup database created in", fn)
 
     zw_callback = zwencode("callback")
 
