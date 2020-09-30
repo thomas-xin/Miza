@@ -1318,10 +1318,9 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                             b = io.BytesIO()
                             z = ZipFile(b, "w", compression=zipfile.ZIP_DEFLATED)
                             z.writestr("DATA", data=s)
+                            z.close()
                             b.seek(0)
                             s = b.read()
-                            z.close()
-                            print(s)
                     else:
                         s = s.encode("utf-8")
                     with open(self.file, "wb") as f:
