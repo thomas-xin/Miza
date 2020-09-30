@@ -1081,13 +1081,8 @@ class AudioFile:
         f = open("cache/" + self.file, "rb")
         it = discord.oggparse.OggStream(f).iter_packets()
 
-        def read():
-            with suppress(StopIteration):
-                return next(it)
-            raise EOFError
-
         # For compatibility with other audio readers
-        reader = cdict(file=f, read=read, _read = f.read, closed=False, advanced=False, is_opus=lambda: True)
+        reader = cdict(file=f, read=lambda: next(it), _read = f.read, closed=False, advanced=False, is_opus=lambda: True)
 
         def close():
             reader.closed = True

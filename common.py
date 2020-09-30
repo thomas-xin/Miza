@@ -18,6 +18,7 @@ with MultiThreadedImporter(globals()) as importer:
         "psutil",
         "threading",
         "urllib",
+        "zipfile",
     )
 
 PROC = psutil.Process()
@@ -25,6 +26,7 @@ quit = lambda *args, **kwargs: PROC.kill()
 
 tracemalloc.start()
 
+from zipfile import ZipFile
 import urllib.request, urllib.parse
 
 python = ("python3", "python")[os.name == "nt"]
@@ -1252,9 +1254,16 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                     s = f.read()
                 if not s:
                     raise FileNotFoundError
+                b = io.BytesIO(s)
+                if zipfile.is_zipfile(b):
+                    b.seek(0)
+                    z = ZipFile(b)
+                    s = zipped.open("DATA").read()
+                    z.close()
                 data = None
-                with suppress(pickle.UnpicklingError):
-                    data = pickle.loads(s)
+                with tracebacksuppressor:
+                    if s[0] == 128:
+                        data = pickle.loads(s)
                 if type(data) in (str, bytes):
                     data = eval(compile(data, "<database>", "eval", optimize=2))
                 if data is None:
@@ -1305,6 +1314,13 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                     if not s or len(s) > 262144:
                         # print("Pickling " + name + "...")
                         s = pickle.dumps(self.data)
+                        if len(s) > 1048576:
+                            b = io.BytesIO()
+                            z = ZipFile(b, "w", compression=zipfile.ZIP_DEFLATED)
+                            z.writestr("DATA", data=s)
+                            b.seek(0)
+                            z.close()
+                            s = b.read()
                     else:
                         s = s.encode("utf-8")
                     with open(self.file, "wb") as f:
