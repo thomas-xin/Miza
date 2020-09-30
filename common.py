@@ -1000,6 +1000,9 @@ async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
 # Manages both sync and async get requests.
 class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, collections.abc.Callable):
 
+    session = None
+    semaphore = emptyctx
+
     async def _init_(self):
         self.session = aiohttp.ClientSession(loop=eloop)
         self.semaphore = Semaphore(512, 256, delay=0.25)
@@ -1048,21 +1051,51 @@ Request = RequestManager()
 create_task(Request._init_())
 
 
+def load_emojis():
+    global emoji_translate, emoji_replace, em_trans
+    with tracebacksuppressor:
+        resp = Request("https://raw.githubusercontent.com/BreadMoirai/DiscordEmoji/master/src/main/java/com/github/breadmoirai/Emoji.java", decode=True, timeout=None)
+        e_resp = [line.strip()[:-1] for line in resp[resp.index("public enum Emoji {") + len("public enum Emoji {"):resp.index("private static final Emoji[] SORTED;")].strip().split("\n")]
+        e_data = {safe_eval(words[0]).encode("utf-16", "surrogatepass").decode("utf-16"): safe_eval(words[2][:-1]) for emoji in e_resp for words in (emoji.strip(";")[emoji.index("\\u") - 1:].split(","),) if words[2][:-1].strip() != "null"}
+        emoji_translate = {k: v for k, v in e_data.items() if len(k) == 1}
+        emoji_replace = {k: v for k, v in e_data.items() if len(k) > 1}
+        em_trans = "".maketrans(emoji_translate)
+
+def translate_emojis(s):
+    return s.translate(em_trans)
+
+def replace_emojis(s):
+    for emoji, url in emoji_replace.items():
+        if emoji in s:
+            s = s.replace(emoji, url)
+    return s
+
+def find_emojis_ex(s):
+    out = deque()
+    for emoji, url in emoji_replace.items():
+        if emoji in s:
+            out.append(url)
+    return set(out)
+
+create_future_ex(load_emojis, priority=True)
+
+
 # Stores and manages timezones information.
 TIMEZONES = cdict()
 
 def load_timezones():
-    with open("misc/timezones.txt", "rb") as f:
-        data = f.read().decode("utf-8", "replace")
-        for line in data.splitlines():
-            info = line.split("\t")
-            abb = info[0].casefold()
-            if len(abb) >= 3 and (abb not in TIMEZONES or "(unofficial)" not in info[1]):
-                temp = info[-1].replace("\\", "/")
-                curr = sorted([round((1 - (i[3] == "−") * 2) * (time_parse(i[4:]) if ":" in i else float(i[4:]) * 60) * 60) for i in temp.split("/") if i.startswith("UTC")])
-                if len(curr) == 1:
-                    curr = curr[0]
-                TIMEZONES[abb] = curr
+    with tracebacksuppressor():
+        with open("misc/timezones.txt", "rb") as f:
+            data = f.read().decode("utf-8", "replace")
+            for line in data.splitlines():
+                info = line.split("\t")
+                abb = info[0].casefold()
+                if len(abb) >= 3 and (abb not in TIMEZONES or "(unofficial)" not in info[1]):
+                    temp = info[-1].replace("\\", "/")
+                    curr = sorted([round((1 - (i[3] == "−") * 2) * (time_parse(i[4:]) if ":" in i else float(i[4:]) * 60) * 60) for i in temp.split("/") if i.startswith("UTC")])
+                    if len(curr) == 1:
+                        curr = curr[0]
+                    TIMEZONES[abb] = curr
 
 def is_dst(dt=None, timezone="UTC"):
     if dt is None:

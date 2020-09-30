@@ -719,7 +719,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Follows a message link, replacing emojis and user mentions with their icon URLs.
     async def follow_to_image(self, url):
-        temp = find_urls(url)
+        temp = find_urls(translate_emojis(url))
         if temp:
             return temp
         users = find_users(url)
@@ -743,6 +743,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     if resp.status_code >= 400:
                         url = url[:-3] + "png"
             out.append(url)
+        if not out:
+            return find_emojis_ex(url)
         return out
 
         # Sends a message to a channel, then edits to add links to all attached files.
@@ -799,7 +801,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def attachment_from_file(self, file):
         a_id = int(file.split(".")[0][11:])
         self.cache.attachments[a_id] = a_id
-        return data
     
     async def get_attachment(self, url):
         if is_discord_url(url) and "attachments/" in url[:64]:
@@ -2492,8 +2493,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 create_task(self.get_ip())
                 if not self.started:
                     self.started = True
+                    attachments = sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: os.path.getmtime("cache/" + file))
                     for file in attachments:
-                        self.attachment_from_file(file)
+                        with tracebacksuppressor():
+                            self.attachment_from_file(file)
                     print("Loading imported modules...")
                     # Wait until all modules have been loaded successfully
                     while self.modload:

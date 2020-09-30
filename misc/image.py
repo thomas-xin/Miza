@@ -1047,7 +1047,7 @@ def plt_special(d, user=None, **void):
 
 
 def from_bytes(b):
-    if b[:4] == b"<svg":
+    if b[:4] == b"<svg" or b[:5] == b"<?xml":
         resp = requests.post("https://www.svgtopng.me/api/svgtopng/upload-file", headers=header(), files={"files": ("temp.svg", b, "image/svg+xml"), "format": (None, "PNG"), "forceTransparentWhite": (None, "true"), "jpegQuality": (None, "256")})
         zipped = ZipFile(io.BytesIO(resp.content))
         out = io.BytesIO(zipped.open("temp.png").read())
