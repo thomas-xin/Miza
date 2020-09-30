@@ -1258,7 +1258,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                 if zipfile.is_zipfile(b):
                     b.seek(0)
                     z = ZipFile(b)
-                    s = zipped.open("DATA").read()
+                    s = z.open("DATA").read()
                     z.close()
                 data = None
                 with tracebacksuppressor:
