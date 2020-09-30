@@ -32,7 +32,10 @@ Dario Alpern
 -Integer factorization calculator: {https://github.com/alpertron/calculators}
 
 https://www.ofoct.com/audio-converter/convert-wav-or-mp3-ogg-aac-wma-to-midi.html
--Used by the audio to midi converter
+-Used by the ogg to midi converter
+
+https://www.svgtopng.me/
+-Used by the svg to png converter
 
 https://www.djtech.net/humor/useless_facts.htm
 https://github.com/sameerkumar18/useless-facts-api

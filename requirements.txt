@@ -19,6 +19,5 @@ pytube3>=9.6.4
 python-dateutil>=2.8.1
 requests>=2.24.0
 rule34>=1.6.0
-svglib>=1.0.1
 sympy>=1.6.2
 youtube-dl>=2020.9.20

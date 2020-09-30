@@ -4,7 +4,7 @@ import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, t
 import numpy as np
 import PIL
 from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
-from svglib.svglib import svg2rlg
+from zipfile import ZipFile
 from reportlab.graphics import renderPM
 import matplotlib.pyplot as plt
 
@@ -56,6 +56,12 @@ is_discord_url = lambda url: discord_match.findall(url)
 
 fcache = "cache" if os.path.exists("cache") else "../cache"
 
+def header():
+    return {
+        "DNT": "1",
+        "user-agent": f"Mozilla/5.{int(time.time() * 1000) % 10}",
+    }
+
 def get_request(url):
     if is_discord_url(url) and "attachments/" in url[:64]:
         try:
@@ -68,7 +74,7 @@ def get_request(url):
                 with open(fn, "rb") as f:
                     file_print(f"Attachment {a_id} loaded from cache.")
                     return f.read()
-    with requests.get(url, stream=True, timeout=12) as resp:
+    with requests.get(url, headers=header(), stream=True, timeout=12) as resp:
         return resp.content
 
 
@@ -917,10 +923,10 @@ def remove_matte(image, colour):
                 col = cell[:t] - r * col
                 if max(col) > 0:
                     ratio = sum(cell) / max(col)
-                    cell[:t] = col
+                    cell[:t] = np.clip(col * ratio, 0, 255)
                     cell[3] /= ratio
                 else:
-                    cell[3] *= 1 - r
+                    cell[3] = 0
     image = Image.fromarray(arr.astype(np.uint8))
     return image
 
@@ -1042,10 +1048,9 @@ def plt_special(d, user=None, **void):
 
 def from_bytes(b):
     if b[:4] == b"<svg":
-        drawing = svg2rlg(io.BytesIO(b))
-        out = io.BytesIO()
-        renderPM.drawToFile(drawing, out, fmt="PNG")
-        out.seek(0)
+        resp = requests.post("https://www.svgtopng.me/api/svgtopng/upload-file", headers=header(), files={"files": ("temp.svg", b, "image/svg+xml"), "format": (None, "PNG"), "forceTransparentWhite": (None, "true"), "jpegQuality": (None, "256")})
+        zipped = ZipFile(io.BytesIO(resp.content))
+        out = io.BytesIO(zipped.open("temp.png").read())
     elif b[:4] == b"%PDF":
         return ImageSequence(*pdf2image.convert_from_bytes(b, poppler_path="misc/poppler", use_pdftocairo=True))
     else:
