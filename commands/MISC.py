@@ -513,7 +513,7 @@ class UpdateDogpiles(Database):
 
 
 class MathQuiz(Command):
-    name = ["MathTest"]
+    name = ["MathTest", "mq"]
     min_level = 1
     description = "Starts a math quiz in the current channel."
     usage = "<mode(easy)(hard)> <disable(?d)>"
