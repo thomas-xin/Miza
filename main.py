@@ -40,7 +40,7 @@ def delete(f):
     while os.path.exists(f):
         try:
             os.remove(f)
-            break
+            return
         except:
             traceback.print_exc()
         time.sleep(1)

@@ -334,7 +334,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         return call
 
     # Init takes arguments and casts to a deque if possible, else generates as a single value. Allocates space equal to 3 times the length of the input iterable.
-    def __init__(self, *args, **void):
+    def __init__(self, *args, fromarray=False, **void):
         self.block = True if not getattr(self, "block", None) else 2
         self.hash = None
         self.frozenset = None
@@ -352,7 +352,14 @@ custom list-like data structure that incorporates the functionality of numpy arr
         if issubclass(type(iterable), self.__class__) and iterable:
             self.offs = iterable.offs
             self.size = iterable.size
-            self.data = iterable.data.copy()
+            if fromarray:
+                self.data = iterable.data
+            else:
+                self.data = iterable.data.copy()
+        elif fromarray:
+            self.offs = 0
+            self.size = len(iterable)
+            self.data = iterable
         else:
             if not issubclass(type(iterable), collections.abc.Sequence) or issubclass(type(iterable), collections.abc.Mapping) or type(iterable) in (str, bytes):
                 try:
@@ -736,8 +743,33 @@ custom list-like data structure that incorporates the functionality of numpy arr
             if type(key) is int:
                 key = key % self.size
                 return self.view.__getitem__(key)
-            return self.__class__(self.view.__getitem__(key))
-        return self.__class__(self.view.__getitem__(*args))
+            if type(key) is slice:
+                if key.step in (None, 1):
+                    start = key.start
+                    if start is None:
+                        start = 0
+                    stop = key.stop
+                    if stop is None:
+                        stop = self.size
+                    if start >= self.size or stop <= start and (stop >= 0 or stop + self.size <= start):
+                        return self.__class__()
+                    temp = self.__class__(self, fromarray=True)
+                    if start < 0:
+                        if start < -self.size:
+                            start = 0
+                        else:
+                            start %= self.size
+                    if stop < 0:
+                        stop %= self.size
+                    elif stop > self.size:
+                        stop = self.size
+                    temp.offs += start
+                    temp.size = stop - start
+                    if not temp.size:
+                        return self.__class__()
+                    return temp
+            return self.__class__(self.view.__getitem__(key), fromarray=True)
+        return self.__class__(self.view.__getitem__(*args), fromarray=True)
 
     # Takes ints, slices and iterables for indexing
     @blocking

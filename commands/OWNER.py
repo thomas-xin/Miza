@@ -259,7 +259,7 @@ class UpdateExec(Database):
                                 if spl[0].isalnum():
                                     spl.pop(0)
                                 proc = "\n".join(spl)
-                            proc = proc.strip("`")
+                            proc = proc.strip("`").strip()
                         if not proc:
                             return
                         with suppress(KeyError):
