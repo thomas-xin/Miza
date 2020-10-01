@@ -759,13 +759,6 @@ class AudioQueue(alist):
     def update_load(self):
         q = self
         if q:
-            if len(q) > self.maxitems + 2048:
-                q.__init__(q[1 - self.maxitems:].appendleft(q[0]))
-            elif len(q) > self.maxitems:
-                q.rotate(-1)
-                while len(q) > self.maxitems:
-                    q.pop()
-                q.rotate(1)
             dels = deque()
             for i, e in enumerate(q):
                 if i >= len(q) or i > 8191:
@@ -883,6 +876,8 @@ class AudioQueue(alist):
 
     # Enqueue items at target position, starting audio playback if queue was previously empty.
     def enqueue(self, items, position):
+        if len(items) > self.maxitems:
+            items = items[:self.maxitems]
         if not self:
             self.__init__(items)
             self.auds.source = None
@@ -894,6 +889,13 @@ class AudioQueue(alist):
             self.rotate(-position)
             self.extend(items)
             self.rotate(len(items) + position)
+        if len(self) > self.maxitems + 2048:
+            self.__init__(self[1 - self.maxitems:].appendleft(self[0]), fromarray=True)
+        elif len(self) > self.maxitems:
+            self.rotate(-1)
+            while len(self) > self.maxitems:
+                self.pop()
+            self.rotate(1)
         return self
 
 
