@@ -2,6 +2,7 @@ antlr4-python3-runtime>=4.8
 asyncio>=3.4.3
 blend-modes>=2.1.0
 bs4>=0.0.1
+colormath>=3.0.0
 discord.py>=1.4.1
 googletrans>=3.0.0
 knackpy>=1.0.9
