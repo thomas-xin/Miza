@@ -19,31 +19,23 @@ def pull_e621(argv, delay=5):
     try:
         v1, v2 = 1, 1
         items = argv.replace(" ", "%20").casefold()
-        baseurl = "https://e621.net/post/index/"
-        url = baseurl + "1/" + items
+        baseurl = "https://e621.net/posts?tags="
+        url = baseurl + items
         s = Request(url, decode=True)
         with suppress(ValueError):
-            ind = s.index('class="next_page" rel="next"')
-            s = s[ind - 90:ind]
-            d = s.split(" ")
-            i = -1
-            while True:
-                if "</a>" in d[i]:
-                    break
-                i -= 1
-            u = d[i][:-4]
-            u = u[u.index(">") + 1:]
-            v1 = xrand(1, int(u))
-
-            url = baseurl + str(v1) + "/" + items
-            s = Request(url, decode=True)
+            i = s.index("</a></li><li class='arrow'><a rel=\"next\"")
+            sx = s[:i]
+            ri = sx.rindex(">")
+            pages = int(sx[ri + 1:])
+            v1 = xrand(1, pages + 1)
+            s = Request(f"{url}&page={v1}", decode=True)
 
         with suppress(ValueError):
             limit = s.index('class="next_page" rel="next"')
             s = s[:limit]
 
-        search = '<a href="/post/show/'
-        sources = []
+        search = ' data-file-url="'
+        sources = deque()
         with suppress(ValueError):
             while True:
                 ind1 = s.index(search)
@@ -51,24 +43,13 @@ def pull_e621(argv, delay=5):
                 ind2 = s.index('"')
                 target = s[:ind2]
                 with suppress(ValueError):
-                    sources.append(int(target))
-        x = None
-        while not x:
+                    sources.append(target)
+        sources = list(sources)
+        for _ in loop(8):
             v2 = xrand(len(sources))
-            x = sources[v2]
-            found = False
-            url = "https://e621.net/post/show/" + str(x)
-            s = Request(url, decode=True)
-            search = '<a href="https://static1.e621.net/data/'
-            ind1 = s.index(search)
-            s = s[ind1 + 9:]
-            ind2 = s.index('"')
-            s = s[:ind2]
-            url = s
+            url = sources[v2]
             if is_image(url) is not None:
-                found = True
-            if not found:
-                x = None
+                break
         return [url, v1, v2 + 1]
     except:
         if LOG:
