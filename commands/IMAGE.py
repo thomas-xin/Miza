@@ -298,7 +298,7 @@ class CreateEmoji(Command):
     min_level = 2
     description = "Creates a custom emoji from a URL or attached file."
     usage = "<1:name> <0:url{attached_file}>"
-    flags = "ae"
+    flags = "aed"
     no_parse = True
     rate_limit = (3, 4)
     _timeout_ = 3
@@ -1334,15 +1334,15 @@ class UpdateReacts(Database):
                 reacting = {}
                 for k in following:
                     if is_alphanumeric(k) and " " not in k:
-                        words = text.split(" ")
+                        words = text.split()
                     else:
-                        words = message.content.casefold()
+                        words = full_prune(message.content)
                     if k in words:
                         emojis = following[k]
                         # Store position for each keyword found
                         reacting[words.index(k) / len(words)] = emojis
                 # Reactions sorted by their order of appearance in the message
-                for r in sorted(list(reacting)):
+                for r in sorted(reacting):
                     for react in reacting[r]:
                         try:
                             await message.add_reaction(react)

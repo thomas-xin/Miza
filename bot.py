@@ -195,18 +195,24 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     async def get_first_sendable(self, guild, member):
         if member is None:
             return guild.owner
+        found = {}
+        for channel in sorted(guild.text_channels, key=lambda c: c.id):
+            if channel.permissions_for(member).send_messages:
+                with suppress(ValueError):
+                    rname = full_prune(channel.name).replace("-", " ").replace("_", " ").split()[0]
+                    i = ("miza", "bots", "bot", "general").index(rname)
+                    if i < min(found):
+                        found[i] = channel
+        if found:
+            return found[min(found)]
         channel = guild.system_channel
         if channel is None or not channel.permissions_for(member).send_messages:
             channel = guild.rules_channel
             if channel is None or not channel.permissions_for(member).send_messages:
-                found = False
-                if guild.text_channels:
-                    for channel in guild.text_channels:
-                        if channel.permissions_for(member).send_messages:
-                            found = True
-                            break
-                if not found:
-                    return guild.owner
+                for channel in sorted(guild.text_channels, key=lambda c: c.id):
+                    if channel.permissions_for(member).send_messages:
+                        return channel
+                return guild.owner
         return channel
 
     # Returns a discord object if it is in any of the internal cache.
@@ -1886,8 +1892,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             tc = getattr(command, "time_consuming", False)
                             if not loop and tc:
                                 fut = create_task(channel.trigger_typing())
-                            # Send bot event: user has executed command
-                            await self.send_event("_command_", user=user, command=command)
                             # Get maximum time allowed for command to process
                             timeout = getattr(command, "_timeout_", 1) * bot.timeout
                             if timeout >= inf:
@@ -1913,6 +1917,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             if fut is None and not hasattr(command, "typing"):
                                 create_task(delayed_callback(future, 2, typing, channel))
                             response = await future
+                            # Send bot event: user has executed command
+                            await self.send_event("_command_", user=user, command=command, loop=loop, message=message)
                             # Process response to command if there is one
                             if response is not None:
                                 if fut is not None:

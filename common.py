@@ -430,6 +430,9 @@ find_emojis = lambda s: regexp("<.?:[^<>:]+:[0-9]+>").findall(s)
 find_users = lambda s: regexp("<@!?[0-9]+>").findall(s)
 
 
+def get_message_length(message):
+    return len(message.system_content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
+
 # Returns a string representation of a message object.
 def message_repr(message, limit=1024, username=False):
     c = message.content

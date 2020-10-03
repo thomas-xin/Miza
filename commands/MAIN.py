@@ -376,7 +376,7 @@ class Avatar(Command):
                                 break
                             try:
                                 p = bot.get_mimic(u_id, user)
-                                embs.add(self.getMimicData(p, flags))
+                                embs.add(self.getMimicData(p))
                             except:
                                 pass
                             else:
@@ -411,7 +411,7 @@ class Avatar(Command):
 
 
 class Info(Command):
-    name = ["UserInfo", "ServerInfo", "WhoIs", "Profile"]
+    name = ["UserInfo", "ServerInfo", "WhoIs"]
     min_level = 0
     description = "Shows information about the target user or server."
     usage = "<*objects> <verbose(?v)>"
@@ -1328,9 +1328,6 @@ class UpdateReminders(Database):
 class UpdateMessageCount(Database):
     name = "counts"
 
-    def getMessageLength(self, message):
-        return len(message.system_content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
-
     def startCalculate(self, guild):
         self.data[guild.id] = {"counts": {}, "totals": {}, "oldest": {}}
         create_task(self.getUserMessageCount(guild))
@@ -1376,7 +1373,7 @@ class UpdateMessageCount(Database):
                     return 0
                 messages = await channel.history(limit=None).flatten()
                 gen = tuple(m for m in messages if m.author.id != c_id)
-                avg = sum(self.getMessageLength(m) for m in gen) / len(gen)
+                avg = sum(get_message_length(m) for m in gen) / len(gen)
                 return avg
             if guild.id in self.data:
                 d = self.data[guild.id]
@@ -1459,7 +1456,7 @@ class UpdateMessageCount(Database):
                 orig_id = oldest.get(u)
                 if not orig_id or message.id < orig_id:
                     oldest[u] = message.id
-                length = self.getMessageLength(message)
+                length = get_message_length(message)
                 try:
                     data[u] += 1
                     avgs[u] += length
@@ -1507,7 +1504,7 @@ class UpdateMessageCount(Database):
                 if user.id not in set_dict(d, "oldest", {}):
                     d["oldest"][user.id] = message.id
                 count = d["counts"].get(user.id, 0) + 1
-                total = d["totals"].get(user.id, 0) + self.getMessageLength(message)
+                total = d["totals"].get(user.id, 0) + get_message_length(message)
                 d["totals"][user.id] = total
                 d["counts"][user.id] = count
                 self.update()
@@ -1752,6 +1749,7 @@ class UpdateUsers(Database):
 
     def _offline_(self, user, **void):
         set_dict(self.data, user.id, {})["last_offline"] = utc()
+        self.update()
 
     # User seen, add event to activity database
     def _seen_(self, user, delay, event, count=1, raw=None, **void):
@@ -1759,14 +1757,38 @@ class UpdateUsers(Database):
         add_dict(self.data, {user.id: {"last_seen": 0}})
         self.data[user.id]["last_seen"] = utc() + delay
         self.data[user.id]["last_action"] = raw
+        self.update()
 
     # User executed command, add to activity database
-    def _command_(self, user, command, **void):
+    def _command_(self, user, loop, command, **void):
         self.send_event(user.id, "command")
         add_dict(self.data, {user.id: {"commands": {command.__name__: 1}}})
         self.data[user.id]["last_used"] = utc()
         self.data.get(user.id, EMPTY).pop("last_mention", None)
-        self.update()
+        if not loop:
+            self.add_xp(user, getattr(command, "xp", xrand(6, 14)))
+    
+    def _send_(self, message, **void):
+        user = message.author
+        size = get_message_length(message)
+        points = math.sqrt(size) + len(message.content.split())
+        if points >= 8:
+            typing = self.data.get(user.id, EMPTY).get("last_typing", None)
+            if typing is None:
+                set_dict(self.data, user.id, {})["last_typing"] = inf
+            elif typing >= inf:
+                return
+            else:
+                self.data[user.id].pop("last_typing", None)
+        else:
+            self.data[user.id].pop("last_typing", None)
+        if not xrand(1000):
+            self.add_diamonds(user, points)
+            points *= 1000
+            create_task(message.add_reaction("✨"))
+        else:
+            self.add_gold(user, points)
+        self.add_xp(user, points)
 
     async def _mention_(self, user, message, msg, **void):
         bot = self.bot
@@ -1784,7 +1806,52 @@ class UpdateUsers(Database):
             await bot.seen(user, event="misc", raw="Being naughty")
             add_dict(self.data, {user.id: {"last_mention": 1}})
             self.data[user.id]["last_used"] = t
+            self.update()
             raise CommandCancelledError
+
+    def get_xp(self, user):
+        if user.id == self.bot.id:
+            if self.data.get(self.bot.id, EMPTY).get("xp", 0) != inf:
+                set_dict(self.data, self.bot.id, {})["xp"] = inf
+                self.data[self.bot.id]["gold"] = inf
+                self.data[self.bot.id]["diamonds"] = inf
+                self.update()
+            return inf
+        return self.data.get(user.id, EMPTY).get("xp", 0)
+
+    def xp_to_level(self, xp):
+        if is_finite(xp):
+            return int((xp * 3 / 2000) ** (2 / 3)) + 1
+        return xp
+    
+    def xp_to_next(self, level):
+        if is_finite(level):
+            return ceil(math.sqrt(level - 1) * 1000)
+        return level
+    
+    def xp_required(self, level):
+        if is_finite(level):
+            return ceil((level - 1) ** 1.5 * 2000 / 3)
+        return level
+
+    def add_xp(self, user, amount):
+        if user.id != self.bot.id:
+            add_dict(set_dict(self.data, user.id, {}), {"xp": amount})
+            self.update()
+    
+    def add_gold(self, user, amount):
+        if user.id != self.bot.id:
+            add_dict(set_dict(self.data, user.id, {}), {"gold": amount})
+            self.update()
+
+    def add_diamonds(self, user, amount):
+        if user.id != self.bot.id:
+            add_dict(set_dict(self.data, user.id, {}), {"diamonds": amount})
+            self.update()
+
+    async def _typing_(self, user, **void):
+        set_dict(self.data, user.id, {})["last_typing"] = utc()
+        self.update()
 
     async def _nocommand_(self, message, msg, force=False, **void):
         bot = self.bot
@@ -1925,7 +1992,9 @@ class UpdateUsers(Database):
             self.data[user.id]["last_used"] = utc()
             await send(out)
             await bot.seen(user, event="misc", raw="Talking to me")
+            self.add_xp(user, xrand(12, 20))
         else:
             if not self.data.get(user.id, EMPTY).get("last_mention") and random.random() > 0.6:
                 self.data.get(user.id, EMPTY).pop("last_talk", None)
             self.data.get(user.id, EMPTY).pop("last_mention", None)
+        self.update()

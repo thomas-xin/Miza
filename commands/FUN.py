@@ -258,6 +258,7 @@ class Text2048(Command):
                     create_task(message.add_reaction(react.decode("utf-8")))
             g = ND2048(*size, flags=mode)
             data = g.serialize()
+            score = 0
         else:
             # Get direction of movement
             data = "-".join(spl).encode("utf-8")
@@ -265,6 +266,7 @@ class Text2048(Command):
             if reac not in self.directions:
                 return
             r = self.directions[reac]
+            score = 0
             try:
                 # Undo action only works in easy mode
                 if r == -1:
@@ -277,12 +279,14 @@ class Text2048(Command):
                 # Random moves
                 elif r == -2:
                     g = ND2048.load(data)
+                    score = g.score()
                     if not g.move(-1, count=16):
                         return
                     data = g.serialize()
                 # Regular moves; each dimension has 2 possible moves
                 elif r >> 1 < len(size):
                     g = ND2048.load(data)
+                    score = g.score()
                     if not g.move(r >> 1, r & 1):
                         return
                     data = g.serialize()
@@ -313,7 +317,17 @@ class Text2048(Command):
                 emb.set_author(**get_author(u))
             content = "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + data.decode("utf-8") + "\nPlaying 2048...```*"
             emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
-            emb.set_footer(text="Score: " + str(g.score()))
+            fscore = g.score()
+            if score is not None:
+                xp = max(0, fscore - score) * 16 / np.prod(g.data.shape)
+                if mode & 1:
+                    xp /= math.sqrt(2)
+                elif mode & 2:
+                    xp /= 2
+                elif mode & 4:
+                    xp /= 3
+                bot.database.users.add_xp(user, xp)
+            emb.set_footer(text=f"Score: {fscore}")
             await message.edit(content=content, embed=emb)
 
     async def __call__(self, bot, argv, args, user, flags, guild, **void):
@@ -354,6 +368,151 @@ class Text2048(Command):
         if "e" in flags:
             mode |= 1
         return "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "\nStarting Game...```*"
+
+    
+class SlotMachine(Command):
+    name = ["Slots"]
+    min_level = 0
+    description = "Plays a slot machine game."
+    usage = "<bet[100]>"
+    rate_limit = 3
+    emojis = {
+        "❤️": 20,
+        "🍒": 6,
+        "💎": None,
+        "🍎": 4,
+        "🍇": 5,
+        "🍋": 2,
+        "🍉": 1,
+        "🍌": 3,
+    }
+
+    def select(self):
+        x = random.random()
+        if x < 1 / 32:
+            return "💎"
+        elif x < 3 / 32:
+            return "❤️"
+        return choice("🍒🍎🍇🍋🍉🍌")
+
+    def generate(self, count=3):
+        x = random.random()
+        if x < 1 / 4:
+            count = 3
+        elif x < 7 / 12:
+            count = 2
+        else:
+            count = 1
+        out = hlist([self.select()] * count)
+        while len(out) < 3:
+            out.append(choice(self.emojis))
+        return shuffle(out)
+
+    async def as_emojis(self, wheel):
+        out = ""
+        for item in wheel:
+            if item is None:
+                out += await create_future(self.bot.database.emojis.emoji_as, "slot_machine.gif")
+            else:
+                out += item
+        return out
+
+    async def __call__(self, argv, user, **void):
+        if argv:
+            bet = await self.bot.eval_math(argv, user)
+            if bet < 100:
+                raise ValueError("Minimum bet is 100 coins.")
+        else:
+            bet = 100
+        if bet > self.bot.data.users.get(user.id, {}).get("gold", 0):
+            raise OverflowError("Bet cannot be greater than your balance.")
+        self.bot.database.users.add_gold(user, -bet)
+        return f"*```callback-fun-slotmachine-{user.id}_{bet}-\nLoading Slot Machine...```*"
+
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, bet = [int(i) for i in vals.split("_")]
+        if reaction is None or reaction.decode("utf-8", "replace") == "⤵️":
+            if reaction is None:
+                create_task(message.add_reaction("⤵️"))
+                user = await bot.fetch_user(u_id)
+            else:
+                if bet > self.bot.data.users.get(user.id, {}).get("gold", 0):
+                    raise OverflowError("Bet cannot be greater than your balance.")
+                self.bot.database.users.add_gold(user, -bet)
+            wheel_true = self.generate()
+            wheel_display = [None] * 3
+            wheel_order = deque(shuffle(range(3)))
+            emb = discord.Embed(colour=rand_colour()).set_author(**get_author(user))
+            async with delay(2):
+                emoj = await self.as_emojis(wheel_display)
+                gold = self.bot.data.users.get(user.id, {}).get("gold", 0)
+                emb.description = f"```css\n[Slot Machine]```{emoj}\nBet: 🪙 {bet}\nBalance: 🪙 {int(gold)}"
+                await message.edit(content=None, embed=emb)
+            while wheel_order:
+                async with delay(1):
+                    i = wheel_order.popleft()
+                    wheel_display[i] = wheel_true[i]
+                    if not wheel_order:
+                        gold = diamonds = 0
+                        start = f"```callback-fun-slotmachine-{user.id}_{bet}-\n"
+                        if wheel_true[0] == wheel_true[1] == wheel_true[2]:
+                            gold = self.emojis[wheel_true[0]]
+                            if gold is None:
+                                diamonds = bet
+                            else:
+                                gold *= bet
+                        rewards = deque()
+                        if diamonds:
+                            bot.database.users.add_diamonds(user, diamonds)
+                            rewards.append(f"💎 {int(diamonds)}")
+                        if gold:
+                            bot.database.users.add_gold(user, gold)
+                            rewards.append(f"🪙 {int(gold)}")
+                        if not rewards:
+                            rewards = "None 😔"
+                        else:
+                            rewards = "\n".join(rewards)
+                        end = f"\nRewards:\n{rewards}\n"
+                    else:
+                        start = "```ini\n"
+                        end = ""
+                    emoj = await self.as_emojis(wheel_display)
+                    gold = self.bot.data.users.get(user.id, {}).get("gold", 0)
+                    emb.description = f"{start}[Slot Machine]```{emoj}\nBet: 🪙 {bet}\nBalance: 🪙 {int(gold)}{end}"
+                    await message.edit(embed=emb)
+            return await message.edit(embed=emb)
+
+
+class Profile(Command):
+    name = ["Balance", "Wallet"]
+    min_level = 0
+    description = "Shows the target users' profile."
+    usage = "<*objects>"
+    rate_limit = 1
+    multi = True
+
+    async def __call__(self, bot, args, argv, argl, user, guild, channel, **void):
+        users = await bot.find_users(argl, args, user, guild)
+        if not users:
+            raise LookupError("No results found.")
+        for user in users:
+            data = bot.data.users.get(user.id, {})
+            xp = bot.database.users.get_xp(user)
+            level = bot.database.users.xp_to_level(xp)
+            xp_curr = bot.database.users.xp_required(level)
+            xp_next = bot.database.users.xp_required(level + 1)
+            ratio = (xp - xp_curr) / (xp_next - xp_curr)
+            gold = data.get("gold", 0)
+            diamonds = data.get("diamonds", 0)
+            bar = await bot.create_progress_bar(18, ratio)
+            with suppress(OverflowError):
+                xp = int(xp)
+            with suppress(OverflowError):
+                diamonds = int(diamonds)
+            with suppress(OverflowError):
+                gold = int(gold)
+            description = f"{bar}\n`Lv {level}`\n`XP {xp}/{xp_next}`\n💎 {diamonds}\n🪙 {gold}"
+            bot.send_as_embeds(channel, description, thumbnail=best_url(user), author=get_author(user), colour=xrand(1536))
 
 
 class MimicConfig(Command):
@@ -704,6 +863,7 @@ class MimicSend(Command):
                 await wait_on_none(bot.send_as_webhook(channel, msg, username=name, avatar_url=url, tts=tts))
                 mimic.count += 1
                 mimic.total += len(msg)
+                bot.database.users.add_xp(user, math.sqrt(len(msg)) * 2)
             create_task(message.add_reaction("👀"))
 
 
@@ -769,6 +929,7 @@ class UpdateMimics(Database):
                             await wait_on_none(bot.send_as_webhook(channel, msg, username=name, avatar_url=url, tts=tts))
                             mimic.count += 1
                             mimic.total += len(k.msg)
+                            bot.database.users.add_xp(user, math.sqrt(len(msg)) * 2)
 
     async def updateMimic(self, mimic, guild=None, it=None):
         if set_dict(mimic, "auto", None):

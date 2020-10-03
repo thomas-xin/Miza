@@ -454,10 +454,18 @@ class UpdateEmojis(Database):
         self.bot.cache.emojis[emoji.id] = emoji
         return emoji
 
+    def convert(self, emoji):
+        if emoji.animated:
+            return f"<a:_:{emoji.id}>"
+        return f"<:_:{emoji.id}>"
+
+    def emoji_as(self, s):
+        return self.convert(self.get(s))
+
     def create_progress_bar(self, length, ratio):
-        start_bar = [str(self.get(f"start_bar_{i}.gif")) for i in range(5)]
-        mid_bar = [str(self.get(f"mid_bar_{i}.gif")) for i in range(5)]
-        end_bar = [str(self.get(f"end_bar_{i}.gif")) for i in range(5)]
+        start_bar = [self.emoji_as(f"start_bar_{i}.gif") for i in range(5)]
+        mid_bar = [self.emoji_as(f"mid_bar_{i}.gif") for i in range(5)]
+        end_bar = [self.emoji_as(f"end_bar_{i}.gif") for i in range(5)]
         high = length * 4
         position = min(high, round(ratio * high))
         items = deque()
