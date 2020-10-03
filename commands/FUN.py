@@ -403,7 +403,7 @@ class SlotMachine(Command):
             count = 2
         else:
             count = 1
-        out = hlist([self.select()] * count)
+        out = alist([self.select()] * count)
         while len(out) < 3:
             out.append(choice(self.emojis))
         return shuffle(out)

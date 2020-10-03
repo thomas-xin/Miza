@@ -75,9 +75,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             owner_id = auth["owner_id"]
             if type(owner_id) not in (list, tuple):
                 owner_id = (owner_id,)
-            self.owners = hlist(int(i) for i in owner_id)
+            self.owners = alist(int(i) for i in owner_id)
         except KeyError:
-            self.owners = hlist()
+            self.owners = alist()
             print("WARNING: owner_id not found. Unable to locate owner.")
         # Initialize rest of bot variables
         self.proc = PROC
