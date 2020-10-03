@@ -344,7 +344,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 members.add(user)
         return members
 
-    async def query_members(self, members, query):
+    async def query_members(self, members, query, fuzzy=1 / 3):
         if type(query) is not str:
             query = str(query)
         with suppress(LookupError):
@@ -369,18 +369,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 qkey=userQuery3,
                 ikey=userIter3,
             )
-        with suppress(LookupError):
-            return await str_lookup(
-                members,
-                query,
-                qkey=userQuery4,
-                ikey=userIter4,
-                fuzzy=1 / 3,
-            )
+        if fuzzy is not None:
+            with suppress(LookupError):
+                return await str_lookup(
+                    members,
+                    query,
+                    qkey=userQuery4,
+                    ikey=userIter4,
+                    fuzzy=fuzzy,
+                )
         raise LookupError(f"No results for {query}.")
 
     # Fetches a member in the target server by ID or name lookup.
-    async def fetch_member_ex(self, u_id, guild=None, allow_banned=True):
+    async def fetch_member_ex(self, u_id, guild=None, allow_banned=True, fuzzy=1 / 3):
         if type(u_id) is not int:
             with suppress(TypeError, ValueError):
                 u_id = int(u_id)
@@ -399,7 +400,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if not members:
                     members = guild.members = await guild.fetch_members(limit=None)
                     guild._members.update({m.id: m for m in members})
-                return await self.query_members(members, u_id)
+                return await self.query_members(members, u_id, fuzzy=fuzzy)
         return member
 
     # Fetches the first seen instance of the target user as a member in any shared server.

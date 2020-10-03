@@ -458,7 +458,7 @@ class SlotMachine(Command):
                         if wheel_true[0] == wheel_true[1] == wheel_true[2]:
                             gold = self.emojis[wheel_true[0]]
                             if gold is None:
-                                diamonds = bet
+                                diamonds = bet / 5
                             else:
                                 gold *= bet
                         rewards = deque()
