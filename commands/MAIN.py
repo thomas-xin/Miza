@@ -231,6 +231,9 @@ class Prefix(Command):
     description = "Shows or changes the prefix for ⟨MIZA⟩'s commands for this server."
     usage = "<prefix[]> <default(?d)>"
     flags = "hd"
+    umap = {c: "" for c in ZeroEnc}
+    umap["\u200a"] = ""
+    utrans = "".maketrans(umap)
 
     def __call__(self, argv, guild, perm, bot, flags, **void):
         pref = bot.data.prefixes
@@ -247,6 +250,8 @@ class Prefix(Command):
             reason = f"to change command prefix for {guild}"
             raise self.perm_error(perm, req, reason)
         prefix = argv
+        if not prefix.isalnum():
+            prefix = prefix.translate(self.utrans)
         # Backslash is not allowed, it is used to escape commands normally
         if prefix.startswith("\\"):
             raise TypeError("Prefix must not begin with backslash.")
