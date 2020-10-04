@@ -1389,12 +1389,16 @@ class UpdateMessageCache(Database):
                     print(i)
         print(f"{len(data)} messages successfully loaded from file.")
 
-    async def load(self):
+    def getmtime(self):
         if os.path.exists(self.file):
-            t = os.path.getmtime(self.file)
-            if utc() - t < 3600:
-                create_task(self._load())
-                return datetime.datetime.fromtimestamp(t)
+            return os.path.getmtime(self.file)
+        return 0
+
+    async def load(self):
+        t = self.getmtime()
+        if utc() - t < 3600:
+            create_task(self._load())
+            return datetime.datetime.fromtimestamp(t)
 
     async def save(self):
         data = {}
@@ -1455,8 +1459,9 @@ class UpdateMessageLogs(Database):
                 time = await self.bot.database.message_cache.load()
             return [create_task(self.bot.database.counts.getGuildHistory(guild, lim, after=time, callback=self.callback)) for guild in self.bot.guilds]
 
-    async def _save_(self, **void):
-        await self.bot.database.message_cache.save()
+    async def _save_(self, force=False, **void):
+        if force or utc() - self.bot.database.message_cache.getmtime() > 120:
+            await self.bot.database.message_cache.save()
     
     def callback(self, messages, **void):
         create_future_ex(self.bot.update_from_client, priority=True)

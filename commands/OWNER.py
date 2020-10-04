@@ -33,13 +33,13 @@ class Restart(Command):
             # Restart announcements for when a time input is specified
             if "in" in argv:
                 argv = argv[argv.rindex("in") + 2:]
-            wait = await bot.eval_time(argv, user)
+            wait = await bot.eval_time(argv)
             await channel.send("*Preparing to " + name + " in " + sec2time(wait) + "...*")
             emb = discord.Embed(colour=discord.Colour(1))
             emb.set_author(name=str(bot.user), url=bot.website, icon_url=best_url(bot.user))
             emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(wait)}, apologies for any inconvenience..."
             await bot.send_event("_announce_", embed=emb)
-            save = create_task(bot.send_event("_save_"))
+            save = create_task(bot.send_event("_save_", force=True))
             if wait > 0:
                 await asyncio.sleep(wait)
         elif name == "shutdown":
@@ -49,7 +49,7 @@ class Restart(Command):
         with suppress(AttributeError):
             PRINT.close()
         if save is None:
-            save = create_task(bot.send_event("_save_"))
+            save = create_task(bot.send_event("_save_", force=False))
         async with delay(1):
             with discord.context_managers.Typing(channel):
                 # Call _destroy_ bot event to indicate to all databases the imminent shutdown
