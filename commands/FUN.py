@@ -652,15 +652,15 @@ class UpdateDailies(Database):
         for i in range(min(20, level + 5 >> 1)):
             q_id = xrand(12)
             if q_id == 0:
-                x = round((level * 10 + 100) * random.random() + 100)
-                q = cdict(name=f"Post {x} messages", gold=x * 10, progress=0, required=x, action="send")
+                x = round((level * 10 + 100) * random.random() + 70)
+                q = cdict(name=f"Post {x} messages", gold=x * 4, progress=0, required=x, action="send")
             elif q_id == 1:
                 q = cdict(name=f"Invite me to a server and/or react to the join message", diamonds=floor(10 + level / 5), progress=0, required=1, action="guild")
             elif q_id == 2:
                 q = cdict(name=f"Earn 1 diamond", gold=level * 50, action="diamond")
             elif q_id == 3:
                 x = round((level * 5 + 20) * random.random() + 20)
-                q = cdict(name=f"Use {x} commands", gold=x * 20, progress=0, required=x, action="command")
+                q = cdict(name=f"Use {x} commands", gold=x * 9, progress=0, required=x, action="command")
             elif q_id == 4:
                 x = round((level * 200 + 1000) * random.random() + 1000)
                 q = cdict(name=f"Earn {x} experience", gold=x >> 1, progress=0, required=x, action="xp")
@@ -672,19 +672,19 @@ class UpdateDailies(Database):
                 q = cdict(name=f"Send {x} total characters of text", gold=x >> 3, progress=0, required=x, action="text")
             elif q_id == 7:
                 x = round((level * 5 + 20) * random.random() + 20)
-                q = cdict(name=f"Add {x} reactions", gold=x * 8, progress=0, required=x, action="react")
+                q = cdict(name=f"Add {x} reactions", gold=x * 3, progress=0, required=x, action="react")
             elif q_id == 8:
                 x = round((level * 100 + 500) * random.random() + 400)
                 q = cdict(name=f"Pay {x} to other users", gold=x >> 1, progress=0, required=x, action="pay")
             elif q_id == 9:
                 x = round((level * 10 + 90) * random.random() + 80)
-                q = cdict(name=f"Type for {sec2time(x)}", gold=x * 3, progress=0, required=x, action="typing")
+                q = cdict(name=f"Type for {sec2time(x)}", gold=x * 2, progress=0, required=x, action="typing")
             elif q_id == 10:
                 x = xrand(10, 21)
-                q = cdict(name=f"Change your status {x} times", gold=x * 50, progress=0, required=x, action="status")
+                q = cdict(name=f"Change your status {x} times", gold=x * 10, progress=0, required=x, action="status")
             elif q_id == 11:
                 x = xrand(20, 41)
-                q = cdict(name=f"Talk to me {x} times", gold=x * 30, progress=0, required=x, action="talk")
+                q = cdict(name=f"Talk to me {x} times", gold=x * 12, progress=0, required=x, action="talk")
             quests.append(q)
         return quests.appendleft(cdict(name="Daily rewards", gold=level * 100 + 1000, progress=1, required=1, action=None))
 
