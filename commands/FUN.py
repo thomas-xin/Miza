@@ -587,7 +587,8 @@ class Daily(Command):
         data = bot.database.dailies.get(user)
         emb = discord.Embed(title="Daily Quests", colour=rand_colour()).set_author(**get_author(user))
         bal = await bot.database.users.get_balance(user)
-        emb.description = f"```callback-fun-daily-{user.id}-\n{len(data['quests'])} tasks available\n{sec2time(86400 - utc() + data['time'])} remaining```Balance: {bal}"
+        c = len(data['quests'])
+        emb.description = f"```callback-fun-daily-{user.id}-\n{c} task{'' if c == 1 else 's'} available\n{sec2time(86400 - utc() + data['time'])} remaining```Balance: {bal}"
         for field in data["quests"][:5]:
             bar = await bot.create_progress_bar(10, field.progress / field.required)
             rewards = await bot.as_rewards(field.get("diamonds", None), field.get("gold", None))
@@ -606,7 +607,8 @@ class Daily(Command):
         data = bot.database.dailies.collect(user)
         emb = discord.Embed(title="Daily Quests", colour=rand_colour()).set_author(**get_author(user))
         bal = await bot.database.users.get_balance(user)
-        emb.description = f"```callback-fun-daily-{user.id}-\n{len(data['quests'])} tasks available\n{sec2time(86400 - utc() + data['time'])} remaining```Balance: {bal}"
+        c = len(data['quests'])
+        emb.description = f"```callback-fun-daily-{user.id}-\n{c} task{'' if c == 1 else 's'} available\n{sec2time(86400 - utc() + data['time'])} remaining```Balance: {bal}"
         for field in data["quests"][:5]:
             bar = await bot.create_progress_bar(10, field.progress / field.required)
             rewards = await bot.as_rewards(field.get("diamonds", None), field.get("gold", None))
