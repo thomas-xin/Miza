@@ -266,6 +266,23 @@ class CommandCancelledError(RuntimeError):
     __slots__ = ()
 
 
+def zip2bytes(data):
+    if not hasattr(data, "read"):
+        data = io.BytesIO(data)
+    z = ZipFile(data, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
+    b = z.open("DATA").read()
+    z.close()
+    return b
+
+def bytes2zip(data):
+    b = io.BytesIO()
+    z = ZipFile(b, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
+    z.writestr("DATA", data=data)
+    z.close()
+    b.seek(0)
+    return b.read()
+
+
 # Safer than raw eval, more powerful than json.decode
 def eval_json(s):
     with suppress(json.JSONDecodeError):
@@ -1318,12 +1335,7 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                         # print("Pickling " + name + "...")
                         s = pickle.dumps(self.data)
                         if len(s) > 1048576:
-                            b = io.BytesIO()
-                            z = ZipFile(b, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-                            z.writestr("DATA", data=s)
-                            z.close()
-                            b.seek(0)
-                            s = b.read()
+                            s = bytes2zip(s)
                     else:
                         s = s.encode("utf-8")
                     with open(self.file, "wb") as f:

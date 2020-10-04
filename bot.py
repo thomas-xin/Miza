@@ -8,6 +8,8 @@ from common import *
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
 
+heartbeat_proc = psutil.Popen(["python", "misc/heartbeat.py"])
+
 
 # Main class containing all global bot data.
 class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collections.abc.Callable):
@@ -96,6 +98,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # Assign bot cache to global variables for convenience
         globals().update(self.cache)
         self.get_modules()
+        self.heartbeat_proc = heartbeat_proc
 
     __str__ = lambda self: str(self.user)
     __repr__ = lambda self: repr(self.user)
@@ -782,10 +785,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return message
 
     # Inserts a message into the bot cache, discarding existing ones if full.
-    def add_message(self, message):
+    def add_message(self, message, files=True):
         self.cache.messages[message.id] = message
         self.limit_cache("messages")
-        if message.author.id != self.id:
+        if message.author.id != self.id and files:
             if (utc_dt() - message.created_at).total_seconds() < 7200:
                 for attachment in message.attachments:
                     if getattr(attachment, "size", inf) < 1048576:
@@ -2343,6 +2346,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     await create_future(self.update, priority=True)
                     await create_future(self.update_from_guilds, priority=True)
 
+    # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
+    async def heartbeat_loop(self):
+        print("Heartbeat Loop initiated.")
+        with tracebacksuppressor:
+            while not self.closed:
+                d = await delayed_coro(create_future(os.path.exists, self.heartbeat, priority=True), 0.5)
+                if d:
+                    with tracebacksuppressor(FileNotFoundError):
+                        await create_future(os.remove, self.heartbeat, priority=True)
+
     # User seen event
     seen = lambda self, user, delay=0, event=None, **kwargs: create_task(self.send_event("_seen_", user=user, delay=delay, event=event, **kwargs))
 
@@ -2599,6 +2612,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     self.ready = True
                     # Send ready event to all databases.
                     await self.send_event("_ready_", bot=self)
+                    create_task(self.heartbeat_loop())
+                    await create_future(self.heartbeat_proc.kill)
                     print("Initialization complete.")
                 else:
                     for fut in futs:
@@ -2655,14 +2670,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 raw += f", {channel.guild}"
             await self.seen(user, event="reaction", raw=raw)
             if user.id != self.id:
-                reaction = str(payload.emoji)
-                await self.react_callback(message, reaction, user)
-                await self.check_to_delete(message, reaction, user)
                 if "users" in self.data:
                     self.database.users.add_xp(user, xrand(4, 7))
                     self.database.users.add_gold(user, xrand(1, 5))
                 if "dailies" in self.data:
                     self.database.dailies.progress_quests(user, "react")
+                reaction = str(payload.emoji)
+                await self.react_callback(message, reaction, user)
+                await self.check_to_delete(message, reaction, user)
 
         # Reaction remove event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
         @self.event
@@ -2695,10 +2710,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             # Check for users with a voice state.
             if after is not None and not after.afk:
                 if before is None:
-                    await self.seen(member, event="misc", raw=f"Joining a voice channel, {member.guild}")
                     if "users" in self.data:
-                        self.database.users.add_xp(after, xrand(60, 120))
-                        self.database.users.add_gold(after, xrand(20, 50))
+                        self.database.users.add_xp(after, xrand(6, 12))
+                        self.database.users.add_gold(after, xrand(2, 5))
+                    await self.seen(member, event="misc", raw=f"Joining a voice channel, {member.guild}")
                 elif any((getattr(before, attr) != getattr(after, attr) for attr in ("self_mute", "self_deaf", "self_stream", "self_video"))):
                     await self.seen(member, event="misc", raw=f"Updating their voice settings, {member.guild}")
 
@@ -2772,6 +2787,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     after._update(data)
             self.add_message(after)
             if raw or before.content != after.content:
+                if "users" in self.data:
+                    self.database.users.add_xp(after.author, xrand(1, 4))
                 await self.handle_message(after)
                 if getattr(after, "guild", None):
                     create_task(self.send_event("_edit_", before=before, after=after))
@@ -2866,9 +2883,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     member = None
                 if member is None or member.guild == after.guild:
                     if self.status_updated(before, after):
-                        await self.seen(after, event="misc", raw="Changing their status")
                         if "dailies" in self.data:
                             self.database.dailies.progress_quests(after, "status")
+                        await self.seen(after, event="misc", raw="Changing their status")
                     elif after.status == discord.Status.offline:
                         await self.send_event("_offline_", user=after)
 
@@ -2978,17 +2995,6 @@ def userIter4(x):
         yield to_alphanumeric(x.nick).replace(" ", "").casefold()
 
 
-# Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
-async def heartbeat_loop():
-    print("Heartbeat Loop initiated.")
-    with tracebacksuppressor:
-        while not bot.closed:
-            d = await delayed_coro(create_future(os.path.exists, bot.heartbeat, priority=True), 0.5)
-            if d:
-                with tracebacksuppressor(FileNotFoundError):
-                    await create_future(os.remove, bot.heartbeat, priority=True)
-
-
 # If this is the module being run and not imported, create a new Bot instance and run it.
 if __name__ == "__main__":
     # Redirects all output to the main log manager (PRINT).
@@ -3001,7 +3007,6 @@ if __name__ == "__main__":
             proc_start()
             miza = bot = client = Bot()
             miza.miza = miza
-            create_task(heartbeat_loop())
             with miza:
                 miza.run()
     print = _print

@@ -28,51 +28,54 @@ class Restart(Command):
             if succ:
                 return f"Successfully unloaded {argv.lower()}."
             return f"Error unloading {argv.lower()}. Please see log for more info."
+        save = None
         if argv:
             # Restart announcements for when a time input is specified
             if "in" in argv:
                 argv = argv[argv.rindex("in") + 2:]
-            delay = await bot.eval_time(argv, user)
-            await channel.send("*Preparing to " + name + " in " + sec2time(delay) + "...*")
+            wait = await bot.eval_time(argv, user)
+            await channel.send("*Preparing to " + name + " in " + sec2time(wait) + "...*")
             emb = discord.Embed(colour=discord.Colour(1))
             emb.set_author(name=str(bot.user), url=bot.website, icon_url=best_url(bot.user))
-            emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(delay)}, apologies for any inconvenience..."
+            emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(wait)}, apologies for any inconvenience..."
             await bot.send_event("_announce_", embed=emb)
-            if delay > 0:
-                await asyncio.sleep(delay)
+            save = create_task(bot.send_event("_save_"))
+            if wait > 0:
+                await asyncio.sleep(wait)
         elif name == "shutdown":
             await channel.send("Shutting down... :wave:")
         else:
             await channel.send("Restarting... :wave:")
-        with discord.context_managers.Typing(channel):
-            with suppress(AttributeError):
-                PRINT.close()
-            t = time.time()
-            # Call _destroy_ bot event to indicate to all databases the imminent shutdown
-            await bot.send_event("_destroy_")
-            # Save any database that has not already been autosaved
-            await create_future(bot.update, priority=True)
-            # Disconnect as many voice clients as possible
-            futs = deque()
-            for guild in client.guilds:
-                member = guild.get_member(client.user.id)
-                if member:
-                    voice = member.voice
-                    if voice:
-                        futs.append(create_task(member.move_to(None)))
-            for fut in futs:
-                with suppress():
-                    await fut
+        with suppress(AttributeError):
+            PRINT.close()
+        if save is None:
+            save = create_task(bot.send_event("_save_"))
+        async with delay(1):
+            with discord.context_managers.Typing(channel):
+                # Call _destroy_ bot event to indicate to all databases the imminent shutdown
+                await bot.send_event("_destroy_", shutdown=True)
+                # Save any database that has not already been autosaved
+                await create_future(bot.update, priority=True)
+                # Disconnect as many voice clients as possible
+                futs = deque()
+                for guild in client.guilds:
+                    member = guild.get_member(client.user.id)
+                    if member:
+                        voice = member.voice
+                        if voice:
+                            futs.append(create_task(member.move_to(None)))
+                with tracebacksuppressor:
+                    await create_future(retry, os.remove, "log.txt", attempts=8, delay=0.1)
+                for fut in futs:
+                    with suppress():
+                        await fut
+                await save
         with suppress():
             await client.close()
         if name.casefold() == "shutdown":
             touch(bot.shutdown)
         else:
             touch(bot.restart)
-        with tracebacksuppressor:
-            retry(os.remove, "log.txt", attempts=8, delay=0.1)
-        if time.time() - t < 1:
-            await asyncio.sleep(1)
         bot.close()
         del client
         del bot

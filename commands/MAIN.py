@@ -1405,13 +1405,18 @@ class UpdateMessageCount(Database):
         return "Calculating..."
 
     # What are the rate limits for the message history calls?
-    async def getChannelHistory(self, channel, limit=None, callback=None):
+    async def getChannelHistory(self, channel, limit=None, after=None, callback=None):
 
         async def delay_if_exc(channel):
             t = utc()
-            history = channel.history(limit=limit, oldest_first=(limit is None))
+            history = channel.history(limit=limit, after=after, oldest_first=(limit is None))
             try:
-                return await history.flatten()
+                add_message = self.bot.add_message
+                out = deque()
+                async for m in history:
+                    add_message(m)
+                    out.append(m)
+                return list(out)
             except discord.Forbidden:
                 return []
             except:
@@ -1432,9 +1437,9 @@ class UpdateMessageCount(Database):
             return await create_future(callback, channel=channel, messages=messages)
         return messages
 
-    async def getGuildHistory(self, guild, limit=None, callback=None):
+    async def getGuildHistory(self, guild, limit=None, after=None, callback=None):
         lim = None if limit is None else ceil(limit / min(128, len(guild.text_channels)))
-        output = cdict({channel.id: create_task(self.getChannelHistory(channel, limit=lim, callback=callback)) for channel in guild.text_channels})
+        output = cdict({channel.id: create_task(self.getChannelHistory(channel, limit=lim, after=after, callback=callback)) for channel in guild.text_channels})
         for k, v in output.items():
             output[k] = await v
         return output

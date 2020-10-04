@@ -1345,6 +1345,95 @@ class UpdateUserLogs(Database):
             self.bot.send_embeds(channel, emb)
 
 
+class UpdateMessageCache(Database):
+    name = "message_cache"
+    no_file = True
+    file = "saves/message_cache.json"
+
+    async def _load(self):
+        with open(self.file, "rb") as f:
+            zipped = await create_future(f.read)
+        out = await create_future(zip2bytes, zipped)
+        data = await create_future(pickle.loads, out)
+        add_message = self.bot.add_message
+        get_user = self.bot.get_user
+        fetch_channel = self.bot.fetch_channel
+        i = 0
+        for m_id, m in data.items():
+            try:
+                m_id = int(m_id)
+            except ValueError:
+                continue
+            channel = await fetch_channel(m.pop("channel"))
+            user = guild = None
+            if "author" in m:
+                user = get_user(m["author"], True)
+                guild = getattr(channel, "guild", None)
+                if guild is not None:
+                    member = guild.get_member(user.id)
+                    if member is not None:
+                        user = member
+                m.pop("author", None)
+            try:
+                message = discord.Message(state=self.bot._state, channel=channel, data=m)
+                if user is not None:
+                    message.author = user
+                add_message(message, files=False)
+            except:
+                print_exc()
+                print(m)
+            i += 1
+            if not i & 1023:
+                await asyncio.sleep(0.2)
+                if not i & 65535:
+                    print(i)
+        print(f"{len(data)} messages successfully loaded from file.")
+
+    async def load(self):
+        if os.path.exists(self.file):
+            t = os.path.getmtime(self.file)
+            if utc() - t < 3600:
+                create_task(self._load())
+                return datetime.datetime.fromtimestamp(t)
+
+    async def save(self):
+        data = {}
+        for i, message in enumerate(deque(self.bot.cache.messages.values()), 1):
+            reactions = []
+            attachments = [dict(id=a.id, size=a.size, filename=a.filename, url=a.url, proxy_url=a.proxy_url) for a in message.attachments]
+            embeds = [e.to_dict() for e in message.embeds]
+            data[message.id] = dict(
+                id=message.id,
+                author=message.author.id,
+                webhook_id=message.webhook_id,
+                reactions=reactions,
+                attachments=attachments,
+                embeds=embeds,
+                edited_timestamp=str(message._edited_timestamp) if message._edited_timestamp else "",
+                type=message.type.value,
+                pinned=message.pinned,
+                flags=message.flags.value,
+                mention_everyone=message.mention_everyone,
+                tts=message.tts,
+                content=message.content,
+                channel=message.channel.id,
+            )
+            for reaction in message.reactions:
+                if not reaction.custom_emoji:
+                    r = dict(emoji=dict(id=None, name=str(reaction)))
+                    if reaction.count != 1:
+                        r["count"] = reaction.count
+                    if reaction.me:
+                        r["me"] = reaction.me
+                    reactions.append(r)
+            if not i & 32767:
+                await asyncio.sleep(0.2)
+        out = await create_future(pickle.dumps, data)
+        zipped = await create_future(bytes2zip, out)
+        with open(self.file, "wb") as f:
+            await create_future(f.write, zipped)
+
+
 class UpdateMessageLogs(Database):
     name = "logM"
 
@@ -1357,14 +1446,19 @@ class UpdateMessageLogs(Database):
             if utc_dt() - h > datetime.timedelta(seconds=3600):
                 self.dc.pop(h)
 
-    def _bot_ready_(self, **void):
+    async def _bot_ready_(self, **void):
         if not self.searched and len(self.bot.cache.messages) <= 65536:
             self.searched = True
             lim = floor(2097152 / len(self.bot.guilds))
-            return [create_task(self.bot.database.counts.getGuildHistory(guild, lim, callback=self.callback)) for guild in self.bot.guilds]
+            time = None
+            with tracebacksuppressor:
+                time = await self.bot.database.message_cache.load()
+            return [create_task(self.bot.database.counts.getGuildHistory(guild, lim, after=time, callback=self.callback)) for guild in self.bot.guilds]
+
+    async def _save_(self, **void):
+        await self.bot.database.message_cache.save()
     
     def callback(self, messages, **void):
-        messages = [self.bot.add_message(message) for message in messages]
         create_future_ex(self.bot.update_from_client, priority=True)
         return messages
 
