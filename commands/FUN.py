@@ -686,7 +686,7 @@ class UpdateDailies(Database):
                 x = xrand(20, 41)
                 q = cdict(name=f"Talk to me {x} times", gold=x * 12, progress=0, required=x, action="talk")
             quests.append(q)
-        return quests.appendleft(cdict(name="Daily rewards", gold=level * 100 + 1000, progress=1, required=1, action=None))
+        return quests.appendleft(cdict(name="Daily rewards", gold=level * 50 + 500, progress=1, required=1, action=None))
 
     def progress_quests(self, user, action, value=1):
         if user.id == self.bot.id:

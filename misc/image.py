@@ -1059,7 +1059,7 @@ def from_bytes(b):
     try:
         return Image.open(out)
     except PIL.UnidentifiedImageError:
-        file_print(b[:65536])
+        file_print(b[:1024])
         raise
 
 
