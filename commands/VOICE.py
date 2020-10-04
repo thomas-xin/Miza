@@ -222,6 +222,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             self.preparing = True
             self.player = None
             self.timeout = utc()
+            self.ts = None
             self.lastsent = 0
             self.last_end = 0
             self.pausec = False
@@ -3728,6 +3729,17 @@ class UpdateAudio(Database):
                             auds = self.players[g]
                             create_future_ex(auds.update, priority=True)
                             create_task(self.research(auds))
+                            if auds.queue and not auds.paused and "dailies" in bot.data:
+                                if auds.ts is None:
+                                    auds.ts = utc()
+                                for member in auds.vc.channel.members:
+                                    if member.id != bot.id:
+                                        vs = member.voice
+                                        if vs is not None and not vs.deaf and not vs.self_deaf:
+                                            bot.database.dailies.progress_quests(member, "music", utc() - auds.ts)
+                                auds.ts = utc()
+                            else:
+                                auds.ts = None
                         if not a & 15:
                             await asyncio.sleep(0.2)
                         a += 1

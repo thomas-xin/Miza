@@ -1786,9 +1786,12 @@ class UpdateUsers(Database):
             self.add_diamonds(user, points)
             points *= 1000
             create_task(message.add_reaction("✨"))
+            print(f"{user} has triggered the rare message bonus in {message.guild}!")
         else:
             self.add_gold(user, points)
         self.add_xp(user, points)
+        if "dailies" in self.bot.data:
+            self.bot.database.dailies.valid_message(message)
 
     async def _mention_(self, user, message, msg, **void):
         bot = self.bot
@@ -1834,19 +1837,27 @@ class UpdateUsers(Database):
             return ceil((level - 1) ** 1.5 * 2000 / 3)
         return level
 
+    async def get_balance(self, user):
+        data = self.data.get(user.id, EMPTY)
+        return await self.bot.as_rewards(data.get("diamonds"), data.get("gold"))
+
     def add_xp(self, user, amount):
-        if user.id != self.bot.id:
+        if user.id != self.bot.id and amount:
             add_dict(set_dict(self.data, user.id, {}), {"xp": amount})
+            if "dailies" in self.bot.data:
+                self.bot.database.dailies.progress_quests(user, "xp", amount)
             self.update()
     
     def add_gold(self, user, amount):
-        if user.id != self.bot.id:
+        if user.id != self.bot.id and amount:
             add_dict(set_dict(self.data, user.id, {}), {"gold": amount})
             self.update()
 
     def add_diamonds(self, user, amount):
-        if user.id != self.bot.id:
+        if user.id != self.bot.id and amount:
             add_dict(set_dict(self.data, user.id, {}), {"diamonds": amount})
+            if "dailies" in self.bot.data:
+                self.bot.database.dailies.progress_quests(user, "diamonds", amount)
             self.update()
 
     async def _typing_(self, user, **void):
@@ -1993,6 +2004,8 @@ class UpdateUsers(Database):
             await send(out)
             await bot.seen(user, event="misc", raw="Talking to me")
             self.add_xp(user, xrand(12, 20))
+            if "dailies" in bot.data:
+                bot.database.dailies.progress_quests(user, "talk")
         else:
             if not self.data.get(user.id, EMPTY).get("last_mention") and random.random() > 0.6:
                 self.data.get(user.id, EMPTY).pop("last_talk", None)

@@ -746,7 +746,14 @@ class Ask(Command):
             "you're": "i'm",
             "you'll": "i'll",
         })
-        q = " ".join(alist(q.split()).replace("you", "I").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
+        res = alist(q.split())
+        for sym in "!.,":
+            if sym in q:
+                for word, rep in {"you": "I", "me": "you", "i": "I"}.items():
+                    res.replace(word + sym, rep + sym)
+        q = " ".join(res.replace("you", "I").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
+        if "dailies" in bot.data:
+            bot.database.dailies.progress_quests(user, "talk")
         await channel.send(escape_everyone(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\uf000", "")))
 
 

@@ -73,6 +73,7 @@ print_exc = lambda: sys.stdout.write(traceback.format_exc())
 
 class Dummy(BaseException):
     __slots__ = ()
+    __bool__ = lambda: False
 
 
 loop = lambda x: repeat(None, x)
@@ -1410,9 +1411,17 @@ class fcdict(cdict):
 
     __slots__ = ()
 
-    __init__ = lambda self, *args, **kwargs: super().__init__({full_prune(k): v for k, v in dict(*args, **kwargs).items()})
-    __setitem__ = lambda self, k, v: super().__setitem__(full_prune(k), v)
-    __getitem__ = lambda self, k: super().__getitem__(full_prune(k))
+    __init__ = lambda self, *args, **kwargs: super().__init__({k.casefold() if k.isalnum() else full_prune(k): v for k, v in dict(*args, **kwargs).items()})
+    def __setitem__(self, k, v):
+        if k.isalnum():
+            return super().__setitem__(k.casefold(), v)
+        return super().__setitem__(full_prune(k), v)
+    def __getitem__(self, k):
+        if k.isalnum():
+            with suppress(KeyError):
+                return super().__getitem__(k)
+            return super().__getitem__(k.casefold())
+        return super().__getitem__(full_prune(k))
     __contains__ = lambda self, k: super().__contains__(k) or super().__contains__(full_prune(k))
 
     def __getattr__(self, k):

@@ -41,6 +41,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.cache = fcdict({c: {} for c in self.caches})
         # Channel-Webhook cache: for accessing all webhooks for a channel.
         self.cw_cache = cdict()
+        self.usernames = {}
         self.events = mdict()
         self.react_sem = cdict()
         self.mention = ()
@@ -330,6 +331,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             with suppress():
                 return self.get_member(u_id, guild)
             return user
+        with suppress(KeyError):
+            if "#" in u_id:
+                user = self.usernames[u_id]
+                if guild is None:
+                    return user
+                u_id = user.id
         return await self.fetch_member_ex(u_id, guild)
 
     async def get_full_members(self, guild):
@@ -862,6 +869,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Updates bot cache from the discord.py guild objects.
     def update_from_guilds(self):
+        self.update_usernames()
         for i, guild in enumerate(self.guilds, 1):
             members = self.cache.members
             members.update({m.id: m for m in guild.members if m.id not in members})
@@ -881,6 +889,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             a_id = next(iter(attachments))
             self.cache.attachments[a_id] = a_id
             attachments.pop(a_id)
+
+    def update_usernames(self):
+        self.usernames = {str(user): user for user in self._connection._users.values()}
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def get_prefix(self, guild):
@@ -1534,6 +1545,23 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             z.close()
             print("Backup database created in", fn)
 
+    async def as_rewards(self, diamonds, gold=Dummy):
+        if type(diamonds) is float:
+            diamonds = floor(diamonds)
+        if type(gold) is float:
+            gold = floor(gold)
+        if gold is Dummy:
+            gold = diamonds
+            diamonds = 0
+        out = deque()
+        if diamonds:
+            out.append(f"💎 {diamonds}")
+        if gold:
+            out.append(f"🪙 {gold}")
+        if out:
+            return " ".join(out)
+        return None
+
     zw_callback = zwencode("callback")
 
     # Operates on reactions on special messages, calling the _callback_ methods of commands when necessary.
@@ -1626,6 +1654,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 bot=self,
                             ),
                             timeout=timeout)
+                        await self.send_event("_callback_", user=user, command=f, loop=False, message=message)
                         break
             self.react_sem.pop(message.id, None)
 
@@ -2139,7 +2168,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             embs = set_dict(self.embed_senders, c_id, [])
             embs.extend(embeds)
 
-    def send_as_embeds(self, channel, description=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None):
+    def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None):
+        if type(description) is discord.Embed:
+            emb = description
+            description = emb.description
+            title = emb.title
+            fields = emb.fields
+            author = emb.author
+            footer = emb.footer
+            thumbnail = emb.thumbnail
+            image = emb.image
+            if emb.colour:
+                colour = colorsys.rgb_to_hsv(alist(raw2colour(emb.colour)) / 255)[0] * 1536
         if description is not None and type(description) is not str:
             if type(description) in (bytes, bytearray):
                 description = description.decode("utf-8", "replace")
@@ -2151,6 +2191,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         off = 128 if not issubclass(type(colour), collections.abc.Sequence) else colour[1]
         embs = deque()
         emb = discord.Embed(colour=colour2raw(hue2colour(col)))
+        if title:
+            emb.title = title
         if description:
             # Separate text into paragraphs, then lines, then words, then characters and attempt to add them one at a time, adding extra embeds when necessary
             curr = ""
@@ -2574,7 +2616,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             channel = await self.get_first_sendable(g, m)
             emb = discord.Embed(colour=discord.Colour(8364031))
             emb.set_author(**get_author(self.user))
-            emb.description = f"Hi there! I'm {self.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
+            emb.description = f"```callback-fun-profile-{utc()}-\nHi there!```I'm {self.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
             user = None
             with suppress(discord.Forbidden):
                 a = guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add)
@@ -2584,6 +2626,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         break
             if user is not None:
                 emb.description += f", {user_mention(user.id)}"
+                if "dailies" in self.data:
+                    self.database.dailies.progress_quests(user, "invite")
             emb.description += (
                 f"!\nMy default prefix is `{self.prefix}`, which can be changed as desired on a per-server basis. Mentioning me also serves as an alias for all prefixes.\n"
                 + f"For more information, use the `{self.prefix}help` command, and my source code is available at {self.website} for those who are interested.\n"
@@ -2592,9 +2636,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if not m.guild_permissions.administrator:
                 emb.add_field(name="Psst!", value=(
                     "I noticed you haven't given me administrator permissions here.\n"
-                    + "That's completely understandable if intentional, but please note that without the required permissions, some features may not function well, or not at all."
+                    + "That's completely understandable if intentional, but please note that some features may not function well, or not at all, without the required permissions."
                 ))
-            await channel.send(embed=emb)
+            message = await channel.send(embed=emb)
+            await message.add_reaction("✅")
 
         # Reaction add event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
         @self.event
@@ -2613,6 +2658,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 reaction = str(payload.emoji)
                 await self.react_callback(message, reaction, user)
                 await self.check_to_delete(message, reaction, user)
+                if "users" in self.data:
+                    self.database.users.add_xp(user, xrand(4, 7))
+                    self.database.users.add_gold(user, xrand(1, 5))
+                if "dailies" in self.data:
+                    self.database.dailies.progress_quests(user, "react")
 
         # Reaction remove event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
         @self.event
@@ -2646,6 +2696,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if after is not None and not after.afk:
                 if before is None:
                     await self.seen(member, event="misc", raw=f"Joining a voice channel, {member.guild}")
+                    if "users" in self.data:
+                        self.database.users.add_xp(after, xrand(60, 120))
+                        self.database.users.add_gold(after, xrand(20, 50))
                 elif any((getattr(before, attr) != getattr(after, attr) for attr in ("self_mute", "self_deaf", "self_stream", "self_video"))):
                     await self.seen(member, event="misc", raw=f"Updating their voice settings, {member.guild}")
 
@@ -2790,6 +2843,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # User update event: calls _user_update_ and _seen_ bot database events.
         @self.event
         async def on_user_update(before, after):
+            b = str(before)
+            a = str(after)
+            if b != a:
+                self.usernames.pop(b, None)
+                self.usernames[a] = after
             await self.send_event("_user_update_", before=before, after=after)
             await self.seen(after, event="misc", raw="Editing their profile")
 
@@ -2809,6 +2867,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if member is None or member.guild == after.guild:
                     if self.status_updated(before, after):
                         await self.seen(after, event="misc", raw="Changing their status")
+                        if "dailies" in self.data:
+                            self.database.dailies.progress_quests(after, "status")
                     elif after.status == discord.Status.offline:
                         await self.send_event("_offline_", user=after)
 

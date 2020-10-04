@@ -233,7 +233,7 @@ class Text2048(Command):
     time_consuming = True
     name = ["2048"]
     min_level = 0
-    description = "Plays a game of 2048 using reactions."
+    description = "Plays a game of 2048 using reactions. Gained points are rewarded as gold."
     usage = "<0*:dimension_sizes[4x4]> <1:dimension_count[2]> <special_tiles(?s)> <public(?p)> <insanity_mode(?i)> <easy_mode(?e)>"
     flags = "pies"
     rate_limit = (1, 3)
@@ -326,7 +326,8 @@ class Text2048(Command):
                     xp /= 2
                 elif mode & 4:
                     xp /= 3
-                bot.database.users.add_xp(user, xp)
+                bot.database.users.add_gold(user, xp)
+                emb.description += await bot.as_rewards(f"+{int(xp)}")
             emb.set_footer(text=f"Score: {fscore}")
             await message.edit(content=content, embed=emb)
 
@@ -373,7 +374,7 @@ class Text2048(Command):
 class SlotMachine(Command):
     name = ["Slots"]
     min_level = 0
-    description = "Plays a slot machine game."
+    description = "Plays a slot machine game. Costs gold to play, can yield gold and diamonds."
     usage = "<bet[100]>"
     rate_limit = 3
     emojis = {
@@ -418,12 +419,16 @@ class SlotMachine(Command):
         return out
 
     async def __call__(self, argv, user, **void):
+        b1 = 5
+        b2 = 50
         if argv:
             bet = await self.bot.eval_math(argv, user)
-            if bet < 100:
-                raise ValueError("Minimum bet is 100 coins.")
+            if bet < b1:
+                raise ValueError(f"Minimum bet is {b1} coins.")
+            if bet > b2:
+                raise ValueError(f"Maximum bet is {b2} coins.")
         else:
-            bet = 100
+            bet = b1
         if bet > self.bot.data.users.get(user.id, {}).get("gold", 0):
             raise OverflowError("Bet cannot be greater than your balance.")
         self.bot.database.users.add_gold(user, -bet)
@@ -436,17 +441,19 @@ class SlotMachine(Command):
                 create_task(message.add_reaction("⤵️"))
                 user = await bot.fetch_user(u_id)
             else:
-                if bet > self.bot.data.users.get(user.id, {}).get("gold", 0):
+                if bet > bot.data.users.get(user.id, {}).get("gold", 0):
                     raise OverflowError("Bet cannot be greater than your balance.")
-                self.bot.database.users.add_gold(user, -bet)
+                bot.database.users.add_gold(user, -bet)
             wheel_true = self.generate()
             wheel_display = [None] * 3
             wheel_order = deque(shuffle(range(3)))
             emb = discord.Embed(colour=rand_colour()).set_author(**get_author(user))
             async with delay(2):
                 emoj = await self.as_emojis(wheel_display)
-                gold = self.bot.data.users.get(user.id, {}).get("gold", 0)
-                emb.description = f"```css\n[Slot Machine]```{emoj}\nBet: 🪙 {bet}\nBalance: 🪙 {int(gold)}"
+                gold = bot.data.users.get(user.id, {}).get("gold", 0)
+                bets = await bot.as_rewards(bet)
+                bals = await bot.as_rewards(gold)
+                emb.description = f"```css\n[Slot Machine]```{emoj}\nBet: {bets}\nBalance: {bals}"
                 await message.edit(content=None, embed=emb)
             while wheel_order:
                 async with delay(1):
@@ -461,26 +468,252 @@ class SlotMachine(Command):
                                 diamonds = bet / 5
                             else:
                                 gold *= bet
-                        rewards = deque()
-                        if diamonds:
-                            bot.database.users.add_diamonds(user, diamonds)
-                            rewards.append(f"💎 {int(diamonds)}")
-                        if gold:
-                            bot.database.users.add_gold(user, gold)
-                            rewards.append(f"🪙 {int(gold)}")
-                        if not rewards:
-                            rewards = "None 😔"
-                        else:
-                            rewards = "\n".join(rewards)
+                        bot.database.users.add_diamonds(user, diamonds)
+                        bot.database.users.add_gold(user, gold)
+                        rewards = await bot.as_rewards(diamonds, gold)
                         end = f"\nRewards:\n{rewards}\n"
                     else:
                         start = "```ini\n"
                         end = ""
                     emoj = await self.as_emojis(wheel_display)
-                    gold = self.bot.data.users.get(user.id, {}).get("gold", 0)
-                    emb.description = f"{start}[Slot Machine]```{emoj}\nBet: 🪙 {bet}\nBalance: 🪙 {int(gold)}{end}"
+                    gold = bot.data.users.get(user.id, {}).get("gold", 0)
+                    bets = await bot.as_rewards(bet)
+                    bals = await bot.as_rewards(gold)
+                    emb.description = f"{start}[Slot Machine]```{emoj}\nBet: {bets}\nBalance: {bals}{end}"
                     await message.edit(embed=emb)
             return await message.edit(embed=emb)
+
+
+class Pay(Command):
+    name = ["GiveCoins", "GiveGold"]
+    min_level = 0
+    description = "Pays a specified amount of coins to the target user."
+    usage = "<0:user> <1:amount[1]>"
+    rate_limit = 0.5
+
+    async def __call__(self, bot, user, args, guild, **void):
+        if not args:
+            raise ArgumentError("Please input target user.")
+        target = await bot.fetch_user_member(args.pop(0), guild)
+        if target.id == bot.id:
+            return "\u200bI appreciate the generosity, but I have enough already :3"
+        if args:
+            amount = await bot.eval_math(" ".join(args), user)
+        else:
+            amount = 1
+        if amount <= 0:
+            raise ValueError("Please input a valid amount of coins.")
+        if amount > bot.data.users.get(user.id, {}).get("gold", 0):
+            raise OverflowError("Payment cannot be greater than your balance.")
+        bot.database.users.add_gold(user, -amount)
+        bot.database.users.add_gold(target, amount)
+        bot.database.dailies.progress_quests(user, "pay", amount)
+        return css_md(f"{sqr_md(user)} has paid {sqr_md(amount)} coins to {sqr_md(target)}.")
+
+
+class Dogpile(Command):
+    server_only = True
+    min_level = 2
+    description = "Causes ⟨MIZA⟩ to automatically imitate users when 3+ of the same messages are posted in a row. Grants XP and gold when triggered."
+    usage = "<enable(?e)> <disable(?d)>"
+    flags = "aed"
+    rate_limit = 0.5
+
+    async def __call__(self, flags, guild, **void):
+        update = self.data.dogpiles.update
+        bot = self.bot
+        following = bot.data.dogpiles
+        curr = following.get(guild.id, False)
+        if "d" in flags:
+            if guild.id in following:
+                following.pop(guild.id)
+                update()
+            return css_md(f"Disabled dogpile imitating for {sqr_md(guild)}.")
+        if "e" in flags or "a" in flags:
+            following[guild.id] = True
+            update()
+            return css_md(f"Enabled dogpile imitating for {sqr_md(guild)}.")
+        if curr:
+            return ini_md(f"Dogpile imitating is currently enabled in {sqr_md(guild)}.")
+        return ini_md(f"Dogpile imitating is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
+
+
+class UpdateDogpiles(Database):
+    name = "dogpiles"
+
+    def __load__(self):
+        self.msgFollow = cdict()
+
+    async def _nocommand_(self, text, edit, orig, message, **void):
+        if message.guild is None or not orig:
+            return
+        g_id = message.guild.id
+        following = self.data
+        if g_id in following:
+            u_id = message.author.id
+            c_id = message.channel.id
+            if not edit:
+                if following[g_id]:
+                    checker = orig
+                    curr = self.msgFollow.get(c_id)
+                    if curr is None:
+                        curr = [checker, 1, 0]
+                        self.msgFollow[c_id] = curr
+                    # Must not imitate same user spamming
+                    elif checker == curr[0] and u_id != curr[2]:
+                        curr[1] += 1
+                        if curr[1] >= 3:
+                            curr[1] = xrand(-3) + 1
+                            if len(checker):
+                                create_task(message.channel.send(checker, tts=message.tts))
+                                bot.database.users.add_xp(message.author, len(message) / 2 + 16)
+                                bot.database.users.add_gold(message.author, len(message) / 4 + 32)
+                    else:
+                        # Don't imitate messages longer than 128 characters to prevent spam
+                        if len(checker) > 128:
+                            checker = ""
+                        curr[0] = checker
+                        curr[1] = xrand(-1, 2)
+                    curr[2] = u_id
+
+
+class Daily(Command):
+    name = ["Quests", "Tasks", "Challenges"]
+    min_level = 0
+    description = "Shows your list of daily quests."
+    rate_limit = 1
+
+    async def __call__(self, bot, user, channel, **void):
+        data = bot.database.dailies.get(user)
+        emb = discord.Embed(title="Daily Quests", colour=rand_colour()).set_author(**get_author(user))
+        bal = await bot.database.users.get_balance(user)
+        emb.description = f"```callback-fun-daily-{user.id}-\n{len(data['quests'])} tasks available\n{sec2time(utc() - data['time'])} remaining```Balance: {bal}"
+        for field in data["quests"][:5]:
+            bar = await bot.create_progress_bar(10, field.progress / field.required)
+            rewards = await bot.as_rewards(field.get("diamonds", None), field.get("gold", None))
+            emb.add_field(name=field.name, value=f"{bar} `{int(field.progress)}/{field.required}`\nRewards: {rewards}", inline=False)
+        message = await channel.send(embed=emb)
+        create_task(message.add_reaction("✅"))
+    
+    async def _callback_(self, bot, user, reaction, message, perm, vals, **void):
+        if reaction is None:
+            return
+        if reaction.decode("utf-8", "replace") != "✅":
+            return
+        u_id = vals
+        if str(user.id) != u_id:
+            return
+        data = bot.database.dailies.collect(user)
+        emb = discord.Embed(title="Daily Quests", colour=rand_colour()).set_author(**get_author(user))
+        bal = await bot.database.users.get_balance(user)
+        emb.description = f"```callback-fun-daily-{user.id}-\n{len(data['quests'])} tasks available\n{sec2time(utc() - data['time'])} remaining```Balance: {bal}"
+        for field in data["quests"][:5]:
+            bar = await bot.create_progress_bar(10, field.progress / field.required)
+            rewards = await bot.as_rewards(field.get("diamonds", None), field.get("gold", None))
+            emb.add_field(name=field.name, value=f"{bar} `{floor(field.progress)}/{field.required}`\nRewards: {rewards}", inline=False)
+        return await message.edit(embed=emb)
+
+
+class UpdateDailies(Database):
+    name = "dailies"
+    user = True
+
+    def __load__(self, **void):
+        self.typing = {}
+
+    def get(self, user):
+        data = self.data.get(user.id)
+        if data is None or utc() - data["time"] > 86400:
+            data = self.data[user.id] = dict(quests=self.generate(user), time=tparser.parse("0s").timestamp())
+            self.update()
+        return data
+
+    def collect(self, user):
+        data = self.get(user)
+        quests = data["quests"]
+        pops = set()
+        for i, quest in enumerate(quests):
+            if quest.progress >= quest.required:
+                self.bot.database.users.add_diamonds(user, quest.get("diamonds"))
+                self.bot.database.users.add_gold(user, quest.get("gold"))
+                pops.add(i)
+        if pops:
+            quests.pops(pops)
+            self.update()
+        return data
+
+    def generate(self, user):
+        if user.id == self.bot.id:
+            return dict(quests=(), time=inf)
+        level = self.bot.database.users.xp_to_level(self.bot.database.users.get_xp(user))
+        quests = alist()
+        for i in range(min(20, level + 5 >> 1)):
+            q_id = xrand(12)
+            if q_id == 0:
+                x = round((level * 10 + 100) * random.random() + 100)
+                q = cdict(name=f"Post {x} messages", gold=x * 10, progress=0, required=x, action="send")
+            elif q_id == 1:
+                q = cdict(name=f"Invite me to a server and/or react to the join message", diamonds=floor(10 + level / 5), progress=0, required=1, action="guild")
+            elif q_id == 2:
+                q = cdict(name=f"Earn 1 diamond", gold=level * 50, action="diamond")
+            elif q_id == 3:
+                x = round((level * 5 + 20) * random.random() + 20)
+                q = cdict(name=f"Use {x} commands", gold=x * 20, progress=0, required=x, action="command")
+            elif q_id == 4:
+                x = round((level * 200 + 1000) * random.random() + 1000)
+                q = cdict(name=f"Earn {x} experience", gold=x >> 1, progress=0, required=x, action="xp")
+            elif q_id == 5:
+                x = round((level + 5) * random.random() + 3) * 60
+                q = cdict(name=f"Listen to {sec2time(x)} of my music", gold=x, progress=0, required=x, action="music")
+            elif q_id == 6:
+                x = round((level * 200 + 1000) * random.random() + 2000)
+                q = cdict(name=f"Send {x} total characters of text", gold=x >> 3, progress=0, required=x, action="text")
+            elif q_id == 7:
+                x = round((level * 5 + 20) * random.random() + 20)
+                q = cdict(name=f"Add {x} reactions", gold=x * 8, progress=0, required=x, action="react")
+            elif q_id == 8:
+                x = round((level * 100 + 500) * random.random() + 400)
+                q = cdict(name=f"Pay {x} to other users", gold=x >> 1, progress=0, required=x, action="pay")
+            elif q_id == 9:
+                x = round((level * 10 + 90) * random.random() + 80)
+                q = cdict(name=f"Type for {sec2time(x)}", gold=x * 3, progress=0, required=x, action="typing")
+            elif q_id == 10:
+                x = xrand(10, 21)
+                q = cdict(name="Change your status {x} times", gold=x * 50, progress=0, required=x, action="status")
+            elif q_id == 11:
+                x = xrand(20, 41)
+                q = cdict(name="Talk to me {x} times", gold=x * 30, progress=0, required=x, action="talk")
+            quests.append(q)
+        return quests.appendleft(cdict(name="Daily rewards", gold=level * 100 + 1000, progress=1, required=1, action=None))
+
+    def progress_quests(self, user, action, value=1):
+        if user.id == self.bot.id:
+            return
+        data = self.get(user)
+        quests = data["quests"]
+        for i in range(min(5, len(quests))):
+            quest = quests[i]
+            if quest.action == action:
+                quest.progress += value
+                self.update()
+
+    def valid_message(self, message):
+        user = message.author
+        self.progress_quests(user, "send")
+        self.progress_quests(user, "text", get_message_length(message))
+        if user.id in self.typing:
+            t = utc()
+            self.progress_quests(user, "typing", t - self.typing.pop(user.id, t))
+
+    def _command_(self, user, **void):
+        self.progress_quests(user, "command")
+
+    def _typing_(self, user, **void):
+        if user.id in self.typing:
+            if utc() - self.typing[user.id] > 10:
+                self.progress_quests(user, "typing", 10)
+                self.typing[user.id] = utc()
+        self.typing[user.id] = utc()
 
 
 class Profile(Command):
@@ -505,14 +738,27 @@ class Profile(Command):
             gold = data.get("gold", 0)
             diamonds = data.get("diamonds", 0)
             bar = await bot.create_progress_bar(18, ratio)
-            with suppress(OverflowError):
-                xp = int(xp)
-            with suppress(OverflowError):
-                diamonds = int(diamonds)
-            with suppress(OverflowError):
-                gold = int(gold)
-            description = f"{bar}\n`Lv {level}`\n`XP {xp}/{xp_next}`\n💎 {diamonds}\n🪙 {gold}"
+            xp = floor(xp)
+            bal = await bot.as_rewards(diamonds, gold)
+            description = f"{bar}\n`Lv {level}`\n`XP {xp}/{xp_next}`\n{bal}"
             bot.send_as_embeds(channel, description, thumbnail=best_url(user), author=get_author(user), colour=xrand(1536))
+
+    join_cache = {}
+
+    async def _callback_(self, bot, message, reaction, user, vals, **void):
+        ts = int(vals)
+        if utc() - ts > 86400:
+            self.join_cache.pop(message.id, None)
+            return
+        if reaction is None or reaction.decode("utf-8", "replace") != "✅":
+            return
+        cache = set_dict(self.join_cache, message.id, set())
+        if len(cache) > 256:
+            cache.pop()
+        if user.id in cache:
+            return
+        cache.add(user.id)
+        bot.database.dailies.progress_quests(user, "invite")
 
 
 class MimicConfig(Command):
@@ -863,7 +1109,6 @@ class MimicSend(Command):
                 await wait_on_none(bot.send_as_webhook(channel, msg, username=name, avatar_url=url, tts=tts))
                 mimic.count += 1
                 mimic.total += len(msg)
-                bot.database.users.add_xp(user, math.sqrt(len(msg)) * 2)
             create_task(message.add_reaction("👀"))
 
 
