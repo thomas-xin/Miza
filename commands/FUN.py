@@ -681,10 +681,10 @@ class UpdateDailies(Database):
                 q = cdict(name=f"Type for {sec2time(x)}", gold=x * 3, progress=0, required=x, action="typing")
             elif q_id == 10:
                 x = xrand(10, 21)
-                q = cdict(name="Change your status {x} times", gold=x * 50, progress=0, required=x, action="status")
+                q = cdict(name=f"Change your status {x} times", gold=x * 50, progress=0, required=x, action="status")
             elif q_id == 11:
                 x = xrand(20, 41)
-                q = cdict(name="Talk to me {x} times", gold=x * 30, progress=0, required=x, action="talk")
+                q = cdict(name=f"Talk to me {x} times", gold=x * 30, progress=0, required=x, action="talk")
             quests.append(q)
         return quests.appendleft(cdict(name="Daily rewards", gold=level * 100 + 1000, progress=1, required=1, action=None))
 
