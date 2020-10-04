@@ -888,7 +888,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if os.path.exists(file):
                     os.remove(file)
         attachments = {k: v for k, v in self.cache.attachments.items() if type(v) is bytes}
-        while len(attachments) > 2048:
+        while len(attachments) > 512:
             a_id = next(iter(attachments))
             self.cache.attachments[a_id] = a_id
             attachments.pop(a_id)
