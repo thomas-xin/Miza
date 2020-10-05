@@ -195,6 +195,7 @@ class ND2048(collections.abc.MutableSequence):
                     temp = np.moveaxis(copy.deepcopy(self.data), dim, -1)
                     if self.recurse(temp) or self.recurse(np.flip(temp)):
                         valid = True
+                        break
                 if not valid:
                     raise GameOverError("Game Over.")
         return moved
