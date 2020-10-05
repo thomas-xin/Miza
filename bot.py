@@ -50,6 +50,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.semaphore = Semaphore(2, 1, delay=0.5)
         self.ready_semaphore = Semaphore(1, inf, delay=0.5)
         self.guild_semaphore = Semaphore(5, inf, delay=1, rate_limit=5)
+        self.user_semaphore = Semaphore(64, inf, delay=0.5, rate_limit=8)
         print("Time:", datetime.datetime.now())
         print("Initializing...")
         # O(1) time complexity for searching directory
@@ -264,10 +265,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         u_id = verify_id(u_id)
         if type(u_id) is not int:
             raise TypeError(f"Invalid user identifier: {u_id}")
-        user = await super().fetch_user(u_id)
-        self.cache.users[u_id] = user
-        self.limit_cache("users")
-        return user
+        async with self.user_semaphore:
+            user = await super().fetch_user(u_id)
+            self.cache.users[u_id] = user
+            self.limit_cache("users")
+            return user
 
     # Gets a user from ID, using the bot cache.
     def get_user(self, u_id, replace=False):
@@ -2545,6 +2547,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 self._data = data
                 self.id = int(data["id"])
                 self.created_at = snowflake_time(self.id)
+                author = int(data["author"])
+                if author not in bot.cache.users:
+                    create_task(bot.fetch_user(author))
 
             def __copy__(self):
                 d = self.__getattribute__("_data")
