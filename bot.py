@@ -2534,26 +2534,35 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             ack = delete
             ghost = True
 
+        class LoadedMessage(discord.Message):
+            pass
+
         class CachedMessage(discord.abc.Snowflake):
 
-            __slots__ = ("_data", "author", "channel")
-            id = 0
-            created_at = None
+            __slots__ = ("_data", "id", "created_at", "author", "channel")
 
             def __init__(self, data):
                 self._data = data
+                self.id = int(data["id"])
+                self.created_at = snowflake_time(self.id)
+
+            def __copy__(self):
+                d = self.__getattribute__("_data")
+                channel = self.channel
+                author = self.author
+                d.pop("author", None)
+                d.pop("channel", None)
+                message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
+                message.author = author
+                return message
 
             def __getattr__(self, k):
                 if k in self.__slots__:
                     with suppress(AttributeError):
                         return self.__getattribute__(k)
                 d = self.__getattribute__("_data")
-                if k == "id":
-                    try:
-                        d["id"] = int(d["id"])
-                    except:
-                        pass
-                    return d["id"]
+                if k == "content":
+                    return d["content"]
                 if k == "channel":
                     self.channel = bot.cache.channels.get(int(d["channel"]))
                     return self.channel
@@ -2566,21 +2575,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             self.author = member
                     return self.author
                 m = bot.cache.messages.get(d["id"])
-                if m is None or m is self:
-                    channel = self.channel
-                    author = self.author
-                    d.pop("author", None)
-                    d.pop("channel", None)
-                    message = discord.Message(state=bot._state, channel=channel, data=d)
-                    message.author = author
-                    bot.cache.messages[d["id"]] = message
-                    bot.add_message(message, files=False)
+                if m is None or m is self or not issubclass(type(m), bot.LoadedMessage):
+                    message = self.__copy__()
+                    if type(m) is not discord.Message:
+                        bot.add_message(message, files=False)
                     return getattr(message, k)
                 return getattr(m, k)
 
         bot.UserGuild = UserGuild
         bot.GhostUser = GhostUser
         bot.GhostMessage = GhostMessage
+        bot.LoadedMessage = LoadedMessage
         bot.CachedMessage = CachedMessage
     
     def set_client_events(self):
