@@ -47,6 +47,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.events = mdict()
         self.react_sem = cdict()
         self.mention = ()
+        self.user_loader = set()
         self.semaphore = Semaphore(2, 1, delay=0.5)
         self.ready_semaphore = Semaphore(1, inf, delay=0.5)
         self.guild_semaphore = Semaphore(5, inf, delay=1, rate_limit=5)
@@ -270,6 +271,29 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             self.cache.users[u_id] = user
             self.limit_cache("users")
             return user
+
+    async def auser2cache(self, u_id):
+        with suppress(discord.NotFound):
+            self.cache.users[u_id] = await super().fetch_user(u_id)
+
+    def user2cache(self, data):
+        users = self.cache.users
+        u_id = int(data["id"])
+        if u_id not in users:
+            if type(data) is dict:
+                with tracebacksuppressor:
+                    if "s" in data:
+                        data["username"], data["discriminator"] = data.pop("s").rsplit("#", 1)
+                    users[u_id] = self._state.store_user(data)
+                    return
+            self.user_loader.add(u_id)
+
+    def update_users(self):
+        if self.user_loader:
+            if not self.user_semaphore.busy:
+                u_id = self.user_loader.pop()
+                if u_id not in self.cache.users:
+                    create_task(self.auser2cache(u_id))
 
     # Gets a user from ID, using the bot cache.
     def get_user(self, u_id, replace=False):
@@ -2311,6 +2335,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 else:
                     with delay(1 / freq):
                         await_fut(self.send_event("_call_"), delay=0.002, priority=True)
+                self.update_users()
 
     # The slow update loop that runs once every 1 second.
     async def slow_loop(self):
@@ -2547,9 +2572,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 self._data = data
                 self.id = int(data["id"])
                 self.created_at = snowflake_time(self.id)
-                author = int(data["author"])
-                if author not in bot.cache.users:
-                    create_task(bot.fetch_user(author))
+                author = data["author"]
+                if author["id"] not in bot.cache.users:
+                    bot.user2cache(author)
 
             def __copy__(self):
                 d = self.__getattribute__("_data")
@@ -2572,7 +2597,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     self.channel = bot.cache.channels.get(int(d["channel"]))
                     return self.channel
                 if k == "author":
-                    self.author = bot.get_user(d["author"], replace=True)
+                    self.author = bot.get_user(d["author"]["id"], replace=True)
                     guild = getattr(self.channel, "guild", None)
                     if guild is not None:
                         member = guild.get_member(self.author.id)

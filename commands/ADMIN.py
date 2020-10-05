@@ -1385,7 +1385,8 @@ class UpdateMessageCache(Database):
             if type(message) is bot.CachedMessage:
                 m = message._data
                 if "author" not in m:
-                    m["author"] = message.author.id
+                    author = message.author
+                    m["author"] = dict(id=author.id, s=str(author), avatar=author.avatar)
                 if "channel" not in m:
                     m["channel"] = message.channel.id
                 data[message.id] = m
@@ -1393,9 +1394,10 @@ class UpdateMessageCache(Database):
                 reactions = []
                 attachments = [dict(id=a.id, size=a.size, filename=a.filename, url=a.url, proxy_url=a.proxy_url) for a in message.attachments]
                 embeds = [e.to_dict() for e in message.embeds]
+                author = message.author
                 data[message.id] = dict(
                     id=message.id,
-                    author=message.author.id,
+                    author=dict(id=author.id, s=str(author), avatar=author.avatar),
                     webhook_id=message.webhook_id,
                     reactions=reactions,
                     attachments=attachments,
