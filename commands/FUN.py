@@ -650,14 +650,14 @@ class UpdateDailies(Database):
         level = self.bot.database.users.xp_to_level(self.bot.database.users.get_xp(user))
         quests = alist()
         for i in range(min(20, level + 5 >> 1)):
-            q_id = xrand(12)
+            q_id = xrand(11)
             if q_id == 0:
                 x = round((level * 10 + 100) * random.random() + 70)
                 q = cdict(name=f"Post {x} messages", gold=x * 4, progress=0, required=x, action="send")
             elif q_id == 1:
                 q = cdict(name=f"Invite me to a server and/or react to the join message", diamonds=floor(10 + level / 5), progress=0, required=1, action="guild")
             elif q_id == 2:
-                q = cdict(name=f"Earn 1 diamond", gold=level * 50, action="diamond")
+                q = cdict(name=f"Earn 1 diamond", gold=level * 50, progress=0, required=1, action="diamond")
             elif q_id == 3:
                 x = round((level * 5 + 20) * random.random() + 20)
                 q = cdict(name=f"Use {x} commands", gold=x * 9, progress=0, required=x, action="command")
@@ -677,12 +677,9 @@ class UpdateDailies(Database):
                 x = round((level * 100 + 500) * random.random() + 400)
                 q = cdict(name=f"Pay {x} to other users", gold=x >> 1, progress=0, required=x, action="pay")
             elif q_id == 9:
-                x = round((level * 10 + 90) * random.random() + 80)
+                x = round((level * 28 + 240) * random.random() + 180)
                 q = cdict(name=f"Type for {sec2time(x)}", gold=x * 2, progress=0, required=x, action="typing")
             elif q_id == 10:
-                x = xrand(10, 21)
-                q = cdict(name=f"Change your status {x} times", gold=x * 10, progress=0, required=x, action="status")
-            elif q_id == 11:
                 x = xrand(20, 41)
                 q = cdict(name=f"Talk to me {x} times", gold=x * 12, progress=0, required=x, action="talk")
             quests.append(q)
