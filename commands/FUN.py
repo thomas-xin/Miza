@@ -280,7 +280,6 @@ class Text2048(Command):
                 # Random moves
                 elif r == -2:
                     g = ND2048.load(data)
-                    score = g.score()
                     if not g.move(-1, count=16):
                         return
                     data = g.serialize()
@@ -292,8 +291,32 @@ class Text2048(Command):
                         return
                     data = g.serialize()
             except GameOverError:
+                if u_id == 0:
+                    u = None
+                elif user.id == u_id:
+                    u = user
+                else:
+                    u = bot.get_user(u_id, replace=True)
+                emb = discord.Embed(colour=discord.Colour(1))
+                if u is None:
+                    emb.set_author(name="@everyone", icon_url=bot.discord_icon)
+                else:
+                    emb.set_author(**get_author(u))
+                emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
+                fscore = g.score()
+                if score is not None:
+                    xp = max(0, fscore - score) * 16 / np.prod(g.data.shape)
+                    if mode & 1:
+                        xp /= math.sqrt(2)
+                    elif mode & 2:
+                        xp /= 2
+                    elif mode & 4:
+                        xp /= 3
+                    bot.database.users.add_gold(user, xp)
+                    emb.description += await bot.as_rewards(f"+{int(xp)}")
+                emb.set_footer(text=f"Score: {fscore}")
                 # Clear reactions and announce game over message
-                await message.edit(content="**```\n2048: GAME OVER```**")
+                await message.edit(content="**```\n2048: GAME OVER```**", embed=emb)
                 if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
                     await message.clear_reactions()
                 else:
@@ -303,6 +326,7 @@ class Text2048(Command):
                 for c in ("🇬", "🇦", "🇲", "🇪", "⬛", "🇴", "🇻", "3️⃣", "🇷"):
                     create_task(message.add_reaction(c))
                     await asyncio.sleep(0.5)
+                return
         if data is not None:
             # Update message if gamestate has been changed
             if u_id == 0:
