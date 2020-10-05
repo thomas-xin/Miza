@@ -1575,9 +1575,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             print("Backup database created in", fn)
 
     async def as_rewards(self, diamonds, gold=Dummy):
-        if type(diamonds) is float:
+        if type(diamonds) is not int:
             diamonds = floor(diamonds)
-        if type(gold) is float:
+        if type(gold) is not int:
             gold = floor(gold)
         if gold is Dummy:
             gold = diamonds
