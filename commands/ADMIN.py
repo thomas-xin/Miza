@@ -1351,40 +1351,18 @@ class UpdateMessageCache(Database):
     file = "saves/message_cache.json"
 
     async def _load(self):
+        bot = self.bot
         with open(self.file, "rb") as f:
             zipped = await create_future(f.read)
         out = await create_future(zip2bytes, zipped)
         data = await create_future(pickle.loads, out)
-        add_message = self.bot.add_message
-        get_user = self.bot.get_user
-        fetch_channel = self.bot.fetch_channel
         i = 0
         for m_id, m in data.items():
-            try:
-                m_id = int(m_id)
-            except ValueError:
-                continue
-            channel = await fetch_channel(m.pop("channel"))
-            user = guild = None
-            if "author" in m:
-                user = get_user(m["author"], True)
-                guild = getattr(channel, "guild", None)
-                if guild is not None:
-                    member = guild.get_member(user.id)
-                    if member is not None:
-                        user = member
-                m.pop("author", None)
-            try:
-                message = discord.Message(state=self.bot._state, channel=channel, data=m)
-                if user is not None:
-                    message.author = user
-                add_message(message, files=False)
-            except:
-                print_exc()
-                print(m)
+            message = bot.CachedMessage(m)
+            bot.cache.messages[m_id] = message
             i += 1
-            if not i & 1023:
-                await asyncio.sleep(0.2)
+            if not i & 16383:
+                await asyncio.sleep(0.1)
                 if not i & 65535:
                     print(i)
         print(f"{len(data)} messages successfully loaded from file.")
@@ -1430,8 +1408,8 @@ class UpdateMessageCache(Database):
                     if reaction.me:
                         r["me"] = reaction.me
                     reactions.append(r)
-            if not i & 32767:
-                await asyncio.sleep(0.2)
+            if not i & 16383:
+                await asyncio.sleep(0.1)
         out = await create_future(pickle.dumps, data)
         zipped = await create_future(bytes2zip, out)
         with open(self.file, "wb") as f:

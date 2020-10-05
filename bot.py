@@ -2534,9 +2534,54 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             ack = delete
             ghost = True
 
+        class CachedMessage(discord.abc.Snowflake):
+
+            __slots__ = ("_data", "author", "channel")
+            id = 0
+            created_at = None
+
+            def __init__(self, data):
+                self._data = data
+
+            def __getattr__(self, k):
+                if k in self.__slots__:
+                    with suppress(AttributeError):
+                        return self.__getattribute__(k)
+                d = self.__getattribute__("_data")
+                if k == "id":
+                    try:
+                        d["id"] = int(d["id"])
+                    except:
+                        pass
+                    return d["id"]
+                if k == "channel":
+                    self.channel = bot.cache.channels.get(int(d["channel"]))
+                    return self.channel
+                if k == "author":
+                    self.author = bot.get_user(d["author"], replace=True)
+                    guild = getattr(self.channel, "guild", None)
+                    if guild is not None:
+                        member = guild.get_member(self.author.id)
+                        if member is not None:
+                            self.author = member
+                    return self.author
+                m = bot.cache.messages.get(d["id"])
+                if m is None or m is self:
+                    channel = self.channel
+                    author = self.author
+                    d.pop("author", None)
+                    d.pop("channel", None)
+                    message = discord.Message(state=bot._state, channel=channel, data=d)
+                    message.author = author
+                    bot.cache.messages[d["id"]] = message
+                    bot.add_message(message, files=False)
+                    return getattr(message, k)
+                return getattr(m, k)
+
         bot.UserGuild = UserGuild
         bot.GhostUser = GhostUser
         bot.GhostMessage = GhostMessage
+        bot.CachedMessage = CachedMessage
     
     def set_client_events(self):
 
@@ -2550,7 +2595,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             with tracebacksuppressor:
                 futs = set()
                 futs.add(create_task(self.get_state()))
-                print("Servers: ")
+                print("Servers:")
                 for guild in self.guilds:
                     if guild.unavailable:
                         print(f"> Guild {guild.id} is not available.")
@@ -2564,7 +2609,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     self.started = True
                     attachments = sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: os.path.getmtime("cache/" + file))
                     for file in attachments:
-                        with tracebacksuppressor():
+                        with tracebacksuppressor:
                             self.attachment_from_file(file)
                     print("Loading imported modules...")
                     # Wait until all modules have been loaded successfully
