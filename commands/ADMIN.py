@@ -261,7 +261,7 @@ class Mute(Command):
             await channel.send(msg)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos = [int(i) for i in vals.split("_")]
+        u_id, pos = [int(i) for i in vals.split("_", 1)]
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
@@ -479,7 +479,7 @@ class Ban(Command):
             await channel.send(msg)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos = [int(i) for i in vals.split("_")]
+        u_id, pos = [int(i) for i in vals.split("_", 1)]
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
@@ -1442,11 +1442,15 @@ class UpdateMessageLogs(Database):
     async def _bot_ready_(self, **void):
         if not self.searched and len(self.bot.cache.messages) <= 65536:
             self.searched = True
-            lim = floor(2097152 / len(self.bot.guilds))
             time = None
             with tracebacksuppressor:
                 time = await self.bot.database.message_cache.load()
-            return [create_task(self.bot.database.counts.getGuildHistory(guild, lim, after=time, callback=self.callback)) for guild in self.bot.guilds]
+            create_task(self.load_new_messages(time))
+
+    async def load_new_messages(self, time):
+        for guild in self.bot.guilds:
+            lim = floor(2097152 / len(self.bot.guilds))
+            await self.bot.database.counts.getGuildHistory(guild, lim, after=time, callback=self.callback)
 
     async def _save_(self, force=False, **void):
         if force or utc() - self.bot.database.message_cache.getmtime() > 120:
@@ -1639,7 +1643,7 @@ class UpdateFileLogs(Database):
                                 if b is None:
                                     with delay(1):
                                         b = self.bot.cache.attachments[a.id]
-                        fil = discord.File(io.BytesIO(b), filename=str(a).split("/")[-1])
+                        fil = discord.File(io.BytesIO(b), filename=str(a).rsplit("/", 1)[-1])
                         fils.append(fil)
                     except:
                         msg.append(best_url(a))

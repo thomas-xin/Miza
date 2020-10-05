@@ -137,7 +137,7 @@ def pull_rule34_paheal(argv, delay=5):
         with suppress(ValueError):
             ind = s.index('">Last</a><br>')
             s = s[ind - 5:ind]
-            v1 = xrand(1, int(s.split("/")[-1]))
+            v1 = xrand(1, int(s.rsplit("/", 1)[-1]))
             url = url[:-1] + str(v1)
 
             s = Request(url, decode=True)

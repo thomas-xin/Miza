@@ -124,7 +124,7 @@ class IMG(Command):
         bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos = [int(i) for i in vals.split("_")]
+        u_id, pos = [int(i) for i in vals.split("_", 1)]
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
@@ -237,7 +237,7 @@ class React(Command):
         return css_md(f"Added {sqr_md(a)} ➡️ {sqr_md(args[-1])} to the auto react list for {sqr_md(guild)}.")
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos = [int(i) for i in vals.split("_")]
+        u_id, pos = [int(i) for i in vals.split("_", 1)]
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
@@ -1125,20 +1125,23 @@ class Blend(Command):
         await bot.send_with_file(message.channel, "", f, filename=fn)
 
 
-class Cat(Command):
+class ImagePool:
     min_level = 0
-    description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it."
     usage = "<verbose(?v)>"
     flags = "v"
-    rate_limit = 0.25
+    rate_limit = 0.1
 
-    def __load__(self):
-        self.buffer = deque()
-        self.found = cdict()
-        self.refilling = False
-        create_task(self.refill_buffer(128))
+    async def __call__(self, bot, channel, flags, **void):
+        url = await bot.database.imagepools.get(self.database, self.fetch_one)
+        if "v" in flags:
+            return escape_everyone(url)
+        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
-    # Fetches one image from random pool
+
+class Cat(ImagePool, Command):
+    description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it."
+    database = "cats"
+
     async def fetch_one(self):
         if random.random() > 2 / 3:
             if random.random() > 2 / 3:
@@ -1159,58 +1162,11 @@ class Cat(Command):
             url = d["file" if x == 1 else "url"]
         return url
 
-    # Refills image buffer to a certain amount
-    async def refill_buffer(self, amount):
-        try:
-            while len(self.buffer) < amount + 1:
-                futs = [create_task(self.fetch_one()) for _ in loop(8)]
-                out = deque()
-                for fut in futs:
-                    with tracebacksuppressor:
-                        res = await fut
-                        out.append(res)
-                self.buffer.extend(out)
-                time.sleep(0.25)
-        except:
-            self.refilling = False
-            raise
-        self.refilling = False
 
-    # Grabs next image from buffer, allocating when necessary
-    async def get_buffer(self, amount):
-        if len(self.buffer) < amount + 1:
-            if not self.refilling:
-                self.refilling = True
-                create_task(self.refill_buffer(amount << 1))
-            if len(self.found) >= 4096:
-                return choice(tuple(self.found))
-            if not self.buffer:
-                return await create_future(nekos.cat, timeout=8)
-        url = self.buffer.popleft()
-        self.found[url] = True
-        return url
-
-    async def __call__(self, channel, flags, **void):
-        url = await self.get_buffer(64)
-        if "v" in flags:
-            return escape_everyone(url)
-        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
-
-
-class Dog(Command):
-    min_level = 0
+class Dog(ImagePool, Command):
     description = "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it."
-    usage = "<verbose(?v)>"
-    flags = "v"
-    rate_limit = 0.25
+    database = "dogs"
 
-    def __load__(self):
-        self.buffer = deque()
-        self.found = cdict()
-        self.refilling = False
-        create_task(self.refill_buffer(128))
-
-    # Fetches one image from random pool
     async def fetch_one(self):
         if random.random() > 2 / 3:
             if random.random() > 2 / 3:
@@ -1229,89 +1185,73 @@ class Dog(Command):
             if type(d) is list:
                 d = choice(d)
             url = d["file" if x == 1 else "message"]
-            url = url.replace("\\", "/")
+            if "\\" in url:
+                url = url.replace("\\/", "/").replace("\\", "/")
             while "///" in url:
                 url = url.replace("///", "//")
         return url
 
-    # Refills image buffer to a certain amount
-    async def refill_buffer(self, amount):
-        try:
-            while len(self.buffer) < amount + 1:
-                futs = [create_task(self.fetch_one()) for _ in loop(8)]
-                out = deque()
-                for fut in futs:
-                    with tracebacksuppressor:
-                        res = await fut
-                        out.append(res)
-                self.buffer.extend(out)
-                time.sleep(0.25)
-        except:
-            self.refilling = False
-            raise
-        self.refilling = False
 
-    # Grabs next image from buffer, allocating when necessary
-    async def get_buffer(self, amount):
-        if len(self.buffer) < amount + 1:
-            if not self.refilling:
-                self.refilling = True
-                create_task(self.refill_buffer(amount << 1))
-            if len(self.found) >= 4096:
-                return choice(tuple(self.found))
-            if not self.buffer:
-                return await create_future(nekos.img, "woof", timeout=8)
-        url = self.buffer.popleft()
-        self.found[url] = True
-        return url
+class _8Ball(ImagePool, Command):
+    description = "Pulls a random image from cdn.nekos.life/8ball, and embeds it."
+    database = "8ball"
 
-    async def __call__(self, channel, flags, **void):
-        url = await self.get_buffer(64)
+    def __call__(self, channel, flags, **void):
+        e_id = choice(
+            "Absolutely",
+            "Ask_Again",
+            "Go_For_It",
+            "It_is_OK",
+            "It_will_pass",
+            "Maybe",
+            "No",
+            "No_doubt",
+            "Not_Now",
+            "Very_Likely",
+            "Wait_For_It",
+            "Yes",
+            "Youre_hot",
+            "cannot_tell_now",
+            "count_on_it",
+        )
+        url = f"https://cdn.nekos.life/8ball/{e_id}.png"
         if "v" in flags:
             return escape_everyone(url)
         self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
 
-class _8Ball(Command):
-    min_level = 0
-    description = "Pulls a random image from cdn.nekos.life/8ball, and embeds it."
+class UpdateImagePools(Database):
+    name = "imagepools"
+    loading = {}
 
-    def __load__(self):
-        self.buffer = deque()
-        self.found = cdict()
-        self.refilling = False
-        create_future_ex(self.refill_buffer, 128)
+    async def load_until(self, key, func, threshold):
+        data = set_dict(self.data, key, alist())
+        found = set(data)
+        for i in range(threshold << 1):
+            if len(data) > threshold:
+                break
+            with tracebacksuppressor:
+                out = await func()
+                if out not in found:
+                    if i & 1:
+                        data.appendleft(out)
+                    else:
+                        data.append(out)
+                    found.add(out)
+                    self.update()
 
-    # Fetches one image from random pool
-    fetch_one = lambda self: nekos.img("8ball")
-
-    # Refills image buffer to a certain amount
-    def refill_buffer(self, amount):
-        try:
-            while len(self.buffer) < amount + 1:
-                url = self.fetch_one()
-                self.buffer.append(url)
-                time.sleep(0.25)
-        except:
-            self.refilling = False
-            raise
-        self.refilling = False
-
-    # Grabs next image from buffer, allocating when necessary
-    def get_buffer(self, amount):
-        if len(self.buffer) < amount + 1:
-            if not self.refilling:
-                self.refilling = True
-                create_future_ex(self.refill_buffer, amount << 1)
-            if not self.buffer:
-                return choice(tuple(self.found))
-        url = self.buffer.popleft()
-        self.found[url] = True
-        return url
-
-    def __call__(self, channel, **void):
-        url = self.get_buffer(64)
-        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
+    async def get(self, key, func, threshold=512):
+        if not self.loading.get(key):
+            self.loading[key] = True
+            create_task(self.load_until(key, func, threshold))
+        data = set_dict(self.data, key, alist())
+        if len(data) < threshold or len(data) < threshold << 1 and xrand(2):
+            out = await func()
+            if out not in data:
+                data.add(out)
+                self.update()
+            return out
+        return choice(data)
 
 
 class UpdateImages(Database):

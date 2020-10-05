@@ -205,7 +205,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         for channel in sorted(guild.text_channels, key=lambda c: c.id):
             if channel.permissions_for(member).send_messages:
                 with suppress(ValueError):
-                    rname = full_prune(channel.name).replace("-", " ").replace("_", " ").split()[0]
+                    rname = full_prune(channel.name).replace("-", " ").replace("_", " ").split(maxsplit=1)[0]
                     i = ("miza", "bots", "bot", "general").index(rname)
                     if i < min(found):
                         found[i] = channel
@@ -513,14 +513,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         # Parse and follow invites to get partial guild info
                         invite = await super().fetch_invite(g_id.strip("< >"))
                         g = invite.guild
+                        with suppress(KeyError):
+                            return self.cache.guilds[g.id]
                         if not hasattr(g, "member_count"):
-                            guild = cdict(member_count=invite.approximate_member_count)
+                            guild = cdict(ghost=True, member_count=invite.approximate_member_count)
                             for at in g.__slots__:
                                 setattr(guild, at, getattr(g, at))
                             icon = str(guild.icon)
                             guild.icon_url = f"https://cdn.discordapp.com/icons/{guild.id}/{icon}"
                             if icon.startswith("a_"):
                                 guild.icon_url += ".gif"
+                            guild.created_at = snowflake_time(guild.id)
                         else:
                             guild = g
                         return guild
@@ -699,7 +702,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         for url in urls:
             if is_discord_message_link(url):
                 found = deque()
-                spl = url[url.index("channels/") + 9:].replace("?", "/").split("/")
+                spl = url[url.index("channels/") + 9:].replace("?", "/").split("/", 2)
                 c = await self.fetch_channel(spl[1])
                 m = await self.fetch_message(spl[2], c)
                 # All attachments should be valid URLs
@@ -736,12 +739,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         elif preserve:
                             lost.append(u)
             elif images and is_imgur_url(url):
-                first = url.split("?")[0]
+                first = url.split("?", 1)[0]
                 if not first.endswith(".jpg"):
                     first += ".jpg"
                 out.append(first)
             elif images and is_giphy_url(url):
-                first = url.split("?")[0]
+                first = url.split("?", 1)[0]
                 item = first[first.rindex("/") + 1:]
                 out.append(f"https://media2.giphy.com/media/{item}/giphy.gif")
             elif images and is_tenor_url(url):
@@ -842,13 +845,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return attachment
 
     def attachment_from_file(self, file):
-        a_id = int(file.split(".")[0][11:])
+        a_id = int(file.split(".", 1)[0][11:])
         self.cache.attachments[a_id] = a_id
     
     async def get_attachment(self, url):
         if is_discord_url(url) and "attachments/" in url[:64]:
             with suppress(ValueError):
-                a_id = int(url.split("?")[0].split("/")[-2])
+                a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
                 with suppress(LookupError):
                     for i in range(30):
                         data = self.cache.attachments[a_id]
@@ -1385,7 +1388,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         raw += 86400
                     while raw - curr > 86400:
                         raw -= 86400
-                t = utc_ts(raw) - utc_ts(tparser.parse("0s"))
+                t = utc_ts(raw) - zerot()
         if type(t) is not float:
             t = float(t)
         return t

@@ -245,7 +245,7 @@ class Text2048(Command):
 
     async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
         # print(user, message, reaction, argv)
-        u_id, mode = [int(x) for x in vals.split("_")]
+        u_id, mode = [int(x) for x in vals.split("_", 1)]
         if reaction is not None and u_id != user.id and u_id != 0 and perm < 3:
             return
         spl = argv.split("-")
@@ -460,7 +460,7 @@ class SlotMachine(Command):
         return f"*```callback-fun-slotmachine-{user.id}_{bet}-\nLoading Slot Machine...```*"
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, bet = [int(i) for i in vals.split("_")]
+        u_id, bet = [int(i) for i in vals.split("_", 1)]
         if reaction is None or reaction.decode("utf-8", "replace") == "⤵️":
             if reaction is None:
                 create_task(message.add_reaction("⤵️"))
@@ -603,7 +603,7 @@ class UpdateDogpiles(Database):
 
 
 class Daily(Command):
-    name = ["Quests", "Tasks", "Challenges"]
+    name = ["Quests", "Quest", "Tasks", "Challenges", "Dailies"]
     min_level = 0
     description = "Shows your list of daily quests."
     rate_limit = 1
@@ -651,7 +651,7 @@ class UpdateDailies(Database):
     def get(self, user):
         data = self.data.get(user.id)
         if data is None or utc() - data["time"] >= 86400:
-            data = self.data[user.id] = dict(quests=self.generate(user), time=tparser.parse("0s").timestamp())
+            data = self.data[user.id] = dict(quests=self.generate(user), time=zerot())
             self.update()
         return data
 
@@ -680,7 +680,7 @@ class UpdateDailies(Database):
                 x = round((level * 10 + 100) * random.random() + 70)
                 q = cdict(name=f"Post {x} messages", gold=x * 4, progress=0, required=x, action="send")
             elif q_id == 1:
-                q = cdict(name=f"Invite me to a server and/or react to the join message", diamonds=floor(10 + level / 5), progress=0, required=1, action="guild")
+                q = cdict(name=f"Invite me to a server and/or react to the join message", diamonds=floor(10 + level / 5), progress=0, required=1, action="invite")
             elif q_id == 2:
                 q = cdict(name=f"Earn 1 diamond", gold=level * 50, progress=0, required=1, action="diamond")
             elif q_id == 3:
@@ -737,11 +737,12 @@ class UpdateDailies(Database):
             if utc() - self.typing[user.id] > 10:
                 self.progress_quests(user, "typing", 10)
                 self.typing[user.id] = utc()
-        self.typing[user.id] = utc()
+        else:
+            self.typing[user.id] = utc()
 
 
 class Profile(Command):
-    name = ["Balance", "Wallet"]
+    name = ["Bal", "Balance", "Wallet"]
     min_level = 0
     description = "Shows the target users' profile."
     usage = "<*objects>"
@@ -770,7 +771,7 @@ class Profile(Command):
     join_cache = {}
 
     async def _callback_(self, bot, message, reaction, user, vals, **void):
-        ts = int(vals)
+        ts = int(float(vals))
         if utc() - ts > 86400:
             self.join_cache.pop(message.id, None)
             return
@@ -1023,7 +1024,7 @@ class Mimic(Command):
         return css_md(out)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos = [int(i) for i in vals.split("_")]
+        u_id, pos = [int(i) for i in vals.split("_", 1)]
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm <= inf:
             return
         if reaction not in self.directions and reaction is not None:

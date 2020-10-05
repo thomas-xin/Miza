@@ -305,7 +305,7 @@ class Loop(Command):
                     (str(bot.id) + ">" + n).upper() in func.replace(" ", "").upper()
                 ):
                     raise PermissionError("Must be owner to execute nested loop.")
-        func2 = " ".join(func2.split(" ")[1:])
+        func2 = " ".join(func2.split(" ", 1)[1:])
         create_task(send_with_react(
             channel,
             italics(css_md(f"Looping {sqr_md(func)} {iters} time{'s' if iters != 1 else ''}...")),
@@ -358,6 +358,11 @@ class Avatar(Command):
             async with ExceptionSender(channel):
                 with suppress(StopIteration):
                     if argv:
+                        if is_url(argv) or argv.startswith("discord.gg/"):
+                            g = await bot.fetch_guild(argv)
+                            emb = await self.getGuildData(g, flags)
+                            embs.add(emb)
+                            raise StopIteration
                         u_id = argv
                         with suppress():
                             u_id = verify_id(u_id)
@@ -526,6 +531,11 @@ class Info(Command):
             with ExceptionSender(channel):
                 with suppress(StopIteration):
                     if argv:
+                        if is_url(argv) or argv.startswith("discord.gg/"):
+                            g = await bot.fetch_guild(argv)
+                            emb = await self.getGuildData(g, flags)
+                            embs.add(emb)
+                            raise StopIteration
                         u_id = argv
                         with suppress():
                             u_id = verify_id(u_id)
@@ -1007,7 +1017,7 @@ class Reminder(Command):
                 foundkey = cdict(get=lambda *void: None)
             if foundkey.get("event"):
                 if " event " in argv:
-                    spl = argv.split(" event ")
+                    spl = argv.rsplit(" event ", 1)
                 elif temp.startswith("event "):
                     spl = [argv[6:]]
                     msg = ""
@@ -1020,7 +1030,7 @@ class Reminder(Command):
                 if temp.endswith("is online"):
                     argv = argv[:-9]
                 if " when " in argv:
-                    spl = argv.split(" when ")
+                    spl = argv.rsplit(" when ", 1)
                 elif temp.startswith("when "):
                     spl = [argv[5:]]
                     msg = ""
@@ -1031,7 +1041,7 @@ class Reminder(Command):
                     break
             if foundkey.get("in"):
                 if " in " in argv:
-                    spl = argv.split(" in ")
+                    spl = argv.rsplit(" in ", 1)
                 elif temp.startswith("in "):
                     spl = [argv[3:]]
                     msg = ""
@@ -1041,7 +1051,7 @@ class Reminder(Command):
                     break
             if foundkey.get("at"):
                 if " at " in argv:
-                    spl = argv.split(" at ")
+                    spl = argv.rsplit(" at ", 1)
                 elif temp.startswith("at "):
                     spl = [argv[3:]]
                     msg = ""
@@ -1051,7 +1061,7 @@ class Reminder(Command):
                     break
             if foundkey.get("on"):
                 if " on " in argv:
-                    spl = argv.split(" on ")
+                    spl = argv.rsplit(" on ", 1)
                 elif temp.startswith("on "):
                     spl = [argv[3:]]
                     msg = ""
@@ -1181,7 +1191,7 @@ class Reminder(Command):
         return dict(content=out, embed=emb)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos, s_id = [int(i) for i in vals.split("_")]
+        u_id, pos, s_id = [int(i) for i in vals.split("_", 2)]
         if reaction not in (None, self.directions[-1]) and u_id != user.id:
             return
         if reaction not in self.directions and reaction is not None:

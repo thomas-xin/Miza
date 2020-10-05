@@ -908,17 +908,7 @@ def org2xm(org, dat=None):
         if not is_url(org):
             raise TypeError("Invalid input URL.")
         org = verify_url(org)
-        data = None
-        resp = None
-        # Make sure file header is correct
-        with requests.get(org, timeout=8, stream=True) as resp:
-            it = resp.iter_content(4096)
-            b = bytes()
-            while len(b) < 4:
-                b += next(it)
-            if not b.startswith(b"Org-"):
-                raise ValueError("Invalid file header.")
-            data = b + resp.content
+        data = Request(org)
         if not data:
             raise FileNotFoundError("Error downloading file content.")
     else:
@@ -951,7 +941,7 @@ def org2xm(org, dat=None):
     if compat:
         args.append("c")
     subprocess.check_output(args)
-    r_xm = "cache/" + str(ts) + ".xm"
+    r_xm = f"cache/{ts}.xm"
     if not os.path.exists("cache/" + str(ts) + ".xm"):
         raise FileNotFoundError("Unable to locate converted file.")
     if not os.path.getsize(r_xm):
@@ -962,12 +952,61 @@ def org2xm(org, dat=None):
     return r_xm
 
 
+def mid2mp3(mid):
+    url = Request(
+        "https://hostfast.onlineconverter.com/file/send",
+        files={
+            "class": (None, "audio"),
+            "from": (None, "midi"),
+            "to": (None, "mp3"),
+            "source": (None, "file"),
+            "file": mid,
+            "audio_quality": (None, "192"),
+        },
+        method="post",
+        decode=True,
+    )
+    print(url)
+    fn = url.rsplit("/", 1)[-1].strip("\x00")
+    for i in range(360):
+        with delay(1):
+            test = Request(f"https://hostfast.onlineconverter.com/file/{fn}")
+            if test == b"d":
+                break
+        print(i)
+    ts = round(utc() * 1000)
+    r_mp3 = f"cache/{ts}.mp3"
+    with open(r_mp3, "wb") as f:
+        f.write(Request(f"https://hostfast.onlineconverter.com/file/{fn}/download"))
+    return r_mp3
+
+
+CONVERTERS = {
+    b"MThd": mid2mp3,
+    b"Org-": org2xm,
+}
+
+def select_and_convert(stream):
+    with requests.get(stream, timeout=8, stream=True) as resp:
+        it = resp.iter_content(4096)
+        b = bytes()
+        while len(b) < 4:
+            b += next(it)
+        try:
+            convert = CONVERTERS[b[:4]]
+        except KeyError:
+            raise ValueError("Invalid file header.")
+        b += resp.content
+    return convert(b)
+
+
 # Represents a cached audio file in opus format. Executes and references FFmpeg processes loading the file.
 class AudioFile:
     
     def __init__(self, fn):
         self.file = fn
         self.proc = None
+        self.wasfile = False
         self.loading = False
         self.expired = False
         self.buffered = False
@@ -998,12 +1037,11 @@ class AudioFile:
                 with delay(0.1):
                     if not self.proc.is_running():
                         if check_fmt:
-                            try:
-                                xm = org2xm(stream)
-                            except ValueError:
-                                pass
-                            else:
-                                return self.load(xm, check_fmt=False, force=True)
+                            new = None
+                            with suppress(ValueError):
+                                new = select_and_convert(stream)
+                            if new is not None:
+                                return self.load(new, check_fmt=False, force=True)
                         print(self.proc.args)
                         err = self.proc.stderr.read().decode("utf-8", "replace")
                         if err:
@@ -1031,7 +1069,7 @@ class AudioFile:
         if ytdl.bot is not None and "videoplayback" in stream:
             with suppress(ValueError):
                 i = stream.index("&ip=") + 4
-                ip = stream[i:].split("&")[0]
+                ip = stream[i:].split("&", 1)[0]
                 ytdl.bot.update_ip(ip)
         return self
 
@@ -1042,11 +1080,12 @@ class AudioFile:
     def update(self):
         # Newly loaded files have their duration estimates copied to all queue entries containing them
         if self.loaded:
-            dur = self.duration()
-            if dur is not None:
-                for e in self.assign:
-                    e["duration"] = dur
-                self.assign.clear()
+            if not self.wasfile:
+                dur = self.duration()
+                if dur is not None:
+                    for e in self.assign:
+                        e["duration"] = dur
+                    self.assign.clear()
         # Check when file has been fully loaded
         elif self.buffered and not self.proc.is_running():
             if not self.loaded:
@@ -1436,7 +1475,7 @@ class AudioDownloader:
                 except KeyError:
                     url = resp["id"]
         if is_discord_url(url):
-            title = url.split("?")[0].split("/")[-1]
+            title = url.split("?", 1)[0].rsplit("/", 1)[-1]
             if "." in title:
                 title = title[:title.rindex(".")]
             return dict(url=url, webpage_url=url, title=title, direct=True)
@@ -1454,7 +1493,7 @@ class AudioDownloader:
     # Extracts audio information from a single URL.
     def extract_from(self, url):
         if is_discord_url(url):
-            title = url.split("?")[0].split("/")[-1]
+            title = url.split("?", 1)[0].rsplit("/", 1)[-1]
             if "." in title:
                 title = title[:title.rindex(".")]
             return dict(url=url, webpage_url=url, title=title, direct=True)
@@ -1501,7 +1540,7 @@ class AudioDownloader:
                 for x in ("?list=", "&list="):
                     if x in item:
                         p_id = item[item.index(x) + len(x):]
-                        p_id = p_id.split("&")[0]
+                        p_id = p_id.split("&", 1)[0]
                         break
                 # Pages may contain up to 50 items each
                 if p_id:
@@ -1537,7 +1576,7 @@ class AudioDownloader:
                     for x in ("?v=", "&v="):
                         if x in item:
                             v_id = item[item.index(x) + len(x):]
-                            v_id = v_id.split("&")[0]
+                            v_id = v_id.split("&", 1)[0]
                             break
                     if v_id:
                         for i, e in enumerate(output):
@@ -1549,21 +1588,21 @@ class AudioDownloader:
                 if "playlist" in item:
                     url = item[item.index("playlist"):]
                     url = url[url.index("/") + 1:]
-                    key = url.split("/")[0]
+                    key = url.split("/", 1)[0]
                     url = f"https://api.spotify.com/v1/playlists/{key}/tracks?type=track,episode"
                     page = 100
                 # Spotify album searches contain up to 50 items each
                 elif "album" in item:
                     url = item[item.index("album"):]
                     url = url[url.index("/") + 1:]
-                    key = url.split("/")[0]
+                    key = url.split("/", 1)[0]
                     url = f"https://api.spotify.com/v1/albums/{key}/tracks?type=track,episode"
                     page = 50
                 # Single track links also supported
                 elif "track" in item:
                     url = item[item.index("track"):]
                     url = url[url.index("/") + 1:]
-                    key = url.split("/")[0]
+                    key = url.split("/", 1)[0]
                     url = f"https://api.spotify.com/v1/tracks/{key}"
                     page = 1
                 else:
@@ -1600,7 +1639,7 @@ class AudioDownloader:
                     for x in ("?highlight=spotify:track:", "&highlight=spotify:track:"):
                         if x in item:
                             v_id = item[item.index(x) + len(x):]
-                            v_id = v_id.split("&")[0]
+                            v_id = v_id.split("&", 1)[0]
                             break
                     if v_id:
                         for i, e in enumerate(output):
@@ -1653,7 +1692,7 @@ class AudioDownloader:
                                     if "title" in entry:
                                         title = entry["title"]
                                     else:
-                                        title = entry["url"].split("/")[-1]
+                                        title = entry["url"].rsplit("/", 1)[-1]
                                         if "." in title:
                                             title = title[:title.rindex(".")]
                                         found = False
@@ -1787,7 +1826,9 @@ class AudioDownloader:
         # Select a filename based on current time to avoid conflicts
         if fmt[:3] == "mid":
             mid = True
-            fmt = "ogg"
+            fmt = "mp3"
+            br = 192
+            fs = 67108864
         else:
             mid = False
         fn = f"cache/&{time_snowflake(utc_dt())}.{fmt}"
@@ -1796,44 +1837,58 @@ class AudioDownloader:
         stream = info["stream"]
         if not stream:
             raise LookupError(f"No stream URLs found for {url}")
-        # Attempt to automatically adjust output bitrate based on file duration
-        duration = get_duration(stream)
-        if type(duration) not in (int, float):
-            dur = 960
-        else:
-            dur = duration
-        fs = fl - 131072
+        if not mid:
+            # Attempt to automatically adjust output bitrate based on file duration
+            duration = get_duration(stream)
+            if type(duration) not in (int, float):
+                dur = 960
+            else:
+                dur = duration
+            fs = fl - 131072
         args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-vn", "-i", stream]
         if auds is not None:
             args.extend(auds.construct_options(full=True))
             dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
-        if dur > 960:
-            dur = 960
-        br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
+        if not mid:
+            if dur > 960:
+                dur = 960
+            br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
+        if br > auds.stats.bitrate:
+            br = max(4096, auds.stats.bitrate)
         args.extend(("-ar", str(SAMPLE_RATE), "-b:a", str(br), "-fs", str(fs), fn))
         try:
             subprocess.check_output(args)
         except subprocess.CalledProcessError as ex:
             # Attempt to convert file from org if FFmpeg failed
             try:
-                xm = org2xm(stream)
+                new = select_and_convert(stream)
             except ValueError:
                 raise ex
             # Re-estimate duration if file was successfully converted from org
-            args[8] = xm
-            dur = get_duration(xm)
-            if dur:
-                if auds:
-                    dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
-                br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
-                args[-4] = str(br)
+            args[8] = new
+            if not mid:
+                dur = get_duration(new)
+                if dur:
+                    if auds:
+                        dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
+                    br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
+                    args[-4] = str(br)
+                if br > auds.stats.bitrate:
+                    br = max(4096, auds.stats.bitrate)
             subprocess.check_output(args)
-            with suppress():
-                os.remove(xm)
+            if not is_url(new):
+                with suppress():
+                    os.remove(new)
         if not mid:
             return fn, f"{info['name']}.{fmt}"
         with open(fn, "rb") as f:
-            resp = Request("https://cts.ofoct.com/upload.php", method="post", files={"myfile": ("temp.ogg", f)}, timeout=32, decode=True)
+            resp = Request(
+                "https://cts.ofoct.com/upload.php",
+                method="post",
+                files={"myfile": ("temp.mp3", f)},
+                timeout=32,
+                decode=True
+            )
             resp_fn = ast.literal_eval(resp)[0]
         url = f"https://cts.ofoct.com/convert-file_v2.php?cid=audio2midi&output=MID&tmpfpath={resp_fn}&row=file1&sourcename=temp.ogg&rowid=file1"
         print(url)
@@ -2023,7 +2078,7 @@ class Queue(Command):
             return css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(sec2time(total_duration))}. 🎶"), 1
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos, v = [int(i) for i in vals.split("_")]
+        u_id, pos, v = [int(i) for i in vals.split("_", 2)]
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
@@ -2226,7 +2281,7 @@ class Playlist(Command):
         return css_md(f"Added {sqr_md(', '.join(names))} to the default playlist for {sqr_md(guild)}.")
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos = [int(i) for i in vals.split("_")]
+        u_id, pos = [int(i) for i in vals.split("_", 1)]
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
@@ -3769,6 +3824,7 @@ class UpdateAudio(Database):
         for file in os.listdir("cache"):
             if file.endswith(".opus") and file not in ytdl.cache:
                 ytdl.cache[file] = f = AudioFile(file)
+                f.wasfile = True
                 f.loading = f.buffered = f.loaded = True
                 f.stream = "cache/" + file
                 f.proc = cdict(is_running=lambda: False, kill=lambda: None)

@@ -449,7 +449,7 @@ class CS_Database(Database):
 
 
 class MathQuiz(Command):
-    name = ["MathTest", "mq"]
+    name = ["MathTest", "MQ"]
     min_level = 1
     description = "Starts a math quiz in the current channel."
     usage = "<mode(easy)(hard)> <disable(?d)>"
@@ -789,8 +789,8 @@ class DeviantArt(Command):
         user = spl[0]
         if spl[1] != "gallery":
             raise ArgumentError("Please input a DeviantArt Gallery URL.")
-        content = spl[2].split("&")[0]
-        folder = no_md(spl[-1].split("&")[0])
+        content = spl[2].split("&", 1)[0]
+        folder = no_md(spl[-1].split("&", 1)[0])
         # Gallery may be an ID or "all"
         try:
             content = int(content)

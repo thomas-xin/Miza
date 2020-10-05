@@ -65,7 +65,7 @@ def header():
 def get_request(url):
     if is_discord_url(url) and "attachments/" in url[:64]:
         try:
-            a_id = int(url.split("?")[0].split("/")[-2])
+            a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
         except ValueError:
             pass
         else:

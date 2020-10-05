@@ -1005,12 +1005,8 @@ custom list-like data structure that incorporates the functionality of numpy arr
         if sorted:
             try:
                 temp = np.unique(self.view)
-            except TypeError:
-                temp = {}
-                for x in self.view:
-                    if x not in temp:
-                        temp[x] = None
-                temp = sorted(temp)
+            except:
+                temp = sorted(set(self.view))
         else:
             temp = {}
             for x in self.view:
@@ -1384,7 +1380,10 @@ class cdict(dict):
         with suppress(AttributeError):
             return self.__getattribute__(k)
         if not k.startswith("__") or not k.endswith("__"):
-            return self.__getitem__(k)
+            try:
+                return self.__getitem__(k)
+            except KeyError as ex:
+                raise AttributeError(*ex.args)
         raise AttributeError(k)
 
     def __setattr__(self, k, v):
@@ -2880,6 +2879,15 @@ def int_key(d):
 utc = time.time
 utc_dt = datetime.datetime.utcnow
 ep = datetime.datetime(1970, 1, 1)
+
+_last_update = 0
+_last_date = None
+def zerot():
+    global _last_date, _last_update
+    if utc() // 100 > _last_update:
+        _last_update = utc() // 100
+        _last_date = utc_ts(datetime.datetime.fromtimestamp(time.mktime(datetime.datetime.now().date().timetuple())))
+    return _last_date
 
 def utc_ts(dt):
     with suppress(TypeError):
