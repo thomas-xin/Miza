@@ -591,8 +591,8 @@ class UpdateDogpiles(Database):
                             curr[1] = xrand(-3) + 1
                             if len(checker):
                                 create_task(message.channel.send(checker, tts=message.tts))
-                                self.bot.database.users.add_xp(message.author, len(message) / 2 + 16)
-                                self.bot.database.users.add_gold(message.author, len(message) / 4 + 32)
+                                self.bot.database.users.add_xp(message.author, len(message.content) / 2 + 16)
+                                self.bot.database.users.add_gold(message.author, len(message.content) / 4 + 32)
                     else:
                         # Don't imitate messages longer than 128 characters to prevent spam
                         if len(checker) > 128:
