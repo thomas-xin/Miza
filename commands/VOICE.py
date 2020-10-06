@@ -1853,7 +1853,7 @@ class AudioDownloader:
             if dur > 960:
                 dur = 960
             br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
-        if br > auds.stats.bitrate:
+        if auds and br > auds.stats.bitrate:
             br = max(4096, auds.stats.bitrate)
         args.extend(("-ar", str(SAMPLE_RATE), "-b:a", str(br), "-fs", str(fs), fn))
         try:
@@ -1873,7 +1873,7 @@ class AudioDownloader:
                         dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
                     br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
                     args[-4] = str(br)
-                if br > auds.stats.bitrate:
+                if auds and br > auds.stats.bitrate:
                     br = max(4096, auds.stats.bitrate)
             subprocess.check_output(args)
             if not is_url(new):
