@@ -1845,6 +1845,8 @@ class AudioDownloader:
             else:
                 dur = duration
             fs = fl - 131072
+        else:
+            dur = 0
         args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-vn", "-i", stream]
         if auds is not None:
             args.extend(auds.construct_options(full=True))
