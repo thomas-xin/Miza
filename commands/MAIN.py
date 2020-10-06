@@ -1593,9 +1593,11 @@ class UpdateFlavour(Database):
     async def get(self):
         out = x = None
         i = xrand(7)
-        if i <= 1 and self.facts:
+        facts = self.bot.database.users.facts
+        useless = self.bot.database.users.useless
+        if i <= 1 and facts:
             with tracebacksuppressor:
-                text = choice(self.facts)
+                text = choice(facts)
                 fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
                 out = f"\n{fact} `{text}`"
         elif i == 2:
@@ -1619,16 +1621,16 @@ class UpdateFlavour(Database):
             with tracebacksuppressor:
                 if self.data.get(x) and len(self.data[x]) > 256 and xrand(2):
                     return choice(self.data[x])
-                if len(self.useless) < 128 and (not self.useless or random.random() > 0.75):
+                if len(useless) < 128 and (not useless or random.random() > 0.75):
                     data = await Request("https://www.uselessfacts.net/api/posts?d=" + str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date()), aio=True)
                     factlist = [fact["title"].replace("`", "") for fact in eval_json(data) if "title" in fact]
                     random.shuffle(factlist)
-                    self.useless = deque()
+                    useless.clear()
                     for text in factlist:
                         fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
                         out = f"\n{fact} `{text}`"
-                        self.useless.append(out)
-                out = self.useless.popleft()
+                        useless.append(out)
+                out = useless.popleft()
         if x and out:
             if x in self.data:
                 if out not in self.data[x]:
@@ -1657,7 +1659,7 @@ class UpdateUsers(Database):
         self.flavour_buffer = deque()
         self.flavour_set = set()
         self.flavour = ()
-        self.useless = ()
+        self.useless = deque()
         with open("misc/facts.txt", "r", encoding="utf-8") as f:
             self.facts = f.read().splitlines()
 
