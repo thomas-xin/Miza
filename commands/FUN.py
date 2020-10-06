@@ -729,8 +729,9 @@ class UpdateDailies(Database):
             t = utc()
             self.progress_quests(user, "typing", t - self.typing.pop(user.id, t))
 
-    def _command_(self, user, **void):
-        self.progress_quests(user, "command")
+    def _command_(self, user, loop=False, **void):
+        if not loop:
+            self.progress_quests(user, "command")
 
     def _typing_(self, user, **void):
         if user.id in self.typing:
