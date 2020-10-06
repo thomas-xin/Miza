@@ -1223,7 +1223,7 @@ class _8Ball(ImagePool, Command):
 class UpdateImagePools(Database):
     name = "imagepools"
     loading = {}
-    sem = Semaphore(6, 1, rate_limit=1)
+    sem = Semaphore(8, 1, rate_limit=1)
     no_delete = True
 
     async def load_until(self, key, func, threshold):
@@ -1244,12 +1244,13 @@ class UpdateImagePools(Database):
     
     async def proc(self, key, func):
         with tracebacksuppressor(SemaphoreOverflowError):
-            data = set_dict(self.data, key, alist())
-            out = await func()
-            if out not in data:
-                data.add(out)
-                self.update()
-            return out
+            async with self.sem:
+                data = set_dict(self.data, key, alist())
+                out = await func()
+                if out not in data:
+                    data.add(out)
+                    self.update()
+                return out
 
     async def get(self, key, func, threshold=1024):
         if not self.loading.get(key):
