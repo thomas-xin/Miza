@@ -73,11 +73,11 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     
     def __enter__(self):
         self.last = utc()
-        if self.active >= self.limit or len(self.rate_bin) >= self.limit:
+        if self.is_busy():
             if self.passive >= self.buffer:
                 raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
             self.passive += 1
-            while self.active >= self.limit or len(self.rate_bin) >= self.limit:
+            while self.is_busy():
                 time.sleep(self.delay if not self.ratio else (random.random() * self.ratio + 1) * self.delay)
                 self._update_bin()
             self.passive -= 1
@@ -88,11 +88,11 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     
     async def __aenter__(self):
         self.last = utc()
-        if self.active >= self.limit or len(self.rate_bin) >= self.limit:
+        if self.is_busy():
             if self.passive >= self.buffer:
                 raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
             self.passive += 1
-            while self.active >= self.limit or len(self.rate_bin) >= self.limit:
+            while self.is_busy():
                 await asyncio.sleep(self.delay)
                 self._update_bin()
             self.passive -= 1
@@ -113,8 +113,11 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         while self.value >= self.limit:
             await asyncio.sleep(self.delay)
         
-    def is_busy(self):
+    def is_active(self):
         return self.active or self.passive
+
+    def is_busy(self):
+        return self.active >= self.limit or len(self.rate_bin) >= self.limit
 
     @property
     def busy(self):
