@@ -1251,12 +1251,12 @@ class UpdateImagePools(Database):
                 self.update()
             return out
 
-    async def get(self, key, func, threshold=512):
+    async def get(self, key, func, threshold=1024):
         if not self.loading.get(key):
             self.loading[key] = True
             create_task(self.load_until(key, func, threshold))
         data = set_dict(self.data, key, alist())
-        if len(data) < threshold or len(data) < threshold << 1 and xrand(2):
+        if len(data) < threshold >> 1 or len(data) < threshold and xrand(2):
             out = await func()
             if out not in data:
                 data.add(out)
