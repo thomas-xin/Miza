@@ -1350,6 +1350,7 @@ class UpdateMessageCache(Database):
     no_file = True
     file = "saves/message_cache.json"
     loaded = False
+    finished = False
 
     async def _load(self):
         bot = self.bot
@@ -1379,9 +1380,10 @@ class UpdateMessageCache(Database):
         if utc() - t < 3600:
             create_task(self._load())
             return datetime.datetime.fromtimestamp(t)
+        self.loaded = True
 
     async def save(self):
-        if self.loaded:
+        if self.loaded and self.finished:
             bot = self.bot
             data = {}
             for i, message in enumerate(deque(bot.cache.messages.values()), 1):
@@ -1454,6 +1456,7 @@ class UpdateMessageLogs(Database):
         for guild in self.bot.guilds:
             lim = floor(2097152 / len(self.bot.guilds))
             await self.bot.database.counts.getGuildHistory(guild, lim, after=time, callback=self.callback)
+        self.bot.database.message_cache.finished = True
 
     async def _save_(self, force=False, **void):
         if force or utc() - self.bot.database.message_cache.getmtime() > 120:
