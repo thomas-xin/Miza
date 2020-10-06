@@ -1242,7 +1242,7 @@ class UpdateImagePools(Database):
                     found.add(out)
                     self.update()
     
-    async def proc(key, func):
+    async def proc(self, key, func):
         with tracebacksuppressor(SemaphoreOverflowError):
             data = set_dict(self.data, key, alist())
             out = await func()

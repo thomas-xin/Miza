@@ -1785,7 +1785,7 @@ class UpdateUsers(Database):
             async with self.semaphore:
                 changed = False
                 while len(self.flavour_buffer) < 32:
-                    out = self.bot.database.flavour.get()
+                    out = await self.bot.database.flavour.get()
                     if out:
                         self.flavour_buffer.append(out)
                         self.flavour_set.add(out)

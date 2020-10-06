@@ -2707,7 +2707,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         @self.event
         async def on_guild_join(guild):
             create_task(self.load_guild_webhooks(guild))
-            print("New server: " + str(guild))
+            print(f"New server: {guild}")
             g = await self.fetch_guild(guild.id)
             m = guild.me
             await self.send_event("_join_", user=m, guild=g)
