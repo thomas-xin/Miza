@@ -2882,12 +2882,18 @@ ep = datetime.datetime(1970, 1, 1)
 
 _last_update = 0
 _last_date = None
+
 def zerot():
     global _last_date, _last_update
     if utc() // 100 > _last_update:
         _last_update = utc() // 100
-        _last_date = utc_ts(datetime.datetime.fromtimestamp(time.mktime(datetime.datetime.now().date().timetuple())))
-    return _last_date
+        t = utc()
+        now = datetime.datetime.now()
+        tutc = datetime.timezone.utc
+        _last_date = datetime.datetime.fromtimestamp(time.mktime((now - datetime.timedelta(seconds=now.replace(tzinfo=tutc).timestamp() - t)).date().timetuple())).replace(tzinfo=tutc)
+    return _last_date.timestamp()
+
+to_utc = lambda dt: dt.replace(tzinfo=datetime.timezone.utc)
 
 def utc_ts(dt):
     with suppress(TypeError):

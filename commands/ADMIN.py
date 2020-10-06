@@ -1055,7 +1055,7 @@ class UpdateBans(Database):
 
     def __load__(self):
         d = self.data
-        self.listed = alist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
+        self.listed = alist(sorted(((d[i][0]["t"], i) for i in d if d[i]), key=lambda x: x[0]))
 
     async def _call_(self):
         t = utc()
@@ -1349,6 +1349,7 @@ class UpdateMessageCache(Database):
     name = "message_cache"
     no_file = True
     file = "saves/message_cache.json"
+    loaded = False
 
     async def _load(self):
         bot = self.bot
@@ -1365,6 +1366,7 @@ class UpdateMessageCache(Database):
                 await asyncio.sleep(0.1)
                 if not i & 65535:
                     print(i)
+        self.loaded = True
         print(f"{len(data)} messages successfully loaded from file.")
 
     def getmtime(self):
@@ -1379,52 +1381,53 @@ class UpdateMessageCache(Database):
             return datetime.datetime.fromtimestamp(t)
 
     async def save(self):
-        bot = self.bot
-        data = {}
-        for i, message in enumerate(deque(bot.cache.messages.values()), 1):
-            if type(message) is bot.CachedMessage:
-                m = message._data
-                if "author" not in m:
+        if self.loaded:
+            bot = self.bot
+            data = {}
+            for i, message in enumerate(deque(bot.cache.messages.values()), 1):
+                if type(message) is bot.CachedMessage:
+                    m = message._data
+                    if "author" not in m:
+                        author = message.author
+                        m["author"] = dict(id=author.id, s=str(author), avatar=author.avatar)
+                    if "channel" not in m:
+                        m["channel"] = message.channel.id
+                    data[message.id] = m
+                else:
+                    reactions = []
+                    attachments = [dict(id=a.id, size=a.size, filename=a.filename, url=a.url, proxy_url=a.proxy_url) for a in message.attachments]
+                    embeds = [e.to_dict() for e in message.embeds]
                     author = message.author
-                    m["author"] = dict(id=author.id, s=str(author), avatar=author.avatar)
-                if "channel" not in m:
-                    m["channel"] = message.channel.id
-                data[message.id] = m
-            else:
-                reactions = []
-                attachments = [dict(id=a.id, size=a.size, filename=a.filename, url=a.url, proxy_url=a.proxy_url) for a in message.attachments]
-                embeds = [e.to_dict() for e in message.embeds]
-                author = message.author
-                data[message.id] = dict(
-                    id=message.id,
-                    author=dict(id=author.id, s=str(author), avatar=author.avatar),
-                    webhook_id=message.webhook_id,
-                    reactions=reactions,
-                    attachments=attachments,
-                    embeds=embeds,
-                    edited_timestamp=str(message._edited_timestamp) if message._edited_timestamp else "",
-                    type=message.type.value,
-                    pinned=message.pinned,
-                    flags=message.flags.value,
-                    mention_everyone=message.mention_everyone,
-                    tts=message.tts,
-                    content=message.content,
-                    channel=message.channel.id,
-                )
-                for reaction in message.reactions:
-                    if not reaction.custom_emoji:
-                        r = dict(emoji=dict(id=None, name=str(reaction)))
-                        if reaction.count != 1:
-                            r["count"] = reaction.count
-                        if reaction.me:
-                            r["me"] = reaction.me
-                        reactions.append(r)
-            if not i & 16383:
-                await asyncio.sleep(0.1)
-        out = await create_future(pickle.dumps, data)
-        zipped = await create_future(bytes2zip, out)
-        with open(self.file, "wb") as f:
-            await create_future(f.write, zipped)
+                    data[message.id] = dict(
+                        id=message.id,
+                        author=dict(id=author.id, s=str(author), avatar=author.avatar),
+                        webhook_id=message.webhook_id,
+                        reactions=reactions,
+                        attachments=attachments,
+                        embeds=embeds,
+                        edited_timestamp=str(message._edited_timestamp) if message._edited_timestamp else "",
+                        type=message.type.value,
+                        pinned=message.pinned,
+                        flags=message.flags.value,
+                        mention_everyone=message.mention_everyone,
+                        tts=message.tts,
+                        content=message.content,
+                        channel=message.channel.id,
+                    )
+                    for reaction in message.reactions:
+                        if not reaction.custom_emoji:
+                            r = dict(emoji=dict(id=None, name=str(reaction)))
+                            if reaction.count != 1:
+                                r["count"] = reaction.count
+                            if reaction.me:
+                                r["me"] = reaction.me
+                            reactions.append(r)
+                if not i & 16383:
+                    await asyncio.sleep(0.1)
+            out = await create_future(pickle.dumps, data)
+            zipped = await create_future(bytes2zip, out)
+            with open(self.file, "wb") as f:
+                await create_future(f.write, zipped)
 
 
 class UpdateMessageLogs(Database):

@@ -1585,6 +1585,61 @@ class UpdateMessages(Database):
                         await eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id, msg=msg)
 
 
+
+class UpdateFlavour(Database):
+    name = "flavour"
+    no_delete = True
+
+    async def get(self):
+        out = x = None
+        i = xrand(7)
+        if i <= 1 and self.facts:
+            with tracebacksuppressor:
+                text = choice(self.facts)
+                fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
+                out = f"\n{fact} `{text}`"
+        elif i == 2:
+            x = "affirmations"
+            with tracebacksuppressor:
+                if self.data.get(x) and len(self.data[x]) > 64 and xrand(2):
+                    return choice(self.data[x])
+                data = await Request("https://www.affirmations.dev/", aio=True)
+                text = eval_json(data)["affirmation"].replace("`", "")
+                out = f"\nAffirmation: `{text}`"
+        elif i == 3:
+            x = "geek_jokes"
+            with tracebacksuppressor:
+                if self.data.get(x) and len(self.data[x]) > 64 and xrand(2):
+                    return choice(self.data[x])
+                data = await Request("https://geek-jokes.sameerkumar.website/api", aio=True)
+                text = eval_json(data).replace("`", "")
+                out = f"\nGeek joke: `{text}`"
+        else:
+            x = "useless_facts"
+            with tracebacksuppressor:
+                if self.data.get(x) and len(self.data[x]) > 256 and xrand(2):
+                    return choice(self.data[x])
+                if len(self.useless) < 128 and (not self.useless or random.random() > 0.75):
+                    data = await Request("https://www.uselessfacts.net/api/posts?d=" + str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date()), aio=True)
+                    factlist = [fact["title"].replace("`", "") for fact in eval_json(data) if "title" in fact]
+                    random.shuffle(factlist)
+                    self.useless = deque()
+                    for text in factlist:
+                        fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
+                        out = f"\n{fact} `{text}`"
+                        self.useless.append(out)
+                out = self.useless.popleft()
+        if x and out:
+            if x in self.data:
+                if out not in self.data[x]:
+                    self.data[x].add(out)
+                    self.update()
+            else:
+                self.data[x] = alist((out,))
+                self.update()
+        return out
+
+
 EMPTY = {}
 
 # This database takes up a lot of space, storing so many events from users
@@ -1597,7 +1652,7 @@ class UpdateUsers(Database):
     mentionspam = re.compile("<@[!&]?[0-9]+>")
 
     def __load__(self):
-        self.semaphore = Semaphore(3, 2, delay=0.5)
+        self.semaphore = Semaphore(1, 2, delay=0.5)
         self.facts = None
         self.flavour_buffer = deque()
         self.flavour_set = set()
@@ -1729,36 +1784,8 @@ class UpdateUsers(Database):
         with suppress(SemaphoreOverflowError):
             async with self.semaphore:
                 changed = False
-                while len(self.flavour_buffer) < 10:
-                    out = None
-                    i = xrand(7)
-                    if i <= 1 and self.facts:
-                        with tracebacksuppressor:
-                            text = choice(self.facts)
-                            fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
-                            out = f"\n{fact} `{text}`"
-                    elif i == 2:
-                        with tracebacksuppressor:
-                            data = await Request("https://www.affirmations.dev/", aio=True)
-                            text = eval_json(data)["affirmation"].replace("`", "")
-                            out = f"\nAffirmation: `{text}`"
-                    elif i == 3:
-                        with tracebacksuppressor:
-                            data = await Request("https://geek-jokes.sameerkumar.website/api", aio=True)
-                            text = eval_json(data).replace("`", "")
-                            out = f"\nGeek joke: `{text}`"
-                    else:
-                        with tracebacksuppressor:
-                            if len(self.useless) < 128 and (not self.useless or random.random() > 0.75):
-                                data = await Request("https://www.uselessfacts.net/api/posts?d=" + str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date()), aio=True)
-                                factlist = [fact["title"].replace("`", "") for fact in eval_json(data) if "title" in fact]
-                                random.shuffle(factlist)
-                                self.useless = deque()
-                                for text in factlist:
-                                    fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
-                                    out = f"\n{fact} `{text}`"
-                                    self.useless.append(out)
-                            out = self.useless.popleft()
+                while len(self.flavour_buffer) < 32:
+                    out = self.bot.database.flavour.get()
                     if out:
                         self.flavour_buffer.append(out)
                         self.flavour_set.add(out)
@@ -1790,6 +1817,8 @@ class UpdateUsers(Database):
     
     def _send_(self, message, **void):
         user = message.author
+        if user.id == self.bot.id:
+            return
         size = get_message_length(message)
         points = math.sqrt(size) + len(message.content.split())
         if points >= 8:

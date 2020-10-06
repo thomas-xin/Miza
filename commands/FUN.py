@@ -678,7 +678,7 @@ class UpdateDailies(Database):
             q_id = xrand(11)
             if q_id == 0:
                 x = round((level * 10 + 100) * random.random() + 70)
-                q = cdict(name=f"Post {x} messages", gold=x * 4, progress=0, required=x, action="send")
+                q = cdict(name=f"Post {x} messages", gold=x * 2, progress=0, required=x, action="send")
             elif q_id == 1:
                 q = cdict(name=f"Invite me to a server and/or react to the join message", diamonds=floor(10 + level / 5), progress=0, required=1, action="invite")
             elif q_id == 2:
@@ -693,11 +693,11 @@ class UpdateDailies(Database):
                 x = round((level + 5) * random.random() + 3) * 60
                 q = cdict(name=f"Listen to {sec2time(x)} of my music", gold=x, progress=0, required=x, action="music")
             elif q_id == 6:
-                x = round((level * 200 + 1000) * random.random() + 2000)
+                x = round((level * 250 + 1000) * random.random() + 2000)
                 q = cdict(name=f"Send {x} total characters of text", gold=x >> 3, progress=0, required=x, action="text")
             elif q_id == 7:
                 x = round((level * 5 + 20) * random.random() + 20)
-                q = cdict(name=f"Add {x} reactions", gold=x * 3, progress=0, required=x, action="react")
+                q = cdict(name=f"Add {x} reactions", gold=x * 5, progress=0, required=x, action="react")
             elif q_id == 8:
                 x = round((level * 100 + 500) * random.random() + 400)
                 q = cdict(name=f"Pay {x} to other users", gold=x >> 1, progress=0, required=x, action="pay")
@@ -706,9 +706,9 @@ class UpdateDailies(Database):
                 q = cdict(name=f"Type for {sec2time(x)}", gold=x * 2, progress=0, required=x, action="typing")
             elif q_id == 10:
                 x = xrand(20, 41)
-                q = cdict(name=f"Talk to me {x} times", gold=x * 12, progress=0, required=x, action="talk")
+                q = cdict(name=f"Talk to me {x} times", gold=x * 7, progress=0, required=x, action="talk")
             quests.append(q)
-        return quests.appendleft(cdict(name="Daily rewards", gold=level * 50 + 500, progress=1, required=1, action=None))
+        return quests.appendleft(cdict(name="Daily rewards", gold=level * 50 + 400, progress=1, required=1, action=None))
 
     def progress_quests(self, user, action, value=1):
         if user.id == self.bot.id:
