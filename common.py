@@ -596,7 +596,7 @@ def verify_id(obj):
         return obj
     if type(obj) is str:
         with suppress(ValueError):
-            return int(str(obj).translate(__itrans))
+            return int(obj.translate(__itrans))
         return obj
     with suppress(AttributeError):
         return obj.id

@@ -1007,6 +1007,8 @@ custom list-like data structure that incorporates the functionality of numpy arr
                 temp = np.unique(self.view)
             except:
                 temp = sorted(set(self.view))
+        elif sorted is None:
+            temp = tuple(set(self.view))
         else:
             temp = {}
             for x in self.view:

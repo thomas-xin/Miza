@@ -1819,7 +1819,7 @@ class UpdateUsers(Database):
     
     def _send_(self, message, **void):
         user = message.author
-        if user.id == self.bot.id:
+        if user.id == self.bot.id or self.bot.get_perms(user, message.guild) <= -inf:
             return
         size = get_message_length(message)
         points = math.sqrt(size) + len(message.content.split())

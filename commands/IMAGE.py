@@ -1241,6 +1241,7 @@ class UpdateImagePools(Database):
                         data.append(out)
                     found.add(out)
                     self.update()
+        data.uniq(sorted=None)
     
     async def proc(self, key, func):
         with tracebacksuppressor(SemaphoreOverflowError):

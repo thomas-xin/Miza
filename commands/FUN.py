@@ -401,7 +401,7 @@ class SlotMachine(Command):
     min_level = 0
     description = "Plays a slot machine game. Costs gold to play, can yield gold and diamonds."
     usage = "<bet[100]>"
-    rate_limit = 3
+    rate_limit = 5
     emojis = {
         "❤️": 20,
         "🍒": 6,
@@ -670,7 +670,7 @@ class UpdateDailies(Database):
         return data
 
     def generate(self, user):
-        if user.id == self.bot.id:
+        if user.id == self.bot.id or self.bot.is_blacklisted(user.id):
             return dict(quests=(), time=inf)
         level = self.bot.database.users.xp_to_level(self.bot.database.users.get_xp(user))
         quests = alist()
@@ -711,7 +711,7 @@ class UpdateDailies(Database):
         return quests.appendleft(cdict(name="Daily rewards", gold=level * 50 + 400, progress=1, required=1, action=None))
 
     def progress_quests(self, user, action, value=1):
-        if user.id == self.bot.id:
+        if user.id == self.bot.id or self.bot.is_blacklisted(user.id):
             return
         data = self.get(user)
         quests = data["quests"]

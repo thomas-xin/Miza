@@ -283,8 +283,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if type(data) is dict:
                 with tracebacksuppressor:
                     if "s" in data:
-                        data["username"], data["discriminator"] = data.pop("s").rsplit("#", 1)
-                    users[u_id] = self._state.store_user(data)
+                        s = data.pop("s")
+                        data["username"], data["discriminator"] = s.rsplit("#", 1)
+                    else:
+                        s = data["username"] + "#" + data["discriminator"]
+                    self.usernames[s] = users[u_id] = self._state.store_user(data)
                     return
             self.user_loader.add(u_id)
 
@@ -301,6 +304,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             try:
                 u_id = int(u_id)
             except (ValueError, TypeError):
+                with suppress(KeyError):
+                    return self.user_from_identifier(u_id)
                 raise TypeError(f"Invalid user identifier: {u_id}")
         with suppress(KeyError):
             return self.cache.users[u_id]
@@ -345,6 +350,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         u = await self.fetch_user_member(u_id, guild)
         return (u,)
 
+    def user_from_identifier(self, u_id):
+        if "#" in u_id:
+            with suppress(KeyError):
+                return self.usernames[u_id]
+
     async def fetch_user_member(self, u_id, guild=None):
         u_id = verify_id(u_id)
         if type(u_id) is int:
@@ -354,18 +364,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 user = await self.fetch_user(u_id)
             with suppress():
                 if guild:
-                    temp = guild.get_member(user.id)
-                    if temp is not None:
-                        return temp
+                    member = guild.get_member(user.id)
+                    if member is not None:
+                        return member
             with suppress():
                 return self.get_member(u_id, guild)
             return user
-        with suppress(KeyError):
-            if "#" in u_id:
-                user = self.usernames[u_id]
-                if guild is None:
-                    return user
-                u_id = user.id
+        user = self.user_from_identifier(u_id)
+        if user is not None:
+            if guild is None:
+                return user
+            member = guild.get_member(user.id)
+            if member is not None:
+                return member
+            return user
         return await self.fetch_member_ex(u_id, guild)
 
     async def get_full_members(self, guild):
@@ -923,7 +935,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             attachments.pop(a_id)
 
     def update_usernames(self):
-        self.usernames = {str(user): user for user in self._connection._users.values()}
+        self.usernames = {str(user): user for user in self.cache.users.values()}
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def get_prefix(self, guild):
