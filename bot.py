@@ -304,8 +304,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             try:
                 u_id = int(u_id)
             except (ValueError, TypeError):
-                with suppress(KeyError):
-                    return self.user_from_identifier(u_id)
+                user = self.user_from_identifier(u_id)
+                if user is not None:
+                    return user
+                if "#" in u_id:
+                    raise LookupError(f"User identifier not found: {u_id}")
                 raise TypeError(f"Invalid user identifier: {u_id}")
         with suppress(KeyError):
             return self.cache.users[u_id]
