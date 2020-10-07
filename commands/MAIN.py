@@ -1866,6 +1866,8 @@ class UpdateUsers(Database):
             raise CommandCancelledError
 
     def get_xp(self, user):
+        if self.bot.is_blacklisted(user.id):
+            return -inf
         if user.id == self.bot.id:
             if self.data.get(self.bot.id, EMPTY).get("xp", 0) != inf:
                 set_dict(self.data, self.bot.id, {})["xp"] = inf
@@ -1895,19 +1897,19 @@ class UpdateUsers(Database):
         return await self.bot.as_rewards(data.get("diamonds"), data.get("gold"))
 
     def add_xp(self, user, amount):
-        if user.id != self.bot.id and amount:
+        if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
             add_dict(set_dict(self.data, user.id, {}), {"xp": amount})
             if "dailies" in self.bot.data:
                 self.bot.database.dailies.progress_quests(user, "xp", amount)
             self.update()
     
     def add_gold(self, user, amount):
-        if user.id != self.bot.id and amount:
+        if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
             add_dict(set_dict(self.data, user.id, {}), {"gold": amount})
             self.update()
 
     def add_diamonds(self, user, amount):
-        if user.id != self.bot.id and amount:
+        if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
             add_dict(set_dict(self.data, user.id, {}), {"diamonds": amount})
             if "dailies" in self.bot.data:
                 self.bot.database.dailies.progress_quests(user, "diamonds", amount)
