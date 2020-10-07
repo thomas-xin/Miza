@@ -296,6 +296,8 @@ class UpdateExec(Database):
                     reacts="❎"
                 )
             user = message.author
+            if "dailies" in bot.data:
+                bot.database.dailies.progress_quests(user, "talk")
             emb = discord.Embed(colour=discord.Colour(16777214))
             emb.set_author(name=f"{user} ({user.id})", icon_url=best_url(user))
             emb.description = message_repr(message)

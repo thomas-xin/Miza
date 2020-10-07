@@ -92,7 +92,9 @@ class Hello(Command):
     min_level = 0
     description = "Sends a waving emoji. Useful for checking whether the bot is online."
     
-    def __call__(self, **void):
+    def __call__(self, bot, user, **void):
+        if "dailies" in bot.data:
+            bot.database.dailies.progress_quests(user, "talk")
         return "👋"
 
 
