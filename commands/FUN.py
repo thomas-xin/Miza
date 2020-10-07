@@ -400,7 +400,8 @@ class SlotMachine(Command):
     name = ["Slots"]
     min_level = 0
     description = "Plays a slot machine game. Costs gold to play, can yield gold and diamonds."
-    usage = "<bet[100]>"
+    usage = "<bet[100]> <skip_animation(?s)>"
+    flags = "s"
     rate_limit = 5
     emojis = {
         "❤️": 20,
@@ -443,7 +444,7 @@ class SlotMachine(Command):
                 out += item
         return out
 
-    async def __call__(self, argv, user, **void):
+    async def __call__(self, argv, user, flags, **void):
         b1 = 5
         b2 = 50
         if argv:
@@ -457,10 +458,14 @@ class SlotMachine(Command):
         if bet > self.bot.data.users.get(user.id, {}).get("gold", 0):
             raise OverflowError("Bet cannot be greater than your balance.")
         self.bot.database.users.add_gold(user, -bet)
-        return f"*```callback-fun-slotmachine-{user.id}_{bet}-\nLoading Slot Machine...```*"
+        skip = int("s" in flags)
+        return f"*```callback-fun-slotmachine-{user.id}_{bet}_{skip}-\nLoading Slot Machine...```*"
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, bet = [int(i) for i in vals.split("_", 1)]
+        spl = [int(i) for i in vals.split("_", 2)]
+        if len(spl) < 3:
+            spl.append(0)
+        u_id, bet, skip = spl
         if reaction is None or reaction.decode("utf-8", "replace") == "⤵️":
             if reaction is None:
                 create_task(message.add_reaction("⤵️"))
@@ -470,18 +475,20 @@ class SlotMachine(Command):
                     raise OverflowError("Bet cannot be greater than your balance.")
                 bot.database.users.add_gold(user, -bet)
             wheel_true = self.generate()
-            wheel_display = [None] * 3
-            wheel_order = deque(shuffle(range(3)))
+            wheel_display = [None] * 3 if not skip else wheel_true
+            wheel_order = deque(shuffle(range(3))) if not skip else deque((0, ))
             emb = discord.Embed(colour=rand_colour()).set_author(**get_author(user))
-            async with delay(2):
-                emoj = await self.as_emojis(wheel_display)
-                gold = bot.data.users.get(user.id, {}).get("gold", 0)
-                bets = await bot.as_rewards(bet)
-                bals = await bot.as_rewards(gold)
-                emb.description = f"```css\n[Slot Machine]```{emoj}\nBet: {bets}\nBalance: {bals}"
-                await message.edit(content=None, embed=emb)
+            if not skip:
+                async with delay(2):
+                    emoj = await self.as_emojis(wheel_display)
+                    gold = bot.data.users.get(user.id, {}).get("gold", 0)
+                    bets = await bot.as_rewards(bet)
+                    bals = await bot.as_rewards(gold)
+                    emb.description = f"```css\n[Slot Machine]```{emoj}\nBet: {bets}\nBalance: {bals}"
+                    await message.edit(content=None, embed=emb)
+            ctx = delay(1) if not skip else emptyctx
             while wheel_order:
-                async with delay(1):
+                async with ctx:
                     i = wheel_order.popleft()
                     wheel_display[i] = wheel_true[i]
                     if not wheel_order:
@@ -506,7 +513,6 @@ class SlotMachine(Command):
                     bals = await bot.as_rewards(gold)
                     emb.description = f"{start}[Slot Machine]```{emoj}\nBet: {bets}\nBalance: {bals}{end}"
                     await message.edit(embed=emb)
-            return await message.edit(embed=emb)
 
 
 class Pay(Command):

@@ -882,7 +882,7 @@ class AudioQueue(alist):
         if not self:
             self.__init__(items)
             self.auds.source = None
-            create_future_ex(self.advance, process=False, timeout=120)
+            create_future_ex(self.update_load, timeout=120)
             return self
         if position == -1:
             self.extend(items)

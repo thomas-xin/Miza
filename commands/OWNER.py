@@ -6,6 +6,31 @@ except ModuleNotFoundError:
     from common import *
 
 
+class Reload(Command):
+    name = ["Unload"]
+    min_level = nan
+    description = "Reloads a specified module."
+    _timeout_ = inf
+
+    async def __call__(self, bot, message, channel, guild, argv, name, **void):
+        mod = full_prune(argv)
+        _mod = mod.upper()
+        if mod:
+            mod = " " + mod
+        await message.add_reaction("❗")
+        if name == "unload":
+            await channel.send(f"Unloading {mod}...")
+            succ = await create_future(bot.unload, _mod, priority=True)
+            if succ:
+                return f"Successfully unloaded {mod}."
+            return f"Error unloading {mod}. Please see log for more info."
+        await channel.send(f"Reloading {mod}...")
+        succ = await create_future(bot.reload, _mod, priority=True)
+        if succ:
+            return f"Successfully reloaded {mod}."
+        return f"Error reloading {mod}. Please see log for more info."
+
+
 class Restart(Command):
     name = ["Shutdown", "Reload", "Unload", "Reboot"]
     min_level = nan
@@ -16,18 +41,6 @@ class Restart(Command):
         bot = self.bot
         client = bot.client
         await message.add_reaction("❗")
-        if name == "reload":
-            await channel.send(f"Reloading {argv.lower()}...")
-            succ = await create_future(bot.reload, argv.upper(), priority=True)
-            if succ:
-                return f"Successfully reloaded {argv.lower()}."
-            return f"Error reloading {argv.lower()}. Please see log for more info."
-        if name == "unload":
-            await channel.send(f"Unloading {argv.lower()}...")
-            succ = await create_future(bot.unload, argv, priority=True)
-            if succ:
-                return f"Successfully unloaded {argv.lower()}."
-            return f"Error unloading {argv.lower()}. Please see log for more info."
         save = None
         if argv:
             # Restart announcements for when a time input is specified

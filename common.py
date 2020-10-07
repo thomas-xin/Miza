@@ -100,7 +100,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
             self.rate_bin.append(utc())
         self.active += 1
         return self
-    
+
     def __exit__(self, *args):
         self.active -= 1
         self.last = utc()
@@ -112,12 +112,12 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     async def __call__(self):
         while self.value >= self.limit:
             await asyncio.sleep(self.delay)
-        
+
     def is_active(self):
         return self.active or self.passive
 
     def is_busy(self):
-        return self.active >= self.limit or len(self.rate_bin) >= self.limit
+        return self.active >= self.limit or len(self._update_bin()) >= self.limit
 
     @property
     def busy(self):
