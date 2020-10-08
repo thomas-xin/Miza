@@ -524,35 +524,28 @@ class Char2Emoj(Command):
 class Time(Command):
     name = ["UTC", "GMT", "T"]
     min_level = 0
-    description = "Shows the current time in a certain timezone."
-    usage = "<offset_hours[0]>"
+    description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user."
+    usage = "<offset_hours[0]> | <user[]>"
 
-    async def __call__(self, name, argv, args, user, **void):
+    async def __call__(self, name, channel, guild, argv, args, user, **void):
         s = 0
         # Only check for timezones if the command was called with alias "t" or "time"
         if args and name in "time":
-            for arg in (args[0], args[-1]):
-                a = arg
-                h = 0
-                for op in "+-":
-                    try:
-                        i = arg.index(op)
-                    except ValueError:
-                        continue
-                    a = arg[:i]
-                    h += float(arg[i:])
-                tz = a.casefold()
-                if tz in TIMEZONES:
-                    s = get_timezone(tz)
-                    argv = argv.replace(arg, "")
-                    break
-                h = 0
-            s += h * 3600
+            user = await self.bot.fetch_user_member(argv, guild)
+            argv = None
         elif name in TIMEZONES:
             s = TIMEZONES.get(name, 0)
         t = utc_dt()
+        estimated = None
         if argv:
             h = await self.bot.eval_math(argv, user)
+        elif name in "time":
+            h = self.bot.database.users.get_timezone(user.id)
+            if h is None:
+                h = self.bot.database.users.estimate_timezone(user.id)
+                estimated = True
+            else:
+                estimated = False
         else:
             h = 0
         if h or s:
@@ -560,7 +553,29 @@ class Time(Command):
         hrs = round_min(h + s / 3600)
         if hrs >= 0:
             hrs = "+" + str(hrs)
-        return ini_md(f"Current time at UTC/GMT{hrs}: {sqr_md(t)}.")
+        out = f"Current time at UTC/GMT{hrs}: {sqr_md(t)}."
+        if estimated:
+            out += "\nUsing timezone automatically estimated from discord activity."
+        elif estimated is not None:
+            out += "\nUsing timezone assigned by user."
+        return ini_md(out)
+
+
+class Timezone(Command):
+    min_level = 0
+    description = "Shows the current time in a certain timezone."
+    usage = "<timezone> <list(?l)>"
+
+    async def __call__(self, channel, argv, **void):
+        if argv.startswith("-l") or argv.startswith("list"):
+            fields = deque()
+            for k, v in COUNTRIES.items():
+                fields.append((k, ", ".join(v), False))
+            self.bot.send_as_embeds(channel, title="Timezone list", fields=fields, author=get_author(self.bot.user))
+            return
+        secs = as_timezone(argv)
+        t = utc_dt() + datetime.timedelta(seconds=secs)
+        return ini_md(f"Current time at UTC/GMT{round_min(secs / 3600)}: {sqr_md(t)}.")
 
 
 class TimeCalc(Command):
@@ -584,7 +599,7 @@ class TimeCalc(Command):
         if len(timestamps) == 1:
             out = f"{round_min(timestamps[0])} ({datetime.datetime.utcfromtimestamp(timestamps[0])} UTC)"
         else:
-            out = sec2time(max(timestamps) - min(timestamps))
+            out = time_diff(max(timestamps), min(timestamps))
         return code_md(out)
 
 

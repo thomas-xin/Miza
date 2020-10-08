@@ -274,9 +274,9 @@ class Neko(Command):
     flags = "lrv"
     rate_limit = 0.5
 
-    async def __call__(self, args, argv, flags, channel, **void):
+    async def __call__(self, bot, args, argv, flags, channel, guild, **void):
         isNSFW = is_nsfw(channel)
-        if "l" in flags:
+        if "l" in flags or argv == "list":
             available = []
             text = "Available tags in **" + channel.name + "**:\n```ini\n"
             for key in neko_tags:
@@ -301,7 +301,7 @@ class Neko(Command):
             if not argv:
                 url = nekos.img("neko")
             else:
-                raise LookupError(f"Search tag {argv} not found. Use ?l for list.")
+                raise LookupError(f"Search tag {argv} not found. Use {bot.get_prefix(guild)}neko list for list.")
         else:
             v = xrand(len(selected))
             get = selected[v]

@@ -12,7 +12,6 @@ with MultiThreadedImporter(globals()) as importer:
         "asyncio",
         "discord",
         "json",
-        "pytz",
         "requests",
         "aiohttp",
         "psutil",
@@ -1138,6 +1137,24 @@ def get_timezone(tz):
         return s[is_dst(timezone=tz.upper())]
     return s
 
+def as_timezone(tz):
+    if not tz:
+        raise KeyError
+    with suppress(KeyError):
+        return round((city_time(tz).timestamp() - utc()) / 60) * 60
+    a = tz
+    h = 0
+    for op in ("+-"):
+        try:
+            i = a.index(op)
+        except ValueError:
+            continue
+        a = a[:i]
+        h += float(arg[i:])
+        break
+    tz = a.casefold()
+    return get_timezone(tz) + h * 3600
+
 create_future_ex(load_timezones, priority=True)
 
 def parse_with_now(expr):
@@ -1167,20 +1184,12 @@ def tzparse(expr):
                 args = shlex.split(expr)
             except ValueError:
                 args = expr.split()
-            for arg in (args[0], args[-1]):
-                a = arg
-                h = 0
-                for op in "+-":
-                    try:
-                        i = arg.index(op)
-                    except ValueError:
-                        continue
-                    a = arg[:i]
-                    h += float(arg[i:])
-                tz = a.casefold()
-                if tz in TIMEZONES:
-                    t = get_timezone(tz)
-                    expr = expr.replace(arg, "")
+            for i in (0, -1):
+                arg = args[i]
+                with suppress(KeyError):
+                    t = as_timezone(arg)
+                    args.pop(i)
+                    expr = " ".join(args)
                     break
                 h = 0
             t = parse_with_now(expr) - datetime.timedelta(hours=h, seconds=t)

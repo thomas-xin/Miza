@@ -353,7 +353,7 @@ def spin_gif(image, duration):
     if duration == 0:
         fps = 0
     else:
-        fps = round(32 / abs(duration))
+        fps = round(64 / abs(duration))
     rate = 8
     while fps > 24 and rate < 32:
         fps >>= 1

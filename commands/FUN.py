@@ -748,10 +748,10 @@ class UpdateDailies(Database):
             self.typing[user.id] = utc()
 
 
-class Profile(Command):
-    name = ["Bal", "Balance", "Wallet"]
+class Wallet(Command):
+    name = ["Bal", "Balance"]
     min_level = 0
-    description = "Shows the target users' profile."
+    description = "Shows the target users' wallet."
     usage = "<*objects>"
     rate_limit = 1
     multi = True

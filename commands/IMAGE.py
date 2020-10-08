@@ -913,8 +913,8 @@ class Resize(Command):
         if message.attachments:
             args = [best_url(a) for a in message.attachments] + args
             argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
-        if not args:
-            if "l" in flags:
+        if not args or argv == "list":
+            if "l" in flags or argv == "list":
                 return ini_md("Available scaling operations: [nearest, linear, hamming, bicubic, lanczos, auto]")
             raise ArgumentError("Please input an image by URL or attachment.")
         with discord.context_managers.Typing(channel):
@@ -1049,8 +1049,8 @@ class Blend(Command):
         if message.attachments:
             args = [best_url(a) for a in message.attachments] + args
             argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
-        if not args:
-            if "l" in flags:
+        if not args or argv == "list":
+            if "l" in flags or argv == "list":
                 return ini_md(
                     "Available blend operations: ["
                     + "replace, add, sub, mul, div, mod, and, or, xor, nand, nor, xnor, "

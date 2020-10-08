@@ -38,6 +38,7 @@ with MultiThreadedImporter() as importer:
         "traceback",
         "time",
         "datetime",
+        "pytz",
         "ast",
         "copy",
         "pickle",
@@ -1412,16 +1413,10 @@ class fcdict(cdict):
 
     __slots__ = ()
 
-    __init__ = lambda self, *args, **kwargs: super().__init__({k.casefold() if k.isalnum() else full_prune(k): v for k, v in dict(*args, **kwargs).items()})
+    __init__ = lambda self, *args, **kwargs: super().__init__({full_prune(k): v for k, v in dict(*args, **kwargs).items()})
     def __setitem__(self, k, v):
-        if k.isalnum():
-            return super().__setitem__(k.casefold(), v)
         return super().__setitem__(full_prune(k), v)
     def __getitem__(self, k):
-        if k.isalnum():
-            with suppress(KeyError):
-                return super().__getitem__(k)
-            return super().__getitem__(k.casefold())
         return super().__getitem__(full_prune(k))
     __contains__ = lambda self, k: super().__contains__(k) or super().__contains__(full_prune(k))
 
@@ -2880,29 +2875,33 @@ def int_key(d):
 # Time functions
 utc = time.time
 utc_dt = datetime.datetime.utcnow
+utc_ft = datetime.datetime.fromtimestamp
 ep = datetime.datetime(1970, 1, 1)
 
-_last_update = 0
-_last_date = None
-
 def zerot():
-    global _last_date, _last_update
-    if utc() // 100 > _last_update:
-        _last_update = utc() // 100
-        t = utc()
-        now = datetime.datetime.now()
-        tutc = datetime.timezone.utc
-        _last_date = datetime.datetime.fromtimestamp(time.mktime((now - datetime.timedelta(seconds=now.replace(tzinfo=tutc).timestamp() - t)).date().timetuple())).replace(tzinfo=tutc)
-    return _last_date.timestamp()
+    today = utc_dt()
+    return datetime.datetime(today.year, today.month, today.day).timestamp()
 
 to_utc = lambda dt: dt.replace(tzinfo=datetime.timezone.utc)
+to_naive = lambda dt: dt.replace(tzinfo=None)
 
 def utc_ts(dt):
     with suppress(TypeError):
         return (dt - ep).total_seconds()
     return dt.replace(tzinfo=datetime.timezone.utc).timestamp()
 
-# utc_ts = lambda dt: dt.replace(tzinfo=datetime.timezone.utc).timestamp()
+ZONES = {zone.split("/", 1)[-1].replace("-", "").replace("_", "").casefold(): zone for zone in pytz.all_timezones}
+COUNTRIES = mdict()
+for tz in pytz.all_timezones:
+    if "/" in tz and not tz.startswith("Etc/"):
+        COUNTRIES.append(tz.split("/", 1)[0], tz.split("/", 1)[-1])
+CITIES = {city.split("/", 1)[-1].replace("-", "").replace("_", "").casefold(): city for country in COUNTRIES.values() for city in country}
+
+def city_timezone(city):
+    return pytz.timezone(ZONES[full_prune(city)])
+
+def city_time(city):
+    return to_utc(city_timezone(city).fromutc(utc_dt()))
 
 # Values in seconds of various time intervals.
 TIMEUNITS = {
@@ -2990,6 +2989,56 @@ def time_parse(ts):
         elif len(data):
             raise TypeError("Too many time arguments.")
     return t
+
+def time_diff(t2, t1):
+    out = ""
+    years = t2.year - t1.year
+    months = t2.month - t1.month
+    days = t2.day - t1.day
+    hours = getattr(t2, "hour", 0) - getattr(t1, "hour", 0)
+    minutes = getattr(t2, "minute", 0) - getattr(t1, "minute", 0)
+    seconds = getattr(t2, "second", 0) - getattr(t1, "second", 0)
+    while seconds < 0:
+        minutes -= 1
+        seconds += 60
+    while minutes < 0:
+        hours -= 1
+        minutes += 60
+    while hours < 0:
+        days -= 1
+        hours += 24
+    while days < 0:
+        months -= 1
+        d = 31
+        while d:
+            with suppress(ValueError) if d > 28 else emptyctx:
+                datetime.datetime(t2.year, t2.month - 1, d, 0)
+                break
+            d -= 1
+        days += d
+    while months < 0:
+        years -= 1
+        months += 12
+    if years:
+        out += f"{years} years "
+    if months:
+        out += f"{months} months "
+    if days:
+        out += f"{days} days "
+    if hours:
+        out += f"{hours} hours "
+    if minutes:
+        out += f"{minutes} minutes "
+    if seconds or not out:
+        out += f"{seconds} seconds"
+    return out
+
+def next_date(dt):
+    t = utc_dt()
+    new = datetime.datetime(t.year, dt.month, dt.day)
+    while new < t:
+        new = new.replace(year=new.year + 1)
+    return new
 
 
 RE = cdict()
@@ -3132,6 +3181,8 @@ def uni_str(s, fmt=0):
 def unicode_prune(s):
     if type(s) is not str:
         s = str(s)
+    if s.isalnum():
+        return s
     return s.translate(__trans)
 
 full_prune = lambda s: unicode_prune(s).casefold()

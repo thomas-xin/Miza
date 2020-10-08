@@ -2241,6 +2241,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         emb = discord.Embed(colour=colour2raw(hue2colour(col)))
         if title:
             emb.title = title
+        if author:
+            emb.set_author(**author)
         if description:
             # Separate text into paragraphs, then lines, then words, then characters and attempt to add them one at a time, adding extra embeds when necessary
             curr = ""
@@ -2266,9 +2268,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     paragraphs.appendleft(para[i + 1:])
                     paragraphs.appendleft(para[:i] + s)
                     continue
-                if not embs:
-                    if author:
-                        emb.set_author(**author)
                 if len(curr) + len(para) > 2000:
                     emb.description = md(curr.strip())
                     curr = para
@@ -2280,9 +2279,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if curr:
                 emb.description = md(curr.strip())
         if fields:
+            if issubclass(type(fields), collections.abc.Mapping):
+                fields = fields.items()
             for field in fields:
                 if issubclass(type(field), collections.abc.Mapping):
-                    field = tuple(field.values())
+                    field = tuple(field.items())
                 elif not issubclass(type(field), collections.abc.Sequence):
                     field = tuple(field)
                 n = lim_str(field[0], 256)
@@ -2315,7 +2316,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         embs.append(discord.Embed(colour=colour2raw(hue2colour(col))))
                     embs[i].set_image(url=img)
                     embs[i].url = img
-        self.send_embeds(channel, embeds=embs)
+        return self.send_embeds(channel, embeds=embs)
 
     # Updates all embed senders.
     def update_embeds(self):

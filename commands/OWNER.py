@@ -212,7 +212,7 @@ class UpdateExec(Database):
             if code is None:
                 _ = glob.get("_")
                 func = "async def _():\n\tlocals().update(globals())\n"
-                func += "\n".join("\t" + line for line in proc.splitlines())
+                func += "\n".join("\tglobals().update(locals())\n" if line.strip().startswith("return") else "" + "\t" + line for line in proc.splitlines())
                 func += "\n\tglobals().update(locals())"
                 code2 = await create_future(compile, func, "<terminal>", "exec", optimize=2, priority=True)
                 await create_future(eval, code2, glob, priority=True)

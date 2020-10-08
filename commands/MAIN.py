@@ -814,6 +814,62 @@ class Info(Command):
         bot.send_embeds(channel, embeds=embs)
 
 
+class Profile(Command):
+    name = ["User", "UserProfile"]
+    min_level = 0
+    description = "Shows or edits a user profile on ⟨MIZA⟩."
+    usage = "<user[]> | <option(description)(timezone)(birthday)> <value[]>"
+    rate_limit = 1
+    
+    async def __call__(self, user, args, channel, guild, bot, **void):
+        setting = None
+        if not args:
+            target = user
+        elif args[0] in ("description", "timezone", "birthday"):
+            target = user
+            setting = args.pop(0)
+            if not args:
+                value = None
+            else:
+                value = " ".join(args)
+        else:
+            target = await bot.fetch_user_member(" ".join(args), guild)
+        if setting is None:
+            profile = bot.data.users.get(target.id, EMPTY)
+            description = profile.get("description", "")
+            birthday = profile.get("birthday")
+            timezone = profile.get("timezone")
+            if timezone:
+                td = datetime.timedelta(seconds=as_timezone(timezone))
+                description += ini_md(f"Current time: {sqr_md(utc_dt() + td)}")
+            if birthday:
+                t = utc_dt()
+                if timezone:
+                    birthday -= td
+                description += ini_md(f"Age: {sqr_md(time_diff(t, birthday))}\nBirthday in: {sqr_md(time_diff(next_date(birthday), t))}")
+            fields = set()
+            for field in ("timezone", "birthday"):
+                fields.add((field, profile.get(field), False))
+            return bot.send_as_embeds(channel, description, fields=fields, author=get_author(target))
+        if value is None:
+            return ini_md(f"Currently set {setting} for {sqr_md(user)}: {sqr_md(bot.data.users.get(user.id, EMPTY).get(setting))}.")
+        if setting == "description":
+            if len(value) > 1024:
+                raise OverflowError("Description must be 1024 or fewer in length.")
+        elif setting == "timezone":
+            value = value.casefold()
+            try:
+                as_timezone(value)
+            except KeyError:
+                raise ArgumentError(f"Entered value could not be recognized as a timezone location or abbreviation. Use {bot.get_prefix(guild)}timezone list for list.")
+        else:
+            dt = tzparse(value)
+            value = datetime.date(dt.year, dt.month, dt.day)
+        bot.data.users.setdefault(user.id, {})[setting] = value
+        bot.database.users.update()
+        return css_md(f"Successfully changed {setting} for {sqr_md(user)} to {sqr_md(value)}.")
+
+
 class Activity(Command):
     name = ["Recent", "Log"]
     min_level = 0
@@ -825,11 +881,7 @@ class Activity(Command):
 
     async def __call__(self, guild, user, argv, flags, channel, bot, **void):
         if argv:
-            u_id = verify_id(argv)
-            try:
-                user = await bot.fetch_user(u_id)
-            except (TypeError, discord.NotFound):
-                user = await bot.fetch_member_ex(u_id, guild)
+            user = await bot.fetch_user_member(argv, guild)
         data = await create_future(bot.database.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=12)
         with discord.context_managers.Typing(channel):
             resp = await process_image("plt_special", "$", (data, str(user)), guild)
@@ -1078,20 +1130,12 @@ class Reminder(Command):
                         args = shlex.split(argv)
                     except ValueError:
                         args = argv.split()
-                    for arg in (args[0], args[-1]):
-                        a = arg
-                        h = 0
-                        for op in "+-":
-                            try:
-                                i = arg.index(op)
-                            except ValueError:
-                                continue
-                            a = arg[:i]
-                            h += float(arg[i:])
-                        tz = a.casefold()
-                        if tz in TIMEZONES:
-                            t = get_timezone(tz)
-                            argv = argv.replace(arg, "")
+                    for i in (0, -1):
+                        arg = args[i]
+                        with suppress(KeyError):
+                            t = as_timezone(arg)
+                            args.pop(i)
+                            expr = " ".join(args)
                             break
                         h = 0
                     t += h * 3600
@@ -1111,20 +1155,12 @@ class Reminder(Command):
                     args = shlex.split(argv)
                 except ValueError:
                     args = argv.split()
-                for arg in (args[0], args[-1]):
-                    a = arg
-                    h = 0
-                    for op in "+-":
-                        try:
-                            i = arg.index(op)
-                        except ValueError:
-                            continue
-                        a = arg[:i]
-                        h += float(arg[i:])
-                    tz = a.casefold()
-                    if tz in TIMEZONES:
-                        t = get_timezone(tz)
-                        argv = argv.replace(arg, "")
+                for i in (0, -1):
+                    arg = args[i]
+                    with suppress(KeyError):
+                        t = as_timezone(arg)
+                        args.pop(i)
+                        expr = " ".join(args)
                         break
                     h = 0
                 t += h * 3600
@@ -1724,6 +1760,11 @@ class UpdateUsers(Database):
             out = [sum(out[i:i + factor]) for i in range(0, len(out), factor)]
         return out
 
+    def get_timezone(self, u_id):
+        timezone = self.data.get(u_id, EMPTY).get("timezone")
+        if timezone is not None:
+            return round_min(as_timezone(timezone) / 3600)
+
     def estimate_timezone(self, u_id):
         data = self.data.get(u_id, EMPTY).get("recent")
         if not data:
@@ -1912,7 +1953,7 @@ class UpdateUsers(Database):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
             add_dict(set_dict(self.data, user.id, {}), {"diamonds": amount})
             if "dailies" in self.bot.data:
-                self.bot.database.dailies.progress_quests(user, "diamonds", amount)
+                self.bot.database.dailies.progress_quests(user, "diamond", amount)
             self.update()
 
     async def _typing_(self, user, **void):
