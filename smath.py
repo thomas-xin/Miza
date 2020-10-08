@@ -3140,8 +3140,14 @@ def time_diff(t2, t1):
         months -= 1
         d = 31
         while d:
-            with suppress(ValueError) if d > 28 else emptyctx:
-                datetime.datetime(t2.year, t2.month - 1, d, 0)
+            try:
+                datetime.datetime(t2.year % 400 + 2000, t2.month - 1, d, 0)
+            except ValueError:
+                if d > 28:
+                    pass
+                else:
+                    raise
+            else:
                 break
             d -= 1
         days += d
