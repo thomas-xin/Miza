@@ -3153,8 +3153,7 @@ def time_diff(t2, t1):
         out += f"{seconds} second"
         if seconds != 1:
             out += "s"
-        out += " "
-    return out
+    return out.strip()
 
 def dyn_time_diff(t2, t1):
     if isnan(t2) or isnan(t1):

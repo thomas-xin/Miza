@@ -1224,7 +1224,7 @@ class Reminder(Command):
         if keyed:
             out += f" upon next event from {sqr_md(user_mention(t))}"
         else:
-            out += f" in {sqr_md(time_until(t + ts))}"
+            out += f" in {sqr_md(time_until(t + utc()))}"
         out += ":```"
         return dict(content=out, embed=emb)
 
