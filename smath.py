@@ -2873,9 +2873,94 @@ def int_key(d):
 
 
 # Time functions
+class DynamicDT(datetime.datetime):
+
+    __slots__ = ("_offset", "_ts")
+
+    def __str__(self):
+        y = super().year + self.offset()
+        return "0" * max(0, 3 - int(math.log10(max(1, y)))) + str(y) + super().__str__()[4:]
+
+    def __repr__(self):
+        return self.__class__.__name__ + "(" + ", ".join(str(i) for i in super().timetuple()[:6]) + f", microsecond={super().microsecond}" if super().microsecond else "" + ").set_offset(" + str(self._offset) + ")"
+
+    def timestamp(self):
+        with suppress(AttributeError):
+            return self._ts
+        return self.update_timestamp()
+
+    def update_timestamp(self):
+        offs = self.offset() * 31556952
+        try:
+            self._ts = offs + round_min(super().timestamp())
+        except OSError:
+            self._ts = offs + round_min((self - ep).total_seconds())
+        return self._ts
+
+    def offset(self):
+        with suppress(AttributeError):
+            return self._offset
+        self._offset = 0
+        return 0
+
+    def set_offset(self, offs, update_ts=True):
+        self._offset = round(offs)
+        if update_ts:
+            self.update_timestamp()
+        return self
+
+    def __add__(self, other):
+        if type(other) is not datetime.timedelta:
+            return self.__class__.fromtimestamp(self.timestamp() + other)
+        return self.__class__.fromtimestamp(super().__add__(other).timestamp() + self.offset() * 31556952)
+    __radd__ = __add__
+
+    def __sub__(self, other):
+        if type(other) not in (datetime.timedelta, datetime.datetime, datetime.date):
+            return self.__class__.fromtimestamp(self.timestamp() + other)
+        out = super().__sub__(other)
+        ts = getattr(out, "timestamp", None)
+        if ts is None:
+            return out
+        return self.__class__.fromtimestamp(ts + self.offset() * 31556952)
+    __rsub__ = __sub__
+
+    @property
+    def year(self):
+        return super().year + self.offset()
+
+    @classmethod
+    def utcfromtimestamp(cls, ts):
+        offs, ots = divmod(ts, 12622780800)
+        if abs(offs) >= 4:
+            ots = round(ots)
+            ts = round(ts)
+        d = utc_ft(ots)
+        dt = cls(*d.timetuple()[:6], d.microsecond, tzinfo=datetime.timezone.utc).set_offset(offs * 400, False)
+        dt._ts = ts
+        return dt
+
+    @classmethod
+    def fromtimestamp(cls, ts):
+        offs, ots = divmod(ts, 12622780800)
+        if abs(offs) >= 4:
+            ots = round(ots)
+            ts = round(ts)
+        d = datetime.datetime.fromtimestamp(ots)
+        dt = cls(*d.timetuple()[:6], d.microsecond).set_offset(offs * 400, False)
+        dt._ts = ts
+        return dt
+
+    @classmethod
+    def fromdatetime(cls, dt):
+        return cls(*dt.timetuple()[:6], d.microsecond, tzinfo=dt.tzinfo)
+
 utc = time.time
 utc_dt = datetime.datetime.utcnow
-utc_ft = datetime.datetime.fromtimestamp
+utc_ft = datetime.datetime.utcfromtimestamp
+utc_ddt = lambda: dt_ft(utc())
+utc_dft = DynamicDT.utcfromtimestamp
+dt2dt = DynamicDT.fromdatetime
 ep = datetime.datetime(1970, 1, 1)
 
 def zerot():
@@ -2886,6 +2971,8 @@ to_utc = lambda dt: dt.replace(tzinfo=datetime.timezone.utc)
 to_naive = lambda dt: dt.replace(tzinfo=None)
 
 def utc_ts(dt):
+    if type(dt) is DynamicDT:
+        return dt.timestamp()
     with suppress(TypeError):
         return (dt - ep).total_seconds()
     return dt.replace(tzinfo=datetime.timezone.utc).timestamp()
@@ -2906,7 +2993,7 @@ def city_time(city):
 # Values in seconds of various time intervals.
 TIMEUNITS = {
     "galactic year": 7157540528801820.28133333333333,
-    "millenium": [31556925216., "millenia"],
+    "millennium": [31556925216., "millennia"],
     "century": [3155692521.6, "centuries"],
     "decade": 315569252.16,
     "year": 31556925.216,
@@ -2992,12 +3079,14 @@ def time_parse(ts):
 
 def time_diff(t2, t1):
     out = ""
+    galactic_years = 0
+    millennia = 0
     years = t2.year - t1.year
     months = t2.month - t1.month
     days = t2.day - t1.day
     hours = getattr(t2, "hour", 0) - getattr(t1, "hour", 0)
     minutes = getattr(t2, "minute", 0) - getattr(t1, "minute", 0)
-    seconds = getattr(t2, "second", 0) - getattr(t1, "second", 0)
+    seconds = getattr(t2, "second", 0) - getattr(t1, "second", 0) + (getattr(t2, "microsecond", 0) - getattr(t1, "microsecond", 0)) / 100000
     while seconds < 0:
         minutes -= 1
         seconds += 60
@@ -3019,19 +3108,66 @@ def time_diff(t2, t1):
     while months < 0:
         years -= 1
         months += 12
+    if years >= 1000:
+        millennia, years = divmod(years, 1000)
+    if millennia >= 226814:
+        galactic_years, millennia = divmod(millennia, 226814)
+    if galactic_years:
+        out += f"{galactic_years} galactic year"
+        if galactic_years != 1:
+            out += "s"
+        out += " "
+    if millennia:
+        out += f"{millennia} millenni"
+        if millennia != 1:
+            out += "a"
+        else:
+            out += "um"
+        out += " "
     if years:
-        out += f"{years} years "
+        out += f"{years} year"
+        if years != 1:
+            out += "s"
+        out += " "
     if months:
-        out += f"{months} months "
+        out += f"{months} month"
+        if months != 1:
+            out += "s"
+        out += " "
     if days:
-        out += f"{days} days "
+        out += f"{days} day"
+        if days != 1:
+            out += "s"
+        out += " "
     if hours:
-        out += f"{hours} hours "
+        out += f"{hours} hour"
+        if hours != 1:
+            out += "s"
+        out += " "
     if minutes:
-        out += f"{minutes} minutes "
+        out += f"{minutes} minute"
+        if minutes != 1:
+            out += "s"
+        out += " "
     if seconds or not out:
-        out += f"{seconds} seconds"
+        out += f"{seconds} second"
+        if seconds != 1:
+            out += "s"
+        out += " "
     return out
+
+def dyn_time_diff(t2, t1):
+    if isnan(t2) or isnan(t1):
+        return "NaN"
+    if t2 >= inf:
+        return "inf galactic years"
+    if t2 <= -inf:
+        return "-inf galactic years"
+    return time_diff(DynamicDT.fromtimestamp(t2), DynamicDT.fromtimestamp(t1))
+
+def time_until(ts):
+    return dyn_time_diff(ts, utc())
+
 
 def next_date(dt):
     t = utc_dt()

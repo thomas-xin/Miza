@@ -2077,7 +2077,7 @@ class Queue(Command):
         else:
             names = f"{len(names)} items"
         if "h" not in flags:
-            return css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(sec2time(total_duration))}. 🎶"), 1
+            return css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(time_until(utc() + total_duration))}. 🎶"), 1
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos, v = [int(i) for i in vals.split("_", 2)]
@@ -2134,7 +2134,7 @@ class Queue(Command):
         cnt = len(q)
         info = (
             str(cnt) + " item" + "s" * (cnt != 1) + "\nEstimated total duration: "
-            + sec2time(totalTime / auds.speed) + "```*"
+            + time_until(utc() + totalTime / auds.speed) + "```*"
         )
         if not q:
             duration = 0
@@ -2184,13 +2184,13 @@ class Queue(Command):
             if v:
                 if estim > 0:
                     curr += "Time until playing: "
-                    estimate = sec2time(estim / auds.speed)
+                    estimate = time_until(utc() + estim / auds.speed)
                     if i <= 1 or not auds.stats.shuffle:
                         curr += "[" + estimate + "]"
                     else:
                         curr += "{" + estimate + "}"
                 else:
-                    curr += "Remaining time: [" + sec2time((estim + e_dur(e.duration)) / auds.speed) + "]"
+                    curr += "Remaining time: [" + time_until(utc() + (estim + e_dur(e.duration)) / auds.speed) + "]"
                 curr += "```"
             curr += "\n"
             if len(embstr) + len(curr) > 2048 - len(emb.description):

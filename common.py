@@ -1150,7 +1150,7 @@ def as_timezone(tz):
         except ValueError:
             continue
         a = a[:i]
-        h += float(arg[i:])
+        h += float(a[i:])
         break
     tz = a.casefold()
     return get_timezone(tz) + h * 3600
@@ -1159,8 +1159,8 @@ create_future_ex(load_timezones, priority=True)
 
 def parse_with_now(expr):
     if expr.strip().casefold() == "now":
-        return datetime.datetime.utcnow()
-    return tparser.parse(expr)
+        return utc_ddt()
+    return dt2dt(tparser.parse(expr))
 
 # Parses a time expression, with an optional timezone input at the end.
 def tzparse(expr):
@@ -1192,18 +1192,18 @@ def tzparse(expr):
                     expr = " ".join(args)
                     break
                 h = 0
-            t = parse_with_now(expr) - datetime.timedelta(hours=h, seconds=t)
+            t = parse_with_now(expr) - (h * 3600 + t)
         else:
             t = parse_with_now(expr)
         if day is not None:
-            curr = utc_dt() + datetime.timedelta(days=day)
-            one_day = datetime.timedelta(days=1)
+            curr = utc_ddt() + day * 86400
+            one_day = 86400
             while t < curr:
                 t += one_day
             while t - curr > one_day:
                 t -= one_day
         return t
-    return datetime.datetime.utcfromtimestamp(s)
+    return utc_dft(s)
 
 
 # Basic inheritable class for all bot commands.

@@ -152,7 +152,7 @@ class Mute(Command):
                         update()
                     create_task(channel.send(css_md(f"Successfully unmuted {sqr_md(user)} in {sqr_md(guild)}.")))
                     continue
-                create_task(channel.send(italics(ini_md(f"Current mute for {sqr_md(user)} in {sqr_md(guild)}: {sqr_md(sec2time(mute['t'] - ts))}."))))
+                create_task(channel.send(italics(ini_md(f"Current mute for {sqr_md(user)} in {sqr_md(guild)}: {sqr_md(time_until(mute['t']))}."))))
             return
         # This parser is a mess too
         mutetype = " ".join(args)
@@ -237,7 +237,7 @@ class Mute(Command):
                     print(mutelist)
                     print(bot.database.mutes.listed)
                     update()
-                    msg = css_md(f"Updated mute for {sqr_md(user)} from {sqr_md(sec2time(mute['t'] - ts))} to {sqr_md(sec2time(length))}.")
+                    msg = css_md(f"Updated mute for {sqr_md(user)} from {sqr_md(time_until(mute['t']))} to {sqr_md(time_until(ts + length))}.")
                     await channel.send(msg)
                 return
         async with ExceptionSender(channel):
@@ -257,7 +257,7 @@ class Mute(Command):
             print(mutelist)
             print(bot.database.mutes.listed)
             update()
-            msg = css_md(f"{sqr_md(user)} has been muted in {sqr_md(guild)} for {sqr_md(sec2time(length))}. Reason: {sqr_md(reason)}")
+            msg = css_md(f"{sqr_md(user)} has been muted in {sqr_md(guild)} for {sqr_md(time_until(ts + length))}. Reason: {sqr_md(reason)}")
             await channel.send(msg)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
@@ -308,7 +308,7 @@ class Mute(Command):
                 user = await bot.fetch_user(mute["u"])
                 emb.add_field(
                     name=f"{user} ({user.id})",
-                    value=f"Duration {italics(single_md(sec2time(mute['t'] - ts)))}\nReason: {italics(single_md(escape_markdown(str(mute['r']))))}"
+                    value=f"Duration {italics(single_md(time_until(mute['t'])))}\nReason: {italics(single_md(escape_markdown(str(mute['r']))))}"
                 )
         more = len(mutes) - pos - page
         if more > 0:
@@ -375,7 +375,7 @@ class Ban(Command):
                         update()
                     create_task(channel.send(css_md(f"Successfully unbanned {sqr_md(user)} from {sqr_md(guild)}.")))
                     continue
-                create_task(channel.send(italics(ini_md(f"Current ban for {sqr_md(user)} from {sqr_md(guild)}: {sqr_md(sec2time(ban['t'] - ts))}."))))
+                create_task(channel.send(italics(ini_md(f"Current ban for {sqr_md(user)} from {sqr_md(guild)}: {sqr_md(time_until(ban['t']))}."))))
             return
         # This parser is a mess too
         bantype = " ".join(args)
@@ -460,7 +460,7 @@ class Ban(Command):
                     print(banlist)
                     print(bot.database.bans.listed)
                     update()
-                    msg = css_md(f"Updated ban for {sqr_md(user)} from {sqr_md(sec2time(ban['t'] - ts))} to {sqr_md(sec2time(length))}.")
+                    msg = css_md(f"Updated ban for {sqr_md(user)} from {sqr_md(time_until(ban['t']))} to {sqr_md(time_until(ts + length))}.")
                     await channel.send(msg)
                 return
         async with ExceptionSender(channel):
@@ -475,7 +475,7 @@ class Ban(Command):
             print(banlist)
             print(bot.database.bans.listed)
             update()
-            msg = css_md(f"{sqr_md(user)} has been banned from {sqr_md(guild)} for {sqr_md(sec2time(length))}. Reason: {sqr_md(reason)}")
+            msg = css_md(f"{sqr_md(user)} has been banned from {sqr_md(guild)} for {sqr_md(time_until(ts + length))}. Reason: {sqr_md(reason)}")
             await channel.send(msg)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
@@ -526,7 +526,7 @@ class Ban(Command):
                 user = await bot.fetch_user(ban["u"])
                 emb.add_field(
                     name=f"{user} ({user.id})",
-                    value=f"Duration {italics(single_md(sec2time(ban['t'] - ts)))}\nReason: {italics(single_md(escape_markdown(str(ban['r']))))}"
+                    value=f"Duration {italics(single_md(time_until(ban['t'])))}\nReason: {italics(single_md(escape_markdown(str(ban['r']))))}"
                 )
         more = len(bans) - pos - page
         if more > 0:
@@ -1282,9 +1282,8 @@ class UpdateUserLogs(Database):
             emb = discord.Embed(colour=16777214)
             emb.set_author(**get_author(user))
             emb.description = f"{user_mention(user.id)} has joined the server."
-            age = (utc_dt() - user.created_at).total_seconds()
             if age < 86400 * 7:
-                emb.description += f"\n⚠️ Account is {sec2time(age)} old. ⚠️"
+                emb.description += f"\n⚠️ Account is {time_diff(utc_dt(), user.created_at)} old. ⚠️"
             self.bot.send_embeds(channel, emb)
     
     async def _leave_(self, user, **void):

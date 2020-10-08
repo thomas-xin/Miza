@@ -710,7 +710,7 @@ class Info(Command):
                         if type(ls) is str:
                             seen = ls
                         else:
-                            seen = f"{sec2time(max(0, ts - ls))} ago"
+                            seen = f"{dyn_time_diff(ts, min(ts, ls))} ago"
                         if la:
                             seen = f"{la}, {seen}"
                         if "v" in flags:
@@ -845,7 +845,7 @@ class Profile(Command):
             if birthday:
                 t = utc_dt()
                 if timezone:
-                    birthday -= td
+                    birthday = datetime.datetime(birthday.year, birthday.month, birthday.day) - td
                 description += ini_md(f"Age: {sqr_md(time_diff(t, birthday))}\nBirthday in: {sqr_md(time_diff(next_date(birthday), t))}")
             fields = set()
             for field in ("timezone", "birthday"):
@@ -941,7 +941,7 @@ class Status(Command):
 
             misc_info = (
                 f"Cached files\n`{len(cache)}`\nConnected voice channels\n`{len(bot.voice_clients)}`\nTotal data sent/received\n`{byte_scale(bot.total_bytes)}B`\n"
-                + f"System time\n`{datetime.datetime.now()}`\nPing latency\n`{sec2time(bot.latency)}`\nCurrent uptime\n`{sec2time(utc() - bot.start_time)}`\nPublic IP address\n`{bot.ip}`"
+                + f"System time\n`{datetime.datetime.now()}`\nPing latency\n`{sec2time(bot.latency)}`\nCurrent uptime\n`{dyn_time_diff(utc(), bot.start_time)}`\nPublic IP address\n`{bot.ip}`"
             )
             emb.add_field(name="Misc info", value=misc_info)
             emb.add_field(name="Code info", value=f"[`{byte_scale(size[0])}B, {size[1]} lines`]({bot.website})")
@@ -1224,7 +1224,7 @@ class Reminder(Command):
         if keyed:
             out += f" upon next event from {sqr_md(user_mention(t))}"
         else:
-            out += f" in {sqr_md(sec2time(t))}"
+            out += f" in {sqr_md(time_until(t + ts))}"
         out += ":```"
         return dict(content=out, embed=emb)
 
@@ -1270,7 +1270,7 @@ class Reminder(Command):
             content += f"{len(rems)} messages currently scheduled for {str(sendable).replace('`', '')}:```*"
             msg = iter2str(
                 rems[pos:pos + page],
-                key=lambda x: lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x["msg"]), 96) + "` ➡️ " + (user_mention(x["u_id"]) if "u_id" in x else sec2time(x["t"] - t)),
+                key=lambda x: lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x["msg"]), 96) + "` ➡️ " + (user_mention(x["u_id"]) if "u_id" in x else time_until(x["t"])),
                 left="`[",
                 right="]`",
             )
@@ -2034,7 +2034,7 @@ class UpdateUsers(Database):
                             old = snowflake_time(old)
                         if old is not None and old < curr:
                             curr = old
-                        out += f"\nServer insights: `{member} has been active here for {sec2time(utc() - curr.timestamp())}!`"
+                        out += f"\nServer insights: `{member} has been active here for {dyn_time_diff(utc(), curr.timestamp())}!`"
                     elif i == 2:
                         events = bot.database.users.get_events(member.id, interval=900)
                         out += f"\nServer insights: `{member} has performed {sum(events)} discord actions in the past 7 days!`"

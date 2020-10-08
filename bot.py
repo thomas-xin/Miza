@@ -1404,7 +1404,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         raw += 86400
                     while raw - curr > 86400:
                         raw -= 86400
-                t = utc_ts(raw) - zerot()
+                t = (raw - zerot()).timestamp()
         if type(t) is not float:
             t = float(t)
         return t
