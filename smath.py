@@ -1625,9 +1625,9 @@ def isqrt(x):
 
 # Rounds a number to a certain amount of decimal places.
 def round(x, y=None):
-    with suppress(Exception):
+    with suppress():
         if is_finite(x):
-            with suppress(Exception):
+            with suppress():
                 if x == int(x):
                     return int(x)
                 if y is None:
@@ -1637,7 +1637,7 @@ def round(x, y=None):
             return x
     if type(x) is complex:
         return round(x.real, y) + round(x.imag, y) * 1j
-    with suppress(Exception):
+    with suppress():
         return math.round(x)
     return x
 
@@ -3126,7 +3126,7 @@ def time_diff(t2, t1):
     days = t2.day - t1.day
     hours = getattr(t2, "hour", 0) - getattr(t1, "hour", 0)
     minutes = getattr(t2, "minute", 0) - getattr(t1, "minute", 0)
-    seconds = getattr(t2, "second", 0) - getattr(t1, "second", 0) + (getattr(t2, "microsecond", 0) - getattr(t1, "microsecond", 0)) / 100000
+    seconds = round(getattr(t2, "second", 0) - getattr(t1, "second", 0) + (getattr(t2, "microsecond", 0) - getattr(t1, "microsecond", 0)) / 100000, 6)
     while seconds < 0:
         minutes -= 1
         seconds += 60
