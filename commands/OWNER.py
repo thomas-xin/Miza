@@ -32,7 +32,7 @@ class Reload(Command):
 
 
 class Restart(Command):
-    name = ["Shutdown", "Reload", "Unload", "Reboot"]
+    name = ["Shutdown", "Reboot"]
     min_level = nan
     description = "Restarts, reloads, or shuts down ⟨MIZA⟩, with an optional delay."
     _timeout_ = inf
