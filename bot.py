@@ -1726,7 +1726,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             with suppress(discord.NotFound):
                                 u = await self.fetch_user(next(iter(self.owners)))
                                 n = u.name
-                                text = f"live to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {uni_str(n)}'{'s' if n[-1] != 's' else ''} place!"
+                                text = f"live to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {belongs(uni_str(n))} place!"
                                 activity = discord.Streaming(name=text, url=self.website)
                                 activity.game = self.website
                                 if changed:

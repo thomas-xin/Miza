@@ -3234,6 +3234,15 @@ def replace_map(s, mapping):
     return s.translate(trans)
 
 
+def belongs(s):
+    s = s.strip()
+    if not s:
+        return ""
+    if full_prune(s[-1]) == "s":
+        return s + "'"
+    return s + "'s"
+
+
 # Converts a bytes object to a hex string.
 def bytes2hex(b, space=True):
     if type(b) is str:

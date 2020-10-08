@@ -555,9 +555,9 @@ class Time(Command):
             hrs = "+" + str(hrs)
         out = f"Current time at UTC/GMT{hrs}: {sqr_md(t)}."
         if estimated:
-            out += "\nUsing timezone automatically estimated from discord activity."
+            out += f"\nUsing timezone automatically estimated from {sqr_md(user)}'s discord activity."
         elif estimated is not None:
-            out += "\nUsing timezone assigned by user."
+            out += f"\nUsing timezone assigned by {sqr_md(user)}."
         return ini_md(out)
 
 
