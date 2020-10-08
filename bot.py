@@ -30,6 +30,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     def __init__(self, cache_size=4194304, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
+        self.start_time = utc()
         super().__init__(max_messages=256, heartbeat_timeout=60, guild_ready_timeout=5)
         self.cache_size = cache_size
         self.timeout = timeout

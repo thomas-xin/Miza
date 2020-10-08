@@ -883,13 +883,13 @@ class Status(Command):
 
             discord_info = (
                 f"Shard count\n`{shards}`\nServer count\n`{len(bot.guilds)}`\nUser count\n`{len(bot.cache.users)}`\n"
-                + f"Channel count\n`{len(bot.cache.channels)}`\nRole count\n`{len(bot.cache.roles)}`\nEmoji count\n`{len(bot.cache.emojis)}`"
+                + f"Channel count\n`{len(bot.cache.channels)}`\nRole count\n`{len(bot.cache.roles)}`\nEmoji count\n`{len(bot.cache.emojis)}`\nCached messages\n`{len(bot.cache.messages)}`"
             )
             emb.add_field(name="Discord info", value=discord_info)
 
             misc_info = (
-                f"Cached messages\n`{len(bot.cache.messages)}`\nCached files\n`{len(cache)}`\nConnected voice channels\n`{len(bot.voice_clients)}`\nTotal data sent/received\n`{byte_scale(bot.total_bytes)}B`\n"
-                + f"System time\n`{datetime.datetime.now()}`\nPing latency\n`{sec2time(bot.latency)}`\nPublic IP address\n`{bot.ip}`"
+                f"Cached files\n`{len(cache)}`\nConnected voice channels\n`{len(bot.voice_clients)}`\nTotal data sent/received\n`{byte_scale(bot.total_bytes)}B`\n"
+                + f"System time\n`{datetime.datetime.now()}`\nPing latency\n`{sec2time(bot.latency)}`\nCurrent uptime\n`{sec2time(utc() - bot.start_time)}`\nPublic IP address\n`{bot.ip}`"
             )
             emb.add_field(name="Misc info", value=misc_info)
             emb.add_field(name="Code info", value=f"[`{byte_scale(size[0])}B, {size[1]} lines`]({bot.website})")
