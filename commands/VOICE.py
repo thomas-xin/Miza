@@ -1102,7 +1102,7 @@ class AudioFile:
             self.ensure_time()
             return
         # Remove any unused file that has been left for a long time
-        if utc() - self.time > 12000
+        if utc() - self.time > 12000:
             try:
                 fl = os.path.getsize("cache/" + self.file)
             except FileNotFoundError:
