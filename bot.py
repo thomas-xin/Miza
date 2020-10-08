@@ -1287,17 +1287,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return await process_math(f, int(prec), int(r), key, timeout=12, variables=variables)
 
     TimeChecks = {
-        "galactic year": ("gy", "galactic year", "galactic years"),
-        "millenium": ("ml", "millenium", "millenia"),
-        "century": ("c", "century", "centuries"),
-        "decade": ("dc", "decade", "decades"),
-        "year": ("y", "year", "years"),
-        "month": ("mo", "mth", "month", "mos", "mths", "months"),
-        "week": ("w", "wk", "week", "wks", "weeks"),
-        "day": ("d", "day", "days"),
-        "hour": ("h", "hr", "hour", "hrs", "hours"),
-        "minute": ("m", "min", "minute", "mins", "minutes"),
-        "second": ("s", "sec", "second", "secs", "seconds"),
+        "galactic years": ("gy", "galactic year", "galactic years"),
+        "millennia": ("ml", "millenium", "millenia"),
+        "centuries": ("c", "century", "centuries"),
+        "decades": ("dc", "decade", "decades"),
+        "years": ("y", "year", "years"),
+        "months": ("mo", "mth", "month", "mos", "mths", "months"),
+        "weeks": ("w", "wk", "week", "wks", "weeks"),
+        "days": ("d", "day", "days"),
+        "hours": ("h", "hr", "hour", "hrs", "hours"),
+        "minutes": ("m", "min", "minute", "mins", "minutes"),
+        "seconds": ("s", "sec", "second", "secs", "seconds"),
     }
     num_words = "(?:(?:(?:[0-9]+|[a-z]{1,}illion)|thousand|hundred|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|zero|one|two|three|four|five|six|seven|eight|nine)\\s*)"
     numericals = re.compile("^(?:" + num_words + "|(?:a|an)\\s*)(?:" + num_words + ")*", re.I)
@@ -1361,6 +1361,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         f = f.replace("yesterday", "")
                     if day is not None:
                         raise StopIteration
+                    dd = {}
+                    td = {}
                     for tc in self.TimeChecks:
                         for check in reversed(self.TimeChecks[tc]):
                             if check in f:
@@ -1379,10 +1381,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                         f = f"{temp} {f}"
                                 else:
                                     n = await self.eval_math(temp, obj)
-                                s = TIMEUNITS[tc]
-                                if type(s) is list:
-                                    s = s[0]
-                                t += s * n
+                                if tc == "weeks":
+                                    add_dict(td, {"days": n * 7})
+                                elif tc in ("days", "hours", "minutes", "seconds"):
+                                    add_dict(td, {tc: n})
+                                else:
+                                    add_dict(dd, {tc: n})
                     temp = f.strip()
                     if temp:
                         match = self.numericals.search(temp)
@@ -1395,6 +1399,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         else:
                             n = await self.eval_math(temp, obj)
                         t += n
+                    t += td.get("seconds", 0)
+                    t += td.get("minutes", 0) * 60
+                    t += td.get("hours", 0) * 3600
+                    t += td.get("days", 0) * 86400
+                    if dd:
+                        ts = utc()
+                        dt = utc_dft(t + ts)
+                        years = dd.get("years", 0) + dd.get("decades", 0) * 10 + dd.get("centuries", 0) * 100 + dd.get("millennia", 0) * 1000 + dd.get("galactic years", 0) * 226814
+                        dt = dt.add_years(years)
+                        months = dd.get("months", 0)
+                        dt = dt.add_months(months)
+                        t = dt.timestamp() - ts
             except:
                 # Use datetime parser if regular parser fails
                 raw = tzparse(f if f else expr)

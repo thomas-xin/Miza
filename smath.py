@@ -2925,6 +2925,46 @@ class DynamicDT(datetime.datetime):
         return self.__class__.fromtimestamp(ts + self.offset() * 31556952)
     __rsub__ = __sub__
 
+    def add_years(self, years=1):
+        if not years:
+            return self
+        offs = self.offset()
+        if abs(years) >= 400:
+            x, years = divmod(years, 400)
+        else:
+            x = 0
+        try:
+            new_dt = self.__class__(super().year + years, self.month, self.day, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
+        except ValueError:
+            month = self.month + 1
+            if month > 12:
+                month = 1
+                years += 1
+            new_dt = self.__class__(super().year + years, month, 1, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
+        return new_dt.set_offset(offs + x * 400)
+
+    def add_months(self, months=1):
+        if not months:
+            return self
+        offs = self.offset()
+        years = 0
+        month = self.month + months
+        if month < 0 or month > 12:
+            years, month = divmod(month, 12)
+        if abs(years) >= 400:
+            x, years = divmod(years, 400)
+        else:
+            x = 0
+        try:
+            new_dt = self.__class__(super().year + years, month, self.day, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
+        except ValueError:
+            month += 1
+            if month > 12:
+                month = 1
+                years += 1
+            new_dt = self.__class__(super().year + years, month, 1, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
+        return new_dt.set_offset(offs + x * 400)
+
     @property
     def year(self):
         return super().year + self.offset()
@@ -2958,7 +2998,7 @@ class DynamicDT(datetime.datetime):
 utc = time.time
 utc_dt = datetime.datetime.utcnow
 utc_ft = datetime.datetime.utcfromtimestamp
-utc_ddt = lambda: dt_ft(utc())
+utc_ddt = lambda: utc_ft(utc())
 utc_dft = DynamicDT.utcfromtimestamp
 dt2dt = DynamicDT.fromdatetime
 ep = datetime.datetime(1970, 1, 1)
