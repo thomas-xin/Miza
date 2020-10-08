@@ -3005,7 +3005,7 @@ ep = datetime.datetime(1970, 1, 1)
 
 def zerot():
     today = utc_dt()
-    return datetime.datetime(today.year, today.month, today.day).timestamp()
+    return datetime.datetime(today.year, today.month, today.day, tzinfo=datetime.timezone.utc).timestamp()
 
 to_utc = lambda dt: dt.replace(tzinfo=datetime.timezone.utc)
 to_naive = lambda dt: dt.replace(tzinfo=None)
@@ -3190,7 +3190,11 @@ def time_diff(t2, t1):
             out += "s"
         out += " "
     if seconds or not out:
-        out += f"{seconds} second"
+        s = str(seconds)
+        if "." in s:
+            spl = s.split(".", 1)
+            s = spl[0] + "." + spl[1][:6]
+        out += f"{s} second"
         if seconds != 1:
             out += "s"
     return out.strip()
