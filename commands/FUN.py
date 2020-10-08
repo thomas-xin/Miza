@@ -534,7 +534,7 @@ class Pay(Command):
             amount = 1
         if amount <= 0:
             raise ValueError("Please input a valid amount of coins.")
-        if amount > bot.data.users.get(user.id, {}).get("gold", 0):
+        if not amount <= bot.data.users.get(user.id, {}).get("gold", 0):
             raise OverflowError("Payment cannot be greater than your balance.")
         bot.database.users.add_gold(user, -amount)
         bot.database.users.add_gold(target, amount)
