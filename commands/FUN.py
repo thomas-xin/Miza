@@ -424,13 +424,13 @@ class SlotMachine(Command):
 
     def generate(self, count=3):
         x = random.random()
-        if x < 1 / 4:
+        if x < 1 / 5:
             count = 3
-        elif x < 7 / 12:
+        elif x < 8 / 15:
             count = 2
         else:
             count = 1
-        out = alist([self.select()] * count)
+        out = alist((self.select(),) * count)
         while len(out) < 3:
             out.append(choice(self.emojis))
         return shuffle(out)

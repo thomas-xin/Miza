@@ -1193,6 +1193,13 @@ def parse_with_now(expr):
             year += 2000
             expr = regexp("[0-9]{10,}").sub(str(year), expr, 1)
             return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
+        elif s.startswith("Unknown string format") or s.startswith("month must be in"):
+            y = int(regexp("[0-9]{5,}").findall(expr)[0])
+            offs, year = divmod(y, 400)
+            offs = offs * 400 - 2000
+            year += 2000
+            expr = regexp("[0-9]{5,}").sub(str(year), expr, 1)
+            return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
         raise
     if bc:
         y = -dt.year
@@ -1243,6 +1250,8 @@ def tzparse(expr):
             while t - curr > one_day:
                 t -= one_day
         return t
+    if not is_finite(s) or abs(s) >= 1 << 31:
+        s = int(expr.split(".", 1)[0])
     return utc_dft(s)
 
 
