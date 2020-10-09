@@ -821,6 +821,7 @@ class Profile(Command):
     usage = "<user[]> | <option(description)(timezone)(birthday)> <value[]> <delete(?d)>"
     flags = "d"
     rate_limit = 1
+    no_parse = True
     
     async def __call__(self, user, args, flags, channel, guild, bot, **void):
         setting = None

@@ -1939,8 +1939,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             if not argv:
                                 args = []
                             else:
+                                args = None
                                 # Used as a goto lol
                                 with suppress(StopIteration):
+                                    if hasattr(command, "no_parse"):
+                                        raise StopIteration
                                     brackets = {"<": ">", "(": ")", "[": "]", "{": "}"}
                                     for x, y in brackets.items():
                                         if x in argv and y in argv:
@@ -1961,6 +1964,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                                 except ValueError:
                                                     args = argv2.split()
                                                 raise StopIteration
+                                if args is None:
                                     argv2 = single_space(argv.replace("\n", " ").replace("\t", " "))
                                     try:
                                         args = shlex.split(argv2)
