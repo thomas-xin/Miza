@@ -2878,7 +2878,7 @@ class DynamicDT(datetime.datetime):
     __slots__ = ("_offset", "_ts")
 
     def __str__(self):
-        y = super().year + self.offset()
+        y = self.year
         return "0" * max(0, 3 - int(math.log10(max(1, y)))) + str(y) + super().__str__()[4:]
 
     def __repr__(self):
@@ -2973,6 +2973,12 @@ class DynamicDT(datetime.datetime):
     @property
     def year(self):
         return super().year + self.offset()
+
+    def as_date(self):
+        y = self.year
+        m = self.month
+        d = self.day
+        return "0" * max(0, 3 - int(math.log10(max(1, y)))) + str(y) + "-" + ("0" if m < 10 else "") + str(m) + "-" + ("0" if d < 10 else "") + str(d)
 
     @classmethod
     def utcfromtimestamp(cls, ts):
@@ -3222,10 +3228,9 @@ def dyn_time_diff(t2, t1):
 def time_until(ts):
     return dyn_time_diff(ts, utc())
 
-
 def next_date(dt):
     t = utc_dt()
-    new = datetime.datetime(t.year, dt.month, dt.day, tzinfo=datetime.timezone.utc)
+    new = datetime.datetime(t.year, dt.month, dt.day)
     while new < t:
         new = new.replace(year=new.year + 1)
     return new

@@ -876,6 +876,8 @@ class Profile(Command):
             value = DynamicDT(year + 2000, dt.month, dt.day).set_offset(offs * 400 - 2000)
         bot.data.users.setdefault(user.id, {})[setting] = value
         bot.database.users.update()
+        if type(value) is DynamicDT:
+            value = value.as_date()
         return css_md(f"Successfully changed {setting} for {sqr_md(user)} to {sqr_md(value)}.")
 
 

@@ -1149,8 +1149,8 @@ def as_timezone(tz):
             i = a.index(op)
         except ValueError:
             continue
-        a = a[:i]
         h += float(a[i:])
+        a = a[:i]
         break
     tz = a.casefold()
     return get_timezone(tz) + h * 3600
