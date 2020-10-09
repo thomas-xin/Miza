@@ -818,10 +818,11 @@ class Profile(Command):
     name = ["User", "UserProfile"]
     min_level = 0
     description = "Shows or edits a user profile on ⟨MIZA⟩."
-    usage = "<user[]> | <option(description)(timezone)(birthday)> <value[]>"
+    usage = "<user[]> | <option(description)(timezone)(birthday)> <value[]> <delete(?d)>"
+    flags = "d"
     rate_limit = 1
     
-    async def __call__(self, user, args, channel, guild, bot, **void):
+    async def __call__(self, user, args, flags, channel, guild, bot, **void):
         setting = None
         if not args:
             target = user
@@ -843,9 +844,12 @@ class Profile(Command):
                 td = datetime.timedelta(seconds=as_timezone(timezone))
                 description += ini_md(f"Current time: {sqr_md(utc_dt() + td)}")
             if birthday:
+                if type(birthday) is not DynamicDT:
+                    birthday = profile["birthday"] = DynamicDT.fromdatetime(birthday)
+                    bot.database.users.update()
                 t = utc_dt()
                 if timezone:
-                    birthday = datetime.datetime(birthday.year, birthday.month, birthday.day) - td
+                    birthday -= td
                 description += ini_md(f"Age: {sqr_md(time_diff(t, birthday))}\nBirthday in: {sqr_md(time_diff(next_date(birthday), t))}")
             fields = set()
             for field in ("timezone", "birthday"):
@@ -853,6 +857,10 @@ class Profile(Command):
             return bot.send_as_embeds(channel, description, fields=fields, author=get_author(target))
         if value is None:
             return ini_md(f"Currently set {setting} for {sqr_md(user)}: {sqr_md(bot.data.users.get(user.id, EMPTY).get(setting))}.")
+        if setting != "description" and value.casefold() in ("undefined", "remove", "rem", "reset", "unset", "delete", "clear", "null", "none") or "d" in flags:
+            profile.pop(setting, None)
+            bot.database.users.update()
+            return css_md(f"Successfully removed {setting} for {sqr_md(user)}.")
         if setting == "description":
             if len(value) > 1024:
                 raise OverflowError("Description must be 1024 or fewer in length.")
@@ -864,7 +872,8 @@ class Profile(Command):
                 raise ArgumentError(f"Entered value could not be recognized as a timezone location or abbreviation. Use {bot.get_prefix(guild)}timezone list for list.")
         else:
             dt = tzparse(value)
-            value = datetime.date(dt.year, dt.month, dt.day)
+            offs, year = divmod(dt.year, 400)
+            value = DynamicDT(year + 2000, dt.month, dt.day).set_offset(offs * 400 - 2000)
         bot.data.users.setdefault(user.id, {})[setting] = value
         bot.database.users.update()
         return css_md(f"Successfully changed {setting} for {sqr_md(user)} to {sqr_md(value)}.")

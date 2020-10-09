@@ -2993,7 +2993,7 @@ class DynamicDT(datetime.datetime):
 
     @classmethod
     def fromdatetime(cls, dt):
-        return cls(*dt.timetuple()[:6], d.microsecond, tzinfo=dt.tzinfo)
+        return cls(*dt.timetuple()[:6], getattr(dt, "microsecond", 0), tzinfo=dt.tzinfo)
 
 utc = time.time
 utc_dt = datetime.datetime.utcnow
@@ -3138,19 +3138,19 @@ def time_diff(t2, t1):
         hours += 24
     while days < 0:
         months -= 1
-        d = 31
-        while d:
-            try:
-                datetime.datetime(t2.year % 400 + 2000, t2.month - 1, d, 0)
-            except ValueError:
-                if d > 28:
-                    pass
-                else:
-                    raise
+        if t2.month in (1, 2, 4, 6, 8, 9, 11):
+            days += 31
+        elif t2.month == 3:
+            if not t2.year % 400:
+                days += 29
+            elif not t2.year % 100:
+                days += 28
+            elif not t2.year % 4:
+                days += 29
             else:
-                break
-            d -= 1
-        days += d
+                days += 28
+        else:
+            days += 30
     while months < 0:
         years -= 1
         months += 12
@@ -3220,7 +3220,7 @@ def time_until(ts):
 
 def next_date(dt):
     t = utc_dt()
-    new = datetime.datetime(t.year, dt.month, dt.day)
+    new = datetime.datetime(t.year, dt.month, dt.day, tzinfo=datetime.timezone.utc)
     while new < t:
         new = new.replace(year=new.year + 1)
     return new
