@@ -2878,11 +2878,18 @@ class DynamicDT(datetime.datetime):
     __slots__ = ("_offset", "_ts")
 
     def __str__(self):
-        y = self.year
-        return "0" * max(0, 3 - int(math.log10(max(1, y)))) + str(y) + super().__str__()[4:]
+        y = self.year_repr()
+        return y + super().__str__()[4:]
 
     def __repr__(self):
         return self.__class__.__name__ + "(" + ", ".join(str(i) for i in super().timetuple()[:6]) + f", microsecond={super().microsecond}" if super().microsecond else "" + ").set_offset(" + str(self._offset) + ")"
+
+    def year_repr(self):
+        y = self.year
+        if y >= 0:
+            return "0" * max(0, 3 - int(math.log10(max(1, y)))) + str(y)
+        y = -y
+        return "0" * max(0, 3 - int(math.log10(max(1, y)))) + str(y) + " BC"
 
     def timestamp(self):
         with suppress(AttributeError):
@@ -2934,6 +2941,7 @@ class DynamicDT(datetime.datetime):
     def add_years(self, years=1):
         if not years:
             return self
+        added = years >= 0
         offs = self.offset()
         if abs(years) >= 400:
             x, years = divmod(years, 400)
@@ -2942,11 +2950,16 @@ class DynamicDT(datetime.datetime):
         try:
             new_dt = self.__class__(super().year + years, self.month, self.day, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
         except ValueError:
-            month = self.month + 1
-            if month > 12:
-                month = 1
-                years += 1
-            new_dt = self.__class__(super().year + years, month, 1, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
+            if added:
+                month = self.month + 1
+                if month > 12:
+                    month = 1
+                    years += 1
+                new_dt = self.__class__(super().year + years, month, 1, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
+            else:
+                month = self.month
+                day = month_days(super().year + years, month)
+                new_dt = self.__class__(super().year + years, month, day, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
         return new_dt.set_offset(offs + x * 400)
 
     def add_months(self, months=1):
@@ -2976,10 +2989,15 @@ class DynamicDT(datetime.datetime):
         return super().year + self.offset()
 
     def as_date(self):
-        y = self.year
+        y = self.year_repr()
+        if y.endswith(" BC"):
+            bc = " BC"
+            y = y[:-3]
+        else:
+            bc = ""
         m = self.month
         d = self.day
-        return "0" * max(0, 3 - int(math.log10(max(1, y)))) + str(y) + "-" + ("0" if m < 10 else "") + str(m) + "-" + ("0" if d < 10 else "") + str(d)
+        return y + "-" + ("0" if m < 10 else "") + str(m) + "-" + ("0" if d < 10 else "") + str(d) + bc
 
     @classmethod
     def utcfromtimestamp(cls, ts):
@@ -3005,7 +3023,10 @@ class DynamicDT(datetime.datetime):
 
     @classmethod
     def fromdatetime(cls, dt):
+        if type(dt) is cls:
+            return dt
         return cls(*dt.timetuple()[:6], getattr(dt, "microsecond", 0), tzinfo=getattr(dt, "tzinfo", None))
+
 
 utc = time.time
 utc_dt = datetime.datetime.utcnow
@@ -3089,6 +3110,19 @@ def time_convert(s):
 # Returns the string representation of a time value in seconds, in word form.
 sec2time = lambda s: " ".join(time_convert(s))
 
+def month_days(year, month):
+    if month in (4, 6, 9, 11):
+        return 30
+    elif month == 3:
+        if not year % 400:
+            return 29
+        elif not year % 100:
+            return 28
+        elif not year % 4:
+            return 29
+        return 28
+    return 31
+
 # Returns a representation of a time interval using days:hours:minutes:seconds.
 def time_disp(s):
     if not is_finite(s):
@@ -3150,25 +3184,13 @@ def time_diff(t2, t1):
         hours += 24
     while days < 0:
         months -= 1
-        if t2.month in (1, 2, 4, 6, 8, 9, 11):
-            days += 31
-        elif t2.month == 3:
-            if not t2.year % 400:
-                days += 29
-            elif not t2.year % 100:
-                days += 28
-            elif not t2.year % 4:
-                days += 29
-            else:
-                days += 28
-        else:
-            days += 30
+        days += month_days(t2.year, t2.month - 1)
     while months < 0:
         years -= 1
         months += 12
-    if years >= 1000:
+    if abs(years) >= 1000:
         millennia, years = divmod(years, 1000)
-    if millennia >= 226814:
+    if abs(millennia) >= 226814:
         galactic_years, millennia = divmod(millennia, 226814)
     if galactic_years:
         out += f"{galactic_years} galactic year"

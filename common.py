@@ -1145,22 +1145,62 @@ def as_timezone(tz):
     a = tz
     h = 0
     for op in ("+-"):
-        try:
+        with suppress(ValueError):
             i = a.index(op)
-        except ValueError:
-            continue
-        h += float(a[i:])
-        a = a[:i]
-        break
+            h += float(a[i:])
+            a = a[:i]
+            break
     tz = a.casefold()
     return get_timezone(tz) + h * 3600
 
 create_future_ex(load_timezones, priority=True)
 
 def parse_with_now(expr):
-    if expr.strip().casefold() == "now":
+    if not expr or expr.strip().casefold() == "now":
         return utc_ddt()
-    return dt2dt(tparser.parse(expr))
+    bc = False
+    if expr[-3:].casefold() == " ad":
+        expr = expr[:-3]
+    elif expr[-5:].casefold() == " a.d.":
+        expr = expr[:-5]
+    if expr[-3:].casefold() == " bc":
+        expr = expr[:-3]
+        bc = True
+    elif expr[-5:].casefold() == " b.c.":
+        expr = expr[:-5]
+        bc = True
+    try:
+        dt = tparser.parse(expr)
+    except Exception as ex:
+        print(ex)
+        s = str(ex).split(":", 1)[0]
+        if s.startswith("year "):
+            s = s[5:]
+            if s.endswith(" is out of range"):
+                s = s[:-16]
+                y = int(s)
+                if bc:
+                    y = -y
+                offs, year = divmod(y, 400)
+                offs = offs * 400 - 2000
+                year += 2000
+                expr = regexp("0*" + s).sub(str(year), expr, 1)
+                return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
+        elif s.startswith("Python int too large to convert to C"):
+            y = int(regexp("[0-9]{10,}").findall(expr)[0])
+            offs, year = divmod(y, 400)
+            offs = offs * 400 - 2000
+            year += 2000
+            expr = regexp("[0-9]{10,}").sub(str(year), expr, 1)
+            return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
+        raise
+    if bc:
+        y = -dt.year
+        offs, year = divmod(y, 400)
+        offs = offs * 400 - 2000
+        year += 2000
+        return DynamicDT.fromdatetime(dt.replace(year=year)).set_offset(offs)
+    return dt2dt(dt)
 
 # Parses a time expression, with an optional timezone input at the end.
 def tzparse(expr):

@@ -855,7 +855,7 @@ class Profile(Command):
             fields = set()
             for field in ("timezone", "birthday"):
                 value = profile.get(field)
-                if field == "birthday":
+                if type(value) is DynamicDT:
                     value = value.as_date()
                 fields.add((field, value, False))
             return bot.send_as_embeds(channel, description, fields=fields, author=get_author(target))
