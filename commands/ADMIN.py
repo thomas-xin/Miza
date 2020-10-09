@@ -14,7 +14,7 @@ class Purge(Command):
     description = "Deletes a number of messages from a certain user in current channel."
     usage = "<1:*users{bot}{everyone(?a)}> <0:count[1]> <ignore(?i)> <range(?r)> <hide(?h)>"
     flags = "fiaehr"
-    rate_limit = 2
+    rate_limit = (2, 4)
     multi = True
 
     async def __call__(self, bot, args, argl, user, channel, name, flags, perm, guild, **void):
@@ -106,7 +106,7 @@ class Mute(Command):
     usage = "<0:*users> <1:time[]> <2:reason[]> <hide(?h)> <debug(?z)>"
     flags = "fhz"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-    rate_limit = 2
+    rate_limit = (2, 5)
     multi = True
 
     async def __call__(self, bot, args, argl, message, channel, guild, flags, perm, user, name, **void):
@@ -329,7 +329,7 @@ class Ban(Command):
     usage = "<0:*users> <1:time[]> <2:reason[]> <hide(?h)> <debug(?z)>"
     flags = "fhz"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-    rate_limit = 2
+    rate_limit = (2, 5)
     multi = True
 
     async def __call__(self, bot, args, argl, message, channel, guild, flags, perm, user, name, **void):
@@ -547,7 +547,7 @@ class RoleGiver(Command):
     usage = "<0:react_to[]> <1:role[]> <delete_messages(?x)> <disable(?d)>"
     flags = "aedx"
     no_parse = True
-    rate_limit = 1
+    rate_limit = (2, 4)
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
         update = self.bot.database.rolegivers.update
@@ -590,7 +590,7 @@ class RoleGiver(Command):
             role = await str_lookup(
                 rolelist,
                 r,
-                qkey=lambda x: [str(x), unicode_prune(x).replace(" ", "").casefold()],
+                qkey=lambda x: [str(x), full_prune(x.replace(" ", ""))],
             )
         # Must ensure that the user does not assign roles higher than their own
         if inf > perm:
@@ -686,7 +686,7 @@ class AutoRole(Command):
                 role = await str_lookup(
                     rolelist,
                     r,
-                    qkey=lambda x: [str(x), unicode_prune(x).replace(" ", "").casefold()],
+                    qkey=lambda x: [str(x), full_prune(x.replace(" ", ""))],
                 )
             # Must ensure that the user does not assign roles higher than their own
             if not inf > perm:
@@ -1628,8 +1628,6 @@ class UpdateFileLogs(Database):
             c_id = self.data[guild.id]
             if message.attachments:
                 try:
-                    if not self.bot.is_trusted(guild.id):
-                        raise EOFError
                     channel = await self.bot.fetch_channel(c_id)
                 except (EOFError, discord.NotFound):
                     self.data.pop(guild.id)

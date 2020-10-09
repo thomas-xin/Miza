@@ -69,7 +69,7 @@ class Translate(Command):
     usage = "<0:language> <1:string> <verbose(?v)> <papago(?p)>"
     flags = "pv"
     no_parse = True
-    rate_limit = 2
+    rate_limit = (2, 7)
 
     async def __call__(self, channel, args, flags, user, **void):
         if not args:
@@ -125,7 +125,7 @@ class Math(Command):
     description = "Evaluates a math formula."
     usage = "<function> <verbose(?v)> <rationalize(?r)> <show_variables(?l)> <clear_variables(?c)>"
     flags = "rvlcd"
-    rate_limit = 0.5
+    rate_limit = (0.5, 5)
     typing = True
 
     async def __call__(self, bot, argv, name, channel, guild, flags, user, **void):
@@ -607,7 +607,7 @@ class Follow(Command):
     name = ["follow_url", "Redirect"]
     min_level = 0
     description = "Follows a discord message link and/or finds URLs in a string."
-    rate_limit = 1
+    rate_limit = (1, 5)
     
     async def __call__(self, channel, argv, **void):
         urls = find_urls(argv)
@@ -632,7 +632,7 @@ class Match(Command):
     name = ["RE", "RegEx", "RexExp", "GREP"]
     min_level = 0
     description = "matches two strings using Linux-style RegExp, or computes the match ratio of two strings."
-    rate_limit = 0.125
+    rate_limit = (0.5, 2)
     no_parse = True
     
     async def __call__(self, args, name, **void):
@@ -668,6 +668,7 @@ class Ask(Command):
     description = "Ask me any question, and I'll answer it!"
     usage = "<string>"
     no_parse = True
+    rate_limit = (0.5, 1)
 
     async def __call__(self, channel, user, argv, **void):
         bot = self.bot
@@ -783,7 +784,7 @@ class UrbanDictionary(Command):
     description = "Searches Urban Dictionary for an item."
     usage = "<string> <verbose(?v)>"
     flags = "v"
-    rate_limit = 2
+    rate_limit = (2, 8)
     typing = True
 
     async def __call__(self, channel, argv, flags, **void):

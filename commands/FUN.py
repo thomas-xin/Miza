@@ -237,7 +237,7 @@ class Text2048(Command):
     description = "Plays a game of 2048 using reactions. Gained points are rewarded as gold."
     usage = "<0*:dimension_sizes[4x4]> <1:dimension_count[2]> <special_tiles(?s)> <public(?p)> <insanity_mode(?i)> <easy_mode(?e)>"
     flags = "pies"
-    rate_limit = (1, 3)
+    rate_limit = (3, 9)
     reacts = ("⬅️", "➡️", "⬆️", "⬇️", "⏪", "⏩", "⏫", "⏬", "◀️", "▶️", "🔼", "🔽", "👈", "👉", "👆", "👇")
     directions = demap((r.encode("utf-8"), i) for i, r in enumerate(reacts))
     directions[b'\xf0\x9f\x92\xa0'] = -2
@@ -402,7 +402,7 @@ class SlotMachine(Command):
     description = "Plays a slot machine game. Costs gold to play, can yield gold and diamonds."
     usage = "<bet[100]> <skip_animation(?s)>"
     flags = "s"
-    rate_limit = 5
+    rate_limit = (5, 10)
     emojis = {
         "❤️": 20,
         "🍒": 6,
@@ -791,6 +791,73 @@ class Wallet(Command):
             return
         cache.add(user.id)
         bot.database.dailies.progress_quests(user, "invite")
+
+
+class Shop(Command):
+    min_level = 0
+    description = "Displays the shop system, or purchases an item."
+    usage = "<item[]>"
+    rate_limit = 1
+
+    products = cdict(
+        upgradeserver=cdict(
+            name="Upgrade Server",
+            cost=[1728, 248832],
+            description="Upgrades the server's privilege level, granting access to all command categories and reducing command cooldown.",
+        ),
+    )
+
+    async def __call__(self, bot, guild, channel, user, argv, **void):
+        if not argv:
+            desc = ""
+            for product in self.products.values():
+                cost = await bot.as_rewards(*product.cost)
+                description = ini_md(f"{sqr_md(product.name)} {cost}\n{product.description}")
+            return bot.send_as_embeds(description, title="Shop", author=get_author(user))
+        item = argv.replace("-", "").replace("_", "").replace(" ", "").casefold()
+        try:
+            product = self.products[item]
+        except KeyError:
+            raise LookupError(f"Sorry, we don't sell {argv} here...")
+        data = bot.data.users.get(user.id, {})
+        gold = data.get("gold", 0)
+        diamonds = data.get("diamonds", 0)
+        if len(product.cost) < 2 or diamonds >= product.cost[0]:
+            if gold >= product.cost[-1]:
+                if product.name == "Upgrade Server":
+                    if bot.is_trusted(guild):
+                        return "```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers."
+                    return await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}-\nYou are about to upgrade the server's privilege level from 0 to 1.\nThis is irreversible. Please choose wisely.```", reacts="✅")
+                raise NotImplementedError("Target item has not yet been implemented.")
+        raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
+
+    async def _callback_(self, bot, message, reaction, user, vals, **void):
+        if reaction is None or reaction.decode("utf-8", "replace") != "✅":
+            return
+        u_id, item = vals.split("_", 1)
+        u_id = int(u_id)
+        if u_id != user.id:
+            return
+        guild = message.guild
+        try:
+            product = self.products[item]
+        except KeyError:
+            raise LookupError(f"Sorry, we don't sell {argv} here...")
+        data = bot.data.users.get(user.id, {})
+        gold = data.get("gold", 0)
+        diamonds = data.get("diamonds", 0)
+        if len(product.cost) < 2 or diamonds >= product.cost[0]:
+            if gold >= product.cost[-1]:
+                if product.name == "Upgrade Server":
+                    if bot.is_trusted(guild):
+                        return "```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers."
+                    bot.database.users.add_diamonds(-product.cost[0])
+                    bot.database.users.add_gold(-product.cost[-1])
+                    bot.data.trusted[guild.id] = True
+                    bot.database.trusted.update()
+                    return f"```{sqr_md(guild)} has been successfully elevated from 0 to 1 privilege level.```"
+                raise NotImplementedError("Target item has not yet been implemented.")
+        raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
 
 
 class MimicConfig(Command):

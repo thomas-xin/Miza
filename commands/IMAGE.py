@@ -300,7 +300,7 @@ class CreateEmoji(Command):
     usage = "<1:name> <0:url{attached_file}>"
     flags = "aed"
     no_parse = True
-    rate_limit = (3, 4)
+    rate_limit = (3, 6)
     _timeout_ = 3
     typing = True
 
@@ -397,7 +397,7 @@ class Saturate(Command):
     description = "Changes colour saturation of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
-    rate_limit = (2, 3)
+    rate_limit = (2, 5)
     _timeout_ = 3
     typing = True
 
@@ -421,7 +421,7 @@ class Contrast(Command):
     description = "Changes colour contrast of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
-    rate_limit = (2, 3)
+    rate_limit = (2, 5)
     _timeout_ = 3
     typing = True
 
@@ -445,7 +445,7 @@ class Brightness(Command):
     description = "Changes colour brightness of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
-    rate_limit = (2, 3)
+    rate_limit = (2, 5)
     _timeout_ = 3
     typing = True
 
@@ -469,7 +469,7 @@ class Sharpness(Command):
     description = "Changes colour sharpness of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
-    rate_limit = (2, 3)
+    rate_limit = (2, 5)
     _timeout_ = 3
     typing = True
 
@@ -493,7 +493,7 @@ class HueShift(Command):
     description = "Changes colour hue of supplied image."
     usage = "<0:url{attached_file}> <1:adjustment[0.5]>"
     no_parse = True
-    rate_limit = (2, 3)
+    rate_limit = (2, 5)
     _timeout_ = 3
     typing = True
 
@@ -517,7 +517,7 @@ class Blur(Command):
     description = "Applies Gaussian Blur to supplied image."
     usage = "<0:url{attached_file}> <1:radius[8]>"
     no_parse = True
-    rate_limit = (2, 3)
+    rate_limit = (2, 5)
     _timeout_ = 3
     typing = True
 
@@ -542,7 +542,7 @@ class ColourDeficiency(Command):
     description = "Applies a colourblindness filter to the target image."
     usage = "<0:url{attached_file}> <type[deuteranomaly]> <1:ratio[0.9]>"
     no_parse = True
-    rate_limit = (3, 4.5)
+    rate_limit = (3, 7)
     _timeout_ = 3.5
     typing = True
 
@@ -605,7 +605,7 @@ class RemoveMatte(Command):
     description = "Removes a colour from the supplied image."
     usage = "<0:url{attached_file}> <colour[255, 255, 255]>"
     no_parse = True
-    rate_limit = (4, 6)
+    rate_limit = (4, 9)
     _timeout_ = 4.5
     typing = True
 
@@ -656,7 +656,7 @@ class Invert(Command):
     description = "Inverts supplied image."
     usage = "<0:url{attached_file}>"
     no_parse = True
-    rate_limit = (2, 3)
+    rate_limit = (2, 4.5)
     _timeout_ = 3
     typing = True
 
@@ -680,7 +680,7 @@ class GreyScale(Command):
     description = "Greyscales supplied image."
     usage = "<0:url{attached_file}>"
     no_parse = True
-    rate_limit = (2, 3)
+    rate_limit = (2, 4.5)
     _timeout_ = 3
     typing = True
 
@@ -703,7 +703,7 @@ class Magik(Command):
     description = "Applies the Magik image filter to supplied image."
     usage = "<0:url{attached_file}> <cell_size[7]>"
     no_parse = True
-    rate_limit = (3, 4)
+    rate_limit = (3, 7)
     _timeout_ = 4
     typing = True
 
@@ -727,7 +727,7 @@ class Colour(Command):
     description = "Creates a 128x128 image filled with the target colour."
     usage = "<Colour>"
     no_parse = True
-    rate_limit = (1, 2)
+    rate_limit = (1, 3)
     flags = "v"
     trans = {
         "hsv": hsv_to_rgb,
@@ -771,7 +771,7 @@ class Rainbow(Command):
     description = "Creates a .gif image from repeatedly hueshifting supplied image."
     usage = "<0:url{attached_file}> <1:duration[2]>"
     no_parse = True
-    rate_limit = (5, 8)
+    rate_limit = (5, 12)
     _timeout_ = 4
     typing = True
 
@@ -791,7 +791,7 @@ class Spin(Command):
     description = "Creates a .gif image from repeatedly rotating supplied image."
     usage = "<0:url{attached_file}> <1:duration[2]>"
     no_parse = True
-    rate_limit = (5, 8)
+    rate_limit = (5, 11)
     _timeout_ = 4
     typing = True
 
@@ -811,7 +811,7 @@ class GMagik(Command):
     description = "Repeatedly applies the Magik image filter to supplied image."
     usage = "<0:url{attached_file}> <cell_size[7]>"
     no_parse = True
-    rate_limit = (7, 11)
+    rate_limit = (7, 13)
     _timeout_ = 4
     typing = True
 
@@ -830,7 +830,7 @@ class Liquefy(Command):
     description = "Repeatedly applies slight distortion to supplied image."
     usage = "<0:url{attached_file}> <cell_size[12]>"
     no_parse = True
-    rate_limit = (7, 11)
+    rate_limit = (7, 14)
     _timeout_ = 4
     typing = True
 
@@ -903,7 +903,7 @@ class Resize(Command):
     description = "Changes size of supplied image, using an optional scaling operation."
     usage = "<0:url{attached_file}> <1:x_multiplier[0.5]> <2:y_multiplier[x]> <3:operation[auto](?l)>"
     no_parse = True
-    rate_limit = 3
+    rate_limit = (3, 6)
     flags = "l"
     _timeout_ = 3
     typing = True
@@ -978,7 +978,7 @@ class Fill(Command):
     description = "Fills an optional amount of channels in the target image with an optional value."
     usage = "<0:url{attached_file}> <1*:channels(r)(g)(b)(c)(m)(y)(h)(s)(v)(a)> <-1:value[0]>"
     no_parse = True
-    rate_limit = 3
+    rate_limit = (3, 6)
     flags = "l"
     _timeout_ = 3
     typing = True
@@ -1039,7 +1039,7 @@ class Blend(Command):
     description = "Combines the two supplied images, using an optional blend operation."
     usage = "<0:url1{attached_file}> <1:url2{attached_file}> <2:operation[blend](?l)> <3:opacity[0.5][1]>"
     no_parse = True
-    rate_limit = (3, 5)
+    rate_limit = (3, 8)
     flags = "l"
     _timeout_ = 3
     typing = True
@@ -1129,7 +1129,7 @@ class ImagePool:
     min_level = 0
     usage = "<verbose(?v)>"
     flags = "v"
-    rate_limit = 0.1
+    rate_limit = (0.1, 0.25)
 
     async def __call__(self, bot, channel, flags, **void):
         url = await bot.database.imagepools.get(self.database, self.fetch_one)

@@ -1954,7 +1954,7 @@ class Queue(Command):
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     _timeout_ = 2
-    rate_limit = (0.5, 1.5)
+    rate_limit = (0.5, 3)
     typing = True
 
     async def __call__(self, bot, user, perm, message, channel, guild, flags, name, argv, **void):
@@ -2345,7 +2345,7 @@ class Connect(Command):
     min_level = 0
     description = "Summons the bot into a voice channel."
     usage = "<channel{curr}(0)>"
-    rate_limit = 3
+    rate_limit = (3, 4)
 
     async def __call__(self, user, channel, name="join", argv="", vc=None, **void):
         bot = self.bot
@@ -2479,7 +2479,7 @@ class Skip(Command):
     description = "Removes an entry or range of entries from the voice channel queue."
     usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
     flags = "fhv"
-    rate_limit = (0.5, 1.5)
+    rate_limit = (0.5, 3)
 
     async def __call__(self, bot, user, perm, name, args, argv, guild, flags, message, **void):
         if guild.id not in bot.database.audio.players:
@@ -2629,6 +2629,7 @@ class Pause(Command):
     description = "Pauses, stops, or resumes audio playing."
     usage = "<hide(?h)>"
     flags = "h"
+    rate_limit = (0.5, 3)
 
     async def __call__(self, bot, name, guild, user, perm, channel, flags, **void):
         auds = await auto_join(guild, channel, user, bot)
@@ -2668,7 +2669,7 @@ class Seek(Command):
     description = "Seeks to a position in the current audio file."
     usage = "<position[0]> <hide(?h)>"
     flags = "h"
-    rate_limit = (0.5, 2.5)
+    rate_limit = (0.5, 3)
 
     async def __call__(self, argv, bot, guild, user, perm, channel, name, flags, **void):
         auds = await auto_join(guild, channel, user, bot)
@@ -2825,7 +2826,7 @@ class AudioSettings(Command):
         "SQ": "shuffle",
         "24/7": "stay",
     }
-    rate_limit = (0.5, 3)
+    rate_limit = (0.5, 6)
 
     def __init__(self, *args):
         self.alias = list(self.aliasMap) + list(self.aliasExt)[1:]
@@ -2937,9 +2938,15 @@ class AudioSettings(Command):
             else:
                 if op == "bitrate":
                     if val > 1966.08:
-                        raise PermissionError(f"Maximum allowed bitrate is 196608.")
+                        raise PermissionError("Maximum allowed bitrate is 196608.")
                     elif val < 5.12:
-                        raise ValueError(f"Bitrate must be equal to or above 512.")
+                        raise ValueError("Bitrate must be equal to or above 512.")
+                elif op == "speed":
+                    if abs(val * 2 ** (origStats.get("resample", 0) / 12)) > 16:
+                        raise OverflowError("Maximum speed is 1600%.")
+                elif op == "resample":
+                    if abs(origStats.get("speed", 1) * 2 ** (val / 12)) > 16:
+                        raise OverflowError("Maximum speed is 1600%.")
                 origStats[op] = val
             if auds.queue:
                 if type(op) is str and op not in "loop repeat shuffle quiet stay":
@@ -2964,7 +2971,7 @@ class Rotate(Command):
     description = "Rotates the queue to the left by a certain amount of steps."
     usage = "<position> <hide(?h)>"
     flags = "h"
-    rate_limit = 5
+    rate_limit = (4, 9)
 
     async def __call__(self, perm, argv, flags, guild, channel, user, bot, **void):
         auds = await auto_join(guild, channel, user, bot)
@@ -2990,7 +2997,7 @@ class Shuffle(Command):
     description = "Shuffles the audio queue."
     usage = "<force(?f)> <hide(?h)>"
     flags = "fh"
-    rate_limit = 5
+    rate_limit = (4, 9)
 
     async def __call__(self, perm, flags, guild, channel, user, bot, **void):
         auds = await auto_join(guild, channel, user, bot)
@@ -3017,7 +3024,7 @@ class Reverse(Command):
     description = "Reverses the audio queue direction."
     usage = "<hide(?h)>"
     flags = "h"
-    rate_limit = 5
+    rate_limit = (4, 9)
 
     async def __call__(self, perm, flags, guild, channel, user, bot, **void):
         auds = await auto_join(guild, channel, user, bot)
@@ -3034,7 +3041,7 @@ class UnmuteAll(Command):
     server_only = True
     time_consuming = True
     min_level = 3
-    description = "Disables server mute for all members."
+    description = "Disables server mute/deafen for all members."
     usage = "<hide(?h)>"
     flags = "h"
     rate_limit = 10
@@ -3098,7 +3105,7 @@ class Player(Command):
     description = "Creates an auto-updating virtual audio player for the current server."
     usage = "<controllable(?c)> <disable(?d)> <show_debug(?z)>"
     flags = "cdez"
-    rate_limit = 1
+    rate_limit = (2, 7)
 
     async def showCurr(self, auds):
         q = auds.queue
@@ -3457,7 +3464,7 @@ class Lyrics(Command):
         ),
         flags=re.I,
     )
-    rate_limit = (2, 3)
+    rate_limit = (2, 6)
     typing = True
 
     async def __call__(self, bot, guild, channel, message, argv, flags, user, **void):
@@ -3508,7 +3515,7 @@ class Download(Command):
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
     usage = "<0:search_link{queue}> <-1:out_format[ogg]> <apply_settings(?a)> <verbose_search(?v)> <show_debug(?z)>"
     flags = "avz"
-    rate_limit = (7, 12)
+    rate_limit = (7, 16)
     typing = True
 
     async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):

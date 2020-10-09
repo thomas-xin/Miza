@@ -251,7 +251,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             return self.cache.channels[s_id]
         try:
             user = await super().fetch_user(s_id)
-        except LookupError:
+        except (LookupError, discord.NotFound):
             channel = await super().fetch_channel(s_id)
             self.cache.channels[s_id] = channel
             self.limit_cache("channels")
@@ -1132,7 +1132,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             trusted = self.data.trusted
         except (AttributeError, KeyError):
             return False
-        return verify_id(guild) in trusted
+        return trusted.get(verify_id(guild))
 
     # Checks if a user is blacklisted from the bot.
     def is_blacklisted(self, user):
@@ -2751,7 +2751,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             channel = await self.get_first_sendable(g, m)
             emb = discord.Embed(colour=discord.Colour(8364031))
             emb.set_author(**get_author(self.user))
-            emb.description = f"```callback-fun-profile-{utc()}-\nHi there!```I'm {self.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
+            emb.description = f"```callback-fun-wallet-{utc()}-\nHi there!```I'm {self.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
             user = None
             with suppress(discord.Forbidden):
                 a = guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add)

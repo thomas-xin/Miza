@@ -457,8 +457,6 @@ class MathQuiz(Command):
     rate_limit = 3
 
     async def __call__(self, channel, guild, flags, argv, **void):
-        if not self.bot.is_trusted(guild.id):
-            raise PermissionError("Must be in a trusted server to perform this command.")
         mathdb = self.bot.database.mathtest
         if "d" in flags:
             if channel.id in mathdb.data:
@@ -765,8 +763,6 @@ class DeviantArt(Command):
     rate_limit = 4
 
     async def __call__(self, argv, flags, channel, guild, bot, **void):
-        if not bot.is_trusted(guild.id):
-            raise PermissionError("Must be in a trusted server to perform this command.")
         data = bot.data.deviantart
         update = bot.database.deviantart.update
         if not argv:
@@ -826,8 +822,6 @@ class UpdateDeviantArt(Database):
         bot = self.bot
         try:
             channel = await bot.fetch_channel(c_id)
-            if not bot.is_trusted(channel.guild.id):
-                raise LookupError
         except LookupError:
             self.data.pop(c_id, None)
             return

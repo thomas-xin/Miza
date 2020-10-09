@@ -158,7 +158,7 @@ class EnabledCommands(Command):
     usage = "<command{all}> <add(?e)> <remove(?d)> <list(?l)> <hide(?h)>"
     flags = "aedlh"
 
-    def __call__(self, argv, args, flags, user, channel, perm, **void):
+    def __call__(self, argv, args, flags, user, channel, guild, perm, **void):
         update = self.data.enabled.update
         bot = self.bot
         enabled = bot.data.enabled
@@ -193,7 +193,9 @@ class EnabledCommands(Command):
             return f"Currently enabled command categories in {channel_mention(channel.id)}:\n{ini_md(iter2str(temp))}"
         if "e" not in flags and "a" not in flags and "d" not in flags:
             catg = argv.casefold()
-            if not catg in bot.categories:
+            if not bot.is_trusted(guild) and catg not in standard_commands:
+                raise PermissionError(f"Elevated server priviliges required for specified command category.")
+            if catg not in bot.categories:
                 raise LookupError(f"Unknown command category {argv}.")
             if catg in enabled:
                 return css_md(f"Command category {sqr_md(catg)} is currently enabled in {sqr_md(channel)}.")
@@ -271,7 +273,7 @@ class Loop(Command):
     min_display = "1+"
     description = "Loops a command."
     usage = "<0:iterations> <1:command>"
-    rate_limit = 3
+    rate_limit = (3, 7)
 
     async def __call__(self, args, argv, message, channel, callback, bot, perm, user, guild, **void):
         if not args:
@@ -282,7 +284,7 @@ class Loop(Command):
         # Bot owner bypasses restrictions
         if not isnan(perm):
             if iters > 32 and not bot.is_trusted(guild.id):
-                raise PermissionError("Must be in a trusted server to execute loop of more than 32 iterations.")
+                raise PermissionError(f"Elevated server priviliges required to execute loop of greater than 32 iterations.")
             # Required level is 1/3 the amount of loops required, rounded up
             scale = 3
             limit = perm * scale
@@ -891,7 +893,7 @@ class Activity(Command):
     description = "Shows recent Discord activity for the targeted user."
     usage = "<user> <verbose(?v)>"
     flags="v"
-    rate_limit = 1
+    rate_limit = (2, 9)
     typing = True
 
     async def __call__(self, guild, user, argv, flags, channel, bot, **void):
@@ -1002,7 +1004,7 @@ class Reminder(Command):
     usage = "<1:message> <0:time> <disable(?d)>"
     flags = "aed"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-    rate_limit = 1 / 3
+    rate_limit = (1 / 3, 4)
     keywords = ["on", "at", "in", "when", "event"]
     keydict = {re.compile(f"(^|[^a-z0-9]){i[::-1]}([^a-z0-9]|$)", re.I): None for i in keywords}
     timefind = None

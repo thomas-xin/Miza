@@ -386,37 +386,6 @@ class DownloadServer(Command):
         return bold(ini_md(sqr_md(response)))
 
 
-class Trust(Command):
-    name = ["Untrust"]
-    min_level = nan
-    description = "Adds or removes a server from the bot's trusted server list."
-    usage = "<server_id(curr)(?a)> <enable(?e)> <disable(?d)>"
-    flags = "aed"
-
-    def __call__(self, bot, flags, message, guild, argv, **void):
-        update = bot.database.trusted.update
-        if "a" in flags:
-            guilds = bot.client.guilds
-        else:
-            if argv:
-                g_id = verify_id(argv)
-                guild = cdict(id=g_id)
-            guilds = [guild]
-        if "e" in flags:
-            create_task(message.add_reaction("❗"))
-            for guild in guilds:
-                bot.data.trusted[guild.id] = True
-            update()
-            return css_md(f"Successfully added {sqr_md(', '.join(str(guild) for guild in guilds))} to trusted list.")
-        elif "d" in flags:
-            create_task(message.add_reaction("❗"))
-            for guild in guilds:
-                bot.data.trusted.pop(guild.id, None)
-            update()
-            return fix_md(f"Successfully removed {sqr_md(guild)} from trusted list.")
-        return css_md(f"Trusted server list: {list(no_md(bot.cache.guilds.get(g, g)) for g in bot.data.trusted)}.")
-
-
 class UpdateTrusted(Database):
     name = "trusted"
 

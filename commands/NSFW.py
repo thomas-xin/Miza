@@ -272,7 +272,7 @@ class Neko(Command):
     description = "Pulls a random image from nekos.life and embeds it."
     usage = "<tags[neko]> <random(?r)> <verbose(?v)> <list(?l)>"
     flags = "lrv"
-    rate_limit = 0.5
+    rate_limit = (0.5, 7)
 
     async def __call__(self, bot, args, argv, flags, channel, guild, **void):
         isNSFW = is_nsfw(channel)
@@ -330,7 +330,7 @@ class Lewd(Command):
     usage = "<query> <verbose(?v)>"
     flags = "v"
     no_parse = True
-    rate_limit = 1
+    rate_limit = (1, 10)
 
     async def __call__(self, args, flags, channel, **void):
         if not is_nsfw(channel):

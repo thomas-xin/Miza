@@ -598,6 +598,8 @@ def verify_id(obj):
             return int(obj.translate(__itrans))
         return obj
     with suppress(AttributeError):
+        return obj.recipient.id
+    with suppress(AttributeError):
         return obj.id
     return int(obj)
 
