@@ -823,7 +823,7 @@ class Profile(Command):
     rate_limit = 1
     no_parse = True
     
-    async def __call__(self, user, args, flags, channel, guild, bot, **void):
+    async def __call__(self, user, args, argv, flags, channel, guild, bot, **void):
         setting = None
         if not args:
             target = user
@@ -833,7 +833,7 @@ class Profile(Command):
             if not args:
                 value = None
             else:
-                value = " ".join(args)
+                value = argv[len(setting) + 1:]
         else:
             target = await bot.fetch_user_member(" ".join(args), guild)
         if setting is None:
