@@ -829,7 +829,7 @@ class Profile(Command):
         setting = None
         if not args:
             target = user
-        elif args[0] in ("description", "timezone", "birthday"):
+        elif args[0] in ("description", "timezone", "time", "birthday"):
             target = user
             setting = args.pop(0)
             if not args:
@@ -870,7 +870,7 @@ class Profile(Command):
         if setting == "description":
             if len(value) > 1024:
                 raise OverflowError("Description must be 1024 or fewer in length.")
-        elif setting == "timezone":
+        elif setting.startswith("time"):
             value = value.casefold()
             try:
                 as_timezone(value)

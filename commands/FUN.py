@@ -813,7 +813,7 @@ class Shop(Command):
             for product in self.products.values():
                 cost = await bot.as_rewards(*product.cost)
                 description = ini_md(f"{sqr_md(product.name)} {cost}\n{product.description}")
-            return bot.send_as_embeds(description, title="Shop", author=get_author(user))
+            return bot.send_as_embeds(channel, description, title="Shop", author=get_author(user))
         item = argv.replace("-", "").replace("_", "").replace(" ", "").casefold()
         try:
             product = self.products[item]
