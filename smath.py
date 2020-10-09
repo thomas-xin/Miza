@@ -2912,7 +2912,10 @@ class DynamicDT(datetime.datetime):
     def __add__(self, other):
         if type(other) is not datetime.timedelta:
             return self.__class__.fromtimestamp(self.timestamp() + other)
-        return self.__class__.fromtimestamp(super().__add__(other).timestamp() + self.offset() * 31556952)
+        ts = super().__add__(other).timestamp()
+        if abs(self.offset()) >= 25600:
+            ts = round(ts)
+        return self.__class__.fromtimestamp(ts + self.offset() * 31556952)
     __radd__ = __add__
 
     def __sub__(self, other):
@@ -2922,6 +2925,8 @@ class DynamicDT(datetime.datetime):
         ts = getattr(out, "timestamp", None)
         if ts is None:
             return out
+        if abs(self.offset()) >= 25600:
+            ts = round(ts)
         return self.__class__.fromtimestamp(ts + self.offset() * 31556952)
     __rsub__ = __sub__
 
@@ -2972,7 +2977,7 @@ class DynamicDT(datetime.datetime):
     @classmethod
     def utcfromtimestamp(cls, ts):
         offs, ots = divmod(ts, 12622780800)
-        if abs(offs) >= 4:
+        if abs(offs) >= 64:
             ots = round(ots)
             ts = round(ts)
         d = utc_ft(ots)
@@ -2993,7 +2998,7 @@ class DynamicDT(datetime.datetime):
 
     @classmethod
     def fromdatetime(cls, dt):
-        return cls(*dt.timetuple()[:6], getattr(dt, "microsecond", 0), tzinfo=dt.tzinfo)
+        return cls(*dt.timetuple()[:6], getattr(dt, "microsecond", 0), tzinfo=getattr(dt, "tzinfo", None))
 
 utc = time.time
 utc_dt = datetime.datetime.utcnow
