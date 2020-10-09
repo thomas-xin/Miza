@@ -2611,7 +2611,8 @@ class Skip(Command):
                 if auds.source is not None:
                     auds.source.advanced = True
                 await create_future(auds.stop, timeout=18)
-                create_future_ex(auds.queue.advance, timeout=18)
+                r = not name.startswith("r")
+                create_future_ex(auds.queue.advance, looped=r, repeated=r, shuffled=r, timeout=18)
                 if count < 4:
                     response += f"{sqr_md(song.name)} has been removed from the queue.\n"
                 count += 1
