@@ -686,7 +686,7 @@ class UpdateDailies(Database):
                 x = round((level * 10 + 100) * random.random() + 70)
                 q = cdict(name=f"Post {x} messages", gold=x * 2, progress=0, required=x, action="send")
             elif q_id == 1:
-                q = cdict(name=f"Invite me to a server and/or react to the join message", diamonds=floor(10 + level / 5), progress=0, required=1, action="invite")
+                q = cdict(name=f"Invite me to a server and/or react to the join message", diamonds=floor(50 + level * 2 / 3), progress=0, required=1, action="invite")
             elif q_id == 2:
                 q = cdict(name=f"Earn 1 diamond", gold=level * 50, progress=0, required=1, action="diamond")
             elif q_id == 3:
@@ -825,8 +825,10 @@ class Shop(Command):
         if len(product.cost) < 2 or diamonds >= product.cost[0]:
             if gold >= product.cost[-1]:
                 if product.name == "Upgrade Server":
+                    if hasattr(guild, "ghost"):
+                        return "```\nThis item can only be purchased in a server.```"
                     if bot.is_trusted(guild):
-                        return "```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers."
+                        return "```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.```"
                     return await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}-\nYou are about to upgrade the server's privilege level from 0 to 1.\nThis is irreversible. Please choose wisely.```", reacts="✅")
                 raise NotImplementedError("Target item has not yet been implemented.")
         raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
