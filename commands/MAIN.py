@@ -853,7 +853,10 @@ class Profile(Command):
                 description += ini_md(f"Age: {sqr_md(time_diff(t, birthday))}\nBirthday in: {sqr_md(time_diff(next_date(birthday), t))}")
             fields = set()
             for field in ("timezone", "birthday"):
-                fields.add((field, profile.get(field), False))
+                value = profile.get(field)
+                if field == "birthday":
+                    value = value.as_date()
+                fields.add((field, value, False))
             return bot.send_as_embeds(channel, description, fields=fields, author=get_author(target))
         if value is None:
             return ini_md(f"Currently set {setting} for {sqr_md(user)}: {sqr_md(bot.data.users.get(user.id, EMPTY).get(setting))}.")
