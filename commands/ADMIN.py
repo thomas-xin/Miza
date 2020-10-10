@@ -232,7 +232,7 @@ class Mute(Command):
                         mutelist.remove(user.id, key=lambda x: x["u"])
                     with suppress(LookupError):
                         bot.data.mutes.listed.remove(guild.id, key=lambda x: x[-1])
-                    mutelist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": mute.get("r"), "x": mute.get("x")}, key=lambda x: x["t"])
+                    mutelist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": mute.get("r"), "x": mute.get("x", ())}, key=lambda x: x["t"])
                     bot.data.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
                     print(mutelist)
                     print(bot.data.mutes.listed)
