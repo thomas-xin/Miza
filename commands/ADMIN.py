@@ -972,6 +972,7 @@ class UpdateMutes(Database):
                     text = italics(css_md(f"{sqr_md(user)} has been unmuted in {sqr_md(guild)}."))
                 except:
                     text = italics(css_md(f"Unable to unmute {sqr_md(user)} in {sqr_md(guild)}."))
+                    print_exc()
                 await channel.send(text)
             self.update()
 
@@ -1096,6 +1097,7 @@ class UpdateBans(Database):
                     text = italics(css_md(f"{sqr_md(user)} has been unbanned from {sqr_md(guild)}."))
                 except:
                     text = italics(css_md(f"Unable to unban {sqr_md(user)} from {sqr_md(guild)}."))
+                    print_exc()
                 await channel.send(text)
             self.update()
 

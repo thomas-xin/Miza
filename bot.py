@@ -27,11 +27,23 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     # This is a fixed ID apparently
     deleted_user = 456226577798135808
     _globals = globals()
+    intents = discord.Intents(
+        guilds=True,
+        members=True,
+        bans=True,
+        emojis=True,
+        webhooks=True,
+        voice_states=True,
+        presences=True,
+        messages=True,
+        reactions=True,
+        typing=True,
+    )
 
     def __init__(self, cache_size=4194304, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
         self.start_time = utc()
-        super().__init__(max_messages=256, heartbeat_timeout=60, guild_ready_timeout=5)
+        super().__init__(max_messages=256, heartbeat_timeout=60, guild_ready_timeout=5, intents=self.intents)
         self.cache_size = cache_size
         self.timeout = timeout
         self.set_classes()
@@ -922,7 +934,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.update_usernames()
         for i, guild in enumerate(self.guilds, 1):
             members = self.cache.members
-            members.update({m.id: m for m in guild.members if m.id not in members})
+            members.update({k: v for k, v in guild._members.items() if k not in members})
             self.cache.channels.update(guild._channels)
             self.cache.roles.update(guild._roles)
             if not i & 127:
@@ -2955,7 +2967,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if messages is None or len(messages) < len(payload.message_ids):
                     raise LookupError
             except:
-                messages = set()
+                messages = alist()
                 channel = await self.fetch_channel(payload.channel_id)
                 for m_id in payload.message_ids:
                     try:
