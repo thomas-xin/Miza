@@ -28,7 +28,6 @@ tracemalloc.start()
 from zipfile import ZipFile
 import urllib.request, urllib.parse
 
-python = ("python3", "python")[os.name == "nt"]
 url_parse = urllib.parse.quote
 escape_markdown = discord.utils.escape_markdown
 escape_mentions = discord.utils.escape_mentions
@@ -266,6 +265,19 @@ class TooManyRequests(PermissionError):
 
 class CommandCancelledError(RuntimeError):
     __slots__ = ()
+
+
+python = ("python3", "python")[os.name == "nt"]
+python_path = ""
+with tracebacksuppressor:
+    with open("auth.json") as f:
+        auth = ast.literal_eval(f.read())
+    py = auth.get("python_path")
+    while py.endswith("\\") or py.endswith("/"):
+        py = py[:-1]
+    if py:
+        python_path = py + "/"
+        python = python_path + "python"
 
 
 def zip2bytes(data):
@@ -641,6 +653,7 @@ IMAGE_FORMS = {
     ".webp": True,
 }
 def is_image(url):
+    url = url.split("?", 1)[0]
     if "." in url:
         url = url[url.rindex("."):]
         url = url.casefold()
@@ -1190,6 +1203,8 @@ def parse_with_now(expr):
                 return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
         elif s.startswith("Python int too large to convert to C"):
             y = int(regexp("[0-9]{10,}").findall(expr)[0])
+            if bc:
+                y = -y
             offs, year = divmod(y, 400)
             offs = offs * 400 - 2000
             year += 2000
@@ -1197,6 +1212,8 @@ def parse_with_now(expr):
             return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
         elif s.startswith("Unknown string format") or s.startswith("month must be in"):
             y = int(regexp("[0-9]{5,}").findall(expr)[0])
+            if bc:
+                y = -y
             offs, year = divmod(y, 400)
             offs = offs * 400 - 2000
             year += 2000
@@ -1321,10 +1338,11 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
 
 
 # Basic inheritable class for all bot databases.
-class Database(collections.abc.Hashable, collections.abc.Callable):
+class Database(collections.abc.MutableMapping, collections.abc.Hashable, collections.abc.Callable):
     bot = None
     rate_limit = 3
     name = "data"
+    data = {}
 
     def __init__(self, bot, catg):
         name = self.name
@@ -1356,14 +1374,14 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
                         print(self.file)
                         print_exc()
                         raise FileNotFoundError
-                bot.data[name] = self.data = data
+                self.data = data
             except FileNotFoundError:
                 data = None
         else:
             data = None
         if not data:
-            bot.data[name] = self.data = cdict()
-        bot.database[name] = self
+            self.data = cdict()
+        bot.database[name] = bot.data[name] = self
         self.catg = catg
         self.bot = bot
         self._semaphore = Semaphore(1, 1, delay=0.5, rate_limit=self.rate_limit)
@@ -1381,6 +1399,29 @@ class Database(collections.abc.Hashable, collections.abc.Callable):
     __hash__ = lambda self: hash(self.__name__)
     __str__ = lambda self: f"Database <{self.__name__}>"
     __call__ = lambda self: None
+    __len__ = lambda self: len(self.data)
+    __iter__ = lambda self: iter(self.data)
+    __contains__ = lambda self, k: k in self.data
+    __eq__ = lambda self, other: self.data == other
+    __ne__ = lambda self, other: self.data != other
+    def __setitem__(self, k, v):
+        self.data[k] = v
+        return self
+    def __getitem__(self, k):
+        return self.data[k]
+    def __delitem__(self, k):
+        return self.data.__delitem__(k)
+
+    keys = lambda self: self.data.keys()
+    items = lambda self: self.data.items()
+    values = lambda self: self.data.values()
+    get = lambda self, *args, **kwargs: self.data.get(*args, **kwargs)
+    pop = lambda self, *args, **kwargs: self.data.pop(*args, **kwargs)
+    popitem = lambda self, *args, **kwargs: self.data.popitem(*args, **kwargs)
+    clear = lambda self: self.data.clear()
+    setdefault = lambda self, k, v: self.data.setdefault(k, v)
+    keys = lambda self: self.data.keys()
+    discard = lambda self, k: self.data.pop(k, None)
 
     def update(self, force=False):
         if not hasattr(self, "updated"):

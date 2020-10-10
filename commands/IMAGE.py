@@ -329,7 +329,8 @@ class CreateEmoji(Command):
             if len(image) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")
             if len(image) > 262144 or not is_image(url):
-                path = "cache/" + str(guild.id)
+                ts = round(utc() * 1000)
+                path = "cache/" + str(ts)
                 f = await create_future(open, path, "wb", timeout=18)
                 await create_future(f.write, image, timeout=18)
                 await create_future(f.close, timeout=18)
@@ -1132,7 +1133,7 @@ class ImagePool:
     rate_limit = (0.1, 0.25)
 
     async def __call__(self, bot, channel, flags, **void):
-        url = await bot.database.imagepools.get(self.database, self.fetch_one)
+        url = await bot.data.imagepools.get(self.data, self.fetch_one)
         if "v" in flags:
             return escape_everyone(url)
         self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
@@ -1223,7 +1224,7 @@ class _8Ball(ImagePool, Command):
 class UpdateImagePools(Database):
     name = "imagepools"
     loading = {}
-    sem = Semaphore(8, 1, rate_limit=1)
+    sem = Semaphore(8, 2, rate_limit=1)
     no_delete = True
 
     async def load_until(self, key, func, threshold):
@@ -1244,7 +1245,7 @@ class UpdateImagePools(Database):
         data.uniq(sorted=None)
     
     async def proc(self, key, func):
-        with tracebacksuppressor(SemaphoreOverflowError):
+        with suppress(SemaphoreOverflowError):
             async with self.sem:
                 data = set_dict(self.data, key, alist())
                 out = await func()
@@ -1264,8 +1265,7 @@ class UpdateImagePools(Database):
                 data.add(out)
                 self.update()
             return out
-        if not self.sem.busy:
-            create_task(self.proc(key, func))
+        create_task(self.proc(key, func))
         return choice(data)
 
 

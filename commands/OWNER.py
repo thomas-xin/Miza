@@ -111,7 +111,7 @@ class Execute(Command):
     })
 
     def __call__(self, bot, flags, argv, message, channel, guild, **void):
-        update = bot.database.exec.update
+        update = bot.data.exec.update
         if not argv:
             argv = 0
         try:
@@ -310,7 +310,7 @@ class UpdateExec(Database):
                 )
             user = message.author
             if "dailies" in bot.data:
-                bot.database.dailies.progress_quests(user, "talk")
+                bot.data.dailies.progress_quests(user, "talk")
             emb = discord.Embed(colour=discord.Colour(16777214))
             emb.set_author(name=f"{user} ({user.id})", icon_url=best_url(user))
             emb.description = message_repr(message)
@@ -381,7 +381,7 @@ class DownloadServer(Command):
                 if b:
                     await send(file=discord.File(io.BytesIO(b), filename=fn + ".txt"))
 
-            await self.bot.database.counts.getGuildHistory(guild, callback=callback)
+            await self.bot.data.counts.getGuildHistory(guild, callback=callback)
         response = uni_str("Download Complete.")
         return bold(ini_md(sqr_md(response)))
 

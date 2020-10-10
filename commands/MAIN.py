@@ -94,7 +94,7 @@ class Hello(Command):
     
     def __call__(self, bot, user, **void):
         if "dailies" in bot.data:
-            bot.database.dailies.progress_quests(user, "talk")
+            bot.data.dailies.progress_quests(user, "talk")
         return "👋"
 
 
@@ -455,15 +455,15 @@ class Info(Command):
         try:
             g.region
             if not hasattr(g, "ghost"):
-                pcount = await bot.database.counts.getUserMessages(None, g)
+                pcount = await bot.data.counts.getUserMessages(None, g)
         except (AttributeError, KeyError):
             pcount = 0
         if not hasattr(g, "ghost"):
             with suppress(AttributeError, KeyError):
                 # Top users by message counts
-                pavg = await bot.database.counts.getUserAverage(None, g)
+                pavg = await bot.data.counts.getUserAverage(None, g)
                 users = deque()
-                us = await bot.database.counts.getGuildMessages(g)
+                us = await bot.data.counts.getGuildMessages(g)
                 if type(us) is str:
                     top = us
                 else:
@@ -716,7 +716,7 @@ class Info(Command):
                         if la:
                             seen = f"{la}, {seen}"
                         if "v" in flags:
-                            tz = bot.database.users.estimate_timezone(u.id)
+                            tz = bot.data.users.estimate_timezone(u.id)
                             if tz >= 0:
                                 zone = f"GMT+{tz}"
                             else:
@@ -744,12 +744,12 @@ class Info(Command):
                                         fav = comfreq.popleft()
                         with suppress(LookupError):
                             if not hasattr(guild, "ghost"):
-                                gmsg = bot.database.counts.getUserGlobalMessageCount(u)
-                                msgs = await bot.database.counts.getUserMessages(u, guild)
-                                avgs = await bot.database.counts.getUserAverage(u, guild)
+                                gmsg = bot.data.counts.getUserGlobalMessageCount(u)
+                                msgs = await bot.data.counts.getUserMessages(u, guild)
+                                avgs = await bot.data.counts.getUserAverage(u, guild)
                     with suppress(LookupError):
                         if not hasattr(guild, "ghost"):
-                            us = await bot.database.counts.getGuildMessages(guild)
+                            us = await bot.data.counts.getGuildMessages(guild)
                             if type(us) is str:
                                 pos = us
                             else:
@@ -849,7 +849,7 @@ class Profile(Command):
             if birthday:
                 if type(birthday) is not DynamicDT:
                     birthday = profile["birthday"] = DynamicDT.fromdatetime(birthday)
-                    bot.database.users.update()
+                    bot.data.users.update()
                 t = utc_dt()
                 if timezone:
                     birthday -= td
@@ -865,7 +865,7 @@ class Profile(Command):
             return ini_md(f"Currently set {setting} for {sqr_md(user)}: {sqr_md(bot.data.users.get(user.id, EMPTY).get(setting))}.")
         if setting != "description" and value.casefold() in ("undefined", "remove", "rem", "reset", "unset", "delete", "clear", "null", "none") or "d" in flags:
             profile.pop(setting, None)
-            bot.database.users.update()
+            bot.data.users.update()
             return css_md(f"Successfully removed {setting} for {sqr_md(user)}.")
         if setting == "description":
             if len(value) > 1024:
@@ -881,7 +881,7 @@ class Profile(Command):
             offs, year = divmod(dt.year, 400)
             value = DynamicDT(year + 2000, dt.month, dt.day).set_offset(offs * 400 - 2000)
         bot.data.users.setdefault(user.id, {})[setting] = value
-        bot.database.users.update()
+        bot.data.users.update()
         if type(value) is DynamicDT:
             value = value.as_date()
         return css_md(f"Successfully changed {setting} for {sqr_md(user)} to {sqr_md(value)}.")
@@ -899,7 +899,7 @@ class Activity(Command):
     async def __call__(self, guild, user, argv, flags, channel, bot, **void):
         if argv:
             user = await bot.fetch_user_member(argv, guild)
-        data = await create_future(bot.database.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=12)
+        data = await create_future(bot.data.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=12)
         with discord.context_managers.Typing(channel):
             resp = await process_image("plt_special", "$", (data, str(user)), guild)
             fn = resp[0]
@@ -919,7 +919,7 @@ class Status(Command):
             if perm < 2:
                 raise PermissionError("Permission level 2 or higher required to unset auto-updating status.")
             bot.data.messages.pop(channel.id)
-            bot.database.messages.update()
+            bot.data.messages.update()
             return fix_md("Successfully disabled status updates.")
         elif "a" not in flags and "e" not in flags:
             return await self._callback2_(channel)
@@ -927,7 +927,7 @@ class Status(Command):
             raise PermissionError("Permission level 2 or higher required to set auto-updating status.")
         message = await channel.send(italics(code_md("Loading bot status...")))
         set_dict(bot.data.messages, channel.id, {})[message.id] = cdict(t=0, command="bot.commands.status[0]")
-        bot.database.messages.update()
+        bot.data.messages.update()
     
     async def _callback2_(self, channel, m_id=None, msg=None, **void):
         bot = self.bot
@@ -980,7 +980,7 @@ class Status(Command):
         message = await func(embed=emb)
         if m_id is not None and message is not None:
             bot.data.messages[channel.id] = {message.id: cdict(t=utc(), command="bot.commands.status[0]")}
-            bot.database.messages.update()
+            bot.data.messages.update()
 
 
 class Invite(Command):
@@ -1027,7 +1027,7 @@ class Reminder(Command):
             sendable = user
             word = "reminders"
         rems = bot.data.reminders.get(sendable.id, [])
-        update = bot.database.reminders.update
+        update = bot.data.reminders.update
         if "d" in flags:
             if not len(rems):
                 return ini_md(f"No {word} currently set for {sqr_md(sendable)}.")
@@ -1039,9 +1039,9 @@ class Reminder(Command):
             x = rems.pop(i)
             if i == 0:
                 with suppress(IndexError):
-                    bot.database.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
+                    bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
                 if rems:
-                    bot.database.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
+                    bot.data.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
             update()
             return ini_md(f"Successfully removed {sqr_md(lim_str(x['msg'], 128))} from {word} list for {sqr_md(sendable)}.")
         if not argv:
@@ -1228,9 +1228,9 @@ class Reminder(Command):
         bot.data.reminders[sendable.id] = sort(rems, key=lambda x: x["t"])
         with suppress(IndexError):
             # Remove existing schedule
-            bot.database.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
+            bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
         # Insert back into bot schedule
-        bot.database.reminders.listed.insort((bot.data.reminders[sendable.id][0]["t"], sendable.id), key=lambda x: x[0])
+        bot.data.reminders.listed.insort((bot.data.reminders[sendable.id][0]["t"], sendable.id), key=lambda x: x[0])
         update()
         emb = discord.Embed(description=msg)
         emb.set_author(name=username, url=url, icon_url=url)
@@ -1648,8 +1648,8 @@ class UpdateFlavour(Database):
     async def get(self):
         out = x = None
         i = xrand(7)
-        facts = self.bot.database.users.facts
-        useless = self.bot.database.users.useless
+        facts = self.bot.data.users.facts
+        useless = self.bot.data.users.useless
         if i <= 1 and facts:
             with tracebacksuppressor:
                 text = choice(facts)
@@ -1726,7 +1726,7 @@ class UpdateUsers(Database):
             +"\n\tno_parse = True"
 
             +"\n\tasync def __call__(self, message, argv, **void):"
-            +"\n\t\tawait self.bot.database.users._nocommand_(message, self.bot.user.mention + ' ' + argv, force=True)",
+            +"\n\t\tawait self.bot.data.users._nocommand_(message, self.bot.user.mention + ' ' + argv, force=True)",
             data,
         )
         mod = __name__
@@ -1847,7 +1847,7 @@ class UpdateUsers(Database):
             async with self.semaphore:
                 changed = False
                 while len(self.flavour_buffer) < 32:
-                    out = await self.bot.database.flavour.get()
+                    out = await self.bot.data.flavour.get()
                     if out:
                         self.flavour_buffer.append(out)
                         self.flavour_set.add(out)
@@ -1902,7 +1902,7 @@ class UpdateUsers(Database):
             self.add_gold(user, points)
         self.add_xp(user, points)
         if "dailies" in self.bot.data:
-            self.bot.database.dailies.valid_message(message)
+            self.bot.data.dailies.valid_message(message)
 
     async def _mention_(self, user, message, msg, **void):
         bot = self.bot
@@ -1958,7 +1958,7 @@ class UpdateUsers(Database):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
             add_dict(set_dict(self.data, user.id, {}), {"xp": amount})
             if "dailies" in self.bot.data:
-                self.bot.database.dailies.progress_quests(user, "xp", amount)
+                self.bot.data.dailies.progress_quests(user, "xp", amount)
             self.update()
     
     def add_gold(self, user, amount):
@@ -1970,7 +1970,7 @@ class UpdateUsers(Database):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
             add_dict(set_dict(self.data, user.id, {}), {"diamonds": amount})
             if "dailies" in self.bot.data:
-                self.bot.database.dailies.progress_quests(user, "diamond", amount)
+                self.bot.data.dailies.progress_quests(user, "diamond", amount)
             self.update()
 
     async def _typing_(self, user, **void):
@@ -2041,7 +2041,7 @@ class UpdateUsers(Database):
                     i = xrand(4)
                     member = choice(guild.members)
                     if i == 0:
-                        count = await bot.database.counts.getUserMessages(member, guild)
+                        count = await bot.data.counts.getUserMessages(member, guild)
                         out += f"\nServer insights: `{member} has posted {count} message{'s' if count != 1 else ''} in total!`"
                     elif i == 1:
                         curr = member.joined_at
@@ -2053,7 +2053,7 @@ class UpdateUsers(Database):
                             curr = old
                         out += f"\nServer insights: `{member} has been active here for {dyn_time_diff(utc(), curr.timestamp())}!`"
                     elif i == 2:
-                        events = bot.database.users.get_events(member.id, interval=900)
+                        events = bot.data.users.get_events(member.id, interval=900)
                         out += f"\nServer insights: `{member} has performed {sum(events)} discord actions in the past 7 days!`"
                     else:
                         i = xrand(4)
@@ -2118,7 +2118,7 @@ class UpdateUsers(Database):
             await bot.seen(user, event="misc", raw="Talking to me")
             self.add_xp(user, xrand(12, 20))
             if "dailies" in bot.data:
-                bot.database.dailies.progress_quests(user, "talk")
+                bot.data.dailies.progress_quests(user, "talk")
         else:
             if not self.data.get(user.id, EMPTY).get("last_mention") and random.random() > 0.6:
                 self.data.get(user.id, EMPTY).pop("last_talk", None)

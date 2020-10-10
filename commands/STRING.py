@@ -136,7 +136,7 @@ class Math(Command):
             return f"Currently assigned variables for {user}:\n" + ini_md(iter2str(var))
         if "c" in flags or "d" in flags:
             bot.data.variables.pop(user.id, None)
-            bot.database.variables.update()
+            bot.data.variables.update()
             return italics(css_md(f"Successfully cleared all variables for {sqr_md(user)}."))
         if not argv:
             raise ArgumentError(f"Input string is empty. Use {bot.get_prefix(guild)}math help for help.")
@@ -178,7 +178,7 @@ class Math(Command):
             env[var] = resp[0]
             while len(env) > 64:
                 env.pop(next(iter(env)))
-            bot.database.variables.update()
+            bot.data.variables.update()
             return css_md(f"Variable {sqr_md(var)} set to {sqr_md(resp[0])}.")
         if argv.lower() == "help":
             return answer
@@ -540,9 +540,9 @@ class Time(Command):
         if argv:
             h = await self.bot.eval_math(argv, user)
         elif name in "time":
-            h = self.bot.database.users.get_timezone(user.id)
+            h = self.bot.data.users.get_timezone(user.id)
             if h is None:
-                h = self.bot.database.users.estimate_timezone(user.id)
+                h = self.bot.data.users.estimate_timezone(user.id)
                 estimated = True
             else:
                 estimated = False
@@ -769,7 +769,7 @@ class Ask(Command):
                     res.replace(word + sym, rep + sym)
         q = " ".join(res.replace("you", "I").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
         if "dailies" in bot.data:
-            bot.database.dailies.progress_quests(user, "talk")
+            bot.data.dailies.progress_quests(user, "talk")
         await channel.send(escape_everyone(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\uf000", "")))
 
 

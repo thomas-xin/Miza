@@ -1437,6 +1437,14 @@ class fcdict(cdict):
                 return default
             raise
 
+    def popitem(self, k, default=Dummy):
+        try:
+            return super().popitem(full_prune(k))
+        except KeyError:
+            if default is not Dummy:
+                return default
+            raise
+
 
 # Dictionary with multiple assignable values per key.
 class mdict(cdict):
@@ -1457,10 +1465,22 @@ class mdict(cdict):
         if v not in values:
             values.append(v)
 
+    add = append
+
     def popleft(self, k):
         values = super().__getitem__(k)
         if len(values):
             v = values.popleft()
+        else:
+            v = None
+        if not values:
+            super().pop(k)
+        return v
+
+    def popright(self, k):
+        values = super().__getitem__(k)
+        if len(values):
+            v = values.popright()
         else:
             v = None
         if not values:
@@ -1527,6 +1547,13 @@ class demap(collections.abc.Mapping):
             temp = self.__getitem__(k)
             self.__delitem__(k)
             return temp
+        return v
+
+    def popitem(self, k, v=None):
+        with suppress(KeyError):
+            temp = self.__getitem__(k)
+            self.__delitem__(k)
+            return (k, temp)
         return v
 
     clear = lambda self: (self.a.clear(), self.b.clear())

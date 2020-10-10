@@ -8,7 +8,7 @@ from common import *
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
 
-heartbeat_proc = psutil.Popen(["python", "misc/heartbeat.py"])
+heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 
 
 # Main class containing all global bot data.
@@ -690,8 +690,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         raise LookupError("Unable to find suitable guild.")
 
     async def create_progress_bar(self, length, ratio=0.5):
-        if "emojis" in self.database:
-            return await create_future(self.database.emojis.create_progress_bar, length, ratio)
+        if "emojis" in self.data:
+            return await create_future(self.data.emojis.create_progress_bar, length, ratio)
         position = min(length, round(length * ratio))
         return "⬜" * position + "⬛" * length - position
 
@@ -878,7 +878,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                     with open(f"cache/attachment_{data}.bin", "rb") as f:
                                         data = await create_future(f.read)
                                 except FileNotFoundError:
-                                    return None
+                                    data = await Request(url, aio=True)
+                                    await self.add_attachment(cdict(id=a_id), data=data)
+                                    return data
                                 else:
                                     self.cache.attachments[a_id] = data
                             print(f"Successfully loaded attachment {a_id} from cache.")
@@ -1026,7 +1028,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             u_id = user
         g_perm = set_dict(perms, guild.id, {})
         g_perm.update({u_id: round_min(value)})
-        self.database.perms.update()
+        self.data.perms.update()
     
     # Sets the permission value for a snowflake in a guild to a value.
     def remove_perms(self, user, guild):
@@ -1037,7 +1039,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             u_id = user
         g_perm = set_dict(perms, guild.id, {})
         g_perm.pop(u_id, None)
-        self.database.perms.update()
+        self.data.perms.update()
 
     # Checks whether a member's status was changed.
     def status_changed(self, before, after):
@@ -1573,8 +1575,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.categories = fcdict()
         self.dbitems = fcdict()
         self.commands = fcdict()
-        self.database = fcdict()
         self.data = fcdict()
+        self.database = fcdict()
         self.size = fcdict()
         for f in os.listdir():
             if is_code(f):
@@ -1589,8 +1591,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.update_embeds()
         saved = alist()
         with tracebacksuppressor:
-            for i in self.database:
-                u = self.database[i]
+            for i in self.data:
+                u = self.data[i]
                 if getattr(u, "update", None) is not None:
                     if u.update(True):
                         saved.append(i)
@@ -1603,6 +1605,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             os.mkdir("backup")
         fn = f"backup/saves.{datetime.datetime.utcnow().date()}.zip"
         if not os.path.exists(fn):
+            await_fut(self.send_event("_save_"))
             z = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
             for file in os.listdir("saves"):
                 z.write(f"saves/{file}", f"saves/{file}")
@@ -1754,7 +1757,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 await self.seen(self.user, event="misc", raw="Changing their status")
                     if self.bot_ready:
                         # Update databases
-                        for u in self.database.values():
+                        for u in self.data.values():
                             if not u._semaphore.busy:
                                 create_future(u, priority=True)
                             if not u._garbage_semaphore.busy:
@@ -2696,7 +2699,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     print("Command aliases:")
                     print(self.commands)
                     # Assign all bot database events to their corresponding keys.
-                    for u in self.database.values():
+                    for u in self.data.values():
                         for f in dir(u):
                             if f.startswith("_") and f[-1] == "_" and f[1] != "_":
                                 func = getattr(u, f, None)
@@ -2762,7 +2765,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if user is not None:
                 emb.description += f", {user_mention(user.id)}"
                 if "dailies" in self.data:
-                    self.database.dailies.progress_quests(user, "invite")
+                    self.data.dailies.progress_quests(user, "invite")
             emb.description += (
                 f"!\nMy default prefix is `{self.prefix}`, which can be changed as desired on a per-server basis. Mentioning me also serves as an alias for all prefixes.\n"
                 + f"For more information, use the `{self.prefix}help` command, and my source code is available at {self.website} for those who are interested.\n"
@@ -2791,10 +2794,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             await self.seen(user, event="reaction", raw=raw)
             if user.id != self.id:
                 if "users" in self.data:
-                    self.database.users.add_xp(user, xrand(4, 7))
-                    self.database.users.add_gold(user, xrand(1, 5))
+                    self.data.users.add_xp(user, xrand(4, 7))
+                    self.data.users.add_gold(user, xrand(1, 5))
                 if "dailies" in self.data:
-                    self.database.dailies.progress_quests(user, "react")
+                    self.data.dailies.progress_quests(user, "react")
                 reaction = str(payload.emoji)
                 await self.react_callback(message, reaction, user)
                 await self.check_to_delete(message, reaction, user)
@@ -2831,8 +2834,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if after is not None and not after.afk:
                 if before is None:
                     if "users" in self.data:
-                        self.database.users.add_xp(after, xrand(6, 12))
-                        self.database.users.add_gold(after, xrand(2, 5))
+                        self.data.users.add_xp(after, xrand(6, 12))
+                        self.data.users.add_gold(after, xrand(2, 5))
                     await self.seen(member, event="misc", raw=f"Joining a voice channel, {member.guild}")
                 elif any((getattr(before, attr) != getattr(after, attr) for attr in ("self_mute", "self_deaf", "self_stream", "self_video"))):
                     await self.seen(member, event="misc", raw=f"Updating their voice settings, {member.guild}")
@@ -2908,7 +2911,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             self.add_message(after)
             if raw or before.content != after.content:
                 if "users" in self.data:
-                    self.database.users.add_xp(after.author, xrand(1, 4))
+                    self.data.users.add_xp(after.author, xrand(1, 4))
                 await self.handle_message(after)
                 if getattr(after, "guild", None):
                     create_task(self.send_event("_edit_", before=before, after=after))
@@ -3004,7 +3007,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if member is None or member.guild == after.guild:
                     if self.status_updated(before, after):
                         if "dailies" in self.data:
-                            self.database.dailies.progress_quests(after, "status")
+                            self.data.dailies.progress_quests(after, "status")
                         await self.seen(after, event="misc", raw="Changing their status")
                     elif after.status == discord.Status.offline:
                         await self.send_event("_offline_", user=after)

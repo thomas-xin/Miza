@@ -134,14 +134,14 @@ def get_best_audio(entry):
 async def auto_join(guild, channel, user, bot, preparing=False, vc=None):
     if type(channel) in (str, int):
         channel = await bot.fetch_channel(channel)
-    if guild.id not in bot.database.audio.players:
+    if guild.id not in bot.data.audio.players:
         for func in bot.commands.connect:
             try:
                 await func(user=user, channel=channel, vc=vc)
             except (discord.ClientException, AttributeError):
                 pass
     try:
-        auds = bot.database.audio.players[guild.id]
+        auds = bot.data.audio.players[guild.id]
     except KeyError:
         raise LookupError("Unable to find voice channel.")
     auds.channel = channel
@@ -156,12 +156,12 @@ copy_entry = lambda item: {"name": item.name, "url": item.url, "duration": item.
 async def disconnect_members(bot, guild, members, channel=None):
     if bot.id in (member.id for member in members):
         with suppress(KeyError):
-            auds = bot.database.audio.players[guild.id]
+            auds = bot.data.audio.players[guild.id]
             if channel is not None:
                 auds.channel = channel
             auds.dead = True
-            bot.database.audio.connecting.pop(guild.id, None)
-            await bot.database.audio(guild=guild)
+            bot.data.audio.connecting.pop(guild.id, None)
+            await bot.data.audio(guild=guild)
     futs = [create_task(member.move_to(None)) for member in members]
     for fut in futs:
         await fut
@@ -232,7 +232,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             self.new(update=False)
             self.queue = AudioQueue()
             self.queue._init_(auds=self)
-            bot.database.audio.players[vc.guild.id] = self
+            bot.data.audio.players[vc.guild.id] = self
 
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
@@ -350,8 +350,8 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
     def kill(self, reason=None):
         self.dead = None
         g = self.guild.id
-        self.bot.database.audio.players.pop(g, None)
-        self.bot.database.audio.connecting.pop(g, None)
+        self.bot.data.audio.players.pop(g, None)
+        self.bot.data.audio.connecting.pop(g, None)
         with suppress(LookupError):
             if reason is None:
                 reason = css_md(f"🎵 Successfully disconnected from {sqr_md(self.guild)}. 🎵")
@@ -426,7 +426,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             if m.voice.deaf or m.voice.mute or m.voice.afk:
                 await_fut(m.edit(mute=False, deafen=False))
         # Attempt to reconnect if not connected, otherwise update queue
-        if not (vc.is_connected() or self.bot.database.audio.is_connecting(vc.guild.id)):
+        if not (vc.is_connected() or self.bot.data.audio.is_connecting(vc.guild.id)):
             await_fut(self.reconnect())
         else:
             self.att = 0
@@ -439,7 +439,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
 
     async def smart_connect(self, channel=None):
         if hasattr(self, "dead"):
-            self.bot.database.audio.connecting.pop(channel.guild.id, None)
+            self.bot.data.audio.connecting.pop(channel.guild.id, None)
             return
         if not self.vc.is_connected():
             guild = channel.guild
@@ -475,7 +475,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
     async def set_voice_client(self, channel):
         voice_client = await self.smart_connect(channel)
         self.vc = voice_client
-        self.bot.database.audio.connecting.pop(voice_client.guild.id, None)
+        self.bot.data.audio.connecting.pop(voice_client.guild.id, None)
         return voice_client
 
     # Attempts to reconnect to a voice channel that was removed. Gives up if unable to rejoin within 60 seconds.
@@ -483,7 +483,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         try:
             if hasattr(self, "dead") or self.vc.is_connected():
                 return
-            self.bot.database.audio.connecting[self.vc.guild.id] = utc()
+            self.bot.data.audio.connecting[self.vc.guild.id] = utc()
             if getattr(self, "att", 0) <= 0:
                 self.att = utc()
             self.vc = await self.smart_connect(self.vc.channel)
@@ -501,7 +501,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             print_exc()
             if getattr(self, "att", 0) > 0 and utc() - self.att > 60:
                 self.dead = True
-        self.bot.database.audio.connecting.pop(self.vc.guild.id, None)
+        self.bot.data.audio.connecting.pop(self.vc.guild.id, None)
 
     # Updates audio player messages.
     async def update_player(self):
@@ -1988,7 +1988,7 @@ class Queue(Command):
             )
         # Get audio player as fast as possible, scheduling it to join asynchronously if necessary
         try:
-            auds = bot.database.audio.players[guild.id]
+            auds = bot.data.audio.players[guild.id]
             auds.channel = channel
             future = None
         except KeyError:
@@ -2225,7 +2225,7 @@ class Playlist(Command):
     typing = True
 
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
-        update = self.bot.database.playlists.update
+        update = self.bot.data.playlists.update
         bot = self.bot
         if argv or "d" in flags:
             req = 2
@@ -2382,7 +2382,7 @@ class Connect(Command):
                         raise LookupError("Unable to find voice channel.")
                 else:
                     vc_ = voice.channel
-        connecting = bot.database.audio.connecting
+        connecting = bot.data.audio.connecting
         # target guild may be different from source guild
         if vc_ is None:
             guild = channel.guild
@@ -2417,7 +2417,7 @@ class Connect(Command):
                 await disconnect_members(bot, guild, (member,))
                 return ini_md(f"Disconnected {sqr_md(member)} from {sqr_md(guild)}."), 1
             try:
-                auds = bot.database.audio.players[guild.id]
+                auds = bot.data.audio.players[guild.id]
             except KeyError:
                 raise LookupError("Unable to find voice channel.")
             auds.channel = channel
@@ -2425,7 +2425,7 @@ class Connect(Command):
                 raise self.perm_error(perm, 1, "to disconnect while other users are in voice")
             auds.dead = True
             connecting.pop(guild.id, None)
-            await bot.database.audio(guild=guild)
+            await bot.data.audio(guild=guild)
             return
         # Check if already in voice, move if that is the case
         joined = False
@@ -2440,8 +2440,8 @@ class Connect(Command):
             connecting[guild.id] = utc()
             vc = cdict(channel=vc_, is_playing=lambda: False, is_connected=lambda: None, guild=vc_.guild, disconnect=async_nop, move_to=async_nop, play=lambda *args, **kwargs: exec("raise RuntimeError"), stop=lambda: None, source=None)
         # Create audio source if none already exists
-        if guild.id not in bot.database.audio.players:
-            bot.database.audio.players[guild.id] = auds = CustomAudio(bot, vc, channel)
+        if guild.id not in bot.data.audio.players:
+            bot.data.audio.players[guild.id] = auds = CustomAudio(bot, vc, channel)
         if not joined:
             if not vc_.permissions_for(guild.me).connect:
                 raise ConnectionError("Insufficient permissions to connect to voice channel.")
@@ -2455,7 +2455,7 @@ class Connect(Command):
                 await aretry(check_if_connected, attempts=16, delay=0.125)
             except:
                 connecting.pop(guild.id, None)
-                bot.database.audio.players.pop(guild.id)
+                bot.data.audio.players.pop(guild.id)
                 raise
             joined = True
         if vc.is_connected():
@@ -2467,7 +2467,7 @@ class Connect(Command):
                 create_task(member.edit(mute=False, deafen=False))
         if joined:
             # Send update event to bot audio database upon joining
-            create_task(bot.database.audio(guild=guild))
+            create_task(bot.data.audio(guild=guild))
             return css_md(f"🎵 Successfully connected to {sqr_md(vc_)} in {sqr_md(guild)}. 🎵"), 1
 
 
@@ -2482,9 +2482,9 @@ class Skip(Command):
     rate_limit = (0.5, 3)
 
     async def __call__(self, bot, user, perm, name, args, argv, guild, flags, message, **void):
-        if guild.id not in bot.database.audio.players:
+        if guild.id not in bot.data.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
-        auds = bot.database.audio.players[guild.id]
+        auds = bot.data.audio.players[guild.id]
         auds.channel = message.channel
         # ~clear is an alias for ~skip -f inf
         if name.startswith("c"):
@@ -2656,7 +2656,7 @@ class Pause(Command):
         if auds.player is not None:
             auds.player.time = 1 + utc()
         # Send an update event
-        await bot.database.audio(guild=guild)
+        await bot.data.audio(guild=guild)
         if "h" not in flags:
             past = name + "pe" * (name == "stop") + "d"
             return italics(css_md(f"Successfully {past} audio playback in {sqr_md(guild)}.")), 1
@@ -3201,11 +3201,11 @@ class Player(Command):
     async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, **void):
         if message is None:
             return
-        if not guild.id in bot.database.audio.players:
+        if not guild.id in bot.data.audio.players:
             with suppress(discord.NotFound, discord.Forbidden):
                 await message.clear_reactions()
             return
-        auds = bot.database.audio.players[guild.id]
+        auds = bot.data.audio.players[guild.id]
         if reaction is None:
             auds.player = cdict(
                 time=inf,
@@ -3473,7 +3473,7 @@ class Lyrics(Command):
             argv = a.url + " " + argv
         if not argv:
             try:
-                auds = bot.database.audio.players[guild.id]
+                auds = bot.data.audio.players[guild.id]
                 if not auds.queue:
                     raise LookupError
                 argv = auds.queue[0].name
@@ -3656,7 +3656,7 @@ class Download(Command):
                         ))
                         try:
                             if int(spl[3]):
-                                auds = bot.database.audio.players[guild.id]
+                                auds = bot.data.audio.players[guild.id]
                             else:
                                 auds = None
                         except LookupError:
@@ -3801,7 +3801,7 @@ class UpdateAudio(Database):
                                     if member.id != bot.id:
                                         vs = member.voice
                                         if vs is not None and not vs.deaf and not vs.self_deaf:
-                                            bot.database.dailies.progress_quests(member, "music", utc() - auds.ts)
+                                            bot.data.dailies.progress_quests(member, "music", utc() - auds.ts)
                                 auds.ts = utc()
                             else:
                                 auds.ts = None

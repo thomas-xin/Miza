@@ -117,7 +117,7 @@ class Mute(Command):
                 + str(user.id) + "_0"
                 + "-\nLoading mute list...```*"
             )
-        update = self.bot.database.mutes.update
+        update = self.bot.data.mutes.update
         ts = utc()
         mutelist = bot.data.mutes.get(guild.id, alist())
         if type(mutelist) is not alist:
@@ -146,9 +146,9 @@ class Mute(Command):
                         mutelist.pops(ind)["u"]
                         if 0 in ind:
                             with suppress(LookupError):
-                                bot.database.mutes.listed.remove(guild.id, key=lambda x: x[-1])
+                                bot.data.mutes.listed.remove(guild.id, key=lambda x: x[-1])
                             if mutelist:
-                                bot.database.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
+                                bot.data.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
                         update()
                     create_task(channel.send(css_md(f"Successfully unmuted {sqr_md(user)} in {sqr_md(guild)}.")))
                     continue
@@ -205,7 +205,7 @@ class Mute(Command):
     async def getMutes(self, guild):
         loc = self.bot.data.mutes.get(guild.id)
         # This API call could potentially be replaced with a single init call and a well maintained cache of muted users
-        role = await self.bot.database.muteroles.get(guild)
+        role = await self.bot.data.muteroles.get(guild)
         glob = [cdict(user=member) for member in role.members]
         mutes = {mute.user.id: {"u": mute.user.id, "r": None, "t": inf} for mute in glob}
         if loc:
@@ -221,7 +221,7 @@ class Mute(Command):
         ts = utc()
         bot = self.bot
         mutelist = set_dict(bot.data.mutes, guild.id, alist())
-        update = bot.database.mutes.update
+        update = bot.data.mutes.update
         for m in glob:
             u = m.user
             if user.id == u.id:
@@ -231,17 +231,17 @@ class Mute(Command):
                     with suppress(LookupError):
                         mutelist.remove(user.id, key=lambda x: x["u"])
                     with suppress(LookupError):
-                        bot.database.mutes.listed.remove(guild.id, key=lambda x: x[-1])
+                        bot.data.mutes.listed.remove(guild.id, key=lambda x: x[-1])
                     mutelist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": mute.get("r"), "x": mute.get("x")}, key=lambda x: x["t"])
-                    bot.database.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
+                    bot.data.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
                     print(mutelist)
-                    print(bot.database.mutes.listed)
+                    print(bot.data.mutes.listed)
                     update()
                     msg = css_md(f"Updated mute for {sqr_md(user)} from {sqr_md(time_until(mute['t']))} to {sqr_md(time_until(ts + length))}.")
                     await channel.send(msg)
                 return
         async with ExceptionSender(channel):
-            role = await self.bot.database.muteroles.get(guild)
+            role = await self.bot.data.muteroles.get(guild)
             member = guild.get_member(user.id)
             if member is None:
                 roles = ()
@@ -251,11 +251,11 @@ class Mute(Command):
             with suppress(LookupError):
                 mutelist.remove(user.id, key=lambda x: x["u"])
             with suppress(LookupError):
-                bot.database.mutes.listed.remove(guild.id, key=lambda x: x[-1])
+                bot.data.mutes.listed.remove(guild.id, key=lambda x: x[-1])
             mutelist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": reason, "x": {r.id for r in roles if not r.managed}}, key=lambda x: x["t"])
-            bot.database.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
+            bot.data.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
             print(mutelist)
-            print(bot.database.mutes.listed)
+            print(bot.data.mutes.listed)
             update()
             msg = css_md(f"{sqr_md(user)} has been muted in {sqr_md(guild)} for {sqr_md(time_until(ts + length))}. Reason: {sqr_md(reason)}")
             await channel.send(msg)
@@ -268,7 +268,7 @@ class Mute(Command):
             return
         guild = message.guild
         user = await bot.fetch_user(u_id)
-        update = self.bot.database.mutes.update
+        update = self.bot.data.mutes.update
         ts = utc()
         mutelist = bot.data.mutes.get(guild.id, [])
         mutes, glob = await self.getMutes(guild)
@@ -340,7 +340,7 @@ class Ban(Command):
                 + str(user.id) + "_0"
                 + "-\nLoading ban list...```*"
             )
-        update = self.bot.database.bans.update
+        update = self.bot.data.bans.update
         ts = utc()
         banlist = bot.data.bans.get(guild.id, alist())
         if type(banlist) is not alist:
@@ -369,9 +369,9 @@ class Ban(Command):
                         banlist.pops(ind)["u"]
                         if 0 in ind:
                             with suppress(LookupError):
-                                bot.database.bans.listed.remove(guild.id, key=lambda x: x[-1])
+                                bot.data.bans.listed.remove(guild.id, key=lambda x: x[-1])
                             if banlist:
-                                bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
+                                bot.data.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
                         update()
                     create_task(channel.send(css_md(f"Successfully unbanned {sqr_md(user)} from {sqr_md(guild)}.")))
                     continue
@@ -443,7 +443,7 @@ class Ban(Command):
         ts = utc()
         bot = self.bot
         banlist = set_dict(bot.data.bans, guild.id, alist())
-        update = bot.database.bans.update
+        update = bot.data.bans.update
         for b in glob:
             u = b.user
             if user.id == u.id:
@@ -453,12 +453,12 @@ class Ban(Command):
                     with suppress(LookupError):
                         banlist.remove(user.id, key=lambda x: x["u"])
                     with suppress(LookupError):
-                        bot.database.bans.listed.remove(guild.id, key=lambda x: x[-1])
+                        bot.data.bans.listed.remove(guild.id, key=lambda x: x[-1])
                     if length < inf:
                         banlist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": ban.get("r")}, key=lambda x: x["t"])
-                        bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
+                        bot.data.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
                     print(banlist)
-                    print(bot.database.bans.listed)
+                    print(bot.data.bans.listed)
                     update()
                     msg = css_md(f"Updated ban for {sqr_md(user)} from {sqr_md(time_until(ban['t']))} to {sqr_md(time_until(ts + length))}.")
                     await channel.send(msg)
@@ -468,12 +468,12 @@ class Ban(Command):
             with suppress(LookupError):
                 banlist.remove(user.id, key=lambda x: x["u"])
             with suppress(LookupError):
-                bot.database.bans.listed.remove(guild.id, key=lambda x: x[-1])
+                bot.data.bans.listed.remove(guild.id, key=lambda x: x[-1])
             if length < inf:
                 banlist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": reason}, key=lambda x: x["t"])
-                bot.database.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
+                bot.data.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
             print(banlist)
-            print(bot.database.bans.listed)
+            print(bot.data.bans.listed)
             update()
             msg = css_md(f"{sqr_md(user)} has been banned from {sqr_md(guild)} for {sqr_md(time_until(ts + length))}. Reason: {sqr_md(reason)}")
             await channel.send(msg)
@@ -486,7 +486,7 @@ class Ban(Command):
             return
         guild = message.guild
         user = await bot.fetch_user(u_id)
-        update = self.bot.database.bans.update
+        update = self.bot.data.bans.update
         ts = utc()
         banlist = bot.data.bans.get(guild.id, [])
         bans, glob = await self.getBans(guild)
@@ -550,7 +550,7 @@ class RoleGiver(Command):
     rate_limit = (2, 4)
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
-        update = self.bot.database.rolegivers.update
+        update = self.bot.data.rolegivers.update
         bot = self.bot
         data = bot.data.rolegivers
         if "d" in flags:
@@ -618,7 +618,7 @@ class AutoRole(Command):
     rate_limit = 1
 
     async def __call__(self, argv, args, name, user, channel, guild, perm, flags, **void):
-        update = self.bot.database.autoroles.update
+        update = self.bot.data.autoroles.update
         bot = self.bot
         data = bot.data.autoroles
         if "d" in flags:
@@ -726,7 +726,7 @@ class RolePreserver(Command):
     flags = "aed"
 
     def __call__(self, flags, guild, **void):
-        update = self.bot.database.rolepreservers.update
+        update = self.bot.data.rolepreservers.update
         bot = self.bot
         following = bot.data.rolepreservers
         # Empty dictionary is enough to represent an active role preserver here
@@ -823,7 +823,7 @@ class UserLog(Command):
 
     async def __call__(self, bot, flags, channel, guild, **void):
         data = bot.data.logU
-        update = bot.database.logU.update
+        update = bot.data.logU.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
@@ -850,7 +850,7 @@ class MessageLog(Command):
 
     async def __call__(self, bot, flags, channel, guild, **void):
         data = bot.data.logM
-        update = bot.database.logM.update
+        update = bot.data.logM.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
@@ -877,7 +877,7 @@ class FileLog(Command):
 
     async def __call__(self, bot, flags, channel, guild, **void):
         data = bot.data.logF
-        update = bot.database.logF.update
+        update = bot.data.logF.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
             update()
@@ -952,7 +952,7 @@ class UpdateMutes(Database):
                 except (LookupError, discord.Forbidden, discord.NotFound):
                     channel = await self.bot.get_first_sendable(guild, m)
                 try:
-                    role = await self.bot.database.muteroles.get(guild)
+                    role = await self.bot.data.muteroles.get(guild)
                     member = guild.get_member(user.id)
                     if member is None or role not in member.roles:
                         raise LookupError
@@ -983,7 +983,7 @@ class UpdateMutes(Database):
                         with suppress(KeyError):
                             x["x"] = self.bot.data.rolepreservers[guild.id][user.id]
                             self.bot.data.rolepreservers[guild.id].pop(user.id)
-                    role = await self.bot.database.muteroles.get(guild)
+                    role = await self.bot.data.muteroles.get(guild)
                     return await user.add_roles(role, reason="Sticky mute")
 
 
@@ -1449,18 +1449,18 @@ class UpdateMessageLogs(Database):
             self.searched = True
             time = None
             with tracebacksuppressor:
-                time = await self.bot.database.message_cache.load()
+                time = await self.bot.data.message_cache.load()
             create_task(self.load_new_messages(time))
 
     async def load_new_messages(self, time):
         for guild in self.bot.guilds:
             lim = floor(2097152 / len(self.bot.guilds))
-            await self.bot.database.counts.getGuildHistory(guild, lim, after=time, callback=self.callback)
-        self.bot.database.message_cache.finished = True
+            await self.bot.data.counts.getGuildHistory(guild, lim, after=time, callback=self.callback)
+        self.bot.data.message_cache.finished = True
 
     async def _save_(self, force=False, **void):
-        if force or utc() - self.bot.database.message_cache.getmtime() > 120:
-            await self.bot.database.message_cache.save()
+        if force or utc() - self.bot.data.message_cache.getmtime() > 120:
+            await self.bot.data.message_cache.save()
     
     def callback(self, messages, **void):
         create_future_ex(self.bot.update_from_client, priority=True)

@@ -312,7 +312,7 @@ class Text2048(Command):
                         xp /= 2
                     elif mode & 4:
                         xp /= 3
-                    bot.database.users.add_gold(user, xp)
+                    bot.data.users.add_gold(user, xp)
                     emb.description += await bot.as_rewards(f"+{int(xp)}")
                 emb.set_footer(text=f"Score: {fscore}")
                 # Clear reactions and announce game over message
@@ -351,7 +351,7 @@ class Text2048(Command):
                     xp /= 2
                 elif mode & 4:
                     xp /= 3
-                bot.database.users.add_gold(user, xp)
+                bot.data.users.add_gold(user, xp)
                 emb.description += await bot.as_rewards(f"+{int(xp)}")
             emb.set_footer(text=f"Score: {fscore}")
             await message.edit(content=content, embed=emb)
@@ -439,7 +439,7 @@ class SlotMachine(Command):
         out = ""
         for item in wheel:
             if item is None:
-                out += await create_future(self.bot.database.emojis.emoji_as, "slot_machine.gif")
+                out += await create_future(self.bot.data.emojis.emoji_as, "slot_machine.gif")
             else:
                 out += item
         return out
@@ -457,7 +457,7 @@ class SlotMachine(Command):
             bet = b1
         if bet > self.bot.data.users.get(user.id, {}).get("gold", 0):
             raise OverflowError("Bet cannot be greater than your balance.")
-        self.bot.database.users.add_gold(user, -bet)
+        self.bot.data.users.add_gold(user, -bet)
         skip = int("s" in flags)
         return f"*```callback-fun-slotmachine-{user.id}_{bet}_{skip}-\nLoading Slot Machine...```*"
 
@@ -473,7 +473,7 @@ class SlotMachine(Command):
             else:
                 if bet > bot.data.users.get(user.id, {}).get("gold", 0):
                     raise OverflowError("Bet cannot be greater than your balance.")
-                bot.database.users.add_gold(user, -bet)
+                bot.data.users.add_gold(user, -bet)
             wheel_true = self.generate()
             wheel_display = [None] * 3 if not skip else wheel_true
             wheel_order = deque(shuffle(range(3))) if not skip else deque((0, ))
@@ -500,8 +500,8 @@ class SlotMachine(Command):
                                 diamonds = bet / 5
                             else:
                                 gold *= bet
-                        bot.database.users.add_diamonds(user, diamonds)
-                        bot.database.users.add_gold(user, gold)
+                        bot.data.users.add_diamonds(user, diamonds)
+                        bot.data.users.add_gold(user, gold)
                         rewards = await bot.as_rewards(diamonds, gold)
                         end = f"\nRewards:\n{rewards}\n"
                     else:
@@ -536,9 +536,9 @@ class Pay(Command):
             raise ValueError("Please input a valid amount of coins.")
         if not amount <= bot.data.users.get(user.id, {}).get("gold", 0):
             raise OverflowError("Payment cannot be greater than your balance.")
-        bot.database.users.add_gold(user, -amount)
-        bot.database.users.add_gold(target, amount)
-        bot.database.dailies.progress_quests(user, "pay", amount)
+        bot.data.users.add_gold(user, -amount)
+        bot.data.users.add_gold(target, amount)
+        bot.data.dailies.progress_quests(user, "pay", amount)
         return css_md(f"{sqr_md(user)} has paid {sqr_md(amount)} coins to {sqr_md(target)}.")
 
 
@@ -597,8 +597,8 @@ class UpdateDogpiles(Database):
                             curr[1] = xrand(-3) + 1
                             if len(checker):
                                 create_task(message.channel.send(checker, tts=message.tts))
-                                self.bot.database.users.add_xp(message.author, len(message.content) / 2 + 16)
-                                self.bot.database.users.add_gold(message.author, len(message.content) / 4 + 32)
+                                self.bot.data.users.add_xp(message.author, len(message.content) / 2 + 16)
+                                self.bot.data.users.add_gold(message.author, len(message.content) / 4 + 32)
                     else:
                         # Don't imitate messages longer than 128 characters to prevent spam
                         if len(checker) > 128:
@@ -615,9 +615,9 @@ class Daily(Command):
     rate_limit = 1
 
     async def __call__(self, bot, user, channel, **void):
-        data = bot.database.dailies.get(user)
+        data = bot.data.dailies.get(user)
         emb = discord.Embed(title="Daily Quests", colour=rand_colour()).set_author(**get_author(user))
-        bal = await bot.database.users.get_balance(user)
+        bal = await bot.data.users.get_balance(user)
         c = len(data['quests'])
         emb.description = f"```callback-fun-daily-{user.id}-\n{c} task{'' if c == 1 else 's'} available\n{sec2time(86400 - utc() + data['time'])} remaining```Balance: {bal}"
         for field in data["quests"][:5]:
@@ -635,9 +635,9 @@ class Daily(Command):
         u_id = vals
         if str(user.id) != u_id:
             return
-        data = bot.database.dailies.collect(user)
+        data = bot.data.dailies.collect(user)
         emb = discord.Embed(title="Daily Quests", colour=rand_colour()).set_author(**get_author(user))
-        bal = await bot.database.users.get_balance(user)
+        bal = await bot.data.users.get_balance(user)
         c = len(data['quests'])
         emb.description = f"```callback-fun-daily-{user.id}-\n{c} task{'' if c == 1 else 's'} available\n{sec2time(86400 - utc() + data['time'])} remaining```Balance: {bal}"
         for field in data["quests"][:5]:
@@ -667,8 +667,8 @@ class UpdateDailies(Database):
         pops = set()
         for i, quest in enumerate(quests):
             if quest.progress >= quest.required:
-                self.bot.database.users.add_diamonds(user, quest.get("diamonds"))
-                self.bot.database.users.add_gold(user, quest.get("gold"))
+                self.bot.data.users.add_diamonds(user, quest.get("diamonds"))
+                self.bot.data.users.add_gold(user, quest.get("gold"))
                 pops.add(i)
         if pops:
             quests.pops(pops)
@@ -678,7 +678,7 @@ class UpdateDailies(Database):
     def generate(self, user):
         if user.id == self.bot.id or self.bot.is_blacklisted(user.id):
             return dict(quests=(), time=inf)
-        level = self.bot.database.users.xp_to_level(self.bot.database.users.get_xp(user))
+        level = self.bot.data.users.xp_to_level(self.bot.data.users.get_xp(user))
         quests = alist()
         for i in range(min(20, level + 5 >> 1)):
             q_id = xrand(11)
@@ -762,10 +762,10 @@ class Wallet(Command):
             raise LookupError("No results found.")
         for user in users:
             data = bot.data.users.get(user.id, {})
-            xp = bot.database.users.get_xp(user)
-            level = bot.database.users.xp_to_level(xp)
-            xp_curr = bot.database.users.xp_required(level)
-            xp_next = bot.database.users.xp_required(level + 1)
+            xp = bot.data.users.get_xp(user)
+            level = bot.data.users.xp_to_level(xp)
+            xp_curr = bot.data.users.xp_required(level)
+            xp_next = bot.data.users.xp_required(level + 1)
             ratio = (xp - xp_curr) / (xp_next - xp_curr)
             gold = data.get("gold", 0)
             diamonds = data.get("diamonds", 0)
@@ -790,7 +790,7 @@ class Wallet(Command):
         if user.id in cache:
             return
         cache.add(user.id)
-        bot.database.dailies.progress_quests(user, "invite")
+        bot.data.dailies.progress_quests(user, "invite")
 
 
 class Shop(Command):
@@ -853,10 +853,10 @@ class Shop(Command):
                 if product.name == "Upgrade Server":
                     if bot.is_trusted(guild):
                         return "```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers."
-                    bot.database.users.add_diamonds(-product.cost[0])
-                    bot.database.users.add_gold(-product.cost[-1])
+                    bot.data.users.add_diamonds(-product.cost[0])
+                    bot.data.users.add_gold(-product.cost[-1])
                     bot.data.trusted[guild.id] = True
-                    bot.database.trusted.update()
+                    bot.data.trusted.update()
                     return f"```{sqr_md(guild)} has been successfully elevated from 0 to 1 privilege level.```"
                 raise NotImplementedError("Target item has not yet been implemented.")
         raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
@@ -1204,7 +1204,7 @@ class MimicSend(Command):
             else:
                 tts = False
             for mimic in m:
-                await bot.database.mimics.updateMimic(mimic, guild)
+                await bot.data.mimics.updateMimic(mimic, guild)
                 name = mimic.name
                 url = mimic.url
                 await wait_on_none(bot.send_as_webhook(channel, msg, username=name, avatar_url=url, tts=tts))
@@ -1275,7 +1275,7 @@ class UpdateMimics(Database):
                             await wait_on_none(bot.send_as_webhook(channel, msg, username=name, avatar_url=url, tts=tts))
                             mimic.count += 1
                             mimic.total += len(k.msg)
-                            bot.database.users.add_xp(user, math.sqrt(len(msg)) * 2)
+                            bot.data.users.add_xp(user, math.sqrt(len(msg)) * 2)
 
     async def updateMimic(self, mimic, guild=None, it=None):
         if set_dict(mimic, "auto", None):

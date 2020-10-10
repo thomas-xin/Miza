@@ -457,7 +457,7 @@ class MathQuiz(Command):
     rate_limit = 3
 
     async def __call__(self, channel, guild, flags, argv, **void):
-        mathdb = self.bot.database.mathtest
+        mathdb = self.bot.data.mathtest
         if "d" in flags:
             if channel.id in mathdb.data:
                 mathdb.data.pop(channel.id)
@@ -764,7 +764,7 @@ class DeviantArt(Command):
 
     async def __call__(self, argv, flags, channel, guild, bot, **void):
         data = bot.data.deviantart
-        update = bot.database.deviantart.update
+        update = bot.data.deviantart.update
         if not argv:
             assigned = data.get(channel.id, ())
             if not assigned:
