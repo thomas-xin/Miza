@@ -353,7 +353,7 @@ def select_and_loads(s, mode="safe", size=None):
         b.seek(0)
         z = ZipFile(b, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
         if size:
-            x = z.get_info().file_size
+            x = z.getinfo().file_size
             if size < x:
                 raise OverflowError(f"Data input size too large ({x} > {size}).")
         s = z.open("DATA").read()
