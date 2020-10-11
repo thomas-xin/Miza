@@ -326,8 +326,10 @@ def eval_json(s):
         return json.loads(s)
     return safe_eval(s)
 
-encrypt = lambda s: b">~MIZA~>" + enc_box.encrypt(s)
+encrypt = lambda s: b">~MIZA~>" + enc_box.encrypt(s if type(s) is bytes else str(s).encode("utf-8"))
 def decrypt(s):
+    if type(s) is not bytes:
+        s = str(s).encode("utf-8")
     if s[:8] == b">~MIZA~>":
         return enc_box.decrypt(s[8:])
     raise ValueError("Data header not found.")
@@ -359,7 +361,10 @@ def select_and_loads(s, mode="safe", size=None):
             except:
                 raise
             else:
-                data = pickle.loads(s)
+                if s[0] == 128:
+                    data = pickle.loads(s)
+                else:
+                    data = s
         elif s[0] == 128:
             data = pickle.loads(s)
     if type(data) in (str, bytes):

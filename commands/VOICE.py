@@ -273,12 +273,13 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         if not position:
             d["stats"].pop("position")
         if js:
+            j = json.dumps(q)
             if len(q) > lim:
-                s = encrypt(pickle.dumps(q))
+                s = encrypt(j)
                 if len(s) > 262144:
                     return bytes2zip(s), "dump.zip"
                 return s, "dump.bin"
-            return json.dumps(d).encode("utf-8"), "dump.json"
+            return j.encode("utf-8"), "dump.json"
         return d, None
 
     # A call to voice_client.play ignoring discord.py bot exceptions.
