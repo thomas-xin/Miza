@@ -2739,12 +2739,12 @@ class Dump(Command):
         else:
             # Queue may already be in dict form if loaded from database
             d = argv
-        q = d["queue"]
+        q = d["queue"][:262144]
         async with discord.context_managers.Typing(channel):
             # Copy items and cast to cdict queue entries
-            for i, e in enumerate(q[:262144], 1):
+            for i, e in enumerate(q, 1):
                 if type(e) is not cdict:
-                    e = q[i] = cdict(e)
+                    e = q[i - 1] = cdict(e)
                 e.u_id = user.id
                 e.skips = deque()
                 if not i & 8191:
