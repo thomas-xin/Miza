@@ -230,6 +230,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             self.new(update=False)
             self.queue = AudioQueue()
             self.queue._init_(auds=self)
+            self.semaphore = Semaphore(1, 4, rate_limit=1 / 8)
             if not bot.is_trusted(getattr(channel, "guild", None)):
                 self.queue.maxitems = 8192
             bot.data.audio.players[vc.guild.id] = self
@@ -265,23 +266,24 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         return stats.volume != 1 or stats.reverb != 0 or stats.pitch != 0 or stats.speed != 1 or stats.pan != 1 or stats.bassboost != 0 or stats.compressor != 0 or stats.chorus != 0 or stats.resample != 0
 
     def get_dump(self, position, js=False):
-        lim = 1024
-        q = [copy_entry(item) for item in self.queue.verify()]
-        s = dict(self.stats)
-        d = {
-            "stats": s,
-            "queue": q,
-        }
-        if not position:
-            d["stats"].pop("position")
-        if js:
-            if len(q) > lim:
-                s = pickle.dumps(d)
-                if len(s) > 262144:
-                    return encrypt(bytes2zip(s)), "dump.bin"
-                return encrypt(s), "dump.bin"
-            return json.dumps(q).encode("utf-8"), "dump.json"
-        return d, None
+        with self.semaphore:
+            lim = 1024
+            q = [copy_entry(item) for item in self.queue.verify()]
+            s = dict(self.stats)
+            d = {
+                "stats": s,
+                "queue": q,
+            }
+            if not position:
+                d["stats"].pop("position")
+            if js:
+                if len(q) > lim:
+                    s = pickle.dumps(d)
+                    if len(s) > 262144:
+                        return encrypt(bytes2zip(s)), "dump.bin"
+                    return encrypt(s), "dump.bin"
+                return json.dumps(q).encode("utf-8"), "dump.json"
+            return d, None
 
     # A call to voice_client.play ignoring discord.py bot exceptions.
     def ensure_play(self):
@@ -890,20 +892,21 @@ class AudioQueue(alist):
 
     # Enqueue items at target position, starting audio playback if queue was previously empty.
     def enqueue(self, items, position):
-        if len(items) > self.maxitems:
-            items = items[:self.maxitems]
-        if not self:
-            self.__init__(items)
-            self.auds.source = None
-            create_future_ex(self.update_load, timeout=120)
-            return self
-        if position == -1:
-            self.extend(items)
-        else:
-            self.rotate(-position)
-            self.extend(items)
-            self.rotate(len(items) + position)
-        return self.verify()
+        with self.auds.semaphore:
+            if len(items) > self.maxitems:
+                items = items[:self.maxitems]
+            if not self:
+                self.__init__(items)
+                self.auds.source = None
+                create_future_ex(self.update_load, timeout=120)
+                return self
+            if position == -1:
+                self.extend(items)
+            else:
+                self.rotate(-position)
+                self.extend(items)
+                self.rotate(len(items) + position)
+            return self.verify()
 
 
 # runs org2xm on a file, with an optional custom sample bank.
