@@ -2037,7 +2037,9 @@ class Queue(Command):
         # Assign search results to queue entries
         added = deque()
         names = []
-        for i, e in enumerate(resp[:262144], 1):
+        for i, e in enumerate(resp, 1):
+            if i > 262144:
+                break
             name = e.name
             url = e.url
             temp = {
