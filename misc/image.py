@@ -59,7 +59,7 @@ fcache = "cache" if os.path.exists("cache") else "../cache"
 def header():
     return {
         "DNT": "1",
-        "user-agent": f"Mozilla/5.{int(time.time() * 1000) % 10}",
+        "user-agent": f"Mozilla/5.{(time.time_ns() // 1000) % 10}",
     }
 
 def get_request(url):
@@ -86,7 +86,7 @@ fpscheck = re.compile("[0-9]+ fps")
 
 def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=None):
     direct = any((size is None, dur is None, orig_fps is None))
-    ts = round(time.time() * 1000)
+    ts = time.time_ns() // 1000
     fn = "cache/" + str(ts)
     if direct:
         if data is None:
@@ -170,7 +170,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         raise
 
 def create_gif(in_type, args, delay):
-    ts = round(time.time() * 1000)
+    ts = time.time_ns() // 1000
     out = "cache/" + str(ts) + ".gif"
     maxsize = 512
     if in_type == "video":
@@ -269,7 +269,7 @@ def rainbow_gif(image, duration):
         image.seek(0)
     else:
         return rainbow_gif2(image, duration)
-    ts = round(time.time() * 1000)
+    ts = time.time_ns() // 1000
     image = resize_max(image, 512, resample=Image.HAMMING)
     size = list(image.size)
     if duration == 0:
@@ -347,7 +347,7 @@ def spin_gif(image, duration):
         image.seek(0)
     else:
         return spin_gif2(image, duration)
-    ts = round(time.time() * 1000)
+    ts = time.time_ns() // 1000
     image = resize_max(image, 512, resample=Image.HAMMING)
     size = list(image.size)
     if duration == 0:
@@ -421,7 +421,7 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
         loops = 1 if loops >= 0 else -1
     maxsize = int(min(512, 32768 / (length * scale ** 0.5) ** 0.5))
     size = list(max_size(*image.size, maxsize))
-    ts = round(time.time() * 1000)
+    ts = time.time_ns() // 1000
     for f in range(length * scale):
         np.random.seed(ts & 4294967295)
         image.seek(f % length)
@@ -444,7 +444,7 @@ def magik_gif(image, cell_size=7, grid_distance=23, iterations=1):
         image.seek(0)
     else:
         return magik_gif2(image, cell_size, grid_distance, iterations)
-    ts = round(time.time() * 1000)
+    ts = time.time_ns() // 1000
     image = resize_max(image, 512, resample=Image.HAMMING)
     out = deque((image,))
     for _ in range(31):
@@ -1039,7 +1039,7 @@ def plt_special(d, user=None, **void):
     plt.xlabel("Time (Hours)")
     plt.ylabel("Action Count")
     plt.legend(loc="upper left")
-    ts = round(time.time() * 1000)
+    ts = time.time_ns() // 1000
     out = "cache/" + str(ts) + ".png"
     plt.savefig(out)
     plt.clf()
@@ -1114,7 +1114,7 @@ def get_image(url, out):
 @logging
 def evalImg(url, operation, args):
     globals()["CURRENT_FRAME"] = 0
-    ts = round(time.time() * 1000)
+    ts = time.time_ns() // 1000
     out = "cache/" + str(ts) + ".png"
     args = eval(args)
     if operation != "$":

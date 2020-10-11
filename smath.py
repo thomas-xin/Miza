@@ -83,7 +83,7 @@ np = numpy
 array = np.array
 deque = collections.deque
 
-random.seed(random.random() + time.time() % 1)
+random.seed(random.randint(0, (1 << 32) - 1) - time.time_ns())
 mp = mpmath.mp
 mp.dps = 64
 
@@ -3055,10 +3055,11 @@ class DynamicDT(datetime.datetime):
         return cls(*dt.timetuple()[:6], getattr(dt, "microsecond", 0), tzinfo=getattr(dt, "tzinfo", None))
 
 
-utc = time.time
+ts_us = lambda: time.time_ns // 1000
+utc = lambda: time.time_ns() / 1e9
 utc_dt = datetime.datetime.utcnow
 utc_ft = datetime.datetime.utcfromtimestamp
-utc_ddt = lambda: utc_ft(utc())
+utc_ddt = lambda: DynamicDT.fromtimestamp(utc())
 utc_dft = DynamicDT.utcfromtimestamp
 dt2dt = DynamicDT.fromdatetime
 ep = datetime.datetime(1970, 1, 1)
@@ -3517,11 +3518,20 @@ def b642bytes(b, alt_char_set=False):
     b = base64.b64decode(b)
     return b
 
+if sys.version_info[0] >= 3 and sys.version_info[1] >= 9:
+    randbytes = random.randbytes
+else:
+    randbytes = lambda size: (np.random.random_sample(size) * 256).astype(np.uint8).tobytes()
 
 # SHA256 operations: base64 and base16.
 shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).replace(b"/", b"-").decode("utf-8", "replace")
 hhash = lambda s: bytes2hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
 ihash = lambda s: int.from_bytes(hashlib.sha256(s.encode("utf-8")).digest(), "little") % 4294967296 - 2147483648
+
+def bxor(b1, b2):
+    x = np.frombuffer(b1, dtype=np.uint8)
+    y = np.frombuffer(b2, dtype=np.uint8)
+    return (x ^ y).tobytes()
 
 
 # Manages a dict object and uses pickle to save and load it.

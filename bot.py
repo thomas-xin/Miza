@@ -19,7 +19,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     heartbeat = "heartbeat.tmp"
     restart = "restart.tmp"
     shutdown = "shutdown.tmp"
-    authdata = "auth.json"
     caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "attachments", "deleted", "banned")
     statuses = (discord.Status.online, discord.Status.idle, discord.Status.dnd)
     # Default command prefix
@@ -71,26 +70,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         directory = frozenset(os.listdir())
         [os.mkdir(folder) for folder in ("cache", "saves", "deleted") if folder not in directory]
         try:
-            f = open(self.authdata)
-        except FileNotFoundError:
-            with open(self.authdata, "w") as f:
-                f.write(
-                    '{\n'
-                    + '"discord_token":"",\n'
-                    + '"owner_id":""\n'
-                    + '}'
-                )
-            print(f"ERROR: Please fill in details for {self.authdata} to continue.")
-            self.setshutdown(2, force=True)
-        with closing(f):
-            auth = ast.literal_eval(f.read())
-        try:
-            self.token = auth["discord_token"]
+            self.token = AUTH["discord_token"]
         except KeyError:
             print("ERROR: discord_token not found. Unable to login.")
             self.setshutdown(force=True)
         try:
-            owner_id = auth["owner_id"]
+            owner_id = AUTH["owner_id"]
             if type(owner_id) not in (list, tuple):
                 owner_id = (owner_id,)
             self.owners = alist(int(i) for i in owner_id)

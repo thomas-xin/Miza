@@ -690,7 +690,7 @@ class UpdateDailies(Database):
             elif q_id == 2:
                 q = cdict(name=f"Earn 1 diamond", gold=level * 50, progress=0, required=1, action="diamond")
             elif q_id == 3:
-                x = round((level * 5 + 20) * random.random() + 20)
+                x = round((level + 10) * random.random() + 20)
                 q = cdict(name=f"Use {x} commands", gold=x * 9, progress=0, required=x, action="command")
             elif q_id == 4:
                 x = round((level * 200 + 1000) * random.random() + 1000)
@@ -711,7 +711,7 @@ class UpdateDailies(Database):
                 x = round((level * 28 + 240) * random.random() + 180)
                 q = cdict(name=f"Type for {sec2time(x)}", gold=x * 2, progress=0, required=x, action="typing")
             elif q_id == 10:
-                x = xrand(20, 41)
+                x = xrand(10, 21)
                 q = cdict(name=f"Talk to me {x} times", gold=x * 7, progress=0, required=x, action="talk")
             quests.append(q)
         return quests.appendleft(cdict(name="Daily rewards", gold=level * 50 + 400, progress=1, required=1, action=None))

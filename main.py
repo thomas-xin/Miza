@@ -1,9 +1,8 @@
 # Loads the install_update module, which makes sure all required libraries are installed to their required versions.
-from install_update import os, traceback, python
-
+from install_update import *
 
 # Makes sure an authentication file exists.
-if not os.path.exists("auth.json"):
+if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
     print("Authentication file not found. Generating empty template...")
     f = open("auth.json", "wb")
     d = {

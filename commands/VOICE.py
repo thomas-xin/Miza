@@ -18,19 +18,17 @@ try:
 except subprocess.CalledProcessError:
     pass
 except FileNotFoundError:
-    print("WARNING: FFmpeg not found. Required for voice commands.")
+    print("WARNING: FFmpeg not found. Unable to convert and play audio.")
 
-with open("auth.json") as f:
-    auth = ast.literal_eval(f.read())
 try:
-    genius_key = auth["genius_key"]
+    genius_key = AUTH["genius_key"]
     if not genius_key:
         raise
 except:
     genius_key = None
     print("WARNING: genius_key not found. Unable to use API to search song lyrics.")
 try:
-    google_api_key = auth["google_api_key"]
+    google_api_key = AUTH["google_api_key"]
     if not google_api_key:
         raise
 except:
@@ -265,10 +263,8 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         return stats.volume != 1 or stats.reverb != 0 or stats.pitch != 0 or stats.speed != 1 or stats.pan != 1 or stats.bassboost != 0 or stats.compressor != 0 or stats.chorus != 0 or stats.resample != 0
 
     def get_dump(self, position, js=False):
-        lim = 32768
-        if len(self.queue) > lim:
-            raise OverflowError(f"Too many items in queue ({len(self.queue)} > {lim}).")
-        q = [copy_entry(item) for item in self.queue]
+        lim = 1024
+        q = [copy_entry(item) for item in self.queue.verify()]
         s = dict(self.stats)
         d = {
             "stats": s,
@@ -277,8 +273,13 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         if not position:
             d["stats"].pop("position")
         if js:
-            return json.dumps(d)
-        return d
+            if len(q) > lim:
+                s = encrypt(pickle.dumps(q))
+                if len(s) > 262144:
+                    return bytes2zip(s), "dump.zip"
+                return s, "dump.bin"
+            return json.dumps(d).encode("utf-8"), "dump.json"
+        return d, None
 
     # A call to voice_client.play ignoring discord.py bot exceptions.
     def ensure_play(self):
@@ -452,7 +453,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
                 if channel is not None:
                     await self.vc.move_to(channel)
                 if not self.vc.is_connected():
-                    await self.vc.connect(_tries=3)
+                    await self.vc.connect(reconnect=True, timeout=7)
                 return self.vc
             if member.voice is not None:
                 if channel is None:
@@ -602,7 +603,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             volume *= 2
         # Compressor setting, this needs a bit of tweaking perhaps
         if stats.compressor:
-            comp = min(8000, abs(stats.compressor + sgn(stats.compressor)))
+            comp = min(8000, abs(stats.compressor * 10 + sgn(stats.compressor)))
             while abs(comp) > 1:
                 c = min(20, comp)
                 try:
@@ -746,7 +747,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
 # Manages the audio queue. Has optimized insertion/removal on both ends, and linear time lookup. One instance of this class is created per audio player.
 class AudioQueue(alist):
 
-    maxitems = 131072
+    maxitems = 262144
         
     def _init_(self, auds):
         self.auds = auds
@@ -875,6 +876,16 @@ class AudioQueue(alist):
                 auds.vc.stop()
                 auds.source = None
 
+    def verify(self):
+        if len(self) > self.maxitems + 2048:
+            self.__init__(self[1 - self.maxitems:].appendleft(self[0]), fromarray=True)
+        elif len(self) > self.maxitems:
+            self.rotate(-1)
+            while len(self) > self.maxitems:
+                self.pop()
+            self.rotate(1)
+        return self
+
     # Enqueue items at target position, starting audio playback if queue was previously empty.
     def enqueue(self, items, position):
         if len(items) > self.maxitems:
@@ -890,14 +901,7 @@ class AudioQueue(alist):
             self.rotate(-position)
             self.extend(items)
             self.rotate(len(items) + position)
-        if len(self) > self.maxitems + 2048:
-            self.__init__(self[1 - self.maxitems:].appendleft(self[0]), fromarray=True)
-        elif len(self) > self.maxitems:
-            self.rotate(-1)
-            while len(self) > self.maxitems:
-                self.pop()
-            self.rotate(1)
-        return self
+        return self.verify()
 
 
 # runs org2xm on a file, with an optional custom sample bank.
@@ -917,7 +921,7 @@ def org2xm(org, dat=None):
         data = org
     # Set compatibility option if file is not of org2 format.
     compat = not data.startswith(b"Org-02")
-    ts = round(utc() * 1000)
+    ts = ts_us()
     # Write org data to file.
     r_org = "cache/" + str(ts) + ".org"
     with open(r_org, "wb") as f:
@@ -973,8 +977,7 @@ def mid2mp3(mid):
             test = Request(f"https://hostfast.onlineconverter.com/file/{fn}")
             if test == b"d":
                 break
-        print(i)
-    ts = round(utc() * 1000)
+    ts = ts_us()
     r_mp3 = f"cache/{ts}.mp3"
     with open(r_mp3, "wb") as f:
         f.write(Request(f"https://hostfast.onlineconverter.com/file/{fn}/download"))
@@ -1651,13 +1654,10 @@ class AudioDownloader:
                 # Allow loading of files output by ~dump
                 if is_url(item):
                     url = verify_url(item)
-                    if url.endswith(".json") or url.endswith(".txt"):
+                    if url[-5:] == ".json" or url[-4:] in (".txt", ".bin", ".zip"):
                         s = await_fut(self.bot.get_request(url))
-                        if len(s) > 8388608:
-                            raise OverflowError("Playlist entity data too large.")
-                        s = s[s.index(b"{"):s.rindex(b"}") + 1]
-                        d = json.loads(s)
-                        q = d["queue"]
+                        d = select_and_loads(s, size=268435456)
+                        q = d["queue"][:262144]
                         return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
                 # Otherwise call automatic extract_info function
                 resp = self.extract_info(item, count, search=search)
@@ -1831,7 +1831,7 @@ class AudioDownloader:
             fs = 67108864
         else:
             mid = False
-        fn = f"cache/&{time_snowflake(utc_dt())}.{fmt}"
+        fn = f"cache/&{ts_us()}.{fmt}"
         info = self.extract(url)[0]
         self.get_stream(info, force=True, download=False)
         stream = info["stream"]
@@ -1859,12 +1859,15 @@ class AudioDownloader:
             br = max(4096, auds.stats.bitrate)
         args.extend(("-ar", str(SAMPLE_RATE), "-b:a", str(br), "-fs", str(fs), fn))
         try:
-            subprocess.check_output(args)
+            resp = subprocess.run(args)
+            resp.check_returncode()
         except subprocess.CalledProcessError as ex:
             # Attempt to convert file from org if FFmpeg failed
             try:
                 new = select_and_convert(stream)
             except ValueError:
+                if resp.stderr:
+                    raise RuntimeError(*ex.args, resp.stderr)
                 raise ex
             # Re-estimate duration if file was successfully converted from org
             args[8] = new
@@ -1877,7 +1880,13 @@ class AudioDownloader:
                     args[-4] = str(br)
                 if auds and br > auds.stats.bitrate:
                     br = max(4096, auds.stats.bitrate)
-            subprocess.check_output(args)
+            try:
+                resp = subprocess.run(args)
+                resp.check_returncode()
+            except subprocess.CalledProcessError as ex:
+                if resp.stderr:
+                    raise RuntimeError(*ex.args, resp.stderr)
+                raise ex
             if not is_url(new):
                 with suppress():
                     os.remove(new)
@@ -2028,7 +2037,7 @@ class Queue(Command):
         # Assign search results to queue entries
         added = deque()
         names = []
-        for e in resp:
+        for e in resp[:262144]:
             name = e.name
             url = e.url
             temp = {
@@ -2710,43 +2719,36 @@ class Dump(Command):
         # ~save is the same as ~dump without an argument
         if argv == "" and not message.attachments or name == "save":
             if name == "load":
-                raise ArgumentError("Please input a file, URL or json data to load.")
+                raise ArgumentError("Please input a file or URL to load.")
             async with discord.context_managers.Typing(channel):
-                resp = await create_future(auds.get_dump, "x" in flags, js=True, timeout=18)
-                f = discord.File(io.BytesIO(bytes(resp, "utf-8")), filename="dump.json")
+                resp, fn = await create_future(auds.get_dump, "x" in flags, js=True, timeout=18)
+                f = discord.File(io.BytesIO(resp), filename=fn)
             create_task(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f))
             return
         if not is_alone(auds, user) and perm < 1:
             raise self.perm_error(perm, 1, "to load new queue while other users are in voice")
         if type(argv) is str:
-            try:
-                if message.attachments:
-                    url = message.attachments[0].url
-                else:
-                    url = argv
-                urls = await bot.follow_url(argv, allow=True, images=False)
-                url = urls[0]
-                s = await self.bot.get_request(url)
-                s = s[s.index(b"{"):]
-                if s[-4:] == b"\n```":
-                    s = s[:-4]
-            except:
-                s = argv
-                print_exc()
-            d = json.loads(s.strip())
+            if message.attachments:
+                url = message.attachments[0].url
+            else:
+                url = argv
+            urls = await bot.follow_url(argv, allow=True, images=False)
+            url = urls[0]
+            s = await self.bot.get_request(url)
+            d = await create_future(select_and_loads, s, size=268435456)
         else:
             # Queue may already be in dict form if loaded from database
             d = argv
         q = d["queue"]
         async with discord.context_managers.Typing(channel):
             # Copy items and cast to cdict queue entries
-            for i, e in enumerate(q):
+            for i, e in enumerate(q[:262144], 1):
                 if type(e) is not cdict:
                     e = q[i] = cdict(e)
                 e.u_id = user.id
                 e.skips = deque()
-                if not 1 + i & 2047:
-                    await asyncio.sleep(0.2)
+                if not i & 8191:
+                    await asyncio.sleep(0.1)
             if auds.player is not None:
                 auds.player.time = 1 + utc()
             # Shuffle newly loaded dump if autoshuffle is on
@@ -3819,7 +3821,7 @@ class UpdateAudio(Database):
     # Stores all currently playing audio data to temporary database when bot shuts down
     async def _destroy_(self, **void):
         for auds in tuple(self.players.values()):
-            d = await create_future(auds.get_dump, True)
+            d, _ = await create_future(auds.get_dump, True)
             self.data[auds.vc.channel.id] = {"dump": d, "channel": auds.channel.id}
             await create_future(auds.kill, reason="")
         for file in tuple(ytdl.cache.values()):

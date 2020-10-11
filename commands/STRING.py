@@ -34,17 +34,16 @@ class PapagoTrans:
 
 
 translators = {"Google Translate": Translator(["translate.google.com"])}
-with open("auth.json") as f:
-    auth = ast.literal_eval(f.read())
+
 try:
-    translators["Papago"] = PapagoTrans(auth["papago_id"], auth["papago_secret"])
+    translators["Papago"] = PapagoTrans(AUTH["papago_id"], AUTH["papago_secret"])
 except KeyError:
     translators["Papago"] = cdict(
         translate=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to use Papago Translate.")'),
     )
     print("WARNING: papago_id/papago_secret not found. Unable to use Papago Translate.")
 try:
-    rapidapi_key = auth["rapidapi_key"]
+    rapidapi_key = AUTH["rapidapi_key"]
     if not rapidapi_key:
         raise
 except:

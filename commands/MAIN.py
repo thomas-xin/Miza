@@ -5,11 +5,8 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-
-with open("auth.json") as f:
-    auth = ast.literal_eval(f.read())
 try:
-    discord_id = auth["discord_id"]
+    discord_id = AUTH["discord_id"]
     if not discord_id:
         raise
 except:

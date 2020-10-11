@@ -329,7 +329,7 @@ class CreateEmoji(Command):
             if len(image) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")
             if len(image) > 262144 or not is_image(url):
-                ts = round(utc() * 1000)
+                ts = ts_us()
                 path = "cache/" + str(ts)
                 f = await create_future(open, path, "wb", timeout=18)
                 await create_future(f.write, image, timeout=18)

@@ -58,10 +58,8 @@ class DouClub:
                 })
         return output
 
-with open("auth.json") as f:
-    auth = ast.literal_eval(f.read())
 try:
-    douclub = DouClub(auth["knack_id"], auth["knack_secret"])
+    douclub = DouClub(AUTH["knack_id"], AUTH["knack_secret"])
 except KeyError:
     douclub = cdict(
         search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to search Doukutsu Club.")'),

@@ -18,6 +18,7 @@ with MultiThreadedImporter(globals()) as importer:
         "threading",
         "urllib",
         "zipfile",
+        "nacl"
     )
 
 PROC = psutil.Process()
@@ -27,6 +28,7 @@ tracemalloc.start()
 
 from zipfile import ZipFile
 import urllib.request, urllib.parse
+import nacl.secret
 
 url_parse = urllib.parse.quote
 escape_markdown = discord.utils.escape_markdown
@@ -269,15 +271,34 @@ class CommandCancelledError(RuntimeError):
 
 python = ("python3", "python")[os.name == "nt"]
 python_path = ""
+
+enc_key = None
+
+with open("auth.json") as f:
+    AUTH = eval(f.read())
+
 with tracebacksuppressor:
-    with open("auth.json") as f:
-        auth = ast.literal_eval(f.read())
-    py = auth.get("python_path")
+    py = AUTH.get("python_path")
     while py.endswith("\\") or py.endswith("/"):
         py = py[:-1]
     if py:
         python_path = py + "/"
         python = python_path + "python"
+
+with tracebacksuppressor:
+    enc_key = AUTH["encryption_key"]
+
+if not enc_key:
+    enc_key = AUTH["encryption_key"] = base64.b64encode(randbytes(32)).decode("utf-8", "replace")
+    try:
+        s = json.dumps(AUTH).encode("utf-8")
+    except:
+        print_exc()
+        s = repr(AUTH).encode("utf-8")
+    with open("auth.json", "wb") as f:
+        f.write(s)
+
+enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
 
 
 def zip2bytes(data):
@@ -299,9 +320,59 @@ def bytes2zip(data):
 
 # Safer than raw eval, more powerful than json.decode
 def eval_json(s):
+    if type(s) is memoryview:
+        s = bytes(s)
     with suppress(json.JSONDecodeError):
         return json.loads(s)
     return safe_eval(s)
+
+encrypt = lambda s: b">~MIZA~>" + enc_box.encrypt(s)
+def decrypt(s):
+    if s[:8] != b">~MIZA~>":
+        s = s[8:]
+        return decrypt(s)
+    raise ValueError("Data header not found.")
+
+def select_and_loads(s, mode="safe", size=None):
+    if not s:
+        raise ValueError("Data must not be empty.")
+    if size and size < len(s):
+        raise OverflowError("Data input size too large.")
+    if type(s) is str:
+        s = s.encode("utf-8")
+    b = io.BytesIO(s)
+    if zipfile.is_zipfile(b):
+        b.seek(0)
+        z = ZipFile(b, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
+        if size:
+            x = z.get_info().file_size
+            if size < x:
+                raise OverflowError(f"Data input size too large ({x} > {size}).")
+        s = z.open("DATA").read()
+        z.close()
+    data = None
+    with tracebacksuppressor:
+        if mode != "unsafe":
+            try:
+                s = decrypt(s)
+            except ValueError:
+                pass
+            except:
+                raise
+            else:
+                data = pickle.loads(s)
+        elif s[0] == 128:
+            data = pickle.loads(s)
+    if type(data) in (str, bytes):
+        s, data = data, None
+    if data is None:
+        if mode == "unsafe":
+            data = eval(compile(s, "<loader>", "eval", optimize=2, dont_inherit=False))
+        else:
+            if b"{" in s:
+                s = s[s.index(b"{"):s.rindex(b"}") + 1]
+            data = eval_json(s)
+    return data
 
 
 # Decodes HTML encoded characters in a string.
@@ -1355,25 +1426,12 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
                     s = f.read()
                 if not s:
                     raise FileNotFoundError
-                b = io.BytesIO(s)
-                if zipfile.is_zipfile(b):
-                    b.seek(0)
-                    z = ZipFile(b, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
-                    s = z.open("DATA").read()
-                    z.close()
-                data = None
-                with tracebacksuppressor:
-                    if s[0] == 128:
-                        data = pickle.loads(s)
-                if type(data) in (str, bytes):
-                    data = eval(compile(data, "<database>", "eval", optimize=2))
-                if data is None:
-                    try:
-                        data = eval(compile(s, "<database>", "eval", optimize=2))
-                    except:
-                        print(self.file)
-                        print_exc()
-                        raise FileNotFoundError
+                try:
+                    data = select_and_loads(s, mode="unsafe")
+                except:
+                    print(self.file)
+                    print_exc()
+                    raise FileNotFoundError
                 self.data = data
             except FileNotFoundError:
                 data = None

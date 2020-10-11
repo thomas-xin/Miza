@@ -559,7 +559,7 @@ def evalSym(f, prec=64, r=False, variables=None):
 def procResp(resp):
     # Return file path if necessary
     if isinstance(resp[0], Plot):
-        ts = round(time.time() * 1000)
+        ts = time.time_ns() // 1000
         name = f"{ts}.png"
         fn = "cache/" + name
         try:
@@ -570,7 +570,7 @@ def procResp(resp):
         plt.clf()
         s = "{'file':'" + fn + "'}\n"
     elif resp[0] == plt:
-        ts = round(time.time() * 1000)
+        ts = time.time_ns() // 1000
         name = f"{ts}.png"
         fn = "cache/" + name
         try:
