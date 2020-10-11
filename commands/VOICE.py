@@ -2037,7 +2037,7 @@ class Queue(Command):
         # Assign search results to queue entries
         added = deque()
         names = []
-        for e in resp[:262144]:
+        for i, e in enumerate(resp[:262144], 1):
             name = e.name
             url = e.url
             temp = {
@@ -2052,6 +2052,8 @@ class Queue(Command):
                 temp["research"] = True
             added.append(cdict(temp))
             names.append(no_md(name))
+            if not i & 16383:
+                await asyncio.sleep(0.2)
         # Prepare to enqueue entries
         if "b" not in flags:
             total_duration = 0
@@ -2137,8 +2139,8 @@ class Queue(Command):
                 totalTime += e_dur(e.duration)
                 if i < pos:
                     startTime += e_dur(e.duration)
-                if not 1 + i & 4095:
-                    await asyncio.sleep(0.2)
+                if not 1 + i & 32767:
+                    await asyncio.sleep(0.1)
                 i += 1
         cnt = len(q)
         info = (

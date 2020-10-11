@@ -350,6 +350,7 @@ def select_and_loads(s, mode="safe", size=None):
             raise
     b = io.BytesIO(s)
     if zipfile.is_zipfile(b):
+        print(f"Loading zip file of size {len(s)}...")
         b.seek(0)
         z = ZipFile(b, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
         if size:
