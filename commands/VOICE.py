@@ -274,7 +274,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             d["stats"].pop("position")
         if js:
             if len(q) > lim:
-                s = pickle.dumps(q)
+                s = pickle.dumps(d)
                 if len(s) > 262144:
                     return encrypt(bytes2zip(s)), "dump.bin"
                 return encrypt(s), "dump.bin"
