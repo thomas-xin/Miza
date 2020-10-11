@@ -341,6 +341,13 @@ def select_and_loads(s, mode="safe", size=None):
         raise OverflowError("Data input size too large.")
     if type(s) is str:
         s = s.encode("utf-8")
+    if mode != "unsafe":
+        try:
+            s = decrypt(s)
+        except ValueError:
+            pass
+        except:
+            raise
     b = io.BytesIO(s)
     if zipfile.is_zipfile(b):
         b.seek(0)
@@ -353,21 +360,9 @@ def select_and_loads(s, mode="safe", size=None):
         z.close()
     data = None
     with tracebacksuppressor:
-        if mode != "unsafe":
-            try:
-                s = decrypt(s)
-            except ValueError:
-                pass
-            except:
-                raise
-            else:
-                if s[0] == 128:
-                    data = pickle.loads(s)
-                else:
-                    data = s
-        elif s[0] == 128:
+        if s[0] == 128:
             data = pickle.loads(s)
-    if type(data) in (str, bytes):
+    if data and type(data) in (str, bytes):
         s, data = data, None
     if data is None:
         if mode == "unsafe":
