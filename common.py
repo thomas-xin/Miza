@@ -328,9 +328,8 @@ def eval_json(s):
 
 encrypt = lambda s: b">~MIZA~>" + enc_box.encrypt(s)
 def decrypt(s):
-    if s[:8] != b">~MIZA~>":
-        s = s[8:]
-        return decrypt(s)
+    if s[:8] == b">~MIZA~>":
+        return enc_box.decrypt(s[8:])
     raise ValueError("Data header not found.")
 
 def select_and_loads(s, mode="safe", size=None):
