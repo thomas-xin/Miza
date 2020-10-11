@@ -230,6 +230,8 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             self.new(update=False)
             self.queue = AudioQueue()
             self.queue._init_(auds=self)
+            if not bot.is_trusted(getattr(channel, "guild", None)):
+                self.queue.maxitems = 8192
             bot.data.audio.players[vc.guild.id] = self
 
     def __str__(self):
@@ -855,6 +857,9 @@ class AudioQueue(alist):
                     try:
                         # Gets audio file stream and loads into audio source object
                         source = ytdl.get_stream(entry)
+                        if source.startswith("ytsearch:"):
+                            ytdl.extract_single(entry)
+                            source = ytdl.get_stream(entry)
                         auds.new(source)
                         self.loading = False
                         auds.ensure_play()
