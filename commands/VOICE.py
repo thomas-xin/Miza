@@ -1810,7 +1810,7 @@ class AudioDownloader:
         # Otherwise attempt to start file download
         try:
             self.cache[fn] = f = AudioFile(fn)
-            if stream.startswith("ytsearch:"):
+            if stream.startswith("ytsearch:") or stream in (None, "none"):
                 ytdl.extract_single(entry)
                 stream = entry.get("stream", None)
                 if not stream:
@@ -2182,48 +2182,49 @@ class Queue(Command):
         else:
             icon = ""
         emb.set_thumbnail(url=icon)
-        embstr = ""
-        currTime = startTime
-        i = pos
-        while i < min(pos + 10, len(q)):
-            e = q[i]
-            space = (int(math.log10(len(q))) - int(math.log10(max(1, i))))
-            curr = "`" + " " * space
-            curr += f'【{i}】 `{"[`" + no_md(lim_str(no_md(e.name), 48 - int(math.log10(len(q))))) + "`]"}({ensure_url(e.url)})` ({time_disp(e_dur(e.duration))})`'
-            if v:
-                try:
-                    u = bot.cache.users[e.u_id]
-                    name = u.display_name
-                except KeyError:
-                    name = "Deleted User"
-                    with suppress():
-                        u = await bot.fetch_user(e.u_id)
+        async with auds.semaphore:
+            embstr = ""
+            currTime = startTime
+            i = pos
+            while i < min(pos + 10, len(q)):
+                e = q[i]
+                space = (int(math.log10(len(q))) - int(math.log10(max(1, i))))
+                curr = "`" + " " * space
+                curr += f'【{i}】 `{"[`" + no_md(lim_str(no_md(e.name), 48 - int(math.log10(len(q))))) + "`]"}({ensure_url(e.url)})` ({time_disp(e_dur(e.duration))})`'
+                if v:
+                    try:
+                        u = bot.cache.users[e.u_id]
                         name = u.display_name
-                curr += "\n" + css_md(sqr_md(name))
-            if auds.reverse and len(auds.queue):
-                estim = currTime + elapsed - e_dur(auds.queue[0].duration)
-            else:
-                estim = currTime - elapsed
-            if v:
-                if estim > 0:
-                    curr += "Time until playing: "
-                    estimate = time_until(utc() + estim / auds.speed)
-                    if i <= 1 or not auds.stats.shuffle:
-                        curr += "[" + estimate + "]"
-                    else:
-                        curr += "{" + estimate + "}"
+                    except KeyError:
+                        name = "Deleted User"
+                        with suppress():
+                            u = await bot.fetch_user(e.u_id)
+                            name = u.display_name
+                    curr += "\n" + css_md(sqr_md(name))
+                if auds.reverse and len(auds.queue):
+                    estim = currTime + elapsed - e_dur(auds.queue[0].duration)
                 else:
-                    curr += "Remaining time: [" + time_until(utc() + (estim + e_dur(e.duration)) / auds.speed) + "]"
-                curr += "```"
-            curr += "\n"
-            if len(embstr) + len(curr) > 2048 - len(emb.description):
-                break
-            embstr += curr
-            if i <= 1 or not auds.stats.shuffle:
-                currTime += e_dur(e.duration)
-            if not 1 + 1 & 4095:
-                await asyncio.sleep(0.3)
-            i += 1
+                    estim = currTime - elapsed
+                if v:
+                    if estim > 0:
+                        curr += "Time until playing: "
+                        estimate = time_until(utc() + estim / auds.speed)
+                        if i <= 1 or not auds.stats.shuffle:
+                            curr += "[" + estimate + "]"
+                        else:
+                            curr += "{" + estimate + "}"
+                    else:
+                        curr += "Remaining time: [" + time_until(utc() + (estim + e_dur(e.duration)) / auds.speed) + "]"
+                    curr += "```"
+                curr += "\n"
+                if len(embstr) + len(curr) > 2048 - len(emb.description):
+                    break
+                embstr += curr
+                if i <= 1 or not auds.stats.shuffle:
+                    currTime += e_dur(e.duration)
+                if not 1 + 1 & 4095:
+                    await asyncio.sleep(0.3)
+                i += 1
         emb.description += embstr
         more = len(q) - i
         if more > 0:
@@ -2566,83 +2567,84 @@ class Skip(Command):
                     break
             if not valid:
                 elems = range(count)
-        # Calculate required vote count based on amount of non-bot members in voice
-        members = sum(1 for m in auds.vc.channel.members if not m.bot)
-        required = 1 + members >> 1
-        response = ""
-        i = 1
-        for pos in elems:
-            pos = float(pos)
-            try:
-                # If infinite entries are selected and force flag is set, remove all items
-                if not is_finite(pos):
-                    if "f" in flags:
-                        auds.queue.clear()
-                        create_future_ex(auds.new, timeout=18)
-                        if "h" not in flags:
-                            return italics(fix_md("Removed all items from the queue.")), 1
-                        return
-                    raise LookupError
-                curr = auds.queue[pos]
-            except LookupError:
-                response += "\n" + repr(IndexError(f"Entry {pos} is out of range."))
-                continue
-            # Add skips if voting
-            if issubclass(type(curr.skips), collections.abc.MutableSequence):
-                if "f" in flags or user.id == curr["u_id"] and not "v" in flags:
+        async with auds.semaphore:
+            # Calculate required vote count based on amount of non-bot members in voice
+            members = sum(1 for m in auds.vc.channel.members if not m.bot)
+            required = 1 + members >> 1
+            response = ""
+            i = 1
+            for pos in elems:
+                pos = float(pos)
+                try:
+                    # If infinite entries are selected and force flag is set, remove all items
+                    if not is_finite(pos):
+                        if "f" in flags:
+                            auds.queue.clear()
+                            create_future_ex(auds.new, timeout=18)
+                            if "h" not in flags:
+                                return italics(fix_md("Removed all items from the queue.")), 1
+                            return
+                        raise LookupError
+                    curr = auds.queue[pos]
+                except LookupError:
+                    response += "\n" + repr(IndexError(f"Entry {pos} is out of range."))
+                    continue
+                # Add skips if voting
+                if issubclass(type(curr.skips), collections.abc.MutableSequence):
+                    if "f" in flags or user.id == curr["u_id"] and not "v" in flags:
+                        curr.skips = None
+                    elif user.id not in curr.skips:
+                        curr.skips.append(user.id)
+                elif "v" in flags:
+                    curr.skips = deque([user.id])
+                else:
                     curr.skips = None
-                elif user.id not in curr.skips:
-                    curr.skips.append(user.id)
-            elif "v" in flags:
-                curr.skips = deque([user.id])
-            else:
-                curr.skips = None
-            if curr.skips is not None:
-                if len(response) > 1200:
-                    response = lim_str(response, 1200)
-                else:
-                    response += f"Voted to remove {sqr_md(curr.name)} from the queue.\nCurrent vote count: {sqr_md(len(curr.skips))}, required vote count: {sqr_md(required)}.\n"
-            if not i & 2047:
-                await asyncio.sleep(0.2)
-            i += 1
-        # Get list of items to remove from the queue, based on whether they have sufficient amount of skips
-        pops = set()
-        count = 0
-        i = 1
-        while i < len(auds.queue):
-            q = auds.queue
-            song = q[i]
-            if song.skips is None or len(song.skips) >= required:
-                if count <= 3:
-                    q.pop(i)
-                else:
-                    pops.add(i)
-                    i += 1
-                if count < 4:
-                    response += f"{sqr_md(song.name)} has been removed from the queue.\n"
-                count += 1
-            else:
+                if curr.skips is not None:
+                    if len(response) > 1200:
+                        response = lim_str(response, 1200)
+                    else:
+                        response += f"Voted to remove {sqr_md(curr.name)} from the queue.\nCurrent vote count: {sqr_md(len(curr.skips))}, required vote count: {sqr_md(required)}.\n"
+                if not i & 8191:
+                    await asyncio.sleep(0.2)
                 i += 1
-        if pops:
-            auds.queue.pops(pops)
-        if auds.queue:
-            # If first item is skipped, advance queue and update audio player
-            song = auds.queue[0]
-            if song.skips is None or len(song.skips) >= required:
-                song.played = True
-                auds.preparing = False
-                if auds.source is not None:
-                    auds.source.advanced = True
-                await create_future(auds.stop, timeout=18)
-                r = not name.startswith("r")
-                create_future_ex(auds.queue.advance, looped=r, repeated=r, shuffled=r, timeout=18)
-                if count < 4:
-                    response += f"{sqr_md(song.name)} has been removed from the queue.\n"
-                count += 1
-        if "h" not in flags:
-            if count >= 4:
-                return italics(css_md(f"{sqr_md(count)} items have been removed from the queue."))
-            return css_md(response), 1
+            # Get list of items to remove from the queue, based on whether they have sufficient amount of skips
+            pops = set()
+            count = 0
+            i = 1
+            while i < len(auds.queue):
+                q = auds.queue
+                song = q[i]
+                if song.skips is None or len(song.skips) >= required:
+                    if count <= 3:
+                        q.pop(i)
+                    else:
+                        pops.add(i)
+                        i += 1
+                    if count < 4:
+                        response += f"{sqr_md(song.name)} has been removed from the queue.\n"
+                    count += 1
+                else:
+                    i += 1
+            if pops:
+                auds.queue.pops(pops)
+            if auds.queue:
+                # If first item is skipped, advance queue and update audio player
+                song = auds.queue[0]
+                if song.skips is None or len(song.skips) >= required:
+                    song.played = True
+                    auds.preparing = False
+                    if auds.source is not None:
+                        auds.source.advanced = True
+                    await create_future(auds.stop, timeout=18)
+                    r = not name.startswith("r")
+                    create_future_ex(auds.queue.advance, looped=r, repeated=r, shuffled=r, timeout=18)
+                    if count < 4:
+                        response += f"{sqr_md(song.name)} has been removed from the queue.\n"
+                    count += 1
+            if "h" not in flags:
+                if count >= 4:
+                    return italics(css_md(f"{sqr_md(count)} items have been removed from the queue."))
+                return css_md(response), 1
 
 
 class Pause(Command):
@@ -2999,10 +3001,11 @@ class Rotate(Command):
         if len(auds.queue) > 1 and amount:
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to rotate queue while other users are in voice")
-            # Clear "played" tag of current item
-            auds.queue[0].pop("played", None)
-            auds.queue.rotate(-amount)
-            auds.seek(inf)
+            async with auds.semaphore:
+                # Clear "played" tag of current item
+                auds.queue[0].pop("played", None)
+                auds.queue.rotate(-amount)
+                auds.seek(inf)
         if "h" not in flags:
             return italics(css_md(f"Successfully rotated queue [{amount}] step{'s' if amount != 1 else ''}.")), 1
 
@@ -3021,15 +3024,16 @@ class Shuffle(Command):
         if len(auds.queue) > 1:
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to shuffle queue while other users are in voice")
-            if "f" in flags:
-                # Clear "played" tag of current item
-                auds.queue[0].pop("played", None)
-                shuffle(auds.queue)
-                auds.seek(inf)
-            else:
-                temp = auds.queue.popleft()
-                shuffle(auds.queue)
-                auds.queue.appendleft(temp)
+            async with auds.semaphore:
+                if "f" in flags:
+                    # Clear "played" tag of current item
+                    auds.queue[0].pop("played", None)
+                    shuffle(auds.queue)
+                    auds.seek(inf)
+                else:
+                    temp = auds.queue.popleft()
+                    shuffle(auds.queue)
+                    auds.queue.appendleft(temp)
         if "h" not in flags:
             return italics(css_md(f"Successfully shuffled queue for {sqr_md(guild)}.")), 1
 
@@ -3048,8 +3052,9 @@ class Reverse(Command):
         if len(auds.queue) > 1:
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to reverse queue while other users are in voice")
-            reverse(auds.queue)
-            auds.queue.rotate(-1)
+            async with auds.semaphore:
+                reverse(auds.queue)
+                auds.queue.rotate(-1)
         if "h" not in flags:
             return italics(css_md(f"Successfully reversed queue for {sqr_md(guild)}.")), 1
 

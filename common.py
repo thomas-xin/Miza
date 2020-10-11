@@ -348,6 +348,8 @@ def select_and_loads(s, mode="safe", size=None):
             pass
         except:
             raise
+        else:
+            time.sleep(0.1)
     b = io.BytesIO(s)
     if zipfile.is_zipfile(b):
         print(f"Loading zip file of size {len(s)}...")
