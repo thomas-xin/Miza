@@ -857,9 +857,6 @@ class AudioQueue(alist):
                     try:
                         # Gets audio file stream and loads into audio source object
                         source = ytdl.get_stream(entry)
-                        if source.startswith("ytsearch:"):
-                            ytdl.extract_single(entry)
-                            source = ytdl.get_stream(entry)
                         auds.new(source)
                         self.loading = False
                         auds.ensure_play()
@@ -1810,6 +1807,11 @@ class AudioDownloader:
         # Otherwise attempt to start file download
         try:
             self.cache[fn] = f = AudioFile(fn)
+            if stream.startswith("ytsearch:"):
+                ytdl.extract_single(entry)
+                stream = entry.get("stream", None)
+                if not stream:
+                    raise FileNotFoundError("Unable to locate appropriate file stream.")
             f.load(stream, check_fmt=entry.get("duration") is None)
             # Assign file duration estimate to queue entry
             f.assign.append(entry)
