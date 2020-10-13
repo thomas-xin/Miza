@@ -19,16 +19,16 @@ class Reload(Command):
             mod = " " + mod
         await message.add_reaction("❗")
         if name == "unload":
-            await channel.send(f"Unloading {mod}...")
+            await channel.send(f"Unloading{mod}...")
             succ = await create_future(bot.unload, _mod, priority=True)
             if succ:
-                return f"Successfully unloaded {mod}."
-            return f"Error unloading {mod}. Please see log for more info."
-        await channel.send(f"Reloading {mod}...")
+                return f"Successfully unloaded{mod}."
+            return f"Error unloading{mod}. Please see log for more info."
+        await channel.send(f"Reloading{mod}...")
         succ = await create_future(bot.reload, _mod, priority=True)
         if succ:
-            return f"Successfully reloaded {mod}."
-        return f"Error reloading {mod}. Please see log for more info."
+            return f"Successfully reloaded{mod}."
+        return f"Error reloading{mod}. Please see log for more info."
 
 
 class Restart(Command):
