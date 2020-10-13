@@ -856,6 +856,8 @@ class Profile(Command):
                 value = profile.get(field)
                 if type(value) is DynamicDT:
                     value = value.as_date()
+                elif field == "timezone" and value is not None:
+                    value = timezone_repr(value)
                 fields.add((field, value, False))
             return bot.send_as_embeds(channel, description, fields=fields, author=get_author(target))
         if value is None:
@@ -881,6 +883,8 @@ class Profile(Command):
         bot.data.users.update()
         if type(value) is DynamicDT:
             value = value.as_date()
+        elif setting.startswith("time") and value is not None:
+            value = timezone_repr(value)
         return css_md(f"Successfully changed {setting} for {sqr_md(user)} to {sqr_md(value)}.")
 
 

@@ -1241,6 +1241,11 @@ def as_timezone(tz):
     tz = a.casefold()
     return get_timezone(tz) + h * 3600
 
+def timezone_repr(tz):
+    if tz in ZONES:
+        return " ".join(w.capitalize() for w in tz.split())
+    return tz.upper()
+
 create_future_ex(load_timezones, priority=True)
 
 def parse_with_now(expr):

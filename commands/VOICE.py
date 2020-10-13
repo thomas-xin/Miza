@@ -1470,6 +1470,8 @@ class AudioDownloader:
     # Repeatedly makes calls to youtube-dl until there is no more data to be collected.
     def extract_true(self, url):
         while not is_url(url):
+            with suppress(NotImplementedError):
+                return self.search_yt(regexp("ytsearch[0-9]*:").sub("", url, 1))[0]
             resp = self.extract_from(url)
             if "entries" in resp:
                 resp = resp["entries"][0]
@@ -1486,17 +1488,31 @@ class AudioDownloader:
             title = url.split("?", 1)[0].rsplit("/", 1)[-1]
             if "." in title:
                 title = title[:title.rindex(".")]
-            return dict(url=url, webpage_url=url, title=title, direct=True)
+            return dict(url=url, name=title, direct=True)
         try:
-            return self.downloader.extract_info(url, download=False, process=True)
+            entries = self.downloader.extract_info(url, download=False, process=True)
         except youtube_dl.DownloadError as ex:
             s = str(ex)
             if "403" in s or "No video formats found" in s or "Unable to extract video data" in s:
                 try:
-                    return self.from_pytube(url)
+                    entries = self.from_pytube(url)
                 except youtube_dl.DownloadError:
                     raise FileNotFoundError("Unable to fetch audio data.")
-            raise
+            else:
+                raise
+        out = deque()
+        for entry in entries:
+            temp = cdict(
+                name=entry["title"],
+                url=entry["webpage_url"],
+                duration=entry.get("duration"),
+                stream=get_best_audio(entry),
+                icon=get_best_icon(entry),
+            )
+            if not temp.duration:
+                temp.research = True
+            out.append(temp)
+        return out
 
     # Extracts audio information from a single URL.
     def extract_from(self, url):
@@ -1664,6 +1680,9 @@ class AudioDownloader:
                         d = select_and_loads(s, size=268435456)
                         q = d["queue"][:262144]
                         return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
+                else:
+                    with suppress(NotImplementedError):
+                        return self.search_yt(item)[:1]
                 # Otherwise call automatic extract_info function
                 resp = self.extract_info(item, count, search=search)
                 if resp.get("_type", None) == "url":
@@ -1739,6 +1758,87 @@ class AudioDownloader:
                 raise
             print_exc()
             return 0
+
+    def item_yt(self, item):
+        video = next(iter(item.values()))
+        if "videoId" not in video:
+            return
+        try:
+            dur = time_parse(video["lengthText"]["simpleText"])
+        except KeyError:
+            dur = None
+        try:
+            title = video["title"]["runs"][0]["text"]
+        except KeyError:
+            title = video["title"]["simpleText"]
+        try:
+            tn = video["thumbnail"]
+        except KeyError:
+            thumbnail = None
+        else:
+            if type(tn) is dict:
+                thumbnail = sorted(tn["thumbnails"], key=lambda t: t.get("width", 0) * t.get("height", 0))[-1]["url"]
+            else:
+                thumbnail = tn
+            thumbnail = thumbnail.split("?", 1)[0]
+        try:
+            views = int(video["viewCountText"]["simpleText"].replace(",", "").replace("views", "").replace(" ", ""))
+        except (KeyError, ValueError):
+            views = 0
+        return cdict(
+            name=video["title"]["runs"][0]["text"],
+            url=f"https://www.youtube.com/watch?v={video['videoId']}",
+            duration=dur,
+            icon=thumbnail,
+            views=views,
+        )
+
+    def parse_yt(self, s):
+        data = eval_json(s)
+        results = alist()
+        try:
+            pages = data["contents"]["twoColumnSearchResultsRenderer"]["primaryContents"]["sectionListRenderer"]["contents"]
+        except KeyError:
+            pages = data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"]
+        for page in pages:
+            try:
+                items = next(iter(page.values()))["contents"]
+            except KeyError:
+                continue
+            for item in items:
+                if "promoted" not in next(iter(item)).casefold():
+                    entry = self.item_yt(item)
+                    if entry is not None:
+                        results.append(entry)
+        return sorted(results, key=lambda entry: entry.views, reverse=True)
+
+    def search_yt(self, query, limit=1):
+        url = f"https://www.youtube.com/results?search_query={verify_url(query)}"
+        resp = Request(url, timeout=12)
+        result = None
+        with suppress(ValueError):
+            s = resp[resp.index(b"// scraper_data_begin") + 21:resp.rindex(b"// scraper_data_end")]
+            s = s[s.index(b"var ytInitialData = ") + 20:s.rindex(b";")]
+            result = self.parse_yt(s)
+        with suppress(ValueError):
+            s = resp[resp.index(b'window["ytInitialData"] = ') + 26:]
+            s = s[:s.index(b'window["ytInitialPlayerResponse"] = null;')]
+            s = s[:s.rindex(b";")]
+            result = self.parse_yt(s)
+        if result is None:
+            raise NotImplementedError("Unable to read json response.")
+        q = full_prune(query)
+        high = alist()
+        low = alist()
+        for entry in result:
+            if entry.duration and entry.duration < 960 and fuzzy_substring(q, to_alphanumeric(full_prune(entry.name))) >= 2 / 3:
+                high.append(entry)
+            else:
+                low.append(entry)
+        out = sorted(high, key=lambda entry: fuzzy_substring(q, to_alphanumeric(full_prune(entry.name))), reverse=True)
+        out.extend(sorted(low, key=lambda entry: fuzzy_substring(q, to_alphanumeric(full_prune(entry.name))), reverse=True))
+        print(out)
+        return out
 
     # Performs a search, storing and using cached search results for efficiency.
     def search(self, item, force=False):
@@ -1938,10 +2038,12 @@ class AudioDownloader:
                 data = self.extract_true(item)
                 if "entries" in data:
                     data = data["entries"][0]
+                elif not issubclass(type(data), collections.abc.Mapping):
+                    data = data[0]
                 obj = cdict(t=utc())
                 obj.data = out = [cdict(
-                    name=data["title"],
-                    url=data["webpage_url"],
+                    name=data["name"],
+                    url=data["url"],
                     stream=get_best_audio(data),
                     icon=get_best_icon(data),
                 )]
