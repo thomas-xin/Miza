@@ -30,7 +30,8 @@ from zipfile import ZipFile
 import urllib.request, urllib.parse
 import nacl.secret
 
-url_parse = urllib.parse.quote
+url_parse = urllib.parse.quote_plus
+url_encode = urllib.urlencode
 escape_markdown = discord.utils.escape_markdown
 escape_mentions = discord.utils.escape_mentions
 escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere").replace("<@&", "<@\xad&")
@@ -614,7 +615,7 @@ async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]
                     elif loose and qlist[a] in b:
                         if not len(b) >= cache[a][1][0]:
                             cache[a][1] = [len(b), i]
-        if not x & 1023:
+        if not x & 2047:
             await asyncio.sleep(0.1)
     for c in cache:
         if c[0][0] < inf:

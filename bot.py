@@ -394,8 +394,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return members
 
     async def query_members(self, members, query, fuzzy=1 / 3):
-        if type(query) is not str:
-            query = str(query)
+        query = str(query)
         with suppress(LookupError):
             return await str_lookup(
                 members,
@@ -3039,13 +3038,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # Webhook update event: updates the bot's webhook cache if there are new webhooks.
         @self.event
         async def on_webhooks_update(channel):
-            webhooks = await channel.webhooks()
-            for w in tuple(self.cw_cache.get(channel.id, {}).values()):
-                if w not in webhooks:
-                    self.cw_cache[channel.id].pop(w.id)
-                    self.cache.users.pop(w.id)
-            for w in webhooks:
-                self.add_webhook(w)
+            if channel.guild.id in self._connection._guilds:
+                webhooks = await channel.webhooks()
+                for w in tuple(self.cw_cache.get(channel.id, {}).values()):
+                    if w not in webhooks:
+                        self.cw_cache[channel.id].pop(w.id)
+                        self.cache.users.pop(w.id)
+                for w in webhooks:
+                    self.add_webhook(w)
 
         # User ban event: calls _ban_ bot database event.
         @self.event

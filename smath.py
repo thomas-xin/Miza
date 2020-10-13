@@ -3055,7 +3055,7 @@ class DynamicDT(datetime.datetime):
         return cls(*dt.timetuple()[:6], getattr(dt, "microsecond", 0), tzinfo=getattr(dt, "tzinfo", None))
 
 
-ts_us = lambda: time.time_ns // 1000
+ts_us = lambda: time.time_ns() // 1000
 utc = lambda: time.time_ns() / 1e9
 utc_dt = datetime.datetime.utcnow
 utc_ft = datetime.datetime.utcfromtimestamp
@@ -3427,11 +3427,29 @@ def uni_str(s, fmt=0):
 def unicode_prune(s):
     if type(s) is not str:
         s = str(s)
-    if s.isalnum():
+    if s.isascii():
         return s
     return s.translate(__trans)
 
-full_prune = lambda s: unicode_prune(s).casefold()
+__qmap = {
+    "“": '"',
+    "”": '"',
+    "„": '"',
+    "‘": "'",
+    "’": "'",
+    "‚": "'",
+    "〝": '"',
+    "〞": '"',
+    "⸌": "'",
+    "⸍": "'",
+    "⸢": "'",
+    "⸣": "'",
+    "⸤": "'",
+    "⸥": "'",
+}
+__qtrans = "".maketrans(__qmap)
+
+full_prune = lambda s: unicode_prune(s).translate(__qtrans).casefold()
 
 
 # A fuzzy substring search that returns the ratio of characters matched between two strings.

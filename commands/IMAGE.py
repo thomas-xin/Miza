@@ -1133,7 +1133,7 @@ class ImagePool:
     rate_limit = (0.1, 0.25)
 
     async def __call__(self, bot, channel, flags, **void):
-        url = await bot.data.imagepools.get(self.data, self.fetch_one)
+        url = await bot.data.imagepools.get(self.database, self.fetch_one)
         if "v" in flags:
             return escape_everyone(url)
         self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))

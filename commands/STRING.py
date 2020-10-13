@@ -212,7 +212,7 @@ class Hex2Uni(Command):
     def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        b = hex2Bytes(argv.replace("0x", "").replace(" ", ""))
+        b = hex2bytes(argv.replace("0x", "").replace(" ", ""))
         return fix_md(b.decode("utf-8", "replace"))
 
 
