@@ -31,7 +31,6 @@ import urllib.request, urllib.parse
 import nacl.secret
 
 url_parse = urllib.parse.quote_plus
-url_encode = urllib.urlencode
 escape_markdown = discord.utils.escape_markdown
 escape_mentions = discord.utils.escape_mentions
 escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere").replace("<@&", "<@\xad&")
@@ -713,7 +712,7 @@ def is_discord_message_link(url):
     check = url[:64]
     return "channels/" in check and "discord" in check
 
-verify_url = lambda url: url if is_url(url) else urllib.parse.quote(url)
+verify_url = lambda url: url if is_url(url) else url_parse(url)
 
 
 # Checks if a URL contains a valid image extension, and removes it if possible.
