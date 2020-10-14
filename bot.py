@@ -64,6 +64,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.ready_semaphore = Semaphore(1, inf, delay=0.5)
         self.guild_semaphore = Semaphore(5, inf, delay=1, rate_limit=5)
         self.user_semaphore = Semaphore(64, inf, delay=0.5, rate_limit=8)
+        self.disk_semaphore = Semaphore(1, 1, delay=0.5)
+        self.disk = 0
         print("Time:", datetime.datetime.now())
         print("Initializing...")
         # O(1) time complexity for searching directory
@@ -1457,6 +1459,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             return float(c), float(m)
         return 0, 0
 
+    async def get_disk(self):
+        with tracebacksuppressor(SemaphoreOverflowError):
+            async with self.disk_semaphore:
+                disk = await create_future(get_folder_size, "cache", priority=True)
+                disk += await create_future(get_folder_size, "saves", priority=True)
+                self.disk = disk
+        return self.disk
+
     # Gets the status of the bot.
     async def get_state(self):
         stats = azero(3)
@@ -1467,8 +1477,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
         cpu = await create_future(psutil.cpu_count, priority=True)
         mem = await create_future(psutil.virtual_memory, priority=True)
-        disk = await create_future(get_folder_size, "cache", priority=True)
-        disk += await create_future(get_folder_size, "saves", priority=True)
+        disk = await self.get_disk()
         # CPU is totalled across all cores
         stats[0] /= cpu
         # Memory is in %
