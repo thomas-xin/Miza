@@ -383,9 +383,9 @@ def select_and_dumps(data, mode="safe"):
             s = repr(data)
         except:
             s = None
-        if not s or len(s) > 262144:
+        if not s or len(s) > 65536:
             s = pickle.dumps(data)
-            if len(s) > 1048576:
+            if len(s) > 262144:
                 s = bytes2zip(s)
         else:
             s = s.encode("utf-8")

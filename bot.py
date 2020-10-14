@@ -1477,7 +1477,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
         cpu = await create_future(psutil.cpu_count, priority=True)
         mem = await create_future(psutil.virtual_memory, priority=True)
-        disk = await self.get_disk()
+        disk = self.disk
         # CPU is totalled across all cores
         stats[0] /= cpu
         # Memory is in %
@@ -2429,13 +2429,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # The slowest update loop that runs once a minute. Used for slow operations, such as the bot database autosave event.
     async def minute_loop(self):
-        await asyncio.sleep(60)
         while not self.closed:
             async with delay(60):
                 async with tracebacksuppressor:
-                    await self.send_event("_minute_loop_")
                     await create_future(self.update, priority=True)
+                    await asyncio.sleep(1)
                     await create_future(self.update_from_guilds, priority=True)
+                    await asyncio.sleep(1)
+                    await self.get_disk()
+                    await asyncio.sleep(1)
+                await self.send_event("_minute_loop_")
 
     # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
     async def heartbeat_loop(self):
@@ -2925,10 +2928,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             raw = False
             if payload.cached_message:
                 before = payload.cached_message
-                after = await self.fetch_message(m_id, payload.message_id)
+                after = await self.fetch_message(m_id, payload.channel_id)
             else:
                 try:
-                    before = messages[m_id]
+                    before = await self.fetch_message(m_id)
                 except LookupError:
                     # If message was not in cache, create a ghost message object to represent old message.
                     c_id = data.get("channel_id")
@@ -2960,6 +2963,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         before.author = after.author
                     raw = True
                 else:
+                    if type(before) is self.CachedMessage:
+                        before = copy.copy(before)
                     after = copy.copy(before)
                     after._update(data)
             self.add_message(after)

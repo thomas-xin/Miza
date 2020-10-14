@@ -2954,9 +2954,9 @@ class DynamicDT(datetime.datetime):
     def __str__(self):
         y = self.year_repr()
         return y + super().__str__()[4:]
-
+        
     def __repr__(self):
-        return self.__class__.__name__ + "(" + ", ".join(str(i) for i in super().timetuple()[:6]) + f", microsecond={super().microsecond}" if super().microsecond else "" + ").set_offset(" + str(self._offset) + ")"
+        return self.__class__.__name__ + "(" + ", ".join(str(i) for i in self.timetuple()[:6]) + (f", microsecond={self.microsecond}" if getattr(self, "microsecond", 0) else "") + ").set_offset(" + str(self._offset) + ")"
 
     def year_repr(self):
         y = self.year
