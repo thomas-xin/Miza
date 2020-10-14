@@ -3080,7 +3080,7 @@ class DynamicDT(datetime.datetime):
             ots = round(ots)
             ts = round(ts)
         d = utc_ft(ots)
-        dt = cls(*d.timetuple()[:6], d.microsecond, tzinfo=datetime.timezone.utc).set_offset(offs * 400, False)
+        dt = cls(*d.timetuple()[:6], d.microsecond).set_offset(offs * 400, False)
         dt._ts = ts
         return dt
 

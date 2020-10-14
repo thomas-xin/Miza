@@ -1619,7 +1619,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if not os.path.exists(fn):
             await_fut(self.send_event("_save_"))
             z = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-            z.write("saves", "saves")
+            for folder in os.listdir("saves"):
+                fp = "saves/" + folder
+                if os.path.isdir(fp):
+                    for file in os.listdir(fp):
+                        z.write(fp + "/" + file, fp + "/" + file)
+                else:
+                    z.write(fp, fp)
             z.close()
             print("Backup database created in", fn)
 
