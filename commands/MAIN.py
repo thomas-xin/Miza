@@ -1539,7 +1539,7 @@ class UpdateMessageCount(Database):
     def _send_(self, message, **void):
         user = message.author
         guild = message.guild
-        if guild.id not in self.data:
+        if self.scanned and guild.id not in self.data:
             self.startCalculate(guild)
         d = self.data[guild.id]
         if type(d) is str:

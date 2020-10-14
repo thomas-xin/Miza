@@ -1371,7 +1371,7 @@ class UpdateMessageCache(Database):
                 print(m)
                 print_exc()
             m_id = m["id"]
-            self.raws[m_id] = m
+            self.raws.setdefault(fn, {})[m_id] = m
             bot.cache.messages[m_id] = found[m_id] = message
             i += 1
             if not i & 2047:
@@ -1402,7 +1402,7 @@ class UpdateMessageCache(Database):
                 os.remove(fn)
         self.load_file(fn)
         bot = self.bot
-        saved = deque(self.raws.setdefault(fn, {}).values())
+        saved = self.raws.setdefault(fn, {})
         for i, message in enumerate(tuple(messages.values()), 1):
             if type(message) is bot.CachedMessage:
                 m = message._data
@@ -1414,7 +1414,6 @@ class UpdateMessageCache(Database):
                         m["channel"] = message.channel.id
                     except AttributeError:
                         continue
-                saved.append(m)
             else:
                 if message.channel is None:
                     continue
@@ -1445,11 +1444,11 @@ class UpdateMessageCache(Database):
                         if reaction.me:
                             r["me"] = reaction.me
                         reactions.append(r)
-            saved.append(m)
+            saved[m["id"]] = m
             self.raws[fn][m["id"]] = m
             if not i & 1023:
                 time.sleep(0.1)
-        out = data = pickle.dumps(saved)
+        out = data = pickle.dumps(list(saved.values()))
         if len(data) > 65536:
             out = bytes2zip(data)
         with open(fn, "wb") as f:
@@ -1463,7 +1462,8 @@ class UpdateMessageCache(Database):
             for fn, messages in saving.items():
                 await create_future(self.saves, fn, messages)
             open(self.files + "/-1", "wb").close()
-            print(f"Message Database: {len(saving)} files updated.")
+            if len(saving) >= 8:
+                print(f"Message Database: {len(saving)} files updated.")
 
     getmtime = lambda self: utc_ft(os.path.getmtime(self.files + "/-1"))
 
