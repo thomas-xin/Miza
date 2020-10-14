@@ -1454,7 +1454,6 @@ class UpdateMessageCache(Database):
             out = bytes2zip(data)
         with open(fn, "wb") as f:
             f.write(out)
-        print(f"{len(saved)} messages saved to {fn}.")
 
     async def _save_(self, **void):
         async with self.save_sem:
@@ -1464,6 +1463,7 @@ class UpdateMessageCache(Database):
             for fn, messages in saving.items():
                 await create_future(self.saves, fn, messages)
             open(self.files + "/-1", "wb").close()
+            print(f"Message Database: {len(saving)} files updated.")
 
     getmtime = lambda self: utc_ft(os.path.getmtime(self.files + "/-1"))
 

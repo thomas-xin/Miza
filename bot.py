@@ -342,11 +342,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         u_id = verify_id(args.pop(0))
         if type(u_id) is int:
             role = guild.get_role(u_id)
-            if roles:
-                return (role,)
             if role is not None:
+                if roles:
+                    return (role,)
                 return role.members
-        elif "@" in u_id and ("everyone" in u_id or "here" in u_id):
+        if "@" in u_id and ("everyone" in u_id or "here" in u_id):
             return await self.get_full_members(guild)
         u = await self.fetch_user_member(u_id, guild)
         return (u,)
