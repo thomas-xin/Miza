@@ -1445,7 +1445,6 @@ class UpdateMessageCache(Database):
                             r["me"] = reaction.me
                         reactions.append(r)
             saved[m["id"]] = m
-            self.raws[fn][m["id"]] = m
             if not i & 1023:
                 time.sleep(0.1)
         out = data = pickle.dumps(list(saved.values()))
