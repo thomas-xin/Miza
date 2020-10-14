@@ -1500,6 +1500,10 @@ class AudioDownloader:
                     raise FileNotFoundError("Unable to fetch audio data.")
             else:
                 raise
+        if "entries" in entries:
+            entries = entries["entries"]
+        else:
+            entries = [entries]
         out = deque()
         for entry in entries:
             temp = cdict(
@@ -1780,7 +1784,6 @@ class AudioDownloader:
                 thumbnail = sorted(tn["thumbnails"], key=lambda t: t.get("width", 0) * t.get("height", 0))[-1]["url"]
             else:
                 thumbnail = tn
-            thumbnail = thumbnail.split("?", 1)[0]
         try:
             views = int(video["viewCountText"]["simpleText"].replace(",", "").replace("views", "").replace(" ", ""))
         except (KeyError, ValueError):
@@ -2366,7 +2369,6 @@ class Playlist(Command):
                     return css_md(sqr_md(f"WARNING: {len(pl)} ENTRIES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
                 pl[guild.id].clear()
                 pl.pop(guild.id)
-                update()
                 return italics(css_md(f"Successfully removed all {sqr_md(len(pl))} entries from the default playlist for {sqr_md(guild)}."))
             # Set callback message for scrollable list
             return (
@@ -2379,7 +2381,7 @@ class Playlist(Command):
             i = await bot.eval_math(argv, guild.id)
             temp = pl[i]
             pl.pop(i)
-            update()
+            update(guild.id)
             return italics(css_md(f"Removed {sqr_md(temp.name)} from the default playlist for {sqr_md(guild)}."))
         lim = 8 << self.bot.is_trusted(guild.id) * 2 + 1
         if len(pl) >= lim:
@@ -2405,7 +2407,7 @@ class Playlist(Command):
         if not names:
             raise LookupError(f"No results for {argv}.")
         pl.sort(key=lambda x: x["name"].casefold())
-        update()
+        update(guild.id)
         return css_md(f"Added {sqr_md(', '.join(names))} to the default playlist for {sqr_md(guild)}.")
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
@@ -3945,11 +3947,11 @@ class UpdateAudio(Database):
             d, _ = await create_future(auds.get_dump, True)
             self.data[auds.vc.channel.id] = {"dump": d, "channel": auds.channel.id}
             await create_future(auds.kill, reason="")
+            self.update(auds.vc.channel.id)
         for file in tuple(ytdl.cache.values()):
             if not file.loaded:
                 await create_future(file.destroy)
-        self.update()
-        await create_future(self.update, True, priority=True)
+        await create_future(self.update, force=True, priority=True)
 
     # Restores all audio players from temporary database when applicable
     async def _bot_ready_(self, bot, **void):
@@ -3979,7 +3981,6 @@ class UpdateAudio(Database):
                     print("auto-loading queue", argv, "to", guild)
                     await dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc)
         self.data.clear()
-        self.update()
 
 
 class UpdatePlaylists(Database):

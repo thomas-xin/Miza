@@ -135,12 +135,11 @@ class Math(Command):
             return f"Currently assigned variables for {user}:\n" + ini_md(iter2str(var))
         if "c" in flags or "d" in flags:
             bot.data.variables.pop(user.id, None)
-            bot.data.variables.update()
             return italics(css_md(f"Successfully cleared all variables for {sqr_md(user)}."))
         if not argv:
             raise ArgumentError(f"Input string is empty. Use {bot.get_prefix(guild)}math help for help.")
         r = "r" in flags
-        p = flags.get("v", 0) * 2 + 1 << 6
+        p = flags.get("v", 0) * 2 + 1 << 7
         var = None
         if "plot" in name and not argv.lower().startswith("plot"):
             argv = f"{name}({argv})"
@@ -177,7 +176,7 @@ class Math(Command):
             env[var] = resp[0]
             while len(env) > 64:
                 env.pop(next(iter(env)))
-            bot.data.variables.update()
+            bot.data.variables.update(user.id)
             return css_md(f"Variable {sqr_md(var)} set to {sqr_md(resp[0])}.")
         if argv.lower() == "help":
             return answer

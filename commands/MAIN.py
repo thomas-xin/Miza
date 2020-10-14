@@ -174,13 +174,11 @@ class EnabledCommands(Command):
                     enabled[channel.id] = categories.union(enabled[channel.id])
                 else:
                     enabled[channel.id] = categories
-                update()
                 if "h" in flags:
                     return
                 return css_md(f"Enabled all standard command categories in {sqr_md(channel)}.")
             if "d" in flags:
                 enabled[channel.id] = set()
-                update()
                 if "h" in flags:
                     return
                 return css_md(f"Disabled all standard command categories in {sqr_md(channel)}.")
@@ -209,15 +207,14 @@ class EnabledCommands(Command):
                         curr.add(catg)
                     else:
                         curr.append(catg)
-                    update()
+                    update(channel.id)
             else:
                 if catg in curr:
                     curr.remove(catg)
-                    update()
+                    update(channel.id)
         check = curr if type(curr) is set else frozenset(curr)
         if check == default_commands:
             enabled.pop(channel.id)
-            update()
         if "h" in flags:
             return
         category = "category" if len(args) == 1 else "categories"
@@ -242,7 +239,6 @@ class Prefix(Command):
         if "d" in flags:
             if guild.id in pref:
                 pref.pop(guild.id)
-                update()
             return css_md(f"Successfully reset command prefix for {sqr_md(guild)}.")
         if not argv:
             return css_md(f"Current command prefix for {sqr_md(guild)}: {sqr_md(bot.get_prefix(guild))}.")
@@ -257,7 +253,6 @@ class Prefix(Command):
         if prefix.startswith("\\"):
             raise TypeError("Prefix must not begin with backslash.")
         pref[guild.id] = prefix
-        update()
         if "h" not in flags:
             return css_md(f"Successfully changed command prefix for {sqr_md(guild)} to {sqr_md(argv)}.")
 
@@ -846,7 +841,7 @@ class Profile(Command):
             if birthday:
                 if type(birthday) is not DynamicDT:
                     birthday = profile["birthday"] = DynamicDT.fromdatetime(birthday)
-                    bot.data.users.update()
+                    bot.data.users.update(target.id)
                 t = utc_dt()
                 if timezone:
                     birthday -= td
@@ -864,7 +859,7 @@ class Profile(Command):
             return ini_md(f"Currently set {setting} for {sqr_md(user)}: {sqr_md(bot.data.users.get(user.id, EMPTY).get(setting))}.")
         if setting != "description" and value.casefold() in ("undefined", "remove", "rem", "reset", "unset", "delete", "clear", "null", "none") or "d" in flags:
             profile.pop(setting, None)
-            bot.data.users.update()
+            bot.data.users.update(user.id)
             return css_md(f"Successfully removed {setting} for {sqr_md(user)}.")
         if setting == "description":
             if len(value) > 1024:
@@ -880,7 +875,7 @@ class Profile(Command):
             offs, year = divmod(dt.year, 400)
             value = DynamicDT(year + 2000, dt.month, dt.day).set_offset(offs * 400 - 2000)
         bot.data.users.setdefault(user.id, {})[setting] = value
-        bot.data.users.update()
+        bot.data.users.update(user.id)
         if type(value) is DynamicDT:
             value = value.as_date()
         elif setting.startswith("time") and value is not None:
@@ -920,7 +915,7 @@ class Status(Command):
             if perm < 2:
                 raise PermissionError("Permission level 2 or higher required to unset auto-updating status.")
             bot.data.messages.pop(channel.id)
-            bot.data.messages.update()
+            bot.data.messages.update(channel.id)
             return fix_md("Successfully disabled status updates.")
         elif "a" not in flags and "e" not in flags:
             return await self._callback2_(channel)
@@ -928,7 +923,7 @@ class Status(Command):
             raise PermissionError("Permission level 2 or higher required to set auto-updating status.")
         message = await channel.send(italics(code_md("Loading bot status...")))
         set_dict(bot.data.messages, channel.id, {})[message.id] = cdict(t=0, command="bot.commands.status[0]")
-        bot.data.messages.update()
+        bot.data.messages.update(channel.id)
     
     async def _callback2_(self, channel, m_id=None, msg=None, **void):
         bot = self.bot
@@ -981,7 +976,6 @@ class Status(Command):
         message = await func(embed=emb)
         if m_id is not None and message is not None:
             bot.data.messages[channel.id] = {message.id: cdict(t=utc(), command="bot.commands.status[0]")}
-            bot.data.messages.update()
 
 
 class Invite(Command):
@@ -1043,7 +1037,7 @@ class Reminder(Command):
                     bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
                 if rems:
                     bot.data.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
-            update()
+            update(sendable.id)
             return ini_md(f"Successfully removed {sqr_md(lim_str(x['msg'], 128))} from {word} list for {sqr_md(sendable)}.")
         if not argv:
             # Set callback message for scrollable list
@@ -1232,7 +1226,7 @@ class Reminder(Command):
             bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
         # Insert back into bot schedule
         bot.data.reminders.listed.insort((bot.data.reminders[sendable.id][0]["t"], sendable.id), key=lambda x: x[0])
-        update()
+        update(sendable.id)
         emb = discord.Embed(description=msg)
         emb.set_author(name=username, url=url, icon_url=url)
         if "announce" in name:
@@ -1356,7 +1350,6 @@ class UpdateReminders(Database):
                 u = x
             emb.set_author(**get_author(u))
             self.bot.send_embeds(ch, emb)
-            self.update()
 
     # Seen event: runs when users perform discord actions
     async def _seen_(self, user, **void):
@@ -1392,7 +1385,6 @@ class UpdateReminders(Database):
                         self.data.pop(u_id)
             with suppress(KeyError):
                 self.data.pop(s)
-                self.update()
 
 
 # This database has caused so many rate limit issues
@@ -1400,19 +1392,11 @@ class UpdateMessageCount(Database):
     name = "counts"
 
     def startCalculate(self, guild):
-        self.data[guild.id] = {"counts": {}, "totals": {}, "oldest": {}}
+        self.data[guild.id] = {"counts": {}, "totals": {}, "words": {}, "oldest": {}}
         create_task(self.getUserMessageCount(guild))
 
     async def getUserMessages(self, user, guild):
         if self.scanned == -1:
-            c_id = self.bot.id
-            if guild is None or hasattr(guild, "ghost"):
-                channel = user.dm_channel
-                if channel is None:
-                    return 0
-                messages = await channel.history(limit=None).flatten()
-                count = sum(1 for m in messages if m.author.id != c_id)
-                return count
             if guild.id in self.data:
                 d = self.data[guild.id]
                 if type(d) is str:
@@ -1423,7 +1407,6 @@ class UpdateMessageCount(Database):
                 if user is None:
                     return sum(c.values())
                 return c.get(user.id, 0)
-            self.startCalculate(guild)
         return "Calculating..."
     
     def getUserGlobalMessageCount(self, user):
@@ -1438,14 +1421,6 @@ class UpdateMessageCount(Database):
     async def getUserAverage(self, user, guild):
         if self.scanned == -1:
             c_id = self.bot.id
-            if guild is None or hasattr(guild, "ghost"):
-                channel = user.dm_channel
-                if channel is None:
-                    return 0
-                messages = await channel.history(limit=None).flatten()
-                gen = tuple(m for m in messages if m.author.id != c_id)
-                avg = sum(get_message_length(m) for m in gen) / len(gen)
-                return avg
             if guild.id in self.data:
                 d = self.data[guild.id]
                 if type(d) is str:
@@ -1461,18 +1436,14 @@ class UpdateMessageCount(Database):
                 c.pop(user.id, None)
                 t.pop(user.id, None)
                 return 0
-        return "Calculating..."            
+        return "Calculating..."
 
     async def getGuildMessages(self, guild):
-        if guild is None or hasattr(guild, "ghost"):
-            return "Invalid server."
         if self.scanned == -1:
             if guild.id in self.data:
                 with suppress(LookupError):
                     return self.data[guild.id]["counts"]
                 return self.data[guild.id]
-            self.startCalculate(guild)
-            create_task(self.getUserMessageCount(guild))
         return "Calculating..."
 
     # What are the rate limits for the message history calls?
@@ -1524,6 +1495,7 @@ class UpdateMessageCount(Database):
         print(guild)
         data = {}
         avgs = {}
+        word = {}
         oldest = self.data[guild.id]["oldest"]
         histories = await self.getGuildHistory(guild)
         for messages in histories.values():
@@ -1533,70 +1505,56 @@ class UpdateMessageCount(Database):
                 if not orig_id or message.id < orig_id:
                     oldest[u] = message.id
                 length = get_message_length(message)
+                words = get_message_words(message)
                 try:
                     data[u] += 1
                     avgs[u] += length
+                    word[u] += words
                 except KeyError:
                     data[u] = 1
                     avgs[u] = length
+                    word[u] = words
                 if not i & 8191:
                     await asyncio.sleep(0.5)
-        add_dict(self.data[guild.id], {"counts": data, "totals": avgs, 0: True})
-        self.update()
+        add_dict(self.data[guild.id], {"counts": data, "totals": avgs, "words": word, 0: True})
+        self.update(guild.id)
         print(guild)
         print(self.data[guild.id])
 
     def __load__(self):
         self.scanned = False
-        self.semaphore = Semaphore(12, 256, delay=5)
+        self.semaphore = Semaphore(20, 256, delay=5)
 
     async def __call__(self):
         if self.scanned:
             return
         self.scanned = True
-        year = datetime.timedelta(seconds=31556925.216)
         guilds = self.bot.guilds
-        i = 1
         for guild in sorted(guilds, key=lambda g: g.member_count, reverse=True):
-            if guild.id not in self.data:
-                oneyear = utc_dt() - guild.created_at < year
-                if guild.member_count < 512 or oneyear:
-                    async with self.semaphore:
-                        self.startCalculate(guild)
-                    if not i & 7:
-                        await asyncio.sleep(60)
-                    i += 1
+            if guild.id not in self.data or 0 not in self.data[guild.id]:
+                self.startCalculate(guild)
         self.scanned = -1
 
     # Add new messages to the post count database
     def _send_(self, message, **void):
-        if self.scanned == -1:
-            user = message.author
-            guild = message.guild
-            if guild.id in self.data:
-                d = self.data[guild.id]
-                if type(d) is str:
-                    return
-                if user.id not in set_dict(d, "oldest", {}):
-                    d["oldest"][user.id] = message.id
-                count = d["counts"].get(user.id, 0) + 1
-                total = d["totals"].get(user.id, 0) + get_message_length(message)
-                d["totals"][user.id] = total
-                d["counts"][user.id] = count
-                self.update()
-            else:
-                self.startCalculate(guild)
+        user = message.author
+        guild = message.guild
+        if guild.id not in self.data:
+            self.startCalculate(guild)
+        d = self.data[guild.id]
+        if type(d) is str:
+            return
+        if user.id not in set_dict(d, "oldest", {}):
+            d["oldest"][user.id] = message.id
+        count = d["counts"].get(user.id, 0) + 1
+        total = d["totals"].get(user.id, 0) + get_message_length(message)
+        d["totals"][user.id] = total
+        d["counts"][user.id] = count
+        self.update(user.id)                
 
 
 class UpdatePrefix(Database):
     name = "prefixes"
-
-    # This is O(n) so it's on the lazy loop
-    async def __call__(self):
-        for g in tuple(self.data):
-            if self.data[g] == self.bot.prefix:
-                self.data.pop(g)
-                self.update()
 
 
 class UpdateEnabled(Database):
@@ -1691,10 +1649,9 @@ class UpdateFlavour(Database):
             if x in self.data:
                 if out not in self.data[x]:
                     self.data[x].add(out)
-                    self.update()
+                    self.update(x)
             else:
                 self.data[x] = alist((out,))
-                self.update()
         return out
 
 
@@ -1859,7 +1816,7 @@ class UpdateUsers(Database):
 
     def _offline_(self, user, **void):
         set_dict(self.data, user.id, {})["last_offline"] = utc()
-        self.update()
+        self.update(user.id)
 
     # User seen, add event to activity database
     def _seen_(self, user, delay, event, count=1, raw=None, **void):
@@ -1867,7 +1824,7 @@ class UpdateUsers(Database):
         add_dict(self.data, {user.id: {"last_seen": 0}})
         self.data[user.id]["last_seen"] = utc() + delay
         self.data[user.id]["last_action"] = raw
-        self.update()
+        self.update(user.id)
 
     # User executed command, add to activity database
     def _command_(self, user, loop, command, **void):
@@ -1921,7 +1878,7 @@ class UpdateUsers(Database):
             await bot.seen(user, event="misc", raw="Being naughty")
             add_dict(self.data, {user.id: {"last_mention": 1}})
             self.data[user.id]["last_used"] = t
-            self.update()
+            self.update(user.id)
             raise CommandCancelledError
 
     def get_xp(self, user):
@@ -1932,7 +1889,7 @@ class UpdateUsers(Database):
                 set_dict(self.data, self.bot.id, {})["xp"] = inf
                 self.data[self.bot.id]["gold"] = inf
                 self.data[self.bot.id]["diamonds"] = inf
-                self.update()
+                self.update(self.bot.id)
             return inf
         return self.data.get(user.id, EMPTY).get("xp", 0)
 
@@ -1960,23 +1917,23 @@ class UpdateUsers(Database):
             add_dict(set_dict(self.data, user.id, {}), {"xp": amount})
             if "dailies" in self.bot.data:
                 self.bot.data.dailies.progress_quests(user, "xp", amount)
-            self.update()
+            self.update(user.id)
     
     def add_gold(self, user, amount):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
             add_dict(set_dict(self.data, user.id, {}), {"gold": amount})
-            self.update()
+            self.update(user.id)
 
     def add_diamonds(self, user, amount):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
             add_dict(set_dict(self.data, user.id, {}), {"diamonds": amount})
             if "dailies" in self.bot.data:
                 self.bot.data.dailies.progress_quests(user, "diamond", amount)
-            self.update()
+            self.update(user.id)
 
     async def _typing_(self, user, **void):
         set_dict(self.data, user.id, {})["last_typing"] = utc()
-        self.update()
+        self.update(user.id)
 
     async def _nocommand_(self, message, msg, force=False, **void):
         bot = self.bot
@@ -2124,4 +2081,4 @@ class UpdateUsers(Database):
             if not self.data.get(user.id, EMPTY).get("last_mention") and random.random() > 0.6:
                 self.data.get(user.id, EMPTY).pop("last_talk", None)
             self.data.get(user.id, EMPTY).pop("last_mention", None)
-        self.update()
+        self.update(user.id)

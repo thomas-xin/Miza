@@ -558,11 +558,9 @@ class Dogpile(Command):
         if "d" in flags:
             if guild.id in following:
                 following.pop(guild.id)
-                update()
             return css_md(f"Disabled dogpile imitating for {sqr_md(guild)}.")
         if "e" in flags or "a" in flags:
             following[guild.id] = True
-            update()
             return css_md(f"Enabled dogpile imitating for {sqr_md(guild)}.")
         if curr:
             return ini_md(f"Dogpile imitating is currently enabled in {sqr_md(guild)}.")
@@ -658,7 +656,6 @@ class UpdateDailies(Database):
         data = self.data.get(user.id)
         if data is None or utc() - data["time"] >= 86400:
             data = self.data[user.id] = dict(quests=self.generate(user), time=zerot())
-            self.update()
         return data
 
     def collect(self, user):
@@ -672,7 +669,7 @@ class UpdateDailies(Database):
                 pops.add(i)
         if pops:
             quests.pops(pops)
-            self.update()
+            self.update(user.id)
         return data
 
     def generate(self, user):
@@ -681,7 +678,7 @@ class UpdateDailies(Database):
         level = self.bot.data.users.xp_to_level(self.bot.data.users.get_xp(user))
         quests = alist()
         for i in range(min(20, level + 5 >> 1)):
-            q_id = xrand(11)
+            q_id = xrand(12)
             if q_id == 0:
                 x = round((level * 10 + 100) * random.random() + 70)
                 q = cdict(name=f"Post {x} messages", gold=x * 2, progress=0, required=x, action="send")
@@ -699,18 +696,21 @@ class UpdateDailies(Database):
                 x = round((level + 5) * random.random() + 3) * 60
                 q = cdict(name=f"Listen to {sec2time(x)} of my music", gold=x, progress=0, required=x, action="music")
             elif q_id == 6:
+                x = round((level * 50 + 200) * random.random() + 400)
+                q = cdict(name=f"Send {x} total words of text", gold=x >> 1, progress=0, required=x, action="word")
+            elif q_id == 7:
                 x = round((level * 250 + 1000) * random.random() + 2000)
                 q = cdict(name=f"Send {x} total characters of text", gold=x >> 3, progress=0, required=x, action="text")
-            elif q_id == 7:
+            elif q_id == 8:
                 x = round((level * 5 + 20) * random.random() + 20)
                 q = cdict(name=f"Add {x} reactions", gold=x * 5, progress=0, required=x, action="react")
-            elif q_id == 8:
+            elif q_id == 9:
                 x = round((level * 100 + 500) * random.random() + 400)
                 q = cdict(name=f"Pay {x} to other users", gold=x >> 1, progress=0, required=x, action="pay")
-            elif q_id == 9:
+            elif q_id == 10:
                 x = round((level * 28 + 240) * random.random() + 180)
                 q = cdict(name=f"Type for {sec2time(x)}", gold=x * 2, progress=0, required=x, action="typing")
-            elif q_id == 10:
+            elif q_id == 11:
                 x = xrand(10, 21)
                 q = cdict(name=f"Talk to me {x} times", gold=x * 7, progress=0, required=x, action="talk")
             quests.append(q)
@@ -725,12 +725,13 @@ class UpdateDailies(Database):
             quest = quests[i]
             if quest.action == action:
                 quest.progress += value
-                self.update()
+                self.update(user.id)
 
     def valid_message(self, message):
         user = message.author
         self.progress_quests(user, "send")
         self.progress_quests(user, "text", get_message_length(message))
+        self.progress_quests(user, "word", get_message_words(message))
         if user.id in self.typing:
             t = utc()
             self.progress_quests(user, "typing", t - self.typing.pop(user.id, t))
@@ -856,7 +857,6 @@ class Shop(Command):
                     bot.data.users.add_diamonds(-product.cost[0])
                     bot.data.users.add_gold(-product.cost[-1])
                     bot.data.trusted[guild.id] = True
-                    bot.data.trusted.update()
                     return f"```{sqr_md(guild)} has been successfully elevated from 0 to 1 privilege level.```"
                 raise NotImplementedError("Target item has not yet been implemented.")
         raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
@@ -881,14 +881,16 @@ class MimicConfig(Command):
             raise LookupError("Target mimic ID not found.")
         # Users are not allowed to modify mimics they do not control
         if not isnan(perm):
-            mimics = set_dict(mimicdb, user.id, {})
+            u_id = user.id
+            mimics = set_dict(mimicdb, u_id, {})
             found = 0
             for prefix in mimics:
                 found += mimics[prefix].count(m_id)
             if not found:
                 raise PermissionError("Target mimic does not belong to you.")
         else:
-            mimics = mimicdb[mimicdb[m_id].u_id]
+            u_id = mimicdb[m_id].u_id
+            mimics = mimicdb[u_id]
             found = True
         mimic = mimicdb[m_id]
         opt = args.pop(0).casefold()
@@ -954,7 +956,8 @@ class MimicConfig(Command):
                 raise OverflowError("Must be 512 or fewer in length.")
         name = mimic.name
         mimic[setting] = new
-        update()
+        update(m_id)
+        update(u_id)
         return css_md(f"Changed {setting} for {sqr_md(name)} to {sqr_md(new)}.")
 
 
@@ -981,7 +984,6 @@ class Mimic(Command):
                 if "f" not in flags and len(mimics) > 1:
                     return css_md(sqr_md(f"WARNING: {len(mimics)} MIMICS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
                 mimicdb.pop(user.id)
-                update()
                 return italics(css_md(f"Successfully removed all {sqr_md(len(mimics))} webhook mimics for {sqr_md(user)}."))
             # Set callback message for scrollable list
             return (
@@ -1001,7 +1003,7 @@ class Mimic(Command):
                     mimic = mimicdb.pop(m_id)
                 else:
                     mimics.pop(prefix)
-                    update()
+                    update(user.id)
                     raise KeyError
                 if not mlist:
                     mimics.pop(prefix)
@@ -1017,7 +1019,7 @@ class Mimic(Command):
                     with suppress(ValueError, IndexError):
                         mimics[prefix].remove(m_id)
                 mimicdb.pop(mimic.id)
-            update()
+            update(user.id)
             return italics(css_md(f"Successfully removed webhook mimic {sqr_md(mimic.name)} for {sqr_md(user)}."))
         if not prefix:
             raise IndexError("Prefix must not be empty.")
@@ -1093,7 +1095,8 @@ class Mimic(Command):
             mimics[prefix].append(m_id)
         else:
             mimics[prefix] = [m_id]
-        update()
+        update(m_id)
+        update(u_id)
         out = f"Successfully added webhook mimic {sqr_md(mimic.name)} with prefix {sqr_md(mimic.prefix)} and ID {sqr_md(mimic.id)}"
         if dop is not None:
             out += f", bound to user [{user_mention(dop) if type(dop) is int else f'<{dop}>'}]"
@@ -1113,7 +1116,7 @@ class Mimic(Command):
         for k in tuple(mimics):
             if not mimics[k]:
                 mimics.pop(k)
-                update()
+                update(user.id)
         page = 24
         last = max(0, len(mimics) - page)
         if reaction is not None:
@@ -1312,7 +1315,7 @@ class UpdateMimics(Database):
     async def __call__(self):
         with tracebacksuppressor(SemaphoreOverflowError):
             async with self._semaphore:
-                async with delay(2):
+                async with delay(20):
                     # Garbage collector for unassigned mimics
                     i = 1
                     for m_id in tuple(self.data):
@@ -1321,10 +1324,8 @@ class UpdateMimics(Database):
                             try:
                                 if mimic.u_id not in self.data or mimic.id not in self.data[mimic.u_id][mimic.prefix]:
                                     self.data.pop(m_id)
-                                    self.update()
                             except:
                                 self.data.pop(m_id)
-                                self.update()
                         if not i % 8191:
                             await asyncio.sleep(0.45)
                         i += 1

@@ -79,6 +79,12 @@ class Dummy(BaseException):
 
 loop = lambda x: repeat(None, x)
 
+def try_int(i):
+    try:
+        return int(i)
+    except:
+        return i
+
 np = numpy
 array = np.array
 deque = collections.deque
@@ -1378,6 +1384,7 @@ class cdict(dict):
     __repr__ = lambda self: f"{self.__class__.__name__}({super().__repr__() if super().__len__() else ''})"
     __str__ = lambda self: super().__repr__()
     __iter__ = lambda self: iter(tuple(super().__iter__()))
+    __call__ = lambda self, k: self.__getitem__(k)
 
     def __getattr__(self, k):
         with suppress(AttributeError):
@@ -1481,6 +1488,46 @@ class mdict(cdict):
         values = super().__getitem__(k)
         if len(values):
             v = values.popright()
+        else:
+            v = None
+        if not values:
+            super().pop(k)
+        return v
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        for it in args:
+            for k, v in it.items():
+                self.extend(k, v)
+        for k, v in kwargs:
+            self.extend(k, v)
+
+
+# Dictionary with multiple assignable values per key. Uses sets.
+class msdict(cdict):
+
+    __slots__ = ()
+
+    count = lambda self: sum(len(v) for v in super().values())
+
+    def extend(self, k, v):
+        try:
+            values = super().__getitem__(k)
+        except KeyError:
+            return super().__setitem__(k, set(v))
+        return values.update(v)
+
+    def append(self, k, v):
+        values = set_dict(super(), k, set())
+        if v not in values:
+            values.add(v)
+
+    add = append
+
+    def popleft(self, k):
+        values = super().__getitem__(k)
+        if len(values):
+            v = values.pop()
         else:
             v = None
         if not values:
@@ -3054,12 +3101,16 @@ class DynamicDT(datetime.datetime):
             return dt
         return cls(*dt.timetuple()[:6], getattr(dt, "microsecond", 0), tzinfo=getattr(dt, "tzinfo", None))
 
+    @classmethod
+    def utcnow(cls):
+        return cls.utcfromtimestamp(utc())
+
 
 ts_us = lambda: time.time_ns() // 1000
 utc = lambda: time.time_ns() / 1e9
 utc_dt = datetime.datetime.utcnow
 utc_ft = datetime.datetime.utcfromtimestamp
-utc_ddt = lambda: DynamicDT.fromtimestamp(utc())
+utc_ddt = DynamicDT.utcnow
 utc_dft = DynamicDT.utcfromtimestamp
 dt2dt = DynamicDT.fromdatetime
 ep = datetime.datetime(1970, 1, 1)

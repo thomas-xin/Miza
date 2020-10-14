@@ -128,7 +128,6 @@ class Execute(Command):
                 bot.data.exec[channel.id] |= num
             except KeyError:
                 bot.data.exec[channel.id] = num
-            update()
             # Test bitwise flags for enabled terminals
             out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec[channel.id]))
             create_task(message.add_reaction("❗"))
@@ -142,7 +141,6 @@ class Execute(Command):
                     bot.data.exec[channel.id] &= -num - 1
                     if not bot.data.exec[channel.id]:
                         bot.data.exec.pop(channel.id)
-            update()
             return css_md(f"Successfully removed {sqr_md(out)} terminal.")
         out = iter2str({k: ", ".join(self.terminal_types.get(1 << i) for i in bits(v) for k, v in bot.data.exec.items())})
         return ini_md(f"Terminals currently set to {sqr_md(out)}")
@@ -211,8 +209,13 @@ class UpdateExec(Database):
                 code = await create_future(compile, proc, "<terminal>", "exec", optimize=2, priority=True)
             if code is None:
                 _ = glob.get("_")
+                defs = False
+                lines = proc.splitlines()
+                for line in lines:
+                    if line.startswith("def") or line.startswith("async def"):
+                        defs = True
                 func = "async def _():\n\tlocals().update(globals())\n"
-                func += "\n".join(("\tglobals().update(locals())\n" if line.strip().startswith("return") else "") + "\t" + line for line in proc.splitlines())
+                func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
                 func += "\n\tglobals().update(locals())"
                 code2 = await create_future(compile, func, "<terminal>", "exec", optimize=2, priority=True)
                 await create_future(eval, code2, glob, priority=True)
@@ -402,12 +405,10 @@ class Suspend(Command):
         if len(args) >= 1:
             user = await bot.fetch_user(verify_id(args[0]))
             if "d" in flags:
-                bot.data.blacklist.discard(user.id)
-                update()
+                bot.data.blacklist.pop(user.id, None)
                 return css_md(f"{sqr_md(user)} has been removed from the blacklist.")
             if "a" in flags or "e" in flags:
-                bot.data.blacklist.add(user.id)
-                update()
+                bot.data.blacklist[user.id] = True
                 return css_md(f"{sqr_md(user)} has been added to the blacklist.")
             susp = bot.is_blacklisted(user.id)
             return css_md(f"{sqr_md(user)} is currently {'not' if not susp else ''} blacklisted.")
@@ -417,11 +418,6 @@ class Suspend(Command):
 class UpdateBlacklist(Database):
     name = "blacklist"
     no_delete = True
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if type(self.data) is not set:
-            self.bot.data[self.name] = self.data = set(self.data)
 
 
 class UpdateEmojis(Database):
@@ -437,7 +433,6 @@ class UpdateEmojis(Database):
         with open(f"misc/emojis/{name}", "rb") as f:
             emoji = await_fut(guild.create_custom_emoji(name="_m", image=f.read()))
             self.data[name] = emoji.id
-            self.update()
         self.bot.cache.emojis[emoji.id] = emoji
         return emoji
 

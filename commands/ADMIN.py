@@ -149,7 +149,7 @@ class Mute(Command):
                                 bot.data.mutes.listed.remove(guild.id, key=lambda x: x[-1])
                             if mutelist:
                                 bot.data.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
-                        update()
+                        update(guild.id)
                     create_task(channel.send(css_md(f"Successfully unmuted {sqr_md(user)} in {sqr_md(guild)}.")))
                     continue
                 create_task(channel.send(italics(ini_md(f"Current mute for {sqr_md(user)} in {sqr_md(guild)}: {sqr_md(time_until(mute['t']))}."))))
@@ -236,7 +236,7 @@ class Mute(Command):
                     bot.data.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
                     print(mutelist)
                     print(bot.data.mutes.listed)
-                    update()
+                    update(guild.id)
                     msg = css_md(f"Updated mute for {sqr_md(user)} from {sqr_md(time_until(mute['t']))} to {sqr_md(time_until(ts + length))}.")
                     await channel.send(msg)
                 return
@@ -256,7 +256,7 @@ class Mute(Command):
             bot.data.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
             print(mutelist)
             print(bot.data.mutes.listed)
-            update()
+            update(guild.id)
             msg = css_md(f"{sqr_md(user)} has been muted in {sqr_md(guild)} for {sqr_md(time_until(ts + length))}. Reason: {sqr_md(reason)}")
             await channel.send(msg)
 
@@ -372,7 +372,7 @@ class Ban(Command):
                                 bot.data.bans.listed.remove(guild.id, key=lambda x: x[-1])
                             if banlist:
                                 bot.data.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
-                        update()
+                        update(guild.id)
                     create_task(channel.send(css_md(f"Successfully unbanned {sqr_md(user)} from {sqr_md(guild)}.")))
                     continue
                 create_task(channel.send(italics(ini_md(f"Current ban for {sqr_md(user)} from {sqr_md(guild)}: {sqr_md(time_until(ban['t']))}."))))
@@ -459,7 +459,7 @@ class Ban(Command):
                         bot.data.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
                     print(banlist)
                     print(bot.data.bans.listed)
-                    update()
+                    update(guild.id)
                     msg = css_md(f"Updated ban for {sqr_md(user)} from {sqr_md(time_until(ban['t']))} to {sqr_md(time_until(ts + length))}.")
                     await channel.send(msg)
                 return
@@ -474,7 +474,7 @@ class Ban(Command):
                 bot.data.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
             print(banlist)
             print(bot.data.bans.listed)
-            update()
+            update(guild.id)
             msg = css_md(f"{sqr_md(user)} has been banned from {sqr_md(guild)} for {sqr_md(time_until(ts + length))}. Reason: {sqr_md(reason)}")
             await channel.send(msg)
 
@@ -563,7 +563,6 @@ class RoleGiver(Command):
                 return italics(css_md(f"Removed {sqr_md(react)} from the rolegiver list for {sqr_md(channel)}."))
             if channel.id in data:
                 data.pop(channel.id)
-                update()
             return italics(css_md(f"Removed all automated rolegivers from {sqr_md(channel)}."))
         assigned = set_dict(data, channel.id, {})
         if not argv:
@@ -602,7 +601,7 @@ class RoleGiver(Command):
         alist = set_dict(assigned, react, [[], False])
         alist[1] |= "x" in flags
         alist[0].append(role.id) 
-        update()
+        update(channel.id)
         return italics(css_md(f"Added {sqr_md(react)} ➡️ {sqr_md(role)} to {sqr_md(channel.name)}."))
 
 
@@ -649,12 +648,11 @@ class AutoRole(Command):
                         if not i % 5:
                             await asyncio.sleep(5)
                         i += 1
-                update()
+                update(guild.id)
                 rolestr = sqr_md(", ".join(str(role) for role in removed))
                 return italics(css_md(f"Removed {rolestr} from the autorole list for {sqr_md(guild)}."))
             if guild.id in data:
                 data.pop(guild.id)
-                update()
             return italics(css_md(f"Removed all items from the autorole list for {sqr_md(guild)}."))
         assigned = set_dict(data, guild.id, alist())
         if not argv:
@@ -699,7 +697,7 @@ class AutoRole(Command):
         new = alist(role.id for role in roles)
         if new not in assigned:
             assigned.append(new)
-            update()
+            update(guild.id)
         # Update all users by adding roles
         if "x" in flags or name == "instarole":
             if roles:
@@ -734,11 +732,10 @@ class RolePreserver(Command):
         if "d" in flags:
             if guild.id in following:
                 following.pop(guild.id)
-                update()
             return italics(css_md(f"Disabled role preservation for {sqr_md(guild)}."))
         elif "e" in flags or "a" in flags:
-            following[guild.id] = {}
-            update()
+            if guild.id not in following:
+                following[guild.id] = {}
             return italics(css_md(f"Enabled role preservation for {sqr_md(guild)}."))
         if curr is None:
             return ini_md(f"Role preservation is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
@@ -826,12 +823,10 @@ class UserLog(Command):
         update = bot.data.logU.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
-            update()
             return italics(css_md(f"Enabled user event logging in {sqr_md(channel)} for {sqr_md(guild)}."))
         elif "d" in flags:
             if guild.id in data:
                 data.pop(guild.id)
-                update()
             return italics(css_md(f"Disabled user event logging for {sqr_md(guild)}."))
         if guild.id in data:
             c_id = data[guild.id]
@@ -853,12 +848,10 @@ class MessageLog(Command):
         update = bot.data.logM.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
-            update()
             return italics(css_md(f"Enabled message event logging in {sqr_md(channel)} for {sqr_md(guild)}."))
         elif "d" in flags:
             if guild.id in data:
                 data.pop(guild.id)
-                update()
             return italics(css_md(f"Disabled message event logging for {sqr_md(guild)}."))
         if guild.id in data:
             c_id = data[guild.id]
@@ -880,12 +873,10 @@ class FileLog(Command):
         update = bot.data.logF.update
         if "e" in flags or "a" in flags:
             data[guild.id] = channel.id
-            update()
             return italics(css_md(f"Enabled file deletion logging in {sqr_md(channel)} for {sqr_md(guild)}."))
         elif "d" in flags:
             if guild.id in data:
                 data.pop(guild.id)
-                update()
             return italics(css_md(f"Disabled file deletion logging for {sqr_md(guild)}."))
         if guild.id in data:
             c_id = data[guild.id]
@@ -974,7 +965,6 @@ class UpdateMutes(Database):
                     text = italics(css_md(f"Unable to unmute {sqr_md(user)} in {sqr_md(guild)}."))
                     print_exc()
                 await channel.send(text)
-            self.update()
 
     async def _join_(self, user, guild, **void):
         if guild.id in self.data:
@@ -1031,7 +1021,7 @@ class UpdateMuteRoles(Database):
         role = await guild.create_role(name="Muted", colour=discord.Colour(1), reason="Mute role setup.")
         self.bot.cache.roles[role.id] = role
         self.data[guild.id] = role.id
-        self.update()
+        self.update(guild.id)
         for channel in guild.channels:
             if not channel.permissions_synced:
                 await channel.set_permissions(target=role, overwrite=self.mute)
@@ -1099,7 +1089,6 @@ class UpdateBans(Database):
                     text = italics(css_md(f"Unable to unban {sqr_md(user)} from {sqr_md(guild)}."))
                     print_exc()
                 await channel.send(text)
-            self.update()
 
     async def _join_(self, user, guild, **void):
         if guild.id in self.data:
@@ -1209,7 +1198,6 @@ class UpdateUserLogs(Database):
                 channel = await self.bot.fetch_channel(c_id)
             except (EOFError, discord.NotFound):
                 self.data.pop(guild.id)
-                self.update()
                 return
             emb = discord.Embed()
             b_url = best_url(before)
@@ -1278,7 +1266,6 @@ class UpdateUserLogs(Database):
                 channel = await self.bot.fetch_channel(c_id)
             except (EOFError, discord.NotFound):
                 self.data.pop(guild.id)
-                self.update()
                 return
             # Colour: White
             emb = discord.Embed(colour=16777214)
@@ -1297,7 +1284,6 @@ class UpdateUserLogs(Database):
                 channel = await self.bot.fetch_channel(c_id)
             except (EOFError, discord.NotFound):
                 self.data.pop(guild.id)
-                self.update()
                 return
             # Colour: Black
             emb = discord.Embed(colour=1)
@@ -1350,88 +1336,139 @@ class UpdateUserLogs(Database):
 class UpdateMessageCache(Database):
     name = "message_cache"
     no_file = True
-    file = "saves/message_cache.json"
-    loaded = False
-    finished = False
+    files = "saves/message_cache"
+    raws = {}
+    loaded = {}
+    saving = {}
+    save_sem = Semaphore(1, 1, 5, 30)
 
-    async def _load(self):
+    def __init__(self, *args):
+        super().__init__(*args)
+        if not os.path.exists(self.files):
+            os.mkdir(self.files)
+
+    def get_fn(self, m_id):
+        l_id = m_id // 10 ** 14
+        return self.files + "/" + str(l_id)
+
+    def load_file(self, fn):
+        if not os.path.exists(fn) or fn in self.loaded:
+            return
+        found = {}
+        self.loaded[fn] = found
         bot = self.bot
-        with open(self.file, "rb") as f:
-            zipped = await create_future(f.read)
-        out = await create_future(zip2bytes, zipped)
-        data = await create_future(pickle.loads, out)
+        with open(fn, "rb") as f:
+            out = zipped = f.read()
+        with tracebacksuppressor(zipfile.BadZipFile):
+            out = zip2bytes(zipped)
+        data = pickle.loads(out)
+        self.loaded[fn] = found
         i = 0
-        for m_id, m in data.items():
-            message = bot.CachedMessage(m)
-            bot.cache.messages[m_id] = message
+        for m in data:
+            try:
+                message = bot.CachedMessage(m)
+            except:
+                print(m)
+                print_exc()
+            m_id = m["id"]
+            self.raws[m_id] = m
+            bot.cache.messages[m_id] = found[m_id] = message
             i += 1
-            if not i & 16383:
-                await asyncio.sleep(0.1)
-                if not i & 65535:
-                    print(i)
-        self.loaded = True
-        print(f"{len(data)} messages successfully loaded from file.")
+            if not i & 2047:
+                time.sleep(0.1)
+        print(f"{len(data)} messages successfully loaded from {fn}")
+        return found
 
-    def getmtime(self):
-        if os.path.exists(self.file):
-            return os.path.getmtime(self.file)
-        return 0
+    def load_message(self, m_id):
+        fn = self.get_fn(m_id)
+        with suppress(KeyError):
+            return self.saving[fn][m_id]
+        if fn in self.loaded:
+            return self.loaded[fn][m_id]
+        found = self.load_file(fn)
+        if not found:
+            raise KeyError(m_id)
+        return found[m_id]
 
-    async def load(self):
-        t = self.getmtime()
-        if utc() - t < 3600:
-            create_task(self._load())
-            return datetime.datetime.fromtimestamp(t)
-        self.loaded = True
+    def save_message(self, message):
+        fn = self.get_fn(message.id)
+        saving = self.saving.setdefault(fn, {})
+        saving[message.id] = message
+        return message
 
-    async def save(self):
-        if self.loaded and self.finished:
-            bot = self.bot
-            data = {}
-            for i, message in enumerate(deque(bot.cache.messages.values()), 1):
-                if type(message) is bot.CachedMessage:
-                    m = message._data
-                    if "author" not in m:
-                        author = message.author
-                        m["author"] = dict(id=author.id, s=str(author), avatar=author.avatar)
-                    if "channel" not in m:
-                        m["channel"] = message.channel.id
-                    data[message.id] = m
-                else:
-                    reactions = []
-                    attachments = [dict(id=a.id, size=a.size, filename=a.filename, url=a.url, proxy_url=a.proxy_url) for a in message.attachments]
-                    embeds = [e.to_dict() for e in message.embeds]
+    def saves(self, fn, messages):
+        if not messages:
+            if os.path.exists(fn):
+                os.remove(fn)
+        self.load_file(fn)
+        bot = self.bot
+        saved = deque(self.raws.setdefault(fn, {}).values())
+        for i, message in enumerate(tuple(messages.values()), 1):
+            if type(message) is bot.CachedMessage:
+                m = message._data
+                if "author" not in m:
                     author = message.author
-                    data[message.id] = dict(
-                        id=message.id,
-                        author=dict(id=author.id, s=str(author), avatar=author.avatar),
-                        webhook_id=message.webhook_id,
-                        reactions=reactions,
-                        attachments=attachments,
-                        embeds=embeds,
-                        edited_timestamp=str(message._edited_timestamp) if message._edited_timestamp else "",
-                        type=message.type.value,
-                        pinned=message.pinned,
-                        flags=message.flags.value,
-                        mention_everyone=message.mention_everyone,
-                        tts=message.tts,
-                        content=message.content,
-                        channel=message.channel.id,
-                    )
-                    for reaction in message.reactions:
-                        if not reaction.custom_emoji:
-                            r = dict(emoji=dict(id=None, name=str(reaction)))
-                            if reaction.count != 1:
-                                r["count"] = reaction.count
-                            if reaction.me:
-                                r["me"] = reaction.me
-                            reactions.append(r)
-                if not i & 16383:
-                    await asyncio.sleep(0.1)
-            out = await create_future(pickle.dumps, data)
-            zipped = await create_future(bytes2zip, out)
-            with open(self.file, "wb") as f:
-                await create_future(f.write, zipped)
+                    m["author"] = dict(id=author.id, s=str(author), avatar=author.avatar)
+                if "channel" not in m:
+                    try:
+                        m["channel"] = message.channel.id
+                    except AttributeError:
+                        continue
+                saved.append(m)
+            else:
+                if message.channel is None:
+                    continue
+                reactions = []
+                attachments = [dict(id=a.id, size=a.size, filename=a.filename, url=a.url, proxy_url=a.proxy_url) for a in message.attachments]
+                embeds = [e.to_dict() for e in message.embeds]
+                author = message.author
+                m = dict(
+                    id=message.id,
+                    author=dict(id=author.id, s=str(author), avatar=author.avatar),
+                    webhook_id=message.webhook_id,
+                    reactions=reactions,
+                    attachments=attachments,
+                    embeds=embeds,
+                    edited_timestamp=str(message._edited_timestamp) if message._edited_timestamp else "",
+                    type=message.type.value,
+                    pinned=message.pinned,
+                    flags=message.flags.value,
+                    mention_everyone=message.mention_everyone,
+                    content=message.content,
+                    channel=message.channel.id,
+                )
+                for reaction in message.reactions:
+                    if not reaction.custom_emoji:
+                        r = dict(emoji=dict(id=None, name=str(reaction)))
+                        if reaction.count != 1:
+                            r["count"] = reaction.count
+                        if reaction.me:
+                            r["me"] = reaction.me
+                        reactions.append(r)
+            saved.append(m)
+            self.raws[fn][m["id"]] = m
+            if not i & 1023:
+                time.sleep(0.1)
+        out = data = pickle.dumps(saved)
+        if len(data) > 65536:
+            out = bytes2zip(data)
+        with open(fn, "wb") as f:
+            f.write(out)
+        print(f"{len(saved)} messages saved to {fn}.")
+
+    async def _save_(self, **void):
+        async with self.save_sem:
+            saving = dict(self.saving)
+            self.loaded.update(self.saving)
+            self.saving.clear()
+            for fn, messages in saving.items():
+                await create_future(self.saves, fn, messages)
+            open(self.files + "/-1", "wb").close()
+
+    getmtime = lambda self: utc_ft(os.path.getmtime(self.files + "/-1"))
+
+    async def _minute_loop_(self):
+        await self._save_()
 
 
 class UpdateMessageLogs(Database):
@@ -1450,19 +1487,17 @@ class UpdateMessageLogs(Database):
         if not self.searched and len(self.bot.cache.messages) <= 65536:
             self.searched = True
             time = None
-            with tracebacksuppressor:
-                time = await self.bot.data.message_cache.load()
-            create_task(self.load_new_messages(time))
+            with tracebacksuppressor(FileNotFoundError):
+                time = self.bot.data.message_cache.getmtime()
+            if time is not None:
+                create_task(self.load_new_messages(time))
 
     async def load_new_messages(self, time):
         for guild in self.bot.guilds:
-            lim = floor(2097152 / len(self.bot.guilds))
+            # lim = floor(2097152 / len(self.bot.guilds))
+            lim = None
             await self.bot.data.counts.getGuildHistory(guild, lim, after=time, callback=self.callback)
         self.bot.data.message_cache.finished = True
-
-    async def _save_(self, force=False, **void):
-        if force or utc() - self.bot.data.message_cache.getmtime() > 120:
-            await self.bot.data.message_cache.save()
     
     def callback(self, messages, **void):
         create_future_ex(self.bot.update_from_client, priority=True)
@@ -1478,7 +1513,6 @@ class UpdateMessageLogs(Database):
                     channel = await self.bot.fetch_channel(c_id)
                 except (EOFError, discord.NotFound):
                     self.data.pop(guild.id)
-                    self.update()
                     return
                 u = before.author
                 emb = discord.Embed(colour=colour2raw(0, 0, 255))
@@ -1500,7 +1534,6 @@ class UpdateMessageLogs(Database):
                 channel = await self.bot.fetch_channel(c_id)
             except (EOFError, discord.NotFound):
                 self.data.pop(guild.id)
-                self.update()
                 return
             now = utc_dt()
             u = message.author
@@ -1568,7 +1601,6 @@ class UpdateMessageLogs(Database):
                 channel = await self.bot.fetch_channel(c_id)
             except (EOFError, discord.NotFound):
                 self.data.pop(guild.id)
-                self.update()
                 return
             now = utc_dt()
             action = discord.AuditLogAction.message_bulk_delete
@@ -1633,7 +1665,6 @@ class UpdateFileLogs(Database):
                     channel = await self.bot.fetch_channel(c_id)
                 except (EOFError, discord.NotFound):
                     self.data.pop(guild.id)
-                    self.update()
                     return
                 # Attempt to recover files from their proxy URLs, otherwise send the original URLs
                 msg = deque()
@@ -1754,7 +1785,7 @@ class UpdateRolePreservers(Database):
             else:
                 print("_leave_", guild, user, None)
                 self.data[guild.id].pop(user.id, None)
-            self.update()
+            self.update(guild.id)
 
 
 class UpdatePerms(Database):

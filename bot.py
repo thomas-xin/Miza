@@ -44,6 +44,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.start_time = utc()
         super().__init__(max_messages=256, heartbeat_timeout=60, guild_ready_timeout=5, intents=self.intents)
         self.cache_size = cache_size
+        # Base cache: contains all other caches
+        self.cache = fcdict({c: {} for c in self.caches})
         self.timeout = timeout
         self.set_classes()
         self.set_client_events()
@@ -51,8 +53,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.client = super()
         self.closed = False
         self.loaded = False
-        # Base cache: contains all other caches
-        self.cache = fcdict({c: {} for c in self.caches})
         # Channel-Webhook cache: for accessing all webhooks for a channel.
         self.cw_cache = cdict()
         self.usernames = {}
@@ -97,6 +97,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.embed_senders = cdict()
         # Assign bot cache to global variables for convenience
         globals().update(self.cache)
+        globals()["messages"] = self.MessageCache()
         self.get_modules()
         self.heartbeat_proc = heartbeat_proc
 
@@ -171,11 +172,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 d = await self.fetch_messageable(key)
                             if d is not None:
                                 continue
-                        print(f"Deleting {key} from {repr(obj)}...")
-                        data.pop(key, None)
-                        obj.update()
+                        print(f"Deleting {key} from {str(obj)}...")
+                        await create_future(data.pop, key, None)
                     if random.random() > 0.99:
-                        await asyncio.sleep(0.2)
+                        await asyncio.sleep(0.5)
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
     async def send_event(self, ev, *args, exc=False, **kwargs):
@@ -577,6 +577,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 raise TypeError(f"Invalid message identifier: {m_id}")
         with suppress(KeyError):
             return self.cache.messages[m_id]
+        if "message_cache" in self.data:
+            with suppress(KeyError):
+                return await create_future(self.data.message_cache.load_message, m_id)
         if channel is None:
             raise LookupError("Message data not found.")
         with suppress(TypeError):
@@ -834,6 +837,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 for attachment in message.attachments:
                     if getattr(attachment, "size", inf) < 1048576:
                         create_task(self.add_attachment(attachment))
+        if "message_cache" in self.data:
+            self.data.message_cache.save_message(message)
         return message
 
     # Deletes a message from the bot cache.
@@ -1258,17 +1263,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 else:
                     r = [ast.literal_eval(f)]
         except (ValueError, TypeError, SyntaxError):
-            r = await self.solve_math(f, obj, 16, 0)
+            r = await self.solve_math(f, obj, 64, 0)
         x = r[0]
         with suppress(TypeError):
             while True:
                 if type(x) is str:
                     raise TypeError
                 x = tuple(x)[0]
+        if type(x) is str and x.isnumeric():
+            return int(x)
         return round_min(float(x))
 
     # Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
-    async def solve_math(self, f, obj=None, prec=64, r=False, timeout=12, variables=None):
+    async def solve_math(self, f, obj=None, prec=128, r=False, timeout=12, variables=None):
         f = f.strip()
         try:
             if obj is None:
@@ -1509,10 +1516,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         obj = var(self, module)
                         if load_type == 1:
                             commands.append(obj)
-                            print(f"Successfully loaded command {repr(obj)}.")
+                            print(f"Successfully loaded command {obj}.")
                         elif load_type == 2:
                             dataitems.append(obj)
-                            print(f"Successfully loaded database {repr(obj)}.")
+                            print(f"Successfully loaded database {obj}.")
             for u in dataitems:
                 for c in commands:
                     c.data[u.name] = u
@@ -1590,7 +1597,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             for i in self.data:
                 u = self.data[i]
                 if getattr(u, "update", None) is not None:
-                    if u.update(True):
+                    if u.update(force=True):
                         saved.append(i)
         if not self.closed and hasattr(self, "total_bytes"):
             with tracebacksuppressor:
@@ -1603,8 +1610,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if not os.path.exists(fn):
             await_fut(self.send_event("_save_"))
             z = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-            for file in os.listdir("saves"):
-                z.write(f"saves/{file}", f"saves/{file}")
+            z.write("saves", "saves")
             z.close()
             print("Backup database created in", fn)
 
@@ -2357,7 +2363,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return sent
 
     # The fast update loop that runs 24 times per second. Used for events where timing is important.
-    def fast_loop(self):
+    async def fast_loop(self):
 
         async def event_call(freq):
             for i in range(freq):
@@ -2370,14 +2376,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             with tracebacksuppressor:
                 sent = self.update_embeds()
                 if sent:
-                    await_fut(event_call(freq), delay=0.005, priority=True)
+                    await event_call(freq)
                 else:
-                    with delay(1 / freq):
-                        await_fut(self.send_event("_call_"), delay=0.002, priority=True)
+                    async with delay(1 / freq):
+                        await self.send_event("_call_")
                 self.update_users()
 
     # The slow update loop that runs once every 1 second.
     async def slow_loop(self):
+        await asyncio.sleep(2)
         while not self.closed:
             async with delay(1):
                 async with tracebacksuppressor:
@@ -2398,6 +2405,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # The lazy update loop that runs once every 2-4 seconds.
     async def lazy_loop(self):
+        await asyncio.sleep(5)
         while not self.closed:
             async with delay(frand(2) + 2):
                 async with tracebacksuppressor:
@@ -2406,9 +2414,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # The slowest update loop that runs once a minute. Used for slow operations, such as the bot database autosave event.
     async def minute_loop(self):
+        await asyncio.sleep(60)
         while not self.closed:
             async with delay(60):
                 async with tracebacksuppressor:
+                    await self.send_event("_minute_loop_")
                     await create_future(self.update, priority=True)
                     await create_future(self.update_from_guilds, priority=True)
 
@@ -2616,11 +2626,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     bot.user2cache(author)
 
             def __copy__(self):
-                d = self.__getattribute__("_data")
+                d = dict(self.__getattribute__("_data"))
                 channel = self.channel
                 author = self.author
                 d.pop("author", None)
                 d.pop("channel", None)
+                if "tts" not in d:
+                    d["tts"] = False
                 message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
                 message.author = author
                 return message
@@ -2633,8 +2645,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if k == "content":
                     return d["content"]
                 if k == "channel":
-                    self.channel = bot.cache.channels.get(int(d["channel"]))
-                    return self.channel
+                    return bot.cache.channels.get(int(d["channel"]))
                 if k == "author":
                     self.author = bot.get_user(d["author"]["id"], replace=True)
                     guild = getattr(self.channel, "guild", None)
@@ -2651,11 +2662,43 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     return getattr(message, k)
                 return getattr(m, k)
 
+        class MessageCache(collections.abc.Mapping):
+            data = bot.cache.messages
+
+            def __getitem__(self, k):
+                with suppress(KeyError):
+                    return self.data[k]
+                return bot.data.message_cache.load_message(k)
+
+            def __setitem__(self, k, v):
+                bot.add_message(v)
+
+            __delitem__ = data.pop
+            __bool__ = lambda self: bool(self.data)
+            __iter__ = data.__iter__
+            __reversed__ = data.__reversed__
+            __len__ = data.__len__
+            __str__ = lambda self: f"<MessageCache ({len(self)} items)>"
+            __repr__ = data.__repr__
+            
+            def __contains__(self, k):
+                with suppress(KeyError):
+                    self[k]
+                    return True
+                return False
+
+            get = data.get
+            pop = data.pop
+            popitem = data.popitem
+            clear = data.clear
+            
+
         bot.UserGuild = UserGuild
         bot.GhostUser = GhostUser
         bot.GhostMessage = GhostMessage
         bot.LoadedMessage = LoadedMessage
         bot.CachedMessage = CachedMessage
+        bot.MessageCache = MessageCache
     
     def set_client_events(self):
 
@@ -2693,7 +2736,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             print(fut)
                             mod = await fut
                     print("Command aliases:")
-                    print(self.commands)
+                    print(self.commands.keys())
                     # Assign all bot database events to their corresponding keys.
                     for u in self.data.values():
                         for f in dir(u):
@@ -2702,7 +2745,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 if callable(func):
                                     self.events.append(f, func)
                     print("Database events:")
-                    print(self.events)
+                    print(self.events.keys())
                     for fut in futs:
                         await fut
                     await self.fetch_user(self.deleted_user)
@@ -2718,7 +2761,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     create_task(self.minute_loop())
                     create_task(self.slow_loop())
                     create_task(self.lazy_loop())
-                    create_thread(self.fast_loop)
+                    create_task(self.fast_loop())
                     print("Update loops initiated.")
                     # Load all webhooks from cached guilds.
                     futs = deque(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)

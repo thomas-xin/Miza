@@ -803,10 +803,9 @@ class DeviantArt(Command):
             else:
                 if channel.id in data and not data[channel.id]:
                     data.pop(channel.id)
-                update()
                 return css_md(f"Successfully unsubscribed from {sqr_md(user)}: {sqr_md(folder)}.")
         set_dict(data, channel.id, {}).__setitem__(content, {"user": user, "type": "gallery", "reversed": ("r" in flags), "entries": {}})
-        update()
+        update(channel.id)
         out = f"Successfully subscribed to {sqr_md(user)}: {sqr_md(folder)}"
         if "r" in flags:
             out += ", posting in reverse order"
@@ -841,7 +840,7 @@ class UpdateDeviantArt(Database):
                 for i in it:
                     if i not in entries:
                         entries[i] = True
-                        self.update()
+                        self.update(c_id)
                         home = "https://www.deviantart.com/" + items[i][2]
                         emb = discord.Embed(
                             colour=discord.Colour(1),
@@ -851,7 +850,7 @@ class UpdateDeviantArt(Database):
                 for i in orig:
                     if i not in items:
                         entries.pop(i)
-                        self.update()
+                        self.update(c_id)
         except:
             print_exc()
         else:

@@ -18,7 +18,8 @@ with MultiThreadedImporter(globals()) as importer:
         "threading",
         "urllib",
         "zipfile",
-        "nacl"
+        "nacl",
+        "shutil",
     )
 
 PROC = psutil.Process()
@@ -278,7 +279,7 @@ with open("auth.json") as f:
     AUTH = eval(f.read())
 
 with tracebacksuppressor:
-    py = AUTH.get("python_path")
+    py = AUTH.get("python_path", "")
     while py.endswith("\\") or py.endswith("/"):
         py = py[:-1]
     if py:
@@ -375,6 +376,185 @@ def select_and_loads(s, mode="safe", size=None):
                 s = s[s.index(b"{"):s.rindex(b"}") + 1]
             data = eval_json(s)
     return data
+
+def select_and_dumps(data, mode="safe"):
+    if mode == "unsafe":
+        try:
+            s = repr(data)
+        except:
+            s = None
+        if not s or len(s) > 262144:
+            s = pickle.dumps(data)
+            if len(s) > 1048576:
+                s = bytes2zip(s)
+        else:
+            s = s.encode("utf-8")
+        return s
+    try:
+        s = json.dumps(data)
+    except:
+        s = None
+    if not s or len(s) > 262144:
+        s = pickle.dumps(data)
+        if len(s) > 1048576:
+            s = bytes2zip(s)
+        return encrypt(s)
+    return s.encode("utf-8")
+
+
+class FileHashDict(collections.abc.MutableMapping):
+
+    sem = Semaphore(64, 128, 0.3, 1)
+
+    def __init__(self, *args, path="", **kwargs):
+        if not kwargs and len(args) == 1:
+            self.data = args[0]
+        else:
+            self.data = dict(*args, **kwargs)
+        self.path = path.rstrip("/")
+        self.modified = set()
+        self.deleted = set()
+        self.iter = None
+        if self.path and not os.path.exists(self.path):
+            os.mkdir(self.path)
+            self.iter = []
+    
+    __hash__ = lambda self: lambda self: hash(self.path)
+    __str__ = lambda self: self.__class__.__name__ + "(" + str(self.data) + ")"
+    __repr__ = lambda self: self.__class__.__name__ + "(" + str(self.full) + ")"
+    __call__ = lambda self, k: self.__getitem__(k)
+    __len__ = lambda self: len(self.keys())
+    __contains__ = lambda self, k: k in self.data or k in self.keys()
+    __eq__ = lambda self, other: self.data == other
+    __ne__ = lambda self, other: self.data != other
+
+    def key_path(self, k):
+        try:
+            k = int(k)
+        except:
+            pass
+        return f"{self.path}/{k}"
+
+    @property
+    def full(self):
+        out = {}
+        waits = set()
+        for k in self.keys():
+            try:
+                out[k] = self.data[k]
+            except KeyError:
+                out[k] = create_future_ex(self.__getitem__, k)
+                waits.add(k)
+        for k in waits:
+            out[k] = out[k].result()
+        return out
+
+    def keys(self):
+        if self.iter is None or self.modified:
+            self.iter = alist(try_int(i) for i in os.listdir(self.path))
+        return self.iter
+
+    def values(self):
+        for k in self.keys():
+            yield self[k]
+
+    def __iter__(self):
+        return iter(self.keys())
+
+    def __reversed__(self):
+        return reversed(self.keys())
+
+    def __getitem__(self, k):
+        with suppress(KeyError):
+            return self.data[k]
+        fn = self.key_path(k)
+        if os.path.exists(fn):
+            with self.sem:
+                with open(fn, "rb") as f:
+                    s = f.read()
+            data = select_and_loads(s, mode="unsafe")
+            self.data[k] = data
+            return data
+        raise KeyError(k)
+
+    def __setitem__(self, k, v):
+        with suppress(ValueError):
+            k = int(k)
+        self.data[k] = v
+        self.modified.add(k)
+
+    def get(self, k, default=None):
+        with suppress(KeyError):
+            return self[k]
+        return default
+
+    def pop(self, k, *args):
+        try:
+            return self.data.pop(k)
+        except KeyError:
+            fn = self.key_path(k)
+            if not os.path.exists(fn):
+                if args:
+                    return args[0]
+                raise
+            self.deleted.add(k)
+
+    __delitem__ = pop
+
+    def popitem(self, k):
+        try:
+            return self.data.popitem(k)
+        except KeyError:
+            out = self[k]
+        self.pop(k)
+        return (k, out)
+
+    def discard(self, k):
+        with suppress(KeyError):
+            return self.pop(k)
+
+    def setdefault(self, k, v):
+        try:
+            return self[k]
+        except KeyError:
+            self[k] = v
+        return v
+
+    def update(self, other):
+        self.modified.update(other)
+        self.update(other)
+        return self
+
+    def clear(self):
+        self.iter.clear()
+        self.modified.clear()
+        self.data.clear()
+        with suppress(FileNotFoundError):
+            shutil.rmtree(self.path)
+        os.mkdir(self.path)
+        return self
+
+    def __update__(self):
+        modified = frozenset(self.modified)
+        self.modified.clear()
+        for k in modified:
+            fn = self.key_path(k)
+            with self.sem:
+                try:
+                    d = self.data[k]
+                except KeyError:
+                    self.deleted.add(k)
+                    continue
+                with open(fn, "wb") as f:
+                    f.write(select_and_dumps(d, mode="unsafe"))
+        deleted = frozenset(self.deleted)
+        self.deleted.clear()
+        for k in deleted:
+            with suppress(FileNotFoundError):
+                os.remove(self.key_path(k))
+        while len(self.data) > 1048576:
+            self.data.pop(next(iter(self.data)), None)
+        return modified
 
 
 # Decodes HTML encoded characters in a string.
@@ -473,11 +653,14 @@ def touch(file):
 
 
 def get_folder_size(folder):
-    folder = folder.strip("/") + "/"
+    folder = folder.rstrip("/") + "/"
     size = 0
     for file in os.listdir(folder):
-        with suppress(FileNotFoundError, PermissionError):
-            size += os.path.getsize(folder + file)
+        if os.path.isdir(folder + file):
+            size += get_folder_size(folder + file)
+        else:
+            with suppress(FileNotFoundError, PermissionError):
+                size += os.path.getsize(folder + file)
     return size
 
 
@@ -536,6 +719,9 @@ find_users = lambda s: regexp("<@!?[0-9]+>").findall(s)
 
 def get_message_length(message):
     return len(message.system_content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
+
+def get_message_words(message):
+    return len(message.system_content.split()) + sum(len(e.description.split()) if e.description else 0 + 2 * len(e.fields) if e.fields else 0 for e in message.embeds) + len(message.attachments)
 
 # Returns a string representation of a message object.
 def message_repr(message, limit=1024, username=False):
@@ -1420,37 +1606,44 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
     bot = None
     rate_limit = 3
     name = "data"
-    data = {}
 
     def __init__(self, bot, catg):
         name = self.name
         self.__name__ = self.__class__.__name__
+        fhp = "saves/" + name
         if not getattr(self, "no_file", False):
-            self.file = "saves/" + name + ".json"
-            self.updated = False
-            try:
-                with open(self.file, "rb") as f:
-                    s = f.read()
-                if not s:
-                    raise FileNotFoundError
+            if os.path.exists(fhp):
+                data = self.data = FileHashDict(path=fhp)
+            else:
+                self.file = fhp + ".json"
+                self.updated = False
                 try:
-                    data = select_and_loads(s, mode="unsafe")
-                except:
-                    print(self.file)
-                    print_exc()
-                    raise FileNotFoundError
-                self.data = data
-            except FileNotFoundError:
-                data = None
+                    with open(self.file, "rb") as f:
+                        s = f.read()
+                    if not s:
+                        raise FileNotFoundError
+                    try:
+                        data = select_and_loads(s, mode="unsafe")
+                    except:
+                        print(self.file)
+                        print_exc()
+                        raise FileNotFoundError
+                    data = FileHashDict(data, path=fhp)
+                    data.modified.update(data.data.keys())
+                    self.data = data
+                except FileNotFoundError:
+                    data = None
         else:
-            data = None
-        if not data:
-            self.data = cdict()
+            data = self.data = {}
+        if data is None:
+            self.data = FileHashDict(path=fhp)
+        if not issubclass(type(self.data), collections.abc.MutableMapping):
+            self.data = FileHashDict(dict.fromkeys(self.data), path=fhp)
         bot.database[name] = bot.data[name] = self
         self.catg = catg
         self.bot = bot
         self._semaphore = Semaphore(1, 1, delay=0.5, rate_limit=self.rate_limit)
-        self._garbage_semaphore = Semaphore(1, 0, delay=3, rate_limit=self.rate_limit + 20)
+        self._garbage_semaphore = Semaphore(1, 0, delay=3, rate_limit=self.rate_limit * 3 + 30)
         self._globals = globals()
         f = getattr(self, "__load__", None)
         if callable(f):
@@ -1463,12 +1656,14 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
 
     __hash__ = lambda self: hash(self.__name__)
     __str__ = lambda self: f"Database <{self.__name__}>"
+    __repr__ = lambda self: repr(self.data)
     __call__ = lambda self: None
     __len__ = lambda self: len(self.data)
     __iter__ = lambda self: iter(self.data)
     __contains__ = lambda self, k: k in self.data
     __eq__ = lambda self, other: self.data == other
     __ne__ = lambda self, other: self.data != other
+
     def __setitem__(self, k, v):
         self.data[k] = v
         return self
@@ -1488,30 +1683,24 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
     keys = lambda self: self.data.keys()
     discard = lambda self, k: self.data.pop(k, None)
 
-    def update(self, force=False):
-        if not hasattr(self, "updated"):
-            self.updated = False
+    def update(self, modified=None, force=False):
+        if hasattr(self, "no_file"):
+            return
         if force:
-            name = getattr(self, "name", None)
-            if name:
-                if self.updated:
-                    self.updated = False
-                    try:
-                        s = str(self.data)
-                    except:
-                        s = None
-                    if not s or len(s) > 262144:
-                        # print("Pickling " + name + "...")
-                        s = pickle.dumps(self.data)
-                        if len(s) > 1048576:
-                            s = bytes2zip(s)
-                    else:
-                        s = s.encode("utf-8")
-                    with open(self.file, "wb") as f:
-                        f.write(s)
-                    return True
+            try:
+                self.data.__update__()
+            except:
+                print(self)
+                print(self.data)
+                print_exc()
         else:
-            self.updated = True
+            if modified is None:
+                self.data.modified.update(self.data.keys())
+            else:
+                if issubclass(type(modified), collections.abc.Sized):
+                    self.data.modified.update(modified)
+                else:
+                    self.data.modified.add(modified)
         return False
     
     def unload(self):
@@ -1525,7 +1714,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
                 if callable(func):
                     bot.events[f].remove(func)
                     print("unloaded", f, "from", self)
-        self.update(True)
+        self.update(force=True)
         bot.data.pop(self, None)
         bot.database.pop(self, None)
 

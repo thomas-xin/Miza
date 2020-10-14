@@ -86,7 +86,6 @@ class IMG(Command):
                 images[key] = url
                 images = {i: images[i] for i in sorted(images)}
                 imglists[guild.id] = images
-                update()
                 if not "h" in flags:
                     return css_md(f"Successfully added {sqr_md(key)} to the image list for {sqr_md(guild)}.")
             if not args:
@@ -94,12 +93,10 @@ class IMG(Command):
                 if "f" not in flags and len(images) > 1:
                     return css_md(sqr_md(f"WARNING: {len(images)} IMAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
                 imglists[guild.id] = {}
-                update()
                 return italics(css_md(f"Successfully removed all {sqr_md(len(images))} images from the image list for {sqr_md(guild)}."))
             key = argv.casefold()
             images.pop(key)
             imglists[guild.id] = images
-            update()
             return italics(css_md(f"Successfully removed {sqr_md(key)} from the image list for {sqr_md(guild)}."))
         if not argv and not "r" in flags:
             # Set callback message for scrollable list
@@ -202,7 +199,6 @@ class React(Command):
                     return css_md(sqr_md(f"WARNING: {len(curr)} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
                 if guild.id in following:
                     following.pop(guild.id)
-                    update()
                 return italics(css_md(f"Successfully removed all {sqr_md(len(curr))} auto reacts for {sqr_md(guild)}."))
             # Set callback message for scrollable list
             return (
@@ -214,7 +210,7 @@ class React(Command):
             a = unicode_prune(argv).casefold()
             if a in curr:
                 curr.pop(a)
-                update()
+                update(guild.id)
                 return italics(css_md(f"Removed {sqr_md(a)} from the auto react list for {sqr_md(guild)}."))
             else:
                 raise LookupError(f"{a} is not in the auto react list.")
@@ -233,7 +229,6 @@ class React(Command):
         await message.add_reaction(emoji)
         curr.append(a, str(emoji))
         following[guild.id] = mdict({i: curr[i] for i in sorted(curr)})
-        update()
         return css_md(f"Added {sqr_md(a)} ➡️ {sqr_md(args[-1])} to the auto react list for {sqr_md(guild)}.")
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
@@ -1241,7 +1236,7 @@ class UpdateImagePools(Database):
                     else:
                         data.append(out)
                     found.add(out)
-                    self.update()
+                    self.update(key)
         data.uniq(sorted=None)
     
     async def proc(self, key, func):
@@ -1251,7 +1246,7 @@ class UpdateImagePools(Database):
                 out = await func()
                 if out not in data:
                     data.add(out)
-                    self.update()
+                    self.update(key)
                 return out
 
     async def get(self, key, func, threshold=1024):
@@ -1263,7 +1258,7 @@ class UpdateImagePools(Database):
             out = await func()
             if out not in data:
                 data.add(out)
-                self.update()
+                self.update(key)
             return out
         create_task(self.proc(key, func))
         return choice(data)
