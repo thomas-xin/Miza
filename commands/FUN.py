@@ -1315,7 +1315,7 @@ class UpdateMimics(Database):
     async def __call__(self):
         with tracebacksuppressor(SemaphoreOverflowError):
             async with self._semaphore:
-                async with delay(20):
+                async with delay(120):
                     # Garbage collector for unassigned mimics
                     i = 1
                     for m_id in tuple(self.data):

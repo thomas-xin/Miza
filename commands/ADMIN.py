@@ -926,6 +926,7 @@ class UpdateMutes(Database):
                 print(self.listed)
                 continue
             x = cdict(temp.pop(0))
+            self.update(g_id)
             if not temp:
                 self.data.pop(g_id)
             else:
@@ -1066,6 +1067,7 @@ class UpdateBans(Database):
                 print(self.listed)
                 continue
             x = cdict(temp.pop(0))
+            self.update(g_id)
             if not temp:
                 self.data.pop(g_id)
             else:
@@ -1448,7 +1450,7 @@ class UpdateMessageCache(Database):
             if not i & 1023:
                 time.sleep(0.1)
         out = data = pickle.dumps(list(saved.values()))
-        if len(data) > 65536:
+        if len(data) > 32768:
             out = bytes2zip(data)
         with open(fn, "wb") as f:
             f.write(out)

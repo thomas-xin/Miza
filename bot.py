@@ -1468,7 +1468,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 self.disk = disk
                 cache = os.listdir("cache")
                 for folder in os.listdir("saves"):
-                    cache += os.listdir("saves/" + folder)
+                    if "." not in folder:
+                        cache += os.listdir("saves/" + folder)
                 self.file_count = len(cache)
         return self.disk
 
@@ -2382,7 +2383,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             sent = True
         return sent
 
-    # The fast update loop that runs 24 times per second. Used for events where timing is important.
+    # The fast update loop that runs 12 times per second. Used for events where timing is important.
     async def fast_loop(self):
 
         async def event_call(freq):
@@ -2390,7 +2391,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 async with delay(1 / freq):
                     await self.send_event("_call_")
 
-        freq = 24
+        freq = 12
         sent = 0
         while not self.closed:
             with tracebacksuppressor:
@@ -2408,7 +2409,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         while not self.closed:
             async with delay(1):
                 async with tracebacksuppressor:
-                    net = psutil.net_io_counters()
+                    net = await create_future(psutil.net_io_counters)
                     net_bytes = net.bytes_sent + net.bytes_recv
                     if not hasattr(self, "net_bytes"):
                         self.net_bytes = deque(maxlen=3)

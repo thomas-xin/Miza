@@ -757,7 +757,6 @@ class AudioQueue(alist):
         self.auds = auds
         self.bot = auds.bot
         self.vc = auds.vc
-        self.prev = ""
         self.lastsent = 0
         self.loading = False
 
@@ -794,7 +793,6 @@ class AudioQueue(alist):
         s = self.auds.stats
         if q and process:
             if q[0].get("played"):
-                self.prev = q[0]["url"]
                 # Remove played status from queue entry
                 q[0].pop("played")
                 if not (s.repeat and repeated):
@@ -814,26 +812,12 @@ class AudioQueue(alist):
         if not (q or self.auds.preparing):
             t = self.bot.data.playlists.get(self.vc.guild.id, ())
             if t:
-                d = None
-                # Make up to 64 attempts to select an item from the default playlist
-                for _ in loop(64):
-                    p = choice(t)
-                    # Do not pick entries that match the previously played song if possible
-                    if len(t) > 1 and p["url"] == self.prev:
-                        continue
-                    d = {
-                        "name": p["name"],
-                        "url": p["url"],
-                        "duration": p["duration"],
-                        "u_id": self.bot.id,
-                        "skips": (),
-                        "research": True,
-                    }
-                    break
-                if d:
-                    q.append(cdict(d))
-                    if self.auds.player:
-                        self.auds.player.time = 1 + utc()
+                for p in shuffle(t):
+                    e = cdict(p)
+                    e.u_id = self.bot.id
+                    e.skips = ()
+                    e.research = True
+                    q.appendleft(e)
         self.update_play()
 
     # Updates next queue entry and starts loading/playing it if possible
@@ -2401,11 +2385,11 @@ class Playlist(Command):
         for e in resp:
             name = e.name
             names.append(no_md(name))
-            pl.append({
-                "name": name,
-                "url": e.url,
-                "duration": e.duration,
-            })
+            pl.append(cdict(
+                name=name,
+                url=e.url,
+                duration=e.duration,
+            ))
         if not names:
             raise LookupError(f"No results for {argv}.")
         pl.sort(key=lambda x: x["name"].casefold())
@@ -3700,41 +3684,6 @@ class Download(Command):
                 res.extend(temp)
                 temp = await create_future(ytdl.search, argv, mode="sc", count=sc)
                 res.extend(temp)
-                # searches = ["ytsearch" + str(yt), "scsearch" + str(sc)]
-                # returns = []
-                # # Simultaneously search both youtube and soundcloud
-                # for r in range(2):
-                #     returns.append(create_future(
-                #         ytdl.downloader.extract_info,
-                #         f"{searches[r]}:{argv.replace(':', '~')}",
-                #         download=False,
-                #         process=r,
-                #         timeout=18,
-                #     ))
-                # returns = await recursive_coro(returns)
-                # # Attempt to find data for results, adjusting if they are incomplete
-                # for r in returns:
-                #     with tracebacksuppressor:
-                #         if type(r) is not str:
-                #             data = r
-                #             for e in data["entries"]:
-                #                 if "webpage_url" in e:
-                #                     if "title" in e:
-                #                         res.append({
-                #                             "name": e["title"],
-                #                             "url": e["webpage_url"],
-                #                         })
-                #                     else:
-                #                         res.append({
-                #                             "name": e["id"],
-                #                             "url": e["webpage_url"],
-                #                         })
-                #                 else:
-                #                     if e["ie_key"].casefold() == "youtube":
-                #                         res.append({
-                #                             "name": e["title"],
-                #                             "url": f"https://www.youtube.com/watch?v={e['url']}",
-                #                         })
             if not res:
                 raise LookupError(f"No results for {argv}.")
             res = res[:10]
@@ -3992,11 +3941,3 @@ class UpdateAudio(Database):
 
 class UpdatePlaylists(Database):
     name = "playlists"
-
-    def __load__(self):
-        pl = self.data
-        for g in pl:
-            for i in range(len(pl[g])):
-                e = pl[g][i]
-                if type(e) is dict:
-                    pl[g][i] = cdict(e)

@@ -952,7 +952,7 @@ class Status(Command):
             emb.add_field(name="Discord info", value=discord_info)
 
             misc_info = (
-                f"Cached files\n`{len(bot.file_count)}`\nConnected voice channels\n`{len(bot.voice_clients)}`\nTotal data sent/received\n`{byte_scale(bot.total_bytes)}B`\n"
+                f"Cached files\n`{bot.file_count}`\nConnected voice channels\n`{len(bot.voice_clients)}`\nTotal data sent/received\n`{byte_scale(bot.total_bytes)}B`\n"
                 + f"System time\n`{datetime.datetime.now()}`\nPing latency\n`{sec2time(bot.latency)}`\nCurrent uptime\n`{dyn_time_diff(utc(), bot.start_time)}`\nPublic IP address\n`{bot.ip}`"
             )
             emb.add_field(name="Misc info", value=misc_info)
@@ -1310,7 +1310,7 @@ class UpdateReminders(Database):
         # This exists so that checking next scheduled item is O(1)
         self.listed = alist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str and d[i]), key=lambda x: x[0]))
 
-    # Fast call: runs 24 times per second
+    # Fast call: runs many times per second
     async def _call_(self):
         t = utc()
         while self.listed:
@@ -1334,6 +1334,7 @@ class UpdateReminders(Database):
                 continue
             # Grab target from database
             x = cdict(temp.pop(0))
+            self.update(u_id)
             if not temp:
                 self.data.pop(u_id)
             else:
@@ -1380,6 +1381,7 @@ class UpdateReminders(Database):
                     it = [rems[i] for i in range(len(rems)) if i not in pops]
                     rems.clear()
                     rems.extend(it)
+                    self.update(u_id)
                     if not rems:
                         self.data.pop(u_id)
             with suppress(KeyError):
@@ -1486,11 +1488,6 @@ class UpdateMessageCount(Database):
         return output
 
     async def getUserMessageCount(self, guild):
-        year = datetime.timedelta(seconds=31556925.216)
-        oneyear = utc_dt() - guild.created_at < year
-        if guild.member_count > 512 and not oneyear:
-            add_dict(self.data[guild.id], {0: True})
-            return
         print(guild)
         data = {}
         avgs = {}

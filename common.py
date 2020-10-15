@@ -379,16 +379,9 @@ def select_and_loads(s, mode="safe", size=None):
 
 def select_and_dumps(data, mode="safe"):
     if mode == "unsafe":
-        try:
-            s = repr(data)
-        except:
-            s = None
-        if not s or len(s) > 65536:
-            s = pickle.dumps(data)
-            if len(s) > 262144:
-                s = bytes2zip(s)
-        else:
-            s = s.encode("utf-8")
+        s = pickle.dumps(data)
+        if len(s) > 65536:
+            s = bytes2zip(s)
         return s
     try:
         s = json.dumps(data)
