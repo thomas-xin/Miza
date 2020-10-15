@@ -1364,7 +1364,6 @@ class UpdateMessageCache(Database):
         with tracebacksuppressor(zipfile.BadZipFile):
             out = zip2bytes(zipped)
         data = pickle.loads(out)
-        self.loaded[fn] = found
         i = 0
         for m in data:
             try:
@@ -1401,6 +1400,7 @@ class UpdateMessageCache(Database):
     def saves(self, fn, messages):
         self.load_file(fn)
         bot = self.bot
+        self.loaded.setdefault(fn, {}).update(messages)
         saved = self.raws.setdefault(fn, {})
         for i, message in enumerate(tuple(messages.values()), 1):
             if type(message) is bot.CachedMessage:
@@ -1459,7 +1459,6 @@ class UpdateMessageCache(Database):
     async def _save_(self, **void):
         async with self.save_sem:
             saving = dict(self.saving)
-            self.loaded.update(self.saving)
             self.saving.clear()
             for fn, messages in saving.items():
                 await create_future(self.saves, fn, messages)
