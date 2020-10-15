@@ -938,7 +938,6 @@ class Status(Command):
                 shards = 1
             size = sum(bot.size.values()) + sum(bot.size2.values())
             stats = bot.curr_state
-            cache = await create_future(os.listdir, "cache/", timeout=12)
 
             bot_info = (
                 f"Process count\n`{active[0]}`\nThread count\n`{active[1]}`\nCoroutine count\n`{active[2]}`\n"
@@ -953,7 +952,7 @@ class Status(Command):
             emb.add_field(name="Discord info", value=discord_info)
 
             misc_info = (
-                f"Cached files\n`{len(cache)}`\nConnected voice channels\n`{len(bot.voice_clients)}`\nTotal data sent/received\n`{byte_scale(bot.total_bytes)}B`\n"
+                f"Cached files\n`{len(bot.file_count)}`\nConnected voice channels\n`{len(bot.voice_clients)}`\nTotal data sent/received\n`{byte_scale(bot.total_bytes)}B`\n"
                 + f"System time\n`{datetime.datetime.now()}`\nPing latency\n`{sec2time(bot.latency)}`\nCurrent uptime\n`{dyn_time_diff(utc(), bot.start_time)}`\nPublic IP address\n`{bot.ip}`"
             )
             emb.add_field(name="Misc info", value=misc_info)

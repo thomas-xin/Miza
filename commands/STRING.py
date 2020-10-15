@@ -70,11 +70,11 @@ class Translate(Command):
     no_parse = True
     rate_limit = (2, 7)
 
-    async def __call__(self, channel, args, flags, user, **void):
+    async def __call__(self, channel, args, argv, flags, user, **void):
         if not args:
             raise ArgumentError("Input string is empty.")
         dest = args[0]
-        string = " ".join(args[1:])
+        string = argv[len(dest):].strip()
         with discord.context_managers.Typing(channel):
             detected = await create_future(translators["Google Translate"].detect, string, timeout=20)
             source = detected.lang

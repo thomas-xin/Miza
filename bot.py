@@ -66,6 +66,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.user_semaphore = Semaphore(64, inf, delay=0.5, rate_limit=8)
         self.disk_semaphore = Semaphore(1, 1, delay=0.5)
         self.disk = 0
+        self.file_count = 0
         print("Time:", datetime.datetime.now())
         print("Initializing...")
         # O(1) time complexity for searching directory
@@ -1465,6 +1466,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 disk = await create_future(get_folder_size, "cache", priority=True)
                 disk += await create_future(get_folder_size, "saves", priority=True)
                 self.disk = disk
+                cache = os.listdir("cache")
+                for folder in os.listdir("saves"):
+                    cache += os.listdir("saves/" + folder)
+                self.file_count = len(cache)
         return self.disk
 
     # Gets the status of the bot.
