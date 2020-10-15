@@ -1399,9 +1399,6 @@ class UpdateMessageCache(Database):
         return message
 
     def saves(self, fn, messages):
-        if not messages:
-            if os.path.exists(fn):
-                os.remove(fn)
         self.load_file(fn)
         bot = self.bot
         saved = self.raws.setdefault(fn, {})
@@ -1449,11 +1446,15 @@ class UpdateMessageCache(Database):
             saved[m["id"]] = m
             if not i & 1023:
                 time.sleep(0.1)
+        if not saved:
+            if os.path.exists(fn):
+                return os.remove(fn)
         out = data = pickle.dumps(list(saved.values()))
         if len(data) > 32768:
             out = bytes2zip(data)
         with open(fn, "wb") as f:
             f.write(out)
+        return len(saved)
 
     async def _save_(self, **void):
         async with self.save_sem:
