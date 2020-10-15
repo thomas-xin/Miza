@@ -1832,7 +1832,7 @@ class AudioDownloader:
     # Performs a search, storing and using cached search results for efficiency.
     def search(self, item, force=False, mode=None, count=1):
         item = verify_search(item)
-        if mode is None and limit == 1 and item in self.searched:
+        if mode is None and count == 1 and item in self.searched:
             if utc() - self.searched[item].t < 18000:
                 return self.searched[item].data
             else:
