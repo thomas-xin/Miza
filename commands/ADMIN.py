@@ -1350,8 +1350,7 @@ class UpdateMessageCache(Database):
             os.mkdir(self.files)
 
     def get_fn(self, m_id):
-        l_id = m_id // 10 ** 14
-        return self.files + "/" + str(l_id)
+        return  m_id // 10 ** 14
 
     def load_file(self, fn):
         if not os.path.exists(fn) or fn in self.loaded:
@@ -1359,7 +1358,7 @@ class UpdateMessageCache(Database):
         found = {}
         self.loaded[fn] = found
         bot = self.bot
-        with open(fn, "rb") as f:
+        with open(self.files + "/" + str(fn), "rb") as f:
             out = zipped = f.read()
         with tracebacksuppressor(zipfile.BadZipFile):
             out = zip2bytes(zipped)
@@ -1452,7 +1451,7 @@ class UpdateMessageCache(Database):
         out = data = pickle.dumps(list(saved.values()))
         if len(data) > 32768:
             out = bytes2zip(data)
-        with open(fn, "wb") as f:
+        with open(self.files + "/" + str(fn), "wb") as f:
             f.write(out)
         return len(saved)
 
