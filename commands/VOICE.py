@@ -3696,12 +3696,8 @@ class Download(Command):
                 sc = min(4, flags.get("v", 0) + 1)
                 yt = min(6, sc << 1)
                 res = []
-                temp = await create_future(ytdl.search_yt, argv)
-                if temp:
-                    res.extend(temp[:yt])
-                else:
-                    temp = await create_future(ytdl.search, argv, mode="yt", count=yt)
-                    res.extend(temp)
+                temp = await create_future(ytdl.search, argv, mode="yt", count=yt)
+                res.extend(temp)
                 temp = await create_future(ytdl.search, argv, mode="sc", count=sc)
                 res.extend(temp)
                 # searches = ["ytsearch" + str(yt), "scsearch" + str(sc)]
