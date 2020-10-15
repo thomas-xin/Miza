@@ -1538,13 +1538,15 @@ class AudioDownloader:
             raise
 
     # Extracts info from a URL or search, adjusting accordingly.
-    def extract_info(self, item, count=1, search=False):
-        if search and not item.startswith("ytsearch:") and not is_url(item):
-            item = item.replace(":", "-")
+    def extract_info(self, item, count=1, search=False, mode=None):
+        if mode or search and not item.startswith("ytsearch:") and not is_url(item):
             if count == 1:
                 c = ""
             else:
-                c = str(count)
+                c = count
+            item = item.replace(":", "-")
+            if mode:
+                return self.downloader.extract_info(f"{mode}search{c}:{item}", download=False, process=False)
             exc = ""
             try:
                 return self.downloader.extract_info(f"ytsearch{c}:{item}", download=False, process=False)
@@ -1559,7 +1561,7 @@ class AudioDownloader:
         return self.downloader.extract_info(item, download=False, process=False)
 
     # Main extract function, able to extract from youtube playlists much faster than youtube-dl using youtube API, as well as ability to follow soundcloud links.
-    def extract(self, item, force=False, count=1, search=True):
+    def extract(self, item, force=False, count=1, mode=None, search=True):
         try:
             page = None
             output = deque()
@@ -1684,11 +1686,11 @@ class AudioDownloader:
                         d = select_and_loads(s, size=268435456)
                         q = d["queue"][:262144]
                         return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
-                else:
+                elif mode in (None, "yt"):
                     with suppress(NotImplementedError):
-                        return self.search_yt(item)[:1]
+                        return self.search_yt(item)[:count]
                 # Otherwise call automatic extract_info function
-                resp = self.extract_info(item, count, search=search)
+                resp = self.extract_info(item, count, search=search, mode=mode)
                 if resp.get("_type", None) == "url":
                     resp = self.extract_from(resp["url"])
                 if resp is None or not len(resp):
@@ -1815,7 +1817,7 @@ class AudioDownloader:
                         results.append(entry)
         return sorted(results, key=lambda entry: entry.views, reverse=True)
 
-    def search_yt(self, query, limit=1):
+    def search_yt(self, query):
         url = f"https://www.youtube.com/results?search_query={verify_url(query)}"
         resp = Request(url, timeout=12)
         result = None
@@ -1844,9 +1846,9 @@ class AudioDownloader:
         return out
 
     # Performs a search, storing and using cached search results for efficiency.
-    def search(self, item, force=False):
+    def search(self, item, force=False, mode=None, count=1):
         item = verify_search(item)
-        if item in self.searched:
+        if mode is None and limit == 1 and item in self.searched:
             if utc() - self.searched[item].t < 18000:
                 return self.searched[item].data
             else:
@@ -1856,7 +1858,7 @@ class AudioDownloader:
         with self.semaphore:
             try:
                 obj = cdict(t=utc())
-                obj.data = output = self.extract(item, force)
+                obj.data = output = self.extract(item, force, mode=mode, count=count)
                 self.searched[item] = obj
                 return output
             except Exception as ex:
@@ -3693,41 +3695,50 @@ class Download(Command):
                 # 2 youtube results per soundcloud result, increased with verbose flag
                 sc = min(4, flags.get("v", 0) + 1)
                 yt = min(6, sc << 1)
-                searches = ["ytsearch" + str(yt), "scsearch" + str(sc)]
-                returns = []
-                # Simultaneously search both youtube and soundcloud
-                for r in range(2):
-                    returns.append(create_future(
-                        ytdl.downloader.extract_info,
-                        f"{searches[r]}:{argv.replace(':', '~')}",
-                        download=False,
-                        process=r,
-                        timeout=18,
-                    ))
-                returns = await recursive_coro(returns)
-                # Attempt to find data for results, adjusting if they are incomplete
-                for r in returns:
-                    with tracebacksuppressor:
-                        if type(r) is not str:
-                            data = r
-                            for e in data["entries"]:
-                                if "webpage_url" in e:
-                                    if "title" in e:
-                                        res.append({
-                                            "name": e["title"],
-                                            "url": e["webpage_url"],
-                                        })
-                                    else:
-                                        res.append({
-                                            "name": e["id"],
-                                            "url": e["webpage_url"],
-                                        })
-                                else:
-                                    if e["ie_key"].casefold() == "youtube":
-                                        res.append({
-                                            "name": e["title"],
-                                            "url": f"https://www.youtube.com/watch?v={e['url']}",
-                                        })
+                res = []
+                temp = await create_future(ytdl.search_yt, argv)
+                if temp:
+                    res.extend(temp[:yt])
+                else:
+                    temp = await create_future(ytdl.search, argv, mode="yt", count=yt)
+                    res.extend(temp)
+                temp = await create_future(ytdl.search, argv, mode="sc", count=sc)
+                res.extend(temp)
+                # searches = ["ytsearch" + str(yt), "scsearch" + str(sc)]
+                # returns = []
+                # # Simultaneously search both youtube and soundcloud
+                # for r in range(2):
+                #     returns.append(create_future(
+                #         ytdl.downloader.extract_info,
+                #         f"{searches[r]}:{argv.replace(':', '~')}",
+                #         download=False,
+                #         process=r,
+                #         timeout=18,
+                #     ))
+                # returns = await recursive_coro(returns)
+                # # Attempt to find data for results, adjusting if they are incomplete
+                # for r in returns:
+                #     with tracebacksuppressor:
+                #         if type(r) is not str:
+                #             data = r
+                #             for e in data["entries"]:
+                #                 if "webpage_url" in e:
+                #                     if "title" in e:
+                #                         res.append({
+                #                             "name": e["title"],
+                #                             "url": e["webpage_url"],
+                #                         })
+                #                     else:
+                #                         res.append({
+                #                             "name": e["id"],
+                #                             "url": e["webpage_url"],
+                #                         })
+                #                 else:
+                #                     if e["ie_key"].casefold() == "youtube":
+                #                         res.append({
+                #                             "name": e["title"],
+                #                             "url": f"https://www.youtube.com/watch?v={e['url']}",
+                #                         })
             if not res:
                 raise LookupError(f"No results for {argv}.")
             res = res[:10]
