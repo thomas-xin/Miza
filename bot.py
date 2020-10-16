@@ -2515,8 +2515,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 me = bot.user
                 name = "DM"
                 topic = None
-                is_nsfw = lambda: True
-                is_news = lambda: False
+                is_nsfw = lambda *self: True
+                is_news = lambda *self: False
 
             def __init__(self, user, channel, **void):
                 self.channel = self.system_channel = self.rules_channel = self.UserChannel(channel)

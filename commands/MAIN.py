@@ -1568,7 +1568,7 @@ class UpdateMessages(Database):
                 return await func(*args, **kwargs)
 
     async def __call__(self, **void):
-        if not self.closed:
+        if self.bot.bot_ready and not self.closed:
             t = utc()
             for c_id, data in tuple(self.data.items()):
                 with tracebacksuppressor():
