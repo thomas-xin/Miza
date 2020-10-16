@@ -1820,7 +1820,7 @@ class AudioDownloader:
         high = alist()
         low = alist()
         for entry in result:
-            if entry.duration and entry.duration < 960 and fuzzy_substring(q, to_alphanumeric(full_prune(entry.name))) >= 2 / 3:
+            if entry.duration and (entry.duration < 960 or "extended" not in entry.name.casefold()) and fuzzy_substring(q, to_alphanumeric(full_prune(entry.name))) >= 1 / 2:
                 high.append(entry)
             else:
                 low.append(entry)

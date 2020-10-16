@@ -1353,12 +1353,15 @@ class UpdateMessageCache(Database):
         return  m_id // 10 ** 14
 
     def load_file(self, fn):
-        if not os.path.exists(fn) or fn in self.loaded:
+        with suppress(KeyError):
+            return self.loaded[fn]
+        path = self.files + "/" + str(fn)
+        if not os.path.exists(path):
             return
         found = {}
         self.loaded[fn] = found
         bot = self.bot
-        with open(self.files + "/" + str(fn), "rb") as f:
+        with open(path, "rb") as f:
             out = zipped = f.read()
         with tracebacksuppressor(zipfile.BadZipFile):
             out = zip2bytes(zipped)
@@ -1445,13 +1448,14 @@ class UpdateMessageCache(Database):
             saved[m["id"]] = m
             if not i & 1023:
                 time.sleep(0.1)
+        path = self.files + "/" + str(fn)
         if not saved:
-            if os.path.exists(fn):
-                return os.remove(fn)
+            if os.path.exists(path):
+                return os.remove(path)
         out = data = pickle.dumps(list(saved.values()))
         if len(data) > 32768:
             out = bytes2zip(data)
-        with open(self.files + "/" + str(fn), "wb") as f:
+        with open(path, "wb") as f:
             f.write(out)
         return len(saved)
 
