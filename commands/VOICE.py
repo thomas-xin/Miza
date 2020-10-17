@@ -2361,8 +2361,8 @@ class Playlist(Command):
                 # This deletes all default playlist entries for the current guild
                 if "f" not in flags and len(pl) > 1:
                     return css_md(sqr_md(f"WARNING: {len(pl)} ENTRIES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
-                pl[guild.id].clear()
-                pl.pop(guild.id)
+                pl.clear()
+                bot.data.playlists.pop(guild.id)
                 return italics(css_md(f"Successfully removed all {sqr_md(len(pl))} entries from the default playlist for {sqr_md(guild)}."))
             # Set callback message for scrollable list
             return (
