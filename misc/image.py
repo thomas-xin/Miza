@@ -720,7 +720,7 @@ blenders = {
     "blt": "blend",
     "blit": "blend",
     "blend": "blend",
-    "replace": "blend",
+    "replace": "replace",
     "+": "add",
     "add": "add",
     "addition": "add",
@@ -805,17 +805,19 @@ def blend_op(image, url, operation, amount, recursive=True):
                 image2.seek(0)
             else:
                 out = deque()
+                total = 0
                 for f in range(2147483648):
                     try:
                         image2.seek(f)
                     except EOFError:
                         break
+                    total += max(image2.info.get("duration", 0), 1 / 60)
                     if str(image.mode) != "RGBA":
                         temp = image.convert("RGBA")
                     else:
                         temp = image
                     out.append(blend_op(temp, image2, operation, amount, recursive=False))
-                return out
+                return dict(duration=total, frames=out)
         try:
             n_frames = 1
             for f in range(CURRENT_FRAME + 1):
@@ -839,7 +841,7 @@ def blend_op(image, url, operation, amount, recursive=True):
         out = Image.fromarray(np.uint8(filt(imgA, imgB, amount)))
     else:
         # Basic blend, use second image
-        if filt == "blend":
+        if filt in ("blend", "replace"):
             out = image2
         # Image operation, use ImageMath.eval
         elif filt.startswith("OP_"):
@@ -905,8 +907,13 @@ def blend_op(image, url, operation, amount, recursive=True):
                 image = image.convert("RGBA")
             if str(out.mode) != "RGBA":
                 out = out.convert("RGBA")
-        # Blend two images
-        out = ImageChops.blend(image, out, amount)
+        if op == "blend":
+            A = out.getchannel("A")
+            A.point(lambda x: round(x * amount))
+            out.putalpha(A)
+            out = Image.alpha_composite(image, out)
+        else:
+            out = Image.blend(image, out, amount)
     return out
 
 

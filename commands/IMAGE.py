@@ -1111,6 +1111,7 @@ class Blend(Command):
             if not name.endswith(".png"):
                 name += ".png"
             resp = await process_image(url1, "blend_op", [url2, operation, opacity], user, timeout=32)
+            print(resp)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
