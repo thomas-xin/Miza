@@ -141,8 +141,10 @@ class Execute(Command):
                     bot.data.exec[channel.id] &= -num - 1
                     if not bot.data.exec[channel.id]:
                         bot.data.exec.pop(channel.id)
+                    else:
+                        bot.data.exec.update(channel.id)
             return css_md(f"Successfully removed {sqr_md(out)} terminal.")
-        out = iter2str({k: ", ".join(self.terminal_types.get(1 << i) for i in bits(v) for k, v in bot.data.exec.items())})
+        out = iter2str({k: ", ".join(self.terminal_types.get(1 << i) for k, v in bot.data.exec.items() for i in bits(v))})
         return ini_md(f"Terminals currently set to {sqr_md(out)}")
 
 

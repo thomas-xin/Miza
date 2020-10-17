@@ -1013,10 +1013,11 @@ class AudioFile:
         classname = classname[classname.index("'") + 1:]
         return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>"
     
-    def load(self, stream, check_fmt=False, force=False):
+    def load(self, stream=None, check_fmt=False, force=False):
         if self.loading and not force:
             return
-        self.stream = stream
+        if stream is not None:
+            self.stream = stream
         self.loading = True
         # Collects data from source, converts to 48khz 192kbps opus format, outputting to target file
         cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
@@ -1140,6 +1141,8 @@ class AudioFile:
 
     # Creates a reader, selecting from direct opus file, single piped FFmpeg, or double piped FFmpeg.
     def create_reader(self, pos=0, auds=None):
+        if not os.path.exists("cache/" + self.file):
+            self.load(force=True)
         stats = auds.stats
         auds.reverse = stats.speed < 0
         if auds.speed < 0.005:
@@ -1820,10 +1823,15 @@ class AudioDownloader:
         high = alist()
         low = alist()
         for entry in result:
-            if entry.duration and (entry.duration < 960 or "extended" not in entry.name.casefold()) and fuzzy_substring(q, to_alphanumeric(full_prune(entry.name))) >= 1 / 2:
-                high.append(entry)
-            else:
-                low.append(entry)
+            if entry.duration:
+                name = full_prune(entry.name)
+                aname = to_alphanumeric(name)
+                spl = aname.split()
+                if entry.duration < 960 or "extended" in q or "hour" in q or "extended" not in spl and "hour" not in spl and "hours" not in spl:
+                    if fuzzy_substring(q, aname) >= 0.5 or fuzzy_substring(q, name) >= 0.5:
+                        high.append(entry)
+                        continue
+            low.append(entry)
         out = sorted(high, key=lambda entry: fuzzy_substring(q, to_alphanumeric(full_prune(entry.name))), reverse=True)
         out.extend(sorted(low, key=lambda entry: fuzzy_substring(q, to_alphanumeric(full_prune(entry.name))), reverse=True))
         print(out)
