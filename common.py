@@ -481,16 +481,21 @@ class FileHashDict(collections.abc.MutableMapping):
             return self[k]
         return default
 
-    def pop(self, k, *args):
+    def pop(self, k, *args, force=False):
         try:
+            fn = self.key_path(k)
+            if os.path.exists(fn):
+                os.remove(fn)
+            if force:
+                out = self[k]
+                del self.data[k]
+                return out
             return self.data.pop(k)
         except KeyError:
-            fn = self.key_path(k)
             if not os.path.exists(fn):
                 if args:
                     return args[0]
                 raise
-            self.deleted.add(k)
 
     __delitem__ = pop
 

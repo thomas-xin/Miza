@@ -136,7 +136,7 @@ class Execute(Command):
             with suppress(KeyError):
                 if num == 0:
                     # Test bitwise flags for enabled terminals
-                    out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec.pop(channel.id)))
+                    out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec.pop(channel.id, force=True)))
                 else:
                     bot.data.exec[channel.id] &= -num - 1
                     if not bot.data.exec[channel.id]:
