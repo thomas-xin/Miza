@@ -115,7 +115,7 @@ eval_const = {
 }
 
 # Not completely safe, but much safer than regular eval
-safe_eval = lambda s: eval(s.replace("__", ""), {}, eval_const)
+safe_eval = lambda s: eval((s.decode("utf-8", "replace") if type(s) is bytes else str(s)).replace("__", ""), {}, eval_const)
 
 null = None
 i = I = j = J = 1j
