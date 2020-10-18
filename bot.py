@@ -349,7 +349,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if roles:
                     return (role,)
                 return role.members
-        if "@" in u_id and ("everyone" in u_id or "here" in u_id):
+        if type(u_id) is str and "@" in u_id and ("everyone" in u_id or "here" in u_id):
             return await self.get_full_members(guild)
         u = await self.fetch_user_member(u_id, guild)
         return (u,)
