@@ -534,6 +534,8 @@ class FileHashDict(collections.abc.MutableMapping):
 
     def __update__(self):
         modified = frozenset(self.modified)
+        if modified:
+            self.iter = None
         self.modified.clear()
         for k in modified:
             fn = self.key_path(k)
@@ -546,6 +548,8 @@ class FileHashDict(collections.abc.MutableMapping):
                 with open(fn, "wb") as f:
                     f.write(select_and_dumps(d, mode="unsafe"))
         deleted = frozenset(self.deleted)
+        if deleted:
+            self.iter = None
         self.deleted.clear()
         for k in deleted:
             with suppress(FileNotFoundError):
