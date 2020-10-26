@@ -443,8 +443,8 @@ class FileHashDict(collections.abc.MutableMapping):
         return out
 
     def keys(self):
-        if self.iter is None or self.modified:
-            self.iter = alist(try_int(i) for i in os.listdir(self.path))
+        if self.iter is None or self.modified or self.deleted:
+            self.iter = alist(try_int(i) for i in os.listdir(self.path) if i not in self.deleted)
         return self.iter
 
     def values(self):
@@ -482,10 +482,9 @@ class FileHashDict(collections.abc.MutableMapping):
         return default
 
     def pop(self, k, *args, force=False):
+        fn = self.key_path(k)
         try:
-            fn = self.key_path(k)
-            if os.path.exists(fn):
-                os.remove(fn)
+            self.deleted.add(k)
             if force:
                 out = self[k]
                 del self.data[k]

@@ -1171,7 +1171,7 @@ class MimicSend(Command):
     no_parse = True
     rate_limit = 0.5
 
-    async def __call__(self, bot, channel, message, user, perm, args, **void):
+    async def __call__(self, bot, channel, message, user, perm, argv, args, **void):
         update = self.data.mimics.update
         mimicdb = bot.data.mimics
         mimics = set_dict(mimicdb, user.id, {})
@@ -1179,7 +1179,7 @@ class MimicSend(Command):
         c_id = verify_id(args.pop(0))
         channel = await bot.fetch_channel(c_id)
         guild = channel.guild
-        msg = " ".join(args)
+        msg = argv.split(None, 2)[-1]
         if not msg:
             raise IndexError("Message is empty.")
         perm = bot.get_perms(user.id, guild)

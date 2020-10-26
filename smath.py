@@ -2973,7 +2973,7 @@ class DynamicDT(datetime.datetime):
     def update_timestamp(self):
         offs = self.offset() * 31556952
         try:
-            self._ts = offs + round_min(super().timestamp())
+            self._ts = offs + round_min(datetime.datetime.timestamp(self))
         except OSError:
             self._ts = offs + round_min((self - ep).total_seconds())
         return self._ts
@@ -3000,7 +3000,7 @@ class DynamicDT(datetime.datetime):
     __radd__ = __add__
 
     def __sub__(self, other):
-        if type(other) not in (datetime.timedelta, datetime.datetime, datetime.date):
+        if type(other) not in (datetime.timedelta, datetime.datetime, datetime.date, self.__class__):
             return self.__class__.fromtimestamp(self.timestamp() + other)
         out = super().__sub__(other)
         ts = getattr(out, "timestamp", None)

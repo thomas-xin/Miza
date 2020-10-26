@@ -1278,7 +1278,7 @@ class Reminder(Command):
             msg = ""
         else:
             t = utc()
-            content += f"{len(rems)} messages currently scheduled for {str(sendable).replace('`', '')}:```*"
+            content += f"{len(rems)} message{'s' if len(rems) != 1 else ''} currently scheduled for {str(sendable).replace('`', '')}:```*"
             msg = iter2str(
                 rems[pos:pos + page],
                 key=lambda x: lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x["msg"]), 96) + "` ➡️ " + (user_mention(x["u_id"]) if "u_id" in x else time_until(x["t"])),
