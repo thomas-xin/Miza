@@ -3714,11 +3714,8 @@ class Download(Command):
         emb.set_author(**get_author(user))
         emb.description = "\n".join((f"`【{i}】` [{escape_markdown(e['name'])}]({ensure_url(e['url'])})" for i in range(len(res)) for e in [res[i]]))
         sent = await channel.send(msg, embed=emb)
-        # Add reaction numbers corresponding to search results
-        for i in range(len(res)):
-            async with delay(0.5):
-                create_task(sent.add_reaction(str(i) + b"\xef\xb8\x8f\xe2\x83\xa3".decode("utf-8")))
         if direct:
+            # Automatically proceed to download and convert immediately
             create_task(self._callback_(
                 message=sent,
                 guild=guild,
@@ -3730,6 +3727,11 @@ class Download(Command):
                 argv=url_enc,
                 user=user
             ))
+        else:
+            # Add reaction numbers corresponding to search results for selection
+            for i in range(len(res)):
+                async with delay(0.5):
+                    create_task(sent.add_reaction(str(i) + b"\xef\xb8\x8f\xe2\x83\xa3".decode("utf-8")))
         # await sent.add_reaction("❎")
 
     async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, argv, user, **void):
