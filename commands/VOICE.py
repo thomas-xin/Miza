@@ -5,8 +5,9 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-import youtube_dl, pytube
+import youtube_dlc, pytube
 from bs4 import BeautifulSoup
+youtube_dl = youtube_dlc
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
@@ -3643,6 +3644,7 @@ class Download(Command):
         # Prioritize attachments in message
         for a in message.attachments:
             argv = a.url + " " + argv
+        direct = False
         # Attempt to download items in queue if no search query provided
         if not argv:
             try:
@@ -3680,6 +3682,7 @@ class Download(Command):
             # Input may be a URL or set of URLs, in which case we attempt to find the first one
             urls = await bot.follow_url(argv, allow=True, images=False)
             if urls:
+                direct = True
                 temp = await create_future(ytdl.extract, urls[0], timeout=120)
                 res.extend(temp)
             if not res:
@@ -3715,6 +3718,18 @@ class Download(Command):
         for i in range(len(res)):
             async with delay(0.5):
                 create_task(sent.add_reaction(str(i) + b"\xef\xb8\x8f\xe2\x83\xa3".decode("utf-8")))
+        if direct:
+            create_task(self._callback_(
+                message=sent,
+                guild=guild,
+                channel=channel,
+                reaction=b"0\xef\xb8\x8f\xe2\x83\xa3",
+                bot=bot,
+                perm=3,
+                vals=f"{user.id}_{len(res)}_{fmt}_{int(bool(a))}",
+                argv=url_enc,
+                user=user
+            ))
         # await sent.add_reaction("❎")
 
     async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, argv, user, **void):

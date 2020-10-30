@@ -5,7 +5,8 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-import youtube_dl, nekos
+import youtube_dlc, nekos
+youtube_dl = youtube_dlc
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
