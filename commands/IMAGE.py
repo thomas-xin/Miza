@@ -1139,6 +1139,7 @@ class ImagePool:
 class Cat(ImagePool, Command):
     description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it."
     database = "cats"
+    name = ["🐱", "Meow"]
 
     async def fetch_one(self):
         if random.random() > 2 / 3:
@@ -1164,6 +1165,7 @@ class Cat(ImagePool, Command):
 class Dog(ImagePool, Command):
     description = "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it."
     database = "dogs"
+    name = ["🐶", "Woof"]
 
     async def fetch_one(self):
         if random.random() > 2 / 3:
@@ -1193,6 +1195,7 @@ class Dog(ImagePool, Command):
 class _8Ball(ImagePool, Command):
     description = "Pulls a random image from cdn.nekos.life/8ball, and embeds it."
     database = "8ball"
+    name = ["🎱"]
 
     def __call__(self, channel, flags, **void):
         e_id = choice(

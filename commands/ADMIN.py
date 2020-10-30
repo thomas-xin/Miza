@@ -9,7 +9,7 @@ except ModuleNotFoundError:
 class Purge(Command):
     time_consuming = True
     _timeout_ = 16
-    name = ["Del", "Delete", "Purge_Range"]
+    name = ["🌪️", "Del", "Delete", "Purge_Range"]
     min_level = 3
     description = "Deletes a number of messages from a certain user in current channel."
     usage = "<1:*users{bot}{everyone(?a)}> <0:count[1]> <ignore(?i)> <range(?r)> <hide(?h)>"
@@ -99,7 +99,7 @@ class Purge(Command):
 
 class Mute(Command):
     server_only = True
-    name = ["Revoke", "Silence", "UnMute"]
+    name = ["🔇", "Revoke", "Silence", "UnMute"]
     min_level = 3
     min_display = "3+"
     description = "Mutes a user for a certain amount of time, with an optional reason."
@@ -322,7 +322,7 @@ class Mute(Command):
 
 class Ban(Command):
     server_only = True
-    name = ["Bans", "Unban"]
+    name = ["🔨", "Bans", "Unban"]
     min_level = 3
     min_display = "3+"
     description = "Bans a user for a certain amount of time, with an optional reason."
@@ -716,7 +716,7 @@ class AutoRole(Command):
 
 class RolePreserver(Command):
     server_only = True
-    name = ["StickyRoles"]
+    name = ["🕵️", "StickyRoles"]
     min_level = 3
     min_display = "3+"
     description = "Causes ⟨MIZA⟩ to save roles for all users, and re-add them when they leave and rejoin."
@@ -744,6 +744,7 @@ class RolePreserver(Command):
 
 class Lockdown(Command):
     server_only = True
+    name = ["🔒"]
     min_level = inf
     description = "Completely locks down the server by removing send message permissions for all users and revoking all invites."
     flags = "f"

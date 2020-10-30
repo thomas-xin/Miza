@@ -20,7 +20,7 @@ standard_commands = default_commands.union(("voice", "image", "fun"))
 
 
 class Help(Command):
-    name = ["?"]
+    name = ["❓", "❔", "?"]
     description = "Shows a list of usable commands, or gives a detailed description of a command."
     usage = "<command{all}> <category{all}> <verbose(?v)>"
     flags = "v"
@@ -85,7 +85,7 @@ class Help(Command):
 
 
 class Hello(Command):
-    name = ["Hi", "👋", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
+    name = ["👋", "Hi", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
     min_level = 0
     description = "Sends a waving emoji. Useful for checking whether the bot is online."
     
@@ -417,7 +417,7 @@ class Avatar(Command):
 
 
 class Info(Command):
-    name = ["UserInfo", "ServerInfo", "WhoIs"]
+    name = ["🔍", "🔎", "UserInfo", "ServerInfo", "WhoIs"]
     min_level = 0
     description = "Shows information about the target user or server."
     usage = "<*objects> <verbose(?v)>"

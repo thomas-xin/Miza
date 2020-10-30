@@ -118,7 +118,7 @@ class Translate(Command):
 
 class Math(Command):
     _timeout_ = 4
-    name = ["M", "PY", "Sympy", "Plot", "Calc"]
+    name = ["🔢", "M", "PY", "Sympy", "Plot", "Calc"]
     alias = name + ["Plot3d"]
     min_level = 0
     description = "Evaluates a math formula."
@@ -520,7 +520,7 @@ class Char2Emoj(Command):
 
 
 class Time(Command):
-    name = ["UTC", "GMT", "T"]
+    name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T"]
     min_level = 0
     description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user."
     usage = "<offset_hours[0]> | <user[]>"
@@ -602,7 +602,7 @@ class TimeCalc(Command):
 
 
 class Follow(Command):
-    name = ["follow_url", "Redirect"]
+    name = ["🚶", "follow_url", "Redirect"]
     min_level = 0
     description = "Follows a discord message link and/or finds URLs in a string."
     rate_limit = (1, 5)
@@ -777,7 +777,7 @@ class UrbanDictionary(Command):
 	"x-rapidapi-host": "mashape-community-urban-dictionary.p.rapidapi.com",
 	"x-rapidapi-key": rapidapi_key,
     }
-    name = ["Urban"]
+    name = ["📖", "Urban"]
     min_level = 0
     description = "Searches Urban Dictionary for an item."
     usage = "<string> <verbose(?v)>"

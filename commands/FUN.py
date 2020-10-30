@@ -803,7 +803,7 @@ class Shop(Command):
     products = cdict(
         upgradeserver=cdict(
             name="Upgrade Server",
-            cost=[1728, 248832],
+            cost=[360, 34560],
             description="Upgrades the server's privilege level, granting access to all command categories and reducing command cooldown.",
         ),
     )

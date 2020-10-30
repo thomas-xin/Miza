@@ -812,7 +812,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return out
 
         # Sends a message to a channel, then edits to add links to all attached files.
-    async def send_with_file(self, channel, msg, file, filename=None, best=False):
+    async def send_with_file(self, channel, msg=None, file=None, filename=None, best=False):
         fp = file.fp
         fp.seek(0)
         data = fp.read()

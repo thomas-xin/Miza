@@ -1838,6 +1838,28 @@ class AudioDownloader:
         print(out)
         return out
 
+    # def extract_yt(self, query):
+    #     if ":" in query:
+    #         query = query.split("v=", 1)[1].split("&", 1)[0]
+    #     url = f"https://www.youtube.com/watch?v={query}&gl=US&hl=en&has_verified=1&bpctr=9999999999"
+    #     resp = Request(url)
+    #     search = b"<script >var ytplayer = ytplayer || {};ytplayer.config = "
+    #     try:
+    #         data = resp[resp.index(search) + len(search):]
+    #     except ValueError:
+    #         raise FileNotFoundError("YouTube player data not found.")
+    #     search = b";ytplayer.web_player_context_config = "
+    #     data = data[:data.index(search)]
+    #     player = eval_json(data)
+    #     resp = eval_json(player["args"]["player_response"])
+    #     entry = {
+    #         "formats": [
+    #             {
+
+    #             }
+    #         ]
+    #     }
+
     # Performs a search, storing and using cached search results for efficiency.
     def search(self, item, force=False, mode=None, count=1):
         item = verify_search(item)
@@ -2064,7 +2086,7 @@ ytdl = AudioDownloader()
 
 class Queue(Command):
     server_only = True
-    name = ["P", "Q", "Play", "Enqueue"]
+    name = ["▶️", "P", "Q", "Play", "Enqueue"]
     alias = name + ["LS"]
     min_level = 0
     description = "Shows the music queue, or plays a song in voice."
@@ -2461,7 +2483,7 @@ class Playlist(Command):
 
 class Connect(Command):
     server_only = True
-    name = ["Summon", "Join", "DC", "Disconnect", "Leave", "Move", "Reconnect"]
+    name = ["📲", "🎧", "🎵", "🎶", "Summon", "Join", "DC", "Disconnect", "Leave", "Move", "Reconnect"]
     # Because Rythm also has this alias :P
     alias = name + ["FuckOff"]
     min_level = 0
@@ -2595,7 +2617,7 @@ class Connect(Command):
 
 class Skip(Command):
     server_only = True
-    name = ["S", "SK", "CQ", "Remove", "Rem", "ClearQueue", "Clear"]
+    name = ["⏭", "🚫", "S", "SK", "CQ", "Remove", "Rem", "ClearQueue", "Clear"]
     min_level = 0
     min_display = "0~1"
     description = "Removes an entry or range of entries from the voice channel queue."
@@ -2747,7 +2769,7 @@ class Skip(Command):
 
 class Pause(Command):
     server_only = True
-    name = ["Resume", "Unpause", "Stop"]
+    name = ["⏸️", "⏯️", "Resume", "Unpause", "Stop"]
     min_level = 0
     min_display = "0~1"
     description = "Pauses, stops, or resumes audio playing."
@@ -2758,7 +2780,7 @@ class Pause(Command):
     async def __call__(self, bot, name, guild, user, perm, channel, flags, **void):
         auds = await auto_join(guild, channel, user, bot)
         auds.preparing = False
-        if name in ("pause", "stop"):
+        if name in ("pause", "stop", "⏸️", "⏯️"):
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, f"to {name} while other users are in voice")
         elif auds.stats.position <= 0:
@@ -2769,7 +2791,10 @@ class Pause(Command):
             auds.seek(0)
         if not auds.paused > 1:
             # ~pause and ~stop cause the audio player to stop
-            auds.paused = auds.pausec = name in ("pause", "stop")
+            if name == "⏯️":
+                auds.paused ^= 1
+            else:
+                auds.paused = auds.pausec = name in ("pause", "stop", "⏸️")
             if auds.paused:
                 create_future_ex(auds.vc.stop, timeout=18)
         if not auds.paused:
@@ -2781,13 +2806,18 @@ class Pause(Command):
         # Send an update event
         await bot.data.audio(guild=guild)
         if "h" not in flags:
-            past = name + "pe" * (name == "stop") + "d"
+            if name in ("⏸️", "pause"):
+                past = "paused"
+            elif name == "⏯️":
+                past = "paused" if auds.paused & 1 else "resumed"
+            else:
+                past = name + "d"
             return italics(css_md(f"Successfully {past} audio playback in {sqr_md(guild)}.")), 1
 
 
 class Seek(Command):
     server_only = True
-    name = ["Replay"]
+    name = ["↔️", "Replay"]
     min_level = 0
     min_display = "0~1"
     description = "Seeks to a position in the current audio file."
@@ -2938,7 +2968,9 @@ class AudioSettings(Command):
         "BPS": "bitrate",
         "BR": "bitrate",
         "LQ": "loop",
+        "🔁": "loop",
         "LoopOne": "repeat",
+        "🔂": "repeat",
         "L1": "repeat",
         "SQ": "shuffle",
         "24/7": "stay",
@@ -3082,7 +3114,7 @@ class AudioSettings(Command):
 
 class Rotate(Command):
     server_only = True
-    name = ["Jump"]
+    name = ["↕️", "Jump"]
     min_level = 0
     min_display = "0~1"
     description = "Rotates the queue to the left by a certain amount of steps."
@@ -3110,6 +3142,7 @@ class Rotate(Command):
 
 class Shuffle(Command):
     server_only = True
+    name = ["🔀"]
     min_level = 0
     min_display = "0~1"
     description = "Shuffles the audio queue."
@@ -3180,6 +3213,7 @@ class VoiceNuke(Command):
     server_only = True
     time_consuming = True
     min_level = 3
+    name = ["☢️"]
     description = "Removes all users from voice channels in the current server."
     usage = "<hide(?h)>"
     flags = "h"
@@ -3630,7 +3664,7 @@ class Lyrics(Command):
 class Download(Command):
     time_consuming = True
     _timeout_ = 20
-    name = ["Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "ConvertORG", "Org2xm", "Convert"]
+    name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "ConvertORG", "Org2xm", "Convert"]
     min_level = 0
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
     usage = "<0:search_link{queue}> <-1:out_format[ogg]> <apply_settings(?a)> <verbose_search(?v)> <show_debug(?z)>"
