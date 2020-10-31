@@ -3037,7 +3037,7 @@ class AudioSettings(Command):
     def __init__(self, *args):
         self.alias = list(self.aliasMap) + list(self.aliasExt)[1:]
         self.name = list(self.aliasMap)
-        self.    self.min_display = "0~1"
+        self.min_display = "0~1"
         self.description = "Changes the current audio settings for this server."
         self.usage = (
             "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <pan(?e)> <bassboost(?b)> <reverb(?r)> <compressor(?c)>"
