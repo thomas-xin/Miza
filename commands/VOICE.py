@@ -85,25 +85,28 @@ def get_duration(filename):
 
 # Gets the best icon/thumbnail for a queue entry.
 def get_best_icon(entry):
-    try:
+    with suppress(KeyError):
+        return entry["icon"]
+    with suppress(KeyError):
         return entry["thumbnail"]
+    try:
+        thumbnails = entry["thumbnails"]
     except KeyError:
         try:
-            thumbnails = entry["thumbnails"]
+            url = entry["webpage_url"]
         except KeyError:
-            try:
-                url = entry["webpage_url"]
-            except KeyError:
-                url = entry["url"]
-            if is_discord_url(url):
-                if not is_image(url):
-                    return "https://cdn.discordapp.com/embed/avatars/0.png"
-            return url
-        return sorted(thumbnails, key=lambda x: -float(x.get("width", x.get("preference", 0) * 4096)))[0]["url"]
+            url = entry["url"]
+        if is_discord_url(url):
+            if not is_image(url):
+                return "https://cdn.discordapp.com/embed/avatars/0.png"
+        return url
+    return sorted(thumbnails, key=lambda x: -float(x.get("width", x.get("preference", 0) * 4096)))[0]["url"]
 
 
 # Gets the best audio file download link for a queue entry.
 def get_best_audio(entry):
+    with suppress(KeyError):
+        return entry["stream"]
     best = -1
     try:
         fmts = entry["formats"]
@@ -1345,8 +1348,9 @@ class AudioDownloader:
     # Gets data from yt-download.org and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def extract_backup(self, url):
         if ":" in url:
-            url = url.split("v=", 1)[1].split("&", 1)[0]
-        resp = Request(f"https://www.yt-download.org/file/mp3/{url}")
+            url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
+        yt_url = f"https://www.yt-download.org/file/mp3/{url}"
+        resp = Request(yt_url)
         search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
         resp = resp[resp.index(search) + len(search):]
         thumbnail = resp[:resp.index(b'"')].decode("utf-8", "replace")
@@ -1374,7 +1378,6 @@ class AudioDownloader:
             "formats": [
                 {
                     "abr": 192,
-                    "vcodec": None,
                     "url": stream,
                 },
             ],
@@ -1530,7 +1533,7 @@ class AudioDownloader:
                     raise FileNotFoundError("Unable to fetch audio data.")
                 else:
                     print(ex)
-                    print("Above exception successfully resolved with yt-downloader.")
+                    print("Above exception successfully resolved with yt-download.")
                     print(entries)
             else:
                 raise
@@ -1571,7 +1574,7 @@ class AudioDownloader:
                         raise FileNotFoundError("Unable to fetch audio data.")
                     else:
                         print(ex)
-                        print("Above exception successfully resolved with yt-downloader.")
+                        print("Above exception successfully resolved with yt-download.")
                         print(entries)
                         return entries
             raise
@@ -1942,7 +1945,7 @@ class AudioDownloader:
         # If "research" tag is set, entry does not contain full data and requires another search
         if "research" in entry:
             try:
-                self.extract_single(entry)
+                self.extract_single(entry, force=True)
                 entry.pop("research", None)
             except:
                 print_exc()
@@ -1982,9 +1985,9 @@ class AudioDownloader:
         try:
             self.cache[fn] = f = AudioFile(fn)
             if stream.startswith("ytsearch:") or stream in (None, "none"):
-                ytdl.extract_single(entry)
+                self.extract_single(entry, force=True)
                 stream = entry.get("stream", None)
-                if not stream:
+                if stream in (None, "none"):
                     raise FileNotFoundError("Unable to locate appropriate file stream.")
             f.load(stream, check_fmt=entry.get("duration") is None)
             # Assign file duration estimate to queue entry
@@ -2091,19 +2094,19 @@ class AudioDownloader:
         return io.BytesIO(out), f"{info['name']}.mid"
 
     # Extracts full data for a single entry. Uses cached results for optimization.
-    def extract_single(self, i):
+    def extract_single(self, i, force=False):
         item = i.url
-        if item in self.searched:
-            if utc() - self.searched[item].t < 18000:
-                it = self.searched[item].data[0]
-                i.name = it.name
-                i.duration = it.get("duration")
-                i.url = it.url
-                return True
-            else:
-                self.searched.pop(item, None)
-        while len(self.searched) > 262144:
-            self.searched.pop(next(iter(self.searched)))
+        if not force:
+            if item in self.searched:
+                if utc() - self.searched[item].t < 18000:
+                    it = self.searched[item].data[0]
+                    i.update(it)
+                    if i.get("stream") not in (None, "none"):
+                        return True
+                else:
+                    self.searched.pop(item, None)
+            while len(self.searched) > 262144:
+                self.searched.pop(next(iter(self.searched)))
         with self.semaphore:
             try:
                 data = self.extract_true(item)
@@ -2124,12 +2127,11 @@ class AudioDownloader:
                     out[0].research = True
                 self.searched[item] = obj
                 it = out[0]
-                i.name = it.name
-                i.duration = it.get("duration")
-                i.url = it.url
+                i.update(it)
             except:
                 i.url = ""
                 print_exc()
+                return False
         return True
 
 ytdl = AudioDownloader()
