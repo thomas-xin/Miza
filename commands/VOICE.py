@@ -235,6 +235,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             self.queue = AudioQueue()
             self.queue._init_(auds=self)
             self.semaphore = Semaphore(1, 4, rate_limit=1 / 8)
+            self.announcer = Semaphore(1, 2, rate_limit=1 / 3)
             if not bot.is_trusted(getattr(channel, "guild", None)):
                 self.queue.maxitems = 8192
             bot.data.audio.players[vc.guild.id] = self
@@ -353,7 +354,11 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         return self.stats.position
 
     # Sends a deletable message to the audio player's channel.
-    announce = lambda self, *args, sync=True, **kwargs: create_task(send_with_react(self.channel, *args, reacts="❎", **kwargs)) if not sync else await_fut(send_with_react(self.channel, *args, reacts="❎", **kwargs))
+    def announce(self, *args, sync=True, **kwargs):
+        if sync:
+            with self.announcer:
+                return await_fut(send_with_react(self.channel, *args, reacts="❎", **kwargs))
+        return create_task(send_with_react(self.channel, *args, reacts="❎", **kwargs))
 
     # Kills this audio player, stopping audio playback. Will cause bot to leave voice upon next update event.
     def kill(self, reason=None):
@@ -428,7 +433,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
                                     ch = channel
                         if ch:
                             await_fut(vc.move_to(ch))
-                            self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else 's'} in {sqr_md(ch)}, automatically joined! 🎵"))
+                            self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"))
         else:
             self.timeout = utc()
         if m.voice is not None:
@@ -847,6 +852,8 @@ class AudioQueue(alist):
                     try:
                         # Gets audio file stream and loads into audio source object
                         source = ytdl.get_stream(entry)
+                        if source is None:
+                            print(entry)
                         auds.new(source)
                         self.loading = False
                         auds.ensure_play()
