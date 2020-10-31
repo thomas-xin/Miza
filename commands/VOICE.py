@@ -1345,48 +1345,75 @@ class AudioDownloader:
                 token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=0.5))
                 self.spotify_header = {"authorization": f"Bearer {json.loads(token[:512])['accessToken']}"}
 
-    # Gets data from yt-download.org and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
+    # Gets data from yt-download.org or y2mate.guru, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def extract_backup(self, url):
         if ":" in url:
             url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
-        yt_url = f"https://www.yt-download.org/file/mp3/{url}"
-        resp = Request(yt_url)
-        search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
-        resp = resp[resp.index(search) + len(search):]
-        thumbnail = resp[:resp.index(b'"')].decode("utf-8", "replace")
-        search = b'<h2 class="text-lg text-teal-600 font-bold m-2 text-center">'
-        resp = resp[resp.index(search) + len(search):]
-        title = resp[:resp.index(b"</h2>")].decode("utf-8", "replace")
-        resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp3/192'.encode("utf-8")) + 9:]
-        stream = resp[:resp.index(b'"')].decode("utf-8", "replace")
-        resp = resp[:resp.index(b"</a>")]
-        search = b'<div class="text-shadow-1">'
-        fs = resp[resp.rindex(search) + len(search):resp.rindex(b"</div>")]
-        if fs.endswith(b"TB"):
-            scale = 1099511627776
-        if fs.endswith(b"GB"):
-            scale = 1073741824
-        elif fs.endswith(b"MB"):
-            scale = 1048576
-        elif fs.endswith(b"KB"):
-            scale = 1024
-        else:
-            scale = 1
-        fs = float(fs.split(None, 1)[0]) * scale
-        dur = fs / 192000 * 8
-        entry = {
-            "formats": [
-                {
-                    "abr": 192,
-                    "url": stream,
-                },
-            ],
-            "duration": dur,
-            "thumbnail": thumbnail,
-            "title": title,
-            "webpage_url": f"https://youtu.be/{url}",
-        }
-        return entry
+        try:
+            yt_url = f"https://www.yt-download.org/file/mp3/{url}"
+            resp = Request(yt_url)
+            search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
+            resp = resp[resp.index(search) + len(search):]
+            thumbnail = resp[:resp.index(b'"')].decode("utf-8", "replace")
+            search = b'<h2 class="text-lg text-teal-600 font-bold m-2 text-center">'
+            resp = resp[resp.index(search) + len(search):]
+            title = resp[:resp.index(b"</h2>")].decode("utf-8", "replace")
+            resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp3/192'.encode("utf-8")) + 9:]
+            stream = resp[:resp.index(b'"')].decode("utf-8", "replace")
+            resp = resp[:resp.index(b"</a>")]
+            search = b'<div class="text-shadow-1">'
+            fs = resp[resp.rindex(search) + len(search):resp.rindex(b"</div>")]
+            if fs.endswith(b"TB"):
+                scale = 1099511627776
+            if fs.endswith(b"GB"):
+                scale = 1073741824
+            elif fs.endswith(b"MB"):
+                scale = 1048576
+            elif fs.endswith(b"KB"):
+                scale = 1024
+            else:
+                scale = 1
+            fs = float(fs.split(None, 1)[0]) * scale
+            dur = fs / 192000 * 8
+            entry = {
+                "formats": [
+                    {
+                        "abr": 192,
+                        "url": stream,
+                    },
+                ],
+                "duration": dur,
+                "thumbnail": thumbnail,
+                "title": title,
+                "webpage_url": f"https://youtu.be/{url}",
+            }
+            print("Successfully resolved with yt-download.")
+            return entry
+        except:
+            pass
+        try:
+            resp = Request("https://y2mate.guru/api/convert", decode=True, data={"url": f"https://youtube.com/watch?v={url}"}, method="POST")
+            data = eval_json(resp)
+            meta = data["meta"]
+            entry = {
+                "formats": [
+                    {
+                        "abr": stream.get("quality", 0),
+                        "url": stream["url"],
+                    } for stream in data["url"] if "url" in stream and stream.get("audio")
+                ],
+                "thumbnail": data.get("thumb"),
+                "title": meta["title"],
+                "webpage_url": meta["source"],
+            }
+            if meta.get("duration"):
+                entry["duration"] = time_parse(meta["duration"])
+            if not entry["formats"]:
+                raise FileNotFoundError
+            print("Successfully resolved with y2mate.")
+            return entry
+        except:
+            raise
         
     # def from_pytube(self, url):
     #     # pytube only accepts direct youtube links
@@ -1531,10 +1558,6 @@ class AudioDownloader:
                     entries = self.extract_backup(url)
                 except youtube_dl.DownloadError:
                     raise FileNotFoundError("Unable to fetch audio data.")
-                else:
-                    print(ex)
-                    print("Above exception successfully resolved with yt-download.")
-                    print(entries)
             else:
                 raise
         if "entries" in entries:
@@ -1569,14 +1592,9 @@ class AudioDownloader:
             if "403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s:
                 if is_url(url):
                     try:
-                        entries = self.extract_backup(url)
+                        return self.extract_backup(url)
                     except youtube_dl.DownloadError:
                         raise FileNotFoundError("Unable to fetch audio data.")
-                    else:
-                        print(ex)
-                        print("Above exception successfully resolved with yt-download.")
-                        print(entries)
-                        return entries
             raise
 
     # Extracts info from a URL or search, adjusting accordingly.
