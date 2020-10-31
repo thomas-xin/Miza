@@ -464,7 +464,7 @@ class Info(Command):
                         users.append(f"{user_mention(u_id)}: {us[u_id]}")
                     top = "\n".join(users)
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
-        emb.add_field(name="Creation time", value=str(g.created_at), inline=1)
+        emb.add_field(name="Creation time", value=str(g.created_at) + "\n" + dyn_time_diff(utc_dt().timestamp(), g.created_at.timestamp()) + " ago", inline=1)
         if "v" in flags:
             with suppress(AttributeError, KeyError):
                 emb.add_field(name="Region", value=str(g.region), inline=1)
@@ -502,7 +502,7 @@ class Info(Command):
         emb.add_field(name="Mimic ID", value=str(p.id), inline=0)
         emb.add_field(name="Name", value=str(p.name), inline=0)
         emb.add_field(name="Prefix", value=str(p.prefix), inline=1)
-        emb.add_field(name="Creation time", value=str(datetime.datetime.fromtimestamp(p.created_at)), inline=1)
+        emb.add_field(name="Creation time", value=str(datetime.datetime.fromtimestamp(p.created_at)) + "\n" + dyn_time_diff(utc_dt().timestamp(), p.created_at) + " ago", inline=1)
         if "v" in flags:
             emb.add_field(name="Gender", value=str(p.gender), inline=1)
             ctime = datetime.datetime.fromtimestamp(p.birthday)
@@ -772,11 +772,11 @@ class Info(Command):
                         d += "```**"
                     emb.description = d
                     emb.add_field(name="User ID", value="`" + str(u.id) + "`", inline=0)
-                    emb.add_field(name="Creation time", value=str(created), inline=1)
+                    emb.add_field(name="Creation time", value=str(created) + "\n" + dyn_time_diff(utc_dt().timestamp(), created.timestamp()) + " ago", inline=1)
                     if joined:
-                        emb.add_field(name="Join time", value=str(joined), inline=1)
+                        emb.add_field(name="Join time", value=str(joined) + "\n" + dyn_time_diff(utc_dt().timestamp(), joined.timestamp()) + " ago", inline=1)
                     if old:
-                        emb.add_field(name="Oldest post time", value=str(old), inline=1)
+                        emb.add_field(name="Oldest post time", value=str(old) + "\n" + dyn_time_diff(utc_dt().timestamp(), old.timestamp()) + " ago", inline=1)
                     if status:
                         emb.add_field(name="Status", value=str(status), inline=1)
                     if zone:
@@ -1832,9 +1832,9 @@ class UpdateUsers(Database):
             elif typing >= inf:
                 return
             else:
-                self.data[user.id].pop("last_typing", None)
+                self.data.get(user.id, EMPTY).pop("last_typing", None)
         else:
-            self.data[user.id].pop("last_typing", None)
+            self.data.get(user.id, EMPTY).pop("last_typing", None)
         if not xrand(1000):
             self.add_diamonds(user, points)
             points *= 1000

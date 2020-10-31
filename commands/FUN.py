@@ -535,7 +535,8 @@ class Pay(Command):
             raise OverflowError("Payment cannot be greater than your balance.")
         bot.data.users.add_gold(user, -amount)
         bot.data.users.add_gold(target, amount)
-        bot.data.dailies.progress_quests(user, "pay", amount)
+        if user.id != target.id:
+            bot.data.dailies.progress_quests(user, "pay", amount)
         return css_md(f"{sqr_md(user)} has paid {sqr_md(amount)} coins to {sqr_md(target)}.")
 
 
