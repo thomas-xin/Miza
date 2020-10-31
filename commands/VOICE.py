@@ -1381,6 +1381,7 @@ class AudioDownloader:
             "duration": dur,
             "thumbnail": thumbnail,
             "title": title,
+            "webpage_url": f"https://youtu.be/{url}",
         }
         return entry
         
@@ -1522,14 +1523,15 @@ class AudioDownloader:
             entries = self.downloader.extract_info(url, download=False, process=True)
         except youtube_dl.DownloadError as ex:
             s = str(ex).casefold()
-            if "403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s:
+            if "403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s:
                 try:
                     entries = self.extract_backup(url)
                 except youtube_dl.DownloadError:
                     raise FileNotFoundError("Unable to fetch audio data.")
                 else:
-                    print_exc()
+                    print(ex)
                     print("Above exception successfully resolved with yt-downloader.")
+                    print(entries)
             else:
                 raise
         if "entries" in entries:
@@ -1561,15 +1563,16 @@ class AudioDownloader:
             return self.downloader.extract_info(url, download=False, process=False)
         except youtube_dl.DownloadError as ex:
             s = str(ex)
-            if "403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s:
+            if "403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s:
                 if is_url(url):
                     try:
                         entries = self.extract_backup(url)
                     except youtube_dl.DownloadError:
                         raise FileNotFoundError("Unable to fetch audio data.")
                     else:
-                        print_exc()
+                        print(ex)
                         print("Above exception successfully resolved with yt-downloader.")
+                        print(entries)
                         return entries
             raise
 
