@@ -1027,7 +1027,11 @@ class AudioFile:
         cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
         self.proc = None
         try:
-            self.proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            try:
+                self.proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            except:
+                print(cmd)
+                raise
             fl = 0
             # Attempt to monitor status of output file
             while fl < 4096:
@@ -1587,8 +1591,8 @@ class AudioDownloader:
             return dict(url=url, webpage_url=url, title=title, direct=True)
         try:
             return self.downloader.extract_info(url, download=False, process=False)
-        except youtube_dl.DownloadError as ex:
-            s = str(ex)
+        except Exception as ex:
+            s = str(ex).casefold()
             if "403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s:
                 if is_url(url):
                     try:
@@ -2004,7 +2008,7 @@ class AudioDownloader:
             self.cache[fn] = f = AudioFile(fn)
             if stream.startswith("ytsearch:") or stream in (None, "none"):
                 self.extract_single(entry, force=True)
-                stream = entry.get("stream", None)
+                stream = entry.get("stream")
                 if stream in (None, "none"):
                     raise FileNotFoundError("Unable to locate appropriate file stream.")
             f.load(stream, check_fmt=entry.get("duration") is None)
@@ -4071,8 +4075,8 @@ class UpdateAudio(Database):
                 flags = "h"
                 message = cdict(attachments=None)
                 for dump in bot.commands.dump:
-                    print("auto-loading queue", argv, "to", guild)
-                    await dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc)
+                    print("auto-loading queue of", len(argv), "items to", guild)
+                    create_task(dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc))
         self.data.clear()
 
 
