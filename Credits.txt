@@ -3,12 +3,6 @@
 Meurer A, Smith CP, Paprocki M, Čertík O, Kirpichev SB, Rocklin M, Kumar A, Ivanov S, Moore JK, Singh S, Rathnayake T, Vig S, Granger BE, Muller RP, Bonazzi F, Gupta H, Vats S, Johansson F, Pedregosa F, Curry MJ, Terrel AR, Roučka Š, Saboo A, Fernando I, Kulal S, Cimrman R, Scopatz A.
 -SymPy: symbolic computing in Python. PeerJ Computer Science 3:e103 {https://doi.org/10.7717/peerj-cs.103}
 
-Fredrik Johansson and others
--mpmath: a Python library for arbitrary-precision floating-point arithmetic {http://mpmath.org}
-
-Virtanen, Pauli and Gommers, Ralf and Oliphant, Travis E. and Haberland, Matt and Reddy, Tyler and Cournapeau, David and Burovski, Evgeni and Peterson, Pearu and Weckesser, Warren and Bright, Jonathan and van der Walt,Stefan J.  and Brett, Matthew and Wilson, Joshua and Jarrod Millman, K. and Mayorov, Nikolay and Nelson, Andrew R.~J. and Jones, Eric and Kern, Robert and Larson, Eric and Carey, CJ and Polat, Ilhan and Feng, Yu and Moore, Eric W. and Vand erPlas, Jake and Laxalde, Denis and Perktold, Josef and Cimrman, Robert and Henriksen, Ian and Quintero, E.~A. and Harris, Charles R and Archibald, Anne M. and Ribeiro, Antonio H. and Pedregosa, Fabian and van Mulbregt, Paul and Contributors
--SciPy 1.0: Fundamental Algorithms for Scientific Computing in Python {https://doi.org/10.1038/s41592-019-0686-2}
-
 Rapptz and others
 -discord.py: A modern, easy to use, feature-rich, and async ready API wrapper for Discord written in Python. {https://github.com/Rapptz/discord.py}
 
