@@ -9,7 +9,7 @@ except ModuleNotFoundError:
 class Purge(Command):
     time_consuming = True
     _timeout_ = 16
-    name = ["🌪️", "Del", "Delete", "Purge_Range"]
+    name = ["🗑", "Del", "Delete", "Purge_Range"]
     min_level = 3
     description = "Deletes a number of messages from a certain user in current channel."
     usage = "<1:*users{bot}{everyone(?a)}> <0:count[1]> <ignore(?i)> <range(?r)> <hide(?h)>"
@@ -744,7 +744,7 @@ class RolePreserver(Command):
 
 class Lockdown(Command):
     server_only = True
-    name = ["🔒"]
+    name = ["🔒", "☣️"]
     min_level = inf
     description = "Completely locks down the server by removing send message permissions for all users and revoking all invites."
     flags = "f"

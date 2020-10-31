@@ -5,7 +5,7 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-import youtube_dlc, pytube
+import youtube_dlc
 from bs4 import BeautifulSoup
 youtube_dl = youtube_dlc
 
@@ -1342,52 +1342,93 @@ class AudioDownloader:
                 token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=0.5))
                 self.spotify_header = {"authorization": f"Bearer {json.loads(token[:512])['accessToken']}"}
 
-    # Gets data from pytube and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
-    def from_pytube(self, url):
-        # pytube only accepts direct youtube links
-        url = verify_url(url)
-        if not url.startswith("https://www.youtube.com/"):
-            if not url.startswith("http://youtu.be/"):
-                if is_url(url):
-                    raise youtube_dl.DownloadError("Not a youtube link.")
-                url = f"https://www.youtube.com/watch?v={url}"
-        try:
-            resp = retry(pytube.YouTube, url, attempts=3, exc=(pytube.exceptions.RegexMatchError,))
-        except pytube.exceptions.RegexMatchError:
-            raise youtube_dl.DownloadError("Invalid single youtube link.")
+    # Gets data from yt-download.org and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
+    def extract_backup(self, url):
+        if ":" in url:
+            url = url.split("v=", 1)[1].split("&", 1)[0]
+        resp = Request(f"https://www.yt-download.org/file/mp3/{url}")
+        search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
+        resp = resp[resp.index(search) + len(search):]
+        thumbnail = resp[:resp.index(b'"')].decode("utf-8", "replace")
+        search = b'<h2 class="text-lg text-teal-600 font-bold m-2 text-center">'
+        resp = resp[resp.index(search) + len(search):]
+        title = resp[:resp.index(b"</h2>")].decode("utf-8", "replace")
+        resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp3/192'.encode("utf-8")) + 9:]
+        stream = resp[:resp.index(b'"')].decode("utf-8", "replace")
+        resp = resp[:resp.index(b"</a>")]
+        search = b'<div class="text-shadow-1">'
+        fs = resp[resp.rindex(search) + len(search):resp.rindex(b"</div>")]
+        if fs.endswith(b"TB"):
+            scale = 1099511627776
+        if fs.endswith(b"GB"):
+            scale = 1073741824
+        elif fs.endswith(b"MB"):
+            scale = 1048576
+        elif fs.endswith(b"KB"):
+            scale = 1024
+        else:
+            scale = 1
+        fs = float(fs.split(None, 1)[0]) * scale
+        dur = fs / 192000 * 8
         entry = {
             "formats": [
                 {
-                    "abr": 0,
-                    "vcodec": stream.video_codec,
-                    "url": stream.url,
-                } for stream in resp.streams.fmt_streams
+                    "abr": 192,
+                    "vcodec": None,
+                    "url": stream,
+                },
             ],
-            "duration": resp.length,
-            "thumbnail": getattr(resp, "thumbnail_url", None),
+            "duration": dur,
+            "thumbnail": thumbnail,
+            "title": title,
         }
-        # Format bitrates
-        for i in range(len(entry["formats"])):
-            stream = resp.streams.fmt_streams[i]
-            try:
-                abr = stream.abr.casefold()
-            except AttributeError:
-                abr = "0"
-            if type(abr) is not str:
-                abr = str(abr)
-            if abr.endswith("kbps"):
-                abr = float(abr[:-4])
-            elif abr.endswith("mbps"):
-                abr = float(abr[:-4]) * 1024
-            elif abr.endswith("bps"):
-                abr = float(abr[:-3]) / 1024
-            else:
-                try:
-                    abr = float(abr)
-                except (ValueError, TypeError):
-                    continue
-            entry["formats"][i]["abr"] = abr
         return entry
+        
+    # def from_pytube(self, url):
+    #     # pytube only accepts direct youtube links
+    #     url = verify_url(url)
+    #     if not url.startswith("https://www.youtube.com/"):
+    #         if not url.startswith("http://youtu.be/"):
+    #             if is_url(url):
+    #                 raise TypeError("Not a youtube link.")
+    #             url = f"https://www.youtube.com/watch?v={url}"
+    #     try:
+    #         resp = retry(pytube.YouTube, url, attempts=3, exc=(pytube.exceptions.RegexMatchError,))
+    #     except pytube.exceptions.RegexMatchError:
+    #         raise RuntimeError("Invalid single youtube link.")
+    #     entry = {
+    #         "formats": [
+    #             {
+    #                 "abr": 0,
+    #                 "vcodec": stream.video_codec,
+    #                 "url": stream.url,
+    #             } for stream in resp.streams.fmt_streams
+    #         ],
+    #         "duration": resp.length,
+    #         "thumbnail": getattr(resp, "thumbnail_url", None),
+    #     }
+    #     # Format bitrates
+    #     for i in range(len(entry["formats"])):
+    #         stream = resp.streams.fmt_streams[i]
+    #         try:
+    #             abr = stream.abr.casefold()
+    #         except AttributeError:
+    #             abr = "0"
+    #         if type(abr) is not str:
+    #             abr = str(abr)
+    #         if abr.endswith("kbps"):
+    #             abr = float(abr[:-4])
+    #         elif abr.endswith("mbps"):
+    #             abr = float(abr[:-4]) * 1024
+    #         elif abr.endswith("bps"):
+    #             abr = float(abr[:-3]) / 1024
+    #         else:
+    #             try:
+    #                 abr = float(abr)
+    #             except (ValueError, TypeError):
+    #                 continue
+    #         entry["formats"][i]["abr"] = abr
+    #     return entry
 
     # Returns part of a spotify playlist.
     def get_spotify_part(self, url):
@@ -1480,12 +1521,15 @@ class AudioDownloader:
         try:
             entries = self.downloader.extract_info(url, download=False, process=True)
         except youtube_dl.DownloadError as ex:
-            s = str(ex)
-            if "403" in s or "No video formats found" in s or "Unable to extract video data" in s:
+            s = str(ex).casefold()
+            if "403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s:
                 try:
-                    entries = self.from_pytube(url)
+                    entries = self.extract_backup(url)
                 except youtube_dl.DownloadError:
                     raise FileNotFoundError("Unable to fetch audio data.")
+                else:
+                    print_exc()
+                    print("Above exception successfully resolved with yt-downloader.")
             else:
                 raise
         if "entries" in entries:
@@ -1517,12 +1561,16 @@ class AudioDownloader:
             return self.downloader.extract_info(url, download=False, process=False)
         except youtube_dl.DownloadError as ex:
             s = str(ex)
-            if "403" in s or "No video formats found" in s or "Unable to extract video data" in s:
+            if "403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s:
                 if is_url(url):
                     try:
-                        return self.from_pytube(url)
+                        entries = self.extract_backup(url)
                     except youtube_dl.DownloadError:
                         raise FileNotFoundError("Unable to fetch audio data.")
+                    else:
+                        print_exc()
+                        print("Above exception successfully resolved with yt-downloader.")
+                        return entries
             raise
 
     # Extracts info from a URL or search, adjusting accordingly.
@@ -2088,7 +2136,6 @@ class Queue(Command):
     server_only = True
     name = ["▶️", "P", "Q", "Play", "Enqueue"]
     alias = name + ["LS"]
-    min_level = 0
     description = "Shows the music queue, or plays a song in voice."
     usage = "<*search_links[]> <verbose(?v)> <hide(?h)> <force(?f)> <budge(?b)> <debug(?z)>"
     flags = "hvfbz"
@@ -2361,7 +2408,6 @@ class Queue(Command):
 class Playlist(Command):
     server_only = True
     name = ["DefaultPlaylist", "PL"]
-    min_level = 0
     min_display = "0~2"
     description = "Shows, appends, or removes from the default playlist."
     usage = "<search_link[]> <remove(?d)> <debug(?z)>"
@@ -2483,17 +2529,16 @@ class Playlist(Command):
 
 class Connect(Command):
     server_only = True
-    name = ["📲", "🎧", "🎵", "🎶", "Summon", "Join", "DC", "Disconnect", "Leave", "Move", "Reconnect"]
+    name = ["📲", "🎤", "🎵", "🎶", "📴", "📛", "Summon", "Join", "DC", "Disconnect", "Leave", "Move", "Reconnect"]
     # Because Rythm also has this alias :P
     alias = name + ["FuckOff"]
-    min_level = 0
     description = "Summons the bot into a voice channel."
     usage = "<channel{curr}(0)>"
     rate_limit = (3, 4)
 
     async def __call__(self, user, channel, name="join", argv="", vc=None, **void):
         bot = self.bot
-        if name in ("dc", "disconnect", "leave", "fuckoff"):
+        if name in ("dc", "disconnect", "leave", "fuckoff", "📴", "📛"):
             vc_ = None
         elif argv or name == "move":
             c_id = verify_id(argv)
@@ -2618,7 +2663,6 @@ class Connect(Command):
 class Skip(Command):
     server_only = True
     name = ["⏭", "🚫", "S", "SK", "CQ", "Remove", "Rem", "ClearQueue", "Clear"]
-    min_level = 0
     min_display = "0~1"
     description = "Removes an entry or range of entries from the voice channel queue."
     usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
@@ -2770,7 +2814,6 @@ class Skip(Command):
 class Pause(Command):
     server_only = True
     name = ["⏸️", "⏯️", "Resume", "Unpause", "Stop"]
-    min_level = 0
     min_display = "0~1"
     description = "Pauses, stops, or resumes audio playing."
     usage = "<hide(?h)>"
@@ -2810,6 +2853,8 @@ class Pause(Command):
                 past = "paused"
             elif name == "⏯️":
                 past = "paused" if auds.paused & 1 else "resumed"
+            elif name == "stop":
+                past = "stopped"
             else:
                 past = name + "d"
             return italics(css_md(f"Successfully {past} audio playback in {sqr_md(guild)}.")), 1
@@ -2818,7 +2863,6 @@ class Pause(Command):
 class Seek(Command):
     server_only = True
     name = ["↔️", "Replay"]
-    min_level = 0
     min_display = "0~1"
     description = "Seeks to a position in the current audio file."
     usage = "<position[0]> <hide(?h)>"
@@ -2851,7 +2895,6 @@ class Dump(Command):
     time_consuming = True
     name = ["Save", "Load"]
     alias = name + ["Dujmpö"]
-    min_level = 0
     min_display = "0~1"
     description = "Saves or loads the currently playing audio queue state."
     usage = "<data{attached_file}> <song_positions(?x)> <append(?a)> <hide(?h)>"
@@ -2947,8 +2990,8 @@ class AudioSettings(Command):
         "Repeat": "repeat",
         "ShuffleQueue": "shuffle",
         "Quiet": "quiet",
-        "Reset": "reset",
         "Stay": "stay",
+        "Reset": "reset",
     }
     aliasExt = {
         "AudioSettings": None,
@@ -2956,13 +2999,24 @@ class AudioSettings(Command):
         "A": None,
         "Vol": "volume",
         "V": "volume",
+        "🔉": "volume",
+        "🔊": "volume",
+        "📢": "volume",
         "SP": "speed",
+        "⏩": "speed",
+        "rewind": "rewind",
+        "⏪": "rewind",
         "PI": "pitch",
+        "↕️": "pitch",
         "PN": "pan",
         "BB": "bassboost",
+        "🥁": "bassboost",
         "RV": "reverb",
+        "📉": "reverb",
         "CO": "compressor",
+        "🗜": "compressor",
         "CH": "chorus",
+        "📊": "chorus",
         "NC": "resample",
         "Rate": "bitrate",
         "BPS": "bitrate",
@@ -2973,15 +3027,17 @@ class AudioSettings(Command):
         "🔂": "repeat",
         "L1": "repeat",
         "SQ": "shuffle",
+        "🤫": "quiet",
+        "🔕": "quiet",
         "24/7": "stay",
+        "♻": "reset",
     }
     rate_limit = (0.5, 6)
 
     def __init__(self, *args):
         self.alias = list(self.aliasMap) + list(self.aliasExt)[1:]
         self.name = list(self.aliasMap)
-        self.min_level = 0
-        self.min_display = "0~1"
+        self.    self.min_display = "0~1"
         self.description = "Changes the current audio settings for this server."
         self.usage = (
             "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <pan(?e)> <bassboost(?b)> <reverb(?r)> <compressor(?c)>"
@@ -3034,7 +3090,7 @@ class AudioSettings(Command):
         if "t" in flags:
             ops.append("stay")
         # If no number input given, show audio setting
-        if not disable and not argv and (len(ops) != 1 or ops[-1] not in "loop repeat shuffle quiet stay"):
+        if not disable and not argv and (len(ops) != 1 or ops[-1] not in "rewind loop repeat shuffle quiet stay"):
             if len(ops) == 1:
                 op = ops[0]
             else:
@@ -3067,8 +3123,14 @@ class AudioSettings(Command):
         s = ""
         for op in ops:
             # These audio settings automatically invert when used
-            if type(op) is str and op in "loop repeat shuffle quiet stay" and not argv:
-                argv = str(not auds.stats[op])
+            if type(op) is str:
+                if op in "loop repeat shuffle quiet stay" and not argv:
+                    argv = str(not auds.stats[op])
+                elif op == "rewind":
+                    argv = "100"
+            if op == "rewind":
+                op = "speed"
+                argv = "- " + argv
             # This disables one or more audio settings
             if disable:
                 val = auds.defaults[op]
@@ -3114,8 +3176,7 @@ class AudioSettings(Command):
 
 class Rotate(Command):
     server_only = True
-    name = ["↕️", "Jump"]
-    min_level = 0
+    name = ["🔄", "Jump"]
     min_display = "0~1"
     description = "Rotates the queue to the left by a certain amount of steps."
     usage = "<position> <hide(?h)>"
@@ -3143,7 +3204,6 @@ class Rotate(Command):
 class Shuffle(Command):
     server_only = True
     name = ["🔀"]
-    min_level = 0
     min_display = "0~1"
     description = "Shuffles the audio queue."
     usage = "<force(?f)> <hide(?h)>"
@@ -3171,7 +3231,6 @@ class Shuffle(Command):
 
 class Reverse(Command):
     server_only = True
-    min_level = 0
     min_display = "0~1"
     description = "Reverses the audio queue direction."
     usage = "<hide(?h)>"
@@ -3254,7 +3313,6 @@ class Player(Command):
         }
     barsize = 24
     name = ["NP", "NowPlaying", "Playing"]
-    min_level = 0
     min_display = "0~3"
     description = "Creates an auto-updating virtual audio player for the current server."
     usage = "<controllable(?c)> <disable(?d)> <show_debug(?z)>"
@@ -3598,7 +3656,6 @@ async def get_lyrics(item):
 class Lyrics(Command):
     time_consuming = True
     name = ["SongLyrics"]
-    min_level = 0
     description = "Searches genius.com for lyrics of a song."
     usage = "<0:search_link{queue}> <verbose(?v)>"
     flags = "v"
@@ -3665,7 +3722,6 @@ class Download(Command):
     time_consuming = True
     _timeout_ = 20
     name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "ConvertORG", "Org2xm", "Convert"]
-    min_level = 0
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
     usage = "<0:search_link{queue}> <-1:out_format[ogg]> <apply_settings(?a)> <verbose_search(?v)> <show_debug(?z)>"
     flags = "avz"

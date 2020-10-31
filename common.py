@@ -1541,7 +1541,7 @@ def tzparse(expr):
 
 # Basic inheritable class for all bot commands.
 class Command(collections.abc.Hashable, collections.abc.Callable):
-    min_level = -inf
+    min_level = 0
     rate_limit = 0
     description = ""
     usage = ""

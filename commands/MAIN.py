@@ -86,7 +86,6 @@ class Help(Command):
 
 class Hello(Command):
     name = ["👋", "Hi", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
-    min_level = 0
     description = "Sends a waving emoji. Useful for checking whether the bot is online."
     
     def __call__(self, bot, user, **void):
@@ -149,7 +148,6 @@ class Perms(Command):
 class EnabledCommands(Command):
     server_only = True
     name = ["EC", "Enable"]
-    min_level = 0
     min_display = "0~3"
     description = "Shows, enables, or disables a command category in the current channel."
     usage = "<command{all}> <add(?e)> <remove(?d)> <list(?l)> <hide(?h)>"
@@ -224,7 +222,6 @@ class EnabledCommands(Command):
 
 class Prefix(Command):
     name = ["ChangePrefix"]
-    min_level = 0
     min_display = "0~3"
     description = "Shows or changes the prefix for ⟨MIZA⟩'s commands for this server."
     usage = "<prefix[]> <default(?d)>"
@@ -320,7 +317,6 @@ class Loop(Command):
 
 class Avatar(Command):
     name = ["PFP", "Icon"]
-    min_level = 0
     description = "Sends a link to the avatar of a user or server."
     usage = "<*objects>"
     multi = True
@@ -418,7 +414,6 @@ class Avatar(Command):
 
 class Info(Command):
     name = ["🔍", "🔎", "UserInfo", "ServerInfo", "WhoIs"]
-    min_level = 0
     description = "Shows information about the target user or server."
     usage = "<*objects> <verbose(?v)>"
     flags = "v"
@@ -810,7 +805,6 @@ class Info(Command):
 
 class Profile(Command):
     name = ["User", "UserProfile"]
-    min_level = 0
     description = "Shows or edits a user profile on ⟨MIZA⟩."
     usage = "<user[]> | <option(description)(timezone)(birthday)> <value[]> <delete(?d)>"
     flags = "d"
@@ -885,7 +879,6 @@ class Profile(Command):
 
 class Activity(Command):
     name = ["Recent", "Log"]
-    min_level = 0
     description = "Shows recent Discord activity for the targeted user."
     usage = "<user> <verbose(?v)>"
     flags="v"
@@ -905,7 +898,6 @@ class Activity(Command):
 
 class Status(Command):
     name = ["State", "Ping"]
-    min_level = 0
     description = "Shows the bot's current internal program state."
     usage = "<enable(?e)> <disable(?d)>"
     flags = "aed"
@@ -979,7 +971,6 @@ class Status(Command):
 
 class Invite(Command):
     name = ["OAuth", "InviteBot", "InviteLink"]
-    min_level = 0
     description = "Sends a link to ⟨MIZA⟩'s homepage and invite code."
     
     def __call__(self, channel, **void):
@@ -993,7 +984,6 @@ class Invite(Command):
 
 class Reminder(Command):
     name = ["Announcement", "Announcements", "Announce", "RemindMe", "Reminders", "Remind"]
-    min_level = 0
     description = "Sets a reminder for a certain date and time."
     usage = "<1:message> <0:time> <disable(?d)>"
     flags = "aed"
@@ -1676,9 +1666,7 @@ class UpdateUsers(Database):
         data = {"Command": Command}
         exec(
             f"class {self.bot.name.replace(' ', '')}(Command):"
-            +"\n\tmin_level = 0"
             +"\n\tno_parse = True"
-
             +"\n\tasync def __call__(self, message, argv, **void):"
             +"\n\t\tawait self.bot.data.users._nocommand_(message, self.bot.user.mention + ' ' + argv, force=True)",
             data,

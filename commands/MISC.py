@@ -237,7 +237,6 @@ def _m2f(mem, val):
 
 class CS_mem2flag(Command):
     name = ["CS_m2f"]
-    min_level = 0
     description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
     usage = "<0:address> <1:value[1]>"
     rate_limit = 1
@@ -252,7 +251,6 @@ class CS_mem2flag(Command):
 class CS_hex2xml(Command):
     time_consuming = True
     name = ["CS_h2x"]
-    min_level = 0
     description = "Converts a given Cave Story hex patch to an xml file readable by Booster's Lab."
     usage = "<hex_data>"
     rate_limit = (3, 5)
@@ -322,7 +320,6 @@ class CS_hex2xml(Command):
 
 class CS_npc(Command):
     time_consuming = True
-    min_level = 0
     description = "Searches the Cave Story NPC list for an NPC by name or ID."
     usage = "<query> <condensed(?c)>"
     flags = "c"
@@ -360,7 +357,6 @@ class CS_npc(Command):
 
 
 class CS_tsc(Command):
-    min_level = 0
     description = "Searches the Cave Story OOB flags list for a memory variable."
     usage = "<query> <condensed(?c)>"
     flags = "c"
@@ -400,7 +396,6 @@ class CS_tsc(Command):
 class CS_mod(Command):
     time_consuming = True
     name = ["CS_search"]
-    min_level = 0
     description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
     usage = "<query>"
     no_parse = True

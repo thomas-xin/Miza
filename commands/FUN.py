@@ -233,7 +233,6 @@ class ND2048(collections.abc.MutableSequence):
 class Text2048(Command):
     time_consuming = True
     name = ["2048"]
-    min_level = 0
     description = "Plays a game of 2048 using reactions. Gained points are rewarded as gold."
     usage = "<0*:dimension_sizes[4x4]> <1:dimension_count[2]> <special_tiles(?s)> <public(?p)> <insanity_mode(?i)> <easy_mode(?e)>"
     flags = "pies"
@@ -398,7 +397,6 @@ class Text2048(Command):
     
 class SlotMachine(Command):
     name = ["Slots"]
-    min_level = 0
     description = "Plays a slot machine game. Costs gold to play, can yield gold and diamonds."
     usage = "<bet[100]> <skip_animation(?s)>"
     flags = "s"
@@ -517,7 +515,6 @@ class SlotMachine(Command):
 
 class Pay(Command):
     name = ["GiveCoins", "GiveGold"]
-    min_level = 0
     description = "Pays a specified amount of coins to the target user."
     usage = "<0:user> <1:amount[1]>"
     rate_limit = 0.5
@@ -608,7 +605,6 @@ class UpdateDogpiles(Database):
 
 class Daily(Command):
     name = ["Quests", "Quest", "Tasks", "Challenges", "Dailies"]
-    min_level = 0
     description = "Shows your list of daily quests."
     rate_limit = 1
 
@@ -751,7 +747,6 @@ class UpdateDailies(Database):
 
 class Wallet(Command):
     name = ["Bal", "Balance"]
-    min_level = 0
     description = "Shows the target users' wallet."
     usage = "<*objects>"
     rate_limit = 1
@@ -795,7 +790,6 @@ class Wallet(Command):
 
 
 class Shop(Command):
-    min_level = 0
     description = "Displays the shop system, or purchases an item."
     usage = "<item[]>"
     rate_limit = 1
@@ -864,7 +858,6 @@ class Shop(Command):
 
 class MimicConfig(Command):
     name = ["PluralConfig", "RPConfig"]
-    min_level = 0
     description = "Modifies an existing webhook mimic's attributes."
     usage = (
         "<0:mimic_id> <1:option(prefix)(name[])(avatar)"
@@ -963,7 +956,6 @@ class MimicConfig(Command):
 
 class Mimic(Command):
     name = ["RolePlay", "Plural", "RP", "RPCreate"]
-    min_level = 0
     description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes."
     usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)> <debug(?z)>"
     flags = "aedzf"
@@ -1165,7 +1157,6 @@ class Mimic(Command):
 
 class MimicSend(Command):
     name = ["RPSend", "PluralSend"]
-    min_level = 0
     description = "Sends a message using a webhook mimic, to the target channel."
     usage = "<0:mimic> <1:channel> <2:string>"
     no_parse = True

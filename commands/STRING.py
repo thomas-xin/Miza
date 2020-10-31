@@ -63,7 +63,6 @@ def getTranslate(translator, string, dest, source):
 class Translate(Command):
     time_consuming = True
     name = ["TR"]
-    min_level = 0
     description = "Translates a string into another language."
     usage = "<0:language> <1:string> <verbose(?v)> <papago(?p)>"
     flags = "pv"
@@ -120,7 +119,6 @@ class Math(Command):
     _timeout_ = 4
     name = ["🔢", "M", "PY", "Sympy", "Plot", "Calc"]
     alias = name + ["Plot3d"]
-    min_level = 0
     description = "Evaluates a math formula."
     usage = "<function> <verbose(?v)> <rationalize(?r)> <show_variables(?l)> <clear_variables(?c)>"
     flags = "rvlcd"
@@ -190,7 +188,6 @@ class UpdateVariables(Database):
 
 class Uni2Hex(Command):
     name = ["U2H", "HexEncode"]
-    min_level = 0
     description = "Converts unicode text to hexadecimal numbers."
     usage = "<string>"
     no_parse = True
@@ -204,7 +201,6 @@ class Uni2Hex(Command):
 
 class Hex2Uni(Command):
     name = ["H2U", "HexDecode"]
-    min_level = 0
     description = "Converts hexadecimal numbers to unicode text."
     usage = "<string>"
 
@@ -215,9 +211,33 @@ class Hex2Uni(Command):
         return fix_md(b.decode("utf-8", "replace"))
 
 
+# class Uni2Bin(Command):
+#     name = ["U2B", "BinEncode"]
+#     description = "Converts unicode text to binary numbers."
+#     usage = "<string>"
+#     no_parse = True
+
+#     def __call__(self, argv, **void):
+#         if not argv:
+#             raise ArgumentError("Input string is empty.")
+#         b = bytes(argv, "utf-8")
+#         return fix_md(bytes2hex(b))
+
+
+# class Bin2Uni(Command):
+#     name = ["B2U", "BinDecode"]
+#     description = "Converts binary numbers to unicode text."
+#     usage = "<string>"
+
+#     def __call__(self, argv, **void):
+#         if not argv:
+#             raise ArgumentError("Input string is empty.")
+#         b = hex2bytes(argv.replace("0x", "").replace(" ", ""))
+#         return fix_md(b.decode("utf-8", "replace"))
+
+
 class ID2Time(Command):
     name = ["I2T", "CreateTime", "Timestamp"]
-    min_level = 0
     description = "Converts a discord ID to its corresponding UTC time."
     usage = "<string>"
 
@@ -230,7 +250,6 @@ class ID2Time(Command):
 
 class Time2ID(Command):
     name = ["T2I", "RTimestamp"]
-    min_level = 0
     description = "Converts a UTC time to its corresponding discord ID."
     usage = "<string>"
 
@@ -243,7 +262,6 @@ class Time2ID(Command):
 
 class SHA256(Command):
     name = ["SHA"]
-    min_level = 0
     description = "Computes the SHA256 hash of a string."
     usage = "<string>"
 
@@ -256,7 +274,6 @@ class SHA256(Command):
 
 class Fancy(Command):
     name = ["FancyText"]
-    min_level = 0
     description = "Creates translations of a string using unicode fonts."
     usage = "<string>"
     no_parse = True
@@ -275,7 +292,6 @@ class Fancy(Command):
 
 class Zalgo(Command):
     name = ["Chaos", "ZalgoText"]
-    min_level = 0
     description = "Generates random combining accent symbols between characters in a string."
     usage = "<string>"
     no_parse = True
@@ -298,7 +314,6 @@ class Zalgo(Command):
 
 class Format(Command):
     name = ["FormatText"]
-    min_level = 0
     description = "Creates neatly fomatted text using combining unicode characters."
     usage = "<string>"
     no_parse = True
@@ -318,7 +333,6 @@ class Format(Command):
 
 class UnFancy(Command):
     name = ["UnFormat", "UnZalgo"]
-    min_level = 0
     description = "Removes unicode formatting and diacritic characters from inputted text."
     usage = "<string>"
 
@@ -337,7 +351,6 @@ class OwOify(Command):
     }
     otrans = "".maketrans(omap)
     name = ["UwU", "OwO", "UwUify"]
-    min_level = 0
     description = "Applies the owo/uwu text filter to a string."
     usage = "<string> <aggressive(?a)> <basic(?b)>"
     flags = "ab"
@@ -385,7 +398,6 @@ class OwOify(Command):
 
 
 class AltCaps(Command):
-    min_level = 0
     description = "Alternates the capitalization on characters in a string."
     usage = "<string>"
     no_parse = True
@@ -500,7 +512,6 @@ def _c2e(string, em1, em2):
 
 class Char2Emoj(Command):
     name = ["C2E"]
-    min_level = 0
     description = "Makes emoji blocks using a string."
     usage = "<0:string> <1:emoji_1> <2:emoji_2>"
 
@@ -521,7 +532,6 @@ class Char2Emoj(Command):
 
 class Time(Command):
     name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T"]
-    min_level = 0
     description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user."
     usage = "<offset_hours[0]> | <user[]>"
 
@@ -560,7 +570,6 @@ class Time(Command):
 
 
 class Timezone(Command):
-    min_level = 0
     description = "Shows the current time in a certain timezone."
     usage = "<timezone> <list(?l)>"
 
@@ -578,7 +587,6 @@ class Timezone(Command):
 
 class TimeCalc(Command):
     name = ["TimeDifference"]
-    min_level = 0
     description = "Computes the difference between two times, or the Unix timestamp of a datetime string."
     usage = "<0:time1> | <1:time2[0]>"
     no_parse = True
@@ -603,7 +611,6 @@ class TimeCalc(Command):
 
 class Follow(Command):
     name = ["🚶", "follow_url", "Redirect"]
-    min_level = 0
     description = "Follows a discord message link and/or finds URLs in a string."
     rate_limit = (1, 5)
     
@@ -628,7 +635,6 @@ class Follow(Command):
 
 class Match(Command):
     name = ["RE", "RegEx", "RexExp", "GREP"]
-    min_level = 0
     description = "matches two strings using Linux-style RegExp, or computes the match ratio of two strings."
     rate_limit = (0.5, 2)
     no_parse = True
@@ -662,7 +668,6 @@ class Match(Command):
 
 
 class Ask(Command):
-    min_level = 0
     description = "Ask me any question, and I'll answer it!"
     usage = "<string>"
     no_parse = True
@@ -778,7 +783,6 @@ class UrbanDictionary(Command):
 	"x-rapidapi-key": rapidapi_key,
     }
     name = ["📖", "Urban"]
-    min_level = 0
     description = "Searches Urban Dictionary for an item."
     usage = "<string> <verbose(?v)>"
     flags = "v"

@@ -51,7 +51,6 @@ def get_video(url, fps):
 
 
 class IMG(Command):
-    min_level = 0
     min_display = "0~2"
     description = "Sends an image in the current chat from a list."
     usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <add(?a)> <delete(?d)> <hide(?h)> <debug(?z)>"
@@ -390,7 +389,6 @@ async def get_image(bot, user, message, args, argv, default=2, ext="png"):
 
 class Saturate(Command):
     name = ["Saturation", "ImageSaturate"]
-    min_level = 0
     description = "Changes colour saturation of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
@@ -414,7 +412,6 @@ class Saturate(Command):
 
 class Contrast(Command):
     name = ["ImageContrast"]
-    min_level = 0
     description = "Changes colour contrast of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
@@ -438,7 +435,6 @@ class Contrast(Command):
 
 class Brightness(Command):
     name = ["Brighten", "ImageBrightness"]
-    min_level = 0
     description = "Changes colour brightness of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
@@ -462,7 +458,6 @@ class Brightness(Command):
 
 class Sharpness(Command):
     name = ["Sharpen", "ImageSharpness"]
-    min_level = 0
     description = "Changes colour sharpness of supplied image."
     usage = "<0:url{attached_file}> <1:multiplier[2]>"
     no_parse = True
@@ -486,7 +481,6 @@ class Sharpness(Command):
 
 class HueShift(Command):
     name = ["Hue"]
-    min_level = 0
     description = "Changes colour hue of supplied image."
     usage = "<0:url{attached_file}> <1:adjustment[0.5]>"
     no_parse = True
@@ -510,7 +504,6 @@ class HueShift(Command):
 
 class Blur(Command):
     name = ["Gaussian", "GaussianBlur"]
-    min_level = 0
     description = "Applies Gaussian Blur to supplied image."
     usage = "<0:url{attached_file}> <1:radius[8]>"
     no_parse = True
@@ -535,7 +528,6 @@ class Blur(Command):
 class ColourDeficiency(Command):
     name = ["ColorBlind", "ColourBlind", "ColorBlindness", "ColourBlindness", "ColorDeficiency"]
     alias = name + ["Protanopia", "Protanomaly", "Deuteranopia", "Deuteranomaly", "Tritanopia", "Tritanomaly", "Achromatopsia", "Achromatonomaly"]
-    min_level = 0
     description = "Applies a colourblindness filter to the target image."
     usage = "<0:url{attached_file}> <type[deuteranomaly]> <1:ratio[0.9]>"
     no_parse = True
@@ -598,7 +590,6 @@ class ColourDeficiency(Command):
 
 class RemoveMatte(Command):
     name = ["RemoveColor", "RemoveColour"]
-    min_level = 0
     description = "Removes a colour from the supplied image."
     usage = "<0:url{attached_file}> <colour[255, 255, 255]>"
     no_parse = True
@@ -649,7 +640,6 @@ class RemoveMatte(Command):
 
 class Invert(Command):
     name = ["Negate"]
-    min_level = 0
     description = "Inverts supplied image."
     usage = "<0:url{attached_file}>"
     no_parse = True
@@ -673,7 +663,6 @@ class Invert(Command):
 
 class GreyScale(Command):
     name = ["GrayScale"]
-    min_level = 0
     description = "Greyscales supplied image."
     usage = "<0:url{attached_file}>"
     no_parse = True
@@ -696,7 +685,6 @@ class GreyScale(Command):
 
 
 class Magik(Command):
-    min_level = 0
     description = "Applies the Magik image filter to supplied image."
     usage = "<0:url{attached_file}> <cell_size[7]>"
     no_parse = True
@@ -720,7 +708,6 @@ class Magik(Command):
 
 class Colour(Command):
     name = ["RGB", "HSV", "CMY", "LAB", "LUV", "XYZ", "Color"]
-    min_level = 0
     description = "Creates a 128x128 image filled with the target colour."
     usage = "<Colour>"
     no_parse = True
@@ -764,7 +751,6 @@ class Colour(Command):
 
 class Rainbow(Command):
     name = ["RainbowGIF"]
-    min_level = 0
     description = "Creates a .gif image from repeatedly hueshifting supplied image."
     usage = "<0:url{attached_file}> <1:duration[2]>"
     no_parse = True
@@ -784,7 +770,6 @@ class Rainbow(Command):
 
 class Spin(Command):
     name = ["SpinGIF"]
-    min_level = 0
     description = "Creates a .gif image from repeatedly rotating supplied image."
     usage = "<0:url{attached_file}> <1:duration[2]>"
     no_parse = True
@@ -804,7 +789,6 @@ class Spin(Command):
 
 class GMagik(Command):
     name = ["MagikGIF"]
-    min_level = 0
     description = "Repeatedly applies the Magik image filter to supplied image."
     usage = "<0:url{attached_file}> <cell_size[7]>"
     no_parse = True
@@ -823,7 +807,6 @@ class GMagik(Command):
 
 class Liquefy(Command):
     name = ["LiquidGIF"]
-    min_level = 0
     description = "Repeatedly applies slight distortion to supplied image."
     usage = "<0:url{attached_file}> <cell_size[12]>"
     no_parse = True
@@ -842,7 +825,6 @@ class Liquefy(Command):
 
 class CreateGIF(Command):
     name = ["Animate", "GIF"]
-    min_level = 0
     description = "Combines multiple supplied images, and/or optionally a video, into an animated .gif image."
     usage = "<0*:urls{attached_files}> <-2:framerate_setting(?r)> <-1:framerate[16]>"
     no_parse = True
@@ -896,7 +878,6 @@ class CreateGIF(Command):
 
 class Resize(Command):
     name = ["ImageScale", "Scale", "Rescale", "ImageResize"]
-    min_level = 0
     description = "Changes size of supplied image, using an optional scaling operation."
     usage = "<0:url{attached_file}> <1:x_multiplier[0.5]> <2:y_multiplier[x]> <3:operation[auto](?l)>"
     no_parse = True
@@ -971,7 +952,6 @@ class Resize(Command):
 
 class Fill(Command):
     name = ["ImageFill", "FillChannel", "FillImage"]
-    min_level = 0
     description = "Fills an optional amount of channels in the target image with an optional value."
     usage = "<0:url{attached_file}> <1*:channels(r)(g)(b)(c)(m)(y)(h)(s)(v)(a)> <-1:value[0]>"
     no_parse = True
@@ -1032,7 +1012,6 @@ class Fill(Command):
 
 class Blend(Command):
     name = ["ImageBlend", "ImageOP"]
-    min_level = 0
     description = "Combines the two supplied images, using an optional blend operation."
     usage = "<0:url1{attached_file}> <1:url2{attached_file}> <2:operation[blend](?l)> <3:opacity[0.5][1]>"
     no_parse = True
@@ -1124,7 +1103,6 @@ class Blend(Command):
 
 
 class ImagePool:
-    min_level = 0
     usage = "<verbose(?v)>"
     flags = "v"
     rate_limit = (0.1, 0.25)

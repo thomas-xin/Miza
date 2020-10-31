@@ -268,7 +268,6 @@ def is_nsfw(channel):
 
 
 class Neko(Command):
-    min_level = 0
     description = "Pulls a random image from nekos.life and embeds it."
     usage = "<tags[neko]> <random(?r)> <verbose(?v)> <list(?l)>"
     flags = "lrv"
