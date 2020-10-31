@@ -287,7 +287,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
                     if len(s) > 262144:
                         return encrypt(bytes2zip(s)), "dump.bin"
                     return encrypt(s), "dump.bin"
-                return json.dumps(q).encode("utf-8"), "dump.json"
+                return json.dumps(d).encode("utf-8"), "dump.json"
             return d, None
 
     # A call to voice_client.play ignoring discord.py bot exceptions.
@@ -2960,6 +2960,8 @@ class Dump(Command):
         else:
             # Queue may already be in dict form if loaded from database
             d = argv
+        if type(d) is list:
+            d = dict(queue=d, stats={})
         q = d["queue"][:262144]
         async with discord.context_managers.Typing(channel):
             # Copy items and cast to cdict queue entries

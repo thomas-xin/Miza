@@ -20,4 +20,4 @@ python-dateutil>=2.8.1
 requests>=2.24.0
 rule34>=1.7.4
 sympy>=1.6.2
-youtube-dlc>=2020.10.26
+youtube-dlc>=2020.10.31
