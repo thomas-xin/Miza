@@ -4084,7 +4084,7 @@ class UpdateAudio(Database):
                 flags = "h"
                 message = cdict(attachments=None)
                 for dump in bot.commands.dump:
-                    print("auto-loading queue of", len(argv), "items to", guild)
+                    print("auto-loading queue of", len(argv["queue"]), "items to", guild)
                     create_task(dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc))
         self.data.clear()
 
