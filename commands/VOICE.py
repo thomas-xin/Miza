@@ -852,12 +852,12 @@ class AudioQueue(alist):
                     try:
                         # Gets audio file stream and loads into audio source object
                         source = ytdl.get_stream(entry)
-                        if source is None:
-                            print(entry)
                         auds.new(source)
                         self.loading = False
                         auds.ensure_play()
                     except:
+                        print(entry)
+                        print(source)
                         self.loading = False
                         print_exc()
                         raise
@@ -1396,7 +1396,7 @@ class AudioDownloader:
                 "duration": dur,
                 "thumbnail": thumbnail,
                 "title": title,
-                "webpage_url": f"https://youtu.be/{url}",
+                "webpage_url": f"https://youtube.com/watch?v={url}",
             }
             print("Successfully resolved with yt-download.")
             return entry
