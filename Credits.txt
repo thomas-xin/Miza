@@ -16,10 +16,6 @@ Sergey M. and others
 -youtube_dl: Command-line program to download videos from YouTube.com and other video sites {https://github.com/ytdl-org/youtube-dl}
 
 
-https://stackoverflow.com/a/37350619
--Used for the image transform filter
-
-
 OTHERS:
 
 Gregot Hennig and others
@@ -49,6 +45,12 @@ https://github.com/Quihico/handy.stuff/blob/master/yt.pagetokens.x10
 
 https://github.com/pocmo/Python-Brainfuck
 -Used for the ~math Brainfuck interpreter.
+
+https://stackoverflow.com/a/37350619
+-Used for the image transform filter
+
+https://yt-download.org/
+-Used for the backup youtube downloader.
 
 
 MISC:
