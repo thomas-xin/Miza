@@ -5,7 +5,6 @@ import numpy as np
 import PIL
 from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
 from zipfile import ZipFile
-from reportlab.graphics import renderPM
 import matplotlib.pyplot as plt
 
 deque = collections.deque
