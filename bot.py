@@ -2745,7 +2745,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 await self.handle_update()
                 futs.add(create_future(self.update_from_client, priority=True))
                 futs.add(create_future(self.update_from_guilds, priority=True))
-                create_task(self.get_ip())
+                create_task(aretry(self.get_ip, delay=20))
                 if not self.started:
                     self.started = True
                     attachments = sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: os.path.getmtime("cache/" + file))

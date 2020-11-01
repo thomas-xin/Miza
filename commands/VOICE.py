@@ -1073,12 +1073,6 @@ class AudioFile:
             with suppress():
                 os.remove("cache/" + self.file)
             raise
-        # Handy way to get external IP using youtube stream links :3
-        if ytdl.bot is not None and "videoplayback" in stream:
-            with suppress(ValueError):
-                i = stream.index("&ip=") + 4
-                ip = stream[i:].split("&", 1)[0]
-                ytdl.bot.update_ip(ip)
         return self
 
     # Touch the file to update its cache time.
