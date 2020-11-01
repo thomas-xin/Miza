@@ -1360,7 +1360,7 @@ class AudioDownloader:
                 resp = resp[resp.rindex(search) + len(search):]
                 search = b";sid='"
                 resp = resp[resp.index(search) + len(search):]
-                self.keepvid_token = resp[:resp.index(b";</script>")].decode("utf-8", "replace")
+                self.keepvid_token = resp[:resp.index(b"';</script>")].decode("utf-8", "replace")
 
     # Gets data from yt-download.org, keepv.id, or y2mate.guru, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def extract_backup(self, url):
