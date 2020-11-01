@@ -1991,7 +1991,7 @@ def set_dict(d, k, v, ignore=False):
 
 # Adds two dictionaries similar to dict.update, but adds conflicting values rather than replacing.
 def add_dict(a, b, replace=True, insert=None):
-    if type(a) is not dict:
+    if not issubclass(type(a), collections.abc.MutableMapping):
         if replace:
             r = b
         else:
@@ -2001,7 +2001,7 @@ def add_dict(a, b, replace=True, insert=None):
         except KeyError:
             r[insert] = a
         return r
-    elif type(b) is not dict:
+    elif not issubclass(type(b), collections.abc.MutableMapping):
         if replace:
             r = a
         else:
@@ -2022,7 +2022,7 @@ def add_dict(a, b, replace=True, insert=None):
             except KeyError:
                 r[k] = b[k]
                 continue
-            if type(temp) is dict or type(b[k]) is dict:
+            if issubclass(type(temp), collections.abc.MutableMapping) or issubclass(type(b[k]), collections.abc.MutableMapping):
                 r[k] = add_dict(b[k], temp, replace)
                 continue
             r[k] = b[k] + temp
