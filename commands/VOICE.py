@@ -1323,6 +1323,10 @@ class AudioDownloader:
         "default_search": "auto",
         "source_address": "0.0.0.0",
     }
+    youtube_x = 0
+    youtube_dl_x = 0
+    spotify_x = 0
+    other_x = 0
 
     def __init__(self):
         self.bot = None
@@ -1346,9 +1350,12 @@ class AudioDownloader:
         if utc() - self.lastclear > 720:
             self.lastclear = utc()
             with tracebacksuppressor:
+                self.youtube_dl_x += 1
                 self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
+                self.spotify_x += 1
                 token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=0.5))
                 self.spotify_header = {"authorization": f"Bearer {json.loads(token[:512])['accessToken']}"}
+                self.other_x += 1
                 resp = Request("https://keepv.id/")
                 search = b"<script>apikey='"
                 resp = resp[resp.rindex(search) + len(search):]
@@ -1367,6 +1374,7 @@ class AudioDownloader:
         webpage_url = f"https://www.youtube.com/watch?v={url}"
         try:
             yt_url = f"https://www.yt-download.org/file/mp3/{url}"
+            self.other_x += 1
             resp = Request(yt_url)
             search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
             resp = resp[resp.index(search) + len(search):]
@@ -1397,6 +1405,7 @@ class AudioDownloader:
         except Exception as ex:
             excs.append(ex)
         try:
+            self.other_x += 1
             resp = Request(
                 "https://keepv.id/",
                 headers={"Accept": "*/*", "Cookie": "PHPSESSID=" + self.keepvid_token, "X-Requested-With": "XMLHttpRequest"},
@@ -1442,6 +1451,7 @@ class AudioDownloader:
         except Exception as ex:
             excs.append(ex)
         try:
+            self.other_x += 1
             resp = Request("https://y2mate.guru/api/convert", decode=True, data={"url": webpage_url}, method="POST")
             data = eval_json(resp)
             meta = data["meta"]
@@ -1516,6 +1526,7 @@ class AudioDownloader:
     # Returns part of a spotify playlist.
     def get_spotify_part(self, url):
         out = deque()
+        self.spotify_x += 1
         resp = Request(url, headers=self.spotify_header)
         d = eval_json(resp)
         with suppress(KeyError):
@@ -1558,6 +1569,7 @@ class AudioDownloader:
     # Returns part of a youtube playlist.
     def get_youtube_part(self, url):
         out = deque()
+        self.youtube_x += 1
         resp = Request(url)
         d = eval_json(resp)
         items = d["items"]
@@ -1602,6 +1614,7 @@ class AudioDownloader:
                 title = title[:title.rindex(".")]
             return dict(url=url, name=title, direct=True)
         try:
+            self.youtube_dl_x += 1
             entries = self.downloader.extract_info(url, download=False, process=True)
         except youtube_dl.DownloadError as ex:
             s = str(ex).casefold()
@@ -1638,6 +1651,7 @@ class AudioDownloader:
                 title = title[:title.rindex(".")]
             return dict(url=url, webpage_url=url, title=title, direct=True)
         try:
+            self.youtube_dl_x += 1
             return self.downloader.extract_info(url, download=False, process=False)
         except Exception as ex:
             s = str(ex).casefold()
@@ -1658,18 +1672,22 @@ class AudioDownloader:
                 c = count
             item = item.replace(":", "-")
             if mode:
+                self.youtube_dl_x += 1
                 return self.downloader.extract_info(f"{mode}search{c}:{item}", download=False, process=False)
             exc = ""
             try:
+                self.youtube_dl_x += 1
                 return self.downloader.extract_info(f"ytsearch{c}:{item}", download=False, process=False)
             except Exception as ex:
                 exc = repr(ex)
             try:
+                self.youtube_dl_x += 1
                 return self.downloader.extract_info(f"scsearch{c}:{item}", download=False, process=False)
             except Exception as ex:
                 raise ConnectionError(exc + repr(ex))
         if is_url(item) or not search:
             return self.extract_from(item)
+        self.youtube_dl_x += 1
         return self.downloader.extract_info(item, download=False, process=False)
 
     # Main extract function, able to extract from youtube playlists much faster than youtube-dl using youtube API, as well as ability to follow soundcloud links.
@@ -1931,6 +1949,7 @@ class AudioDownloader:
 
     def search_yt(self, query):
         url = f"https://www.youtube.com/results?search_query={verify_url(query)}"
+        self.youtube_x += 1
         resp = Request(url, timeout=12)
         result = None
         with suppress(ValueError):
@@ -2015,7 +2034,7 @@ class AudioDownloader:
         # If "research" tag is set, entry does not contain full data and requires another search
         if "research" in entry:
             try:
-                self.extract_single(entry, force=True)
+                self.extract_single(entry)
                 entry.pop("research", None)
             except:
                 print_exc()
@@ -2146,6 +2165,7 @@ class AudioDownloader:
                     os.remove(new)
         if not mid:
             return fn, f"{info['name']}.{fmt}"
+        self.other_x += 1
         with open(fn, "rb") as f:
             resp = Request(
                 "https://cts.ofoct.com/upload.php",
@@ -2159,7 +2179,9 @@ class AudioDownloader:
         print(url)
         with suppress():
             os.remove(fn)
+        self.other_x += 1
         resp = Request(url, timeout=420)
+        self.other_x += 1
         out = Request(f"https://cts.ofoct.com/get-file.php?type=get&genfpath=/tmp/{resp_fn}.mid", timeout=24)
         return io.BytesIO(out), f"{info['name']}.mid"
 
