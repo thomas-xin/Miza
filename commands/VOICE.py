@@ -1355,11 +1355,22 @@ class AudioDownloader:
                 self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
                 token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=0.5))
                 self.spotify_header = {"authorization": f"Bearer {json.loads(token[:512])['accessToken']}"}
+                resp = Request("https://keepv.id/")
+                search = b"<script>apikey='"
+                resp = resp[resp.rindex(search) + len(search):]
+                search = b";sid='"
+                resp = resp[resp.index(search) + len(search):]
+                self.keepvid_token = resp[:resp.index(b";</script>")].decode("utf-8", "replace")
 
-    # Gets data from yt-download.org or y2mate.guru, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
+    # Gets data from yt-download.org, keepv.id, or y2mate.guru, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def extract_backup(self, url):
+        url = verify_url(url)
+        if is_url(url) and not is_youtube_url(url):
+            raise TypeError("Not a youtube link.")
+        excs = alist()
         if ":" in url:
             url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
+        webpage_url = f"https://www.youtube.com/watch?v={url}"
         try:
             yt_url = f"https://www.yt-download.org/file/mp3/{url}"
             resp = Request(yt_url)
@@ -1373,18 +1384,7 @@ class AudioDownloader:
             stream = resp[:resp.index(b'"')].decode("utf-8", "replace")
             resp = resp[:resp.index(b"</a>")]
             search = b'<div class="text-shadow-1">'
-            fs = resp[resp.rindex(search) + len(search):resp.rindex(b"</div>")]
-            if fs.endswith(b"TB"):
-                scale = 1099511627776
-            if fs.endswith(b"GB"):
-                scale = 1073741824
-            elif fs.endswith(b"MB"):
-                scale = 1048576
-            elif fs.endswith(b"KB"):
-                scale = 1024
-            else:
-                scale = 1
-            fs = float(fs.split(None, 1)[0]) * scale
+            fs = parse_fs(resp[resp.rindex(search) + len(search):resp.rindex(b"</div>")])
             dur = fs / 192000 * 8
             entry = {
                 "formats": [
@@ -1396,14 +1396,59 @@ class AudioDownloader:
                 "duration": dur,
                 "thumbnail": thumbnail,
                 "title": title,
-                "webpage_url": f"https://youtube.com/watch?v={url}",
+                "webpage_url": webpage_url,
             }
             print("Successfully resolved with yt-download.")
             return entry
-        except:
-            pass
+        except Exception as ex:
+            excs.append(ex)
         try:
-            resp = Request("https://y2mate.guru/api/convert", decode=True, data={"url": f"https://youtube.com/watch?v={url}"}, method="POST")
+            resp = Request(
+                "https://keepv.id/",
+                headers={"Accept": "*/*", "Cookie": "PHPSESSID=" + self.keepvid_token, "X-Requested-With": "XMLHttpRequest"},
+                data=(("url", webpage_url), ("sid", self.keepvid_token)),
+                method="POST",
+            )
+            search = b'<h2 class="mb-3">'
+            resp = resp[resp.index(search) + len(search):]
+            title = resp[:resp.index(b"</h3>")].decode("utf-8", "replace")
+            search = b'<img src="'
+            resp = resp[resp.index(search) + len(search):]
+            thumbnail = resp[:resp.index(b'"')].decode("utf-8", "replace")
+            entry = {
+                "formats": [],
+                "thumbnail": thumbnail,
+                "title": title,
+                "webpage_url": webpage_url,
+            }
+            with suppress(ValueError):
+                search = b"Download Video</a><br>"
+                resp = resp[resp.index(search) + len(search):]
+                search = b"Duration: "
+                resp = resp[resp.index(search) + len(search):]
+                entry["duration"] = time_parse(resp[:resp.index("<br><br>")])
+            search = b"</a></td></tr></tbody></table><h3>Audio</h3>"
+            resp = resp[resp.index(search) + len(search):]
+            with suppress(ValueError):
+                while resp:
+                    search = b"""</td><td class='text-center'><span class="btn btn-sm btn-outline-"""
+                    resp = resp[resp.index(search) + len(search):]
+                    search = b"</span></td><td class='text-center'>"
+                    resp = resp[resp.index(search) + len(search):]
+                    fs = parse_fs(resp[:resp.index(b"<")])
+                    abr = fs / dur * 8
+                    search = b'class="btn btn-sm btn-outline-primary shadow vdlbtn" href='
+                    resp = resp[resp.index(search) + len(search):]
+                    stream = resp[resp.index(b'"') + 1:resp.index(b'" download="')]
+                    entry["formats"].append(dict(abr=abr, url=stream))
+            if not entry["formats"]:
+                raise FileNotFoundError
+            print("Successfully resolved with keepv.id.")
+            return entry
+        except Exception as ex:
+            excs.append(ex)
+        try:
+            resp = Request("https://y2mate.guru/api/convert", decode=True, data={"url": webpage_url}, method="POST")
             data = eval_json(resp)
             meta = data["meta"]
             entry = {
@@ -1423,7 +1468,9 @@ class AudioDownloader:
                 raise FileNotFoundError
             print("Successfully resolved with y2mate.")
             return entry
-        except:
+        except Exception as ex:
+            excs.append(ex)
+            print(excs)
             raise
         
     # def from_pytube(self, url):

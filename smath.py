@@ -3338,6 +3338,22 @@ def next_date(dt):
     return new
 
 
+def parse_fs(fs):
+    if type(fs) is not bytes:
+        fs = str(fs).encode("utf-8")
+    if fs.endswith(b"TB"):
+        scale = 1099511627776
+    if fs.endswith(b"GB"):
+        scale = 1073741824
+    elif fs.endswith(b"MB"):
+        scale = 1048576
+    elif fs.endswith(b"KB"):
+        scale = 1024
+    else:
+        scale = 1
+    return float(fs.split(None, 1)[0]) * scale
+
+
 RE = cdict()
 
 def regexp(s, flags=0):
