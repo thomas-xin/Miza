@@ -3129,7 +3129,7 @@ def utc_ts(dt):
         return (dt - ep).total_seconds()
     return dt.replace(tzinfo=datetime.timezone.utc).timestamp()
 
-ZONES = {zone.split("/", 1)[-1].replace("-", "").replace("_", "").casefold(): zone for zone in pytz.all_timezones}
+ZONES = {zone.split("/", 1)[-1].replace("-", "").replace("_", "").casefold(): zone for zone in pytz.all_timezones if not zone.startswith("Etc/")}
 COUNTRIES = mdict()
 for tz in pytz.all_timezones:
     if "/" in tz and not tz.startswith("Etc/"):

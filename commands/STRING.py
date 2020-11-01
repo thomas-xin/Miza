@@ -582,7 +582,10 @@ class Timezone(Command):
             return
         secs = as_timezone(argv)
         t = utc_dt() + datetime.timedelta(seconds=secs)
-        return ini_md(f"Current time at UTC/GMT{round_min(secs / 3600)}: {sqr_md(t)}.")
+        h = round_min(secs / 3600)
+        if not h < 0:
+            h = "+" + str(h)
+        return ini_md(f"Current time at UTC/GMT{h}: {sqr_md(t)}.")
 
 
 class TimeCalc(Command):
