@@ -2044,8 +2044,12 @@ class AudioDownloader:
                 stream = entry.get("stream", None)
                 icon = entry.get("icon", None)
         # If stream is still not found or is a soundcloud audio fragment playlist file, perform secondary youtube-dl search
-        if stream in (None, "none") or stream.startswith("https://cf-hls-media.sndcdn.com/"):
+        if stream in (None, "none"):
             data = self.search(entry["url"])
+            stream = set_dict(data[0], "stream", data[0].url)
+            icon = set_dict(data[0], "icon", data[0].url)
+        elif stream.startswith("https://cf-hls-media.sndcdn.com/"):
+            data = self.extract(entry["url"])
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
         # Use SHA-256 hash of URL to avoid filename conflicts
