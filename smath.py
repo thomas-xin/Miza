@@ -3520,7 +3520,7 @@ full_prune = lambda s: unicode_prune(s).translate(__qtrans).casefold()
 
 
 # A fuzzy substring search that returns the ratio of characters matched between two strings.
-def fuzzy_substring(sub, s, match_start=False):
+def fuzzy_substring(sub, s, match_start=False, match_length=True):
     match = 0
     if not match_start or sub and s.startswith(sub[0]):
         found = [0] * len(s)
@@ -3547,7 +3547,7 @@ def fuzzy_substring(sub, s, match_start=False):
                         match += 1 - (x - y) / len(s)
                         found[y] = 1
                     x = y + 1
-        if len(sub) > len(s):
+        if len(sub) > len(s) and match_length:
             match *= len(s) / len(sub)
     # ratio = match / len(s)
     ratio = max(0, min(1, match / len(s)))

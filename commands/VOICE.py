@@ -1972,12 +1972,12 @@ class AudioDownloader:
                 aname = to_alphanumeric(name)
                 spl = aname.split()
                 if entry.duration < 960 or "extended" in q or "hour" in q or "extended" not in spl and "hour" not in spl and "hours" not in spl:
-                    if fuzzy_substring(q, aname) >= 0.5 or fuzzy_substring(q, name) >= 0.5:
+                    if fuzzy_substring(aname, q, match_length=False) >= 0.5 or fuzzy_substring(name, q, match_length=False) >= 0.5:
                         high.append(entry)
                         continue
             low.append(entry)
-        out = sorted(high, key=lambda entry: fuzzy_substring(q, to_alphanumeric(full_prune(entry.name))), reverse=True)
-        out.extend(sorted(low, key=lambda entry: fuzzy_substring(q, to_alphanumeric(full_prune(entry.name))), reverse=True))
+        out = sorted(high, key=lambda entry: fuzzy_substring(to_alphanumeric(full_prune(entry.name)), q, match_length=False), reverse=True)
+        out.extend(sorted(low, key=lambda entry: fuzzy_substring(to_alphanumeric(full_prune(entry.name)), q, match_length=False), reverse=True))
         print(out)
         return out
 

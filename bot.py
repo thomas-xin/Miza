@@ -1257,14 +1257,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     r = [True]
                 elif s in ("f", "false", "n", "no", "off"):
                     r = [False]
-                elif s == "inf":
-                    r = [inf]
-                elif s == "-inf":
-                    r = [-inf]
-                elif s in ("nan", "-nan"):
-                    r = [nan]
                 else:
-                    r = [ast.literal_eval(f)]
+                    try:
+                        r = [float(f)]
+                    except:
+                        r = [ast.literal_eval(f)]
         except (ValueError, TypeError, SyntaxError):
             r = await self.solve_math(f, obj, 64, 0)
         x = r[0]
