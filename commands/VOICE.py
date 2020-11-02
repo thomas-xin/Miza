@@ -851,7 +851,7 @@ class AudioQueue(alist):
                     self.loading = True
                     try:
                         # Gets audio file stream and loads into audio source object
-                        source = ytdl.get_stream(entry)
+                        source = ytdl.get_stream(entry, force=True)
                         auds.new(source)
                         self.loading = False
                         auds.ensure_play()
