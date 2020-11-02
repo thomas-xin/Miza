@@ -3521,6 +3521,8 @@ full_prune = lambda s: unicode_prune(s).translate(__qtrans).casefold()
 
 # A fuzzy substring search that returns the ratio of characters matched between two strings.
 def fuzzy_substring(sub, s, match_start=False, match_length=True):
+    if not match_length and s in sub:
+        return 1
     match = 0
     if not match_start or sub and s.startswith(sub[0]):
         found = [0] * len(s)
