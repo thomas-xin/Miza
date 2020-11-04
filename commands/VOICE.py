@@ -2868,6 +2868,7 @@ class Skip(Command):
                     if not is_finite(pos):
                         if "f" in flags:
                             auds.queue.clear()
+                            auds.paused &= -2
                             create_future_ex(auds.new, timeout=18)
                             if "h" not in flags:
                                 return italics(fix_md("Removed all items from the queue.")), 1
