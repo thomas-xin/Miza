@@ -5,6 +5,8 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
+print = PRINT
+
 import youtube_dlc, nekos
 youtube_dl = youtube_dlc
 

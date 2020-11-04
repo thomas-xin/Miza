@@ -5,6 +5,8 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
+print = PRINT
+
 from googletrans import Translator
 
 

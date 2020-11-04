@@ -5,6 +5,8 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
+print = PRINT
+
 
 class Purge(Command):
     time_consuming = True

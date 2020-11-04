@@ -5,6 +5,8 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
+print = PRINT
+
 try:
     discord_id = AUTH["discord_id"]
     if not discord_id:

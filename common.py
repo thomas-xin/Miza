@@ -1781,22 +1781,26 @@ class __logPrinter:
 
     def __call__(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
         out = str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)
+        if not out:
+            return
         if type(args[0]) is str and args[0].startswith("WARNING:"):
             return sys.__stdout__.write(out)
         if file is None:
             file = self.file
         if file not in self.data:
             self.data[file] = ""
-        if self.history.get(file) == out:
-            add_dict(self.counts, {file:1})
-            return
-        elif self.counts.get(file):
-            count = self.counts.pop(file)
-            times = "s" if count != 1 else ""
-            out = f"<Last message repeated {count} time{times}>\n{out}"
-        else:
-            self.history[file] = out
-            self.counts.clear()
+        temp = out.strip()
+        if temp:
+            if file in self.history and self.history.get(file).strip() == temp:
+                add_dict(self.counts, {file:1})
+                return
+            elif self.counts.get(file):
+                count = self.counts.pop(file)
+                times = "s" if count != 1 else ""
+                out, self.history[file] = f"<Last message repeated {count} time{times}>\n{out}", out
+            else:
+                self.history[file] = out
+                self.counts.pop(file, None)
         self.data[file] += out
         return sys.__stdout__.write(out)
 

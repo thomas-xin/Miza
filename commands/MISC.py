@@ -5,6 +5,8 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
+print = PRINT
+
 import csv, knackpy
 from prettytable import PrettyTable as ptable
 

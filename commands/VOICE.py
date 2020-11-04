@@ -5,11 +5,11 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
+print = PRINT
+
 import youtube_dlc
 from bs4 import BeautifulSoup
 youtube_dl = youtube_dlc
-
-getattr(youtube_dl, "__builtins__", {})["print"] = print
 
 # Audio sample rate for both converting and playing
 SAMPLE_RATE = 48000
@@ -182,6 +182,24 @@ def ensure_url(url):
     if url.startswith("ytsearch:"):
         url = f"https://www.youtube.com/results?search_query={verify_url(url[9:])}"
     return url
+
+
+# This messy regex helps identify and remove certain words in song titles
+lyric_trans = re.compile(
+    (
+        "[([]+"
+        "(((official|full|demo|original|extended) *)?"
+        "((version|ver.?) *)?"
+        "((w\\/)?"
+        "(lyrics?|vocals?|music|ost|instrumental|acoustic|studio|hd|hq) *)?"
+        "((album|video|audio|cover|remix) *)?"
+        "(upload|reupload|version|ver.?)?"
+        "|(feat|ft)"
+        ".+)"
+        "[)\\]]+"
+    ),
+    flags=re.I,
+)
 
 
 # Audio player that wraps discord audio sources, contains a queue, and also manages audio settings.
@@ -1716,9 +1734,9 @@ class AudioDownloader:
                                 break
                             search = f"{url}&pageToken={self.yt_pages[i]}"
                             fut = create_future_ex(self.get_youtube_part, search, timeout=90)
-                            print("Sent 1 youtube search.")
+                            print("Sent 1 youtube playlist snippet.")
                             futs.append(fut)
-                            if not math.log2(i + 4) % 1 or not 4 + i & 15:
+                            if not (i < 1 or math.log2(i + 1) % 1) or not 1 + i & 15:
                                 while futs:
                                     fut = futs.popleft()
                                     res = fut.result()
@@ -1781,7 +1799,7 @@ class AudioDownloader:
                             fut = create_future_ex(self.get_spotify_part, search, timeout=90)
                             print("Sent 1 spotify search.")
                             futs.append(fut)
-                            if not math.log2(i + 1) % 1 or not i & 7:
+                            if not (i < 1 or math.log2(i + 1) % 1) or not i & 7:
                                 while futs:
                                     fut = futs.popleft()
                                     res = fut.result()
@@ -1963,7 +1981,7 @@ class AudioDownloader:
             result = self.parse_yt(s)
         if result is None:
             raise NotImplementedError("Unable to read json response.")
-        q = full_prune(query)
+        q = to_alphanumeric(full_prune(query))
         high = alist()
         low = alist()
         for entry in result:
@@ -1972,12 +1990,17 @@ class AudioDownloader:
                 aname = to_alphanumeric(name)
                 spl = aname.split()
                 if entry.duration < 960 or "extended" in q or "hour" in q or "extended" not in spl and "hour" not in spl and "hours" not in spl:
-                    if fuzzy_substring(aname, q, match_length=False) >= 0.5 or fuzzy_substring(name, q, match_length=False) >= 0.5:
+                    if fuzzy_substring(aname, q, match_length=False) >= 0.5:
                         high.append(entry)
                         continue
             low.append(entry)
-        out = sorted(high, key=lambda entry: fuzzy_substring(to_alphanumeric(full_prune(entry.name)), q, match_length=False), reverse=True)
-        out.extend(sorted(low, key=lambda entry: fuzzy_substring(to_alphanumeric(full_prune(entry.name)), q, match_length=False), reverse=True))
+        def key(entry):
+            coeff = fuzzy_substring(to_alphanumeric(full_prune(entry.name)), q, match_length=False)
+            if coeff < 0.5:
+                coeff = 0
+            return coeff
+        out = sorted(high, key=key, reverse=True)
+        out.extend(sorted(low, key=key, reverse=True))
         print(out)
         return out
 
@@ -3762,22 +3785,6 @@ class Lyrics(Command):
     description = "Searches genius.com for lyrics of a song."
     usage = "<0:search_link{queue}> <verbose(?v)>"
     flags = "v"
-    # This messy regex helps identify and remove certain words in song titles that confuse genius.com
-    lyric_trans = re.compile(
-        (
-            "[([]+"
-            "(((official|full|demo|original|extended) *)?"
-            "((version|ver.?) *)?"
-            "((w\\/)?"
-            "(lyrics?|vocals?|music|ost|instrumental|acoustic|studio|hd|hq) *)?"
-            "((album|video|audio|cover|remix) *)?"
-            "(upload|reupload|version|ver.?)?"
-            "|(feat|ft)"
-            ".+)"
-            "[)\\]]+"
-        ),
-        flags=re.I,
-    )
     rate_limit = (2, 6)
     typing = True
 
@@ -3801,7 +3808,7 @@ class Lyrics(Command):
             search = argv
         search = search.translate(self.bot.mtrans)
         # Attempt to find best query based on the song name
-        item = verify_search(to_alphanumeric(re.sub(self.lyric_trans, "", search)))
+        item = verify_search(to_alphanumeric(lyric_trans.sub("", search)))
         if not item:
             item = verify_search(to_alphanumeric(search))
             if not item:

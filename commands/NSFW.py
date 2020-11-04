@@ -5,6 +5,8 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
+print = PRINT
+
 import nekos, rule34, pybooru
 
 # This entire module is a mess, I honestly don't care for it much
