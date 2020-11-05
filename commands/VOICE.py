@@ -2139,13 +2139,13 @@ class AudioDownloader:
         h = shash(entry["url"])
         fn = h + ".opus"
         # Use cached file if one already exists
-        if fn in self.cache or not download:
+        if self.cache.get(fn) or not download:
             entry["stream"] = stream
             entry["icon"] = icon
             # Files may have a callback set for when they are loaded
             if callback is not None:
                 create_future_ex(callback)
-            f = self.cache.get(fn, None)
+            f = self.cache.get(fn)
             if f is not None:
                 entry["file"] = f
                 # Assign file duration estimate to queue entry
@@ -2156,9 +2156,10 @@ class AudioDownloader:
                     f.assign.append(entry)
                 # Touch file to indicate usage
                 f.ensure_time()
-            while not f.stream:
-                time.sleep(0.1)
-            return f
+                while not f.stream:
+                    time.sleep(0.1)
+            if f or not force or not download:
+                return f
         # Otherwise attempt to start file download
         try:
             self.cache[fn] = f = AudioFile(fn)

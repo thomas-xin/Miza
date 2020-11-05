@@ -3369,7 +3369,7 @@ def time_diff(t2, t1):
         s = str(seconds)
         if "." in s:
             spl = s.split(".", 1)
-            s = spl[0] + "." + spl[1][:6]
+            s = spl[0] + "." + spl[1][:6].rstrip("0")
         out += f"{s} second"
         if seconds != 1:
             out += "s"
