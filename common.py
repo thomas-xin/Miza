@@ -1427,7 +1427,7 @@ def as_timezone(tz):
             a = a[:i]
             break
     tz = a.casefold()
-    return get_timezone(tz) + h * 3600
+    return round_min(get_timezone(tz) + h * 3600)
 
 def timezone_repr(tz):
     if tz in ZONES:
@@ -1532,7 +1532,7 @@ def tzparse(expr):
             one_day = 86400
             while t < curr:
                 t += one_day
-            while t - curr > one_day:
+            while (t - curr).total_seconds() > one_day:
                 t -= one_day
         return t
     if not is_finite(s) or abs(s) >= 1 << 31:

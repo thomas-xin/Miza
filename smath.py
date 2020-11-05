@@ -3058,7 +3058,7 @@ class DynamicDT(datetime.datetime):
 
     def __sub__(self, other):
         if type(other) not in (datetime.timedelta, datetime.datetime, datetime.date, self.__class__):
-            return self.__class__.fromtimestamp(self.timestamp() + other)
+            return self.__class__.fromtimestamp(self.timestamp() - other)
         out = super().__sub__(other)
         ts = getattr(out, "timestamp", None)
         if ts is None:

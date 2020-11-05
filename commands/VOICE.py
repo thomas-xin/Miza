@@ -1390,6 +1390,7 @@ class AudioDownloader:
         if ":" in url:
             url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
         webpage_url = f"https://www.youtube.com/watch?v={url}"
+        resp = None
         try:
             yt_url = f"https://www.yt-download.org/file/mp3/{url}"
             self.other_x += 1
@@ -1421,6 +1422,8 @@ class AudioDownloader:
             print("Successfully resolved with yt-download.")
             return entry
         except Exception as ex:
+            if resp:
+                excs.append(resp)
             excs.append(ex)
         try:
             self.other_x += 1
@@ -1467,6 +1470,8 @@ class AudioDownloader:
             print("Successfully resolved with keepv.id.")
             return entry
         except Exception as ex:
+            if resp:
+                excs.append(resp)
             excs.append(ex)
         try:
             self.other_x += 1
@@ -1491,6 +1496,8 @@ class AudioDownloader:
             print("Successfully resolved with y2mate.")
             return entry
         except Exception as ex:
+            if resp:
+                excs.append(resp)
             excs.append(ex)
             print(excs)
             raise

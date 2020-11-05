@@ -541,8 +541,25 @@ class Time(Command):
         s = 0
         # Only check for timezones if the command was called with alias "t" or "time"
         if args and name in "time":
-            user = await self.bot.fetch_user_member(argv, guild)
-            argv = None
+            try:
+                i = None
+                with suppress(ValueError):
+                    i = argv.index("-")
+                with suppress(ValueError):
+                    j = argv.index("+")
+                    if i is None:
+                        i = j
+                    else:
+                        i = min(i, j)
+                if i is not None:
+                    s = as_timezone(argv[:i])
+                    argv = argv[i:]
+                else:
+                    s = as_timezone(argv)
+                    argv = "0"
+            except KeyError:
+                user = await self.bot.fetch_user_member(argv, guild)
+                argv = None
         elif name in TIMEZONES:
             s = TIMEZONES.get(name, 0)
         t = utc_dt()
