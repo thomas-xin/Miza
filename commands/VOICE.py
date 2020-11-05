@@ -1361,7 +1361,8 @@ class AudioDownloader:
         with open("misc/page_tokens.txt", "r", encoding="utf-8") as f:
             s = f.read()
         page10 = s.splitlines()
-        self.yt_pages = [page10[i] for i in range(0, len(page10), 5)]
+        self.yt_pages = {i * 10: page10[i] for i in range(len(page10))}
+        # self.yt_pages = [page10[i] for i in range(0, len(page10), 5)]
 
     # Initializes youtube_dl object as well as spotify tokens, every 720 seconds.
     def update_dl(self):
@@ -1616,6 +1617,47 @@ class AudioDownloader:
             out.append(temp)
         return out, total
 
+    # Returns a full youtube playlist.
+    def get_youtube_playlist(self, p_id):
+        out = deque()
+        self.youtube_x += 1
+        resp = Request(f"https://www.youtube.com/playlist?list={p_id}")
+        search = b'window["ytInitialData"] = '
+        resp = resp[resp.index(search) + len(search):]
+        resp = resp[:resp.index(b'window["ytInitialPlayerResponse"] = null;')]
+        resp = resp[:resp.rindex(b";")]
+        data = eval_json(resp)
+        count = int(data["sidebar"]["playlistSidebarRenderer"]["items"][0]["playlistSidebarPrimaryInfoRenderer"]["stats"][0]["runs"][0]["text"].replace(",", ""))
+        for part in data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"]:
+            try:
+                video = part["playlistVideoRenderer"]
+            except KeyError:
+                print(part)
+                continue
+            v_id = video['videoId']
+            try:
+                dur = round_min(float(video["lengthSeconds"]))
+            except (KeyError, ValueError):
+                dur = time_parse(video["lengthText"]["simpleText"])
+            temp = cdict(
+                name=video["title"]["runs"][0]["text"],
+                url=f"https://www.youtube.com/watch?v={v_id}",
+                duration=dur,
+                thumbnail=f"https://i.ytimg.com/vi/{v_id}/maxresdefault.jpg",
+            )
+            out.append(temp)
+        print(len(out))
+        if count > 100:
+            url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&key={google_api_key}&playlistId={p_id}"
+            page = 50
+            futs = deque()
+            for curr in range(100, page * ceil(count / page), page):
+                search = f"{url}&pageToken={self.yt_pages[curr]}"
+                futs.append(create_future_ex(self.get_youtube_part, search))
+            for fut in futs:
+                out.extend(fut.result()[0])
+        return out
+
     # Repeatedly makes calls to youtube-dl until there is no more data to be collected.
     def extract_true(self, url):
         while not is_url(url):
@@ -1727,47 +1769,50 @@ class AudioDownloader:
                         p_id = item[item.index(x) + len(x):]
                         p_id = p_id.split("&", 1)[0]
                         break
-                # Pages may contain up to 50 items each
                 if p_id:
-                    url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&key={google_api_key}&playlistId={p_id}"
-                    page = 50
-                if page:
-                    futs = deque()
-                    maxitems = 5000
-                    # Optimized searching with lookaheads
-                    for i, curr in enumerate(range(0, maxitems, page)):
-                        with delay(0.03125):
-                            if curr >= maxitems:
-                                break
-                            search = f"{url}&pageToken={self.yt_pages[i]}"
-                            fut = create_future_ex(self.get_youtube_part, search, timeout=90)
-                            print("Sent 1 youtube playlist snippet.")
-                            futs.append(fut)
-                            if not (i < 1 or math.log2(i + 1) % 1) or not 1 + i & 15:
-                                while futs:
-                                    fut = futs.popleft()
-                                    res = fut.result()
-                                    if not i:
-                                        maxitems = res[1] + page
-                                    if not res[0]:
-                                        maxitems = 0
-                                        futs.clear()
-                                        break
-                                    output += res[0]
-                    while futs:
-                        output.extend(futs.popleft().result()[0])
-                    # Scroll to highlighted entry if possible
-                    v_id = None
-                    for x in ("?v=", "&v="):
-                        if x in item:
-                            v_id = item[item.index(x) + len(x):]
-                            v_id = v_id.split("&", 1)[0]
-                            break
-                    if v_id:
-                        for i, e in enumerate(output):
-                            if v_id in e.url:
-                                output.rotate(-i)
-                                break
+                    with tracebacksuppressor:
+                        return self.get_youtube_playlist(p_id)
+                # # Pages may contain up to 50 items each
+                # if p_id:
+                #     url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&key={google_api_key}&playlistId={p_id}"
+                #     page = 50
+                # if page:
+                #     futs = deque()
+                #     maxitems = 5000
+                #     # Optimized searching with lookaheads
+                #     for i, curr in enumerate(range(0, maxitems, page)):
+                #         with delay(0.03125):
+                #             if curr >= maxitems:
+                #                 break
+                #             search = f"{url}&pageToken={self.yt_pages[curr]}"
+                #             fut = create_future_ex(self.get_youtube_part, search, timeout=90)
+                #             print("Sent 1 youtube playlist snippet.")
+                #             futs.append(fut)
+                #             if not (i < 1 or math.log2(i + 1) % 1) or not 1 + i & 15:
+                #                 while futs:
+                #                     fut = futs.popleft()
+                #                     res = fut.result()
+                #                     if not i:
+                #                         maxitems = res[1] + page
+                #                     if not res[0]:
+                #                         maxitems = 0
+                #                         futs.clear()
+                #                         break
+                #                     output += res[0]
+                #     while futs:
+                #         output.extend(futs.popleft().result()[0])
+                #     # Scroll to highlighted entry if possible
+                #     v_id = None
+                #     for x in ("?v=", "&v="):
+                #         if x in item:
+                #             v_id = item[item.index(x) + len(x):]
+                #             v_id = v_id.split("&", 1)[0]
+                #             break
+                #     if v_id:
+                #         for i, e in enumerate(output):
+                #             if v_id in e.url:
+                #                 output.rotate(-i)
+                #                 break
             elif regexp("(play|open|api)\\.spotify\\.com").search(item):
                 # Spotify playlist searches contain up to 100 items each
                 if "playlist" in item:
@@ -1799,7 +1844,7 @@ class AudioDownloader:
                     maxitems = 10000
                     # Optimized searching with lookaheads
                     for i, curr in enumerate(range(0, maxitems, page)):
-                        with delay(0.125):
+                        with delay(0.03125):
                             if curr >= maxitems:
                                 break
                             search = f"{url}&offset={curr}&limit={page}"
@@ -2350,7 +2395,11 @@ class Queue(Command):
         for i, e in enumerate(resp, 1):
             if i > 262144:
                 break
-            name = e.name
+            try:
+                name = e.name
+            except:
+                print(e)
+                raise
             url = e.url
             temp = {
                 # "hash": e.hash,
