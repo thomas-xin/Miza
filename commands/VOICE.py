@@ -116,6 +116,7 @@ def get_best_audio(entry):
         url = entry["webpage_url"]
     except KeyError:
         url = entry["url"]
+    replace = True
     for fmt in fmts:
         q = fmt.get("abr", 0)
         if type(q) is not int:
@@ -123,12 +124,30 @@ def get_best_audio(entry):
         vcodec = fmt.get("vcodec", "none")
         if vcodec not in (None, "none"):
             q -= 1
-        if q > best:
+        if not fmt["url"].startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
+            replace = False
+        if q > best or replace:
             best = q
             url = fmt["url"]
     if "dropbox.com" in url:
         if "?dl=0" in url:
             url = url.replace("?dl=0", "?dl=1")
+    if url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
+        resp = Request(url)
+        fmts = alist()
+        with suppress(ValueError, KeyError):
+            while True:
+                search = b'<Representation id="'
+                resp = resp[resp.index(search) + len(search):]
+                f_id = resp[:resp.index(b'"')].decode("utf-8")
+                search = b"><BaseURL>"
+                resp = resp[resp.index(search) + len(search):]
+                stream = resp[:resp.index(b'</BaseURL>')].decode("utf-8")
+                fmt = cdict(youtube_dl.extractor.youtube.YoutubeIE._formats[f_id])
+                fmt.url = stream
+                fmts.append(fmt)
+        entry["formats"] = fmts
+        return get_best_audio(entry)
     return url
 
 
@@ -1042,17 +1061,20 @@ class AudioFile:
         self.assign = deque()
         self.semaphore = Semaphore(1, 1, delay=5)
         self.ensure_time()
+        self.webpage_url = None
 
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
         classname = classname[classname.index("'") + 1:]
         return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>"
     
-    def load(self, stream=None, check_fmt=False, force=False):
+    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None):
         if self.loading and not force:
             return
         if stream is not None:
             self.stream = stream
+        if webpage_url is not None:
+            self.webpage_url = webpage_url
         self.loading = True
         # Collects data from source, converts to 48khz 192kbps opus format, outputting to target file
         cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
@@ -1068,6 +1090,11 @@ class AudioFile:
             while fl < 4096:
                 with delay(0.1):
                     if not self.proc.is_running():
+                        err = self.proc.stderr.read().decode("utf-8", "replace")
+                        if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err):
+                            with tracebacksuppressor:
+                                entry = ytdl.extract_backup(self.webpage_url)
+                                return self.load(get_best_audio(entry), check_fmt=False, force=True)
                         if check_fmt:
                             new = None
                             with suppress(ValueError):
@@ -1075,7 +1102,6 @@ class AudioFile:
                             if new is not None:
                                 return self.load(new, check_fmt=False, force=True)
                         print(self.proc.args)
-                        err = self.proc.stderr.read().decode("utf-8", "replace")
                         if err:
                             ex = RuntimeError(err)
                         else:
@@ -1629,10 +1655,14 @@ class AudioDownloader:
         self.youtube_x += 1
         resp = Request(f"https://www.youtube.com/playlist?list={p_id}")
         search = b'window["ytInitialData"] = '
-        resp = resp[resp.index(search) + len(search):]
-        resp = resp[:resp.index(b'window["ytInitialPlayerResponse"] = null;')]
-        resp = resp[:resp.rindex(b";")]
-        data = eval_json(resp)
+        try:
+            resp = resp[resp.index(search) + len(search):]
+            resp = resp[:resp.index(b'window["ytInitialPlayerResponse"] = null;')]
+            resp = resp[:resp.rindex(b";")]
+            data = eval_json(resp)
+        except:
+            print(resp)
+            print_exc()
         count = int(data["sidebar"]["playlistSidebarRenderer"]["items"][0]["playlistSidebarPrimaryInfoRenderer"]["stats"][0]["runs"][0]["text"].replace(",", ""))
         for part in data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"]:
             try:
@@ -2171,7 +2201,7 @@ class AudioDownloader:
                 stream = entry.get("stream")
                 if stream in (None, "none"):
                     raise FileNotFoundError("Unable to locate appropriate file stream.")
-            f.load(stream, check_fmt=entry.get("duration") is None)
+            f.load(stream, check_fmt=entry.get("duration") is None, webpage_url=entry["url"])
             # Assign file duration estimate to queue entry
             f.assign.append(entry)
             entry["stream"] = stream
