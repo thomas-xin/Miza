@@ -1401,7 +1401,7 @@ class AudioDownloader:
             thumbnail = resp[:resp.index(b'"')].decode("utf-8", "replace")
             search = b'<h2 class="text-lg text-teal-600 font-bold m-2 text-center">'
             resp = resp[resp.index(search) + len(search):]
-            title = resp[:resp.index(b"</h2>")].decode("utf-8", "replace")
+            title = html_decode(resp[:resp.index(b"</h2>")].decode("utf-8", "replace"))
             resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp3/192'.encode("utf-8")) + 9:]
             stream = resp[:resp.index(b'"')].decode("utf-8", "replace")
             resp = resp[:resp.index(b"</a>")]
@@ -1436,7 +1436,7 @@ class AudioDownloader:
             )
             search = b'<h2 class="mb-3">'
             resp = resp[resp.index(search) + len(search):]
-            title = resp[:resp.index(b"</h3>")].decode("utf-8", "replace")
+            title = html_decode(resp[:resp.index(b"</h3>")].decode("utf-8", "replace"))
             search = b'<img src="'
             resp = resp[resp.index(search) + len(search):]
             thumbnail = resp[:resp.index(b'"')].decode("utf-8", "replace")
@@ -2106,10 +2106,12 @@ class AudioDownloader:
         if stream == "none" and not force:
             return None
         entry["stream"] = "none"
+        searched = False
         # If "research" tag is set, entry does not contain full data and requires another search
         if "research" in entry:
             try:
                 self.extract_single(entry)
+                searched = True
                 entry.pop("research", None)
             except:
                 print_exc()
@@ -2123,7 +2125,7 @@ class AudioDownloader:
             data = self.search(entry["url"])
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
-        elif stream.startswith("https://cf-hls-media.sndcdn.com/"):
+        elif not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/")):
             data = self.extract(entry["url"])
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
@@ -2148,6 +2150,8 @@ class AudioDownloader:
                     f.assign.append(entry)
                 # Touch file to indicate usage
                 f.ensure_time()
+            while not f.stream:
+                time.sleep(0.1)
             return f
         # Otherwise attempt to start file download
         try:
