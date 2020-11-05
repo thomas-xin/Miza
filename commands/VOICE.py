@@ -100,7 +100,7 @@ def get_best_icon(entry):
             if not is_image(url):
                 return "https://cdn.discordapp.com/embed/avatars/0.png"
         return url
-    return sorted(thumbnails, key=lambda x: -float(x.get("width", x.get("preference", 0) * 4096)))[0]["url"]
+    return sorted(thumbnails, key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)), reverse=True)[0]["url"]
 
 
 # Gets the best audio file download link for a queue entry.
@@ -330,6 +330,9 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             try:
                 self.stats.position = 0
                 # This call may take a while depending on the time taken by FFmpeg to start outputting
+                t = utc()
+                while source.stream is None and utc() - t < 10:
+                    time.sleep(0.1)
                 new_source = source.create_reader(pos, auds=self)
             except OverflowError:
                 source = None
@@ -786,6 +789,7 @@ class AudioQueue(alist):
         self.vc = auds.vc
         self.lastsent = 0
         self.loading = False
+        self.playlist = None
 
     # Update queue, loading all file streams that would be played soon
     def update_load(self):
@@ -837,14 +841,16 @@ class AudioQueue(alist):
                     self.auds.player.time = 1 + utc()
         # If no queue entries found but there is a default playlist assigned, load a random entry from that
         if not (q or self.auds.preparing):
-            t = self.bot.data.playlists.get(self.vc.guild.id, ())
-            if t:
-                for p in shuffle(t):
-                    e = cdict(p)
-                    e.u_id = self.bot.id
-                    e.skips = ()
-                    e.research = True
-                    q.appendleft(e)
+            if not self.playlist:
+                t = self.bot.data.playlists.get(self.vc.guild.id, ())
+                if t:
+                    self.playlist = shuffle(t)
+            p = self.playlist.pop()
+            e = cdict(p)
+            e.u_id = self.bot.id
+            e.skips = ()
+            e.research = True
+            q.appendleft(e)
         self.update_play()
 
     # Updates next queue entry and starts loading/playing it if possible
@@ -2654,7 +2660,8 @@ class Playlist(Command):
             raise LookupError(f"No results for {argv}.")
         pl.sort(key=lambda x: x["name"].casefold())
         update(guild.id)
-        return css_md(f"Added {sqr_md(', '.join(names))} to the default playlist for {sqr_md(guild)}.")
+        stuff = str(len(names)) + " items" if len(names) > 3 else ', '.join(names)
+        return css_md(f"Added {sqr_md(stuff)} to the default playlist for {sqr_md(guild)}.")
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_", 1)]
@@ -2693,6 +2700,7 @@ class Playlist(Command):
             content += f"No currently enabled default playlist for {str(guild).replace('`', '')}.```*"
             msg = ""
         else:
+            pl.sort(key=lambda x: x["name"].casefold())
             content += f"{len(pl)} items in default playlist for {str(guild).replace('`', '')}:```*"
             key = lambda x: lim_str(sqr_md(x["name"]) + "(" + x["url"] + ")", 1900 / page)
             msg = iter2str(pl[pos:pos + page], key=key, offset=pos, left="`【", right="】`")

@@ -1998,10 +1998,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                         if "a" in command.flags and "e" in command.flags and "d" in command.flags:
                                             if args[0].lower() in ("add", "enable", "set", "create", "append"):
                                                 args.pop(0)
-                                                add_dict(flags, {"a": 1})
+                                                inc_dict(flags, a=1)
                                             elif args[0].lower() in ("rem", "disable", "remove", "unset", "delete"):
                                                 args.pop(0)
-                                                add_dict(flags, {"d": 1})
+                                                inc_dict(flags, d=1)
                             # Assign "guild" as an object that mimics the discord.py guild if there is none
                             if guild is None:
                                 guild = self.UserGuild(
@@ -2098,12 +2098,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         except (ArgumentError, TooManyRequests) as ex:
                             if fut is not None:
                                 await fut
+                            command.used.pop(u_id, None)
                             create_task(send_exception(channel, ex))
                             return
                         # Represents all other errors
                         except Exception as ex:
                             if fut is not None:
                                 await fut
+                            command.used.pop(u_id, None)
                             print_exc()
                             create_task(send_exception(channel, ex))
         # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
