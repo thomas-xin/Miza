@@ -1644,7 +1644,10 @@ class AudioDownloader:
             try:
                 dur = round_min(float(video["lengthSeconds"]))
             except (KeyError, ValueError):
-                dur = time_parse(video["lengthText"]["simpleText"])
+                try:
+                    dur = time_parse(video["lengthText"]["simpleText"])
+                except KeyError:
+                    dur = None
             temp = cdict(
                 name=video["title"]["runs"][0]["text"],
                 url=f"https://www.youtube.com/watch?v={v_id}",
