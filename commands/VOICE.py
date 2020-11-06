@@ -1094,6 +1094,7 @@ class AudioFile:
                         if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err):
                             with tracebacksuppressor:
                                 entry = ytdl.extract_backup(self.webpage_url)
+                                print(err)
                                 return self.load(get_best_audio(entry), check_fmt=False, force=True)
                         if check_fmt:
                             new = None

@@ -1138,7 +1138,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             trusted = self.data.trusted
         except (AttributeError, KeyError):
             return False
-        return trusted.get(verify_id(guild))
+        return bool(trusted.get(verify_id(guild)))
 
     # Checks if a user is blacklisted from the bot.
     def is_blacklisted(self, user):
