@@ -1188,10 +1188,10 @@ def evalImg(url, operation, args):
             out = "cache/" + str(ts) + ".gif"
             command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(fps), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
             if len(new) > 64:
-                vf = "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
+                vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
             else:
-                vf = "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=diff_mode=rectangle"
-            command.extend(["-an", "-vf", vf, "-loop", "0", out])
+                vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=diff_mode=rectangle:alpha_threshold=128"
+            command.extend(["-gifflags", "-offsetting", "-an", "-vf", vf, "-loop", "0", out])
             file_print(command)
             file_print(len(new))
             proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

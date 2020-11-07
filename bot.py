@@ -1644,7 +1644,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if diamonds:
             out.append(f"💎 {diamonds}")
         if gold:
-            out.append(f"🪙 {gold}")
+            coin = await create_future(self.data.emojis.emoji_as, "miza_coin.gif")
+            out.append(f"{coin} {gold}")
         if out:
             return " ".join(out)
         return None

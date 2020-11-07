@@ -276,6 +276,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             if not bot.is_trusted(getattr(channel, "guild", None)):
                 self.queue.maxitems = 8192
             bot.data.audio.players[vc.guild.id] = self
+            self.stats.update(bot.data.audiosettings.get(self.guild.id, {}))
 
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
@@ -1663,7 +1664,7 @@ class AudioDownloader:
             data = eval_json(resp)
         except:
             print(resp)
-            print_exc()
+            raise
         count = int(data["sidebar"]["playlistSidebarRenderer"]["items"][0]["playlistSidebarPrimaryInfoRenderer"]["stats"][0]["runs"][0]["text"].replace(",", ""))
         for part in data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"]:
             try:
@@ -1811,7 +1812,20 @@ class AudioDownloader:
                         break
                 if p_id:
                     with tracebacksuppressor:
-                        return self.get_youtube_playlist(p_id)
+                        output.extend(self.get_youtube_playlist(p_id))
+                        # Scroll to highlighted entry if possible
+                        v_id = None
+                        for x in ("?v=", "&v="):
+                            if x in item:
+                                v_id = item[item.index(x) + len(x):]
+                                v_id = v_id.split("&", 1)[0]
+                                break
+                        if v_id:
+                            for i, e in enumerate(output):
+                                if v_id in e.url:
+                                    output.rotate(-i)
+                                    break
+                        return output
                 # # Pages may contain up to 50 items each
                 # if p_id:
                 #     url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&key={google_api_key}&playlistId={p_id}"
@@ -3184,13 +3198,17 @@ class Dump(Command):
                 auds.preparing = True
                 await create_future(auds.stop, timeout=18)
                 auds.queue.clear()
+            auds.paused = False
             auds.stats.update(d["stats"])
             if "position" not in d["stats"]:
                 auds.stats.position = 0
+            position = auds.stats.position
             auds.queue.enqueue(q, -1)
             await create_future(auds.update, timeout=18)
             await create_future(auds.queue.update_play, timeout=18)
-            await create_future(auds.new, auds.file, auds.stats.position, timeout=18)
+            if position:
+                print(position)
+                auds.seek(position)
             if "h" not in flags:
                 return italics(css_md(f"Successfully loaded audio data for {sqr_md(guild)}.")), 1
         else:
@@ -3267,13 +3285,13 @@ class AudioSettings(Command):
     def __init__(self, *args):
         self.alias = list(self.aliasMap) + list(self.aliasExt)[1:]
         self.name = list(self.aliasMap)
-        self.min_display = "0~1"
+        self.min_display = "0~2"
         self.description = "Changes the current audio settings for this server."
         self.usage = (
-            "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <pan(?e)> <bassboost(?b)> <reverb(?r)> <compressor(?c)>"
-            + " <chorus(?u)> <nightcore(?n)> <bitrate(?i)> <loop(?l)> <repeat(?1)> <shuffle(?x)> <quiet(?q)> <stay(?t)> <disable_all(?d)> <hide(?h)>"
+            "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <pan(?e)> <bassboost(?b)> <reverb(?r)> <compressor(?c)> <chorus(?u)> <nightcore(?n)>"
+            + " <bitrate(?i)> <loop(?l)> <repeat(?1)> <shuffle(?x)> <quiet(?q)> <stay(?t)> <force_permanent(?f)> <disable_all(?d)> <hide(?h)>"
         )
-        self.flags = "vspbrcnlxqdh"
+        self.flags = "vspebrcunilxqtfdh"
         self.map = {k.casefold(): self.aliasMap[k] for k in self.aliasMap}
         add_dict(self.map, {k.casefold(): self.aliasExt[k] for k in self.aliasExt})
         super().__init__(*args)
@@ -3344,9 +3362,12 @@ class AudioSettings(Command):
                         res = True
                         break
                 auds.stats = cdict(auds.defaults)
+                if "f" in flags:
+                    bot.data.audiosettings.pop(guild.id, None)
                 if auds.queue and res:
                     await create_future(auds.new, auds.file, pos, timeout=18)
-                return italics(css_md(f"Successfully reset all audio settings for {sqr_md(guild)}."))
+                succ = "Permanently" if "f" in flags else "Successfully"
+                return italics(css_md(f"{succ} reset all audio settings for {sqr_md(guild)}."))
             else:
                 # Default to volume
                 ops.append("volume")
@@ -3376,6 +3397,8 @@ class AudioSettings(Command):
             if op in "loop repeat shuffle quiet stay":
                 origStats[op] = new = bool(val)
                 orig = bool(orig)
+                if "f" in flags:
+                    bot.data.audiosettings.setdefault(guild.id, {})[op] = new
             else:
                 if op == "bitrate":
                     if val > 1966.08:
@@ -3389,6 +3412,8 @@ class AudioSettings(Command):
                     if abs(origStats.get("speed", 1) * 2 ** (val / 12)) > 16:
                         raise OverflowError("Maximum speed is 1600%.")
                 origStats[op] = val
+                if "f" in flags:
+                    bot.data.audiosettings.setdefault(guild.id, {})[op] = val
             if auds.queue:
                 if type(op) is str and op not in "loop repeat shuffle quiet stay":
                     # Attempt to adjust audio setting by re-initializing FFmpeg player
@@ -3399,7 +3424,8 @@ class AudioSettings(Command):
                             print(auds.args)
                         await create_future(auds.stop, timeout=18)
                         raise RuntimeError("Unable to adjust audio setting.")
-            s += f"\nChanged audio {op} setting from [{orig}] to [{new}]."
+            changed = "Permanently changed" if "f" in flags else "Changed"
+            s += f"\n{changed} audio {op} setting from [{orig}] to [{new}]."
         if "h" not in flags:
             return css_md(s), 1
 
@@ -4269,3 +4295,7 @@ class UpdateAudio(Database):
 
 class UpdatePlaylists(Database):
     name = "playlists"
+
+
+class UpdateAudioSettings(Database):
+    name = "audiosettings"

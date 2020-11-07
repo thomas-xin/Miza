@@ -1766,8 +1766,8 @@ class __logPrinter:
                             self.data.pop(f)
                             continue
                         out = lim_str(self.data[f], 65536)
+                        data = enc(self.data[f])
                         self.data[f] = ""
-                        data = enc(out)
                         if self.funcs:
                             [func(out) for func in self.funcs]
                         if f == self.file:
