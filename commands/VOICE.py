@@ -865,12 +865,13 @@ class AudioQueue(alist):
                 t = self.bot.data.playlists.get(self.vc.guild.id, ())
                 if t:
                     self.playlist = shuffle(t)
-            p = self.playlist.pop()
-            e = cdict(p)
-            e.u_id = self.bot.id
-            e.skips = ()
-            e.research = True
-            q.appendleft(e)
+            if self.playlist:
+                p = self.playlist.pop()
+                e = cdict(p)
+                e.u_id = self.bot.id
+                e.skips = ()
+                e.research = True
+                q.appendleft(e)
         self.update_play()
 
     # Updates next queue entry and starts loading/playing it if possible
@@ -1092,7 +1093,7 @@ class AudioFile:
                 with delay(0.1):
                     if not self.proc.is_running():
                         err = self.proc.stderr.read().decode("utf-8", "replace")
-                        if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err):
+                        if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err or "Server returned 403 Forbidden" in err):
                             with tracebacksuppressor:
                                 entry = ytdl.extract_backup(self.webpage_url)
                                 print(err)
