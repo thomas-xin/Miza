@@ -444,7 +444,11 @@ class FileHashDict(collections.abc.MutableMapping):
 
     def keys(self):
         if self.iter is None or self.modified or self.deleted:
-            self.iter = alist(try_int(i) for i in os.listdir(self.path) if i not in self.deleted)
+            gen = try_int(i) for i in os.listdir(self.path) if i not in self.deleted
+            if self.modified:
+                gen = set(gen)
+                gen.update(self.modified)
+            self.iter = alist(gen)
         return self.iter
 
     def values(self):
@@ -458,6 +462,8 @@ class FileHashDict(collections.abc.MutableMapping):
         return reversed(self.keys())
 
     def __getitem__(self, k):
+        if k in self.deleted:
+            raise KeyError(k)
         with suppress(KeyError):
             return self.data[k]
         fn = self.key_path(k)
