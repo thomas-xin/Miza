@@ -1112,7 +1112,7 @@ def get_image(url, out):
                 if os.path.exists(save):
                     with open(save, "rb") as f:
                         data = f.read()
-            if data is not None:
+            if data is None:
                 data = get_request(url)
             if len(data) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")
