@@ -884,7 +884,7 @@ class AudioQueue(alist):
             entry = q[0]
             # Only start loading a new source if there is one to be found and none is already loading/playing
             if (auds.source is None or auds.source.closed or auds.source.advanced) and not entry.get("played", False):
-                if entry.get("stream", None) not in (None, "none"):
+                if entry.get("file", None) or entry.get("stream", None) not in (None, "none"):
                     entry.played = True
                     if not auds.stats.quiet:
                         if utc() - self.lastsent > 1:
@@ -2608,7 +2608,8 @@ class Queue(Command):
             icon = q[0].get("icon", "")
         else:
             icon = ""
-        emb.set_thumbnail(url=icon)
+        if icon:
+            emb.set_thumbnail(url=icon)
         async with auds.semaphore:
             embstr = ""
             currTime = startTime
