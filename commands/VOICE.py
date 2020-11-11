@@ -1744,7 +1744,7 @@ class AudioDownloader:
         try:
             self.youtube_dl_x += 1
             entries = self.downloader.extract_info(url, download=False, process=True)
-        except youtube_dl.DownloadError as ex:
+        except Exception as ex:
             s = str(ex).casefold()
             if type(ex) is not youtube_dl.DownloadError or ("403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s):
                 try:
