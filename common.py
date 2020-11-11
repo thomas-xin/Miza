@@ -1357,7 +1357,7 @@ def load_emojis():
         resp = Request("https://raw.githubusercontent.com/BreadMoirai/DiscordEmoji/master/src/main/java/com/github/breadmoirai/Emoji.java", decode=True, timeout=None)
         e_resp = [line.strip()[:-1] for line in resp[resp.index("public enum Emoji {") + len("public enum Emoji {"):resp.index("private static final Emoji[] SORTED;")].strip().split("\n")]
         e_data = {safe_eval(words[0]).encode("utf-16", "surrogatepass").decode("utf-16"): f" {safe_eval(words[2][:-1])} " for emoji in e_resp for words in (emoji.strip(";")[emoji.index("\\u") - 1:].split(","),) if words[2][:-1].strip() != "null"}
-        with open("misc/emojis.txt", "r") as f:
+        with open("misc/emojis.txt", "r", encoding="utf-8") as f:
             resp = f.read()
         e_data.update({k: v for k, v in (line.split(" ", 1) for line in resp.splitlines())})
         emoji_translate = {k: v for k, v in e_data.items() if len(k) == 1}
