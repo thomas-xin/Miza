@@ -1260,7 +1260,7 @@ class AudioFile:
             self.readers[key] = True
             callback = lambda: self.readers.pop(key, None)
             if buff:
-                while not self.buffered and not self.closed:
+                while not self.buffered and not self.expired:
                     time.sleep(0.1)
                 # Select buffered reader for files not yet fully loaded, convert while downloading
                 player = BufferedAudioReader(self, args, callback=callback)
