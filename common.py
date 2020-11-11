@@ -273,11 +273,11 @@ class CommandCancelledError(RuntimeError):
 python = ("python3", "python")[os.name == "nt"]
 python_path = ""
 
-enc_key = None
 
 with open("auth.json") as f:
     AUTH = eval(f.read())
 
+enc_key = None
 with tracebacksuppressor:
     py = AUTH.get("python_path", "")
     while py.endswith("\\") or py.endswith("/"):

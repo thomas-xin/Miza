@@ -455,7 +455,7 @@ class SlotMachine(Command):
                 raise ValueError(f"Maximum bet is {b2} coins.")
         else:
             bet = b1
-        if bet > self.bot.data.users.get(user.id, {}).get("gold", 0):
+        if not bet <= self.bot.data.users.get(user.id, {}).get("gold", 0):
             raise OverflowError("Bet cannot be greater than your balance.")
         self.bot.data.users.add_gold(user, -bet)
         skip = int("s" in flags)

@@ -531,6 +531,8 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         voice_client = await self.smart_connect(channel)
         self.vc = voice_client
         self.bot.data.audio.connecting.pop(voice_client.guild.id, None)
+        if not self.queue and self.vc.is_playing():
+            self.vc.pause()
         return voice_client
 
     # Attempts to reconnect to a voice channel that was removed. Gives up if unable to rejoin within 60 seconds.
@@ -870,7 +872,7 @@ class AudioQueue(alist):
                 e = cdict(p)
                 e.u_id = self.bot.id
                 e.skips = ()
-                e.research = True
+                e.stream = ytdl.get_stream(e)
                 q.appendleft(e)
         self.update_play()
 
@@ -1051,9 +1053,10 @@ def select_and_convert(stream):
 # Represents a cached audio file in opus format. Executes and references FFmpeg processes loading the file.
 class AudioFile:
     
-    def __init__(self, fn):
+    def __init__(self, fn, stream=None):
         self.file = fn
         self.proc = None
+        self.stream = stream
         self.wasfile = False
         self.loading = False
         self.expired = False
@@ -1075,11 +1078,17 @@ class AudioFile:
             return
         if stream is not None:
             self.stream = stream
+        stream = self.stream
         if webpage_url is not None:
             self.webpage_url = webpage_url
         self.loading = True
         # Collects data from source, converts to 48khz 192kbps opus format, outputting to target file
         cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
+        with suppress():
+            fmt = subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream]).decode("utf-8", "replace").strip()
+            if fmt == "opus":
+                cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
+                print(cmd)
         self.proc = None
         try:
             try:
@@ -1204,6 +1213,9 @@ class AudioFile:
     # Creates a reader, selecting from direct opus file, single piped FFmpeg, or double piped FFmpeg.
     def create_reader(self, pos=0, auds=None):
         if not os.path.exists("cache/" + self.file):
+            t = utc()
+            while utc() - t < 10 and not self.stream:
+                time.sleep(0.1)
             self.load(force=True)
         stats = auds.stats
         auds.reverse = stats.speed < 0
@@ -1657,11 +1669,18 @@ class AudioDownloader:
         out = deque()
         self.youtube_x += 1
         resp = Request(f"https://www.youtube.com/playlist?list={p_id}")
-        search = b'window["ytInitialData"] = '
         try:
-            resp = resp[resp.index(search) + len(search):]
-            resp = resp[:resp.index(b'window["ytInitialPlayerResponse"] = null;')]
-            resp = resp[:resp.rindex(b";")]
+            search = b'window["ytInitialData"] = '
+            try:
+                resp = resp[resp.index(search) + len(search):]
+            except ValueError:
+                search = b"var ytInitialData = "
+                resp = resp[resp.index(search) + len(search):]
+            try:
+                resp = resp[:resp.index(b'window["ytInitialPlayerResponse"] = null;')]
+                resp = resp[:resp.rindex(b";")]
+            except ValueError:
+                resp = resp[:resp.index(b";</script><title>")]
             data = eval_json(resp)
         except:
             print(resp)
@@ -1727,7 +1746,7 @@ class AudioDownloader:
             entries = self.downloader.extract_info(url, download=False, process=True)
         except youtube_dl.DownloadError as ex:
             s = str(ex).casefold()
-            if "403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s:
+            if type(ex) is not youtube_dl.DownloadError or ("403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s):
                 try:
                     entries = self.extract_backup(url)
                 except youtube_dl.DownloadError:
@@ -1764,7 +1783,7 @@ class AudioDownloader:
             return self.downloader.extract_info(url, download=False, process=False)
         except Exception as ex:
             s = str(ex).casefold()
-            if "403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s:
+            if type(ex) is not youtube_dl.DownloadError or ("403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s):
                 if is_url(url):
                     try:
                         return self.extract_backup(url)
@@ -2108,7 +2127,7 @@ class AudioDownloader:
             return coeff
         out = sorted(high, key=key, reverse=True)
         out.extend(sorted(low, key=key, reverse=True))
-        print(out)
+        # print(out)
         return out
 
     # def extract_yt(self, query):
@@ -3208,6 +3227,8 @@ class Dump(Command):
             await create_future(auds.update, timeout=18)
             await create_future(auds.queue.update_play, timeout=18)
             if position:
+                while not auds.is_playing:
+                    await asyncio.sleep(0.2)
                 print(position)
                 auds.seek(position)
             if "h" not in flags:
@@ -3426,7 +3447,7 @@ class AudioSettings(Command):
                         await create_future(auds.stop, timeout=18)
                         raise RuntimeError("Unable to adjust audio setting.")
             changed = "Permanently changed" if "f" in flags else "Changed"
-            s += f"\n{changed} audio {op} setting from [{orig}] to [{new}]."
+            s += f"\n{changed} audio {op} setting from {sqr_md(orig)} to {sqr_md(new)}."
         if "h" not in flags:
             return css_md(s), 1
 
@@ -4073,52 +4094,53 @@ class Download(Command):
         if user.id == u_id or not perm < 3:
             # Make sure reaction is a valid number
             if b"\xef\xb8\x8f\xe2\x83\xa3" in reaction:
-                # Make sure selected index is valid
-                num = int(reaction.decode("utf-8")[0])
-                if num <= int(spl[1]):
-                    # Reconstruct list of URLs from hidden encoded data
-                    data = ast.literal_eval(b642bytes(argv, True).decode("utf-8", "replace"))
-                    url = data[num]
-                    # Select maximum allowed file size
-                    if guild is None:
-                        fl = 8388608
-                    else:
-                        fl = guild.filesize_limit
-                    # Perform all these tasks asynchronously to save time
-                    with discord.context_managers.Typing(channel):
-                        create_task(message.edit(
-                            content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
-                            embed=None,
-                        ))
-                        try:
-                            if int(spl[3]):
-                                auds = bot.data.audio.players[guild.id]
-                            else:
+                async with ExceptionSender(channel):
+                    # Make sure selected index is valid
+                    num = int(reaction.decode("utf-8")[0])
+                    if num <= int(spl[1]):
+                        # Reconstruct list of URLs from hidden encoded data
+                        data = ast.literal_eval(b642bytes(argv, True).decode("utf-8", "replace"))
+                        url = data[num]
+                        # Select maximum allowed file size
+                        if guild is None:
+                            fl = 8388608
+                        else:
+                            fl = guild.filesize_limit
+                        # Perform all these tasks asynchronously to save time
+                        with discord.context_managers.Typing(channel):
+                            create_task(message.edit(
+                                content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
+                                embed=None,
+                            ))
+                            try:
+                                if int(spl[3]):
+                                    auds = bot.data.audio.players[guild.id]
+                                else:
+                                    auds = None
+                            except LookupError:
                                 auds = None
-                        except LookupError:
-                            auds = None
-                        fn, out = await create_future(
-                            ytdl.download_file,
-                            url,
-                            fmt=spl[2],
-                            auds=auds,
-                            fl=fl,
-                            timeout=540,
+                            fn, out = await create_future(
+                                ytdl.download_file,
+                                url,
+                                fmt=spl[2],
+                                auds=auds,
+                                fl=fl,
+                                timeout=540,
+                            )
+                            f = discord.File(fn, out)
+                            create_task(message.edit(
+                                content=css_md(f"Uploading {sqr_md(out)}..."),
+                                embed=None,
+                            ))
+                            create_task(channel.trigger_typing())
+                        await bot.send_with_file(
+                            channel=channel,
+                            msg="",
+                            file=f,
+                            filename=fn,
                         )
-                        f = discord.File(fn, out)
-                        create_task(message.edit(
-                            content=css_md(f"Uploading {sqr_md(out)}..."),
-                            embed=None,
-                        ))
-                        create_task(channel.trigger_typing())
-                    await bot.send_with_file(
-                        channel=channel,
-                        msg="",
-                        file=f,
-                        filename=fn,
-                    )
-                    create_future_ex(os.remove, fn, timeout=18)
-                    create_task(bot.silent_delete(message, no_log=True))
+                        create_future_ex(os.remove, fn, timeout=18)
+                        create_task(bot.silent_delete(message, no_log=True))
 
 
 class UpdateAudio(Database):
@@ -4269,10 +4291,9 @@ class UpdateAudio(Database):
         ytdl.bot = bot
         for file in os.listdir("cache"):
             if file.endswith(".opus") and file not in ytdl.cache:
-                ytdl.cache[file] = f = AudioFile(file)
+                ytdl.cache[file] = f = AudioFile(file, "cache/" + file)
                 f.wasfile = True
                 f.loading = f.buffered = f.loaded = True
-                f.stream = "cache/" + file
                 f.proc = cdict(is_running=lambda: False, kill=lambda: None)
                 f.ensure_time()
                 print("reinstating audio file", file)
