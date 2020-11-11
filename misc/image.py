@@ -1112,6 +1112,7 @@ def get_image(url, out):
                 if os.path.exists(save):
                     with open(save, "rb") as f:
                         data = f.read()
+                    file_print(f"Emoji {save} successfully loaded from cache.")
             if data is None:
                 data = get_request(url)
             if len(data) > 67108864:
@@ -1121,7 +1122,6 @@ def get_image(url, out):
                 raise OverflowError("Max file size to load is 64MB.")
             with open(url, "rb") as f:
                 data = f.read()
-            file_print(f"Emoji {save} successfully loaded from cache.")
             if out != url and out:
                 try:
                     os.remove(url)
