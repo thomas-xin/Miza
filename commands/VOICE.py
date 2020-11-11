@@ -2176,33 +2176,6 @@ class AudioDownloader:
     def get_stream(self, entry, force=False, download=True, callback=None):
         stream = entry.get("stream", None)
         icon = entry.get("icon", None)
-        # "none" indicates stream is currently loading
-        if stream == "none" and not force:
-            return None
-        entry["stream"] = "none"
-        searched = False
-        # If "research" tag is set, entry does not contain full data and requires another search
-        if "research" in entry:
-            try:
-                self.extract_single(entry)
-                searched = True
-                entry.pop("research", None)
-            except:
-                print_exc()
-                entry.pop("research", None)
-                raise
-            else:
-                stream = entry.get("stream", None)
-                icon = entry.get("icon", None)
-        # If stream is still not found or is a soundcloud audio fragment playlist file, perform secondary youtube-dl search
-        if stream in (None, "none"):
-            data = self.search(entry["url"])
-            stream = set_dict(data[0], "stream", data[0].url)
-            icon = set_dict(data[0], "icon", data[0].url)
-        elif not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/")):
-            data = self.extract(entry["url"])
-            stream = set_dict(data[0], "stream", data[0].url)
-            icon = set_dict(data[0], "icon", data[0].url)
         # Use SHA-256 hash of URL to avoid filename conflicts
         h = shash(entry["url"])
         fn = h + ".opus"
@@ -2228,6 +2201,32 @@ class AudioDownloader:
                     time.sleep(0.1)
             if f or not force or not download:
                 return f
+        # "none" indicates stream is currently loading
+        if stream == "none" and not force:
+            return None
+        entry["stream"] = "none"
+        # If "research" tag is set, entry does not contain full data and requires another search
+        if "research" in entry:
+            try:
+                self.extract_single(entry)
+                searched = True
+                entry.pop("research", None)
+            except:
+                print_exc()
+                entry.pop("research", None)
+                raise
+            else:
+                stream = entry.get("stream", None)
+                icon = entry.get("icon", None)
+        # If stream is still not found or is a soundcloud audio fragment playlist file, perform secondary youtube-dl search
+        if stream in (None, "none"):
+            data = self.search(entry["url"])
+            stream = set_dict(data[0], "stream", data[0].url)
+            icon = set_dict(data[0], "icon", data[0].url)
+        elif not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/")):
+            data = self.extract(entry["url"])
+            stream = set_dict(data[0], "stream", data[0].url)
+            icon = set_dict(data[0], "icon", data[0].url)
         # Otherwise attempt to start file download
         try:
             self.cache[fn] = f = AudioFile(fn)
