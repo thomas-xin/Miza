@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 deque = collections.deque
 
-exc = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+exc = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 start = time.time()
 CACHE = {}
 ANIM = False
@@ -49,7 +49,7 @@ def time_parse(ts):
 
 # URL string detector
 url_match = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
-is_url = lambda url: re.search(url_match, url)
+is_url = lambda url: url_match.search(url)
 discord_match = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/")
 is_discord_url = lambda url: discord_match.findall(url)
 
@@ -1052,12 +1052,23 @@ def plt_special(d, user=None, **void):
     return "$" + out
 
 
-def from_bytes(b):
+discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/assets\\/[0-9A-Fa-f]+\\.svg")
+is_discord_emoji = lambda url: discord_emoji.search(url)
+
+
+def write_to(fn, data):
+    with open(fn, "wb") as f:
+        f.write(data)
+
+def from_bytes(b, save=None):
     if b[:4] == b"<svg" or b[:5] == b"<?xml":
         resp = requests.post("https://www.svgtopng.me/api/svgtopng/upload-file", headers=header(), files={"files": ("temp.svg", b, "image/svg+xml"), "format": (None, "PNG"), "forceTransparentWhite": (None, "true"), "jpegQuality": (None, "256")})
         z = ZipFile(io.BytesIO(resp.content), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
-        out = io.BytesIO(z.open("temp.png").read())
+        data = z.open("temp.png").read()
+        out = io.BytesIO(data)
         z.close()
+        if save and data and not os.path.exists(save):
+            exc.submit(write_to, save, data)
     elif b[:4] == b"%PDF":
         return ImageSequence(*pdf2image.convert_from_bytes(b, poppler_path="misc/poppler", use_pdftocairo=True))
     else:
@@ -1091,10 +1102,18 @@ def get_image(url, out):
     if issubclass(type(url), Image.Image):
         return url
     if type(url) not in (bytes, bytearray, io.BytesIO):
+        save = None
         if url in CACHE:
             return CACHE[url]
         if is_url(url):
-            data = get_request(url)
+            data = None
+            if is_discord_emoji(url):
+                save = f"cache/emoji_{url.rsplit('/', 1)[-1].split('.', 1)[0]}"
+                if os.path.exists(save):
+                    with open(save, "rb") as f:
+                        data = f.read()
+            if data is not None:
+                data = get_request(url)
             if len(data) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")
         else:
@@ -1102,12 +1121,13 @@ def get_image(url, out):
                 raise OverflowError("Max file size to load is 64MB.")
             with open(url, "rb") as f:
                 data = f.read()
+            file_print(f"Emoji {save} successfully loaded from cache.")
             if out != url and out:
                 try:
                     os.remove(url)
                 except:
                     pass
-        image = from_bytes(data)
+        image = from_bytes(data, save)
         CACHE[url] = image
     else:
         if len(url) > 67108864:

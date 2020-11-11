@@ -2205,6 +2205,7 @@ class AudioDownloader:
         if stream == "none" and not force:
             return None
         entry["stream"] = "none"
+        searched = False
         # If "research" tag is set, entry does not contain full data and requires another search
         if "research" in entry:
             try:
