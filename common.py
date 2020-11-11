@@ -444,7 +444,7 @@ class FileHashDict(collections.abc.MutableMapping):
 
     def keys(self):
         if self.iter is None or self.modified or self.deleted:
-            gen = try_int(i) for i in os.listdir(self.path) if i not in self.deleted
+            gen = (try_int(i) for i in os.listdir(self.path) if i not in self.deleted)
             if self.modified:
                 gen = set(gen)
                 gen.update(self.modified)
