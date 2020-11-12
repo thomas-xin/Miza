@@ -812,15 +812,37 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return out
 
         # Sends a message to a channel, then edits to add links to all attached files.
-    async def send_with_file(self, channel, msg=None, file=None, filename=None, best=False):
-        fp = file.fp
-        fp.seek(0)
-        data = fp.read()
-        fp.seek(0)
+    async def send_with_file(self, channel, msg=None, file=None, filename=None, best=False, rename=True):
+        f = None
+        fsize = 0
+        size = 8388608
+        with suppress(AttributeError):
+            size = channel.guild.filesize_limit
+        if file and type(file) is not discord.File:
+            if not os.path.exists(file):
+                raise FileNotFoundError(file)
+            fsize = os.path.getsize(file)
+            f = file
+        if fsize <= size:
+            fp = file.fp
+            fp.seek(0)
+            data = fp.read()
+            fsize = len(data)
+            fp.seek(0)
         try:
-            message = await channel.send(msg, file=file)
-            if filename is not None:
-                create_future_ex(os.remove, filename, priority=True)
+            if fsize > size:
+                if not f:
+                    f = filename if filename and type(file) is not discord.File else data
+                if "." in f:
+                    ext = f.rsplit(".", 1)[-1]
+                else:
+                    ext = None
+                url = await create_future(as_file, str(f), filename=filename, ext=ext, rename=rename)
+                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + url)
+            else:
+                message = await channel.send(msg, file=file)
+                if filename is not None:
+                    create_future_ex(os.remove, filename, priority=True)
         except:
             if filename is not None:
                 print(filename, os.path.getsize(filename))
@@ -896,7 +918,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 return data
         return None
 
-    async def get_request(self, url):
+    async def get_request(self, url, limit=None):
+        fn = is_file(url)
+        if fn:
+            if limit:
+                size = os.path.getsize(fn)
+                if size > limit:
+                    raise OverflowError(f"Supplied file too large ({size}) > ({limit})")
+            with open(url, "rb") as f:
+                return await create_future(f.read)
         data = await self.get_attachment(url)
         if data is not None:
             return data
@@ -2081,12 +2111,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                                 filemsg = "Response too long for message."
                                             else:
                                                 filemsg = "Response data:"
-                                            if len(response) <= guild.filesize_limit:
-                                                b = io.BytesIO(response)
-                                                f = discord.File(b, filename="message.txt")
-                                                sent = await self.send_with_file(channel, filemsg, f)
-                                            else:
-                                                raise OverflowError("Response too long for file upload.")
+                                            b = io.BytesIO(response)
+                                            f = discord.File(b, filename="message.txt")
+                                            sent = await self.send_with_file(channel, filemsg, f)
                                     # Add targeted react if there is one
                                     if react and sent:
                                         await sent.add_reaction(react)
@@ -2441,6 +2468,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     await create_future(self.update, priority=True)
                     await asyncio.sleep(1)
                     await create_future(self.update_from_guilds, priority=True)
+                    await asyncio.sleep(1)
+                    await create_future(update_file_cache, priority=True)
                     await asyncio.sleep(1)
                     await self.get_disk()
                     await asyncio.sleep(1)
@@ -3182,6 +3211,55 @@ def userIter4(x):
     yield to_alphanumeric(x.name).replace(" ", "").casefold()
     if getattr(x, "nick", None):
         yield to_alphanumeric(x.nick).replace(" ", "").casefold()
+
+
+PORT = 9801
+IND = ""
+
+def update_file_cache(files=None):
+    if files is None:
+        files = alist(sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND)))
+    if len(files) > 256:
+        curr = files.popleft()
+        ct = int(curr.split("~", 1)[0])
+        if ts_us() - ct > 86400:
+            with tracebacksuppressor:
+                os.remove(IND + curr)
+                print(curr, "deleted.")
+                update_file_cache(files)
+
+def as_file(file, filename=None, ext=None, rename=True):
+    if rename:
+        fn = str(round(ts_us()))
+        out = fn + "~" + (str(file) if filename is None else filename.translate(filetrans))
+    if issubclass(type(file), bytes):
+        with open(f"cache/{IND}{out}", "wb") as f:
+            f.write(file)
+    elif rename:
+        while True:
+            with suppress(PermissionError):
+                os.rename(file, f"cache/{IND}{out}")
+                break
+            time.sleep(0.1)
+    else:
+        fn = file.rsplit("/", 1)[-1][1:].split("~", 1)[0]
+    url = f"http://{miza.ip}:{PORT}/files/{fn}"
+    if ext:
+        url += "." + ext
+    return url
+
+def is_file(url):
+    start = f"http://{miza.ip}:{PORT}/files/"
+    if url.startswith(start):
+        path = url[len(start):].split("~", 1)[0]
+        fn = f"{IND}{path}"
+        for file in os.listdir("cache"):
+            if file.split("~", 1)[0][1:] == path:
+                return f"cache/{file}"
+    return None
+
+
+server = psutil.Popen([python, "server.py"], stdin=subprocess.PIPE)
 
 
 # If this is the module being run and not imported, create a new Bot instance and run it.

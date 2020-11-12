@@ -20,6 +20,7 @@ with MultiThreadedImporter(globals()) as importer:
         "zipfile",
         "nacl",
         "shutil",
+        "flask",
     )
 
 PROC = psutil.Process()
@@ -30,6 +31,7 @@ tracemalloc.start()
 from zipfile import ZipFile
 import urllib.request, urllib.parse
 import nacl.secret
+from flask import Flask
 
 url_parse = urllib.parse.quote_plus
 escape_markdown = discord.utils.escape_markdown
@@ -366,8 +368,8 @@ def select_and_loads(s, mode="safe", size=None):
     with tracebacksuppressor:
         if s[0] == 128:
             data = pickle.loads(s)
-    if data and type(data) in (str, bytes):
-        s, data = data, None
+    # if data and type(data) in (str, bytes):
+    #     s, data = data, None
     if data is None:
         if mode == "unsafe":
             data = eval(compile(s, "<loader>", "eval", optimize=2, dont_inherit=False))
@@ -490,11 +492,12 @@ class FileHashDict(collections.abc.MutableMapping):
     def pop(self, k, *args, force=False):
         fn = self.key_path(k)
         try:
-            self.deleted.add(k)
             if force:
                 out = self[k]
                 del self.data[k]
+                self.deleted.add(k)
                 return out
+            self.deleted.add(k)
             return self.data.pop(k)
         except KeyError:
             if not os.path.exists(fn):
@@ -1547,6 +1550,20 @@ def tzparse(expr):
     if not is_finite(s) or abs(s) >= 1 << 31:
         s = int(expr.split(".", 1)[0])
     return utc_dft(s)
+
+
+__filetrans = {
+    "\\": "_",
+    "/": "_",
+    ":": "=",
+    "*": "-",
+    "?": "&",
+    '"': "^",
+    "<": "{",
+    ">": "}",
+    "|": "!",
+}
+filetrans = "".maketrans(__filetrans)
 
 
 # Basic inheritable class for all bot commands.

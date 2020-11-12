@@ -2253,42 +2253,27 @@ class AudioDownloader:
             entry["url"] = ""
 
     # For ~download
-    def download_file(self, url, fmt="ogg", auds=None, fl=8388608):
+    def download_file(self, url, fmt="ogg", auds=None):
         # Select a filename based on current time to avoid conflicts
         if fmt[:3] == "mid":
             mid = True
             fmt = "mp3"
-            br = 192
-            fs = 67108864
         else:
             mid = False
-        fn = f"cache/&{ts_us()}.{fmt}"
         info = self.extract(url)[0]
         self.get_stream(info, force=True, download=False)
+        outf = f"{info['name']}.{fmt}"
+        fn = f"cache/{ts_us()}~" + outf.translate(filetrans)
         stream = info["stream"]
         if not stream:
             raise LookupError(f"No stream URLs found for {url}")
-        if not mid:
-            # Attempt to automatically adjust output bitrate based on file duration
-            duration = get_duration(stream)
-            if type(duration) not in (int, float):
-                dur = 960
-            else:
-                dur = duration
-            fs = fl - 131072
-        else:
-            dur = 0
         args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-vn", "-i", stream]
         if auds is not None:
             args.extend(auds.construct_options(full=True))
-            dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
-        if not mid:
-            if dur > 960:
-                dur = 960
-            br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
+        br = 196608
         if auds and br > auds.stats.bitrate:
             br = max(4096, auds.stats.bitrate)
-        args.extend(("-ar", str(SAMPLE_RATE), "-b:a", str(br), "-fs", str(fs), fn))
+        args.extend(("-ar", str(SAMPLE_RATE), "-b:a", str(br), "-f", fmt, fn))
         try:
             resp = subprocess.run(args)
             resp.check_returncode()
@@ -2302,15 +2287,6 @@ class AudioDownloader:
                 raise ex
             # Re-estimate duration if file was successfully converted from org
             args[8] = new
-            if not mid:
-                dur = get_duration(new)
-                if dur:
-                    if auds:
-                        dur /= auds.stats.speed / 2 ** (auds.stats.resample / 12)
-                    br = max(32, min(256, floor(((fs - 131072) / dur / 128) / 4) * 4)) * 1024
-                    args[-4] = str(br)
-                if auds and br > auds.stats.bitrate:
-                    br = max(4096, auds.stats.bitrate)
             try:
                 resp = subprocess.run(args)
                 resp.check_returncode()
@@ -2322,7 +2298,7 @@ class AudioDownloader:
                 with suppress():
                     os.remove(new)
         if not mid:
-            return fn, f"{info['name']}.{fmt}"
+            return fn, outf
         self.other_x += 1
         with open(fn, "rb") as f:
             resp = Request(
@@ -2334,14 +2310,14 @@ class AudioDownloader:
             )
             resp_fn = ast.literal_eval(resp)[0]
         url = f"https://cts.ofoct.com/convert-file_v2.php?cid=audio2midi&output=MID&tmpfpath={resp_fn}&row=file1&sourcename=temp.ogg&rowid=file1"
-        print(url)
+        # print(url)
         with suppress():
             os.remove(fn)
         self.other_x += 1
         resp = Request(url, timeout=420)
         self.other_x += 1
         out = Request(f"https://cts.ofoct.com/get-file.php?type=get&genfpath=/tmp/{resp_fn}.mid", timeout=24)
-        return io.BytesIO(out), f"{info['name']}.mid"
+        return io.BytesIO(out), outf[:-4] + ".mid"
 
     # Extracts full data for a single entry. Uses cached results for optimization.
     def extract_single(self, i, force=False):
@@ -4102,11 +4078,6 @@ class Download(Command):
                         # Reconstruct list of URLs from hidden encoded data
                         data = ast.literal_eval(b642bytes(argv, True).decode("utf-8", "replace"))
                         url = data[num]
-                        # Select maximum allowed file size
-                        if guild is None:
-                            fl = 8388608
-                        else:
-                            fl = guild.filesize_limit
                         # Perform all these tasks asynchronously to save time
                         with discord.context_managers.Typing(channel):
                             create_task(message.edit(
@@ -4125,7 +4096,6 @@ class Download(Command):
                                 url,
                                 fmt=spl[2],
                                 auds=auds,
-                                fl=fl,
                                 timeout=540,
                             )
                             f = discord.File(fn, out)
@@ -4134,13 +4104,15 @@ class Download(Command):
                                 embed=None,
                             ))
                             create_task(channel.trigger_typing())
-                        await bot.send_with_file(
+                        out = await bot.send_with_file(
                             channel=channel,
                             msg="",
                             file=f,
                             filename=fn,
+                            rename=False,
                         )
-                        create_future_ex(os.remove, fn, timeout=18)
+                        if out.attachments:
+                            create_future_ex(os.remove, fn, timeout=18)
                         create_task(bot.silent_delete(message, no_log=True))
 
 

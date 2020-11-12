@@ -1480,7 +1480,7 @@ class UpdateMessageCount(Database):
         return output
 
     async def getUserMessageCount(self, guild):
-        print(guild)
+        print("Probing", guild)
         data = {}
         avgs = {}
         word = {}
@@ -1506,7 +1506,7 @@ class UpdateMessageCount(Database):
                     await asyncio.sleep(0.5)
         add_dict(self.data[guild.id], {"counts": data, "totals": avgs, "words": word, 0: True})
         self.update(guild.id)
-        print(guild)
+        print("Completed", guild)
         print(self.data[guild.id])
 
     def __load__(self):

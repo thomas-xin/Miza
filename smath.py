@@ -1130,7 +1130,8 @@ custom list-like data structure that incorporates the functionality of numpy arr
         self.size += 1
         return self
 
-    appendright = add = append
+    add = lambda self, value: object.__getattribute__(self, ("append", "appendleft")[random.randint(0, 1)])(value)
+    appendright = append
 
     # Appends iterable at the start of the list, reallocating when necessary.
     @blocking

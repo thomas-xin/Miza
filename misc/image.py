@@ -142,7 +142,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         command = ["ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
         w, h = max_size(*size, maxsize)
         # Adjust FPS if duration is too long
-        fps = min(fps, 256 * 65536 / w / h / dur * 16 / orig_fps)
+        fps = min(fps, orig_fps)
         r2 = 2 ** 0.5
         rr2 = r2 ** 0.5
         while fps < 12:
@@ -171,7 +171,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
 def create_gif(in_type, args, delay):
     ts = time.time_ns() // 1000
     out = "cache/" + str(ts) + ".gif"
-    maxsize = 512
+    maxsize = 960
     if in_type == "video":
         video2img(args[0], maxsize, round(1000 / delay), out, args[1], args[2], args[3])
         return "$" + out
@@ -243,7 +243,7 @@ def rainbow_gif2(image, duration):
     loops = round(loops * scale) / scale
     if not loops:
         loops = 1 if loops >= 0 else -1
-    maxsize = int(min(512, 32768 / (length * scale ** 0.5) ** 0.5))
+    maxsize = 768
     size = list(max_size(*image.size, maxsize))
     for f in range(length * scale):
         image.seek(f % length)
@@ -269,7 +269,7 @@ def rainbow_gif(image, duration):
     else:
         return rainbow_gif2(image, duration)
     ts = time.time_ns() // 1000
-    image = resize_max(image, 512, resample=Image.HAMMING)
+    image = resize_max(image, 768, resample=Image.HAMMING)
     size = list(image.size)
     if duration == 0:
         fps = 0
@@ -327,7 +327,7 @@ def spin_gif2(image, duration):
     loops = round(loops * scale) / scale
     if not loops:
         loops = 1 if loops >= 0 else -1
-    maxsize = int(min(512, 32768 / (length * scale ** 0.5) ** 0.5))
+    maxsize = 768
     size = list(max_size(*image.size, maxsize))
     for f in range(length * scale):
         image.seek(f % length)
@@ -347,7 +347,7 @@ def spin_gif(image, duration):
     else:
         return spin_gif2(image, duration)
     ts = time.time_ns() // 1000
-    image = resize_max(image, 512, resample=Image.HAMMING)
+    image = 768
     size = list(image.size)
     if duration == 0:
         fps = 0
@@ -418,7 +418,7 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
     loops = round(loops * scale) / scale
     if not loops:
         loops = 1 if loops >= 0 else -1
-    maxsize = int(min(512, 32768 / (length * scale ** 0.5) ** 0.5))
+    maxsize = 768
     size = list(max_size(*image.size, maxsize))
     ts = time.time_ns() // 1000
     for f in range(length * scale):
@@ -444,7 +444,7 @@ def magik_gif(image, cell_size=7, grid_distance=23, iterations=1):
     else:
         return magik_gif2(image, cell_size, grid_distance, iterations)
     ts = time.time_ns() // 1000
-    image = resize_max(image, 512, resample=Image.HAMMING)
+    image = resize_max(image, 768, resample=Image.HAMMING)
     out = deque((image,))
     for _ in range(31):
         for _ in range(iterations):
@@ -1207,7 +1207,7 @@ def evalImg(url, operation, args):
             size = new[0].size
             out = "cache/" + str(ts) + ".gif"
             command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(fps), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
-            if len(new) > 64:
+            if len(new) > 192:
                 vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
             else:
                 vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=diff_mode=rectangle:alpha_threshold=128"
