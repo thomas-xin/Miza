@@ -1818,7 +1818,7 @@ class AudioDownloader:
         self.youtube_dl_x += 1
         return self.downloader.extract_info(item, download=False, process=False)
 
-    # Main extract function, able to extract from youtube playlists much faster than youtube-dl using youtube API, as well as ability to follow soundcloud links.
+    # Main extract function, able to extract from youtube playlists much faster than youtube-dl using youtube API, as well as ability to follow spotify links.
     def extract(self, item, force=False, count=1, mode=None, search=True):
         try:
             page = None
