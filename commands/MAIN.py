@@ -1538,7 +1538,7 @@ class UpdateMessageCount(Database):
         total = d["totals"].get(user.id, 0) + get_message_length(message)
         d["totals"][user.id] = total
         d["counts"][user.id] = count
-        self.update(user.id)                
+        self.update(guild.id)                
 
 
 class UpdatePrefix(Database):
