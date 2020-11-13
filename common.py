@@ -372,7 +372,7 @@ def select_and_loads(s, mode="safe", size=None):
     #     s, data = data, None
     if data is None:
         if mode == "unsafe":
-            data = eval(compile(s, "<loader>", "eval", optimize=2, dont_inherit=False))
+            data = eval(compile(s.replace(b"\0", b""), "<loader>", "eval", optimize=2, dont_inherit=False))
         else:
             if b"{" in s:
                 s = s[s.index(b"{"):s.rindex(b"}") + 1]
@@ -1768,7 +1768,7 @@ class __logPrinter:
         try:
             if type(fn) not in (str, bytes):
                 f = fn
-            if type(b) in (bytes, bytearray):
+            elif type(b) in (bytes, bytearray):
                 f = open(fn, "ab")
             elif type(b) is str:
                 f = open(fn, "a", encoding="utf-8")

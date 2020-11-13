@@ -25,7 +25,7 @@ def get_file(path):
     print(fn)
     for file in os.listdir("cache"):
         if file.split("~", 1)[0] == fn:
-            return flask.send_file("cache/" + file, as_attachment=True, attachment_filename=file.split("~", 1)[-1])
+            return flask.send_file("cache/" + file, as_attachment=False, attachment_filename=file.split("~", 1)[-1])
     return flask.redirect("https://http.cat/404")
 
 @app.route("/", methods=["GET", "POST"])

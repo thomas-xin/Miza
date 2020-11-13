@@ -824,6 +824,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             fsize = os.path.getsize(file)
             f = file
         if fsize <= size:
+            if type(file) is not discord.File:
+                f2 = discord.File(file, filename)
+            if not filename:
+                filename = file
+            file = f2
             fp = file.fp
             fp.seek(0)
             data = fp.read()
