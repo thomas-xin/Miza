@@ -63,7 +63,7 @@ Brayconn (https://github.com/Brayconn)
 -Help with testing
 
 smudgedpasta (https://github.com/smudgedpasta)
--Created art for the bot's profile picture
+-Created art for the bot's profile picture and coin animation
 -Help with testing
 
 pachuco (https://github.com/pachuco)
