@@ -1323,3 +1323,11 @@ class UpdateMimics(Database):
                         if not i % 8191:
                             await asyncio.sleep(0.45)
                         i += 1
+                           
+                           
+class test(command)
+                         name=["muffins", "🧁"]
+                           
+                           def__call__(self, **void):
+                           return "Muffin time :D 🧁🧁🧁"
+                           
