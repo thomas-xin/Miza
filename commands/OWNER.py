@@ -435,7 +435,7 @@ class UpdateEmojis(Database):
             return self.bot.cache.emojis[self.data[name]]
         guild = self.bot.get_available_guild()
         with open(f"misc/emojis/{name}", "rb") as f:
-            emoji = await_fut(guild.create_custom_emoji(name="_m", image=f.read()))
+            emoji = await_fut(guild.create_custom_emoji(name="name", image=f.read()))
             self.data[name] = emoji.id
         self.bot.cache.emojis[emoji.id] = emoji
         return emoji
