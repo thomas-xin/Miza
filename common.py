@@ -1074,7 +1074,7 @@ async def process_math(expr, prec=64, rat=False, key=None, timeout=12, variables
             args = (expr, prec, rat)
         d = repr(bytes("`".join(i if type(i) is str else str(i) for i in args), "utf-8")).encode("utf-8") + b"\n"
         try:
-            with proc.sem:
+            async with proc.sem:
                 await create_future(proc_update, priority=True)
                 await create_future(proc.stdin.write, d)
                 await create_future(proc.stdin.flush, timeout=timeout)
@@ -1108,7 +1108,7 @@ async def process_image(image, operation, args, key=None, timeout=24):
                 await asyncio.sleep(0.5)
         d = repr(bytes("`".join(str(i) for i in (image, operation, args)), "utf-8")).encode("utf-8") + b"\n"
         try:
-            with proc.sem:
+            async with proc.sem:
                 await create_future(proc_update, priority=True)
                 await create_future(proc.stdin.write, d)
                 await create_future(proc.stdin.flush, timeout=timeout)

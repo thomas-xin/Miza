@@ -1202,6 +1202,8 @@ def evalImg(url, operation, args):
         else:
             fps = 1000 * len(new) / duration
             while len(new) > 4096 and fps >= 16:
+                if type(new) is deque:
+                    new = list(new)
                 new = new[::2]
                 fps = 1000 * len(new) / duration
             size = new[0].size
