@@ -1325,7 +1325,7 @@ class UpdateMimics(Database):
                         i += 1
                            
                            
-class test(command):
+class test(Command):
     name=["muffins", "🧁"]
     
     def __call__(self, **void):
