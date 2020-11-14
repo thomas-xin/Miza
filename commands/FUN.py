@@ -1326,7 +1326,8 @@ class UpdateMimics(Database):
                            
                            
 class muffin(Command):
-    name=["muffins", "🧁"]
+    name=["muffins", "🧁", "muffin"]
+    description: "Muffin time! What more is there to say? :D"
     
     def __call__(self, **void):
         return "Muffin time :D 🧁🧁🧁"
