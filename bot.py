@@ -2052,9 +2052,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             if not loop and tc:
                                 fut = create_task(channel.trigger_typing())
                             # Get maximum time allowed for command to process
-                            timeout = getattr(command, "_timeout_", 1) * bot.timeout
-                            if timeout >= inf:
+                            if user.id in bot.owners:
                                 timeout = None
+                            else:
+                                timeout = getattr(command, "_timeout_", 1) * bot.timeout
+                                if timeout >= inf:
+                                    timeout = None
                             # Create a future to run the command
                             future = create_future(
                                 command,                        # command is a callable object, may be async or not
