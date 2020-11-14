@@ -1115,11 +1115,11 @@ def get_image(url, out):
                     file_print(f"Emoji {save} successfully loaded from cache.")
             if data is None:
                 data = get_request(url)
-            if len(data) > 67108864:
-                raise OverflowError("Max file size to load is 64MB.")
+            if len(data) > 8589934592:
+                raise OverflowError("Max file size to load is 8GB.")
         else:
-            if os.path.getsize(url) > 67108864:
-                raise OverflowError("Max file size to load is 64MB.")
+            if os.path.getsize(url) > 8589934592:
+                raise OverflowError("Max file size to load is 8GB.")
             with open(url, "rb") as f:
                 data = f.read()
             if out != url and out:
@@ -1130,8 +1130,8 @@ def get_image(url, out):
         image = from_bytes(data, save)
         CACHE[url] = image
     else:
-        if len(url) > 67108864:
-            raise OverflowError("Max file size to load is 64MB.")
+        if len(url) > 8589934592:
+            raise OverflowError("Max file size to load is 8GB.")
         image = from_bytes(url)
     return image
 
