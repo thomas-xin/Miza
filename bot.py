@@ -826,6 +826,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if fsize <= size:
             if type(file) is not discord.File:
                 f2 = discord.File(file, filename)
+            else:
+                f2 = file
             if not filename:
                 filename = file
             file = f2
