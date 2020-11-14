@@ -811,13 +811,13 @@ class UrbanDictionary(Command):
     rate_limit = (2, 8)
     typing = True
 
-    async def __call__(self, channel, argv, flags, **void):
+    async def __call__(self, channel, argv, flags, _timeout, **void):
         url = (
             "https://mashape-community-urban-dictionary.p.rapidapi.com/define?term="
             + argv.replace(" ", "%20")
         )
         with discord.context_managers.Typing(channel):
-            s = await Request(url, headers=self.header, timeout=16, aio=True)
+            s = await Request(url, headers=self.header, timeout=_timeout, aio=True)
             d = eval_json(s)
             l = d["list"]
             if not l:

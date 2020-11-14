@@ -2071,9 +2071,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 message=message,                # message data
                                 channel=channel,                # channel data
                                 guild=guild,                    # guild data
-                                name=command_check,                     # alias the command was called as
+                                name=command_check,             # alias the command was called as
                                 callback=self.process_message,  # function that called the command
-                                timeout=timeout,                # timeout delay for the command
+                                _timeout=timeout,               # timeout delay assigned to the command
+                                timeout=timeout,                # timeout delay for the whole function
                             )
                             # Add a callback to typing in the channel if the command takes too long
                             if fut is None and not hasattr(command, "typing"):

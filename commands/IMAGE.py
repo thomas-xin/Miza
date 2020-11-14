@@ -820,7 +820,7 @@ class CreateGIF(Command):
     flags = "r"
     typing = True
 
-    async def __call__(self, bot, user, guild, channel, message, flags, args, **void):
+    async def __call__(self, bot, user, guild, channel, message, flags, args, _timeout, **void):
         # Take input from any attachments, or otherwise the message contents
         if message.attachments:
             args += [best_url(a) for a in message.attachments]
@@ -855,9 +855,9 @@ class CreateGIF(Command):
                 args[i] = url
             name = "unknown.gif"
             if video is not None:
-                resp = await process_image("create_gif", "$", ["video", video, delay], user, timeout=232)
+                resp = await process_image("create_gif", "$", ["video", video, delay], user, timeout=_timeout)
             else:
-                resp = await process_image("create_gif", "$", ["image", args, delay], user, timeout=232)
+                resp = await process_image("create_gif", "$", ["image", args, delay], user, timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(message.channel, "", fn, filename=name)
 

@@ -887,10 +887,10 @@ class Activity(Command):
     rate_limit = (2, 9)
     typing = True
 
-    async def __call__(self, guild, user, argv, flags, channel, bot, **void):
+    async def __call__(self, guild, user, argv, flags, channel, bot, _timeout, **void):
         if argv:
             user = await bot.fetch_user_member(argv, guild)
-        data = await create_future(bot.data.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=12)
+        data = await create_future(bot.data.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
         with discord.context_managers.Typing(channel):
             resp = await process_image("plt_special", "$", (data, str(user)), guild)
             fn = resp[0]
