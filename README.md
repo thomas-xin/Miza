@@ -121,6 +121,8 @@ Now onto more command-based things...
 
 (To be filled.)
 
-## Command Syntax and Flags
+```
+Command Syntax and Flags
+```
 
 (Will write a bit about how to use Miza here later.)
