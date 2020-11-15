@@ -112,14 +112,13 @@ Miza also logs up to three places: A log.txt (which the file gets refreshed upon
 
 Now onto more command-based things...
 
-```
-What are trusted servers?
-```
+- What are trusted servers?
+
 (To be filled.)
 
-```
-What is the blacklist for?
-```
+
+- What is the blacklist for?
+
 (To be filled.)
 
 ## Command Syntax and Flags
