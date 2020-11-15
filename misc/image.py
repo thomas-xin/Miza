@@ -1302,7 +1302,7 @@ def evalImg(url, operation, args):
                 image.seek(0)
                 func = getattr(image, operation, None)
                 if func is None:
-                    new = eval(operation)(temp, *args)
+                    new = eval(operation)(image, *args)
                 else:
                     new = func(*args)
             else:
