@@ -88,7 +88,7 @@ Developer tools within Discord
 So Miza isn't just your standard Discord bot. It can go as far as opening a Python terminal within Discord itself, allowing you a discord.py console of Discord API in the comforts of your own server, with a custom cache that Thomas created. For a better reference of discord.py, visit the [Discord.py official documentation!](https://discordpy.readthedocs.io/en/latest/) (Note that Miza will always be able to pick up on edited messages as well, in both the terminal and with any commands.)
 
 #### ⚠ **IMPORTANT NOTE** ⚠
-The in-Discord terminal is *very* powerful, allowing someone to have more power and risk of damaging your servers than someone getting their hands on the actual bot token itself. This being said, be very careful with who you intrust it too. Below are a but a few of the most basic examples of what the terminal can do.
+**The in-Discord terminal is *very* powerful, allowing someone to have more power and risk of damaging your servers than someone getting their hands on the actual bot token itself. This being said, be very careful with who you intrust it too. Below are a but a few of the most basic examples of what the terminal can do.**
 
 ![Screenshot](https://cdn.discordapp.com/attachments/727087981285998593/777536790574923786/unknown.png)
 
@@ -101,3 +101,13 @@ The in-Discord terminal is *very* powerful, allowing someone to have more power 
 ![Screenshot5](https://cdn.discordapp.com/attachments/727087981285998593/777544002957738054/unknown.png)
 
 ![Screenshot6](https://cdn.discordapp.com/attachments/727087981285998593/777545207444013087/unknown.png)
+
+Miza also logs up to three places: The console where you're running the code (we just use a .bat file to run Miza through the Command Prompt on Windows usually, as none of Miza's subprocesses can run on Linux), a log.txt (which the file gets refreshed upon restart) and a log within Discord itself.
+
+![Screenshot7](https://cdn.discordapp.com/attachments/727087981285998593/777554360859099146/Capture9.PNG)
+![Screenshot8](https://cdn.discordapp.com/attachments/727087981285998593/777554361769000960/Capture10.PNG)
+![Screenshot9](https://cdn.discordapp.com/attachments/727087981285998593/777554358095183893/Capture8.PNG)
+
+Now for the actual usage of commands...
+
+## Command syntax and flags
