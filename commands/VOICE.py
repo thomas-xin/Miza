@@ -1104,7 +1104,7 @@ class AudioFile:
                         if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err or "Server returned 403 Forbidden" in err):
                             with tracebacksuppressor:
                                 if "https://cf-hls-media.sndcdn.com/" in stream:
-                                    entry = ytdl.extract_true(self.webpage_url)
+                                    entry = ytdl.extract_from(self.webpage_url)
                                 else:
                                     entry = ytdl.extract_backup(self.webpage_url)
                                 print(err)
