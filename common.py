@@ -20,7 +20,6 @@ with MultiThreadedImporter(globals()) as importer:
         "zipfile",
         "nacl",
         "shutil",
-        "flask",
     )
 
 PROC = psutil.Process()
