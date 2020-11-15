@@ -9,8 +9,8 @@ Introduction | Discord Usage
 ------------ | -------------
 Where can I find what? | Developer tools within Discord
 This explains the basis of where everything is and why for if you ever want to use the code yourself. | This explains what the bot owner(s) can do with Miza.
-How do I use the code? | (Not written yet)
-This explains the key things to remember when hosting Miza, judging by my own experience. | (Not written yet)
+How do I use the code? | Command Syntax and Flags
+This explains the key things to remember when hosting Miza, judging by my own experience. | This explains the structure of Miza's commands and different ways to use them properly.
 
 ## Introduction
 
@@ -88,7 +88,7 @@ Developer tools within Discord
 So Miza isn't just your standard Discord bot. It can go as far as opening a Python terminal within Discord itself, allowing you a discord.py console of Discord API in the comforts of your own server, with a custom cache that Thomas created. For a better reference of discord.py, visit the [Discord.py official documentation!](https://discordpy.readthedocs.io/en/latest/) (Note that Miza will always be able to pick up on edited messages as well, in both the terminal and with any commands.)
 
 #### ⚠ **IMPORTANT NOTE** ⚠
-**The in-Discord terminal is *very* powerful, allowing someone to have more power and risk of damaging your servers than someone getting their hands on the actual bot token itself. This being said, be very careful with who you intrust it too. Below are a but a few of the most basic examples of what the terminal can do.**
+**The in-Discord terminal is *very* powerful, allowing someone to have more power and risk of damaging your servers than someone getting their hands on the actual bot token itself. This being said, be very careful with who you intrust bot ownership too. Below are a but a few of the most basic examples of what the terminal can do.**
 
 ![Screenshot](https://cdn.discordapp.com/attachments/727087981285998593/777536790574923786/unknown.png)
 
@@ -102,12 +102,26 @@ So Miza isn't just your standard Discord bot. It can go as far as opening a Pyth
 
 ![Screenshot6](https://cdn.discordapp.com/attachments/727087981285998593/777545207444013087/unknown.png)
 
-Miza also logs up to three places: The console where you're running the code (we just use a .bat file to run Miza through the Command Prompt on Windows usually, as none of Miza's subprocesses can run on Linux), a log.txt (which the file gets refreshed upon restart) and a log within Discord itself.
+Miza also logs up to three places: A log.txt (which the file gets refreshed upon restart), the console where you're running the code (we just use a .bat file to run Miza through the Command Prompt on Windows usually, as none of Miza's subprocesses can run on Linux) and a log within Discord itself (which isn't hardcoded, you can enable it similarly to how I enabled the Python terminal above.)
 
-![Screenshot7](https://cdn.discordapp.com/attachments/727087981285998593/777554360859099146/Capture9.PNG)
-![Screenshot8](https://cdn.discordapp.com/attachments/727087981285998593/777554361769000960/Capture10.PNG)
+![Screenshot7](https://cdn.discordapp.com/attachments/727087981285998593/777554361769000960/Capture10.PNG)
+
+![Screenshot8](https://cdn.discordapp.com/attachments/727087981285998593/777554360859099146/Capture9.PNG)
+
 ![Screenshot9](https://cdn.discordapp.com/attachments/727087981285998593/777554358095183893/Capture8.PNG)
 
-Now for the actual usage of commands...
+Now onto more command-based things...
 
-## Command syntax and flags
+```
+What are trusted servers?
+```
+(To be filled.)
+
+```
+What is the blacklist for?
+```
+(To be filled.)
+
+## Command Syntax and Flags
+
+(Will write a bit about how to use Miza here later.)
