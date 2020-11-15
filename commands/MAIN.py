@@ -716,6 +716,7 @@ class Info(Command):
                     if "v" in flags:
                         with suppress(LookupError):
                             if is_self:
+                                raise LookupError
                                 # Count total commands used by all users
                                 c = {}
                                 for i, v in enumerate(tuple(bot.data.users.values()), 1):

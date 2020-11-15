@@ -1088,7 +1088,6 @@ class AudioFile:
             fmt = subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream]).decode("utf-8", "replace").strip()
             if fmt == "opus":
                 cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
-                print(cmd)
         self.proc = None
         try:
             try:
@@ -1104,7 +1103,10 @@ class AudioFile:
                         err = self.proc.stderr.read().decode("utf-8", "replace")
                         if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err or "Server returned 403 Forbidden" in err):
                             with tracebacksuppressor:
-                                entry = ytdl.extract_backup(self.webpage_url)
+                                if "https://cf-hls-media.sndcdn.com/" in stream:
+                                    entry = ytdl.extract(self.webpage_url)
+                                else:
+                                    entry = ytdl.extract_backup(self.webpage_url)
                                 print(err)
                                 return self.load(get_best_audio(entry), check_fmt=False, force=True)
                         if check_fmt:
@@ -1690,7 +1692,8 @@ class AudioDownloader:
             try:
                 video = part["playlistVideoRenderer"]
             except KeyError:
-                print(part)
+                if "continuationItemRenderer" not in part:
+                    print(part)
                 continue
             v_id = video['videoId']
             try:
@@ -3462,7 +3465,7 @@ class Shuffle(Command):
     min_display = "0~1"
     description = "Shuffles the audio queue."
     usage = "<force(?f)> <hide(?h)>"
-    flags = "fh"
+    flags = "fsh"
     rate_limit = (4, 9)
 
     async def __call__(self, perm, flags, guild, channel, user, bot, **void):
@@ -3471,7 +3474,7 @@ class Shuffle(Command):
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to shuffle queue while other users are in voice")
             async with auds.semaphore:
-                if "f" in flags:
+                if "f" in flags or "s" in flags:
                     # Clear "played" tag of current item
                     auds.queue[0].pop("played", None)
                     shuffle(auds.queue)

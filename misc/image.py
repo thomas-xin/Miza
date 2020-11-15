@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile
+import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib
 import numpy as np
 import PIL
 from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
@@ -8,6 +8,7 @@ from zipfile import ZipFile
 import matplotlib.pyplot as plt
 
 deque = collections.deque
+suppress = contextlib.suppress
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 start = time.time()
@@ -75,6 +76,8 @@ def get_request(url):
                     return f.read()
     with requests.get(url, headers=header(), stream=True, timeout=12) as resp:
         return resp.content
+    # resp = requests.get(url, headers=header(), stream=True, timeout=12)
+    # return seq(resp)
 
 
 from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), tuple(colour))
@@ -90,13 +93,8 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
     if direct:
         if data is None:
             data = get_request(url)
-        file = open(fn, "wb")
-        try:
-            file.write(data)
-        except:
-            file.close()
-            raise
-        file.close()
+        with open(fn, "wb") as file:
+            file.write(data if type(data) is bytes else data.read())
     try:
         if direct:
             command = ["ffprobe", "-hide_banner", fn]
@@ -219,12 +217,12 @@ def create_gif(in_type, args, delay):
         size[0] /= 2 ** 0.5
         size[1] /= 2 ** 0.5
     size = [round(size[0]), round(size[1])]
+    count = len(imgs)
     if imgs[0].size[0] != size[0]:
-        imgs = [resize_to(img, *size, operation="hamming") for img in imgs]
-    return dict(duration=delay * len(imgs), frames=imgs)
+        imgs = (resize_to(img, *size, operation="hamming") for img in imgs)
+    return dict(duration=delay * len(imgs), count=count, frames=imgs)
 
 def rainbow_gif2(image, duration):
-    out = deque()
     total = 0
     for f in range(2147483648):
         try:
@@ -245,21 +243,24 @@ def rainbow_gif2(image, duration):
         loops = 1 if loops >= 0 else -1
     maxsize = 768
     size = list(max_size(*image.size, maxsize))
-    for f in range(length * scale):
-        image.seek(f % length)
-        if str(image.mode) != "RGBA":
-            temp = image.convert("RGBA")
-        else:
-            temp = image
-        if temp.size[0] != size[0] or temp.size[1] != size[1]:
-            temp = temp.resize(size, Image.HAMMING)
-        A = temp.getchannel("A")
-        channels = list(temp.convert("HSV").split())
-        channels[0] = channels[0].point(lambda x: int(((f / length / scale * loops + x / 256) % 1) * 256))
-        temp = Image.merge("HSV", channels).convert("RGB")
-        temp.putalpha(A)
-        out.append(temp)
-    return dict(duration=total * scale, frames=out)
+
+    def rainbow_gif_iterator(image):
+        for f in range(length * scale):
+            image.seek(f % length)
+            if str(image.mode) != "RGBA":
+                temp = image.convert("RGBA")
+            else:
+                temp = image
+            if temp.size[0] != size[0] or temp.size[1] != size[1]:
+                temp = temp.resize(size, Image.HAMMING)
+            A = temp.getchannel("A")
+            channels = list(temp.convert("HSV").split())
+            channels[0] = channels[0].point(lambda x: int(((f / length / scale * loops + x / 256) % 1) * 256))
+            temp = Image.merge("HSV", channels).convert("RGB")
+            temp.putalpha(A)
+            yield temp
+
+    return dict(duration=total * scale, count=length * scale, frames=rainbow_gif_iterator(image))
 
 def rainbow_gif(image, duration):
     try:
@@ -294,21 +295,23 @@ def rainbow_gif(image, duration):
     channels = list(curr.split())
     if duration < 0:
         rate = -rate
-    out = deque()
-    # Repeatedly hueshift image and return copies
+    count = 256 // abs(rate)
     func = lambda x: (x + rate) & 255
-    for i in range(0, 256, abs(rate)):
-        if i:
-            channels[0] = channels[0].point(func)
-            image = Image.merge("HSV", channels).convert("RGBA")
-            if A is not None:
-                image.putalpha(A)
-        out.append(image)
-    return dict(duration=1000 / fps * len(out), frames=out)
+
+    # Repeatedly hueshift image and return copies
+    def rainbow_gif_iterator(image):
+        for i in range(0, 256, abs(rate)):
+            if i:
+                channels[0] = channels[0].point(func)
+                image = Image.merge("HSV", channels).convert("RGBA")
+                if A is not None:
+                    image.putalpha(A)
+            yield image
+
+    return dict(duration=1000 / fps * count, count=count, frames=rainbow_gif_iterator(image))
 
 
 def spin_gif2(image, duration):
-    out = deque()
     total = 0
     for f in range(2147483648):
         try:
@@ -329,14 +332,17 @@ def spin_gif2(image, duration):
         loops = 1 if loops >= 0 else -1
     maxsize = 768
     size = list(max_size(*image.size, maxsize))
-    for f in range(length * scale):
-        image.seek(f % length)
-        temp = image
-        if temp.size[0] != size[0] or temp.size[1] != size[1]:
-            temp = temp.resize(size, Image.HAMMING)
-        temp = to_circle(temp.rotate(f * 360 / length / scale * loops))
-        out.append(temp)
-    return dict(duration=total * scale, frames=out)
+
+    def spin_gif_iterator(image):
+        for f in range(length * scale):
+            image.seek(f % length)
+            temp = image
+            if temp.size[0] != size[0] or temp.size[1] != size[1]:
+                temp = temp.resize(size, Image.HAMMING)
+            temp = to_circle(temp.rotate(f * 360 / length / scale * loops))
+            yield temp
+
+    return dict(duration=total * scale, count=length * scale, frames=spin_gif_iterator(image))
 
 
 def spin_gif(image, duration):
@@ -361,15 +367,18 @@ def spin_gif(image, duration):
         raise ValueError("Invalid framerate value.")
     if duration < 0:
         rate = -rate
-    out = deque()
+    count = 256 // abs(rate)
+
     # Repeatedly rotate image and return copies
-    for i in range(0, 256, abs(rate)):
-        if i:
-            im = image.rotate(i * 360 / 256)
-        else:
-            im = image
-        out.append(to_circle(im))
-    return dict(duration=1000 / fps * len(out), frames=out)
+    def spin_gif_iterator(image):
+        for i in range(0, 256, abs(rate)):
+            if i:
+                im = image.rotate(i * 360 / 256)
+            else:
+                im = image
+            yield to_circle(im)
+
+    return dict(duration=1000 / fps * count, count=count, frames=spin_gif_iterator(image))
 
 
 def to_square(image):
@@ -399,7 +408,6 @@ def to_circle(image):
 
 
 def magik_gif2(image, cell_size, grid_distance, iterations):
-    out = deque()
     total = 0
     for f in range(2147483648):
         try:
@@ -421,19 +429,22 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
     maxsize = 768
     size = list(max_size(*image.size, maxsize))
     ts = time.time_ns() // 1000
-    for f in range(length * scale):
-        np.random.seed(ts & 4294967295)
-        image.seek(f % length)
-        temp = image
-        if temp.size[0] != size[0] or temp.size[1] != size[1]:
-            temp = temp.resize(size, Image.HAMMING)
-        for _ in range(int(31 * iterations * f / length / scale)):
-            dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
-            src_grid = distort_grid(dst_grid, grid_distance)
-            mesh = grid_to_mesh(src_grid, dst_grid)
-            temp = temp.transform(temp.size, Image.MESH, mesh, resample=Image.NEAREST)
-        out.append(temp)
-    return dict(duration=total * scale, frames=out)
+
+    def magik_gif_iterator(image):
+        for f in range(length * scale):
+            np.random.seed(ts & 4294967295)
+            image.seek(f % length)
+            temp = image
+            if temp.size[0] != size[0] or temp.size[1] != size[1]:
+                temp = temp.resize(size, Image.HAMMING)
+            for _ in range(int(31 * iterations * f / length / scale)):
+                dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
+                src_grid = distort_grid(dst_grid, grid_distance)
+                mesh = grid_to_mesh(src_grid, dst_grid)
+                temp = temp.transform(temp.size, Image.MESH, mesh, resample=Image.NEAREST)
+            yield temp
+
+    return dict(duration=total * scale, count=length * scale, frames=magik_gif_iterator(image))
 
 
 def magik_gif(image, cell_size=7, grid_distance=23, iterations=1):
@@ -445,15 +456,18 @@ def magik_gif(image, cell_size=7, grid_distance=23, iterations=1):
         return magik_gif2(image, cell_size, grid_distance, iterations)
     ts = time.time_ns() // 1000
     image = resize_max(image, 768, resample=Image.HAMMING)
-    out = deque((image,))
-    for _ in range(31):
-        for _ in range(iterations):
-            dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
-            src_grid = distort_grid(dst_grid, grid_distance)
-            mesh = grid_to_mesh(src_grid, dst_grid)
-            image = image.transform(image.size, Image.MESH, mesh, resample=Image.NEAREST)
-        out.append(image)
-    return dict(duration=2, frames=out)
+
+    def magik_gif_iterator(image):
+        yield image
+        for _ in range(31):
+            for _ in range(iterations):
+                dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
+                src_grid = distort_grid(dst_grid, grid_distance)
+                mesh = grid_to_mesh(src_grid, dst_grid)
+                image = image.transform(image.size, Image.MESH, mesh, resample=Image.NEAREST)
+            yield image
+
+    return dict(duration=2, count=32, frames=magik_gif_iterator(image))
 
 
 def quad_as_rect(quad):
@@ -1072,12 +1086,138 @@ def from_bytes(b, save=None):
     elif b[:4] == b"%PDF":
         return ImageSequence(*pdf2image.convert_from_bytes(b, poppler_path="misc/poppler", use_pdftocairo=True))
     else:
-        out = io.BytesIO(b)
+        out = io.BytesIO(b) if type(b) is bytes else b
     try:
         return Image.open(out)
     except PIL.UnidentifiedImageError:
         file_print(b[:1024])
         raise
+
+
+class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContextManager):
+
+    BUF = 262144
+
+    def __init__(self, obj, filename=None):
+        self.iter = None
+        self.closer = getattr(obj, "close", None)
+        if issubclass(type(obj), io.IOBase):
+            if issubclass(type(obj), io.BytesIO):
+                self.data = obj
+            else:
+                obj.seek(0)
+                self.data = io.BytesIO(obj.read())
+                obj.seek(0)
+        elif issubclass(type(obj), bytes) or issubclass(type(obj), bytearray) or issubclass(type(obj), memoryview):
+            self.data = io.BytesIO(obj)
+        elif issubclass(type(obj), collections.abc.Iterator):
+            self.iter = iter(obj)
+            self.data = io.BytesIO()
+            self.high = 0
+        elif issubclass(type(obj), requests.models.Response):
+            self.iter = obj.iter_content(self.BUF)
+            self.data = io.BytesIO()
+            self.high = 0
+        else:
+            raise TypeError(f"a bytes-like object is required, not '{type(obj)}'")
+        self.filename = filename
+        self.buffer = {}
+
+    def __getitem__(self, k):
+        if type(k) is slice:
+            out = io.BytesIO()
+            start = k.start or 0
+            stop = k.stop or inf
+            step = k.step or 1
+            if step < 0:
+                start, stop, step = stop + 1, start + 1, -step
+                rev = True
+            else:
+                rev = False
+            curr = start // self.BUF * self.BUF
+            offs = start % self.BUF
+            out.write(self.load(curr))
+            curr += self.BUF
+            while curr < stop:
+                temp = self.load(curr)
+                if not temp:
+                    break
+                out.write(temp)
+                curr += self.BUF
+            out.seek(0)
+            return out.read()[k]
+        base = k // self.BUF
+        with suppress(KeyError):
+            return self.load(base)[k % self.BUF]
+        raise IndexError("seq index out of range")
+
+    def __str__(self):
+        if self.filename is None:
+            return str(self.data)
+        if self.filename:
+            return f"<seq name='{self.filename}'>"
+        return f"<seq object at {hex(id(self))}"
+
+    def __iter__(self):
+        i = 0
+        while True:
+            x = self[i]
+            if x:
+                yield x
+            i += 1
+
+    def __getattr__(self, k):
+        if k in ("data", "filename"):
+            return self.data
+        return object.__getattribute__(self.data, k)
+
+    close = lambda self: self.closer() if self.closer else None
+    __exit__ = lambda self, *args: self.close()
+
+    def load(self, k):
+        with suppress(KeyError):
+            return self.buffer[k]
+        seek = getattr(self.data, "seek", None)
+        if seek:
+            if self.iter is not None and k + self.BUF >= self.high:
+                seek(self.high)
+                with suppress(StopIteration):
+                    while k + self.BUF >= self.high:
+                        temp = next(self.iter)
+                        self.data.write(temp)
+                        self.high += len(temp)
+            seek(k)
+            self.buffer[k] = self.data.read(self.BUF)
+        else:
+            with suppress(StopIteration):
+                while self.high < k:
+                    temp = next(self.data)
+                    if not temp:
+                        return b""
+                    self.buffer[self.high] = temp
+                    self.high += self.BUF
+        return self.buffer.get(k, b"")
+
+
+def ImageOpIterator(image, step, operation, ts):
+    # Attempt to perform operation on all individual frames of .gif images
+    for i, f in enumerate(range(0, 2147483648, step)):
+        np.random.seed(ts & 4294967295)
+        globals()["CURRENT_FRAME"] = i
+        try:
+            image.seek(f)
+        except EOFError:
+            break
+        if str(image.mode) != "RGBA":
+            temp = image.convert("RGBA")
+        else:
+            temp = image
+        func = getattr(temp, operation, None)
+        if func is None:
+            res = eval(operation)(temp, *args)
+        else:
+            res = func(*args)
+        yield res
 
 
 class ImageSequence(Image.Image):
@@ -1101,7 +1241,7 @@ class ImageSequence(Image.Image):
 def get_image(url, out):
     if issubclass(type(url), Image.Image):
         return url
-    if type(url) not in (bytes, bytearray, io.BytesIO):
+    if type(url) not in (bytes, bytearray, io.BytesIO, seq):
         save = None
         if url in CACHE:
             return CACHE[url]
@@ -1159,65 +1299,63 @@ def evalImg(url, operation, args):
                     raise EOFError
                 image.seek(1)
             except EOFError:
-                new = None
                 globals()["ANIM"] = False
+                image.seek(0)
+                func = getattr(image, operation, None)
+                if func is None:
+                    new = eval(operation)(temp, *args)
+                else:
+                    new = func(*args)
             else:
                 new = dict(frames=deque(), duration=0)
                 globals()["ANIM"] = True
-            # Attempt to perform operation on all individual frames of .gif images
-            for f in range(2147483648):
-                np.random.seed(ts & 4294967295)
-                globals()["CURRENT_FRAME"] = f
-                try:
-                    image.seek(f)
-                except EOFError:
-                    break
-                if str(image.mode) != "RGBA":
-                    temp = image.convert("RGBA")
-                else:
-                    temp = image
-                if new is not None:
-                    new["duration"] += max(temp.info.get("duration", 0), 1 / 60)
-                func = getattr(temp, operation, None)
-                if func is None:
-                    res = eval(operation)(temp, *args)
-                else:
-                    res = func(*args)
-                if new is None:
-                    new = res
-                    break
-                elif issubclass(type(res), Image.Image):
-                    new["frames"].append(res)
-                else:
-                    new["frames"].extend(res)
+                for f in range(2147483648):
+                    try:
+                        image.seek(f)
+                    except EOFError:
+                        break
+                    new["duration"] += max(image.info.get("duration", 0), 1 / 60)
+                fps = 1000 * f / new["duration"]
+                step = 1
+                while f // step > 4096 and fps // step >= 24:
+                    step += 1
+                new["count"] = f // step
+                new["frames"] = ImageOpIterator(image, step, operation=operation, ts=ts)
     else:
         new = eval(url)(*args)
     if type(new) is dict:
         duration = new["duration"]
-        new = new["frames"]
-        if not new:
+        frames = new["frames"]
+        if not frames:
             raise EOFError("No image output detected.")
-        elif len(new) == 1:
-            new = new[0]
+        elif new["count"] == 1:
+            new = frames[0]
         else:
-            fps = 1000 * len(new) / duration
-            while len(new) > 4096 and fps >= 16:
-                if type(new) is deque:
-                    new = list(new)
-                new = new[::2]
-                fps = 1000 * len(new) / duration
-            size = new[0].size
+            fps = 1000 * new["count"] / duration
+            if issubclass(type(frames), collections.abc.Sequence):
+                first = frames[0]
+            else:
+                it = iter(frames)
+                first = next(it)
+
+                def frameit():
+                    with suppress(StopIteration):
+                        while True:
+                            yield next(it)
+
+                frames = frameit()
+            size = first.size
             out = "cache/" + str(ts) + ".gif"
             command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(fps), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
-            if len(new) > 192:
+            if new["count"] > 4096:
                 vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
             else:
                 vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=diff_mode=rectangle:alpha_threshold=128"
             command.extend(["-gifflags", "-offsetting", "-an", "-vf", vf, "-loop", "0", out])
             file_print(command)
-            file_print(len(new))
+            file_print(new["count"])
             proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            for frame in new:
+            for frame in frames:
                 if issubclass(type(frame), Image.Image):
                     if frame.size != size:
                         frame = frame.resize(size)
