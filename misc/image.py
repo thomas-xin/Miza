@@ -174,7 +174,6 @@ def create_gif(in_type, args, delay):
         video2img(args[0], maxsize, round(1000 / delay), out, args[1], args[2], args[3])
         return "$" + out
     images = args
-    maxsize = int(min(maxsize, 32768 / len(images) ** 0.5))
     # Detect if an image sequence or video is being inputted
     imgs = deque()
     for url in images:
@@ -241,7 +240,7 @@ def rainbow_gif2(image, duration):
     loops = round(loops * scale) / scale
     if not loops:
         loops = 1 if loops >= 0 else -1
-    maxsize = 768
+    maxsize = 960
     size = list(max_size(*image.size, maxsize))
 
     def rainbow_gif_iterator(image):
@@ -270,7 +269,7 @@ def rainbow_gif(image, duration):
     else:
         return rainbow_gif2(image, duration)
     ts = time.time_ns() // 1000
-    image = resize_max(image, 768, resample=Image.HAMMING)
+    image = resize_max(image, 960, resample=Image.HAMMING)
     size = list(image.size)
     if duration == 0:
         fps = 0
@@ -330,7 +329,7 @@ def spin_gif2(image, duration):
     loops = round(loops * scale) / scale
     if not loops:
         loops = 1 if loops >= 0 else -1
-    maxsize = 768
+    maxsize = 960
     size = list(max_size(*image.size, maxsize))
 
     def spin_gif_iterator(image):
@@ -353,7 +352,7 @@ def spin_gif(image, duration):
     else:
         return spin_gif2(image, duration)
     ts = time.time_ns() // 1000
-    image = 768
+    image = 960
     size = list(image.size)
     if duration == 0:
         fps = 0
@@ -426,7 +425,7 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
     loops = round(loops * scale) / scale
     if not loops:
         loops = 1 if loops >= 0 else -1
-    maxsize = 768
+    maxsize = 960
     size = list(max_size(*image.size, maxsize))
     ts = time.time_ns() // 1000
 
@@ -455,7 +454,7 @@ def magik_gif(image, cell_size=7, grid_distance=23, iterations=1):
     else:
         return magik_gif2(image, cell_size, grid_distance, iterations)
     ts = time.time_ns() // 1000
-    image = resize_max(image, 768, resample=Image.HAMMING)
+    image = resize_max(image, 960, resample=Image.HAMMING)
 
     def magik_gif_iterator(image):
         yield image
