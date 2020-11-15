@@ -87,7 +87,7 @@ Developer tools within Discord
 
 So Miza isn't just your standard Discord bot. It can go as far as opening a Python terminal within Discord itself, allowing you a discord.py console of Discord API in the comforts of your own server, with a custom cache that Thomas created. For a better reference of discord.py, visit the [Discord.py official documentation!](https://discordpy.readthedocs.io/en/latest/) (Note that Miza will always be able to pick up on edited messages as well, in both the terminal and with any commands.)
 
-⚠ **IMPORTANT NOTE** ⚠
+#### ⚠ **IMPORTANT NOTE** ⚠
 The in-Discord terminal is *very* powerful, allowing someone to have more power and risk of damaging your servers than someone getting their hands on the actual bot token itself. This being said, be very careful with who you intrust it too. Below are a but a few of the most basic examples of what the terminal can do.
 
 ![Screenshot](https://cdn.discordapp.com/attachments/727087981285998593/777536790574923786/unknown.png)
@@ -95,8 +95,6 @@ The in-Discord terminal is *very* powerful, allowing someone to have more power 
 ![Screenshot2](https://cdn.discordapp.com/attachments/727087981285998593/777539347884933150/Capture3.PNG)
 
 ![Screenshot3](https://cdn.discordapp.com/attachments/727087981285998593/777539328062259200/Capture2.PNG)
-
-![Screenshot4](https://cdn.discordapp.com/attachments/727087981285998593/777542921041346560/Capture5.PNG)
 
 ![Screenshot5](https://cdn.discordapp.com/attachments/727087981285998593/777544002957738054/unknown.png)
 
