@@ -102,7 +102,7 @@ So Miza isn't just your standard Discord bot. It can go as far as opening a Pyth
 
 ![Screenshot6](https://cdn.discordapp.com/attachments/727087981285998593/777545207444013087/unknown.png)
 
-Miza also logs up to three places: A log.txt (which the file gets refreshed upon restart), the console where you're running the code (we just use a .bat file to run Miza through the Command Prompt on Windows usually, as none of Miza's subprocesses can run on Linux) and a log within Discord itself (which isn't hardcoded, you can enable it similarly to how I enabled the Python terminal above.)
+Miza also logs up to three places: A *log.txt* (which the file gets refreshed upon restart), the console where you're running the code (we just use a *main.bat* file to run Miza through the Command Prompt on Windows usually, as none of Miza's subprocesses can run on Linux) and a log within Discord itself (which isn't hardcoded, you can enable it similarly to how I enabled the Python terminal above.)
 
 ![Screenshot7](https://cdn.discordapp.com/attachments/727087981285998593/777554361769000960/Capture10.PNG)
 
