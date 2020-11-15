@@ -96,6 +96,8 @@ The in-Discord terminal is *very* powerful, allowing someone to have more power 
 
 ![Screenshot3](https://cdn.discordapp.com/attachments/727087981285998593/777539328062259200/Capture2.PNG)
 
+![Screenshot4](https://cdn.discordapp.com/attachments/727087981285998593/777542932139081738/Capture6.PNG)
+
 ![Screenshot5](https://cdn.discordapp.com/attachments/727087981285998593/777544002957738054/unknown.png)
 
 ![Screenshot6](https://cdn.discordapp.com/attachments/727087981285998593/777545207444013087/unknown.png)
