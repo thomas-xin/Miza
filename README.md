@@ -36,6 +36,45 @@ I'm just going to comment on what I personally found to be the most important th
 
 - **MemoryError()**
 
-Ah yes, the endless spam a few minutes after start-up...
+Ah yes, the endless spam a few minutes after start-up... This is an issue I ran into initially, caused by Miza trying to cache too much at one time. Usually Miza only caches things in chunks if its necessary (like someone running a command on an attachement sent years ago for example). You can counter this issue by reducing how much content Miza caches, which is found right at the top of *bot.py*, in a function that looks like this:
 
-## WIP, I still need to write the rest of the funcionality as well as examples of the commands themselves, but for now the Smudge must go sleepies... zzz
+```py
+def __init__(self, cache_size=4194304, timeout=24):
+        # Initializes client (first in __mro__ of class inheritance)
+        self.start_time = utc()
+        super().__init__(max_messages=256, heartbeat_timeout=60, guild_ready_timeout=5, intents=self.intents)
+        self.cache_size = cache_size
+        # Base cache: contains all other caches
+        self.cache = fcdict({c: {} for c in self.caches})
+
+        # Code continues...
+```
+
+Just reduce the number in `cache_size=4194304` and you should be good to go.
+
+- **IP Address exposure**
+
+So, the main Miza bot hosts a few Minecraft Servers, and in order to keep people up-to-date with the IP whenever there's a change, the ~status will show your IP Address. If you don't want your IP Address exposed publicly, you can change this in the same *bot.py* file as before, down in the `get_ip()` function at around line 1475. It should look like this:
+
+```py
+async def get_ip(self):
+    resp = await Request("https://api.ipify.org", decode=True, aio=True)
+    self.update_ip(resp)
+```
+
+Change `resp = await Request("https://api.ipify.org", decode=True, aio=True)` to `resp = "\u200b"` and it'll always appear as `None`.
+
+- **OS_Error()**
+
+Alright, to quote this issue from when Thomas explained it to me...
+> Invalid argument as a windows error (which is why it's OS error) means that the process being selected is invalid, which in this case, is caused by miza trying to send data to another process running on the computer that was closed or otherwise not open. The image and math commands (and in the latest version of miza, the webserver) run in separate processes entirely, in order to share CPU more fairly and not clog up the main bot when being used for time consuming operations. Because of the matplotlib compatibility issue with python 3.9, I had to effectively make miza run two different python versions, 3.9.0 and 3.8.5, because I'd already updated a lot to 3.9. So... in order to make that possible, I added a "python path" variable to my auth.json, which only worked for Miza. The latest version of miza should run perfectly fine now with python_path set to ""
+
+So in a nutshell, make sure you have `"python_path":"",` in your auth.json, or else you wont be able to use any voice commands, image commands, or etc.
+
+- **Voice commands still not working?**
+
+Make sure you have *ffmpeg* installed onto your computer and in your PATH (it doesn't need to be in the same directory as Miza). I uh... Actually have my ffmpeg pathed by pathing to the misc folder found in [Miza Player](https://github.com/thomas-xin/Miza-Player). 🙃
+
+![ffmpeg](https://cdn.discordapp.com/attachments/688253918890688521/777473182294474753/image0.png)
+
+## Still a WIP...
