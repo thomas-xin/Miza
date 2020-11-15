@@ -20,7 +20,6 @@ with MultiThreadedImporter(globals()) as importer:
         "zipfile",
         "nacl",
         "shutil",
-        "flask",
     )
 
 PROC = psutil.Process()
@@ -1305,6 +1304,111 @@ async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
     except:
         if exc:
             raise
+
+
+class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContextManager):
+
+    BUF = 262144
+
+    def __init__(self, obj, filename=None):
+        self.iter = None
+        self.closer = getattr(obj, "close", None)
+        if issubclass(type(obj), io.IOBase):
+            if issubclass(type(obj), io.BytesIO):
+                self.data = obj
+            else:
+                obj.seek(0)
+                self.data = io.BytesIO(obj.read())
+                obj.seek(0)
+        elif issubclass(type(obj), bytes) or issubclass(type(obj), bytearray) or issubclass(type(obj), memoryview):
+            self.data = io.BytesIO(obj)
+        elif issubclass(type(obj), collections.abc.Iterator):
+            self.iter = iter(obj)
+            self.data = io.BytesIO()
+            self.high = 0
+        elif issubclass(type(obj), requests.models.Response):
+            self.iter = obj.iter_content(self.BUF)
+            self.data = io.BytesIO()
+            self.high = 0
+        else:
+            raise TypeError(f"a bytes-like object is required, not '{type(obj)}'")
+        self.filename = filename
+        self.buffer = {}
+
+    def __getitem__(self, k):
+        if type(k) is slice:
+            out = io.BytesIO()
+            start = k.start or 0
+            stop = k.stop or inf
+            step = k.step or 1
+            if step < 0:
+                start, stop, step = stop + 1, start + 1, -step
+                rev = True
+            else:
+                rev = False
+            curr = start // self.BUF * self.BUF
+            offs = start % self.BUF
+            out.write(self.load(curr))
+            curr += self.BUF
+            while curr < stop:
+                temp = self.load(curr)
+                if not temp:
+                    break
+                out.write(temp)
+                curr += self.BUF
+            out.seek(0)
+            return out.read()[k]
+        base = k // self.BUF
+        with suppress(KeyError):
+            return self.load(base)[k % self.BUF]
+        raise IndexError("seq index out of range")
+
+    def __str__(self):
+        if self.filename is None:
+            return str(self.data)
+        if self.filename:
+            return f"<seq name='{self.filename}'>"
+        return f"<seq object at {hex(id(self))}"
+
+    def __iter__(self):
+        i = 0
+        while True:
+            x = self[i]
+            if x:
+                yield x
+            i += 1
+
+    def __getattr__(self, k):
+        if k in ("data", "filename"):
+            return self.data
+        return object.__getattribute__(self.data, k)
+
+    close = lambda self: self.closer() if self.closer else None
+    __exit__ = lambda self, *args: self.close()
+
+    def load(self, k):
+        with suppress(KeyError):
+            return self.buffer[k]
+        seek = getattr(self.data, "seek", None)
+        if seek:
+            if self.iter is not None and k + self.BUF >= self.high:
+                seek(self.high)
+                with suppress(StopIteration):
+                    while k + self.BUF >= self.high:
+                        temp = next(self.iter)
+                        self.data.write(temp)
+                        self.high += len(temp)
+            seek(k)
+            self.buffer[k] = self.data.read(self.BUF)
+        else:
+            with suppress(StopIteration):
+                while self.high < k:
+                    temp = next(self.data)
+                    if not temp:
+                        return b""
+                    self.buffer[self.high] = temp
+                    self.high += self.BUF
+        return self.buffer.get(k, b"")
 
 # Manages both sync and async get requests.
 class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, collections.abc.Callable):

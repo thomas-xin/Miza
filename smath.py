@@ -1376,63 +1376,6 @@ arange = lambda a, b=None, c=None: alist(xrange(a, b, c))
 azero = lambda size: alist(repeat(0, size))
 
 
-# class DynamicIO(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContextManager):
-
-#     BUF = 65536
-
-#     def __init__(self, obj, mode="rb+", filename=None):
-#         if issubclass(type(obj), str):
-#             self.data = open(obj, mode)
-#         elif issubclass(type(obj), io.IOBase):
-#             if issubclass(type(obj), io.BytesIO):
-#                 self.data = obj
-#             else:
-#                 obj.seek(0)
-#                 self.data = io.BytesIO(obj.read())
-#                 obj.seek(0)
-#         elif issubclass(type(obj), bytes) or issubclass(type(obj), bytearray) or issubclass(type(obj), memoryview):
-#             self.data = io.BytesIO(obj)
-#         else:
-#             raise TypeError(f"a string or bytes-like object is required, not '{type(obj)}'")
-#         self.filename = filename
-#         self.buffer = {}
-
-#     def __getitem__(self, k):
-#         if type(k) is slice:
-#             out = io.BytesIO()
-#             curr = k.start // self.BUF * self.BUF
-#             offs = k.start % self.BUF
-#             if curr.step < 0:
-#                 rev = True
-#                 func = lambda: curr > k.end
-#             else:
-#                 rev = False
-#                 func = lambda: curr < k.end
-#             while func():
-#                 base = curr // self.BUF
-#                 out.write(self.load(base))
-#                 if rev:
-#                     curr -= self.BUF
-#                 else:
-#                     curr += self.BUF
-#         base = k // self.BUF
-#         self.load(base)
-#         with suppress(KeyError):
-#             return self.buffer[base][k % self.BUF]
-
-#     def __str__(self):
-#         if self.filename is None:
-#             return str(self.data)
-#         return f"<DynamicIO name='{self.filename}'>"
-
-#     def __getattr__(self, k):
-#         if k in ("data", "filename"):
-#             return self.data
-#         return object.__getattribute__(self.data, k)
-
-#     __exit__ = lambda self, *args: self.data.close()
-
-
 # Class-based dictionary, with attributes corresponding to keys.
 class cdict(dict):
 
