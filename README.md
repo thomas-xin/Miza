@@ -9,7 +9,7 @@ Introduction | Discord Usage
 ------------ | -------------
 Where can I find what? | Developer tools within Discord
 This explains the basis of where everything is and why for if you ever want to use the code yourself. | This explains what the bot owner(s) can do with Miza.
-How do I use the code? | Command Syntax and Flags
+How do I use the code? | Command syntax and flags
 This explains the key things to remember when hosting Miza, judging by my own experience. | This explains the structure of Miza's commands and different ways to use them properly.
 
 ## Introduction
@@ -114,15 +114,22 @@ Now onto more command-based things...
 
 - **What are trusted servers?**
 
-(To be filled.)
+Certain commands can be quite CPU consuming, especially used in multiple places. Because of this, "trusted servers" exist, which is essentially a server that has all access to commands. When Miza first joins a server, it wont by default (unless the server has been already added to the trusted list), and it is down to the bot owner to assign these.
 
+#### **Note: This feature is removed from the current build of Miza, however, anyone with inf/nan permissions will have to enable command categories per channel to still have access to all commands if desired.**
+
+![Screenshot10](https://cdn.discordapp.com/attachments/727087981285998593/777882312724709386/unknown.png)
 
 - **What is the blacklist for?**
 
-(To be filled.)
+The blacklist is used to prevent users from being able to use the bot's commands, and any DM's they send, commands they try to run, etc, will not be logged. When a user attempts to DM Miza, it will reply in the way Discord would usually respond if you tried to DM someone who has blocked you.
+
+![Screenshot11](https://cdn.discordapp.com/attachments/727087981285998593/777883584484605972/Capture1.PNG)
+
+![Screenshot12](https://cdn.discordapp.com/attachments/727087981285998593/777883566989901834/Capture.PNG)
 
 ```
 Command syntax and flags
 ```
 
-(Will write a bit about how to use Miza here later.)
+(Note to self, Will write a bit about how to use Miza here later. I will address lookup with the unicode parsing, fuzzy_substring() and being able to fetch users outside of the guild, the different ways you can use a command, like how Bray sometimes goes overboard changing audio settings, etc, the levelling/perms system, how the different flags work and where to place the args, the different ways to use a command, including ~miza, and maybe even how to code a command. After that, just link to the background wiki, link to the Discord Server, and done. :colondead:)
