@@ -175,7 +175,7 @@ class muffin(Command):
         return "Muffin time :D 🧁🧁🧁"
 ```
 
-Miza has so much functionality, with so much to explore. The categories are **voice**, **fun**, **admin**, **image**, **string** and **main**, and Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code optimization and fun to be had, with voice commands capable of effects like bassboosting, reverbing and adding a nightcore/resample filter at any intensity you want, (*completely* for free with no premium permmissions needed and 4 different downloaders to keep YouTube links to play or download stable) to image commands allowing you to blend images together at any blend mode you'd like or even make a rainbow gif out of them! This README barely scratches the surface, so again, any questions about Miza's functionality should be asked to Thomas Xin!
+Miza has so much functionality, with so much to explore, with all the command categories being: **voice**, **fun**, **admin**, **image**, **string** and **main**. Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code optimization and fun to be had, with voice commands capable of effects like bassboosting, reverbing and adding a nightcore/resample filter at any intensity you want, (*completely* for free with no premium permmissions needed and 4 different downloaders to keep YouTube links to play or download stable) to image commands allowing you to blend images together at any blend mode you'd like or even make a rainbow gif out of them! This README barely scratches the surface, so again, any questions about Miza's functionality should be asked to Thomas Xin!
 
 [Read our Wiki!](https://github.com/thomas-xin/Miza/wiki)
 
