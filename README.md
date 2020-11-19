@@ -100,15 +100,13 @@ So Miza isn't just your standard Discord bot. It can go as far as opening a Pyth
 
 ![Screenshot5](https://cdn.discordapp.com/attachments/727087981285998593/777544002957738054/unknown.png)
 
-![Screenshot6](https://cdn.discordapp.com/attachments/727087981285998593/777545207444013087/unknown.png)
-
 Miza also logs up to three places: A *log.txt* (which the file gets refreshed upon restart), the console where you're running the code (we just use a *main.bat* file to run Miza through the Command Prompt on Windows usually, as none of Miza's subprocesses can run on Linux) and a log within Discord itself (which isn't hardcoded, you can enable it similarly to how I enabled the Python terminal above.)
 
-![Screenshot7](https://cdn.discordapp.com/attachments/727087981285998593/777554361769000960/Capture10.PNG)
+![Screenshot6](https://cdn.discordapp.com/attachments/727087981285998593/777554361769000960/Capture10.PNG)
 
-![Screenshot8](https://cdn.discordapp.com/attachments/727087981285998593/777554360859099146/Capture9.PNG)
+![Screenshot7](https://cdn.discordapp.com/attachments/727087981285998593/777554360859099146/Capture9.PNG)
 
-![Screenshot9](https://cdn.discordapp.com/attachments/727087981285998593/777554358095183893/Capture8.PNG)
+![Screenshot8](https://cdn.discordapp.com/attachments/727087981285998593/777554358095183893/Capture8.PNG)
 
 Now onto more command-based things...
 
@@ -118,18 +116,67 @@ Certain commands can be quite CPU consuming, especially used in multiple places.
 
 #### **Note: This feature is removed from the current build of Miza, however, anyone with inf/nan permissions will have to enable command categories per channel to still have access to all commands if desired.**
 
-![Screenshot10](https://cdn.discordapp.com/attachments/727087981285998593/777882312724709386/unknown.png)
+![Screenshot9](https://cdn.discordapp.com/attachments/727087981285998593/777882312724709386/unknown.png)
 
 - **What is the blacklist for?**
 
 The blacklist is used to prevent users from being able to use the bot's commands, and any DM's they send, commands they try to run, etc, will not be logged. When a user attempts to DM Miza, it will reply in the way Discord would usually respond if you tried to DM someone who has blocked you.
 
-![Screenshot11](https://cdn.discordapp.com/attachments/727087981285998593/777883584484605972/Capture1.PNG)
+![Screenshot10](https://cdn.discordapp.com/attachments/727087981285998593/777883584484605972/Capture1.PNG)
 
-![Screenshot12](https://cdn.discordapp.com/attachments/727087981285998593/777883566989901834/Capture.PNG)
+![Screenshot11](https://cdn.discordapp.com/attachments/727087981285998593/777883566989901834/Capture.PNG)
 
 ```
 Command syntax and flags
 ```
 
-(Note to self, Will write a bit about how to use Miza here later. I will address lookup with the unicode parsing, fuzzy_substring() and being able to fetch users outside of the guild, the different ways you can use a command, like how Bray sometimes goes overboard changing audio settings, etc, the levelling/perms system, how the different flags work and where to place the args, the different ways to use a command, including ~miza, and maybe even how to code a command. After that, just link to the background wiki, link to the Discord Server, and done. :colondead:)
+By default, Miza's prefix is a tilde character, not be confused with a dash character. It looks like this: `~` But you can also assign a new prefix (on a per-server basis) with the ~prefix command. Alternatively, you can @ Miza or use ~miza/<prefix>miza which would serve as an alias for all bot prefixes. It does not matter how far away the command is from the prefix!
+
+![Screenshot12](https://cdn.discordapp.com/attachments/687567112952348746/779058870475030579/unknown.png)
+
+To enhance or change the effect of a command, Miza has a flag functionality. Flags can be used with either a dash (`-`) or a question mark (`?`), it does not matter which, they do the same thing. Usually, they are the letters a, f, or v, and would follow either directly after the command or after you've given Miza an argument to work with. Use the ~help command if you're confused and would like to see what flag goes with what or where. Here are some examples of how you can use flags!
+
+![Screenshot13](https://cdn.discordapp.com/attachments/687567100767633432/779061024414367784/image0.png)
+
+![Screenshot14](https://cdn.discordapp.com/attachments/687567100767633432/779062054106693662/unknown.png)
+
+![Screenshot15](https://cdn.discordapp.com/attachments/687567100767633432/779063716317888582/Capture.PNG)
+
+![Screenshot16](https://cdn.discordapp.com/attachments/687567100767633432/779063717957599312/Capture1.PNG)
+
+It is also worth mentioning that Miza has a math functionaility in not just a math command, and thanks to it, it can parse some complicated inputs, ranging from decimals/floats too... Brayconn. 🙃 (In the below example, he is using the ~loop command, which lets you repeat a command an inputted certain amount of times.)
+
+![Screenshot17](https://cdn.discordapp.com/attachments/687567100767633432/779065528551473182/unknown.png)
+
+On the topic of parsing, Miza can also interpret unciode characters, has a lookup feature which finds the most accurate match, so you do not have to write the user's name exactly and/or @ them, can lookup users from outside of the guild, send single-message embeds in a webhook if the message exceeds the character limit, and etc!
+
+![Screenshot18](https://cdn.discordapp.com/attachments/687567100767633432/779070391657562162/image0.png)
+
+![Screenshot19](https://cdn.discordapp.com/attachments/687567100767633432/779070391968202792/image1.png)
+
+![Screenshot20](https://cdn.discordapp.com/attachments/687567100767633432/779071275091886081/unknown.png)
+
+Finally, I will address how permissions and levels work. People can use certain commands with Miza based on what perms they have. Bot owners will default to having "nan" perms, nan meaning nothing, which is the strongest levels of perms someone can have, as it bypasses perm restrictions entirely. After that is "inf", which is typically the level an admin or a server owner will have, but someone with nan perms can assign someone to inf (or any level), and server owners can set anyone's level to inf and under. After inf is level 3, then level 2, then level 1, then level 0, level 0 being the lowest level of perms to Miza commands and 3 being the highest under moderator level.
+
+![Screenshot21](https://cdn.discordapp.com/attachments/687567100767633432/779074382063992852/image0.png)
+
+You may notice that sometimes Miza will react a ✨ on your message, too! Miza has a levelling system, ~~don't worry, its not as invasive as certain other bots infamous level-up @, Miza doesn't send a message when you level up at this current time.~~ If you recieve this reaction, then congrats, you've just had a huge boost of exp and other rewards! You can gain rewards through various FUN and/or GAME categories, ranging from an in-Discord 2048 game (which lets you adjust the size of the playing board) to a slots machine.
+
+- **Okay, but how do I make a command?**
+
+Its quite simple! Miza's commands, like almost any Discord bot's that are in multiple files, are written in classes. Below is an example of a fun little test command written by our awesome collaborator, GDB-spur, as an example!
+
+```py
+class muffin(Command):
+    name=["muffins", "🧁", "muffin"]
+    description: "Muffin time! What more is there to say? :D"
+    
+    def __call__(self, **void):
+        return "Muffin time :D 🧁🧁🧁"
+```
+
+Miza has so much functionality, with so much to explore. The categories are **voice**, **fun**, **admin**, **image**, **string** and **main**, and Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code optimisation and fun to be had, with voice commands capable of effects like bassboosting, reverbing and adding a nightcore/resample filter at any intensity you want, (*completely* for free with no premium permmissions needed and 4 different downloaders to keep YouTube links to play or download stable) to image commands allowing you to blend images together at any blend mode you'd like or even make a rainbow gif out of them! This README barely scratches the surface, so again, any questions about Miza's functionality should be asked to Thomas Xin!
+
+[Read our Wiki!](https://github.com/thomas-xin/Miza/wiki)
+
+[Join our Discord Server!](https:/discord.gg//cbKQKAr)
