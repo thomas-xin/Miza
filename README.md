@@ -160,7 +160,7 @@ Finally, I will address how permissions and levels work. People can use certain 
 
 ![Screenshot21](https://cdn.discordapp.com/attachments/687567100767633432/779074382063992852/image0.png)
 
-You may notice that sometimes Miza will react a ✨ on your message, too! Miza has a levelling system, ~~don't worry, its not as invasive as certain other bots infamous level-up @, Miza doesn't send a message when you level up at this current time.~~ If you recieve this reaction, then congrats, you've just had a huge boost of exp and other rewards! You can gain rewards through various FUN and/or GAME categories, ranging from an in-Discord 2048 game (which lets you adjust the size of the playing board) to a slots machine.
+You may notice that sometimes Miza will react a ✨ on your message, too! Miza has a levelling system, ~~don't worry, its not as invasive as certain other bots infamous level-up @, Miza doesn't send a message when you level up at this current time.~~ If you recieve this reaction, then congrats, you've just had a huge boost of exp and other rewards! You can gain rewards through various FUN categories, ranging from an in-Discord 2048 game (which lets you adjust the size of the playing board) to a slots machine.
 
 - **Okay, but how do I make a command?**
 
@@ -175,7 +175,7 @@ class muffin(Command):
         return "Muffin time :D 🧁🧁🧁"
 ```
 
-Miza has so much functionality, with so much to explore. The categories are **voice**, **fun**, **admin**, **image**, **string** and **main**, and Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code optimisation and fun to be had, with voice commands capable of effects like bassboosting, reverbing and adding a nightcore/resample filter at any intensity you want, (*completely* for free with no premium permmissions needed and 4 different downloaders to keep YouTube links to play or download stable) to image commands allowing you to blend images together at any blend mode you'd like or even make a rainbow gif out of them! This README barely scratches the surface, so again, any questions about Miza's functionality should be asked to Thomas Xin!
+Miza has so much functionality, with so much to explore. The categories are **voice**, **fun**, **admin**, **image**, **string** and **main**, and Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code optimization and fun to be had, with voice commands capable of effects like bassboosting, reverbing and adding a nightcore/resample filter at any intensity you want, (*completely* for free with no premium permmissions needed and 4 different downloaders to keep YouTube links to play or download stable) to image commands allowing you to blend images together at any blend mode you'd like or even make a rainbow gif out of them! This README barely scratches the surface, so again, any questions about Miza's functionality should be asked to Thomas Xin!
 
 [Read our Wiki!](https://github.com/thomas-xin/Miza/wiki)
 
