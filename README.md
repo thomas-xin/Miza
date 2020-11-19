@@ -130,7 +130,7 @@ The blacklist is used to prevent users from being able to use the bot's commands
 Command syntax and flags
 ```
 
-By default, Miza's prefix is a tilde character, not be confused with a dash character. It looks like this: `~` But you can also assign a new prefix (on a per-server basis) with the ~prefix command. Alternatively, you can @ Miza or use ~miza/<prefix>miza which would serve as an alias for all bot prefixes. It does not matter how far away the command is from the prefix!
+By default, Miza's prefix is a tilde character, not be confused with a dash character. It looks like this: `~` But you can also assign a new prefix (on a per-server basis) with the ~prefix command. Alternatively, you can @ Miza or use ~miza/(your prefix)miza which would serve as an alias for all bot prefixes. It does not matter how far away the command is from the prefix!
 
 ![Screenshot12](https://cdn.discordapp.com/attachments/687567112952348746/779058870475030579/unknown.png)
 
