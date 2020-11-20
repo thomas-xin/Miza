@@ -134,7 +134,7 @@ By default, Miza's prefix is a tilde character, not be confused with a dash char
 
 ![Screenshot12](https://cdn.discordapp.com/attachments/687567112952348746/779058870475030579/unknown.png)
 
-To enhance or change the effect of a command, Miza has a flag functionality. Flags can be used with either a dash (`-`) or a question mark (`?`), it does not matter which, they do the same thing. Usually, they are the letters a, f, or v, and would follow either directly after the command or after you've given Miza an argument to work with. Use the ~help command if you're confused and would like to see what flag goes with what or where. Here are some examples of how you can use flags!
+To enhance or change the effect of a command, Miza has a flag functionality. Flags can be used with either a dash (`-`), a plus (`+`) or a question mark (`?`), it does not matter which, they do the same thing. Usually, they are the letters a, f, or v, and would follow either directly after the command or after you've given Miza an argument to work with. Use the ~help command if you're confused and would like to see what flag goes with what or where. Here are some examples of how you can use flags!
 
 ![Screenshot13](https://cdn.discordapp.com/attachments/687567100767633432/779061024414367784/image0.png)
 
