@@ -64,7 +64,7 @@ async def get_ip(self):
 
 Change `resp = await Request("https://api.ipify.org", decode=True, aio=True)` to `resp = "\u200b"` and it'll always appear as `None`.
 
-- **OS_Error()**
+- **OSError()**
 
 Alright, to quote this issue from when Thomas explained it to me...
 > Invalid argument as a windows error (which is why it's OS error) means that the process being selected is invalid, which in this case, is caused by miza trying to send data to another process running on the computer that was closed or otherwise not open. The image and math commands (and in the latest version of miza, the webserver) run in separate processes entirely, in order to share CPU more fairly and not clog up the main bot when being used for time consuming operations. Because of the matplotlib compatibility issue with python 3.9, I had to effectively make miza run two different python versions, 3.9.0 and 3.8.5, because I'd already updated a lot to 3.9. So... in order to make that possible, I added a "python path" variable to my auth.json, which only worked for Miza. The latest version of miza should run perfectly fine now with python_path set to ""
@@ -148,7 +148,7 @@ It is also worth mentioning that Miza has a math functionaility in not just a ma
 
 ![Screenshot17](https://cdn.discordapp.com/attachments/687567100767633432/779065528551473182/unknown.png)
 
-On the topic of parsing, Miza can also interpret unciode characters, has a lookup feature which finds the most accurate match, so you do not have to write the user's name exactly and/or @ them, can lookup users from outside of the guild, send single-message embeds in a webhook if the message exceeds the character limit, understand commands without being case sensitive, and etc!
+On the topic of parsing, Miza can also interpret unciode characters, has a lookup feature which finds the most accurate match )so you do not have to write the user's name exactly and/or @ them) can lookup users from outside of the guild via user ID, understand commands without being case sensitive, and etc!
 
 ![Screenshot18](https://cdn.discordapp.com/attachments/687567100767633432/779070391657562162/image0.png)
 
