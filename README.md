@@ -148,7 +148,7 @@ It is also worth mentioning that Miza has a math functionaility in not just a ma
 
 ![Screenshot17](https://cdn.discordapp.com/attachments/687567100767633432/779065528551473182/unknown.png)
 
-On the topic of parsing, Miza can also interpret unciode characters, has a lookup feature which finds the most accurate match )so you do not have to write the user's name exactly and/or @ them) can lookup users from outside of the guild via user ID, understand commands without being case sensitive, and etc!
+On the topic of parsing, Miza can also interpret unciode characters, has a lookup feature which finds the most accurate match (so you do not have to write the user's name exactly and/or @ them) can lookup users from outside of the guild via user ID, understand commands without being case sensitive, and etc!
 
 ![Screenshot18](https://cdn.discordapp.com/attachments/687567100767633432/779070391657562162/image0.png)
 
