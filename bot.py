@@ -840,7 +840,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if fsize > size:
                 if not f:
                     f = filename if filename and type(file) is not discord.File else data
-                if "." in f:
+                if ("." if type(f) is str else b".") in f:
                     ext = f.rsplit(".", 1)[-1]
                 else:
                     ext = None

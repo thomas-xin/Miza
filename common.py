@@ -1567,7 +1567,7 @@ def parse_with_now(expr):
         expr = expr[:-5]
         bc = True
     try:
-        dt = tparser.parse(expr)
+        dt = utc_ft(tparser.parse(expr).timestamp())
     except Exception as ex:
         print(ex)
         s = str(ex).split(":", 1)[0]
@@ -1608,7 +1608,6 @@ def parse_with_now(expr):
         offs = offs * 400 - 2000
         year += 2000
         return DynamicDT.fromdatetime(dt.replace(year=year)).set_offset(offs)
-    return dt2dt(dt)
 
 # Parses a time expression, with an optional timezone input at the end.
 def tzparse(expr):

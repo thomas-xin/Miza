@@ -127,7 +127,7 @@ _bf = lambda s: evaluate(s)
 
 
 # Randomizer
-class dice(sympy.Basic):
+class Random(sympy.Basic):
 
     def __init__(self, a=None, b=None):
         if a is None:
@@ -309,9 +309,9 @@ for i in plots:
 _globals.update({
     "bf": _bf,
     "brainfuck": _bf,
-    "random": dice,
-    "rand": dice,
-    "dice": dice,
+    "random": Random,
+    "rand": Random,
+    "dice": Random,
     "plt": plot,
     "lim": lim,
     "factorint": _factorint,
