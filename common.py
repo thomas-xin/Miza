@@ -1567,7 +1567,7 @@ def parse_with_now(expr):
         expr = expr[:-5]
         bc = True
     try:
-        dt = utc_ft(tparser.parse(expr).timestamp())
+        dt = tparser.parse(expr).replace(tzinfo=datetime.timezone.utc)
     except Exception as ex:
         print(ex)
         s = str(ex).split(":", 1)[0]
