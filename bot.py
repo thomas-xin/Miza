@@ -840,11 +840,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if fsize > size:
                 if not f:
                     f = filename if filename and type(file) is not discord.File else data
-                if ("." if type(f) is str else b".") in f:
+                if type(f) in (bytes, bytearray, memoryview):
+                    f = f.decode("utf-8")
+                elif type(f) is not str:
+                    f = str(f)
+                if "." in f:
                     ext = f.rsplit(".", 1)[-1]
                 else:
                     ext = None
-                url = await create_future(as_file, str(f), filename=filename, ext=ext, rename=rename)
+                url = await create_future(as_file, f, filename=filename, ext=ext, rename=rename)
                 message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + url)
             else:
                 message = await channel.send(msg, file=file)
