@@ -841,7 +841,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if not f:
                     f = filename if filename and type(file) is not discord.File else data
                 if type(f) in (bytes, bytearray, memoryview):
-                    f = f.decode("utf-8")
+                    f = f.decode("utf-8", "replace")
                 elif type(f) is not str:
                     f = str(f)
                 if "." in f:

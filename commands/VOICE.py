@@ -4107,14 +4107,14 @@ class Download(Command):
                                 embed=None,
                             ))
                             create_task(channel.trigger_typing())
-                        out = await bot.send_with_file(
+                        resp = await bot.send_with_file(
                             channel=channel,
                             msg="",
                             file=f,
-                            filename=fn,
+                            filename=out,
                             rename=False,
                         )
-                        if out.attachments:
+                        if resp.attachments:
                             create_future_ex(os.remove, fn, timeout=18)
                         create_task(bot.silent_delete(message, no_log=True))
 
