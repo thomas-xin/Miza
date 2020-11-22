@@ -2320,7 +2320,7 @@ class AudioDownloader:
         resp = Request(url, timeout=420)
         self.other_x += 1
         out = Request(f"https://cts.ofoct.com/get-file.php?type=get&genfpath=/tmp/{resp_fn}.mid", timeout=24)
-        return io.BytesIO(out), outf[:-4] + ".mid"
+        return out, outf[:-4] + ".mid"
 
     # Extracts full data for a single entry. Uses cached results for optimization.
     def extract_single(self, i, force=False):
@@ -4094,14 +4094,13 @@ class Download(Command):
                                     auds = None
                             except LookupError:
                                 auds = None
-                            fn, out = await create_future(
+                            f, out = await create_future(
                                 ytdl.download_file,
                                 url,
                                 fmt=spl[2],
                                 auds=auds,
                                 timeout=540,
                             )
-                            f = discord.File(fn, out)
                             create_task(message.edit(
                                 content=css_md(f"Uploading {sqr_md(out)}..."),
                                 embed=None,

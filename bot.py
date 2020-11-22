@@ -819,10 +819,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         with suppress(AttributeError):
             size = channel.guild.filesize_limit
         if file and type(file) is not discord.File:
-            if not os.path.exists(file):
-                raise FileNotFoundError(file)
-            fsize = os.path.getsize(file)
-            f = file
+            if type(file) is str:
+                if not os.path.exists(file):
+                    raise FileNotFoundError(file)
+                fsize = os.path.getsize(file)
+                f = file
+            else:
+                data  = file
+                file = discord.File(io.BytesIO(data), filename)
+                fsize = len(data)
         if fsize <= size:
             if type(file) is not discord.File:
                 f2 = discord.File(file, filename)
