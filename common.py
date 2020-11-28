@@ -1608,6 +1608,7 @@ def parse_with_now(expr):
         offs = offs * 400 - 2000
         year += 2000
         return DynamicDT.fromdatetime(dt.replace(year=year)).set_offset(offs)
+    return DynamicDT.fromdatetime(dt)
 
 # Parses a time expression, with an optional timezone input at the end.
 def tzparse(expr):

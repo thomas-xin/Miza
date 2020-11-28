@@ -27,7 +27,11 @@ ydl_opts = {
 downloader = youtube_dl.YoutubeDL(ydl_opts)
 
 def get_video(url, fps):
-    entry = downloader.extract_info(url, download=False)
+    try:
+        entry = downloader.extract_info(url, download=False)
+    except:
+        print_exc()
+        return url, None, None, None
     best = 0
     size = None
     dur = None

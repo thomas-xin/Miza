@@ -575,8 +575,8 @@ class RoleGiver(Command):
         if sum(len(alist[0]) for alist in assigned) >= 8:
             raise OverflowError(f"Rolegiver list for #{channel} has reached the maximum of 8 items. Please remove an item to add another.")
         react = args[0].casefold()
-        if len(react) > 64:
-            raise OverflowError("Search substring too long.")
+        if len(react) > 256:
+            raise OverflowError(f"Search substring too long ({len(react)} > 256).")
         r = verify_id(unicode_prune(" ".join(args[1:])))
         if len(guild.roles) <= 1:
             guild.roles = await guild.fetch_roles()

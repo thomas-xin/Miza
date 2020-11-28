@@ -749,7 +749,10 @@ custom list-like data structure that incorporates the functionality of numpy arr
             if type(key) in (float, complex):
                 return get(self.view, key, 1)
             if type(key) is int:
-                key = key % self.size
+                try:
+                    key = key % self.size
+                except ZeroDivisionError:
+                    raise IndexError("Array List index out of range.")
                 return self.view.__getitem__(key)
             if type(key) is slice:
                 if key.step in (None, 1):
@@ -785,7 +788,10 @@ custom list-like data structure that incorporates the functionality of numpy arr
         if len(args) == 2:
             key = args[0]
             if type(key) is int:
-                key = key % self.size
+                try:
+                    key = key % self.size
+                except ZeroDivisionError:
+                    raise IndexError("Array List index out of range.")
             return self.view.__setitem__(key, args[1])
         return self.view.__setitem__(*args)
 
@@ -2030,13 +2036,13 @@ def add_dict(a, b, replace=True, insert=None):
     return r
 
 # Increments a key value pair in a dictionary, replacing if nonexistent.
-def inc_dict(d, **kwargs):
+def inc_dict(_, **kwargs):
     for k, v in kwargs.items():
         try:
-            d[k] += v
+            _[k] += v
         except KeyError:
-            d[k] = v
-    return d
+            _[k] = v
+    return _
 
 # Subtracts a list of keys from a dictionary.
 def sub_dict(d, key):

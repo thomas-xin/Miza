@@ -922,6 +922,8 @@ class Status(Command):
     
     async def _callback2_(self, channel, m_id=None, msg=None, **void):
         bot = self.bot
+        if not hasattr(bot, "bitrate"):
+            return
         emb = discord.Embed(colour=rand_colour())
         emb.set_author(name="Status", url=bot.website, icon_url=best_url(bot.user))
         emb.timestamp = utc_dt()

@@ -1198,7 +1198,7 @@ class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContext
         return self.buffer.get(k, b"")
 
 
-def ImageOpIterator(image, step, operation, ts):
+def ImageOpIterator(image, step, operation, ts, args):
     # Attempt to perform operation on all individual frames of .gif images
     for i, f in enumerate(range(0, 2147483648, step)):
         np.random.seed(ts & 4294967295)
@@ -1300,9 +1300,13 @@ def evalImg(url, operation, args):
             except EOFError:
                 globals()["ANIM"] = False
                 image.seek(0)
-                func = getattr(image, operation, None)
+                if str(image.mode) != "RGBA":
+                    temp = image.convert("RGBA")
+                else:
+                    temp = image
+                func = getattr(temp, operation, None)
                 if func is None:
-                    new = eval(operation)(image, *args)
+                    new = eval(operation)(temp, *args)
                 else:
                     new = func(*args)
             else:
@@ -1319,7 +1323,7 @@ def evalImg(url, operation, args):
                 while f // step > 4096 and fps // step >= 24:
                     step += 1
                 new["count"] = f // step
-                new["frames"] = ImageOpIterator(image, step, operation=operation, ts=ts)
+                new["frames"] = ImageOpIterator(image, step, operation=operation, ts=ts, args=args)
     else:
         new = eval(url)(*args)
     if type(new) is dict:

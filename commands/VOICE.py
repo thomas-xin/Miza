@@ -1500,7 +1500,7 @@ class AudioDownloader:
                 resp = resp[resp.index(search) + len(search):]
                 search = b"Duration: "
                 resp = resp[resp.index(search) + len(search):]
-                entry["duration"] = time_parse(resp[:resp.index("<br><br>")])
+                entry["duration"] = time_parse(resp[:resp.index(b"<br><br>")])
             search = b"</a></td></tr></tbody></table><h3>Audio</h3>"
             resp = resp[resp.index(search) + len(search):]
             with suppress(ValueError):
@@ -4113,8 +4113,8 @@ class Download(Command):
                             filename=out,
                             rename=False,
                         )
-                        if resp.attachments:
-                            create_future_ex(os.remove, fn, timeout=18)
+                        if resp.attachments and type(f) is str:
+                            create_future_ex(os.remove, f, timeout=18)
                         create_task(bot.silent_delete(message, no_log=True))
 
 
