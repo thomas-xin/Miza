@@ -1682,7 +1682,10 @@ class AudioDownloader:
                 resp = resp[:resp.index(b'window["ytInitialPlayerResponse"] = null;')]
                 resp = resp[:resp.rindex(b";")]
             except ValueError:
-                resp = resp[:resp.index(b";</script><title>")]
+                try:
+                    resp = resp[:resp.index(b";</script><title>")]
+                except:
+                    resp = resp[:resp.index(b';</script><link rel="')]
             data = eval_json(resp)
         except:
             print(resp)
