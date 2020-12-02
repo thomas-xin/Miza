@@ -816,20 +816,28 @@ def blend_op(image, url, operation, amount, recursive=True):
             except EOFError:
                 image2.seek(0)
             else:
-                out = deque()
-                total = 0
+                dur = 0
                 for f in range(2147483648):
                     try:
                         image2.seek(f)
                     except EOFError:
                         break
-                    total += max(image2.info.get("duration", 0), 1 / 60)
-                    if str(image.mode) != "RGBA":
-                        temp = image.convert("RGBA")
-                    else:
-                        temp = image
-                    out.append(blend_op(temp, image2, operation, amount, recursive=False))
-                return dict(duration=total, frames=out)
+                    dur += max(image2.info.get("duration", 0), 1 / 60)
+                count = f
+
+                def blend_op_iterator(image, image2, operation, amount):
+                    for f in range(2147483648):
+                        try:
+                            image2.seek(f)
+                        except EOFError:
+                            break
+                        if str(image.mode) != "RGBA":
+                            temp = image.convert("RGBA")
+                        else:
+                            temp = image
+                        yield blend_op(temp, image2, operation, amount, recursive=False)
+
+                return dict(duration=dur, count=count, frames=blend_op_iterator(image, image2, operation, amount))
         try:
             n_frames = 1
             for f in range(CURRENT_FRAME + 1):
