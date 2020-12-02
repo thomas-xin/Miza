@@ -779,6 +779,7 @@ blenders = {
     "darken": "darker",
     "plusdarker": "OP_X+Y-255",
     "plusdarken": "OP_X+Y-255",
+    "overflow": "OVERFLOW",
     "extract": blend_modes.grain_extract,
     "grainextract": blend_modes.grain_extract,
     "merge": blend_modes.grain_merge,
@@ -799,6 +800,8 @@ blenders = {
     "color": "SP_COL",
     "colour": "SP_COL",
 }
+halve = (np.arange(1, 257) >> 1).astype(np.uint8)
+darken = np.concatenate((np.zeros(128, dtype=np.uint8), np.arange(128, dtype=np.uint8)))
 
 def blend_op(image, url, operation, amount, recursive=True):
     op = operation.casefold().replace(" ", "").replace("_", "")
@@ -913,6 +916,38 @@ def blend_op(image, url, operation, amount, recursive=True):
                 else:
                     A = ImageMath.eval("max(X,Y)", dict(X=A1, Y=A2)).convert("L")
                 out.putalpha(A)
+        elif filt == "OVERFLOW":
+            spl = image.split()
+            sprite = image2.split()
+            out = list(spl[:3])
+            for i, I in enumerate(spl[:3]):
+                try:
+                    s = sprite[i]
+                except IndexError:
+                    continue
+                if str(image2.mode) == "RGBA":
+                    s = ImageChops.multiply(s, sprite[-1])
+                if out[i] == I:
+                    out[i] = ImageChops.add(I, s)
+                else:
+                    out[i] = ImageChops.add(out[i], s)
+                extrema = out[i].getextrema()
+                if extrema[-1] == 255:
+                    im1 = I.point(halve)
+                    im2 = s.point(halve)
+                    overflow = ImageChops.add(im1, im2)
+                    overflow = overflow.point(darken)
+                    # overflow = ImageMath.eval("(a+b)/2-127", dict(a=I, b=s)).convert("L")
+                    extrema = overflow.getextrema()
+                    if extrema[-1]:
+                        for j in (x for x in range(3) if x != i):
+                            out[j] = ImageChops.add(out[j], overflow)
+            if str(image.mode) == "RGBA":
+                if str(image2.mode) == "RGBA":
+                    out.append(ImageChops.add(spl[-1], sprite[-1]))
+                else:
+                    out.append(spl[-1])
+            out = Image.merge(image.mode, out)
         # Otherwise attempt to find as ImageChops filter
         else:
             if str(image.mode) != str(image2.mode):

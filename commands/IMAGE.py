@@ -1018,7 +1018,7 @@ class Blend(Command):
                 return ini_md(
                     "Available blend operations: ["
                     + "replace, add, sub, mul, div, mod, and, or, xor, nand, nor, xnor, "
-                    + "difference, overlay, screen, soft, hard, lighten, darken, plusdarken, "
+                    + "difference, overlay, screen, soft, hard, lighten, darken, plusdarken, overflow, "
                     + "burn, linearburn, dodge, lineardodge, hue, sat, lum, colour, extract, merge]"
                 )
             raise ArgumentError("Please input an image by URL or attachment.")
