@@ -1829,7 +1829,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
             if modified is None:
                 self.data.modified.update(self.data.keys())
             else:
-                if issubclass(type(modified), collections.abc.Sized):
+                if issubclass(type(modified), collections.abc.Sized) and type(modified) not in (str, bytes):
                     self.data.modified.update(modified)
                 else:
                     self.data.modified.add(modified)
