@@ -1444,7 +1444,7 @@ class AudioDownloader:
         try:
             yt_url = f"https://www.yt-download.org/file/mp3/{url}"
             self.other_x += 1
-            resp = Request(yt_url)
+            resp = Request(yt_url, timeout=12)
             search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
             resp = resp[resp.index(search) + len(search):]
             thumbnail = resp[:resp.index(b'"')].decode("utf-8", "replace")
@@ -1482,6 +1482,7 @@ class AudioDownloader:
                 headers={"Accept": "*/*", "Cookie": "PHPSESSID=" + self.keepvid_token, "X-Requested-With": "XMLHttpRequest"},
                 data=(("url", webpage_url), ("sid", self.keepvid_token)),
                 method="POST",
+                timeout=12,
             )
             search = b'<h2 class="mb-3">'
             resp = resp[resp.index(search) + len(search):]
@@ -1500,7 +1501,7 @@ class AudioDownloader:
                 resp = resp[resp.index(search) + len(search):]
                 search = b"Duration: "
                 resp = resp[resp.index(search) + len(search):]
-                entry["duration"] = time_parse(resp[:resp.index(b"<br><br>")])
+                entry["duration"] = time_parse(resp[:resp.index(b"<br><br>")].decode("utf-8", "replace"))
             search = b"</a></td></tr></tbody></table><h3>Audio</h3>"
             resp = resp[resp.index(search) + len(search):]
             with suppress(ValueError):
@@ -1525,7 +1526,7 @@ class AudioDownloader:
             excs.append(ex)
         try:
             self.other_x += 1
-            resp = Request("https://y2mate.guru/api/convert", decode=True, data={"url": webpage_url}, method="POST")
+            resp = Request("https://y2mate.guru/api/convert", decode=True, data={"url": webpage_url}, method="POST", timeout=12)
             data = eval_json(resp)
             meta = data["meta"]
             entry = {
