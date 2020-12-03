@@ -1552,52 +1552,6 @@ class AudioDownloader:
             excs.append(ex)
             print(excs)
             raise
-        
-    # def from_pytube(self, url):
-    #     # pytube only accepts direct youtube links
-    #     url = verify_url(url)
-    #     if not url.startswith("https://www.youtube.com/"):
-    #         if not url.startswith("http://youtu.be/"):
-    #             if is_url(url):
-    #                 raise TypeError("Not a youtube link.")
-    #             url = f"https://www.youtube.com/watch?v={url}"
-    #     try:
-    #         resp = retry(pytube.YouTube, url, attempts=3, exc=(pytube.exceptions.RegexMatchError,))
-    #     except pytube.exceptions.RegexMatchError:
-    #         raise RuntimeError("Invalid single youtube link.")
-    #     entry = {
-    #         "formats": [
-    #             {
-    #                 "abr": 0,
-    #                 "vcodec": stream.video_codec,
-    #                 "url": stream.url,
-    #             } for stream in resp.streams.fmt_streams
-    #         ],
-    #         "duration": resp.length,
-    #         "thumbnail": getattr(resp, "thumbnail_url", None),
-    #     }
-    #     # Format bitrates
-    #     for i in range(len(entry["formats"])):
-    #         stream = resp.streams.fmt_streams[i]
-    #         try:
-    #             abr = stream.abr.casefold()
-    #         except AttributeError:
-    #             abr = "0"
-    #         if type(abr) is not str:
-    #             abr = str(abr)
-    #         if abr.endswith("kbps"):
-    #             abr = float(abr[:-4])
-    #         elif abr.endswith("mbps"):
-    #             abr = float(abr[:-4]) * 1024
-    #         elif abr.endswith("bps"):
-    #             abr = float(abr[:-3]) / 1024
-    #         else:
-    #             try:
-    #                 abr = float(abr)
-    #             except (ValueError, TypeError):
-    #                 continue
-    #         entry["formats"][i]["abr"] = abr
-    #     return entry
 
     # Returns part of a spotify playlist.
     def get_spotify_part(self, url):
@@ -1714,7 +1668,6 @@ class AudioDownloader:
                 thumbnail=f"https://i.ytimg.com/vi/{v_id}/maxresdefault.jpg",
             )
             out.append(temp)
-        print(len(out))
         if count > 100:
             url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&key={google_api_key}&playlistId={p_id}"
             page = 50
@@ -1853,47 +1806,6 @@ class AudioDownloader:
                                     output.rotate(-i)
                                     break
                         return output
-                # # Pages may contain up to 50 items each
-                # if p_id:
-                #     url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&key={google_api_key}&playlistId={p_id}"
-                #     page = 50
-                # if page:
-                #     futs = deque()
-                #     maxitems = 5000
-                #     # Optimized searching with lookaheads
-                #     for i, curr in enumerate(range(0, maxitems, page)):
-                #         with delay(0.03125):
-                #             if curr >= maxitems:
-                #                 break
-                #             search = f"{url}&pageToken={self.yt_pages[curr]}"
-                #             fut = create_future_ex(self.get_youtube_part, search, timeout=90)
-                #             print("Sent 1 youtube playlist snippet.")
-                #             futs.append(fut)
-                #             if not (i < 1 or math.log2(i + 1) % 1) or not 1 + i & 15:
-                #                 while futs:
-                #                     fut = futs.popleft()
-                #                     res = fut.result()
-                #                     if not i:
-                #                         maxitems = res[1] + page
-                #                     if not res[0]:
-                #                         maxitems = 0
-                #                         futs.clear()
-                #                         break
-                #                     output += res[0]
-                #     while futs:
-                #         output.extend(futs.popleft().result()[0])
-                #     # Scroll to highlighted entry if possible
-                #     v_id = None
-                #     for x in ("?v=", "&v="):
-                #         if x in item:
-                #             v_id = item[item.index(x) + len(x):]
-                #             v_id = v_id.split("&", 1)[0]
-                #             break
-                #     if v_id:
-                #         for i, e in enumerate(output):
-                #             if v_id in e.url:
-                #                 output.rotate(-i)
-                #                 break
             elif regexp("(play|open|api)\\.spotify\\.com").search(item):
                 # Spotify playlist searches contain up to 100 items each
                 if "playlist" in item:
@@ -2136,28 +2048,6 @@ class AudioDownloader:
         out.extend(sorted(low, key=key, reverse=True))
         # print(out)
         return out
-
-    # def extract_yt(self, query):
-    #     if ":" in query:
-    #         query = query.split("v=", 1)[1].split("&", 1)[0]
-    #     url = f"https://www.youtube.com/watch?v={query}&gl=US&hl=en&has_verified=1&bpctr=9999999999"
-    #     resp = Request(url)
-    #     search = b"<script >var ytplayer = ytplayer || {};ytplayer.config = "
-    #     try:
-    #         data = resp[resp.index(search) + len(search):]
-    #     except ValueError:
-    #         raise FileNotFoundError("YouTube player data not found.")
-    #     search = b";ytplayer.web_player_context_config = "
-    #     data = data[:data.index(search)]
-    #     player = eval_json(data)
-    #     resp = eval_json(player["args"]["player_response"])
-    #     entry = {
-    #         "formats": [
-    #             {
-
-    #             }
-    #         ]
-    #     }
 
     # Performs a search, storing and using cached search results for efficiency.
     def search(self, item, force=False, mode=None, count=1):
