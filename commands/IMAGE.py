@@ -1037,9 +1037,11 @@ class Blend(Command):
             if not url1 or not url2:
                 urls = await bot.follow_to_image(argv)
                 if not urls:
-                    urls = await bot.follow_to_image(url)
+                    urls = await bot.follow_to_image(argv)
                     if not urls:
                         raise ArgumentError("Please input an image by URL or attachment.")
+                if type(urls) not in (list, alist):
+                    urls = alist(urls)
                 if not url1:
                     url1 = urls.pop(0)
                 if not url2:
