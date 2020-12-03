@@ -30,7 +30,6 @@ tracemalloc.start()
 from zipfile import ZipFile
 import urllib.request, urllib.parse
 import nacl.secret
-from flask import Flask
 
 url_parse = urllib.parse.quote_plus
 escape_markdown = discord.utils.escape_markdown
