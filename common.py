@@ -1435,7 +1435,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
     def __call__(self, url, headers={}, files=None, data=None, raw=False, timeout=8, method="get", decode=False, bypass=True, aio=False):
         if bypass:
             if "user-agent" not in headers:
-                headers["user-agent"] = f"Mozilla/5.{xrand(1, 10)}"
+                headers["User-Agent"] = f"Mozilla/5.{xrand(1, 10)}"
             headers["DNT"] = "1"
         method = method.casefold()
         if aio:

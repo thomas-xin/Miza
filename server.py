@@ -1,4 +1,4 @@
-import os, flask
+import os, sys, flask, requests, datetime, pytz, traceback
 from flask import Flask
 from werkzeug.exceptions import HTTPException
 
@@ -58,9 +58,42 @@ def get_file_ex(path, filename):
         return flask.redirect("https://http.cat/404")
 
 @app.route("/", methods=["GET", "POST"])
-def get_ip():
+def home():
     # basic endpoint for the port; return the request's remote (external) IP address
     return flask.request.remote_addr
+
+timezones = {}
+@app.route("/timezone", methods=["GET", "POST"])
+def timezone():
+    ip = flask.request.remote_addr
+    try:
+        try:
+            resp = timezones[ip]
+        except KeyError:
+            url = f"https://tools.keycdn.com/geo.json?host={ip}"
+            resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}"}).json()
+            timezones[resp["data"]["geo"]["ip"]] = resp
+        data = resp["data"]["geo"]
+        tz = data["timezone"]
+        dt = datetime.datetime.now(pytz.timezone(tz))
+        sys.stderr.write(ip + "\t" + str(dt) + "\t" + tz + "\n")
+        html = "\n".join((
+            "<!DOCTYPE html>",
+            "<html>",
+            "<body>",
+            f'<h1 style="text-align:center;">Estimated time: {dt}</h1>',
+            f'<h2 style="text-align:center;">Detected timezone: {tz}</h2>',
+            f'<p style="text-align:center;"><a href="http://{flask.request.host}/timezone">Refresh</a></p>',
+            "</body>",
+            "</html>",
+        ))
+        return html
+    except KeyError:
+        traceback.print_exc()
+        return flask.redirect("https://http.cat/417")
+    except:
+        traceback.print_exc()
+        raise
 
 
 if __name__ == "__main__":

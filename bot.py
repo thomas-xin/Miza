@@ -136,6 +136,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             touch(self.shutdown)
         force_kill(self.proc)
 
+    def start_webserver(self):
+        if getattr(self, "server", None):
+            self.server.kill()
+        self.server = psutil.Popen([python, "server.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        create_thread(stdread, self.server.stdout)
+        create_thread(stdread, self.server.stderr)
+
     # Starts up client.
     def run(self):
         print(f"Logging in...")
@@ -3309,11 +3316,9 @@ if __name__ == "__main__":
             proc_start()
             miza = bot = client = Bot()
             miza.miza = miza
-            server = psutil.Popen([python, "server.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            create_thread(stdread, server.stdout)
-            create_thread(stdread, server.stderr)
+            miza.start_webserver()
             with miza:
                 miza.run()
-            server.kill()
+            miza.server.kill()
     print = _print
     sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__
