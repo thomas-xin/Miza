@@ -29,7 +29,7 @@ def get_file(path):
     for file in os.listdir("cache"):
         # file cache is stored as "{timestamp}~{name}", search for file via timestamp
         if file.split("~", 1)[0] == fn:
-            return flask.send_file("cache/" + file, as_attachment=False, attachment_filename=file.split("~", 1)[-1])
+            return flask.send_file("cache/" + file, as_attachment=True, attachment_filename=file.split("~", 1)[-1])
     # return http.cat 404 if no file found.
     return flask.redirect("https://http.cat/404")
 
