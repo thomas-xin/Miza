@@ -12,6 +12,16 @@ youtube_dl = youtube_dlc
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
+
+try:
+    alexflipnote_key = AUTH["alexflipnote_key"]
+    if not alexflipnote_key:
+        raise
+except:
+    alexflipnote_key = None
+    print("WARNING: alexflipnote_key not found. Unable to use API to generate images.")
+
+
 ydl_opts = {
     "quiet": 1,
     "format": "bestvideo/best",
@@ -1118,8 +1128,8 @@ class Cat(ImagePool, Command):
         else:
             x = 2
         if x:
-            if x == 1:
-                resp = await Request("https://api.alexflipnote.dev/cats", aio=True)
+            if x == 1 and alexflipnote_key:
+                resp = await Request("https://api.alexflipnote.dev/cats", headers={"Authorization": alexflipnote_key}, aio=True)
             else:
                 resp = await Request("https://api.thecatapi.com/v1/images/search", aio=True)
             d = eval_json(resp)
@@ -1144,8 +1154,8 @@ class Dog(ImagePool, Command):
         else:
             x = 2
         if x:
-            if x == 1:
-                resp = await Request("https://api.alexflipnote.dev/dogs", aio=True)
+            if x == 1 and alexflipnote_key:
+                resp = await Request("https://api.alexflipnote.dev/dogs", headers={"Authorization": alexflipnote_key}, aio=True)
             else:
                 resp = await Request("https://dog.ceo/api/breeds/image/random", aio=True)
             d = eval_json(resp)

@@ -7,7 +7,7 @@ IND = ""
 
 
 app = Flask(__name__)
-app.use_x_sendfile = True
+# app.use_x_sendfile = True
 
 
 @app.errorhandler(Exception)
@@ -18,22 +18,44 @@ def on_error(ex):
         return flask.redirect(f"https://http.cat/{ex.code}")
     return flask.redirect("https://http.cat/500")
 
-@app.route("/files/<path>", methods=["GET"])
-def get_file(path):
+@app.route("/favicon.ico", methods=["GET"])
+def favicon():
+    return flask.send_file("misc/icon.ico")
+
+def find_file(path):
     # if no file name is inputted, return no content
     if not path:
-        return flask.redirect("https://http.cat/204")
+        raise EOFError
     # do not include "." in the path name
     path = path.rsplit(".", 1)[0]
-    print(flask.request.remote_addr, path)
     fn = f"{IND}{path}"
-    print(fn)
     for file in os.listdir("cache"):
         # file cache is stored as "{timestamp}~{name}", search for file via timestamp
-        if file.split("~", 1)[0] == fn:
-            return flask.send_file("cache/" + file, as_attachment=True, attachment_filename=file.split("~", 1)[-1])
-    # return http.cat 404 if no file found.
-    return flask.redirect("https://http.cat/404")
+        if file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
+            out = "cache/" + file
+            print(out)
+            return out
+    raise FileNotFoundError
+
+@app.route("/files/<path>", methods=["GET"])
+def get_file(path):
+    print(flask.request.remote_addr, path)
+    try:
+        return flask.send_file(find_file(path), as_attachment=bool(flask.request.args.get("download")))
+    except EOFError:
+        return flask.redirect("https://http.cat/204")
+    except FileNotFoundError:
+        return flask.redirect("https://http.cat/404")
+
+@app.route("/files/<path>/<filename>", methods=["GET"])
+def get_file_ex(path, filename):
+    print(flask.request.remote_addr, path)
+    try:
+        return flask.send_file(find_file(path), as_attachment=bool(flask.request.args.get("download")), attachment_filename=filename)
+    except EOFError:
+        return flask.redirect("https://http.cat/204")
+    except FileNotFoundError:
+        return flask.redirect("https://http.cat/404")
 
 @app.route("/", methods=["GET", "POST"])
 def get_ip():

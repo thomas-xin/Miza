@@ -854,7 +854,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 else:
                     ext = None
                 url = await create_future(as_file, f, filename=filename, ext=ext, rename=rename)
-                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + url)
+                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + url + "\n" + url + "?download=true")
             else:
                 message = await channel.send(msg, file=file)
                 if filename is not None:
@@ -2519,8 +2519,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 else:
                     for react in message.reactions:
                         if str(reaction) == str(react):
-                            users = react.users()
-                            async for u in users:
+                            async for u in react.users():
                                 if u.id == self.id:
                                     check = True
                                     break
@@ -3241,7 +3240,7 @@ def update_file_cache(files=None):
         files = alist(sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND)))
     if len(files) > 256:
         curr = files.popleft()
-        ct = int(curr.split("~", 1)[0])
+        ct = int(curr.rsplit(".", 1)[0].split("~", 1)[0])
         if ts_us() - ct > 86400:
             with tracebacksuppressor:
                 os.remove(IND + curr)
@@ -3250,8 +3249,11 @@ def update_file_cache(files=None):
 
 def as_file(file, filename=None, ext=None, rename=True):
     if rename:
-        fn = str(round(ts_us()))
-        out = fn + "~" + (str(file) if filename is None else filename.translate(filetrans))
+        fn = round(ts_us())
+        for file in os.listdir("cache"):
+            if file.startswith(f"{IND}{fn}"):
+                fn += 1
+        out = str(fn)
     if issubclass(type(file), bytes):
         with open(f"cache/{IND}{out}", "wb") as f:
             f.write(file)
@@ -3262,24 +3264,37 @@ def as_file(file, filename=None, ext=None, rename=True):
                 break
             time.sleep(0.1)
     else:
-        fn = file.rsplit("/", 1)[-1][1:].split("~", 1)[0]
+        fn = file.rsplit("/", 1)[-1][1:].rsplit(".", 1)[0].split("~", 1)[0]
     url = f"http://{miza.ip}:{PORT}/files/{fn}"
-    if ext:
+    if filename:
+        url += "/" + (str(file) if filename is None else filename.translate(filetrans))
+    if ext and "." not in url:
         url += "." + ext
     return url
 
 def is_file(url):
     start = f"http://{miza.ip}:{PORT}/files/"
     if url.startswith(start):
-        path = url[len(start):].split("~", 1)[0]
+        path = url[len(start):].split("/", 1)[0]
         fn = f"{IND}{path}"
         for file in os.listdir("cache"):
-            if file.split("~", 1)[0][1:] == path:
+            if file.rsplit(".", 1)[0].split("~", 1)[0][1:] == path:
                 return f"cache/{file}"
     return None
 
-
-server = psutil.Popen([python, "server.py"], stdin=subprocess.PIPE)
+def stdread(buffer):
+    with tracebacksuppressor:
+        buf = io.BytesIO()
+        while True:
+            b = buffer.read(1)
+            if not b:
+                break
+            if b == b"\n":
+                buf.seek(0)
+                print(buf.read().decode("utf-8", "replace"))
+                buf.seek(0)
+            else:
+                buf.write(b)
 
 
 # If this is the module being run and not imported, create a new Bot instance and run it.
@@ -3294,7 +3309,11 @@ if __name__ == "__main__":
             proc_start()
             miza = bot = client = Bot()
             miza.miza = miza
+            server = psutil.Popen([python, "server.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            create_thread(stdread, server.stdout)
+            create_thread(stdread, server.stderr)
             with miza:
                 miza.run()
+            server.kill()
     print = _print
     sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__

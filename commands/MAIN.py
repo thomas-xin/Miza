@@ -990,8 +990,8 @@ class Invite(Command):
 class Reminder(Command):
     name = ["Announcement", "Announcements", "Announce", "RemindMe", "Reminders", "Remind"]
     description = "Sets a reminder for a certain date and time."
-    usage = "<1:message> <0:time> <disable(?d)>"
-    flags = "aed"
+    usage = "<1:message> <0:time> <urgent(?u)> <disable(?d)>"
+    flags = "aedu"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = (1 / 3, 4)
     keywords = ["on", "at", "in", "when", "event"]
@@ -1042,6 +1042,8 @@ class Reminder(Command):
             )
         if len(rems) >= 64:
             raise OverflowError(f"You have reached the maximum of 64 {word}. Please remove one to add another.")
+        urgent = "u" in flags
+        remind_as = user
         # This parser is so unnecessarily long for what it does...
         keyed = False
         while True:
@@ -1049,6 +1051,14 @@ class Reminder(Command):
             temp = argv.casefold()
             if name == "remind" and temp.startswith("me "):
                 argv = argv[3:]
+                temp = argv.casefold()
+            if temp.startswith("urgently ") or temp.startswith("urgent "):
+                argv = argv.split(" ", 1)[1]
+                temp = argv.casefold()
+                urgent = True
+            if temp.startswith("as ") and " " in argv[3:]:
+                query, argv = argv[3:].split(" ", 1)
+                remind_as = await self.bot.fetch_user_member(query, guild)
                 temp = argv.casefold()
             if temp.startswith("to "):
                 argv = argv[3:]
@@ -1189,30 +1199,37 @@ class Reminder(Command):
                 msg = "[SAMPLE ANNOUNCEMENT]"
             else:
                 msg = "[SAMPLE REMINDER]"
-            msg = bold(css_md(msg))
+            if urgent:
+                msg = bold(css_md(msg))
+            else:
+                msg = bold(ini_md(msg))
         elif len(msg) > 1024:
             raise OverflowError(f"Input message too long ({len(msg)} > 1024).")
-        username = str(user)
-        url = best_url(user)
+        username = str(remind_as)
+        url = best_url(remind_as)
         ts = utc()
         if keyed:
             # Schedule for an event from a user
-            rems.append(cdict(
+            rem = cdict(
                 user=user.id,
                 msg=msg,
                 u_id=t,
                 t=inf,
-            ))
+            )
+            rems.append(rem)
             s = "$" + str(t)
             seq = set_dict(bot.data.reminders, s, deque())
             seq.append(sendable.id)
         else:
             # Schedule for an event at a certain time
-            rems.append(cdict(
+            rem = cdict(
                 user=user.id,
                 msg=msg,
                 t=t + ts,
-            ))
+            )
+            rems.append(rem)
+        if urgent:
+            rem.urgent = True
         # Sort list of reminders
         bot.data.reminders[sendable.id] = sort(rems, key=lambda x: x["t"])
         with suppress(IndexError):
@@ -1223,10 +1240,13 @@ class Reminder(Command):
         update(sendable.id)
         emb = discord.Embed(description=msg)
         emb.set_author(name=username, url=url, icon_url=url)
+        out = "```css\nSuccessfully set "
+        if urgent:
+            out += "urgent "
         if "announce" in name:
-            out = f"```css\nSuccessfully set announcement for {sqr_md(sendable)}"
+            out += f"announcement for {sqr_md(sendable)}"
         else:
-            out = f"```css\nSuccessfully set reminder for {sqr_md(sendable)}"
+            out += f"reminder for {sqr_md(sendable)}"
         if keyed:
             out += f" upon next event from {sqr_md(user_mention(t))}"
         else:
@@ -1298,12 +1318,31 @@ class Reminder(Command):
 class UpdateReminders(Database):
     name = "reminders"
     no_delete = True
-    rate_limit = 1
 
     def __load__(self):
         d = self.data
         # This exists so that checking next scheduled item is O(1)
         self.listed = alist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str and d[i]), key=lambda x: x[0]))
+
+    async def urgent_message(self, channel, embed):
+        t = utc()
+        message = await channel.send(embed=embed)
+        await message.add_reaction("✅")
+        await asyncio.sleep(t - utc() + 60)
+        with suppress(StopIteration):
+            while True:
+                async with delay(60):
+                    for react in self.bot.cache.messages[message.id].reactions:
+                        if str(react) == "✅":
+                            if react.count > 1:
+                                raise StopIteration
+                            async for u in react.users():
+                                if u.id != self.bot.id:
+                                    raise StopIteration
+                    fut = create_task(channel.send(embed=embed))
+                    await self.bot.silent_delete(message)
+                    message = await fut
+                    await message.add_reaction("✅")
 
     # Fast call: runs many times per second
     async def _call_(self):
@@ -1344,7 +1383,10 @@ class UpdateReminders(Database):
             except KeyError:
                 u = x
             emb.set_author(**get_author(u))
-            self.bot.send_embeds(ch, emb)
+            if not x.get("urgent"):
+                self.bot.send_embeds(ch, emb)
+            else:
+                create_task(self.urgent_message(ch, emb))
 
     # Seen event: runs when users perform discord actions
     async def _seen_(self, user, **void):
@@ -1369,7 +1411,10 @@ class UpdateReminders(Database):
                             except KeyError:
                                 u = cdict(x)
                             emb.set_author(**get_author(u))
-                            self.bot.send_embeds(ch, emb)
+                            if not x.get("urgent"):
+                                self.bot.send_embeds(ch, emb)
+                            else:
+                                create_task(self.urgent_message(ch, emb))
                             pops.add(len(rems) - i)
                         elif is_finite(x["t"]):
                             break

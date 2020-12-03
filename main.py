@@ -13,6 +13,7 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
         "google_api_key": "",
         "rapidapi_key": "",
         "genius_key": "",
+        "alexflipnote_key": "",
         "papago_id": "",
         "papago_secret": "",
         "knack_id": "",
