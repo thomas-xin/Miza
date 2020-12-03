@@ -7,6 +7,8 @@ IND = ""
 
 
 app = Flask(__name__)
+app.use_x_sendfile = True
+
 
 @app.errorhandler(Exception)
 def on_error(ex):
@@ -38,4 +40,6 @@ def get_ip():
     # basic endpoint for the port; return the request's remote (external) IP address
     return flask.request.remote_addr
 
-app.run("0.0.0.0", PORT)
+
+if __name__ == "__main__":
+    app.run("0.0.0.0", PORT)
