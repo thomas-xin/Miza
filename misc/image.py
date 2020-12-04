@@ -352,7 +352,7 @@ def spin_gif(image, duration):
     else:
         return spin_gif2(image, duration)
     ts = time.time_ns() // 1000
-    image = 960
+    maxsize = 960
     size = list(image.size)
     if duration == 0:
         fps = 0
