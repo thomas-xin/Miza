@@ -61,6 +61,70 @@ def get_file_ex(path, filename):
 def home():
     # basic endpoint for the port; return the request's remote (external) IP address
     return flask.request.remote_addr
+@app.route("/timezonestyles.css", methods=["GET", "POST"]) #I would just send a file but I'm too lazy to
+def stylesthingy():
+    return """
+    html {
+    width: 100%;
+    height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    vertical-align: middle;
+}
+
+body {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    width: 100%;
+}
+
+div {
+    padding: 5em;
+    border-radius: 1em;
+    box-shadow: 0px 0px 15px 0px rgba(0,0,0,0.3);
+    font-family: system-ui, "comic sans ms";
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+h3 {
+    margin-top: 0;
+    margin-bottom: 0rem;
+    background: white;
+    display: inline-block;
+    position: relative;
+    top: -1.3em;
+    padding: 0.5em;
+    border-radius: 9999999999px;
+    font-weight: lighter;
+}
+
+h1, h2, p {
+    padding: 0;
+    margin-top: 0;
+    width: 100%;
+    text-align: center;
+}
+
+h2 {font-weight: lighter;font-size: 1.2rem;}
+
+a {
+    padding: 0.5em 2em;
+    display: inline-block;
+    background: #49bcff;
+    color: black;
+    text-decoration: none;
+    font-size: 1.1rem;
+    border-radius: 0.5em;
+    margin-bottom: 0;
+}
+
+p {
+    margin-bottom: 1em;
+}
+    """
 
 timezones = {}
 @app.route("/timezone", methods=["GET", "POST"])
@@ -76,17 +140,26 @@ def timezone():
         data = resp["data"]["geo"]
         tz = data["timezone"]
         dt = datetime.datetime.now(pytz.timezone(tz))
-        sys.stderr.write(ip + "\t" + str(dt) + "\t" + tz + "\n")
-        html = "\n".join((
-            "<!DOCTYPE html>",
-            "<html>",
-            "<body>",
-            f'<h1 style="text-align:center;">Estimated time: {dt}</h1>',
-            f'<h2 style="text-align:center;">Detected timezone: {tz}</h2>',
-            f'<p style="text-align:center;"><a href="http://{flask.request.host}/timezone">Refresh</a></p>',
-            "</body>",
-            "</html>",
-        ))
+        sys.stderr.write(ip + "\t" + str(dt) + "\t" + tz + "\n") #uncool :(
+        html = """<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset=\"utf-8\">
+    <title>timezone page</title>  
+    <link rel=\"stylesheet\" type=\"text/css\" href=\"/timezonestyles.css\" />
+  </head>
+  <body>
+    <div>
+      <h3>Estimated time:</h3>
+      <h1>""" + dt + """</h1>
+      <h2>Detected timezone: """ + tz + """</h2>
+      <p>
+        <a href=\"/timezone\">Refresh</a>
+      </p>
+    </div>
+  </body>
+</html>
+        """
         return html
     except KeyError:
         traceback.print_exc()
