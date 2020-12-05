@@ -61,7 +61,7 @@ def home():
 
 @app.route("/timezonestyles.css", methods=["GET", "POST"]) #I would just send a file but I'm too lazy to
 def stylesthingy():
-    return """
+    css = """
     html {
     width: 100%;
     height: 100vh;
@@ -123,6 +123,7 @@ p {
     margin-bottom: 1em;
 }
     """
+    return flask.Response(css, mimetype='text/css')
 
 timezones = {}
 @app.route("/timezone", methods=["GET", "POST"])
@@ -158,7 +159,7 @@ def timezone():
   </body>
 </html>
         """
-        return flask.Response(html, mimetype='text/css')
+        return html
     except KeyError:
         traceback.print_exc()
         return flask.redirect("https://http.cat/417")
