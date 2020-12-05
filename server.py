@@ -59,7 +59,7 @@ def home():
     # basic endpoint for the port; return the request's remote (external) IP address
     return flask.request.remote_addr
 
-@app.route("/timezonestyles.css", methods=["GET", "POST"]) #I would just send a file but I'm too lazy to
+@app.route("/timezonestyles.css", methods=["GET", "POST"])
 def stylesthingy():
     css = """
     html {

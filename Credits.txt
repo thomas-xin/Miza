@@ -54,16 +54,19 @@ https://y2mate.guru/en8/
 
 MISC:
 
-Gabriel Ravier (https://github.com/GabrielRavier)
--Help with code style
+smudgedpasta (https://github.com/smudgedpasta)
+-Created art for the bot's profile picture and coin animation
 -Help with testing
 
 Brayconn (https://github.com/Brayconn)
 -Help with finding APIs for functions
 -Help with testing
 
-smudgedpasta (https://github.com/smudgedpasta)
--Created art for the bot's profile picture and coin animation
+Hucario/IdiocyMan (https://github.com/hucario)
+-Help with webserver CSS formatting
+
+Gabriel Ravier (https://github.com/GabrielRavier)
+-Help with code style
 -Help with testing
 
 pachuco (https://github.com/pachuco)
