@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.errorhandler(Exception)
 def on_error(ex):
-    print(repr(ex))
+    sys.stderr.write(repr(ex) + "\n")
     # Redirect HTTP errors to http.cat, python exceptions go to code 500 (internal server error)
     if issubclass(type(ex), HTTPException):
         return flask.redirect(f"https://http.cat/{ex.code}")
@@ -33,13 +33,11 @@ def find_file(path):
         # file cache is stored as "{timestamp}~{name}", search for file via timestamp
         if file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
             out = "cache/" + file
-            print(out)
             return out
     raise FileNotFoundError
 
 @app.route("/files/<path>", methods=["GET"])
 def get_file(path):
-    print(flask.request.remote_addr, path)
     try:
         return flask.send_file(find_file(path), as_attachment=bool(flask.request.args.get("download")))
     except EOFError:
@@ -49,7 +47,6 @@ def get_file(path):
 
 @app.route("/files/<path>/<filename>", methods=["GET"])
 def get_file_ex(path, filename):
-    print(flask.request.remote_addr, path)
     try:
         return flask.send_file(find_file(path), as_attachment=bool(flask.request.args.get("download")), attachment_filename=filename)
     except EOFError:
@@ -61,6 +58,7 @@ def get_file_ex(path, filename):
 def home():
     # basic endpoint for the port; return the request's remote (external) IP address
     return flask.request.remote_addr
+
 @app.route("/timezonestyles.css", methods=["GET", "POST"]) #I would just send a file but I'm too lazy to
 def stylesthingy():
     return """
@@ -140,7 +138,7 @@ def timezone():
         data = resp["data"]["geo"]
         tz = data["timezone"]
         dt = datetime.datetime.now(pytz.timezone(tz))
-        sys.stderr.write(ip + "\t" + str(dt) + "\t" + tz + "\n") #uncool :(
+        sys.stderr.write(ip + "\t" + str(dt) + "\t" + tz + "\n")
         html = """<!DOCTYPE html>
 <html>
   <head>
@@ -151,7 +149,7 @@ def timezone():
   <body>
     <div>
       <h3>Estimated time:</h3>
-      <h1>""" + dt + """</h1>
+      <h1>""" + str(dt) + """</h1>
       <h2>Detected timezone: """ + tz + """</h2>
       <p>
         <a href=\"/timezone\">Refresh</a>
