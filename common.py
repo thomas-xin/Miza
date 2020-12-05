@@ -1119,6 +1119,7 @@ async def process_image(image, operation, args, key=None, timeout=24):
             raise
         busy.pop(key, None)
         output = evalEX(evalEX(resp))
+        print(output)
         return output
 
 

@@ -158,7 +158,7 @@ def timezone():
   </body>
 </html>
         """
-        return html
+        return flask.Response(html, mimetype='text/css')
     except KeyError:
         traceback.print_exc()
         return flask.redirect("https://http.cat/417")
