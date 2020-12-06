@@ -1501,7 +1501,7 @@ class AudioDownloader:
                 resp = resp[resp.index(search) + len(search):]
                 search = b"Duration: "
                 resp = resp[resp.index(search) + len(search):]
-                entry["duration"] = time_parse(resp[:resp.index(b"<br><br>")].decode("utf-8", "replace"))
+                entry["duration"] = dur = time_parse(resp[:resp.index(b"<br><br>")].decode("utf-8", "replace"))
             search = b"</a></td></tr></tbody></table><h3>Audio</h3>"
             resp = resp[resp.index(search) + len(search):]
             with suppress(ValueError):
@@ -1678,6 +1678,9 @@ class AudioDownloader:
             for fut in futs:
                 out.extend(fut.result()[0])
         return out
+    
+    def ydl_errors(self, s):
+        return "403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s or "information found in video info" in s
 
     # Repeatedly makes calls to youtube-dl until there is no more data to be collected.
     def extract_true(self, url):
@@ -1706,7 +1709,7 @@ class AudioDownloader:
             entries = self.downloader.extract_info(url, download=False, process=True)
         except Exception as ex:
             s = str(ex).casefold()
-            if type(ex) is not youtube_dl.DownloadError or ("403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s):
+            if type(ex) is not youtube_dl.DownloadError or ydl_errors(s):
                 try:
                     entries = self.extract_backup(url)
                 except youtube_dl.DownloadError:
@@ -1743,7 +1746,7 @@ class AudioDownloader:
             return self.downloader.extract_info(url, download=False, process=False)
         except Exception as ex:
             s = str(ex).casefold()
-            if type(ex) is not youtube_dl.DownloadError or ("403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s):
+            if type(ex) is not youtube_dl.DownloadError or self.ydl_errors(s):
                 if is_url(url):
                     try:
                         return self.extract_backup(url)
@@ -2150,7 +2153,7 @@ class AudioDownloader:
             entry["url"] = ""
 
     # For ~download
-    def download_file(self, url, fmt="ogg", auds=None):
+    def download_file(self, url, fmt="ogg", start=None, end=None, auds=None):
         # Select a filename based on current time to avoid conflicts
         if fmt[:3] == "mid":
             mid = True
@@ -2164,7 +2167,12 @@ class AudioDownloader:
         stream = info["stream"]
         if not stream:
             raise LookupError(f"No stream URLs found for {url}")
-        args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-vn", "-i", stream]
+        args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-vn"]
+        if start != "None":
+            args.extend(("-ss", start))
+        if end != "None":
+            args.extend(("-to", end))
+        args.extend(("-i", stream))
         if auds is not None:
             args.extend(auds.construct_options(full=True))
         br = 196608
@@ -3857,10 +3865,10 @@ class Lyrics(Command):
 class Download(Command):
     time_consuming = True
     _timeout_ = 20
-    name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "ConvertORG", "Org2xm", "Convert"]
+    name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "ConvertORG", "Org2xm", "Convert"]
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
-    usage = "<0:search_link{queue}> <-1:out_format[ogg]> <apply_settings(?a)> <verbose_search(?v)> <show_debug(?z)>"
-    flags = "avz"
+    usage = "<0:search_link{queue}> <trim(?t)> <-3:trim_start[-]> <-2:trim_end[-]> <-1:out_format[ogg]> <apply_settings(?a)> <verbose_search(?v)> <show_debug(?z)>"
+    flags = "avtz"
     rate_limit = (7, 16)
     typing = True
 
@@ -3871,6 +3879,7 @@ class Download(Command):
         for a in message.attachments:
             argv = a.url + " " + argv
         direct = False
+        start = end = None
         # Attempt to download items in queue if no search query provided
         if not argv:
             try:
@@ -3879,7 +3888,7 @@ class Download(Command):
                     raise EOFError
                 res = [{"name": e.name, "url": e.url} for e in auds.queue[:10]]
                 fmt = "ogg"
-                end = f"Current items in queue for {guild}:"
+                desc = f"Current items in queue for {guild}:"
             except:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
         else:
@@ -3903,6 +3912,16 @@ class Download(Command):
                     fmt = "ogg"
             else:
                 fmt = "ogg"
+            if name == "trim" or "t" in flags:
+                argv, start, end = argv.rsplit(None, 2)
+                if start == "-":
+                    start = None
+                else:
+                    start = await bot.eval_time(start, user)
+                if end == "-":
+                    end = None
+                else:
+                    end = await bot.eval_time(end, user)
             argv = verify_search(argv)
             res = []
             # Input may be a URL or set of URLs, in which case we attempt to find the first one
@@ -3923,19 +3942,19 @@ class Download(Command):
             if not res:
                 raise LookupError(f"No results for {argv}.")
             res = res[:10]
-            end = f"Search results for {argv}:"
+            desc = f"Search results for {argv}:"
         a = flags.get("a", 0)
-        end += "\nDestination format: {." + fmt + "}"
+        desc += "\nDestination format: {." + fmt + "}"
+        if start or end:
+            desc += f"\nTrim: [{start} ~> {end}]"
         if a:
-            end += ", Audio settings: {ON}"
-        end += "```*"
+            desc += ", Audio settings: {ON}"
+        desc += "```*"
         # Encode URL list into bytes and then custom base64 representation, hide in code box header
         url_bytes = bytes(repr([e["url"] for e in res]), "utf-8")
         url_enc = bytes2b64(url_bytes, True).decode("utf-8", "replace")
-        msg = (
-            "*```" + "\n" * ("z" in flags) + "callback-voice-download-" + str(user.id) 
-            + "_" + str(len(res)) + "_" + fmt + "_" + str(int(bool(a))) + "-" + url_enc + "\n" + end
-        )
+        vals = f"{user.id}_{len(res)}_{fmt}_{int(bool(a))}_{start}_{end}"
+        msg = "*```" + "\n" * ("z" in flags) + "callback-voice-download-" + vals + "-" + url_enc + "\n" + desc
         emb = discord.Embed(colour=rand_colour())
         emb.set_author(**get_author(user))
         emb.description = "\n".join((f"`【{i}】` [{escape_markdown(e['name'])}]({ensure_url(e['url'])})" for i in range(len(res)) for e in [res[i]]))
@@ -3949,7 +3968,7 @@ class Download(Command):
                 reaction=b"0\xef\xb8\x8f\xe2\x83\xa3",
                 bot=bot,
                 perm=3,
-                vals=f"{user.id}_{len(res)}_{fmt}_{int(bool(a))}",
+                vals=vals,
                 argv=url_enc,
                 user=user
             ))
@@ -3988,10 +4007,15 @@ class Download(Command):
                                     auds = None
                             except LookupError:
                                 auds = None
+                            start = end = None
+                            if len(spl) >= 6:
+                                start, end = spl[4:]
                             f, out = await create_future(
                                 ytdl.download_file,
                                 url,
                                 fmt=spl[2],
+                                start=start,
+                                end=end,
                                 auds=auds,
                                 timeout=540,
                             )

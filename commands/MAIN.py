@@ -1314,6 +1314,50 @@ class Reminder(Command):
                     create_task(message.add_reaction(react.decode("utf-8")))
 
 
+class UpdateUrgentReminders(Database):
+    name = "urgentreminders"
+    no_delete = True
+
+    async def _bot_ready_(self, **void):
+        if "listed" not in self.data:
+            self.data["listed"] = alist()
+        create_task(self.update_urgents())
+
+    async def update_urgents(self):
+        while True:
+            with tracebacksuppressor:
+                t = utc()
+                listed = self.data["listed"]
+                while listed:
+                    p = listed[0]
+                    if t < p[0]:
+                        break
+                    with suppress(StopIteration):
+                        listed.popleft()
+                        self.update()
+                        c_id = p[1]
+                        m_id = p[2]
+                        emb = p[3]
+                        p[0] = utc() + 60
+                        channel = await self.bot.fetch_messageable(c_id)
+                        message = await self.bot.fetch_message(m_id, channel)
+                        for react in message.reactions:
+                            if str(react) == "✅":
+                                if react.count > 1:
+                                    raise StopIteration
+                                async for u in react.users():
+                                    if u.id != self.bot.id:
+                                        raise StopIteration
+                        fut = create_task(channel.send(embed=emb))
+                        await self.bot.silent_delete(message)
+                        message = await fut
+                        await message.add_reaction("✅")
+                        p[2] = message.id
+                        listed.insort(p, key=lambda x: x)
+                        self.update()
+            await asyncio.sleep(1)
+
+
 # This database is such a hassle to manage, it has to be able to persist between bot restarts, and has to be able to update with O(1) time complexity when idle
 class UpdateReminders(Database):
     name = "reminders"
@@ -1328,21 +1372,23 @@ class UpdateReminders(Database):
         t = utc()
         message = await channel.send(embed=embed)
         await message.add_reaction("✅")
-        await asyncio.sleep(t - utc() + 60)
-        with suppress(StopIteration):
-            while True:
-                async with delay(60):
-                    for react in self.bot.cache.messages[message.id].reactions:
-                        if str(react) == "✅":
-                            if react.count > 1:
-                                raise StopIteration
-                            async for u in react.users():
-                                if u.id != self.bot.id:
-                                    raise StopIteration
-                    fut = create_task(channel.send(embed=embed))
-                    await self.bot.silent_delete(message)
-                    message = await fut
-                    await message.add_reaction("✅")
+        self.bot.data.urgentreminders.data["listed"].insort([t + 60, channel.id, message.id, embed], key=lambda x: x)
+        self.bot.data.urgentreminders.update()
+        # await asyncio.sleep(t - utc() + 60)
+        # with suppress(StopIteration):
+        #     while True:
+        #         async with delay(60):
+        #             for react in self.bot.cache.messages[message.id].reactions:
+        #                 if str(react) == "✅":
+        #                     if react.count > 1:
+        #                         raise StopIteration
+        #                     async for u in react.users():
+        #                         if u.id != self.bot.id:
+        #                             raise StopIteration
+        #             fut = create_task(channel.send(embed=embed))
+        #             await self.bot.silent_delete(message)
+        #             message = await fut
+        #             await message.add_reaction("✅")
 
     # Fast call: runs many times per second
     async def _call_(self):
@@ -1972,25 +2018,25 @@ class UpdateUsers(Database):
     async def _nocommand_(self, message, msg, force=False, **void):
         bot = self.bot
         user = message.author
-        if user.bot:
-            c_id = message.channel.id
-            for i, m in enumerate(reversed(self.bot.cache.messages.values())):
-                if i >= 1024:
-                    break
-                if m.channel.id == c_id:
-                    user = m.author
-                    if bot.get_perms(user.id, message.guild) <= -inf:
-                        return
-                    if not user.bot:
-                        break
-            if user.bot:
-                async for m in message.channel.history(limit=None):
-                    user = m.author
-                    if bot.get_perms(user.id, message.guild) <= -inf:
-                        return
-                    if not user.bot:
-                        break
         if force or bot.is_mentioned(message, bot, message.guild):
+            if user.bot:
+                c_id = message.channel.id
+                for i, m in enumerate(reversed(self.bot.cache.messages.values())):
+                    if i >= 1024:
+                        break
+                    if m.channel and m.channel.id == c_id:
+                        user = m.author
+                        if bot.get_perms(user.id, message.guild) <= -inf:
+                            return
+                        if not user.bot:
+                            break
+                if user.bot:
+                    async for m in message.channel.history(limit=None):
+                        user = m.author
+                        if bot.get_perms(user.id, message.guild) <= -inf:
+                            return
+                        if not user.bot:
+                            break
             send = message.channel.send
             out = None
             count = self.data.get(user.id, EMPTY).get("last_talk", 0)
