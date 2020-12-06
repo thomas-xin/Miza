@@ -414,7 +414,12 @@ class UpdateUserColours(Database):
             resp = await process_image(url, "get_colour", ["-nogif"], timeout=40)
             colours[key] = out = [round(i) for i in eval_json(resp)]
             self.update()
-        return colour2raw(out)
+        raw = colour2raw(out)
+        if raw == 0:
+            return 1
+        elif raw == 16777215:
+            return 16777214
+        return raw
 
 
 class Suspend(Command):

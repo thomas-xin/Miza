@@ -756,6 +756,34 @@ class Colour(Command):
         await bot.send_with_file(channel, msg, f, filename=fn, best=True)
 
 
+class Average(Command):
+    name = ["AverageColour"]
+    description = "Computes the average pixel colour in RGB for the supplied image."
+    usage = "<url{attached_file}>"
+    no_parse = True
+    rate_limit = (2, 6)
+    _timeout_ = 2
+    typing = True
+
+    async def __call__(self, bot, message, argv, args, **void):
+        if message.attachments:
+            args = [worst_url(a) for a in message.attachments] + args
+            argv = " ".join(worst_url(a) for a in message.attachments) + " " * bool(argv) + argv
+        if not args:
+            raise ArgumentError("Please input an image by URL or attachment.")
+        url = args.pop(0)
+        urls = await bot.follow_url(url, best=True, allow=True, limit=1)
+        if not urls:
+            urls = await bot.follow_to_image(argv)
+            if not urls:
+                urls = await bot.follow_to_image(url)
+                if not urls:
+                    raise ArgumentError("Please input an image by URL or attachment.")
+        url = urls[0]
+        colour = await bot.data.colours.get(url)
+        return css_md("#" + bytes2hex(bytes(raw2colour(colour)), space=False))
+
+
 class Rainbow(Command):
     name = ["RainbowGIF"]
     description = "Creates a .gif image from repeatedly hueshifting supplied image."
