@@ -780,7 +780,7 @@ class Average(Command):
                 if not urls:
                     raise ArgumentError("Please input an image by URL or attachment.")
         url = urls[0]
-        colour = await bot.data.colours.get(url)
+        colour = await bot.data.colours.get(url, threshold=False)
         return css_md("#" + bytes2hex(bytes(raw2colour(colour)), space=False))
 
 

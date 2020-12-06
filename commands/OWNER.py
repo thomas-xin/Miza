@@ -402,7 +402,7 @@ class UpdateUserColours(Database):
     name = "colours"
     no_delete = True
 
-    async def get(self, url):
+    async def get(self, url, threshold=True):
         if is_discord_url(url) and "avatars" in url[:48]:
             key = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
         else:
@@ -415,10 +415,11 @@ class UpdateUserColours(Database):
             colours[key] = out = [round(i) for i in eval_json(resp)]
             self.update()
         raw = colour2raw(out)
-        if raw == 0:
-            return 1
-        elif raw == 16777215:
-            return 16777214
+        if threshold:
+            if raw == 0:
+                return 1
+            elif raw == 16777215:
+                return 16777214
         return raw
 
 
