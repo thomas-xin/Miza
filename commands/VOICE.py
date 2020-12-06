@@ -1084,10 +1084,11 @@ class AudioFile:
         self.loading = True
         # Collects data from source, converts to 48khz 192kbps opus format, outputting to target file
         cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
-        with suppress():
-            fmt = subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream]).decode("utf-8", "replace").strip()
-            if fmt == "opus":
-                cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
+        if "https://cf-hls-media.sndcdn.com/" not in stream:
+            with suppress():
+                fmt = subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream]).decode("utf-8", "replace").strip()
+                if fmt == "opus":
+                    cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
         self.proc = None
         try:
             try:
