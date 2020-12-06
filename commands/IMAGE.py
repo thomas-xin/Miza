@@ -765,7 +765,7 @@ class Average(Command):
     _timeout_ = 2
     typing = True
 
-    async def __call__(self, bot, message, argv, args, **void):
+    async def __call__(self, bot, channel, user, message, argv, args, **void):
         if message.attachments:
             args = [worst_url(a) for a in message.attachments] + args
             argv = " ".join(worst_url(a) for a in message.attachments) + " " * bool(argv) + argv
@@ -780,8 +780,26 @@ class Average(Command):
                 if not urls:
                     raise ArgumentError("Please input an image by URL or attachment.")
         url = urls[0]
-        colour = await bot.data.colours.get(url, threshold=False)
-        return css_md("#" + bytes2hex(bytes(raw2colour(colour)), space=False))
+        with discord.context_managers.Typing(channel):
+            colour = await bot.data.colours.get(url, threshold=False)
+            channels = raw2colour(colour)
+            adj = [x / 255 for x in channels]
+            # Any exceptions encountered during colour transformations will immediately terminate the command
+            msg = ini_md(
+                "HEX colour code: " + sqr_md(bytes(channels).hex().upper())
+                + "\nDEC colour code: " + sqr_md(colour2raw(channels))
+                + "\nRGB values: " + str(channels)
+                + "\nHSV values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_hsv(adj)))
+                + "\nCMY values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_cmy(adj)))
+                + "\nLAB values: " + sqr_md(", ".join(str(round(x)) for x in rgb_to_lab(adj)))
+                + "\nLUV values: " + sqr_md(", ".join(str(round(x)) for x in rgb_to_luv(adj)))
+                + "\nXYZ values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
+            )
+            resp = await process_image("from_colour", "$", [channels], user)
+            fn = resp[0]
+            f = discord.File(fn, filename="colour.png")
+        await bot.send_with_file(channel, msg, f, filename=fn, best=True)
+        # return css_md("#" + bytes2hex(bytes(raw2colour(colour)), space=False))
 
 
 class Rainbow(Command):
