@@ -643,6 +643,17 @@ def resize_to(image, w, h, operation="auto"):
     return image.resize([w, h], filt)
 
 
+def get_colour(image):
+    if "A" in str(image.mode):
+        spl = deque(image.split())
+        A = spl.pop()
+        spl = (ImageChops.multiply(i, A) for i in spl)
+    else:
+        spl = image.split()
+    col = [np.mean(channel) for channel in spl]
+    return str(col)
+
+
 channel_map = {
     "alpha": -1,
     "a": -1,

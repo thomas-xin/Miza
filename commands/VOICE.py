@@ -2656,9 +2656,10 @@ class Playlist(Command):
             content += f"{len(pl)} items in default playlist for {str(guild).replace('`', '')}:```*"
             key = lambda x: lim_str(sqr_md(x["name"]) + "(" + x["url"] + ")", 1900 / page)
             msg = iter2str(pl[pos:pos + page], key=key, offset=pos, left="`【", right="】`")
+        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
         emb = discord.Embed(
             description=content + msg,
-            colour=rand_colour(),
+            colour=colour,
         )
         emb.set_author(**get_author(user))
         more = len(pl) - pos - page

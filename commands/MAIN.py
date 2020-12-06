@@ -27,13 +27,14 @@ class Help(Command):
     usage = "<command{all}> <category{all}> <verbose(?v)>"
     flags = "v"
 
-    def __call__(self, args, user, channel, guild, flags, perm, **void):
+    async def __call__(self, args, user, channel, guild, flags, perm, **void):
         bot = self.bot
         enabled = bot.data.enabled
         g_id = guild.id
         prefix = bot.get_prefix(g_id)
         v = "v" in flags
-        emb = discord.Embed(colour=rand_colour())
+        colour = await self.bot.get_colour(user)
+        emb = discord.Embed(colour=colour)
         emb.set_author(name="❓ Help ❓")
         found = {}
         # Get help on categories, then commands
@@ -327,18 +328,20 @@ class Avatar(Command):
         # Gets icon display of a server and returns as an embed.
         url = to_png(g.icon_url)
         name = g.name
-        emb = discord.Embed(colour=rand_colour())
+        colour = await self.bot.data.colours.get(to_png_ex(g.icon_url))
+        emb = discord.Embed(colour=colour)
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         emb.description = f"{sqr_md(name)}({url})"
         return emb
 
-    def getMimicData(self, p):
+    async def getMimicData(self, p):
         # Gets icon display of a mimic and returns as an embed.
         url = to_png(p.url)
         name = p.name
-        emb = discord.Embed(colour=rand_colour())
+        colour = await self.bot.data.colours.get(to_png_ex(p.url))
+        emb = discord.Embed(colour=colour)
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
@@ -380,7 +383,8 @@ class Avatar(Command):
                                 break
                             try:
                                 p = bot.get_mimic(u_id, user)
-                                embs.add(self.getMimicData(p))
+                                emb = await self.getMimicData(p)
+                                embs.add(emb)
                             except:
                                 pass
                             else:
@@ -405,7 +409,8 @@ class Avatar(Command):
                         u = user
                     name = str(u)
                     url = best_url(u)
-                    emb = discord.Embed(colour=rand_colour())
+                    colour = await self.bot.get_colour(u)
+                    emb = discord.Embed(colour=colour)
                     emb.set_thumbnail(url=url)
                     emb.set_image(url=url)
                     emb.set_author(name=name, icon_url=url, url=url)
@@ -430,7 +435,8 @@ class Info(Command):
             u = g.owner
         except (AttributeError, KeyError):
             u = None
-        emb = discord.Embed(colour=rand_colour())
+        colour = await self.bot.data.colours.get(to_png_ex(g.icon_url))
+        emb = discord.Embed(colour=colour)
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         if u is not None:
@@ -482,10 +488,11 @@ class Info(Command):
             emb.add_field(name="Top users", value=top, inline=0)
         return emb
 
-    def getMimicData(self, p, flags={}):
+    async def getMimicData(self, p, flags={}):
         url = to_png(p.url)
         name = p.name
-        emb = discord.Embed(colour=rand_colour())
+        colour = await self.bot.data.colours.get(to_png_ex(p.url))
+        emb = discord.Embed(colour=url)
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         d = f"{user_mention(p.u_id)}{fix_md(p.id)}"
@@ -564,7 +571,8 @@ class Info(Command):
                                     break
                             try:
                                 p = bot.get_mimic(u_id, user)
-                                embs.add(self.getMimicData(p, flags))
+                                emb = await self.getMimicData(p, flags)
+                                embs.add(emb)
                             except:
                                 pass
                             else:
@@ -760,7 +768,8 @@ class Info(Command):
                         url2 = bot.website
                     else:
                         url2 = url
-                    emb = discord.Embed(colour=rand_colour())
+                    colour = await self.bot.get_colour(u)
+                    emb = discord.Embed(colour=colour)
                     emb.set_thumbnail(url=url)
                     emb.set_author(name=name, icon_url=url, url=url2)
                     d = user_mention(u.id)
@@ -1300,9 +1309,10 @@ class Reminder(Command):
                 left="`[",
                 right="]`",
             )
+        colour = await self.bot.get_colour(user)
         emb = discord.Embed(
             description=content + msg,
-            colour=rand_colour(),
+            colour=colour,
         ).set_author(**get_author(user))
         more = len(rems) - pos - page
         if more > 0:

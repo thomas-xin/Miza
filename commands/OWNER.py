@@ -245,7 +245,8 @@ class UpdateExec(Database):
         if user.id == bot.client.user.id or bot.is_blacklisted(user.id):
             return
         if not hasattr(channel, "guild") or channel.guild is None:
-            emb = discord.Embed(colour=rand_colour())
+            colour = await bot.get_colour(user)
+            emb = discord.Embed(colour=colour)
             emb.set_author(name=f"{user} ({user.id})", icon_url=best_url(user))
             emb.description = italics(ini_md("typing..."))
             for c_id, flag in self.data.items():
@@ -397,6 +398,25 @@ class UpdateTrusted(Database):
     name = "trusted"
 
 
+class UpdateUserColours(Database):
+    name = "colours"
+    no_delete = True
+
+    async def get(self, url):
+        if is_discord_url(url) and "avatars" in url[:48]:
+            key = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
+        else:
+            key = url.split("?", 1)[0]
+        try:
+            out = self.data["colours"][key]
+        except KeyError:
+            colours = self.data.setdefault("colours", {})
+            resp = await process_image(url, "get_colour", [], timeout=40)
+            colours[key] = out = [round(i) for i in eval_json(resp)]
+            self.update()
+        return colour2raw(out)
+
+
 class Suspend(Command):
     name = ["Block", "Blacklist"]
     min_level = nan
@@ -405,7 +425,6 @@ class Suspend(Command):
     flags = "aed"
 
     async def __call__(self, bot, user, guild, args, flags, **void):
-        update = self.data.blacklist.update
         if len(args) >= 1:
             user = await bot.fetch_user(verify_id(args[0]))
             if "d" in flags:

@@ -336,7 +336,8 @@ class Text2048(Command):
                 u = user
             else:
                 u = bot.get_user(u_id, replace=True)
-            emb = discord.Embed(colour=rand_colour())
+            colour = await bot.get_colour(u)
+            emb = discord.Embed(colour=colour)
             if u is None:
                 emb.set_author(name="@everyone", icon_url=bot.discord_icon)
             else:
@@ -477,7 +478,8 @@ class SlotMachine(Command):
             wheel_true = self.generate()
             wheel_display = [None] * 3 if not skip else wheel_true
             wheel_order = deque(shuffle(range(3))) if not skip else deque((0, ))
-            emb = discord.Embed(colour=rand_colour()).set_author(**get_author(user))
+            colour = await bot.get_colour(user)
+            emb = discord.Embed(colour=colour).set_author(**get_author(user))
             if not skip:
                 async with delay(2):
                     emoj = await self.as_emojis(wheel_display)
@@ -613,7 +615,8 @@ class Daily(Command):
 
     async def __call__(self, bot, user, channel, **void):
         data = bot.data.dailies.get(user)
-        emb = discord.Embed(title="Daily Quests", colour=rand_colour()).set_author(**get_author(user))
+        colour = await bot.get_colour(user)
+        emb = discord.Embed(title="Daily Quests", colour=colour).set_author(**get_author(user))
         bal = await bot.data.users.get_balance(user)
         c = len(data['quests'])
         emb.description = f"```callback-fun-daily-{user.id}-\n{c} task{'' if c == 1 else 's'} available\n{sec2time(86400 - utc() + data['time'])} remaining```Balance: {bal}"
@@ -633,7 +636,8 @@ class Daily(Command):
         if str(user.id) != u_id:
             return
         data = bot.data.dailies.collect(user)
-        emb = discord.Embed(title="Daily Quests", colour=rand_colour()).set_author(**get_author(user))
+        colour = await bot.get_colour(user)
+        emb = discord.Embed(title="Daily Quests", colour=colour).set_author(**get_author(user))
         bal = await bot.data.users.get_balance(user)
         c = len(data['quests'])
         emb.description = f"```callback-fun-daily-{user.id}-\n{c} task{'' if c == 1 else 's'} available\n{sec2time(86400 - utc() + data['time'])} remaining```Balance: {bal}"
@@ -1143,9 +1147,10 @@ class Mimic(Command):
             content += f"{len(mimics)} currently enabled webhook mimics for {str(user).replace('`', '')}:```*"
             key = lambda x: lim_str("⟨" + ", ".join(i + ": " + (str(no_md(mimicdb[i].name)), "[<@" + str(getattr(mimicdb[i], "auto", "None")) + ">]")[bool(getattr(mimicdb[i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
             msg = ini_md(iter2str({k: mimics[k] for k in sorted(mimics)[pos:pos + page]}, key=key))
+        colour = await bot.get_colour(user)
         emb = discord.Embed(
             description=content + msg,
-            colour=rand_colour(),
+            colour=colour,
         )
         emb.set_author(**get_author(user))
         more = len(mimics) - pos - page

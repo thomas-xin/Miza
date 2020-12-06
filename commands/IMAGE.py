@@ -176,9 +176,10 @@ class IMG(Command):
         else:
             content += f"{len(images)} images currently assigned for {str(guild).replace('`', '')}:```*"
             msg = "```ini\n" + iter2str({k: "\n" + images[k] for k in tuple(images)[pos:pos + page]}) + "```"
+        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
         emb = discord.Embed(
             description=content + msg,
-            colour=rand_colour(),
+            colour=colour,
         )
         emb.set_author(**get_author(user))
         more = len(images) - pos - page
@@ -288,9 +289,10 @@ class React(Command):
             content += f"{len(curr)} auto reactions currently assigned for {str(guild).replace('`', '')}:```*"
             key = lambda x: "\n" + ", ".join(x)
             msg = "```ini\n" + iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=key) + "```"
+        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
         emb = discord.Embed(
             description=content + msg,
-            colour=rand_colour(),
+            colour=colour,
         )
         emb.set_author(**get_author(user))
         more = len(curr) - pos - page

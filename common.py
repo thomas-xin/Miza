@@ -715,6 +715,8 @@ typing = lambda self: create_task(self.trigger_typing())
 
 # Finds the best URL for a discord object's icon.
 best_url = lambda obj: obj if type(obj) is str else (to_png(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if obj.proxy_url else obj.url))
+# Finds the worst URL for a discord object's icon.
+worst_url = lambda obj: obj if type(obj) is str else (to_png_ex(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if obj.proxy_url else obj.url))
 
 
 get_author = lambda user, u_id=None: cdict(name=f"{user}" + "" if not u_id else f" ({user.id})", icon_url=best_url(user), url=best_url(user))
@@ -855,6 +857,13 @@ def to_png(url):
         url = str(url)
     if url.endswith("?size=1024"):
         url = url[:-10] + "?size=4096"
+    return url.replace(".webp", ".png")
+
+def to_png_ex(url):
+    if type(url) is not str:
+        url = str(url)
+    if url.endswith("?size=1024"):
+        url = url[:-10] + "?size=256"
     return url.replace(".webp", ".png")
 
 

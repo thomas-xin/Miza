@@ -1691,7 +1691,8 @@ class UpdateFileLogs(Database):
                         fils.append(fil)
                     except:
                         msg.append(best_url(a))
-                emb = discord.Embed(colour=rand_colour())
+                colour = await self.bot.get_colour(message.author)
+                emb = discord.Embed(colour=colour)
                 emb.description = f"File{'s' if len(fils) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
                 if not msg:
                     msg = None

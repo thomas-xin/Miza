@@ -955,6 +955,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             return data
         return await Request(url, aio=True)
 
+    async def get_colour(self, user):
+        url = worst_url(user)
+        return await self.data.colours.get(url)
+
     # Limits a cache to a certain amount, discarding oldest entries first.
     def limit_cache(self, cache=None, limit=None):
         if limit is None:
@@ -2338,10 +2342,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 description = str(description)
         if not description and not fields and not thumbnail and not image and not images:
             return
-        col = 0 if colour is None else colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
-        off = 128 if not issubclass(type(colour), collections.abc.Sequence) else colour[1]
+        return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour))
+    
+    async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None):
+        fin_col = None
+        if colour is None:
+            if author:
+                fin_col = await self.data.colours.get(author.icon_url)
+        if fin_col is None:
+            col = 0 if colour is None else colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
+            off = 128 if not issubclass(type(colour), collections.abc.Sequence) else colour[1]
+            fin_col = colour2raw(hue2colour(col))
         embs = deque()
-        emb = discord.Embed(colour=colour2raw(hue2colour(col)))
+        emb = discord.Embed(colour=fin_col)
         if title:
             emb.title = title
         if author:
