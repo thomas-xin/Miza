@@ -877,7 +877,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return message
 
     # Inserts a message into the bot cache, discarding existing ones if full.
-    def add_message(self, message, files=True):
+    def add_message(self, message, files=True, cache=True):
         self.cache.messages[message.id] = message
         self.limit_cache("messages")
         if message.author.id != self.id and files:
@@ -887,6 +887,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         create_task(self.add_attachment(attachment))
         if "message_cache" in self.data:
             self.data.message_cache.save_message(message)
+        if cache and "channel_cache" in self.data:
+            self.data.channel_cache.data.setdefault(message.channel.id, alist()).insort(message.id)
+            self.data.channel_cache.update(message.channel.id)
         return message
 
     # Deletes a message from the bot cache.
@@ -2348,7 +2351,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         fin_col = None
         if colour is None:
             if author:
-                fin_col = await self.data.colours.get(author.icon_url)
+                fin_col = await self.data.colours.get(author["icon_url"])
         if fin_col is None:
             col = 0 if colour is None else colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
             off = 128 if not issubclass(type(colour), collections.abc.Sequence) else colour[1]

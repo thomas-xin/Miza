@@ -423,6 +423,24 @@ class UpdateUserColours(Database):
         return raw
 
 
+class UpdateChannelCache(Database):
+    name = "channel_cache"
+
+    async def get(self, channel):
+        c_id = verify_id(channel)
+        try:
+            messages = self.data[c_id]
+        except KeyError:
+            messages = alist()
+            channel = await self.bot.fetch_sendable(c_id)
+            async for message in channel.history(limit=None):
+                messages.appendleft(message.id)
+                self.bot.add_message(message, files=False, cache=False)
+            self.data[channel.id] = messages
+            self.update(channel.id)
+        return (self.bot.cache.messages[m] for m in reversed(messages))
+
+
 class Suspend(Command):
     name = ["Block", "Blacklist"]
     min_level = nan
