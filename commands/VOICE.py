@@ -3946,8 +3946,8 @@ class Download(Command):
             desc = f"Search results for {argv}:"
         a = flags.get("a", 0)
         desc += "\nDestination format: {." + fmt + "}"
-        if start or end:
-            desc += f"\nTrim: [{start} ~> {end}]"
+        if start is not None or end is not None:
+            desc += f"\nTrim: [{'-' if start is None else start} ~> {'-' if end is None else end}]"
         if a:
             desc += ", Audio settings: {ON}"
         desc += "```*"

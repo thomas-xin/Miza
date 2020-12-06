@@ -1406,69 +1406,72 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         elif len(data):
                             raise TypeError("Too many time arguments.")
                 else:
-                    # Otherwise move on to main parser
-                    f = single_space(self.connectors.sub(" ", expr.replace(",", " "))).casefold()
-                    if "today" in f:
-                        day = 0
-                        f = f.replace("today", "")
-                    elif "tomorrow" in f:
-                        day = 1
-                        f = f.replace("tomorrow", "")
-                    elif "yesterday" in f:
-                        day = -1
-                        f = f.replace("yesterday", "")
-                    if day is not None:
-                        raise StopIteration
-                    dd = {}
-                    td = {}
-                    for tc in self.TimeChecks:
-                        for check in reversed(self.TimeChecks[tc]):
-                            if check in f:
-                                i = f.index(check)
-                                isnt = i + len(check) < len(f) and f[i + len(check)] in self.alphabet
-                                if isnt or not i or f[i - 1] in self.alphabet:
-                                    continue
-                                temp = f[:i]
-                                f = f[i + len(check):].strip()
-                                match = self.numericals.search(temp)
-                                if match:
-                                    i = match.end()
-                                    n = num_parse(temp[:i])
-                                    temp = temp[i:].strip()
-                                    if temp:
-                                        f = f"{temp} {f}"
-                                else:
-                                    n = await self.eval_math(temp, obj)
-                                if tc == "weeks":
-                                    add_dict(td, {"days": n * 7})
-                                elif tc in ("days", "hours", "minutes", "seconds"):
-                                    add_dict(td, {tc: n})
-                                else:
-                                    add_dict(dd, {tc: n})
-                    temp = f.strip()
-                    if temp:
-                        match = self.numericals.search(temp)
-                        if match:
-                            i = match.end()
-                            n = num_parse(temp[:i])
-                            temp = temp[i:].strip()
-                            if temp:
-                                n = await self.eval_math(f"{n} {temp}", obj)
-                        else:
-                            n = await self.eval_math(temp, obj)
-                        t += n
-                    t += td.get("seconds", 0)
-                    t += td.get("minutes", 0) * 60
-                    t += td.get("hours", 0) * 3600
-                    t += td.get("days", 0) * 86400
-                    if dd:
-                        ts = utc()
-                        dt = utc_dft(t + ts)
-                        years = dd.get("years", 0) + dd.get("decades", 0) * 10 + dd.get("centuries", 0) * 100 + dd.get("millennia", 0) * 1000 + dd.get("galactic years", 0) * 226814
-                        dt = dt.add_years(years)
-                        months = dd.get("months", 0)
-                        dt = dt.add_months(months)
-                        t = dt.timestamp() - ts
+                    try:
+                        t = float(expr)
+                    except:
+                        # Otherwise move on to main parser
+                        f = single_space(self.connectors.sub(" ", expr.replace(",", " "))).casefold()
+                        if "today" in f:
+                            day = 0
+                            f = f.replace("today", "")
+                        elif "tomorrow" in f:
+                            day = 1
+                            f = f.replace("tomorrow", "")
+                        elif "yesterday" in f:
+                            day = -1
+                            f = f.replace("yesterday", "")
+                        if day is not None:
+                            raise StopIteration
+                        dd = {}
+                        td = {}
+                        for tc in self.TimeChecks:
+                            for check in reversed(self.TimeChecks[tc]):
+                                if check in f:
+                                    i = f.index(check)
+                                    isnt = i + len(check) < len(f) and f[i + len(check)] in self.alphabet
+                                    if isnt or not i or f[i - 1] in self.alphabet:
+                                        continue
+                                    temp = f[:i]
+                                    f = f[i + len(check):].strip()
+                                    match = self.numericals.search(temp)
+                                    if match:
+                                        i = match.end()
+                                        n = num_parse(temp[:i])
+                                        temp = temp[i:].strip()
+                                        if temp:
+                                            f = f"{temp} {f}"
+                                    else:
+                                        n = await self.eval_math(temp, obj)
+                                    if tc == "weeks":
+                                        add_dict(td, {"days": n * 7})
+                                    elif tc in ("days", "hours", "minutes", "seconds"):
+                                        add_dict(td, {tc: n})
+                                    else:
+                                        add_dict(dd, {tc: n})
+                        temp = f.strip()
+                        if temp:
+                            match = self.numericals.search(temp)
+                            if match:
+                                i = match.end()
+                                n = num_parse(temp[:i])
+                                temp = temp[i:].strip()
+                                if temp:
+                                    n = await self.eval_math(f"{n} {temp}", obj)
+                            else:
+                                n = await self.eval_math(temp, obj)
+                            t += n
+                        t += td.get("seconds", 0)
+                        t += td.get("minutes", 0) * 60
+                        t += td.get("hours", 0) * 3600
+                        t += td.get("days", 0) * 86400
+                        if dd:
+                            ts = utc()
+                            dt = utc_dft(t + ts)
+                            years = dd.get("years", 0) + dd.get("decades", 0) * 10 + dd.get("centuries", 0) * 100 + dd.get("millennia", 0) * 1000 + dd.get("galactic years", 0) * 226814
+                            dt = dt.add_years(years)
+                            months = dd.get("months", 0)
+                            dt = dt.add_months(months)
+                            t = dt.timestamp() - ts
             except:
                 # Use datetime parser if regular parser fails
                 raw = tzparse(f if f else expr)
