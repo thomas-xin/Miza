@@ -648,7 +648,10 @@ def get_colour(image):
         spl = deque(image.split())
         A = np.divide(spl.pop(), 255)
         sumA = np.sum(A)
-        col = [np.sum(np.multiply(channel, A)) / sumA for channel in spl]
+        if sumA == 0:
+            col = [0, 0, 0]
+        else:
+            col = [np.sum(np.multiply(channel, A)) / sumA for channel in spl]
     else:
         spl = image.split()
         col = [np.mean(channel) for channel in spl]
