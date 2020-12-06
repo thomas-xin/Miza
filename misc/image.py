@@ -646,11 +646,12 @@ def resize_to(image, w, h, operation="auto"):
 def get_colour(image):
     if "A" in str(image.mode):
         spl = deque(image.split())
-        A = spl.pop()
-        spl = (ImageChops.multiply(i, A) for i in spl)
+        A = np.divide(spl.pop(), 255)
+        sumA = np.sum(A)
+        col = [np.sum(np.multiply(channel, A)) / sumA for channel in spl]
     else:
         spl = image.split()
-    col = [np.mean(channel) for channel in spl]
+        col = [np.mean(channel) for channel in spl]
     return str(col)
 
 
