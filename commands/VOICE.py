@@ -1710,7 +1710,7 @@ class AudioDownloader:
             entries = self.downloader.extract_info(url, download=False, process=True)
         except Exception as ex:
             s = str(ex).casefold()
-            if type(ex) is not youtube_dl.DownloadError or ydl_errors(s):
+            if type(ex) is not youtube_dl.DownloadError or self.ydl_errors(s):
                 try:
                     entries = self.extract_backup(url)
                 except youtube_dl.DownloadError:
