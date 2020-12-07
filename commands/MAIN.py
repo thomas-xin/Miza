@@ -46,18 +46,20 @@ class Help(Command):
         g_id = guild.id
         prefix = bot.get_prefix(g_id)
         v = "v" in flags
-        emb = discord.Embed()
-        emb.set_author(name="❓ Help ❓")
+        author=dict(name="❓ Help ❓")
+        fields = deque()
         found = {}
+        description = ""
+        colour = None
         # Get help on categories, then commands
         for a in args:
             a = a.casefold()
             if a in bot.categories:
                 coms = bot.categories[a]
-                emb.colour = discord.Colour(help_colours[a])
+                colour = discord.Colour(help_colours[a])
             elif a in bot.commands:
                 coms = bot.commands[a]
-                emb.colour = discord.Colour(help_colours[a.catg])
+                colour = discord.Colour(help_colours[a.catg])
             else:
                 continue
             for com in coms:
@@ -67,10 +69,7 @@ class Help(Command):
                     found[com.__name__] = alist((com,))
         if found:
             # Display list of found commands in an embed
-            i = 0
             for k in found:
-                if i >= 25:
-                    break
                 coms = found[k]
                 for com in coms:
                     a = ", ".join(n.strip("_") for n in com.name)
@@ -81,25 +80,25 @@ class Help(Command):
                     if v or len(found) <= 1:
                         s += f"\n[Usage] {prefix}{com.__name__} {com.usage}\n[Level] {com.min_display}"
                     s += "```"
-                    emb.add_field(
+                    fields.append(dict(
                         name=prefix + com.__name__.strip("_"),
                         value=s,
                         inline=False
-                    )
-                i += 1
+                    ))
         else:
             # Display main help page in an embed
-            emb.colour = discord.Colour(help_colours[None])
-            emb.description = (
+            colour = discord.Colour(help_colours[None])
+            description = (
                 "Please enter a command category to display usable commands,\nor see "
                 + "[Commands](https://github.com/thomas-xin/Miza/wiki/Commands) for full command list."
             )
             if bot.categories:
-                s = bold(ini_md(' '.join((sqr_md(c) for c in standard_commands if c in bot.categories))))
-                emb.add_field(name="Command category list", value=s)
-        emb = emb.to_dict()
-        emb["reacts"] = "❎"
-        bot.send_embeds(channel, embed=emb)
+                s = bold(ini_md(' '.join((sqr_md(c) for c in help_colours if c in bot.categories))))
+                fields.append(dict(name="Command category list", value=s))
+        bot.send_as_embeds(channel, description, author=author, fields=fields, colour=colour, reacts="❎")
+        # emb = emb.to_dict()
+        # emb["reacts"] = "❎"
+        # bot.send_embeds(channel, embed=emb)
 
 
 class Hello(Command):
@@ -977,7 +976,10 @@ class Status(Command):
                 + f"System time\n`{datetime.datetime.now()}`\nPing latency\n`{sec2time(bot.latency)}`\nCurrent uptime\n`{dyn_time_diff(utc(), bot.start_time)}`\nPublic IP address\n`{bot.ip}`"
             )
             emb.add_field(name="Misc info", value=misc_info)
-            emb.add_field(name="Code info", value=f"[`{byte_scale(size[0])}B, {size[1]} lines`]({bot.website})")
+            commands = set()
+            for command in bot.commands.values():
+                commands.update(command)
+            emb.add_field(name="Code info", value=f"Code size\n[`{byte_scale(size[0])}B, {size[1]} lines`]({bot.website})\nCommand count\n[`{len(commands)}`](https://github.com/thomas-xin/Miza/wiki/Commands)")
         else:
             emb.description = msg
         func = channel.send

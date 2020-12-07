@@ -2261,7 +2261,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return message
 
     # Sends a list of embeds to the target sendable, using a webhook when possible.
-    async def _send_embeds(self, sendable, embeds):
+    async def _send_embeds(self, sendable, embeds, reacts=None):
         s_id = verify_id(sendable)
         sendable = await self.fetch_messageable(s_id)
         async with ExceptionSender(sendable):
@@ -2283,9 +2283,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if single:
                 for emb in embeds:
                     async with delay(1 / 3):
-                        reacts = None
                         if type(emb) is not discord.Embed:
-                            reacts = emb.get("reacts")
                             emb = discord.Embed.from_dict(emb)
                         if reacts:
                             create_task(send_with_react(sendable, embed=emb, reacts=reacts))
@@ -2293,22 +2291,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             create_task(sendable.send(embed=emb))
                 return
             embs = deque()
-            reacts = discord.Embed.Empty
             for emb in embeds:
                 if type(emb) is not discord.Embed:
-                    embs.append(discord.Embed.from_dict(emb))
-                    r = emb.get("reacts")
-                    if reacts == discord.Embed.Empty:
-                        reacts = r
-                    if r == reacts:
-                        continue
-                else:
-                    embs.append(emb)
+                    emb = discord.Embed.from_dict(emb)
+                embs.append(emb)
                 reacts = None
             await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=best_url(m), reacts=reacts)
 
     # Adds embeds to the embed sender, waiting for the next update event.
-    def send_embeds(self, channel, embeds=None, embed=None):
+    def send_embeds(self, channel, embeds=None, embed=None, reacts=None):
         if embeds is not None and not issubclass(type(embeds), collections.abc.Collection):
             embeds = (embeds,)
         if embed is not None:
@@ -2321,12 +2312,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         c_id = verify_id(channel)
         user = self.cache.users.get(c_id)
         if user is not None:
-            create_task(self._send_embeds(user, embeds))
+            create_task(self._send_embeds(user, embeds, reacts))
+        elif reacts:
+            create_task(self._send_embeds(channel, embeds, reacts))
         else:
             embs = set_dict(self.embed_senders, c_id, [])
             embs.extend(embeds)
 
-    def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None):
+    def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None):
         if type(description) is discord.Embed:
             emb = description
             description = emb.description
@@ -2345,19 +2338,22 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 description = str(description)
         if not description and not fields and not thumbnail and not image and not images:
             return
-        return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour))
+        return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts))
     
-    async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None):
-        fin_col = None
+    async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None):
+        fin_col = col = None
         if colour is None:
             if author:
                 url = author.get("icon_url")
                 if url:
                     fin_col = await self.data.colours.get(url)
         if fin_col is None:
-            col = 0 if colour is None else colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
-            off = 128 if not issubclass(type(colour), collections.abc.Sequence) else colour[1]
-            fin_col = colour2raw(hue2colour(col))
+            if type(colour) is discord.Colour:
+                fin_col = colour
+            else:
+                col = 0 if colour is None else colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
+                off = 128 if not issubclass(type(colour), collections.abc.Sequence) else colour[1]
+                fin_col = colour2raw(hue2colour(col))
         embs = deque()
         emb = discord.Embed(colour=fin_col)
         if title:
@@ -2393,8 +2389,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     emb.description = md(curr.strip())
                     curr = para
                     embs.append(emb)
-                    col += 128
-                    emb = discord.Embed(colour=colour2raw(hue2colour(col)))
+                    emb = discord.Embed(colour=fin_col)
+                    if col is not None:
+                        col += 128
+                        emb.colour = colour2raw(hue2colour(col))
                 else:
                     curr += para
             if curr:
@@ -2404,7 +2402,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 fields = fields.items()
             for field in fields:
                 if issubclass(type(field), collections.abc.Mapping):
-                    field = tuple(field.items())
+                    field = tuple(field.values())
                 elif not issubclass(type(field), collections.abc.Sequence):
                     field = tuple(field)
                 n = lim_str(field[0], 256)
@@ -2412,8 +2410,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 i = True if len(field) < 3 else field[2]
                 if len(emb) + len(n) + len(v) > 6000 or len(emb.fields) > 24:
                     embs.append(emb)
-                    col += 128
-                    emb = discord.Embed(colour=colour2raw(hue2colour(col)))
+                    emb = discord.Embed(colour=fin_col)
+                    if col is not None:
+                        col += 128
+                        emb.colour = colour2raw(hue2colour(col))
                 emb.add_field(name=n, value=v if v else "\u200b", inline=i)
         if len(emb):
             embs.append(emb)
@@ -2433,11 +2433,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     create_task(channel.send(escape_everyone(img)))
                 else:
                     if i >= len(embs):
-                        col += 128
-                        embs.append(discord.Embed(colour=colour2raw(hue2colour(col))))
+                        emb = discord.Embed(colour=fin_col)
+                        if col is not None:
+                            col += 128
+                            emb.colour = colour2raw(hue2colour(col))
+                        embs.append(emb)
                     embs[i].set_image(url=img)
                     embs[i].url = img
-        return self.send_embeds(channel, embeds=embs)
+        return self.send_embeds(channel, embeds=embs, reacts=reacts)
 
     # Updates all embed senders.
     def update_embeds(self):
