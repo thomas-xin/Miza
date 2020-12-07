@@ -1400,6 +1400,7 @@ def evalImg(url, operation, args):
                 first = next(it)
 
                 def frameit():
+                    yield first
                     with suppress(StopIteration):
                         while True:
                             yield next(it)
