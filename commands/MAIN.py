@@ -59,7 +59,7 @@ class Help(Command):
                 colour = discord.Colour(help_colours[a])
             elif a in bot.commands:
                 coms = bot.commands[a]
-                colour = discord.Colour(help_colours[a.catg])
+                colour = discord.Colour(help_colours[coms[-1].catg])
             else:
                 continue
             for com in coms:
