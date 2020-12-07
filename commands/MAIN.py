@@ -20,6 +20,19 @@ except:
 default_commands = frozenset(("main", "string", "admin"))
 standard_commands = default_commands.union(("voice", "image", "fun"))
 
+help_colours = fcdict({
+    None: 0xfffffe,
+    "main": 0xff0000,
+    "string": 0x00ff00,
+    "admin": 0x0000ff,
+    "voice": 0xff00ff,
+    "image": 0xffff00,
+    "fun": 0x00ffff,
+    "owner": 0xbf7fff,
+    "nsfw": 0xff9f9f,
+    "misc": 0x007f00,
+})
+
 
 class Help(Command):
     name = ["❓", "❔", "?"]
@@ -33,8 +46,7 @@ class Help(Command):
         g_id = guild.id
         prefix = bot.get_prefix(g_id)
         v = "v" in flags
-        colour = await self.bot.get_colour(user)
-        emb = discord.Embed(colour=colour)
+        emb = discord.Embed()
         emb.set_author(name="❓ Help ❓")
         found = {}
         # Get help on categories, then commands
@@ -42,8 +54,10 @@ class Help(Command):
             a = a.casefold()
             if a in bot.categories:
                 coms = bot.categories[a]
+                emb.colour = discord.Colour(help_colours[a])
             elif a in bot.commands:
                 coms = bot.commands[a]
+                emb.colour = discord.Colour(help_colours[a.catg])
             else:
                 continue
             for com in coms:
@@ -75,6 +89,7 @@ class Help(Command):
                 i += 1
         else:
             # Display main help page in an embed
+            emb.colour = discord.Colour(help_colours[None])
             emb.description = (
                 "Please enter a command category to display usable commands,\nor see "
                 + "[Commands](https://github.com/thomas-xin/Miza/wiki/Commands) for full command list."

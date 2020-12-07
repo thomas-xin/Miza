@@ -2351,7 +2351,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         fin_col = None
         if colour is None:
             if author:
-                fin_col = await self.data.colours.get(author["icon_url"])
+                url = author.get("icon_url")
+                if url:
+                    fin_col = await self.data.colours.get(url)
         if fin_col is None:
             col = 0 if colour is None else colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
             off = 128 if not issubclass(type(colour), collections.abc.Sequence) else colour[1]
