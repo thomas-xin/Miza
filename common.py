@@ -422,10 +422,6 @@ class FileHashDict(collections.abc.MutableMapping):
     __ne__ = lambda self, other: self.data != other
 
     def key_path(self, k):
-        try:
-            k = int(k)
-        except:
-            pass
         return f"{self.path}/{k}"
 
     @property
@@ -545,12 +541,12 @@ class FileHashDict(collections.abc.MutableMapping):
         self.modified.clear()
         for k in modified:
             fn = self.key_path(k)
+            try:
+                d = self.data[k]
+            except KeyError:
+                self.deleted.add(k)
+                continue
             with self.sem:
-                try:
-                    d = self.data[k]
-                except KeyError:
-                    self.deleted.add(k)
-                    continue
                 with open(fn, "wb") as f:
                     f.write(select_and_dumps(d, mode="unsafe"))
         deleted = frozenset(self.deleted)
@@ -562,7 +558,7 @@ class FileHashDict(collections.abc.MutableMapping):
                 os.remove(self.key_path(k))
         while len(self.data) > 1048576:
             self.data.pop(next(iter(self.data)), None)
-        return modified
+        return modified.union(deleted)
 
 
 # Decodes HTML encoded characters in a string.
