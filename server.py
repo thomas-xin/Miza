@@ -29,7 +29,7 @@ def find_file(path):
     # do not include "." in the path name
     path = path.rsplit(".", 1)[0]
     fn = f"{IND}{path}"
-    for file in os.listdir("cache"):
+    for file in reversed(os.listdir("cache")):
         # file cache is stored as "{timestamp}~{name}", search for file via timestamp
         if file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
             out = "cache/" + file

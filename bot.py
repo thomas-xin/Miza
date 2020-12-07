@@ -3276,8 +3276,8 @@ def update_file_cache(files=None):
 def as_file(file, filename=None, ext=None, rename=True):
     if rename:
         fn = round(ts_us())
-        for file in os.listdir("cache"):
-            if file.startswith(f"{IND}{fn}"):
+        for fi in os.listdir("cache"):
+            if fi.startswith(f"{IND}{fn}~"):
                 fn += 1
         out = str(fn)
     if issubclass(type(file), bytes):
@@ -3286,7 +3286,7 @@ def as_file(file, filename=None, ext=None, rename=True):
     elif rename:
         while True:
             with suppress(PermissionError):
-                os.rename(file, f"cache/{IND}{out}")
+                os.rename(file, f"cache/{IND}{out}~{filename.translate(filetrans)}")
                 break
             time.sleep(0.1)
     else:
