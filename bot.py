@@ -2498,6 +2498,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     self.net_bytes.append(net_bytes)
                     self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes)
                     self.total_bytes = self.net_bytes[-1] + self.start_bytes
+                    self.api_latency = requests.get("https://discord.com/api/v8").elapsed.total_seconds()
 
     # The lazy update loop that runs once every 2-4 seconds.
     async def lazy_loop(self):
