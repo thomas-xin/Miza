@@ -1848,7 +1848,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 create_task(self.garbage_collect(u))
 
     # Processes a message, runs all necessary commands and bot events. May be called from another source.
-    async def process_message(self, message, msg, edit=True, orig=None, cb_argv=None, loop=False):
+    async def process_message(self, message, msg, edit=True, orig=None, loop=False):
         if self.closed:
             return
         cpy = msg
@@ -1974,10 +1974,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                     else:
                                         raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
                             flags = {}
-                            if cb_argv is not None:
-                                argv = cb_argv
-                                if loop:
-                                    inc_dict(flags, h=1)
+                            if loop:
+                                inc_dict(flags, h=1)
                             if argv:
                                 # Commands by default always parse unicode fonts as regular text unless otherwise specified.
                                 if not hasattr(command, "no_parse"):
@@ -2098,7 +2096,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 channel=channel,                # channel data
                                 guild=guild,                    # guild data
                                 name=command_check,             # alias the command was called as
-                                callback=self.process_message,  # function that called the command
                                 _timeout=timeout,               # timeout delay assigned to the command
                                 timeout=timeout,                # timeout delay for the whole function
                             )

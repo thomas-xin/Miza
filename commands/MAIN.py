@@ -281,7 +281,7 @@ class Loop(Command):
     usage = "<0:iterations> <1:command>"
     rate_limit = (3, 7)
 
-    async def __call__(self, args, argv, message, channel, callback, bot, perm, user, guild, **void):
+    async def __call__(self, args, argv, message, channel, bot, perm, user, guild, **void):
         if not args:
             # Ah yes, I made this error specifically for people trying to use this command to loop songs 🙃
             raise ArgumentError("Please input loop iterations and target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioSettings command.")
@@ -315,17 +315,19 @@ class Loop(Command):
                     (str(bot.id) + ">" + n).upper() in func.replace(" ", "").upper()
                 ):
                     raise PermissionError("Must be owner to execute nested loop.")
-        func2 = " ".join(func2.split(" ", 1)[1:])
+        func2 = func2.split(None, 1)[-1]
         create_task(send_with_react(
             channel,
             italics(css_md(f"Looping {sqr_md(func)} {iters} time{'s' if iters != 1 else ''}...")),
             reacts=["❎"],
         ))
+        fake_message = copy.copy(message)
+        fake_message.content = func2
         for i in range(iters):
             loop = i < iters - 1
             t = utc()
             # Calls process_message with the argument containing the looped command.
-            delay = await callback(message, func, cb_argv=func2, loop=loop)
+            delay = await bot.process_message(fake_message, func, loop=loop)
             # Must abide by command rate limit rules
             delay = delay + t - utc()
             if delay > 0:
