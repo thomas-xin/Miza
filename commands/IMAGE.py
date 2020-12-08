@@ -87,7 +87,7 @@ class IMG(Command):
                 reason = "to change image list for " + guild.name
                 raise self.perm_error(perm, req, reason)
             if "a" in flags or "e" in flags:
-                lim = 64 << bot.is_trusted(guild.id) * 2 + 1
+                lim = 256 << bot.is_trusted(guild.id) * 2 + 1
                 if len(images) > lim:
                     raise OverflowError(f"Image list for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
                 key = " ".join(args[:-1]).casefold()
@@ -1242,7 +1242,7 @@ class ImagePool:
 
 
 class Cat(ImagePool, Command):
-    description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it."
+    description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it. Be sure to check out ⟨WEBSERVER⟩/cats"
     database = "cats"
     name = ["🐱", "Meow"]
 
@@ -1263,12 +1263,12 @@ class Cat(ImagePool, Command):
             d = eval_json(resp)
             if type(d) is list:
                 d = choice(d)
-            url = d["file" if x == 1 else "url"]
+            url = d["file" if x == 1 and alexflipnote_key else "url"]
         return url
 
 
 class Dog(ImagePool, Command):
-    description = "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it."
+    description = "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it. Be sure to check out ⟨WEBSERVER⟩/dogs"
     database = "dogs"
     name = ["🐶", "Woof"]
 
@@ -1289,7 +1289,7 @@ class Dog(ImagePool, Command):
             d = eval_json(resp)
             if type(d) is list:
                 d = choice(d)
-            url = d["file" if x == 1 else "message"]
+            url = d["file" if x == 1 and alexflipnote_key else "message"]
             if "\\" in url:
                 url = url.replace("\\/", "/").replace("\\", "/")
             while "///" in url:

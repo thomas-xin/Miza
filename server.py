@@ -1,4 +1,5 @@
-import os, sys, flask, requests, datetime, pytz, traceback
+from common import *
+import flask
 from flask import Flask
 from werkzeug.exceptions import HTTPException
 
@@ -53,6 +54,39 @@ def get_file_ex(path, filename):
         return flask.redirect("https://http.cat/204")
     except FileNotFoundError:
         return flask.redirect("https://http.cat/404")
+
+cat_t = utc()
+def get_cats():
+    global cats
+    with open("saves/imagepools/cats", "rb") as f:
+        s = f.read()
+    cats = select_and_loads(s)
+    return cats
+cats = get_cats()
+
+@app.route("/cats", methods=["GET"])
+def cat():
+    global cats, cat_t
+    if utc() - cat_t > 300:
+        cat_t = utc()
+        create_future_ex(get_cats)
+    return flask.redirect(choice(cats))
+
+dog_t = utc()
+def get_dogs():
+    global dogs
+    with open("saves/imagepools/dogs", "rb") as f:
+        s = f.read()
+    dogs = select_and_loads(s)
+    return dogs
+dogs = get_dogs()
+
+@app.route("/dogs", methods=["GET"])
+def dog():
+    global dogs, dog_t
+    if utc() - dog_t > 300:
+        create_future_ex(get_dogs)
+    return flask.redirect(choice(dogs))
 
 @app.route("/", methods=["GET", "POST"])
 def home():

@@ -534,7 +534,7 @@ class Char2Emoj(Command):
 
 class Time(Command):
     name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T"]
-    description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user."
+    description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user. Use ⟨WEBSERVER⟩/timezone to find your current time!"
     usage = "<offset_hours[0]> | <user[]>"
 
     async def __call__(self, name, channel, guild, argv, args, user, **void):
@@ -589,7 +589,7 @@ class Time(Command):
 
 
 class Timezone(Command):
-    description = "Shows the current time in a certain timezone."
+    description = "Shows the current time in a certain timezone. Use ⟨WEBSERVER⟩/timezone to find your current time!"
     usage = "<timezone> <list(?l)>"
 
     async def __call__(self, channel, argv, **void):

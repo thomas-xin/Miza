@@ -76,7 +76,7 @@ class Help(Command):
                     if not a:
                         a = "[none]"
                     s = f"```ini\n[Aliases] {a}"
-                    s += f"\n[Effect] {com.description.replace('⟨MIZA⟩', bot.user.name)}"
+                    s += f"\n[Effect] {com.description.replace('⟨MIZA⟩', bot.user.name).replace('⟨WEBSERVER⟩', f'http://{bot.ip}/9801')}"
                     if v or len(found) <= 1:
                         s += f"\n[Usage] {prefix}{com.__name__} {com.usage}\n[Level] {com.min_display}"
                     s += "```"
@@ -1361,7 +1361,7 @@ class UpdateUrgentReminders(Database):
                         break
                     with suppress(StopIteration):
                         listed.popleft()
-                        self.update()
+                        self.update("listed")
                         c_id = p[1]
                         m_id = p[2]
                         emb = p[3]
@@ -1381,7 +1381,7 @@ class UpdateUrgentReminders(Database):
                         await message.add_reaction("✅")
                         p[2] = message.id
                         listed.insort(p, key=lambda x: x)
-                        self.update()
+                        self.update("listed")
             await asyncio.sleep(1)
 
 

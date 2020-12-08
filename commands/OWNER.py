@@ -86,6 +86,8 @@ class Restart(Command):
                         await fut
                 await save
         with suppress():
+            bot.server.kill()
+        with suppress():
             await client.close()
         if name.casefold() == "shutdown":
             touch(bot.shutdown)
