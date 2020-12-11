@@ -2323,7 +2323,7 @@ class UpdateUsers(Database):
                             return
                         if not user.bot:
                             break
-            send = message.channel.send
+            send = lambda *args, **kwargs: send_with_reply(message.channel, message, *args, **kwargs)
             out = None
             count = self.data.get(user.id, EMPTY).get("last_talk", 0)
             # Simulates a randomized conversation
