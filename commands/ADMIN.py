@@ -1593,7 +1593,7 @@ class UpdateMessageLogs(Database):
                 init = "[UNKNOWN USER]"
             emb = discord.Embed(colour=colour2raw(255, 0, 0))
             emb.set_author(name=name_id, icon_url=url, url=url)
-            emb.description = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{after.channel.id}/{after.id}\n"
+            emb.description = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
             emb.description += message_repr(message, limit=2048 - len(emb.description))
             self.bot.send_embeds(channel, emb)
 

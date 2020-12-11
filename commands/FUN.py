@@ -1240,7 +1240,7 @@ class UpdateMimics(Database):
             if admin or "fun" in enabled:
                 database = self.data[user.id]
                 msg = message.content
-                async with ExceptionSender(message.channel, Exception):
+                async with ExceptionSender(message.channel, Exception, reference=message):
                     # Stack multiple messages to send, may be separated by newlines
                     sending = alist()
                     channel = message.channel

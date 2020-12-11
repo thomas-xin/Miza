@@ -3960,7 +3960,7 @@ class Download(Command):
         emb = discord.Embed(colour=rand_colour())
         emb.set_author(**get_author(user))
         emb.description = "\n".join((f"`【{i}】` [{escape_markdown(e['name'])}]({ensure_url(e['url'])})" for i in range(len(res)) for e in [res[i]]))
-        sent = await channel.send(msg, embed=emb)
+        sent = await send_with_reply(msg, message, embed=emb)
         if direct:
             # Automatically proceed to download and convert immediately
             create_task(self._callback_(

@@ -1788,7 +1788,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             self.react_sem[message.id] = max(utc(), self.react_sem.get(message.id, 0) + 1)
             for f in catg:
                 if f.__name__.casefold() == func:
-                    async with ExceptionSender(message.channel, message.id):
+                    async with ExceptionSender(message.channel, reference=message):
                         timeout = getattr(f, "_timeout_", 1) * self.timeout
                         if timeout >= inf:
                             timeout = None
@@ -2162,7 +2162,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             if fut is not None:
                                 await fut
                             command.used.pop(u_id, None)
-                            create_task(send_exception(channel, ex, message.id))
+                            create_task(send_exception(channel, ex, message))
                             return
                         # Represents all other errors
                         except Exception as ex:
@@ -2170,7 +2170,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 await fut
                             command.used.pop(u_id, None)
                             print_exc()
-                            create_task(send_exception(channel, ex, message.id))
+                            create_task(send_exception(channel, ex, message))
         # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
         if not run and u_id != bot.id:
             temp = to_alphanumeric(cpy).casefold()
@@ -2564,7 +2564,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     # Handles a new sent message, calls process_message and sends an error if an exception occurs.
     async def handle_message(self, message, edit=True):
         cpy = msg = message.content
-        async with ExceptionSender(message.channel, message.id):
+        async with ExceptionSender(message.channel, reference=message):
             if msg and msg[0] == "\\":
                 cpy = msg[1:]
             await self.process_message(message, cpy, edit, msg)

@@ -2332,7 +2332,7 @@ class UpdateUsers(Database):
             if "?" in msg and "ask" in bot.commands and random.random() > math.atan(count / 16) / 4:
                 argv = self.mentionspam.sub("", msg).strip()
                 for ask in bot.commands.ask:
-                    await ask(message.channel, user, argv)
+                    await ask(message, message.channel, user, argv)
                 return
             if count:
                 if count < 2 or count == 2 and xrand(2):

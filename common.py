@@ -160,7 +160,7 @@ send_exception = lambda sendable, ex, reference=None: send_with_react(sendable, 
 # A context manager that sends exception tracebacks to a sendable.
 class ExceptionSender(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
-    def __init__(self, sendable, reference=None, *args, **kwargs):
+    def __init__(self, sendable, *args, reference=None, **kwargs):
         self.sendable = sendable
         self.reference = reference
         self.exceptions = args + tuple(kwargs.values())
@@ -715,20 +715,20 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None):
     body = json.dumps(data)
     exc = RuntimeError
     for i in range(xrand(12, 17)):
-        async with delay(1):
-            try:
-                async with sem:
-                    resp = await Request.aio_call(
-                        f"https://discord.com/api/v8/channels/{channel.id}/messages",
-                        method="post",
-                        data=body,
-                        headers={"Content-Type": "application/json", "authorization": f"Bot {channel._state.http.token}"},
-                        files=None,
-                        decode=False
-                    )
-                return discord.Message(state=channel._state, channel=channel, data=eval_json(resp))
-            except Exception as ex:
-                exc = ex
+        try:
+            async with sem:
+                resp = await Request.aio_call(
+                    f"https://discord.com/api/v8/channels/{channel.id}/messages",
+                    method="post",
+                    data=body,
+                    headers={"Content-Type": "application/json", "authorization": f"Bot {channel._state.http.token}"},
+                    files=None,
+                    decode=False
+                )
+            return discord.Message(state=channel._state, channel=channel, data=eval_json(resp))
+        except Exception as ex:
+            exc = ex
+        await asyncio.sleep(i + 1)
     raise exc
 
 # Sends a message to a channel, then adds reactions accordingly.
