@@ -2306,23 +2306,13 @@ class UpdateUsers(Database):
         user = message.author
         if force or bot.is_mentioned(message, bot, message.guild):
             if user.bot:
-                c_id = message.channel.id
-                for i, m in enumerate(reversed(self.bot.cache.messages.values())):
-                    if i >= 1024:
+                history = await self.bot.data.channel_cache.get(message.channel)
+                for m in history:
+                    user = m.author
+                    if bot.get_perms(user.id, message.guild) <= -inf:
+                        return
+                    if not user.bot:
                         break
-                    if m.channel and m.channel.id == c_id:
-                        user = m.author
-                        if bot.get_perms(user.id, message.guild) <= -inf:
-                            return
-                        if not user.bot:
-                            break
-                if user.bot:
-                    async for m in message.channel.history(limit=None):
-                        user = m.author
-                        if bot.get_perms(user.id, message.guild) <= -inf:
-                            return
-                        if not user.bot:
-                            break
             send = lambda *args, **kwargs: send_with_reply(message.channel, not flags and message, *args, **kwargs)
             out = None
             count = self.data.get(user.id, EMPTY).get("last_talk", 0)
