@@ -704,6 +704,8 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None):
         sem = REPLY_SEM[channel.id]
     except KeyError:
         sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
+    if not reference:
+        return await channel.send(content, embed=embed, tts=tts)
     data = dict(
         content=content,
         message_reference=dict(message_id=str(verify_id(reference))),

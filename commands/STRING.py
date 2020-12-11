@@ -692,10 +692,11 @@ class Match(Command):
 class Ask(Command):
     description = "Ask me any question, and I'll answer it!"
     usage = "<string>"
+    flags = "h"
     no_parse = True
     rate_limit = (0.5, 1)
 
-    async def __call__(self, message, channel, user, argv, **void):
+    async def __call__(self, message, channel, user, argv, flags=(), **void):
         bot = self.bot
         guild = getattr(channel, "guild", None)
         q = single_space(full_prune(argv)).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
@@ -718,7 +719,7 @@ class Ask(Command):
         elif q == "where":
             out = "Here, dummy!"
         elif q[:3] == "how" and not q[3:4].isalpha():
-            await send_with_reply(channel, message, "https://imgur.com/gallery/8cfRt")
+            await send_with_reply(channel, "h" not in flags and message, "https://imgur.com/gallery/8cfRt")
             return
         elif (q.startswith("what's ") or q.startswith("whats ") or q.startswith("what is ")) and is_numeric(q):
             q = q[5:]
@@ -731,7 +732,7 @@ class Ask(Command):
                 for _math in bot.commands.math:
                     answer = await _math(bot, q, "ask", channel, guild, {}, user)
                     if answer:
-                        await send_with_reply(channel, message, answer)
+                        await send_with_reply(channel, "h" not in flags and message, answer)
                 return
             else:
                 if bot.in_cache(num) and "info" in bot.commands:
@@ -754,7 +755,7 @@ class Ask(Command):
             answers = ("Ay, I'm busy, ask me later!", "¯\_(ツ)_/¯", "Hm, I dunno, have you tried asking Google?")
             if bots:
                 answers += (f"🥱 I'm tired... go ask {user_mention(choice(bots).id)}...",)
-            await send_with_reply(channel, message, choice(answers))
+            await send_with_reply(channel, "h" not in flags and message, choice(answers))
             return
         elif q.startswith("why "):
             out = alist(
@@ -795,7 +796,7 @@ class Ask(Command):
         q = " ".join(res.replace("you", "I").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
         if "dailies" in bot.data:
             bot.data.dailies.progress_quests(user, "talk")
-        await send_with_reply(channel, message, escape_everyone(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\uf000", "")))
+        await send_with_reply(channel, "h" not in flags and message, escape_everyone(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\uf000", "")))
 
 
 class UrbanDictionary(Command):

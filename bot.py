@@ -2131,13 +2131,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                         if "file" in response:
                                             sent = await self.send_with_file(channel, response.get("content", ""), **response)
                                         else:
-                                            sent = await send_with_reply(channel, message, **response)
+                                            sent = await send_with_react(channel, reference=not loop and message, **response)
                                     else:
                                         if type(response) not in (str, bytes, bytearray):
                                             response = str(response)
                                         # Process everything else as a string
                                         if type(response) is str and len(response) <= 2000:
-                                            sent = await send_with_reply(channel, message, response)
+                                            sent = await send_with_react(channel, response, reference=not loop and message)
                                             # sent = await channel.send(response)
                                         else:
                                             # Send a file if the message is too long

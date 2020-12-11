@@ -2048,8 +2048,8 @@ class UpdateUsers(Database):
         exec(
             f"class {self.bot.name.replace(' ', '')}(Command):"
             +"\n\tno_parse = True"
-            +"\n\tasync def __call__(self, message, argv, **void):"
-            +"\n\t\tawait self.bot.data.users._nocommand_(message, self.bot.user.mention + ' ' + argv, force=True)",
+            +"\n\tasync def __call__(self, message, argv, flags, **void):"
+            +"\n\t\tawait self.bot.data.users._nocommand_(message, self.bot.user.mention + ' ' + argv, flags=flags, force=True)",
             data,
         )
         mod = __name__
@@ -2301,7 +2301,7 @@ class UpdateUsers(Database):
         set_dict(self.data, user.id, {})["last_typing"] = utc()
         self.update(user.id)
 
-    async def _nocommand_(self, message, msg, force=False, **void):
+    async def _nocommand_(self, message, msg, force=False, flags=(), **void):
         bot = self.bot
         user = message.author
         if force or bot.is_mentioned(message, bot, message.guild):
@@ -2323,7 +2323,7 @@ class UpdateUsers(Database):
                             return
                         if not user.bot:
                             break
-            send = lambda *args, **kwargs: send_with_reply(message.channel, message, *args, **kwargs)
+            send = lambda *args, **kwargs: send_with_reply(message.channel, not flags and message, *args, **kwargs)
             out = None
             count = self.data.get(user.id, EMPTY).get("last_talk", 0)
             # Simulates a randomized conversation
@@ -2332,7 +2332,7 @@ class UpdateUsers(Database):
             if "?" in msg and "ask" in bot.commands and random.random() > math.atan(count / 16) / 4:
                 argv = self.mentionspam.sub("", msg).strip()
                 for ask in bot.commands.ask:
-                    await ask(message, message.channel, user, argv)
+                    await ask(message, message.channel, user, argv, flags=flags)
                 return
             if count:
                 if count < 2 or count == 2 and xrand(2):
@@ -2395,7 +2395,7 @@ class UpdateUsers(Database):
                     out = f"Yo, what's good, {user.display_name}? Need me for anything?"
                 prefix = bot.get_prefix(message.guild)
                 out += f" Use `{prefix}?` or `{prefix}help` for help!"
-                send = lambda *args, **kwargs: send_with_react(message.channel, *args, **kwargs, reacts="❎", reference=message)
+                send = lambda *args, **kwargs: send_with_react(message.channel, *args, reacts="❎", reference=not flags and message, **kwargs)
             add_dict(self.data, {user.id: {"last_talk": 1, "last_mention": 1}})
             self.data[user.id]["last_used"] = utc()
             await send(out)
