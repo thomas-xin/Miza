@@ -2027,7 +2027,7 @@ EMPTY = {}
 # This database takes up a lot of space, storing so many events from users
 class UpdateUsers(Database):
     name = "users"
-    user = True
+    no_delete = True
     hours = 168
     interval = 900
     scale = 3600 // interval
@@ -2070,7 +2070,7 @@ class UpdateUsers(Database):
     def send_event(self, u_id, event, count=1):
         # print(self.bot.cache.users.get(u_id), event, count)
         data = set_dict(set_dict(self.data, u_id, {}), "recent", {})
-        hour = round_min(round(utc() // self.interval) / self.scale)
+        hour = round_min(int(utc() // self.interval) / self.scale)
         if data:
             self.clear_events(data, hour - self.hours)
         try:
@@ -2087,8 +2087,8 @@ class UpdateUsers(Database):
     def get_events(self, u_id, interval=3600, event=None):
         data = self.data.get(u_id, EMPTY).get("recent")
         if not data:
-            return list(repeat(0, round(self.hours / self.interval * interval)))
-        hour = round_min(round(utc() // self.interval) / self.scale)
+            return list(repeat(0, int(self.hours / self.interval * interval)))
+        hour = round_min(int(utc() // self.interval) / self.scale)
         self.clear_events(data, hour - self.hours)
         start = hour - self.hours
         if event is None:

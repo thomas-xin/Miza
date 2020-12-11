@@ -21,12 +21,12 @@ class Reload(Command):
             mod = " " + mod
         await message.add_reaction("❗")
         if name == "unload":
-            await send_with_reply(channel, f"Unloading{mod}...", reference=message)
+            await send_with_reply(channel, content=f"Unloading{mod}...", reference=message)
             succ = await create_future(bot.unload, _mod, priority=True)
             if succ:
                 return f"Successfully unloaded{mod}."
             return f"Error unloading{mod}. Please see log for more info."
-        await send_with_reply(channel, f"Reloading{mod}...", reference=message)
+        await send_with_reply(channel, content=f"Reloading{mod}...", reference=message)
         succ = await create_future(bot.reload, _mod, priority=True)
         if succ:
             return f"Successfully reloaded{mod}."
@@ -49,7 +49,7 @@ class Restart(Command):
             if "in" in argv:
                 argv = argv[argv.rindex("in") + 2:]
             wait = await bot.eval_time(argv)
-            await send_with_reply(channel, "*Preparing to " + name + " in " + sec2time(wait) + "...*", reference=message)
+            await send_with_reply(channel, content="*Preparing to " + name + " in " + sec2time(wait) + "...*", reference=message)
             emb = discord.Embed(colour=discord.Colour(1))
             emb.set_author(name=str(bot.user), url=bot.website, icon_url=best_url(bot.user))
             emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(wait)}, apologies for any inconvenience..."
@@ -58,9 +58,9 @@ class Restart(Command):
             if wait > 0:
                 await asyncio.sleep(wait)
         elif name == "shutdown":
-            await send_with_reply(channel, "Shutting down... :wave:", reference=message)
+            await send_with_reply(channel, content="Shutting down... :wave:", reference=message)
         else:
-            await send_with_reply(channel, "Restarting... :wave:", reference=message)
+            await send_with_reply(channel, content="Restarting... :wave:", reference=message)
         with suppress(AttributeError):
             PRINT.close()
         if save is None:
