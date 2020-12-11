@@ -311,7 +311,7 @@ class UpdateExec(Database):
                             elif len(output) > 1993:
                                 bot.send_as_embeds(channel, output, md=code_md)
                             else:
-                                await channel.send(self.prepare_string(output, fmt=""))
+                                await send_with_reply(channel, message, self.prepare_string(output, fmt=""))
                         except:
                             await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎", reference=message)
         # Relay DM messages

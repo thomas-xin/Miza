@@ -2109,7 +2109,7 @@ class UpdateUsers(Database):
         data = self.data.get(u_id, EMPTY).get("recent")
         if not data:
             return 0
-        hour = round_min(round(utc() // self.interval) / self.scale)
+        hour = round_min(int(utc() // self.interval) / self.scale)
         self.clear_events(data, hour - self.hours)
         start = hour - self.hours
         out = [sum(data.get(i / self.scale + start, EMPTY).values()) for i in range(self.hours * self.scale)]
