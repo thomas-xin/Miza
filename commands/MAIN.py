@@ -1155,7 +1155,7 @@ class Profile(Command):
 
 class Activity(Command):
     name = ["Recent", "Log"]
-    description = "Shows recent Discord activity for the targeted user."
+    description = "Shows recent Discord activity for the targeted user, server, or channel."
     usage = "<user> <verbose(?v)>"
     flags="v"
     rate_limit = (2, 9)
@@ -1163,8 +1163,11 @@ class Activity(Command):
 
     async def __call__(self, guild, user, argv, flags, channel, bot, _timeout, **void):
         if argv:
-            try:
+            user = None
+            with suppress():
                 user = bot.cache.guilds[int(argv)]
+            try:
+                user = bot.cache.channels[int(argv)]
             except:
                 user = await bot.fetch_user_member(argv, guild)
         data = await create_future(bot.data.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
