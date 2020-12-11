@@ -40,7 +40,7 @@ class Help(Command):
     usage = "<command{all}> <category{all}> <verbose(?v)>"
     flags = "v"
 
-    async def __call__(self, args, user, channel, guild, flags, perm, **void):
+    async def __call__(self, args, user, channel, guild, message, flags, perm, **void):
         bot = self.bot
         enabled = bot.data.enabled
         g_id = guild.id
@@ -95,10 +95,7 @@ class Help(Command):
             if bot.categories:
                 s = bold(ini_md(' '.join((sqr_md(c) for c in help_colours if c in bot.categories))))
                 fields.append(dict(name="Command category list", value=s))
-        bot.send_as_embeds(channel, description, author=author, fields=fields, colour=colour, reacts="❎")
-        # emb = emb.to_dict()
-        # emb["reacts"] = "❎"
-        # bot.send_embeds(channel, embed=emb)
+        bot.send_as_embeds(channel, description, author=author, fields=fields, colour=colour, reacts="❎", reference=message)
 
 
 class Hello(Command):
@@ -320,6 +317,7 @@ class Loop(Command):
             channel,
             italics(css_md(f"Looping {sqr_md(func)} {iters} time{'s' if iters != 1 else ''}...")),
             reacts=["❎"],
+            reference=message,
         ))
         fake_message = copy.copy(message)
         fake_message.content = func2
@@ -463,12 +461,8 @@ class Info(Command):
             d += code_md(g.description)
         emb.description = d
         top = None
-        try:
-            g.region
-            if not hasattr(g, "ghost"):
-                pcount = await bot.data.counts.getUserMessages(None, g)
-        except (AttributeError, KeyError):
-            pcount = 0
+        if not hasattr(g, "ghost"):
+            pcount = await bot.data.counts.getUserMessages(None, g)
         if not hasattr(g, "ghost"):
             with suppress(AttributeError, KeyError):
                 # Top users by message counts
@@ -739,28 +733,9 @@ class Info(Command):
                         old = snowflake_time(old)
                     if "v" in flags:
                         with suppress(LookupError):
-                            if is_self:
-                                raise LookupError
-                                # Count total commands used by all users
-                                c = {}
-                                for i, v in enumerate(tuple(bot.data.users.values()), 1):
-                                    with suppress(KeyError):
-                                        add_dict(c, v["commands"])
-                                    if not i & 8191:
-                                        await asyncio.sleep(0.2)
-                            else:
-                                c = bot.data.users[u.id]["commands"]
-                            coms = iter_sum(c)
-                            if type(c) is dict:
-                                with suppress(IndexError):
-                                    comfreq = deque(sort(c, reverse=True).keys())
-                                    while fav is None:
-                                        fav = comfreq.popleft()
-                        with suppress(LookupError):
                             if not hasattr(guild, "ghost"):
                                 gmsg = bot.data.counts.getUserGlobalMessageCount(u)
                                 msgs = await bot.data.counts.getUserMessages(u, guild)
-                                avgs = await bot.data.counts.getUserAverage(u, guild)
                     with suppress(LookupError):
                         if not hasattr(guild, "ghost"):
                             us = await bot.data.counts.getGuildMessages(guild)
@@ -811,23 +786,296 @@ class Info(Command):
                         emb.add_field(name="Estimated timezone", value=str(zone), inline=1)
                     if seen:
                         emb.add_field(name="Last seen", value=str(seen), inline=1)
-                    if coms:
-                        emb.add_field(name="Commands used", value=str(coms), inline=1)
-                    if fav:
-                        emb.add_field(name="Favourite command", value=str(fav), inline=1)
                     if dname:
                         emb.add_field(name="Nickname", value=dname, inline=1)
-                    if gmsg:
-                        emb.add_field(name="Global post count", value=str(gmsg), inline=1)
                     if msgs:
                         emb.add_field(name="Post count", value=str(msgs), inline=1)
-                    if avgs:
-                        emb.add_field(name="Average post length", value=str(round(avgs, 9)), inline=1)
                     if pos:
                         emb.add_field(name="Server rank", value=str(pos), inline=1)
                     if role:
                         emb.add_field(name=f"Roles ({len(rolelist)})", value=role, inline=0)
                     embs.add(emb)
+        bot.send_embeds(channel, embeds=embs)
+
+
+class Insights(Command):
+    name = ["📊", "UserInsights", "ServerInsights"]
+    description = "Shows statistics relevant to the target user or server."
+    usage = "<*objects>"
+    rate_limit = 1
+    multi = True
+
+    async def getGuildData(self, g, flags={}):
+        bot = self.bot
+        url = to_png(g.icon_url)
+        name = g.name
+        try:
+            u = g.owner
+        except (AttributeError, KeyError):
+            u = None
+        colour = await self.bot.data.colours.get(to_png_ex(g.icon_url))
+        emb = discord.Embed(colour=colour)
+        emb.set_thumbnail(url=url)
+        emb.set_author(name=name, icon_url=url, url=url)
+        if u is not None:
+            d = user_mention(u.id)
+        else:
+            d = ""
+        if g.description:
+            d += code_md(g.description)
+        emb.description = d
+        pcount = actv = topc = top = None
+        if not hasattr(g, "ghost"):
+            pcount = await bot.data.counts.getUserMessages(None, g)
+            pavg = await bot.data.counts.getUserAverage(None, g)
+            ptotal = await bot.data.counts.getUserTotal(None, g)
+            pword = await bot.data.counts.getUserWords(None, g)
+            activity = await create_future(bot.data.users.get_events, g.id, interval=3600)
+            actv = int(np.sum(activity))
+            actc = cdict()
+            for c in guild.text_channels:
+                a = await create_future(bot.data.users.get_events, c.id, interval=3600)
+                actc[c.id] = int(np.sum(a))
+            m = max(actc.values())
+            mag = (c for c, v in actc.values() if v >= m)
+            topc = f"<#{next(mag)}>"
+            with suppress(AttributeError, KeyError):
+                # Top users by message counts
+                users = deque()
+                us = await bot.data.counts.getGuildMessages(g)
+                if type(us) is str:
+                    top = us
+                else:
+                    ul = sorted(
+                        us,
+                        key=lambda k: us[k],
+                        reverse=True,
+                    )
+                    for i in range(min(32, flags.get("v", 0) * 5 + 10, len(us))):
+                        u_id = ul[i]
+                        users.append(f"{user_mention(u_id)}: {us[u_id]}")
+                    top = "\n".join(users)
+        emb.add_field(name="Server ID", value=str(g.id), inline=0)
+        emb.add_field(name="Creation time", value=str(g.created_at) + "\n" + dyn_time_diff(utc_dt().timestamp(), g.created_at.timestamp()) + " ago", inline=1)
+        emb.add_field(name="Member count", value=str(g.member_count), inline=1)
+        if pcount:
+            emb.add_field(name="Post count", value=str(pcount), inline=1)
+            emb.add_field(name="Average post length", value=str(round(pavg, 9)), inline=1)
+            emb.add_field(name="Total posted text", value=str(ptotal), inline=1)
+            emb.add_field(name="Average word count", value=str(pword), inline=1)
+        if actv:
+            emb.add_field(name="Activity (last 2 weeks)", value=str(actv), inline=1)
+        if topc:
+            emb.add_field(name="Most active channel (last 2 weeks)", value=topc, inline=1)
+        if top is not None:
+            emb.add_field(name="Top users", value=top, inline=0)
+        return emb
+
+    async def __call__(self, argv, argl, name, guild, channel, bot, user, flags, **void):
+        iterator = argl if argl else (argv,)
+        embs = set()
+        for argv in iterator:
+            with ExceptionSender(channel):
+                with suppress(StopIteration):
+                    if argv:
+                        if is_url(argv) or argv.startswith("discord.gg/"):
+                            g = await bot.fetch_guild(argv)
+                            emb = await self.getGuildData(g, flags)
+                            embs.add(emb)
+                            raise StopIteration
+                        u_id = argv
+                        with suppress():
+                            u_id = verify_id(u_id)
+                        u = guild.get_member(u_id) if type(u_id) is int else None
+                        g = None
+                        while u is None and g is None:
+                            with suppress():
+                                u = bot.get_member(u_id, guild)
+                                break
+                            with suppress():
+                                try:
+                                    u = bot.get_user(u_id)
+                                except:
+                                    if not bot.in_cache(u_id):
+                                        u = await bot.fetch_user(u_id)
+                                    else:
+                                        raise
+                                break
+                            if type(u_id) is str and "@" in u_id and ("everyone" in u_id or "here" in u_id):
+                                g = guild
+                                break
+                            if "server" in name:
+                                with suppress():
+                                    g = await bot.fetch_guild(u_id)
+                                    break
+                                with suppress():
+                                    role = await bot.fetch_role(u_id, g)
+                                    g = role.guild
+                                    break
+                                with suppress():
+                                    channel = await bot.fetch_channel(u_id)
+                                    g = channel.guild
+                                    break
+                            with suppress():
+                                g = bot.cache.guilds[u_id]
+                                break
+                            with suppress():
+                                g = bot.cache.roles[u_id].guild
+                                break
+                            with suppress():
+                                g = bot.cache.channels[u_id].guild
+                            with suppress():
+                                u = await bot.fetch_member_ex(u_id, guild)
+                                break
+                            raise LookupError(f"No results for {argv}.")
+                        if g:
+                            emb = await self.getGuildData(g, flags)
+                            embs.add(emb)
+                            raise StopIteration
+                    elif "server" not in name:
+                        u = user
+                    else:
+                        if not hasattr(guild, "ghost"):
+                            emb = await self.getGuildData(guild, flags)
+                            embs.add(emb)
+                            raise StopIteration
+                        else:
+                            u = bot.user
+                    u = await bot.fetch_user_member(u.id, guild)
+                    raise NotImplementedError
+                    # member = guild.get_member(u.id)
+                    # name = str(u)
+                    # url = best_url(u)
+                    # if u.id == bot.id:
+                    #     is_self = True
+                    # else:
+                    #     is_self = False
+                    # dname = getattr(member, "nick", None)
+                    # if member:
+                    #     joined = getattr(u, "joined_at", None)
+                    # else:
+                    #     joined = None
+                    # created = u.created_at
+                    # status = None
+                    # if getattr(u, "status", None):
+                    #     # Show up to 3 different statuses based on the user's desktop, web and mobile status.
+                    #     if not is_self:
+                    #         status_items = [(u.desktop_status, "🖥️"), (u.web_status, "🕸️"), (u.mobile_status, "📱")]
+                    #     else:
+                    #         status_items = [(bot.statuses[(i + bot.status_iter) % 3], x) for i, x in enumerate(("🖥️", "🕸️", "📱"))]
+                    #     ordered = sorted(status_items, key=lambda x: status_order.index(x[0]))
+                    #     for s, i in ordered:
+                    #         if s == discord.Status.offline:
+                    #             ls = bot.data.users.get(u.id, {}).get("last_seen", 0)
+                    #             if utc() - ls < 300 and ls > bot.data.users.get(u.id, {}).get("last_offline", 0):
+                    #                 s = discord.Status.invisible
+                    #         icon = status_icon[s]
+                    #         if not status:
+                    #             s_ = u.status
+                    #             if s != s_ and s == discord.Status.offline:
+                    #                 status = status_text[s_]  + " `" + status_icon[s_] + "❓"
+                    #                 if s not in (discord.Status.offline, discord.Status.invisible):
+                    #                     status += icon
+                    #             else:
+                    #                 status = status_text[s] + " `" + icon
+                    #         if s not in (discord.Status.offline, discord.Status.invisible):
+                    #             if icon not in status:
+                    #                 status += icon
+                    #             status += i
+                    #     if status:
+                    #         status += "`"
+                    #         if len(status) >= 16:
+                    #             status = status.replace(" ", "\n")
+                    # if member:
+                    #     rolelist = [role_mention(i.id) for i in reversed(getattr(u, "roles", ())) if not i.is_default()]
+                    #     role = ", ".join(rolelist)
+                    # else:
+                    #     role = None
+                    # coms = seen = msgs = avgs = gmsg = old = 0
+                    # fav = None
+                    # pos = None
+                    # zone = None
+                    # with suppress(LookupError):
+                    #     ts = utc()
+                    #     ls = bot.data.users[u.id]["last_seen"]
+                    #     la = bot.data.users[u.id].get("last_action")
+                    #     if type(ls) is str:
+                    #         seen = ls
+                    #     else:
+                    #         seen = f"{dyn_time_diff(ts, min(ts, ls))} ago"
+                    #     if la:
+                    #         seen = f"{la}, {seen}"
+                    #     tz = bot.data.users.estimate_timezone(u.id)
+                    #     if tz >= 0:
+                    #         zone = f"GMT+{tz}"
+                    #     else:
+                    #         zone = f"GMT{tz}"
+                    # with suppress(LookupError):
+                    #     old = bot.data.counts.get(guild.id, {})["oldest"][u.id]
+                    #     old = snowflake_time(old)
+                    # with suppress(LookupError):
+                    #     if not hasattr(guild, "ghost"):
+                    #         gmsg = bot.data.counts.getUserGlobalMessageCount(u)
+                    #         msgs = await bot.data.counts.getUserMessages(u, guild)
+                    # with suppress(LookupError):
+                    #     if not hasattr(guild, "ghost"):
+                    #         us = await bot.data.counts.getGuildMessages(guild)
+                    #         if type(us) is str:
+                    #             pos = us
+                    #         else:
+                    #             ul = sorted(
+                    #                 us,
+                    #                 key=lambda k: us[k],
+                    #                 reverse=True,
+                    #             )
+                    #             try:
+                    #                 i = ul.index(u.id)
+                    #                 while i >= 1 and us[ul[i - 1]] == us[ul[i]]:
+                    #                     i -= 1
+                    #                 pos = i + 1
+                    #             except ValueError:
+                    #                 if joined:
+                    #                     pos = len(ul) + 1
+                    # if is_self and bot.website is not None:
+                    #     url2 = bot.website
+                    # else:
+                    #     url2 = url
+                    # colour = await self.bot.get_colour(u)
+                    # emb = discord.Embed(colour=colour)
+                    # emb.set_thumbnail(url=url)
+                    # emb.set_author(name=name, icon_url=url, url=url2)
+                    # d = user_mention(u.id)
+                    # if activity:
+                    #     d += "\n" + italics(code_md(activity))
+                    # if st:
+                    #     if d[-1] == "*":
+                    #         d += " "
+                    #     d += " **```css\n"
+                    #     if st:
+                    #         d += "\n".join(st)
+                    #     d += "```**"
+                    # emb.description = d
+                    # emb.add_field(name="User ID", value="`" + str(u.id) + "`", inline=0)
+                    # emb.add_field(name="Creation time", value=str(created) + "\n" + dyn_time_diff(utc_dt().timestamp(), created.timestamp()) + " ago", inline=1)
+                    # if joined:
+                    #     emb.add_field(name="Join time", value=str(joined) + "\n" + dyn_time_diff(utc_dt().timestamp(), joined.timestamp()) + " ago", inline=1)
+                    # if old:
+                    #     emb.add_field(name="Oldest post time", value=str(old) + "\n" + dyn_time_diff(utc_dt().timestamp(), old.timestamp()) + " ago", inline=1)
+                    # if status:
+                    #     emb.add_field(name="Status", value=str(status), inline=1)
+                    # if zone:
+                    #     emb.add_field(name="Estimated timezone", value=str(zone), inline=1)
+                    # if seen:
+                    #     emb.add_field(name="Last seen", value=str(seen), inline=1)
+                    # if dname:
+                    #     emb.add_field(name="Nickname", value=dname, inline=1)
+                    # if msgs:
+                    #     emb.add_field(name="Post count", value=str(msgs), inline=1)
+                    # if pos:
+                    #     emb.add_field(name="Server rank", value=str(pos), inline=1)
+                    # if role:
+                    #     emb.add_field(name=f"Roles ({len(rolelist)})", value=role, inline=0)
+                    # embs.add(emb)
         bot.send_embeds(channel, embeds=embs)
 
 
@@ -915,7 +1163,10 @@ class Activity(Command):
 
     async def __call__(self, guild, user, argv, flags, channel, bot, _timeout, **void):
         if argv:
-            user = await bot.fetch_user_member(argv, guild)
+            try:
+                user = bot.cache.guilds[int(argv)]
+            except:
+                user = await bot.fetch_user_member(argv, guild)
         data = await create_future(bot.data.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
         with discord.context_managers.Typing(channel):
             resp = await process_image("plt_special", "$", (data, str(user)), guild)
@@ -1006,13 +1257,13 @@ class Invite(Command):
     name = ["OAuth", "InviteBot", "InviteLink"]
     description = "Sends a link to ⟨MIZA⟩'s homepage and invite code."
     
-    def __call__(self, channel, **void):
+    def __call__(self, channel, message, **void):
         if discord_id is None:
             raise FileNotFoundError("Unable to locate bot's Client ID.")
         emb = discord.Embed(colour=rand_colour())
         emb.set_author(**get_author(self.bot.user))
         emb.description = f"[**`Homepage`**]({self.bot.website}) [**`Invite`**](https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord_id}&scope=bot)"
-        self.bot.send_embeds(channel, embed=emb)
+        self.bot.send_embeds(channel, embed=emb, reference=message)
 
 
 class Reminder(Command):
@@ -1070,6 +1321,11 @@ class Reminder(Command):
             )
         if len(rems) >= 64:
             raise OverflowError(f"You have reached the maximum of 64 {word}. Please remove one to add another.")
+        for f in "aeu":
+            if f in flags:
+                for c in (f, f.upper()):
+                    for q in "?-+":
+                        argv = argv.replace(q + c + " ", "").replace(" " + q + c, "")
         urgent = "u" in flags
         remind_as = user
         # This parser is so unnecessarily long for what it does...
@@ -1836,12 +2092,12 @@ class UpdateUsers(Database):
         self.clear_events(data, hour - self.hours)
         start = hour - self.hours
         if event is None:
-            out = [sum(data.get(i / self.scale + start, EMPTY).values()) for i in range(self.hours * self.scale)]
+            out = [np.sum(data.get(i / self.scale + start, EMPTY).values()) for i in range(self.hours * self.scale)]
         else:
             out = [data.get(i / self.scale + start, EMPTY).get(event, 0) for i in range(self.hours * self.scale)]
         if interval != self.interval:
             factor = ceil(interval / self.interval)
-            out = [sum(out[i:i + factor]) for i in range(0, len(out), factor)]
+            out = [np.sum(out[i:i + factor]) for i in range(0, len(out), factor)]
         return out
 
     def get_timezone(self, u_id):
@@ -1930,9 +2186,10 @@ class UpdateUsers(Database):
     # User seen, add event to activity database
     def _seen_(self, user, delay, event, count=1, raw=None, **void):
         self.send_event(user.id, event, count=count)
-        add_dict(self.data, {user.id: {"last_seen": 0}})
-        self.data[user.id]["last_seen"] = utc() + delay
-        self.data[user.id]["last_action"] = raw
+        if type(user) in (discord.User, discord.Member):
+            add_dict(self.data, {user.id: {"last_seen": 0}})
+            self.data[user.id]["last_seen"] = utc() + delay
+            self.data[user.id]["last_action"] = raw
         self.update(user.id)
 
     # User executed command, add to activity database
@@ -1983,7 +2240,7 @@ class UpdateUsers(Database):
         elif len(mentions) >= 2 and self.data.get(user.id, EMPTY).get("last_mention", 0) > 0 and random.random() >= 0.75:
             out = "One mention is enough, but I appreciate your enthusiasm 🙂"
         if out:
-            create_task(send_with_react(message.channel, out, reacts="❎"))
+            create_task(send_with_react(message.channel, out, reacts="❎", reference=message))
             await bot.seen(user, event="misc", raw="Being naughty")
             add_dict(self.data, {user.id: {"last_mention": 1}})
             self.data[user.id]["last_used"] = t
@@ -2115,66 +2372,10 @@ class UpdateUsers(Database):
             if out is not None:
                 guild = message.guild
                 # Add randomized flavour text if in conversation
-                if xrand(4) or guild is None:
-                    if self.flavour_buffer:
-                        out += self.flavour_buffer.popleft()
-                    else:
-                        out += choice(self.flavour)
+                if self.flavour_buffer:
+                    out += self.flavour_buffer.popleft()
                 else:
-                    i = xrand(4)
-                    member = choice(guild.members)
-                    if i == 0:
-                        count = await bot.data.counts.getUserMessages(member, guild)
-                        out += f"\nServer insights: `{member} has posted {count} message{'s' if count != 1 else ''} in total!`"
-                    elif i == 1:
-                        curr = member.joined_at
-                        old = None
-                        with suppress(LookupError):
-                            old = bot.data.counts.get(guild.id, {})["oldest"][member.id]
-                            old = snowflake_time(old)
-                        if old is not None and old < curr:
-                            curr = old
-                        out += f"\nServer insights: `{member} has been active here for {dyn_time_diff(utc(), curr.timestamp())}!`"
-                    elif i == 2:
-                        events = bot.data.users.get_events(member.id, interval=900)
-                        out += f"\nServer insights: `{member} has performed {sum(events)} discord actions in the past 7 days!`"
-                    else:
-                        i = xrand(4)
-                        if i == 0:
-                            users = set(bot.data.counts.get(guild.id, {})["totals"])
-                            users.update(guild._members)
-                            out += f"\nServer insights: `{len(users)} have set their footprint into this server!`"
-                        elif i == 1:
-                            totals = bot.data.counts.get(guild.id, {})["totals"]
-                            u_id = iter_max(totals)
-                            try:
-                                u = await bot.fetch_user(u_id)
-                            except:
-                                u = await bot.get_user(u_id, replace=True)
-                            total = totals[u_id]
-                            out += f"\nServer insights: `{u} has posted the most text, with {total} total characters!`"
-                        elif i == 2:
-                            counts = bot.data.counts.get(guild.id, {})["counts"]
-                            u_id = iter_max(counts)
-                            try:
-                                u = await bot.fetch_user(u_id)
-                            except:
-                                u = await bot.get_user(u_id, replace=True)
-                            count = counts[u_id]
-                            out += f"\nServer insights: `{u} has posted the most messages, with {count} in total!`"
-                        elif i == 3:
-                            found = member
-                            highest = 0
-                            for u_id in guild._members:
-                                if u_id != bot.id:
-                                    mutual = 0
-                                    for g in bot.guilds:
-                                        if u_id in g._members:
-                                            mutual += 1
-                                    if mutual > highest:
-                                        highest = mutual
-                                        found = guild.get_member(u_id)
-                            out += f"\nServer insights: `{found} shares the highest number of mutual servers with me, with {highest}!`"
+                    out += choice(self.flavour)
             else:
                 # Help message greetings
                 i = xrand(7)
@@ -2194,7 +2395,7 @@ class UpdateUsers(Database):
                     out = f"Yo, what's good, {user.display_name}? Need me for anything?"
                 prefix = bot.get_prefix(message.guild)
                 out += f" Use `{prefix}?` or `{prefix}help` for help!"
-                send = lambda *args, **kwargs: send_with_react(message.channel, *args, **kwargs, reacts="❎")
+                send = lambda *args, **kwargs: send_with_react(message.channel, *args, **kwargs, reacts="❎", reference=message)
             add_dict(self.data, {user.id: {"last_talk": 1, "last_mention": 1}})
             self.data[user.id]["last_used"] = utc()
             await send(out)

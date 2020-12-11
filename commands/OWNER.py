@@ -21,12 +21,12 @@ class Reload(Command):
             mod = " " + mod
         await message.add_reaction("❗")
         if name == "unload":
-            await channel.send(f"Unloading{mod}...")
+            await send_with_reply(channel, f"Unloading{mod}...", reference=message)
             succ = await create_future(bot.unload, _mod, priority=True)
             if succ:
                 return f"Successfully unloaded{mod}."
             return f"Error unloading{mod}. Please see log for more info."
-        await channel.send(f"Reloading{mod}...")
+        await send_with_reply(channel, f"Reloading{mod}...", reference=message)
         succ = await create_future(bot.reload, _mod, priority=True)
         if succ:
             return f"Successfully reloaded{mod}."
@@ -49,7 +49,7 @@ class Restart(Command):
             if "in" in argv:
                 argv = argv[argv.rindex("in") + 2:]
             wait = await bot.eval_time(argv)
-            await channel.send("*Preparing to " + name + " in " + sec2time(wait) + "...*")
+            await send_with_reply(channel, "*Preparing to " + name + " in " + sec2time(wait) + "...*", reference=message)
             emb = discord.Embed(colour=discord.Colour(1))
             emb.set_author(name=str(bot.user), url=bot.website, icon_url=best_url(bot.user))
             emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(wait)}, apologies for any inconvenience..."
@@ -58,9 +58,9 @@ class Restart(Command):
             if wait > 0:
                 await asyncio.sleep(wait)
         elif name == "shutdown":
-            await channel.send("Shutting down... :wave:")
+            await send_with_reply(channel, "Shutting down... :wave:", reference=message)
         else:
-            await channel.send("Restarting... :wave:")
+            await send_with_reply(channel, "Restarting... :wave:", reference=message)
         with suppress(AttributeError):
             PRINT.close()
         if save is None:
@@ -187,8 +187,9 @@ class UpdateExec(Database):
         return self.listeners.pop(channel.id, None)
 
     # Asynchronously evaluates Python code
-    async def procFunc(self, proc, channel, bot, term=0):
+    async def procFunc(self, message, proc, bot, term=0):
         # Main terminal uses bot's global variables, virtual one uses a shallow copy per channel
+        channel = message.channel
         if term & 1:
             glob = bot._globals
         else:
@@ -200,7 +201,10 @@ class UpdateExec(Database):
                     print=lambda *args, **kwargs: self._print(*args, channel=channel, **kwargs),
                     input=lambda *args, **kwargs: self._input(*args, channel=channel, **kwargs),
                     channel=channel,
-                    guild=channel.guild,
+                    guild=message.guild,
+                    user=message.author,
+                    message=message,
+                    auds=bot.data.audio.players.get(message.guild.id),
                 ))
         if "\n" not in proc:
             if proc.startswith("await "):
@@ -299,7 +303,7 @@ class UpdateExec(Database):
                         proc = proc.translate(self.qtrans)
                         try:
                             create_task(message.add_reaction("❗"))
-                            result = await self.procFunc(proc, channel, bot, term=f)
+                            result = await self.procFunc(message, proc, bot, term=f)
                             output = str(result)
                             if len(output) > 54000:
                                 f = discord.File(io.BytesIO(output.encode("utf-8")), filename="message.txt")
@@ -309,14 +313,13 @@ class UpdateExec(Database):
                             else:
                                 await channel.send(self.prepare_string(output, fmt=""))
                         except:
-                            await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎")
+                            await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎", reference=message)
         # Relay DM messages
         elif message.guild is None:
             if bot.is_blacklisted(message.author.id):
-                return await send_with_react(channel,
+                return await channel.send(
                     "Your message could not be delivered because you don't share a server with the recipient or you disabled direct messages on your shared server, "
                     + "recipient is only accepting direct messages from friends, or you were blocked by the recipient.",
-                    reacts="❎"
                 )
             user = message.author
             if "dailies" in bot.data:

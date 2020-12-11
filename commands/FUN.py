@@ -809,13 +809,13 @@ class Shop(Command):
         ),
     )
 
-    async def __call__(self, bot, guild, channel, user, argv, **void):
+    async def __call__(self, bot, guild, channel, user, message, argv, **void):
         if not argv:
             desc = ""
             for product in self.products.values():
                 cost = await bot.as_rewards(*product.cost)
                 description = ini_md(f"{sqr_md(product.name)} {cost}\n{product.description}")
-            return bot.send_as_embeds(channel, description, title="Shop", author=get_author(user))
+            return bot.send_as_embeds(channel, description, title="Shop", author=get_author(user), reference=message)
         item = argv.replace("-", "").replace("_", "").replace(" ", "").casefold()
         try:
             product = self.products[item]
@@ -831,7 +831,7 @@ class Shop(Command):
                         return "```\nThis item can only be purchased in a server.```"
                     if bot.is_trusted(guild):
                         return "```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.```"
-                    return await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}-\nYou are about to upgrade the server's privilege level from 0 to 1.\nThis is irreversible. Please choose wisely.```", reacts="✅")
+                    return await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}-\nYou are about to upgrade the server's privilege level from 0 to 1.\nThis is irreversible. Please choose wisely.```", reacts="✅", reference=message)
                 raise NotImplementedError("Target item has not yet been implemented.")
         raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
 

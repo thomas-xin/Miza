@@ -3861,7 +3861,7 @@ class Lyrics(Command):
         title = f"Lyrics for {name}:"
         if len(text) > 54000:
             return (title + "\n\n" + text).strip()
-        bot.send_as_embeds(channel, text, author=dict(name=title), colour=(1024, 128), md=ini_md)
+        bot.send_as_embeds(channel, text, author=dict(name=title), colour=(1024, 128), md=ini_md, reference=message)
 
 
 class Download(Command):

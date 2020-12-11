@@ -1524,7 +1524,7 @@ class UpdateMessageLogs(Database):
                 u = before.author
                 emb = discord.Embed(colour=colour2raw(0, 0, 255))
                 emb.set_author(**get_author(u))
-                emb.description = f"**Message edited in** {channel_mention(before.channel.id)}:"
+                emb.description = f"**Message edited in** {channel_mention(before.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{after.channel.id}/{after.id}"
                 emb.add_field(name="Before", value=message_repr(before))
                 emb.add_field(name="After", value=message_repr(after))
                 self.bot.send_embeds(channel, emb)
@@ -1593,7 +1593,7 @@ class UpdateMessageLogs(Database):
                 init = "[UNKNOWN USER]"
             emb = discord.Embed(colour=colour2raw(255, 0, 0))
             emb.set_author(name=name_id, icon_url=url, url=url)
-            emb.description = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\n"
+            emb.description = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{after.channel.id}/{after.id}\n"
             emb.description += message_repr(message, limit=2048 - len(emb.description))
             self.bot.send_embeds(channel, emb)
 
@@ -1648,6 +1648,8 @@ class UpdateMessageLogs(Database):
                 init = "[UNKNOWN USER]"
             emb = discord.Embed(colour=colour2raw(255, 0, 255))
             emb.description = f"{init} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from** {channel_mention(messages[-1].channel.id)}:\n"
+            for message in messages:
+                emb.description += f"\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}"
             embs = deque([emb])
             for message in messages:
                 u = message.author

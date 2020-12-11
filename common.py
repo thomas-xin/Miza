@@ -154,23 +154,24 @@ tracebacksuppressor = TracebackSuppressor()
 
 
 # Sends an exception into the target discord sendable, with the autodelete react.
-send_exception = lambda sendable, ex: send_with_react(sendable, exc_repr(ex), reacts="❎")
+send_exception = lambda sendable, ex, reference=None: send_with_react(sendable, exc_repr(ex), reacts="❎", reference=reference)
 
 
 # A context manager that sends exception tracebacks to a sendable.
 class ExceptionSender(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
-    def __init__(self, sendable, *args, **kwargs):
+    def __init__(self, sendable, reference=None, *args, **kwargs):
         self.sendable = sendable
+        self.reference = reference
         self.exceptions = args + tuple(kwargs.values())
     
     def __exit__(self, exc_type, exc_value, exc_tb):
         if exc_type and exc_value:
             for exception in self.exceptions:
                 if issubclass(type(exc_value), exception):
-                    create_task(send_exception(self.sendable, exc_value))
+                    create_task(send_exception(self.sendable, exc_value, self.reference))
                     return True
-            create_task(send_exception(self.sendable, exc_value))
+            create_task(send_exception(self.sendable, exc_value, self.reference))
             with tracebacksuppressor:
                 raise exc_value
         return True
@@ -179,9 +180,9 @@ class ExceptionSender(contextlib.AbstractContextManager, contextlib.AbstractAsyn
         if exc_type and exc_value:
             for exception in self.exceptions:
                 if issubclass(type(exc_value), exception):
-                    await send_exception(self.sendable, exc_value)
+                    await send_exception(self.sendable, exc_value, self.reference)
                     return True
-            await send_exception(self.sendable, exc_value)
+            await send_exception(self.sendable, exc_value, self.reference)
             with tracebacksuppressor:
                 raise exc_value
         return True
@@ -696,10 +697,47 @@ async def recursive_coro(item):
     return item
 
 
+REPLY_SEM = cdict()
+
+async def send_with_reply(channel, reference, content="", embed=None, tts=None):
+    try:
+        sem = REPLY_SEM[channel.id]
+    except KeyError:
+        sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
+    data = dict(
+        content=content,
+        message_reference=dict(message_id=str(verify_id(reference))),
+    )
+    if embed is not None:
+        data["embed"] = embed.to_dict()
+    if tts is not None:
+        data["tts"] = tts
+    body = json.dumps(data)
+    exc = RuntimeError
+    for i in range(xrand(12, 17)):
+        async with delay(1):
+            try:
+                async with sem:
+                    resp = await Request.aio_call(
+                        f"https://discord.com/api/v8/channels/{channel.id}/messages",
+                        method="post",
+                        data=body,
+                        headers={"Content-Type": "application/json", "authorization": f"Bot {channel._state.http.token}"},
+                        files=None,
+                        decode=False
+                    )
+                return discord.Message(state=channel._state, channel=channel, data=eval_json(resp))
+            except Exception as ex:
+                exc = ex
+    raise exc
+
 # Sends a message to a channel, then adds reactions accordingly.
-async def send_with_react(channel, *args, reacts=(), **kwargs):
+async def send_with_react(channel, *args, reacts=(), reference=None, **kwargs):
     with tracebacksuppressor:
-        sent = await channel.send(*args, **kwargs)
+        if reference:
+            sent = await send_with_reply(channel, reference, *args, **kwargs)
+        else:
+            sent = await channel.send(*args, **kwargs)
         for react in reacts:
             async with delay(1 / 3):
                 create_task(sent.add_reaction(react))
@@ -1432,7 +1470,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             async with getattr(self.session, method)(url, headers=headers, data=data) as resp:
                 if resp.status >= 400:
                     data = await resp.read()
-                    raise ConnectionError(f"Error {resp.status}: {data.decode('utf-8', 'replace')}")
+                    raise ConnectionError(f"Error {resp.status}", data.decode("utf-8", "replace"))
                 data = await resp.read()
                 if decode:
                     return data.decode("utf-8", "replace")
@@ -1449,7 +1487,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         with self.semaphore:
             with getattr(requests, method)(url, headers=headers, files=files, data=data, stream=True, timeout=timeout) as resp:
                 if resp.status_code >= 400:
-                    raise ConnectionError(f"Error {resp.status_code}: {resp.text}")
+                    raise ConnectionError(f"Error {resp.status_code}", resp.text)
                 if raw:
                     data = resp.raw.read()
                 else:

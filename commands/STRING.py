@@ -71,7 +71,7 @@ class Translate(Command):
     no_parse = True
     rate_limit = (2, 7)
 
-    async def __call__(self, channel, args, argv, flags, user, **void):
+    async def __call__(self, channel, args, argv, flags, user, message, **void):
         if not args:
             raise ArgumentError("Input string is empty.")
         dest = args[0]
@@ -114,7 +114,7 @@ class Translate(Command):
                 footer = dict(text=used)
             else:
                 footer = None
-        self.bot.send_as_embeds(channel, response, author=get_author(user), footer=footer)
+        self.bot.send_as_embeds(channel, response, author=get_author(user), footer=footer, reference=message)
 
 
 class Math(Command):
@@ -280,7 +280,7 @@ class Fancy(Command):
     usage = "<string>"
     no_parse = True
 
-    def __call__(self, channel, argv, **void):
+    def __call__(self, channel, argv, message, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         fields = deque()
@@ -289,7 +289,7 @@ class Fancy(Command):
             if i == len(UNIFMTS) - 2:
                 s = s[::-1]
             fields.append((f"Font {i + 1}", s + "\n"))
-        self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)))
+        self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)), reference=message)
 
 
 class Zalgo(Command):
@@ -304,14 +304,14 @@ class Zalgo(Command):
             return "".join(c + self.randz() for c in s)
         return s[0] + "".join("".join(self.randz() + "\u200b" for i in range(x + 1 >> 1)) + c + "\u200a" + "".join(self.randz() + "\u200b" for i in range(x >> 1)) for c in s[1:])
 
-    async def __call__(self, channel, argv, **void):
+    async def __call__(self, channel, argv, message, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         fields = deque()
         for i in range(1, 9):
             s = self.zalgo(argv, i)
             fields.append((f"Level {i}", s + "\n"))
-        self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)))
+        self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)), reference=message)
 
 
 class Format(Command):
@@ -321,7 +321,7 @@ class Format(Command):
     no_parse = True
     formats = "".join(chr(i) for i in (0x30a, 0x325, 0x303, 0x330, 0x30c, 0x32d, 0x33d, 0x353, 0x35b, 0x20f0))
 
-    def __call__(self, channel, argv, **void):
+    def __call__(self, channel, argv, message, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         fields = deque()
@@ -330,7 +330,7 @@ class Format(Command):
             fields.append((f"Format {i}", s + "\n"))
         s = "".join("_" if c in " _" else c if c in "gjpqy" else c + chr(818) for c in argv)
         fields.append((f"Format {i + 1}", s))
-        self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)))
+        self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)), reference=message)
 
 
 class UnFancy(Command):
@@ -592,12 +592,12 @@ class Timezone(Command):
     description = "Shows the current time in a certain timezone. Use ⟨WEBSERVER⟩/timezone to find your current time!"
     usage = "<timezone> <list(?l)>"
 
-    async def __call__(self, channel, argv, **void):
+    async def __call__(self, channel, argv, message, **void):
         if argv.startswith("-l") or argv.startswith("list"):
             fields = deque()
             for k, v in COUNTRIES.items():
                 fields.append((k, ", ".join(v), False))
-            self.bot.send_as_embeds(channel, description=f"[Click here to find your timezone](http://{self.bot.ip}:9801/timezone)", title="Timezone list", fields=fields, author=get_author(self.bot.user))
+            self.bot.send_as_embeds(channel, description=f"[Click here to find your timezone](http://{self.bot.ip}:9801/timezone)", title="Timezone list", fields=fields, author=get_author(self.bot.user), reference=message)
             return
         secs = as_timezone(argv)
         t = utc_dt() + datetime.timedelta(seconds=secs)
@@ -636,7 +636,7 @@ class Follow(Command):
     description = "Follows a discord message link and/or finds URLs in a string."
     rate_limit = (1, 5)
     
-    async def __call__(self, channel, argv, **void):
+    async def __call__(self, channel, argv, message, **void):
         urls = find_urls(argv)
         out = set()
         for url in urls:
@@ -650,7 +650,7 @@ class Follow(Command):
             raise FileNotFoundError("No valid URLs detected.")
         output = f"`Detected {len(out)} url{'s' if len(out) != 1 else ''}:`\n" + "\n".join(out)
         if len(output) > 2000 and len(output) < 54000:
-            self.bot.send_as_embeds(channel, output)
+            self.bot.send_as_embeds(channel, output, reference=message)
         else:
             return escape_everyone(output)
 

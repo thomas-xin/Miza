@@ -1788,7 +1788,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             self.react_sem[message.id] = max(utc(), self.react_sem.get(message.id, 0) + 1)
             for f in catg:
                 if f.__name__.casefold() == func:
-                    async with ExceptionSender(message.channel):
+                    async with ExceptionSender(message.channel, message.id):
                         timeout = getattr(f, "_timeout_", 1) * self.timeout
                         if timeout >= inf:
                             timeout = None
@@ -2131,13 +2131,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                         if "file" in response:
                                             sent = await self.send_with_file(channel, response.get("content", ""), **response)
                                         else:
-                                            sent = await channel.send(**response)
+                                            sent = await send_with_reply(channel, message, **response)
                                     else:
                                         if type(response) not in (str, bytes, bytearray):
                                             response = str(response)
                                         # Process everything else as a string
                                         if type(response) is str and len(response) <= 2000:
-                                            sent = await channel.send(response)
+                                            sent = await send_with_reply(channel, message, response)
+                                            # sent = await channel.send(response)
                                         else:
                                             # Send a file if the message is too long
                                             if type(response) is not bytes:
@@ -2161,7 +2162,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             if fut is not None:
                                 await fut
                             command.used.pop(u_id, None)
-                            create_task(send_exception(channel, ex))
+                            create_task(send_exception(channel, ex, message.id))
                             return
                         # Represents all other errors
                         except Exception as ex:
@@ -2169,7 +2170,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 await fut
                             command.used.pop(u_id, None)
                             print_exc()
-                            create_task(send_exception(channel, ex))
+                            create_task(send_exception(channel, ex, message.id))
         # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
         if not run and u_id != bot.id:
             temp = to_alphanumeric(cpy).casefold()
@@ -2250,7 +2251,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             w = await self.ensure_webhook(channel, force=True)
             async with w.semaphore:
                 message = await w.send(*args, wait=True, **kwargs)
-        await self.seen(self.user, event="message", count=len(kwargs.get("embeds", (None,))), raw=f"Sending a message, {channel.guild}")
+        await self.seen(self.user, channel.guild, event="message", count=len(kwargs.get("embeds", (None,))), raw=f"Sending a message, {channel.guild}")
         if reacts:
             for react in reacts:
                 async with delay(1 / 3):
@@ -2258,10 +2259,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return message
 
     # Sends a list of embeds to the target sendable, using a webhook when possible.
-    async def _send_embeds(self, sendable, embeds, reacts=None):
+    async def _send_embeds(self, sendable, embeds, reacts=None, reference=None):
         s_id = verify_id(sendable)
         sendable = await self.fetch_messageable(s_id)
-        async with ExceptionSender(sendable):
+        async with ExceptionSender(sendable, reference=reference):
             if not embeds:
                 return
             guild = getattr(sendable, "guild", None)
@@ -2277,13 +2278,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 else:
                     if not m.guild_permissions.manage_webhooks:
                         single = True
-            if single:
+            if single or reference:
                 for emb in embeds:
                     async with delay(1 / 3):
                         if type(emb) is not discord.Embed:
                             emb = discord.Embed.from_dict(emb)
-                        if reacts:
-                            create_task(send_with_react(sendable, embed=emb, reacts=reacts))
+                        if reacts or reference:
+                            create_task(send_with_react(sendable, embed=emb, reacts=reacts, reference=reference))
                         else:
                             create_task(sendable.send(embed=emb))
                 return
@@ -2296,7 +2297,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=best_url(m), reacts=reacts)
 
     # Adds embeds to the embed sender, waiting for the next update event.
-    def send_embeds(self, channel, embeds=None, embed=None, reacts=None):
+    def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None):
         if embeds is not None and not issubclass(type(embeds), collections.abc.Collection):
             embeds = (embeds,)
         if embed is not None:
@@ -2309,14 +2310,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         c_id = verify_id(channel)
         user = self.cache.users.get(c_id)
         if user is not None:
-            create_task(self._send_embeds(user, embeds, reacts))
-        elif reacts:
-            create_task(self._send_embeds(channel, embeds, reacts))
+            create_task(self._send_embeds(user, embeds, reacts, reference))
+        elif reacts or reference:
+            create_task(self._send_embeds(channel, embeds, reacts, reference))
         else:
             embs = set_dict(self.embed_senders, c_id, [])
             embs.extend(embeds)
 
-    def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None):
+    def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None):
         if type(description) is discord.Embed:
             emb = description
             description = emb.description
@@ -2335,9 +2336,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 description = str(description)
         if not description and not fields and not thumbnail and not image and not images:
             return
-        return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts))
+        return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts, reference))
     
-    async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None):
+    async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None):
         fin_col = col = None
         if colour is None:
             if author:
@@ -2437,7 +2438,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         embs.append(emb)
                     embs[i].set_image(url=img)
                     embs[i].url = img
-        return self.send_embeds(channel, embeds=embs, reacts=reacts)
+        return self.send_embeds(channel, embeds=embs, reacts=reacts, reference=reference)
 
     # Updates all embed senders.
     def update_embeds(self):
@@ -2535,7 +2536,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         await create_future(os.remove, self.heartbeat, priority=True)
 
     # User seen event
-    seen = lambda self, user, delay=0, event=None, **kwargs: create_task(self.send_event("_seen_", user=user, delay=delay, event=event, **kwargs))
+    async def seen(self, *args, delay=0, event=None, **kwargs):
+        for arg in args:
+            if arg:
+                await self.send_event("_seen_", user=arg, delay=delay, event=event, **kwargs)
 
     # Deletes own messages if any of the "X" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot.
     async def check_to_delete(self, message, reaction, user):
@@ -2560,7 +2564,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     # Handles a new sent message, calls process_message and sends an error if an exception occurs.
     async def handle_message(self, message, edit=True):
         cpy = msg = message.content
-        async with ExceptionSender(message.channel):
+        async with ExceptionSender(message.channel, message.id):
             if msg and msg[0] == "\\":
                 cpy = msg[1:]
             await self.process_message(message, cpy, edit, msg)
@@ -2931,7 +2935,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             raw = "Adding a reaction"
             if getattr(channel, "guild", None) is not None:
                 raw += f", {channel.guild}"
-            await self.seen(user, event="reaction", raw=raw)
+            await self.seen(user, message.channel, message.guild, event="reaction", raw=raw)
             if user.id != self.id:
                 if "users" in self.data:
                     self.data.users.add_xp(user, xrand(4, 7))
@@ -2954,7 +2958,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             raw = "Adding a reaction"
             if getattr(channel, "guild", None) is not None:
                 raw += f", {channel.guild}"
-            await self.seen(user, event="reaction", raw=raw)
+            await self.seen(user, message.channel, message.guild, event="reaction", raw=raw)
             if user.id != self.id:
                 reaction = str(payload.emoji)
                 await self.react_callback(message, reaction, user)
@@ -2976,9 +2980,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     if "users" in self.data:
                         self.data.users.add_xp(after, xrand(6, 12))
                         self.data.users.add_gold(after, xrand(2, 5))
-                    await self.seen(member, event="misc", raw=f"Joining a voice channel, {member.guild}")
+                    await self.seen(member, member.guild, event="misc", raw=f"Joining a voice channel, {member.guild}")
                 elif any((getattr(before, attr) != getattr(after, attr) for attr in ("self_mute", "self_deaf", "self_stream", "self_video"))):
-                    await self.seen(member, event="misc", raw=f"Updating their voice settings, {member.guild}")
+                    await self.seen(member, member.guild, event="misc", raw=f"Updating their voice settings, {member.guild}")
 
         # Typing event: calls _typing_ and _seen_ bot database events.
         @self.event
@@ -2987,7 +2991,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             raw = "Typing"
             if getattr(channel, "guild", None) is not None:
                 raw += f", {channel.guild}"
-            await self.seen(user, delay=10, event="typing", raw=raw)
+                guild = channel.guild
+            else:
+                guild = None
+            await self.seen(user, guild, delay=10, event="typing", raw=raw)
 
         # Message send event: processes new message. calls _send_ and _seen_ bot database events.
         @self.event
@@ -2999,7 +3006,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             raw = "Sending a message"
             if message.guild is not None:
                 raw += f", {message.guild}"
-            await self.seen(message.author, event="message", raw=raw)
+            await self.seen(message.author, message.channel, message.guild, event="message", raw=raw)
             await self.react_callback(message, None, message.author)
             await self.handle_message(message, False)
 
@@ -3060,7 +3067,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 raw = "Editing a message"
                 if after.guild is not None:
                     raw += f", {after.guild}"
-                await self.seen(after.author, event="message", raw=raw)
+                await self.seen(after.author, after.channel, after.guild, event="message", raw=raw)
 
         # Message delete event: uses raw payloads rather than discord.py message cache. calls _delete_ bot database event.
         @self.event
@@ -3158,7 +3165,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         @self.event
         async def on_member_join(member):
             await self.send_event("_join_", user=member, guild=member.guild)
-            await self.seen(member, event="misc", raw=f"Joining a server, {member.guild}")
+            await self.seen(member, member.guild, event="misc", raw=f"Joining a server, {member.guild}")
 
         # Member leave event: calls _leave_ bot database event.
         @self.event

@@ -275,7 +275,7 @@ class Neko(Command):
     flags = "lrv"
     rate_limit = (0.5, 7)
 
-    async def __call__(self, bot, args, argv, flags, channel, guild, **void):
+    async def __call__(self, bot, args, argv, flags, message, channel, guild, **void):
         isNSFW = is_nsfw(channel)
         if "l" in flags or argv == "list":
             available = []
@@ -319,7 +319,7 @@ class Neko(Command):
                 url = nekos.img(get)
         if "v" in flags:
             return escape_everyone(url)
-        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
+        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536), reference=message)
 
 
 class Lewd(Command):
@@ -331,9 +331,9 @@ class Lewd(Command):
     usage = "<query> <verbose(?v)>"
     flags = "v"
     no_parse = True
-    rate_limit = (1, 10)
+    rate_limit = (1, 6)
 
-    async def __call__(self, args, flags, channel, **void):
+    async def __call__(self, args, flags, message, channel, **void):
         if not is_nsfw(channel):
             raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels.")
         objs = await searchRandomNSFW(" ".join(args), 12)
@@ -346,4 +346,4 @@ class Lewd(Command):
                 + "__**"
             )
             return escape_everyone(text)
-        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
+        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536), reference=message)
