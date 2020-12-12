@@ -17,6 +17,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     website = "https://github.com/thomas-xin/Miza"
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
     heartbeat = "heartbeat.tmp"
+    heartbeat_ack = "heartbeat_ack.tmp"
     restart = "restart.tmp"
     shutdown = "shutdown.tmp"
     caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "attachments", "deleted", "banned")
@@ -2534,10 +2535,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         print("Heartbeat Loop initiated.")
         with tracebacksuppressor:
             while not self.closed:
-                d = await delayed_coro(create_future(os.path.exists, self.heartbeat, priority=True), 0.5)
+                d = await delayed_coro(create_future(os.path.exists, self.heartbeat, priority=True), 1 / 3)
                 if d:
                     with tracebacksuppressor(FileNotFoundError):
-                        await create_future(os.remove, self.heartbeat, priority=True)
+                        await create_future(os.rename, self.heartbeat, self.heartbeat_ack, priority=True)
 
     # User seen event
     async def seen(self, *args, delay=0, event=None, **kwargs):

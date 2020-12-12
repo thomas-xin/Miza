@@ -49,6 +49,7 @@ def delete(f):
 sd = "shutdown.tmp"
 rs = "restart.tmp"
 hb = "heartbeat.tmp"
+hb_ack = "heartbeat_ack.tmp"
 
 delete(sd)
 
@@ -68,22 +69,24 @@ while not os.path.exists(sd):
             alive = True
             while alive:
                 if not os.path.exists(hb):
-                    with open(hb, "wb"):
-                        pass
+                    if os.path.exists(hb_ack):
+                        os.rename(hb_ack, hb)
+                    else:
+                        with open(hb, "wb"):
+                            pass
                 print(
                     "\033[1;36;40m Heartbeat at "
                     + str(datetime.datetime.now())
                     + "\033[1;37;40m."
                 )
-                for i in range(16):
-                    time.sleep(0.5)
+                for i in range(32):
+                    time.sleep(0.25)
                     ld = os.listdir()
                     if rs in ld or sd in ld:
                         alive = False
                         break
-                if not alive or os.path.exists(hb):
+                if os.path.exists(hb):
                     alive = False
-                    break
             for child in proc.children():
                 try:
                     child.kill()
@@ -103,7 +106,7 @@ while not os.path.exists(sd):
             print("\033[1;31;40mBot crashed 16 times in a row. Waiting 5 minutes before trying again.\033[1;37;40m")
             time.sleep(300)
             att = 0
-        print("\033[1;31;40mBot closed without shutdown signal, restarting...\033[1;37;40m")
+        print("\033[1;31;40mBot failed to acknowledge heartbeat signal, restarting...\033[1;37;40m")
     except KeyboardInterrupt:
         raise
     except:
@@ -121,6 +124,7 @@ if proc.is_running():
 delete(sd)
 delete(rs)
 delete(hb)
+delete(hb_ack)
         
 print("Shutdown signal confirmed. Program will now terminate. ")
 raise SystemExit

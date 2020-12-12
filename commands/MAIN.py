@@ -834,7 +834,7 @@ class Insights(Command):
             actv = int(np.sum(activity))
             actc = cdict()
             for c in guild.text_channels:
-                a = await create_future(bot.data.users.get_events, c.id, interval=3600)
+                a = await create_future(bot.data.users.get_events, f"#{c.id}", interval=3600)
                 actc[c.id] = int(np.sum(a))
             m = max(actc.values())
             mag = (c for c, v in actc.values() if v >= m)
@@ -1162,15 +1162,22 @@ class Activity(Command):
     typing = True
 
     async def __call__(self, guild, user, argv, flags, channel, bot, _timeout, **void):
+        u_id = None
         if argv:
             user = None
-            with suppress():
-                user = bot.cache.guilds[int(argv)]
-            try:
-                user = bot.cache.channels[int(argv)]
-            except:
-                user = await bot.fetch_user_member(argv, guild)
-        data = await create_future(bot.data.users.fetch_events, user.id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
+            if not regexp("^<#[0-9]+>$").match(argv):
+                with suppress():
+                    user = bot.cache.guilds[int(argv)]
+            if user is None:
+                try:
+                    user = bot.cache.channels[int(argv)]
+                except:
+                    user = await bot.fetch_user_member(argv, guild)
+                else:
+                    u_id = f"#{user.id}"
+        if not u_id:
+            u_id = user.id
+        data = await create_future(bot.data.users.fetch_events, u_id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
         with discord.context_managers.Typing(channel):
             resp = await process_image("plt_special", "$", (data, str(user)), guild)
             fn = resp[0]
@@ -2188,12 +2195,16 @@ class UpdateUsers(Database):
 
     # User seen, add event to activity database
     def _seen_(self, user, delay, event, count=1, raw=None, **void):
-        self.send_event(user.id, event, count=count)
+        if issubclass(type(user), discord.abc.GuildChannel) or type(user) == discord.DMChannel:
+            u_id = "#" + str(user.id)
+        else:
+            u_id = user.id
+        self.send_event(u_id, event, count=count)
         if type(user) in (discord.User, discord.Member):
-            add_dict(self.data, {user.id: {"last_seen": 0}})
-            self.data[user.id]["last_seen"] = utc() + delay
-            self.data[user.id]["last_action"] = raw
-        self.update(user.id)
+            add_dict(self.data, {u_id: {"last_seen": 0}})
+            self.data[u_id]["last_seen"] = utc() + delay
+            self.data[u_id]["last_action"] = raw
+        self.update(u_id)
 
     # User executed command, add to activity database
     def _command_(self, user, loop, command, **void):
