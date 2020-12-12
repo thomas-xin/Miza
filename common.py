@@ -468,7 +468,20 @@ class FileHashDict(collections.abc.MutableMapping):
             with self.sem:
                 with open(fn, "rb") as f:
                     s = f.read()
-            data = select_and_loads(s, mode="unsafe")
+            data = BaseException
+            with tracebacksuppressor:
+                data = select_and_loads(s, mode="unsafe")
+            if data is BaseException:
+                for file in sorted(os.listdir("backup"), reverse=True):
+                    with tracebacksuppressor:
+                        z = zipfile.ZipFile("backup/" + file, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
+                        s = z.open(fn).read()
+                        z.close()
+                        data = select_and_loads(s, mode="unsafe")
+                        print(f"Successfully recovered backup of {fn} from {file}.")
+                        break
+            if data is BaseException:
+                raise BaseException(k)
             self.data[k] = data
             return data
         raise KeyError(k)
