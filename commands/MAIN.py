@@ -1170,7 +1170,7 @@ class Activity(Command):
                     user = bot.cache.guilds[int(argv)]
             if user is None:
                 try:
-                    user = bot.cache.channels[int(argv)]
+                    user = bot.cache.channels[verify_id(argv)]
                 except:
                     user = await bot.fetch_user_member(argv, guild)
                 else:
