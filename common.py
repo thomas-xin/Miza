@@ -748,15 +748,16 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
     raise exc
 
 # Sends a message to a channel, then adds reactions accordingly.
-async def send_with_react(channel, *args, reacts=(), reference=None, mention=False, **kwargs):
+async def send_with_react(channel, *args, reacts=None, reference=None, mention=False, **kwargs):
     with tracebacksuppressor:
         if reference:
             sent = await send_with_reply(channel, reference, *args, mention=mention, **kwargs)
         else:
             sent = await channel.send(*args, **kwargs)
-        for react in reacts:
-            async with delay(1 / 3):
-                create_task(sent.add_reaction(react))
+        if reacts:
+            for react in reacts:
+                async with delay(1 / 3):
+                    create_task(sent.add_reaction(react))
 
 
 # Creates and starts a coroutine for typing in a channel.
