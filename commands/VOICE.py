@@ -1681,7 +1681,7 @@ class AudioDownloader:
         return out
     
     def ydl_errors(self, s):
-        return "403" in s or "429" in s or "no video formats found" in s or "unable to extract video data" in s or "unable to extract js player" in s or "geo restriction" in s or "information found in video info" in s
+        return not ("video unavailable" in s or "this video is not available" in s or "this video contains content from" in s)
 
     # Repeatedly makes calls to youtube-dl until there is no more data to be collected.
     def extract_true(self, url):
