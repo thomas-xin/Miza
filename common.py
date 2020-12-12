@@ -699,7 +699,7 @@ async def recursive_coro(item):
 
 REPLY_SEM = cdict()
 
-async def send_with_reply(channel, reference, content="", embed=None, tts=None):
+async def send_with_reply(channel, reference, content="", embed=None, tts=None, mention=False):
     try:
         sem = REPLY_SEM[channel.id]
     except KeyError:
@@ -709,6 +709,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None):
     data = dict(
         content=content,
         message_reference=dict(message_id=str(verify_id(reference))),
+        allowed_mentions=dict(parse=["users", "roles", "everyone"], replied_user=mention)
     )
     if embed is not None:
         data["embed"] = embed.to_dict()
@@ -734,10 +735,10 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None):
     raise exc
 
 # Sends a message to a channel, then adds reactions accordingly.
-async def send_with_react(channel, *args, reacts=(), reference=None, **kwargs):
+async def send_with_react(channel, *args, reacts=(), reference=None, mention=False, **kwargs):
     with tracebacksuppressor:
         if reference:
-            sent = await send_with_reply(channel, reference, *args, **kwargs)
+            sent = await send_with_reply(channel, reference, *args, mention=mention, **kwargs)
         else:
             sent = await channel.send(*args, **kwargs)
         for react in reacts:
