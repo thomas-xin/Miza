@@ -1665,6 +1665,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             self.modload.append(create_future(self.get_module, f, priority=True))
         self.loaded = True
 
+    def clear_cache(self):
+        i = 0
+        for f in os.listdir("cache"):
+            if f.startswith("\x7f") or f.startswith("attachment_") or f.startswith("emoji_") or f.endswith(".opus"):
+                pass
+            else:
+                i += 1
+                create_future_ex(os.remove, "cache/" + f)
+        if i > 1:
+            print(f"{i} cached files flagged for deletion.")
+        return i
+
     # Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
     def update(self):
         self.update_embeds()
@@ -1684,6 +1696,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             os.mkdir("backup")
         fn = f"backup/saves.{datetime.datetime.utcnow().date()}.zip"
         if not os.path.exists(fn):
+            create_future_ex(self.clear_cache, priority=True)
             await_fut(self.send_event("_save_"))
             z = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
             for folder in os.listdir("saves"):
