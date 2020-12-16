@@ -1690,7 +1690,7 @@ class AudioDownloader:
                 return self.search_yt(regexp("ytsearch[0-9]*:").sub("", url, 1))[0]
             resp = self.extract_from(url)
             if "entries" in resp:
-                resp = next(iter(resp["entries"]))  
+                resp = next(iter(resp["entries"]))
             if "duration" in resp and "formats" in resp:
                 return resp
             try:

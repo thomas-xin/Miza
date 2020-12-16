@@ -80,8 +80,8 @@ class IMG(Command):
         images = imglists.get(guild.id, {})
         if "a" in flags or "e" in flags or "d" in flags:
             if message.attachments:
-                args = [best_url(a) for a in message.attachments] + args
-                argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
+                args.extend(best_url(a) for a in message.attachments)
+                argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
             req = 2
             if perm < req:
                 reason = "to change image list for " + guild.name
