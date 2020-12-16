@@ -719,7 +719,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
         sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
     if not reference:
         return await channel.send(content, embed=embed, tts=tts)
-    if type(channel) not in (discord.abc.GuildChannel, discord.DMChannel):
+    if not issubclass(type(channel), discord.abc.GuildChannel) and type(channel) is not discord.DMChannel:
         c = channel.dm_channel
         if c is None:
             c = await channel.create_dm()
