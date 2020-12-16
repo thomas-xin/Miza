@@ -219,7 +219,7 @@ def create_gif(in_type, args, delay):
     count = len(imgs)
     if imgs[0].size[0] != size[0]:
         imgs = (resize_to(img, *size, operation="hamming") for img in imgs)
-    return dict(duration=delay * len(imgs), count=count, frames=imgs)
+    return dict(duration=delay * count, count=count, frames=imgs)
 
 def rainbow_gif2(image, duration):
     total = 0

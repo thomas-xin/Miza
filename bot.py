@@ -1050,6 +1050,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     return self.data.perms[guild.id][guild.id]
                 return -inf
             return self.get_role_perms(r, guild)
+        if m.bot:
+            try:
+                return self.data.perms[guild.id][guild.id]
+            except KeyError:
+                return 0
         p = m.guild_permissions
         if p.administrator:
             return inf
@@ -2550,7 +2555,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             while not self.closed:
                 d = await delayed_coro(create_future(os.path.exists, self.heartbeat, priority=True), 1 / 3)
                 if d:
-                    with tracebacksuppressor(FileNotFoundError):
+                    with tracebacksuppressor(FileNotFoundError, PermissionError):
                         await create_future(os.rename, self.heartbeat, self.heartbeat_ack, priority=True)
 
     # User seen event
