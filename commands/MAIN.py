@@ -1267,12 +1267,22 @@ class Invite(Command):
     name = ["OAuth", "InviteBot", "InviteLink"]
     description = "Sends a link to ⟨MIZA⟩'s homepage and invite code."
     
-    def __call__(self, channel, message, **void):
+    async def __call__(self, channel, message, **void):
         if discord_id is None:
             raise FileNotFoundError("Unable to locate bot's Client ID.")
         emb = discord.Embed(colour=rand_colour())
         emb.set_author(**get_author(self.bot.user))
-        emb.description = f"[**`Homepage`**]({self.bot.website}) [**`Invite`**](https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord_id}&scope=bot)"
+        emb.description = f"[**`My Github`**]({self.bot.website}) [**`My Website`**](http://{self.bot.ip}:9801) [**`My Invite`**](https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord_id}&scope=bot%20applications.commands)"
+        if message.guild:
+            member = message.guild.get_member(self.bot.id)
+            if member.guild_permissions.create_instant_invite:
+                invites = await member.guild.invites()
+                if not invites:
+                    channel = await self.bot.get_first_sendable(member.guild, member)
+                    invite = await channel.create_invite(reason="Invite command")
+                else:
+                    invite = sorted(invites, key=lambda invite: (invite.max_age == 0, invite.max_uses - invite.uses != 0, len(invite.url)))[0]
+                emb.description += f" [**`Server Invite`**]({invite.url})"
         self.bot.send_embeds(channel, embed=emb, reference=message)
 
 
