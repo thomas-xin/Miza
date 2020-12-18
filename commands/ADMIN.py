@@ -1532,7 +1532,7 @@ class UpdateMessageLogs(Database):
                 emb = discord.Embed(colour=0x00FFFF)
                 emb.set_author(**get_author(u))
                 emb.description = f"**Slash command executed in** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
-                emb.description += "/" + message_repr(message, limit=2048 - len(emb.description) - 1)
+                emb.description += message_repr(message, limit=2048 - len(emb.description))
                 self.bot.send_embeds(channel, emb)
 
     # Edit events are rather straightforward to log

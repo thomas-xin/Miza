@@ -1989,7 +1989,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 create_task(self.garbage_collect(u))
 
     # Processes a message, runs all necessary commands and bot events. May be called from another source.
-    async def process_message(self, message, msg, edit=True, orig=None, loop=False, parse=True):
+    async def process_message(self, message, msg, edit=True, orig=None, loop=False, slash=False):
         if self.closed:
             return
         cpy = msg
@@ -2003,7 +2003,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             g_id = guild.id
         else:
             g_id = 0
-        if parse:
+        if not slash:
             if u_id != self.id:
                 # Strip quote from message.
                 if msg[:2] == "> ":
@@ -2034,7 +2034,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             prefix = self.prefix
         else:
             prefix = self.get_prefix(guild)
-        if parse:
+        if not slash:
             op = False
             comm = msg
             # Mentioning the bot serves as an alias for the prefix.
@@ -2048,7 +2048,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 comm = comm[len(prefix):].strip()
                 op = True
         else:
-            comm = msg
+            comm = msg[1:]
             op = True
         # Respond to blacklisted users attempting to use a command, or when mentioned without a command.
         if (u_perm <= -inf and (op or self.id in (member.id for member in message.mentions))):
@@ -3173,8 +3173,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     cdata = d.get("data")
                     name = cdata["name"]
                     args = [i.get("value", "") for i in cdata.get("options", ())]
-                    argv = " ".join(i for i in args if i)
-                    message.content = name + " " + argv
+                    argv = "" ".join(i for i in args if i)
+                    message.content = "/" + name + " " + argv
                     try:
                         message.id = int(cdata["id"])
                     except KeyError:
@@ -3202,7 +3202,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     message.channel = channel
                     message.slash = True
                     message.noref = True
-                    return await self.process_message(message, message.content, parse=False)
+                    return await self.process_message(message, message.content, slash=True)
 
         # Message edit event: processes edited message, uses raw payloads rather than discord.py message cache. calls _edit_ and _seen_ bot database events.
         @self.event
