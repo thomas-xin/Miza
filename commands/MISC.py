@@ -240,7 +240,7 @@ def _m2f(mem, val):
 class CS_mem2flag(Command):
     name = ["CS_m2f"]
     description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
-    usage = "<0:address> <1:value[1]>"
+    usage = "<0:address> <1:value(1)>?"
     rate_limit = 1
 
     async def __call__(self, bot, args, user, **void):
@@ -323,7 +323,7 @@ class CS_hex2xml(Command):
 class CS_npc(Command):
     time_consuming = True
     description = "Searches the Cave Story NPC list for an NPC by name or ID."
-    usage = "<query> <condensed(?c)>"
+    usage = "<query> <condensed{?c}>?"
     flags = "c"
     no_parse = True
     rate_limit = 2
@@ -360,7 +360,7 @@ class CS_npc(Command):
 
 class CS_tsc(Command):
     description = "Searches the Cave Story OOB flags list for a memory variable."
-    usage = "<query> <condensed(?c)>"
+    usage = "<query> <condensed{?c}>?"
     flags = "c"
     no_parse = True
     rate_limit = 2
@@ -447,7 +447,7 @@ class MathQuiz(Command):
     name = ["MathTest", "MQ"]
     min_level = 1
     description = "Starts a math quiz in the current channel."
-    usage = "<mode(easy)(hard)> <disable(?d)>"
+    usage = "(easy|hard)? <disable{?d}>?"
     flags = "aed"
     rate_limit = 3
 
@@ -753,7 +753,7 @@ class DeviantArt(Command):
     server_only = True
     min_level = 2
     description = "Subscribes to a DeviantArt Gallery, reposting links to all new posts."
-    usage = "<reversed(?r)> <disable(?d)>"
+    usage = "(add|remove)? <reversed{?r}>?"
     flags = "raed"
     rate_limit = 4
 

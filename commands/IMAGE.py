@@ -69,10 +69,11 @@ def get_video(url, fps):
 class IMG(Command):
     min_display = "0~2"
     description = "Sends an image in the current chat from a list."
-    usage = "<tags[]> <url[]> <verbose(?v)> <random(?r)> <add(?a)> <delete(?d)> <hide(?h)> <debug(?z)>"
+    usage = "(add|delete)? <0:tags>* <1:url>? <verbose{?v}|hide{?h}>?"
     flags = "vraedhzf"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    slash = True
 
     async def __call__(self, bot, flags, args, argv, user, message, channel, guild, perm, **void):
         update = self.data.images.update
@@ -197,11 +198,12 @@ class React(Command):
     name = ["AutoReact"]
     min_level = 2
     description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
-    usage = "<0:react_to[]> <1:react_data[]> <disable(?d)> <debug(?z)>"
+    usage = "<0:react_to>? <1:react_data>? <disable{?d}>?"
     flags = "aedzf"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = (1, 2)
+    slash = True
 
     async def __call__(self, bot, flags, guild, message, user, argv, args, **void):
         update = self.data.reacts.update
@@ -310,12 +312,13 @@ class CreateEmoji(Command):
     name = ["EmojiCreate", "EmojiCopy", "CopyEmoji", "Emoji"]
     min_level = 2
     description = "Creates a custom emoji from a URL or attached file."
-    usage = "<1:name> <0:url{attached_file}>"
+    usage = "<1:name>+ <0:url>"
     flags = "aed"
     no_parse = True
     rate_limit = (3, 6)
     _timeout_ = 3
     typing = True
+    slash = ("Emoji",)
 
     async def __call__(self, bot, user, guild, channel, message, args, argv, _timeout, **void):
         # Take input from any attachments, or otherwise the message contents
@@ -428,7 +431,7 @@ async def get_image(bot, user, message, args, argv, default=2, ext="png"):
 class Saturate(Command):
     name = ["Saturation", "ImageSaturate"]
     description = "Changes colour saturation of supplied image."
-    usage = "<0:url{attached_file}> <1:multiplier[2]>"
+    usage = "<0:url> <1:multiplier(2)>?"
     no_parse = True
     rate_limit = (2, 5)
     _timeout_ = 3
@@ -450,7 +453,7 @@ class Saturate(Command):
 class Contrast(Command):
     name = ["ImageContrast"]
     description = "Changes colour contrast of supplied image."
-    usage = "<0:url{attached_file}> <1:multiplier[2]>"
+    usage = "<0:url> <1:multiplier(2)>?"
     no_parse = True
     rate_limit = (2, 5)
     _timeout_ = 3
@@ -472,7 +475,7 @@ class Contrast(Command):
 class Brightness(Command):
     name = ["Brighten", "ImageBrightness"]
     description = "Changes colour brightness of supplied image."
-    usage = "<0:url{attached_file}> <1:multiplier[2]>"
+    usage = "<0:url> <1:multiplier(2)>?"
     no_parse = True
     rate_limit = (2, 5)
     _timeout_ = 3
@@ -494,7 +497,7 @@ class Brightness(Command):
 class Sharpness(Command):
     name = ["Sharpen", "ImageSharpness"]
     description = "Changes colour sharpness of supplied image."
-    usage = "<0:url{attached_file}> <1:multiplier[2]>"
+    usage = "<0:url> <1:multiplier(2)>?"
     no_parse = True
     rate_limit = (2, 5)
     _timeout_ = 3
@@ -516,7 +519,7 @@ class Sharpness(Command):
 class HueShift(Command):
     name = ["Hue"]
     description = "Changes colour hue of supplied image."
-    usage = "<0:url{attached_file}> <1:adjustment[0.5]>"
+    usage = "<0:url> <1:adjustment(0.5)>?"
     no_parse = True
     rate_limit = (2, 5)
     _timeout_ = 3
@@ -538,7 +541,7 @@ class HueShift(Command):
 class Blur(Command):
     name = ["Gaussian", "GaussianBlur"]
     description = "Applies Gaussian Blur to supplied image."
-    usage = "<0:url{attached_file}> <1:radius[8]>"
+    usage = "<0:url> <1:radius(8)>?"
     no_parse = True
     rate_limit = (2, 5)
     _timeout_ = 3
@@ -561,7 +564,7 @@ class ColourDeficiency(Command):
     name = ["ColorBlind", "ColourBlind", "ColorBlindness", "ColourBlindness", "ColorDeficiency"]
     alias = name + ["Protanopia", "Protanomaly", "Deuteranopia", "Deuteranomaly", "Tritanopia", "Tritanomaly", "Achromatopsia", "Achromatonomaly"]
     description = "Applies a colourblindness filter to the target image."
-    usage = "<0:url{attached_file}> <type[deuteranomaly]> <1:ratio[0.9]>"
+    usage = "<0:url> (protanopia|protanomaly|deuteranopia|deuteranomaly|tritanopia|tritanomaly|achromatopsia|achromatonomaly)? <1:ratio(0.9)>?"
     no_parse = True
     rate_limit = (3, 7)
     _timeout_ = 3.5
@@ -632,7 +635,7 @@ class ColourDeficiency(Command):
 class RemoveMatte(Command):
     name = ["RemoveColor", "RemoveColour"]
     description = "Removes a colour from the supplied image."
-    usage = "<0:url{attached_file}> <colour[255, 255, 255]>"
+    usage = "<0:url> <colour(#FFFFFF)>?"
     no_parse = True
     rate_limit = (4, 9)
     _timeout_ = 4.5
@@ -691,7 +694,7 @@ class RemoveMatte(Command):
 class Invert(Command):
     name = ["Negate"]
     description = "Inverts supplied image."
-    usage = "<0:url{attached_file}>"
+    usage = "<url>"
     no_parse = True
     rate_limit = (2, 4.5)
     _timeout_ = 3
@@ -713,7 +716,7 @@ class Invert(Command):
 class GreyScale(Command):
     name = ["GrayScale"]
     description = "Greyscales supplied image."
-    usage = "<0:url{attached_file}>"
+    usage = "<url>"
     no_parse = True
     rate_limit = (2, 4.5)
     _timeout_ = 3
@@ -734,7 +737,7 @@ class GreyScale(Command):
 
 class Magik(Command):
     description = "Applies the Magik image filter to supplied image."
-    usage = "<0:url{attached_file}> <cell_size[7]>"
+    usage = "<0:url> <cell_size(7)>?"
     no_parse = True
     rate_limit = (3, 7)
     _timeout_ = 4
@@ -756,7 +759,7 @@ class Magik(Command):
 class Colour(Command):
     name = ["RGB", "HSV", "CMY", "LAB", "LUV", "XYZ", "Color"]
     description = "Creates a 128x128 image filled with the target colour."
-    usage = "<Colour>"
+    usage = "<colour>"
     no_parse = True
     rate_limit = (1, 3)
     flags = "v"
@@ -768,6 +771,7 @@ class Colour(Command):
         "xyz": xyz_to_rgb,
     }
     typing = True
+    slash = True
 
     async def __call__(self, bot, user, channel, name, argv, **void):
         channels = parse_colour(argv)
@@ -799,7 +803,7 @@ class Colour(Command):
 class Average(Command):
     name = ["AverageColour"]
     description = "Computes the average pixel colour in RGB for the supplied image."
-    usage = "<url{attached_file}>"
+    usage = "<url>"
     no_parse = True
     rate_limit = (2, 6)
     _timeout_ = 2
@@ -855,7 +859,7 @@ class Average(Command):
 class Rainbow(Command):
     name = ["RainbowGIF"]
     description = "Creates a .gif image from repeatedly hueshifting supplied image."
-    usage = "<0:url{attached_file}> <1:duration[2]>"
+    usage = "<0:url> <1:duration(2)>?"
     no_parse = True
     rate_limit = (5, 12)
     _timeout_ = 4
@@ -873,7 +877,7 @@ class Rainbow(Command):
 class Spin(Command):
     name = ["SpinGIF"]
     description = "Creates a .gif image from repeatedly rotating supplied image."
-    usage = "<0:url{attached_file}> <1:duration[2]>"
+    usage = "<0:url> <1:duration(2)>?"
     no_parse = True
     rate_limit = (5, 11)
     _timeout_ = 4
@@ -891,7 +895,7 @@ class Spin(Command):
 class GMagik(Command):
     name = ["MagikGIF"]
     description = "Repeatedly applies the Magik image filter to supplied image."
-    usage = "<0:url{attached_file}> <cell_size[7]>"
+    usage = "<0:url> <cell_size(7)>?"
     no_parse = True
     rate_limit = (7, 13)
     _timeout_ = 4
@@ -908,7 +912,7 @@ class GMagik(Command):
 class Liquefy(Command):
     name = ["LiquidGIF"]
     description = "Repeatedly applies slight distortion to supplied image."
-    usage = "<0:url{attached_file}> <cell_size[12]>"
+    usage = "<0:url> <cell_size(12)>?"
     no_parse = True
     rate_limit = (7, 14)
     _timeout_ = 4
@@ -925,7 +929,7 @@ class Liquefy(Command):
 class CreateGIF(Command):
     name = ["Animate", "GIF"]
     description = "Combines multiple supplied images, and/or optionally a video, into an animated .gif image."
-    usage = "<0*:urls{attached_files}> <-2:framerate_setting(?r)> <-1:framerate[16]>"
+    usage = "<0:url>+ <-2:framerate_setting{?r}>? <-1:framerate(16)>?"
     no_parse = True
     rate_limit = (8, 24)
     _timeout_ = 10
@@ -987,7 +991,7 @@ class CreateGIF(Command):
 class Resize(Command):
     name = ["ImageScale", "Scale", "Rescale", "ImageResize"]
     description = "Changes size of supplied image, using an optional scaling operation."
-    usage = "<0:url{attached_file}> <1:x_multiplier[0.5]> <2:y_multiplier[x]> <3:operation[auto](?l)>"
+    usage = "<0:url> <1:x_multiplier(0.5)>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|auto)?"
     no_parse = True
     rate_limit = (3, 6)
     flags = "l"
@@ -1070,7 +1074,7 @@ class Resize(Command):
 class Fill(Command):
     name = ["ImageFill", "FillChannel", "FillImage"]
     description = "Fills an optional amount of channels in the target image with an optional value."
-    usage = "<0:url{attached_file}> <1*:channels(r)(g)(b)(c)(m)(y)(h)(s)(v)(a)> <-1:value[0]>"
+    usage = "<0:url> [rgbcmyhsva]* <-1:value(0)>?"
     no_parse = True
     rate_limit = (3, 6)
     flags = "l"
@@ -1139,7 +1143,7 @@ class Fill(Command):
 class Blend(Command):
     name = ["ImageBlend", "ImageOP"]
     description = "Combines the two supplied images, using an optional blend operation."
-    usage = "<0:url1{attached_file}> <1:url2{attached_file}> <2:operation[blend](?l)> <3:opacity[0.5][1]>"
+    usage = "<0:url1> <1:url2> (replace|add|sub|mul|div|mod|and|or|xor|nand|nor|xnor|difference|overlay|screen|soft|hard|lighten|darken|plusdarken|overflow|burn|linearburn|dodge|hue|sat|lum|colour|extract|merge)? <3:opacity(0.5|1)>?"
     no_parse = True
     rate_limit = (3, 8)
     flags = "l"
@@ -1230,7 +1234,7 @@ class Blend(Command):
 
 
 class ImagePool:
-    usage = "<verbose(?v)>"
+    usage = "<verbose{?v}>?"
     flags = "v"
     rate_limit = (0.1, 0.25)
 
@@ -1245,6 +1249,7 @@ class Cat(ImagePool, Command):
     description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it. Be sure to check out ⟨WEBSERVER⟩/cats"
     database = "cats"
     name = ["🐱", "Meow"]
+    slash = True
 
     async def fetch_one(self):
         if random.random() > 2 / 3:
@@ -1271,6 +1276,7 @@ class Dog(ImagePool, Command):
     description = "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it. Be sure to check out ⟨WEBSERVER⟩/dogs"
     database = "dogs"
     name = ["🐶", "Woof"]
+    slash = True
 
     async def fetch_one(self):
         if random.random() > 2 / 3:

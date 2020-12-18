@@ -37,8 +37,9 @@ help_colours = fcdict({
 class Help(Command):
     name = ["❓", "❔", "?"]
     description = "Shows a list of usable commands, or gives a detailed description of a command."
-    usage = "<command{all}> <category{all}> <verbose(?v)>"
+    usage = "<(command|category)>? <verbose{?v}>?"
     flags = "v"
+    slash = True
 
     async def __call__(self, args, user, channel, guild, message, flags, perm, **void):
         bot = self.bot
@@ -100,21 +101,38 @@ class Help(Command):
 
 class Hello(Command):
     name = ["👋", "Hi", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
-    description = "Sends a waving emoji. Useful for checking whether the bot is online."
+    description = "Sends a greeting message. Useful for checking whether the bot is online."
+    usage = "<user>?"
+    slash = True
     
-    def __call__(self, bot, user, **void):
+    async def __call__(self, bot, user, name, argv, guild, **void):
         if "dailies" in bot.data:
             bot.data.dailies.progress_quests(user, "talk")
-        return "👋"
+        if argv:
+            user = await bot.fetch_user_member(argv, guild)
+        if name in ("bye", "cya", "goodbye"):
+            start = choice("Bye", "Cya", "Goodbye")
+        else:
+            start = choice("Hi", "Hello", "Hey", "'sup")
+        middle = choice(user.name, user.display_name)
+        if name in ("bye", "cya", "goodbye"):
+            end = choice("", "See you soon!", "Have a good one!", "Later!", "Talk to you again sometime!", "Was nice talking to you!")
+        else:
+            end = choice("", "How are you?", "Can I help you?", "What can I do for you today?", "Nice to see you!", "Always good to see you!")
+        out = "👋 " + start + ", `" + middle + "`!"
+        if end:
+            out += " " + end
+        return out
 
 
 class Perms(Command):
     server_only = True
     name = ["ChangePerms", "Perm", "ChangePerm", "Permissions"]
     description = "Shows or changes a user's permission level."
-    usage = "<0:*users{self}> <1:level[]> <hide(?h)> <default(?d)>"
+    usage = "<0:users>* <1:new_level>? <default{?d}>? <hide{?h}>?"
     flags = "fhd"
     multi = True
+    slash = True
 
     async def __call__(self, bot, args, argl, user, perm, channel, guild, flags, **void):
         # Get target user from first argument
@@ -164,8 +182,9 @@ class EnabledCommands(Command):
     name = ["EC", "Enable"]
     min_display = "0~3"
     description = "Shows, enables, or disables a command category in the current channel."
-    usage = "<command{all}> <add(?e)> <remove(?d)> <list(?l)> <hide(?h)>"
+    usage = "(enable|disable)? <category>? <list{?l}>? <hide{?h}>?"
     flags = "aedlh"
+    slash = True
 
     def __call__(self, argv, args, flags, user, channel, guild, perm, **void):
         update = self.data.enabled.update
@@ -238,11 +257,12 @@ class Prefix(Command):
     name = ["ChangePrefix"]
     min_display = "0~3"
     description = "Shows or changes the prefix for ⟨MIZA⟩'s commands for this server."
-    usage = "<prefix[]> <default(?d)>"
+    usage = "<new_prefix>? <default{?d}>?"
     flags = "hd"
     umap = {c: "" for c in ZeroEnc}
     umap["\u200a"] = ""
     utrans = "".maketrans(umap)
+    slash = True
 
     def __call__(self, argv, guild, perm, bot, flags, **void):
         pref = bot.data.prefixes
@@ -275,7 +295,7 @@ class Loop(Command):
     min_level = 1
     min_display = "1+"
     description = "Loops a command."
-    usage = "<0:iterations> <1:command>"
+    usage = "<0:iterations> <1:command>+"
     rate_limit = (3, 7)
 
     async def __call__(self, args, argv, message, channel, bot, perm, user, guild, **void):
@@ -335,8 +355,9 @@ class Loop(Command):
 class Avatar(Command):
     name = ["PFP", "Icon"]
     description = "Sends a link to the avatar of a user or server."
-    usage = "<*objects>"
+    usage = "<objects>*"
     multi = True
+    slash = True
 
     async def getGuildData(self, g):
         # Gets icon display of a server and returns as an embed.
@@ -436,10 +457,11 @@ class Avatar(Command):
 class Info(Command):
     name = ["🔍", "🔎", "UserInfo", "ServerInfo", "WhoIs"]
     description = "Shows information about the target user or server."
-    usage = "<*objects> <verbose(?v)>"
+    usage = "<objects>* <verbose{?v}>?"
     flags = "v"
     rate_limit = 1
     multi = True
+    slash = True
 
     async def getGuildData(self, g, flags={}):
         bot = self.bot
@@ -801,9 +823,10 @@ class Info(Command):
 class Insights(Command):
     name = ["📊", "UserInsights", "ServerInsights"]
     description = "Shows statistics relevant to the target user or server."
-    usage = "<*objects>"
+    usage = "<objects>*"
     rate_limit = 1
     multi = True
+    slash = True
 
     async def getGuildData(self, g, flags={}):
         bot = self.bot
@@ -1082,10 +1105,11 @@ class Insights(Command):
 class Profile(Command):
     name = ["User", "UserProfile"]
     description = "Shows or edits a user profile on ⟨MIZA⟩."
-    usage = "<user[]> | <option(description)(timezone)(birthday)> <value[]> <delete(?d)>"
+    usage = "(user|description|timezone|birthday)? <value>? <delete{?d}>?"
     flags = "d"
     rate_limit = 1
     no_parse = True
+    slash = True
     
     async def __call__(self, user, args, argv, flags, channel, guild, bot, **void):
         setting = None
@@ -1156,10 +1180,11 @@ class Profile(Command):
 class Activity(Command):
     name = ["Recent", "Log"]
     description = "Shows recent Discord activity for the targeted user, server, or channel."
-    usage = "<user> <verbose(?v)>"
+    usage = "<user>? <verbose{?v}>?"
     flags="v"
     rate_limit = (2, 9)
     typing = True
+    slash = True
 
     async def __call__(self, guild, user, argv, flags, channel, bot, _timeout, **void):
         u_id = None
@@ -1188,8 +1213,9 @@ class Activity(Command):
 class Status(Command):
     name = ["State", "Ping"]
     description = "Shows the bot's current internal program state."
-    usage = "<enable(?e)> <disable(?d)>"
+    usage = "(enable|disable)?"
     flags = "aed"
+    slash = True
 
     async def __call__(self, perm, flags, channel, bot, **void):
         if "d" in flags:
@@ -1265,7 +1291,8 @@ class Status(Command):
 
 class Invite(Command):
     name = ["OAuth", "InviteBot", "InviteLink"]
-    description = "Sends a link to ⟨MIZA⟩'s homepage and invite code."
+    description = "Sends a link to ⟨MIZA⟩'s homepage, github and invite code, as well as an invite link to the current server if applicable."
+    slash = True
     
     async def __call__(self, channel, message, **void):
         if discord_id is None:
@@ -1274,28 +1301,30 @@ class Invite(Command):
         emb.set_author(**get_author(self.bot.user))
         emb.description = f"[**`My Github`**]({self.bot.website}) [**`My Website`**](http://{self.bot.ip}:9801) [**`My Invite`**](https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord_id}&scope=bot%20applications.commands)"
         if message.guild:
-            member = message.guild.get_member(self.bot.id)
-            if member.guild_permissions.create_instant_invite:
-                invites = await member.guild.invites()
-                if not invites:
-                    channel = await self.bot.get_first_sendable(member.guild, member)
-                    invite = await channel.create_invite(reason="Invite command")
-                else:
-                    invite = sorted(invites, key=lambda invite: (invite.max_age == 0, invite.max_uses - invite.uses != 0, len(invite.url)))[0]
-                emb.description += f" [**`Server Invite`**]({invite.url})"
+            with tracebacksuppressor:
+                member = message.guild.get_member(self.bot.id)
+                if member.guild_permissions.create_instant_invite:
+                    invites = await member.guild.invites()
+                    if not invites:
+                        channel = await self.bot.get_first_sendable(member.guild, member)
+                        invite = await channel.create_invite(reason="Invite command")
+                    else:
+                        invite = sorted(invites, key=lambda invite: (invite.max_age == 0, invite.max_uses - invite.uses != 0, len(invite.url)))[0]
+                    emb.description += f" [**`Server Invite`**]({invite.url})"
         self.bot.send_embeds(channel, embed=emb, reference=message)
 
 
 class Reminder(Command):
     name = ["Announcement", "Announcements", "Announce", "RemindMe", "Reminders", "Remind"]
     description = "Sets a reminder for a certain date and time."
-    usage = "<1:message> <0:time> <urgent(?u)> <disable(?d)>"
+    usage = "<1:message>? <0:time>? <urgent{?u}>? <delete{?d}>?"
     flags = "aedu"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = (1 / 3, 4)
     keywords = ["on", "at", "in", "when", "event"]
     keydict = {re.compile(f"(^|[^a-z0-9]){i[::-1]}([^a-z0-9]|$)", re.I): None for i in keywords}
     timefind = None
+    slash = True
 
     def __load__(self):
         self.timefind = re.compile("(?:(?:(?:[0-9]+:)+[0-9.]+\\s*(?:am|pm)?|" + self.bot.num_words + "|[\\s\-+*\\/^%.,0-9]+\\s*(?:am|pm|s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\\s\\-_]year)s?))\\s*)+$", re.I)

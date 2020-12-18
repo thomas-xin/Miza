@@ -293,11 +293,11 @@ with tracebacksuppressor:
 if not enc_key:
     enc_key = AUTH["encryption_key"] = base64.b64encode(randbytes(32)).decode("utf-8", "replace")
     try:
-        s = json.dumps(AUTH).encode("utf-8")
+        s = json.dumps(AUTH, indent=4)
     except:
         print_exc()
-        s = repr(AUTH).encode("utf-8")
-    with open("auth.json", "wb") as f:
+        s = repr(AUTH)
+    with open("auth.json", "w", encoding="utf-8") as f:
         f.write(s)
 
 enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
@@ -717,7 +717,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
         sem = REPLY_SEM[channel.id]
     except KeyError:
         sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
-    if not reference:
+    if not reference or getattr(reference, "noref", None):
         return await channel.send(content, embed=embed, tts=tts)
     if not issubclass(type(channel), discord.abc.GuildChannel) and not issubclass(type(channel), discord.abc.PrivateChannel):
         c = channel.dm_channel
@@ -749,6 +749,8 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             return discord.Message(state=channel._state, channel=channel, data=eval_json(resp))
         except Exception as ex:
             exc = ex
+            if ex.args and "400" in str(ex.args[0]):
+                break
         await asyncio.sleep(i + 1)
     raise exc
 
@@ -1742,6 +1744,7 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
     rate_limit = 0
     description = ""
     usage = ""
+    slash = False
 
     def perm_error(self, perm, req=None, reason=None):
         if req is None:
@@ -1979,7 +1982,7 @@ class __logPrinter:
         out = str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)
         if not out:
             return
-        if type(args[0]) is str and args[0].startswith("WARNING:"):
+        if args and type(args[0]) is str and args[0].startswith("WARNING:"):
             return sys.__stdout__.write(out)
         if file is None:
             file = self.file

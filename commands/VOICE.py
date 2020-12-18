@@ -2274,13 +2274,14 @@ class Queue(Command):
     name = ["▶️", "P", "Q", "Play", "Enqueue"]
     alias = name + ["LS"]
     description = "Shows the music queue, or plays a song in voice."
-    usage = "<*search_links[]> <verbose(?v)> <hide(?h)> <force(?f)> <budge(?b)> <debug(?z)>"
+    usage = "<search_links>* <force{?f}|budge{?b}|verbose{?v}|hide{?h}>*"
     flags = "hvfbz"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     _timeout_ = 2
     rate_limit = (0.5, 3)
     typing = True
+    slash = ("Play", "Queue")
 
     async def __call__(self, bot, user, perm, message, channel, guild, flags, name, argv, **void):
         # This command is a bit of a mess
@@ -2552,11 +2553,12 @@ class Playlist(Command):
     name = ["DefaultPlaylist", "PL"]
     min_display = "0~2"
     description = "Shows, appends, or removes from the default playlist."
-    usage = "<search_link[]> <remove(?d)> <debug(?z)>"
+    usage = "(add|remove)? <search_links>*"
     flags = "aedzf"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = 0.5
     typing = True
+    slash = True
 
     async def __call__(self, user, argv, guild, flags, channel, perm, **void):
         update = self.bot.data.playlists.update
@@ -2678,8 +2680,9 @@ class Connect(Command):
     # Because Rythm also has this alias :P
     alias = name + ["FuckOff"]
     description = "Summons the bot into a voice channel."
-    usage = "<channel{curr}(0)>"
+    usage = "<channel>?"
     rate_limit = (3, 4)
+    slash = ("Join", "Leave")
 
     async def __call__(self, user, channel, name="join", argv="", vc=None, **void):
         bot = self.bot
@@ -2810,9 +2813,10 @@ class Skip(Command):
     name = ["⏭", "🚫", "S", "SK", "CQ", "Remove", "Rem", "ClearQueue", "Clear"]
     min_display = "0~1"
     description = "Removes an entry or range of entries from the voice channel queue."
-    usage = "<0:queue_position[0]> <force(?f)> <vote(?v)> <hide(?h)>"
+    usage = "<queue_positions(0)>* <force{?f}|vote{?v}|hide{?h}>*"
     flags = "fhv"
     rate_limit = (0.5, 3)
+    slash = True
 
     async def __call__(self, bot, user, perm, name, args, argv, guild, flags, message, **void):
         if guild.id not in bot.data.audio.players:
@@ -2962,9 +2966,10 @@ class Pause(Command):
     name = ["⏸️", "⏯️", "Resume", "Unpause", "Stop"]
     min_display = "0~1"
     description = "Pauses, stops, or resumes audio playing."
-    usage = "<hide(?h)>"
+    usage = "<hide{?h}>?"
     flags = "h"
     rate_limit = (0.5, 3)
+    slash = True
 
     async def __call__(self, bot, name, guild, user, perm, channel, flags, **void):
         auds = await auto_join(guild, channel, user, bot)
@@ -3011,9 +3016,10 @@ class Seek(Command):
     name = ["↔️", "Replay"]
     min_display = "0~1"
     description = "Seeks to a position in the current audio file."
-    usage = "<position[0]> <hide(?h)>"
+    usage = "<position(0)>? <hide{?h}>?"
     flags = "h"
     rate_limit = (0.5, 3)
+    slash = True
 
     async def __call__(self, argv, bot, guild, user, perm, channel, name, flags, **void):
         auds = await auto_join(guild, channel, user, bot)
@@ -3043,9 +3049,10 @@ class Dump(Command):
     alias = name + ["Dujmpö"]
     min_display = "0~1"
     description = "Saves or loads the currently playing audio queue state."
-    usage = "<data{attached_file}> <song_positions(?x)> <append(?a)> <hide(?h)>"
+    usage = "<data>? <append{?a}|song_positions{?x}|hide{?h}>*"
     flags = "ahx"
     rate_limit = (1, 2)
+    slash = True
 
     async def __call__(self, guild, channel, user, bot, perm, name, argv, flags, message, vc=None, **void):
         auds = await auto_join(guild, channel, user, bot, vc=vc)
@@ -3193,11 +3200,8 @@ class AudioSettings(Command):
         self.name = list(self.aliasMap)
         self.min_display = "0~2"
         self.description = "Changes the current audio settings for this server."
-        self.usage = (
-            "<value[]> <volume()(?v)> <speed(?s)> <pitch(?p)> <pan(?e)> <bassboost(?b)> <reverb(?r)> <compressor(?c)> <chorus(?u)> <nightcore(?n)>"
-            + " <bitrate(?i)> <loop(?l)> <repeat(?1)> <shuffle(?x)> <quiet(?q)> <stay(?t)> <force_permanent(?f)> <disable_all(?d)> <hide(?h)>"
-        )
-        self.flags = "vspebrcunilxqtfdh"
+        self.usage = "<value>? <volume(?v)|speed(?s)|pitch(?p)|pan(?e)|bassboost(?b)|reverb(?r)|compressor(?c)|chorus(?u)|nightcore(?n)|bitrate(?i)|loop(?l)|repeat(?1)|shuffle(?x)|quiet(?q)|stay(?t)|force_permanent(?f)|disable(?d)|hide(?h)>*"
+        self.flags = "vspebrcunil1xqtfdh"
         self.map = {k.casefold(): self.aliasMap[k] for k in self.aliasMap}
         add_dict(self.map, {k.casefold(): self.aliasExt[k] for k in self.aliasExt})
         super().__init__(*args)
@@ -3341,7 +3345,7 @@ class Rotate(Command):
     name = ["🔄", "Jump"]
     min_display = "0~1"
     description = "Rotates the queue to the left by a certain amount of steps."
-    usage = "<position> <hide(?h)>"
+    usage = "<position>? <hide{?h}>?"
     flags = "h"
     rate_limit = (4, 9)
 
@@ -3368,9 +3372,10 @@ class Shuffle(Command):
     name = ["🔀"]
     min_display = "0~1"
     description = "Shuffles the audio queue."
-    usage = "<force(?f)> <hide(?h)>"
+    usage = "<force_full_shuffle{?f}|hide{?h}>*"
     flags = "fsh"
     rate_limit = (4, 9)
+    slash = True
 
     async def __call__(self, perm, flags, guild, channel, user, bot, **void):
         auds = await auto_join(guild, channel, user, bot)
@@ -3395,7 +3400,7 @@ class Reverse(Command):
     server_only = True
     min_display = "0~1"
     description = "Reverses the audio queue direction."
-    usage = "<hide(?h)>"
+    usage = "<hide{?h}>?"
     flags = "h"
     rate_limit = (4, 9)
 
@@ -3416,7 +3421,7 @@ class UnmuteAll(Command):
     time_consuming = True
     min_level = 3
     description = "Disables server mute/deafen for all members."
-    usage = "<hide(?h)>"
+    usage = "<hide{?h}>?"
     flags = "h"
     rate_limit = 10
 
@@ -3436,7 +3441,7 @@ class VoiceNuke(Command):
     min_level = 3
     name = ["☢️"]
     description = "Removes all users from voice channels in the current server."
-    usage = "<hide(?h)>"
+    usage = "<hide{?h}>?"
     flags = "h"
     rate_limit = 10
 
@@ -3477,9 +3482,10 @@ class Player(Command):
     name = ["NP", "NowPlaying", "Playing"]
     min_display = "0~3"
     description = "Creates an auto-updating virtual audio player for the current server."
-    usage = "<controllable(?c)> <disable(?d)> <show_debug(?z)>"
+    usage = "<enable{?e}|disable{?d}|controllable{?c}>*"
     flags = "cdez"
     rate_limit = (2, 7)
+    slash = True
 
     async def showCurr(self, auds):
         q = auds.queue
@@ -3819,7 +3825,7 @@ class Lyrics(Command):
     time_consuming = True
     name = ["SongLyrics"]
     description = "Searches genius.com for lyrics of a song."
-    usage = "<0:search_link{queue}> <verbose(?v)>"
+    usage = "<search_link>* <verbose{?v}>?"
     flags = "v"
     rate_limit = (2, 6)
     typing = True
@@ -3869,7 +3875,7 @@ class Download(Command):
     _timeout_ = 20
     name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "ConvertORG", "Org2xm", "Convert"]
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
-    usage = "<0:search_link{queue}> <trim(?t)> <-3:trim_start[-]> <-2:trim_end[-]> <-1:out_format[ogg]> <apply_settings(?a)> <verbose_search(?v)> <show_debug(?z)>"
+    usage = "<0:search_links>* <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(ogg)>? <apply_settings{?a}|verbose_search{?v}>*"
     flags = "avtz"
     rate_limit = (7, 16)
     typing = True

@@ -66,10 +66,11 @@ class Translate(Command):
     time_consuming = True
     name = ["TR"]
     description = "Translates a string into another language."
-    usage = "<0:language> <1:string> <verbose(?v)> <papago(?p)>"
+    usage = "<0:language> <1:string> <verbose{?v}>? <papago{?p}>?"
     flags = "pv"
     no_parse = True
     rate_limit = (2, 7)
+    slash = True
 
     async def __call__(self, channel, args, argv, flags, user, message, **void):
         if not args:
@@ -122,10 +123,11 @@ class Math(Command):
     name = ["🔢", "M", "PY", "Sympy", "Plot", "Calc"]
     alias = name + ["Plot3d"]
     description = "Evaluates a math formula."
-    usage = "<function> <verbose(?v)> <rationalize(?r)> <show_variables(?l)> <clear_variables(?c)>"
+    usage = "<string> <verbose{?v}>? <rationalize{?r}>? <show_variables{?l}>? <clear_variables{?c}>?"
     flags = "rvlcd"
     rate_limit = (0.5, 5)
     typing = True
+    slash = True
 
     async def __call__(self, bot, argv, name, channel, guild, flags, user, **void):
         if "l" in flags:
@@ -279,6 +281,7 @@ class Fancy(Command):
     description = "Creates translations of a string using unicode fonts."
     usage = "<string>"
     no_parse = True
+    slash = True
 
     def __call__(self, channel, argv, message, **void):
         if not argv:
@@ -297,6 +300,7 @@ class Zalgo(Command):
     description = "Generates random combining accent symbols between characters in a string."
     usage = "<string>"
     no_parse = True
+    slash = True
     chrs = [chr(n) for n in zalgo_map]
     randz = lambda self: choice(self.chrs)
     def zalgo(self, s, x):
@@ -319,6 +323,7 @@ class Format(Command):
     description = "Creates neatly fomatted text using combining unicode characters."
     usage = "<string>"
     no_parse = True
+    slash = True
     formats = "".join(chr(i) for i in (0x30a, 0x325, 0x303, 0x330, 0x30c, 0x32d, 0x33d, 0x353, 0x35b, 0x20f0))
 
     def __call__(self, channel, argv, message, **void):
@@ -337,6 +342,7 @@ class UnFancy(Command):
     name = ["UnFormat", "UnZalgo"]
     description = "Removes unicode formatting and diacritic characters from inputted text."
     usage = "<string>"
+    slash = True
 
     def __call__(self, argv, **void):
         if not argv:
@@ -354,7 +360,7 @@ class OwOify(Command):
     otrans = "".maketrans(omap)
     name = ["UwU", "OwO", "UwUify"]
     description = "Applies the owo/uwu text filter to a string."
-    usage = "<string> <aggressive(?a)> <basic(?b)>"
+    usage = "<string> <aggressive{?a}>? <basic{?b}>?"
     flags = "ab"
     no_parse = True
 
@@ -516,6 +522,7 @@ class Char2Emoj(Command):
     name = ["C2E"]
     description = "Makes emoji blocks using a string."
     usage = "<0:string> <1:emoji_1> <2:emoji_2>"
+    slash = True
 
     def __call__(self, args, **extra):
         try:
@@ -534,8 +541,9 @@ class Char2Emoj(Command):
 
 class Time(Command):
     name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T"]
-    description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user. Use ⟨WEBSERVER⟩/timezone to find your current time!"
-    usage = "<offset_hours[0]> | <user[]>"
+    description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user. Be sure to check out ⟨WEBSERVER⟩/timezone!"
+    usage = "<offset_hours|user>?"
+    slash = True
 
     async def __call__(self, name, channel, guild, argv, args, user, **void):
         s = 0
@@ -589,8 +597,9 @@ class Time(Command):
 
 
 class Timezone(Command):
-    description = "Shows the current time in a certain timezone. Use ⟨WEBSERVER⟩/timezone to find your current time!"
-    usage = "<timezone> <list(?l)>"
+    description = "Shows the current time in a certain timezone. Be sure to check out ⟨WEBSERVER⟩/timezone!"
+    usage = "<timezone> <list{?l}>?"
+    slash = True
 
     async def __call__(self, channel, argv, message, **void):
         if argv.startswith("-l") or argv.startswith("list"):
@@ -610,7 +619,7 @@ class Timezone(Command):
 class TimeCalc(Command):
     name = ["TimeDifference"]
     description = "Computes the difference between two times, or the Unix timestamp of a datetime string."
-    usage = "<0:time1> | <1:time2[0]>"
+    usage = "<0:time1> <1:time2>?"
     no_parse = True
 
     def __call__(self, argv, user, **void):
@@ -634,7 +643,9 @@ class TimeCalc(Command):
 class Follow(Command):
     name = ["🚶", "follow_url", "Redirect"]
     description = "Follows a discord message link and/or finds URLs in a string."
+    usage = "<url>*"
     rate_limit = (1, 5)
+    slash = True
     
     async def __call__(self, channel, argv, message, **void):
         urls = find_urls(argv)
@@ -658,6 +669,7 @@ class Follow(Command):
 class Match(Command):
     name = ["RE", "RegEx", "RexExp", "GREP"]
     description = "matches two strings using Linux-style RegExp, or computes the match ratio of two strings."
+    usage = "<0:string1> <1:string2>?"
     rate_limit = (0.5, 2)
     no_parse = True
     
@@ -695,6 +707,7 @@ class Ask(Command):
     flags = "h"
     no_parse = True
     rate_limit = (0.5, 1)
+    slash = True
 
     async def __call__(self, message, channel, user, argv, flags=(), **void):
         bot = self.bot
@@ -799,18 +812,19 @@ class Ask(Command):
         await send_with_reply(channel, "h" not in flags and message, escape_everyone(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\uf000", "")))
 
 
-class UrbanDictionary(Command):
+class Urban(Command):
     time_consuming = True
     header = {
 	"x-rapidapi-host": "mashape-community-urban-dictionary.p.rapidapi.com",
 	"x-rapidapi-key": rapidapi_key,
     }
-    name = ["📖", "Urban"]
+    name = ["📖", "UrbanDictionary"]
     description = "Searches Urban Dictionary for an item."
-    usage = "<string> <verbose(?v)>"
+    usage = "<string> <verbose{?v}>*"
     flags = "v"
     rate_limit = (2, 8)
     typing = True
+    slash = True
 
     async def __call__(self, channel, argv, flags, _timeout, **void):
         url = (

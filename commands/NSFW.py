@@ -271,7 +271,7 @@ def is_nsfw(channel):
 
 class Neko(Command):
     description = "Pulls a random image from nekos.life and embeds it."
-    usage = "<tags[neko]> <random(?r)> <verbose(?v)> <list(?l)>"
+    usage = "<tags(neko)>? <verbose{?v}|random{?r}|list{?l}>?"
     flags = "lrv"
     rate_limit = (0.5, 7)
 
@@ -300,7 +300,7 @@ class Neko(Command):
             selected.append(possible[xrand(len(possible))])
         if not selected:
             if not argv:
-                url = nekos.img("neko")
+                url = await create_future(nekos.img, "neko")
             else:
                 raise LookupError(f"Search tag {argv} not found. Use {bot.get_prefix(guild)}neko list for list.")
         else:
@@ -308,15 +308,15 @@ class Neko(Command):
             get = selected[v]
             if get == "gif":
                 if tagNSFW:
-                    url = nekos.img("nsfw_neko_gif")
+                    url = await create_future(nekos.img, "nsfw_neko_gif")
                 else:
-                    url = nekos.img("ngif")
+                    url = await create_future(nekos.img, "ngif")
             elif get == "cat":
-                url = nekos.cat()
+                url = await create_future(nekos.cat)
             elif get == "404":
-                url = nekos.img("smallboobs")
+                url = await create_future(nekos.img, "smallboobs")
             else:
-                url = nekos.img(get)
+                url = await create_future(nekos.img, get)
         if "v" in flags:
             return escape_everyone(url)
         self.bot.send_as_embeds(channel, image=url, colour=xrand(1536), reference=message)
@@ -328,7 +328,7 @@ class Lewd(Command):
     name = ["nsfw"]
     min_level = 1
     description = "Pulls a random image from a search on Rule34 and e621, and embeds it."
-    usage = "<query> <verbose(?v)>"
+    usage = "<query> <verbose{?v}>?"
     flags = "v"
     no_parse = True
     rate_limit = (1, 6)

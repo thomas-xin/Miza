@@ -144,6 +144,126 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         create_thread(stdread, self.server.stdout)
         create_thread(stdread, self.server.stderr)
 
+    def command_options(self, usage, compare=False):
+        # default = False
+        out = deque()
+        for i in usage.split():
+            with tracebacksuppressor:
+                arg = dict(type=3, name=i, description=i)
+                if i.endswith("?"):
+                    arg["description"] = "[optional] " + arg["description"][:-1]
+                elif i.endswith("*"):
+                    arg["description"] = "[zero or more] " + arg["description"][:-1]
+                else:
+                    if i.endswith("+"):
+                        arg["description"] = "[one or more] " + arg["description"][:-1]
+                    arg["required"] = True
+                    # if not default and usage.count(" "):
+                    #     arg["default"] = default = True
+                arg["description"] = lim_str(arg["description"], 100)
+                if i.startswith("("):
+                    arg["name"] = "option"
+                    s = i[1:i.rindex(")")]
+                    if s.count("|") < 10:
+                        arg["choices"] = [dict(name=opt, value=opt) for opt in s.split("|")]
+                elif i.startswith("["):
+                    arg["name"] = "option"
+                elif i.startswith("<"):
+                    name = i[1:].split(":", 1)[-1].rsplit(">", 1)[0]
+                    if "{" in name:
+                        if name.count("{") > 1:
+                            if name.count("|") >= 10:
+                                arg["name"] = name.split("{", 1)[0]
+                            else:
+                                for n in name.split("|"):
+                                    arg = dict(arg)
+                                    arg["name"], flag = n.split("{", 1)
+                                    arg["choices"] = [dict(name="t", value=flag.rsplit("}", 1)[0]), dict(name="f", value=None if compare else "")]
+                                    out.append(arg)
+                                continue
+                        else:
+                            arg["name"], flag = name.split("{", 1)
+                            arg["choices"] = [dict(name="t", value=flag.rsplit("}", 1)[0]), dict(name="f", value=None if compare else "")]
+                    else:
+                        if name.startswith("("):
+                            name = name.strip("()")
+                        arg["name"] = name.split("(", 1)[0].replace("|", "-")
+                out.append(arg)
+        return sorted(out, key=lambda arg: bool(arg.get("required")), reverse=True)
+
+    def create_command(self, data):
+        with tracebacksuppressor:
+            for i in range(16):
+                resp = requests.post(f"https://discord.com/api/v8/applications/{AUTH['discord_id']}/commands", headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token}, data=json.dumps(data))
+                if resp.status_code == 429:
+                    time.sleep(2)
+                    continue
+                if resp.status_code not in range(200, 400):
+                    print("\n", data, " ", ConnectionError(f"Error {resp.status_code}", resp.text), "\n", sep="")
+                print(resp.text)
+                return
+
+    def update_slash_commands(self):
+        try:
+            discord_id = AUTH["discord_id"]
+        except KeyError:
+            return
+        if not getattr(self, "ip", None):
+            ip = Request("https://api.ipify.org", decode=True)
+            self.update_ip(ip)
+        print("Updating global slash commands...")
+        with tracebacksuppressor:
+            resp = requests.get(f"https://discord.com/api/v8/applications/{discord_id}/commands", headers=dict(Authorization="Bot " + self.token))
+            if resp.status_code not in range(200, 400):
+                raise ConnectionError(f"Error {resp.status_code}", resp.text)
+            commands = alist(c for c in resp.json() if c.get("application_id") == discord_id)
+            print(commands)
+        sem = Semaphore(5, inf, 5)
+        for catg in self.categories.values():
+            for command in catg:
+                with tracebacksuppressor:
+                    if command.slash:
+                        with sem:
+                            aliases = command.slash if type(command.slash) is tuple else (command.__name__,)
+                            for name in (full_prune(i) for i in aliases):
+                                description = lim_str(command.description.replace('⟨MIZA⟩', self.user.name).replace('⟨WEBSERVER⟩', f'http://{self.ip}/9801'), 100)
+                                options = self.command_options(command.usage)
+                                command_data = dict(name=name, description=description)
+                                if options:
+                                    command_data["options"] = options
+                                found = False
+                                for i, curr in enumerate(commands):
+                                    if curr["name"] == name:
+                                        compare = self.command_options(command.usage, compare=True)
+                                        if curr["description"] != description or (compare and curr["options"] != compare or not compare and curr.get("options")):
+                                            print(curr)
+                                            print(f"{curr['name']}'s slash command does not match, removing...")
+                                            for i in range(16):
+                                                resp = requests.delete(f"https://discord.com/api/v8/applications/{discord_id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                                                if resp.status_code == 429:
+                                                    time.sleep(1)
+                                                    continue
+                                                if resp.status_code not in range(200, 400):
+                                                    raise ConnectionError(f"Error {resp.status_code}", resp.text)
+                                                break
+                                        else:
+                                            print(f"{curr['name']}'s slash command matches, ignoring...")
+                                            found = True
+                                        commands.pop(i)
+                                        break
+                                if not found:
+                                    print(f"creating new slash command {command_data['name']}...")
+                                    print(command_data)
+                                    create_future_ex(self.create_command, command_data)
+        time.sleep(3)
+        for curr in commands:
+            with tracebacksuppressor:
+                print(curr)
+                print(f"{curr['name']}'s slash command does not exist, removing...")
+                resp = requests.delete(f"https://discord.com/api/v8/applications/{discord_id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                if resp.status_code not in range(200, 400):
+                    raise ConnectionError(f"Error {resp.status_code}", resp.text)
+
     # Starts up client.
     def run(self):
         print(f"Logging in...")
@@ -960,6 +1080,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return await Request(url, aio=True)
 
     async def get_colour(self, user):
+        if user is None:
+            return 16777214
         url = worst_url(user)
         return await self.data.colours.get(url)
 
@@ -1867,7 +1989,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 create_task(self.garbage_collect(u))
 
     # Processes a message, runs all necessary commands and bot events. May be called from another source.
-    async def process_message(self, message, msg, edit=True, orig=None, loop=False):
+    async def process_message(self, message, msg, edit=True, orig=None, loop=False, parse=True):
         if self.closed:
             return
         cpy = msg
@@ -1881,15 +2003,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             g_id = guild.id
         else:
             g_id = 0
-        if u_id != self.id:
-            # Strip quote from message.
-            if msg[:2] == "> ":
-                msg = msg[2:]
-            # Strip spoiler from message.
-            elif msg[:2] == "||" and msg[-2:] == "||":
-                msg = msg[2:-2]
-            # Strip code boxes from message.
-            msg = msg.replace("`", "").strip()
+        if parse:
+            if u_id != self.id:
+                # Strip quote from message.
+                if msg[:2] == "> ":
+                    msg = msg[2:]
+                # Strip spoiler from message.
+                elif msg[:2] == "||" and msg[-2:] == "||":
+                    msg = msg[2:-2]
+                # Strip code boxes from message.
+                msg = msg.replace("`", "").strip()
         # Get list of enabled commands for the channel.
         if g_id:
             try:
@@ -1911,17 +2034,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             prefix = self.prefix
         else:
             prefix = self.get_prefix(guild)
-        op = False
-        comm = msg
-        # Mentioning the bot serves as an alias for the prefix.
-        for check in self.mention:
-            if comm.startswith(check):
-                prefix = self.prefix
-                comm = comm[len(check):].strip()
+        if parse:
+            op = False
+            comm = msg
+            # Mentioning the bot serves as an alias for the prefix.
+            for check in self.mention:
+                if comm.startswith(check):
+                    prefix = self.prefix
+                    comm = comm[len(check):].strip()
+                    op = True
+                    break
+            if comm.startswith(prefix):
+                comm = comm[len(prefix):].strip()
                 op = True
-                break
-        if comm.startswith(prefix):
-            comm = comm[len(prefix):].strip()
+        else:
+            comm = msg
             op = True
         # Respond to blacklisted users attempting to use a command, or when mentioned without a command.
         if (u_perm <= -inf and (op or self.id in (member.id for member in message.mentions))):
@@ -2892,13 +3019,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     create_task(self.fast_loop())
                     print("Update loops initiated.")
                     # Load all webhooks from cached guilds.
-                    futs = deque(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
+                    futs = alist(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
+                    futs.add(create_future(self.update_slash_commands, priority=True))
                     self.bot_ready = True
                     print("Bot ready.")
                     # Send bot_ready event to all databases.
                     await self.send_event("_bot_ready_", bot=self)
                     for fut in futs:
-                        await fut
+                        with tracebacksuppressor:
+                            await fut
                     self.ready = True
                     # Send ready event to all databases.
                     await self.send_event("_ready_", bot=self)
@@ -3033,6 +3162,48 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             await self.react_callback(message, None, message.author)
             await self.handle_message(message, False)
 
+        @self.event
+        async def on_socket_response(data):
+            if data.get("t") == "INTERACTION_CREATE" and "d" in data:
+                with tracebacksuppressor:
+                    dt = utc_dt()
+                    message = self.GhostMessage()
+                    d = data["d"]
+                    # print(d)
+                    cdata = d.get("data")
+                    name = cdata["name"]
+                    args = [i.get("value", "") for i in cdata.get("options", ())]
+                    argv = " ".join(i for i in args if i)
+                    message.content = name + " " + argv
+                    try:
+                        message.id = int(cdata["id"])
+                    except KeyError:
+                        message.id = time_snowflake(dt)
+                    mdata = d.get("member")
+                    if not mdata:
+                        mdata = d.get("user")
+                    else:
+                        mdata = mdata.get("user")
+                    author = self._state.store_user(mdata)
+                    message.author = author
+                    channel = None
+                    try:
+                        channel = await self.fetch_channel(d["channel_id"])
+                        guild = await self.fetch_guild(d["guild_id"])
+                        message.guild = guild
+                        author = guild.get_member(author.id)
+                        if author:
+                            message.author = author
+                    except KeyError:
+                        if author is None:
+                            raise
+                        if channel is None:
+                            channel = await self.get_dm(author)
+                    message.channel = channel
+                    message.slash = True
+                    message.noref = True
+                    return await self.process_message(message, message.content, parse=False)
+
         # Message edit event: processes edited message, uses raw payloads rather than discord.py message cache. calls _edit_ and _seen_ bot database events.
         @self.event
         async def on_raw_message_edit(payload):
@@ -3080,6 +3251,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         before = copy.copy(before)
                     after = copy.copy(before)
                     after._update(data)
+            if after.channel is None:
+                after.channel = await self.fetch_channel(payload.channel_id)
             self.add_message(after)
             if raw or before.content != after.content:
                 if "users" in self.data:

@@ -236,13 +236,14 @@ class Text2048(Command):
     time_consuming = True
     name = ["2048", "🎮"]
     description = "Plays a game of 2048 using reactions. Gained points are rewarded as gold."
-    usage = "<0*:dimension_sizes[4x4]> <1:dimension_count[2]> <special_tiles(?s)> <public(?p)> <insanity_mode(?i)> <easy_mode(?e)>"
+    usage = "<0:dimension_sizes(4x4)>* <1:dimension_count(2)>? <public{?p}|special_tiles{?s}|insanity_mode{?i}|easy_mode{?e}>*"
     flags = "pies"
     rate_limit = (3, 9)
     reacts = ("⬅️", "➡️", "⬆️", "⬇️", "⏪", "⏩", "⏫", "⏬", "◀️", "▶️", "🔼", "🔽", "👈", "👉", "👆", "👇")
     directions = demap((r.encode("utf-8"), i) for i, r in enumerate(reacts))
     directions[b'\xf0\x9f\x92\xa0'] = -2
     directions[b'\xe2\x86\xa9\xef\xb8\x8f'] = -1
+    slash = ("2048",)
 
     async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
         # print(user, message, reaction, argv)
@@ -401,7 +402,7 @@ class Text2048(Command):
 class SlotMachine(Command):
     name = ["Slots"]
     description = "Plays a slot machine game. Costs gold to play, can yield gold and diamonds."
-    usage = "<bet[100]> <skip_animation(?s)>"
+    usage = "<bet{50}>? <skip_animation{?s}>?"
     flags = "s"
     rate_limit = (5, 10)
     emojis = {
@@ -414,6 +415,7 @@ class SlotMachine(Command):
         "🍉": 1,
         "🍌": 3,
     }
+    slash = ("Slots",)
 
     def select(self):
         x = random.random()
@@ -520,7 +522,7 @@ class SlotMachine(Command):
 class Pay(Command):
     name = ["GiveCoins", "GiveGold"]
     description = "Pays a specified amount of coins to the target user."
-    usage = "<0:user> <1:amount[1]>"
+    usage = "<0:user> <1:amount(1)>?"
     rate_limit = 0.5
 
     async def __call__(self, bot, user, args, guild, **void):
@@ -548,7 +550,7 @@ class Dogpile(Command):
     server_only = True
     min_level = 2
     description = "Causes ⟨MIZA⟩ to automatically imitate users when 3+ of the same messages are posted in a row. Grants XP and gold when triggered."
-    usage = "<enable(?e)> <disable(?d)>"
+    usage = "(enable|disable)?"
     flags = "aed"
     rate_limit = 0.5
 
@@ -753,9 +755,9 @@ class UpdateDailies(Database):
 
 
 class Wallet(Command):
-    name = ["Bal", "Balance"]
+    name = ["Level", "Bal", "Balance"]
     description = "Shows the target users' wallet."
-    usage = "<*objects>"
+    usage = "<users>*"
     rate_limit = 1
     multi = True
 
@@ -866,10 +868,7 @@ class Shop(Command):
 class MimicConfig(Command):
     name = ["PluralConfig", "RPConfig"]
     description = "Modifies an existing webhook mimic's attributes."
-    usage = (
-        "<0:mimic_id> <1:option(prefix)(name[])(avatar)"
-        + "(description)(gender)(birthday)> <2:new>"
-    )
+    usage = "<0:mimic_id> (prefix|name|avatar|description|gender|birthday)? <1:new>?"
     no_parse = True
     rate_limit = 1
 
@@ -964,7 +963,7 @@ class MimicConfig(Command):
 class Mimic(Command):
     name = ["RolePlay", "Plural", "RP", "RPCreate"]
     description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes."
-    usage = "<0:prefix> <1:user[]> <1:name[]> <2:url[]> <disable(?d)> <debug(?z)>"
+    usage = "<0:prefix>? <1:user|name>? <2:url[]>? <delete{?d}>?"
     flags = "aedzf"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -1330,8 +1329,8 @@ class UpdateMimics(Database):
                         i += 1
                            
                            
-class muffin(Command):
-    name=["muffins", "🧁"]
+class Muffin(Command):
+    name=["Muffins", "🧁"]
     description = "Muffin time! What more is there to say? :D"
     
     def __call__(self, **void):

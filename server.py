@@ -17,6 +17,12 @@ def on_error(ex):
     # Redirect HTTP errors to http.cat, python exceptions go to code 500 (internal server error)
     if issubclass(type(ex), HTTPException):
         return flask.redirect(f"https://http.cat/{ex.code}")
+    if issubclass(type(ex), FileNotFoundError):
+        return flask.redirect("https://http.cat/404")
+    if issubclass(type(ex), TimeoutError):
+        return flask.redirect("https://http.cat/504")
+    if issubclass(type(ex), ConnectionError):
+        return flask.redirect("https://http.cat/502")
     return flask.redirect("https://http.cat/500")
 
 @app.route("/favicon.ico", methods=["GET"])

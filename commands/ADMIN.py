@@ -14,10 +14,11 @@ class Purge(Command):
     name = ["🗑", "Del", "Delete", "Purge_Range"]
     min_level = 3
     description = "Deletes a number of messages from a certain user in current channel."
-    usage = "<1:*users{bot}{everyone(?a)}> <0:count[1]> <ignore(?i)> <range(?r)> <hide(?h)>"
+    usage = "<1:users(bots)|?a>? <0:count(1)>? <ignore{?i}|range{?r}|hide{?h}>*"
     flags = "fiaehr"
     rate_limit = (2, 4)
     multi = True
+    slash = True
 
     async def __call__(self, bot, args, argl, user, channel, name, flags, perm, guild, **void):
         print(self, bot, args, argl, user, channel, name, flags, perm, guild, void)
@@ -57,6 +58,7 @@ class Purge(Command):
                 if dt is None or after is None or dt > after:
                     async with bot.guild_semaphore:
                         async for m in channel.history(limit=lim, before=dt, after=after, oldest_first=False):
+                            bot.add_message(m)
                             found = True
                             dt = m.created_at
                             if uset is None and m.author.bot or uset and m.author.id in uset:
@@ -69,6 +71,7 @@ class Purge(Command):
         else:
             async with bot.guild_semaphore:
                 async for m in channel.history(limit=None, before=cdict(id=end), after=cdict(id=start), oldest_first=False):
+                    bot.add_message(m)
                     if uset is None and m.author.bot or uset and m.author.id in uset:
                         delD[m.id] = m
         if len(delD) >= 64 and "f" not in flags:
@@ -105,11 +108,12 @@ class Mute(Command):
     min_level = 3
     min_display = "3+"
     description = "Mutes a user for a certain amount of time, with an optional reason."
-    usage = "<0:*users> <1:time[]> <2:reason[]> <hide(?h)> <debug(?z)>"
+    usage = "<0:users>* <1:time>? (reason)? <2:reason>? <hide{?h}>?"
     flags = "fhz"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = (2, 5)
     multi = True
+    slash = True
 
     async def __call__(self, bot, args, argl, message, channel, guild, flags, perm, user, name, **void):
         if not args and not argl:
@@ -328,11 +332,12 @@ class Ban(Command):
     min_level = 3
     min_display = "3+"
     description = "Bans a user for a certain amount of time, with an optional reason."
-    usage = "<0:*users> <1:time[]> <2:reason[]> <hide(?h)> <debug(?z)>"
+    usage = "<0:users>* <1:time>? (reason)? <2:reason>? <hide{?h}>?"
     flags = "fhz"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = (2, 5)
     multi = True
+    slash = True
 
     async def __call__(self, bot, args, argl, message, channel, guild, flags, perm, user, name, **void):
         if not args and not argl:
@@ -546,10 +551,11 @@ class RoleGiver(Command):
     min_level = 3
     min_display = "3+"
     description = "Adds an automated role giver to the current channel."
-    usage = "<0:react_to[]> <1:role[]> <delete_messages(?x)> <disable(?d)>"
+    usage = "<0:react_to>? <1:role>? <delete_messages{?x}>? <disable{?d}>?"
     flags = "aedx"
     no_parse = True
     rate_limit = (2, 4)
+    slash = True
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
         update = self.bot.data.rolegivers.update
@@ -614,9 +620,10 @@ class AutoRole(Command):
     min_display = "3+"
     _timeout_ = 7
     description = "Causes any new user joining the server to automatically gain the targeted role. Input multiple roles to create a randomized role giver."
-    usage = "<role[]> <disable(?d)> <update_all(?x)>"
+    usage = "<role>? <update_all{?x}>? <disable{?d}>?"
     flags = "aedx"
     rate_limit = 1
+    slash = True
 
     async def __call__(self, argv, args, name, user, channel, guild, perm, flags, **void):
         update = self.bot.data.autoroles.update
@@ -722,8 +729,9 @@ class RolePreserver(Command):
     min_level = 3
     min_display = "3+"
     description = "Causes ⟨MIZA⟩ to save roles for all users, and re-add them when they leave and rejoin."
-    usage = "<enable(?e)> <disable(?d)>"
+    usage = "(enable|disable)?"
     flags = "aed"
+    slash = True
 
     def __call__(self, flags, guild, **void):
         update = self.bot.data.rolepreservers.update
@@ -782,7 +790,7 @@ class SaveChannel(Command):
     name = ["BackupChannel", "DownloadChannel"]
     min_level = 3
     description = "Saves a number of messages in a channel, as well as their contents, to a .txt file."
-    usage = "<0:channel{current}> <1:message_limit[4096]>"
+    usage = "<0:channel>? <1:message_limit(4096)>?"
 
     async def __call__(self, guild, channel, args, **void):
         num = 4096
@@ -817,7 +825,7 @@ class UserLog(Command):
     name = ["MemberLog"]
     min_level = 3
     description = "Causes ⟨MIZA⟩ to log user and member events from the server, in the current channel."
-    usage = "<enable(?e)> <disable(?d)>"
+    usage = "(enable|disable)?"
     flags = "aed"
     rate_limit = 1
 
@@ -842,7 +850,7 @@ class MessageLog(Command):
     server_only = True
     min_level = 3
     description = "Causes ⟨MIZA⟩ to log message events from the server, in the current channel."
-    usage = "<enable(?e)> <disable(?d)>"
+    usage = "(enable|disable)?"
     flags = "aed"
     rate_limit = 1
 
@@ -867,7 +875,7 @@ class FileLog(Command):
     server_only = True
     min_level = 3
     description = "Causes ⟨MIZA⟩ to log deleted files from the server, in the current channel."
-    usage = "<enable(?e)> <disable(?d)>"
+    usage = "(enable|disable)?"
     flags = "aed"
     rate_limit = 1
 
@@ -1510,6 +1518,23 @@ class UpdateMessageLogs(Database):
         create_future_ex(self.bot.update_from_client, priority=True)
         return messages
 
+    async def _command_(self, message, **void):
+        if getattr(message, "slash", None):
+            guild = message.guild
+            if guild and guild.id in self.data:
+                c_id = self.data[guild.id]
+                try:
+                    channel = await self.bot.fetch_channel(c_id)
+                except (EOFError, discord.NotFound):
+                    self.data.pop(guild.id)
+                    return
+                u = message.author
+                emb = discord.Embed(colour=0x00FFFF)
+                emb.set_author(**get_author(u))
+                emb.description = f"**Slash command executed in** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
+                emb.description += "/" + message_repr(message, limit=2048 - len(emb.description) - 1)
+                self.bot.send_embeds(channel, emb)
+
     # Edit events are rather straightforward to log
     async def _edit_(self, before, after, **void):
         if not after.author.bot:
@@ -1522,9 +1547,9 @@ class UpdateMessageLogs(Database):
                     self.data.pop(guild.id)
                     return
                 u = before.author
-                emb = discord.Embed(colour=colour2raw(0, 0, 255))
+                emb = discord.Embed(colour=0x0000FF)
                 emb.set_author(**get_author(u))
-                emb.description = f"**Message edited in** {channel_mention(before.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{after.channel.id}/{after.id}"
+                emb.description = f"**Message edited in** {channel_mention(after.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{after.channel.id}/{after.id}"
                 emb.add_field(name="Before", value=message_repr(before))
                 emb.add_field(name="After", value=message_repr(after))
                 self.bot.send_embeds(channel, emb)
@@ -1591,7 +1616,7 @@ class UpdateMessageLogs(Database):
                                 init = user_mention(t.id)
             except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
-            emb = discord.Embed(colour=colour2raw(255, 0, 0))
+            emb = discord.Embed(colour=0xFF0000)
             emb.set_author(name=name_id, icon_url=url, url=url)
             emb.description = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
             emb.description += message_repr(message, limit=2048 - len(emb.description))
@@ -1646,14 +1671,14 @@ class UpdateMessageLogs(Database):
                                 init = user_mention(t.id)
             except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
-            emb = discord.Embed(colour=colour2raw(255, 0, 255))
+            emb = discord.Embed(colour=0xFF00FF)
             emb.description = f"{init} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from** {channel_mention(messages[-1].channel.id)}:\n"
             for message in messages:
                 emb.description += f"\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}"
             embs = deque([emb])
             for message in messages:
                 u = message.author
-                emb = discord.Embed(colour=colour2raw(127, 0, 127))
+                emb = discord.Embed(colour=0x7F007F)
                 emb.set_author(**get_author(u))
                 emb.description = message_repr(message, limit=2048)
                 embs.append(emb)

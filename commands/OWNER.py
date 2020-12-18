@@ -103,7 +103,7 @@ class Execute(Command):
     name = ["Exec", "Eval"]
     min_level = nan
     description = "Causes all messages by the bot owner in the current channel to be executed as python code on ⟨MIZA⟩."
-    usage = "<type> <enable(?e)> <disable(?d)>"
+    usage = "(enable|disable)? <type(virtual)>?"
     flags = "aed"
     # Different types of terminals for different purposes
     terminal_types = demap({
@@ -361,7 +361,7 @@ class DownloadServer(Command):
     name = ["SaveServer", "ServerDownload"]
     min_level = nan
     description = "Downloads all posted messages in the target server into a sequence of .txt files."
-    usage = "<server_id(curr)>"
+    usage = "<server_id>?"
     flags = "f"
     _timeout_ = 512
     
