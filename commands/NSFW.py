@@ -337,7 +337,7 @@ class Lewd(Command):
         if not is_nsfw(channel):
             raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels.")
         objs = await searchRandomNSFW(" ".join(args), 12)
-        url = verify_url(objs[0].strip())
+        url = verify_url(objs[0].strip().replace(" ", "%20"))
         if "v" in flags:
             text = (
                 "Pulled from " + url
