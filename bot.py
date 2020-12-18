@@ -3162,6 +3162,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             await self.react_callback(message, None, message.author)
             await self.handle_message(message, False)
 
+        # Socket response event: if the event was an interaction, create a virtual message with the arguments as the content, then process as if it were a regular command.
         @self.event
         async def on_socket_response(data):
             if data.get("t") == "INTERACTION_CREATE" and "d" in data:
