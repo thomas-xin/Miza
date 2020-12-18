@@ -3173,7 +3173,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     cdata = d.get("data")
                     name = cdata["name"]
                     args = [i.get("value", "") for i in cdata.get("options", ())]
-                    argv = "" ".join(i for i in args if i)
+                    argv = " ".join(i for i in args if i)
                     message.content = "/" + name + " " + argv
                     try:
                         message.id = int(cdata["id"])
