@@ -2349,8 +2349,7 @@ class UpdateUsers(Database):
         user = message.author
         if force or bot.is_mentioned(message, bot, message.guild):
             if user.bot:
-                history = await self.bot.data.channel_cache.get(message.channel)
-                for m in history:
+                async for m in self.bot.data.channel_cache.get(message.channel):
                     user = m.author
                     if bot.get_perms(user.id, message.guild) <= -inf:
                         return

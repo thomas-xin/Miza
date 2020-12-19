@@ -443,7 +443,8 @@ class UpdateChannelCache(Database):
                 self.bot.add_message(message, files=False, cache=False)
             self.data[channel.id] = messages
             self.update(channel.id)
-        return (self.bot.cache.messages[m] for m in reversed(messages))
+        for m in reversed(messages):
+            yield await self.bot.fetch_message(m, channel)
 
 
 class Suspend(Command):
