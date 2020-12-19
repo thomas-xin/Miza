@@ -179,12 +179,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 for n in name.split("|"):
                                     arg = dict(arg)
                                     arg["name"], flag = n.split("{", 1)
-                                    arg["choices"] = [dict(name="t", value=flag.rsplit("}", 1)[0]), dict(name="f", value=None if compare else "")]
+                                    arg["choices"] = [dict(name="true", value=flag.rsplit("}", 1)[0]), dict(name="false", value=None if compare else "")]
                                     out.append(arg)
                                 continue
                         else:
                             arg["name"], flag = name.split("{", 1)
-                            arg["choices"] = [dict(name="t", value=flag.rsplit("}", 1)[0]), dict(name="f", value=None if compare else "")]
+                            arg["choices"] = [dict(name="true", value=flag.rsplit("}", 1)[0]), dict(name="false", value=None if compare else "")]
                     else:
                         if name.startswith("("):
                             name = name.strip("()")
