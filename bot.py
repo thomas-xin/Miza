@@ -209,9 +209,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             discord_id = AUTH["discord_id"]
         except KeyError:
             return
-        if not getattr(self, "ip", None):
-            ip = Request("https://api.ipify.org", decode=True)
-            self.update_ip(ip)
         print("Updating global slash commands...")
         with tracebacksuppressor:
             resp = requests.get(f"https://discord.com/api/v8/applications/{discord_id}/commands", headers=dict(Authorization="Bot " + self.token))
@@ -309,7 +306,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         for category in ("main", "string", "admin", "voice", "image", "fun"):
             c = f'\n<div class="carouselRight swiper-container"><div class="swiper-wrapper">'
             for command in self.categories[category]:
-                c += f'\n<div class="carouselItem swiper-slide"><h3>{command.parse_name()}</h3><p>{command.parse_description()}</p></div>'
+                desc = command.parse_description()
+                with suppress(ValueError):
+                    i = desc.index("http")
+                    if "://" in desc[i + 4:i + 8]:
+                        url = desc[i:]
+                        for x in range(len(url)):
+                            if url[x] in " !":
+                                break
+                            x += 1
+                        desc = desc[:i] + f'<a href="{url[:x]}">{url[:x].rsplit("/", 1)[-1]}</a>' + url[x:]
+                c += f'\n<div class="carouselItem swiper-slide"><h3>{command.parse_name()}</h3><p>{desc}</p></div>'
                 com_count += 1
             c += '</div><div class="swiper-pagination"></div></div>'
             html += c
@@ -3063,7 +3070,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 await self.handle_update()
                 futs.add(create_future(self.update_from_client, priority=True))
                 futs.add(create_future(self.update_from_guilds, priority=True))
-                create_task(aretry(self.get_ip, delay=20))
+                futs.add(create_task(aretry(self.get_ip, delay=20)))
                 if not self.started:
                     self.started = True
                     attachments = sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: os.path.getmtime("cache/" + file))
