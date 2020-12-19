@@ -56,10 +56,10 @@ class Help(Command):
             else:
                 continue
             for com in coms:
-                if com.__name__ in found:
-                    found[com.__name__].append(com)
+                if com.parse_name() in found:
+                    found[com.parse_name()].append(com)
                 else:
-                    found[com.__name__] = alist((com,))
+                    found[com.parse_name()] = alist((com,))
         if found:
             # Display list of found commands in an embed
             for k in found:
@@ -71,10 +71,10 @@ class Help(Command):
                     s = f"```ini\n[Aliases] {a}"
                     s += f"\n[Effect] {com.parse_description()}"
                     if v or len(found) <= 1:
-                        s += f"\n[Usage] {prefix}{com.__name__} {com.usage}\n[Level] {com.min_display}"
+                        s += f"\n[Usage] {prefix}{com.parse_name()} {com.usage}\n[Level] {com.min_display}"
                     s += "```"
                     fields.append(dict(
-                        name=prefix + com.__name__.strip("_"),
+                        name=prefix + com.parse_name(),
                         value=s,
                         inline=False
                     ))
@@ -1229,7 +1229,7 @@ class Status(Command):
         if not hasattr(bot, "bitrate"):
             return
         emb = discord.Embed(colour=rand_colour())
-        emb.set_author(name="Status", url=bot.github, icon_url=best_url(bot.user))
+        emb.set_author(name="Status", url=bot.webserver, icon_url=best_url(bot.user))
         emb.timestamp = utc_dt()
         if msg is None:
             active = bot.get_active()
@@ -1282,7 +1282,7 @@ class Status(Command):
 
 
 class Invite(Command):
-    name = ["OAuth", "InviteBot", "InviteLink"]
+    name = ["Website", "BotInfo", "InviteLink"]
     description = "Sends a link to ⟨MIZA⟩'s homepage, github and invite code, as well as an invite link to the current server if applicable."
     slash = True
     
@@ -2238,7 +2238,7 @@ class UpdateUsers(Database):
     # User executed command, add to activity database
     def _command_(self, user, loop, command, **void):
         self.send_event(user.id, "command")
-        add_dict(self.data, {user.id: {"commands": {command.__name__: 1}}})
+        add_dict(self.data, {user.id: {"commands": {command.parse_name(): 1}}})
         self.data[user.id]["last_used"] = utc()
         self.data.get(user.id, EMPTY).pop("last_mention", None)
         if not loop:

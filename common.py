@@ -1765,8 +1765,8 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
         if not hasattr(self, "alias"):
             self.alias = self.name
         else:
-            self.alias.append(self.__name__)
-        self.name.append(self.__name__)
+            self.alias.append(self.parse_name())
+        self.name.append(self.parse_name())
         self.aliases = {full_prune(alias).replace("*", "").replace("_", "").replace("||", ""): alias for alias in self.alias}
         self.aliases.pop("", None)
         for a in self.aliases:
@@ -1786,10 +1786,11 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
                 self.data.clear()
                 f()
 
-    __hash__ = lambda self: hash(self.__name__) ^ hash(self.catg)
-    __str__ = lambda self: f"Command <{self.__name__}>"
+    __hash__ = lambda self: hash(self.parse_name()) ^ hash(self.catg)
+    __str__ = lambda self: f"Command <{self.parse_name()}>"
     __call__ = lambda self, **void: None
 
+    parse_name = lambda self: self.__name__.strip("_")
     parse_description = lambda self: self.description.replace('⟨MIZA⟩', self.bot.user.name).replace('⟨WEBSERVER⟩', self.bot.webserver)
 
     def unload(self):

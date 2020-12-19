@@ -145,13 +145,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             touch(self.shutdown)
         force_kill(self.proc)
 
-    def start_webserver(self):
-        if getattr(self, "server", None):
-            self.server.kill()
-        self.server = psutil.Popen([python, "server.py"], stderr=subprocess.PIPE)
-        # create_thread(stdread, self.server.stdout)
-        create_thread(stdread, self.server.stderr)
-
     def command_options(self, usage, compare=False):
         # default = False
         out = deque()
@@ -232,7 +225,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 with tracebacksuppressor:
                     if command.slash:
                         with sem:
-                            aliases = command.slash if type(command.slash) is tuple else (command.__name__,)
+                            aliases = command.slash if type(command.slash) is tuple else (command.parse_name(),)
                             for name in (full_prune(i) for i in aliases):
                                 description = lim_str(command.parse_description(), 100)
                                 options = self.command_options(command.usage)
@@ -316,16 +309,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         for category in ("main", "string", "admin", "voice", "image", "fun"):
             c = f'\n<div class="carouselRight swiper-container"><div class="swiper-wrapper">'
             for command in self.categories[category]:
-                c += f'\n<div class="carouselItem swiper-slide"><h3>{command.__name__}</h3><p>{command.parse_description()}</p></div>'
+                c += f'\n<div class="carouselItem swiper-slide"><h3>{command.parse_name()}</h3><p>{command.parse_description()}</p></div>'
                 com_count += 1
-            c += '\n</div><div class="swiper-pagination"></div><div class="swiper-button-prev"></div></div>'
+            c += '</div><div class="swiper-pagination"></div></div>'
             html += c
-        html += f"<p>...and {len(commands) - com_count} more!</p>"
-        html += f"""			<h2>Why should I choose Miza over other Discord bots?</h2>
+        html += f"\n<p>...and {len(commands) - com_count} more!</p>"
+        html += f"""
+			<h2>Why should I choose Miza over other Discord bots?</h2>
             <p>no fuckn clue lmao<br>Veritatis suscipit architecto sed voluptas. Sit non rem iure doloribus explicabo qui temporibus. Harum unde porro autem aut. Voluptas dolores eaque expedita aut officiis.</p>
         </div>
         <script src="{self.webserver}/static/swiper.min.js"></script>
-        <script src="{self.webserver}/static/yea.js"></script>
+        <script src="{self.webserver}/static/pagination.js"></script>
         <!-- 
         
         </body> 
@@ -340,6 +334,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 </html>"""
         with open("misc/index.html", "w", encoding="utf-8") as f:
             f.write(html)
+        self.start_webserver()
+    
+    def start_webserver(self):
+        if getattr(self, "server", None):
+            with suppress():
+                self.server.kill()
+        self.server = psutil.Popen([python, "server.py"], stderr=subprocess.PIPE)
+        # create_thread(stdread, self.server.stdout)
+        create_thread(stdread, self.server.stderr)
 
     # Starts up client.
     def run(self):
@@ -1850,7 +1853,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             files = [i for i in os.listdir("commands") if is_code(i)]
             for f in files:
                 modload.append(create_future_ex(self.get_module, f, priority=True))
+            create_task(self.create_main_website())
             return all(fut.result() for fut in modload)
+        create_task(self.create_main_website())
         return self.get_module(mod + ".py")
 
     # Loads all modules in the commands folder and initializes bot commands and databases.
@@ -2006,7 +2011,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             # Force a rate limit on the reaction processing for the message
             self.react_sem[message.id] = max(utc(), self.react_sem.get(message.id, 0) + 1)
             for f in catg:
-                if f.__name__.casefold() == func:
+                if f.parse_name().casefold() == func:
                     async with ExceptionSender(message.channel, reference=message):
                         timeout = getattr(f, "_timeout_", 1) * self.timeout
                         if timeout >= inf:
@@ -3625,7 +3630,6 @@ if __name__ == "__main__":
             proc_start()
             miza = bot = client = Bot()
             miza.miza = miza
-            miza.start_webserver()
             with miza:
                 miza.run()
             miza.server.kill()
