@@ -72,7 +72,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         print("Initializing...")
         # O(1) time complexity for searching directory
         directory = frozenset(os.listdir())
-        [os.mkdir(folder) for folder in ("cache", "saves", "deleted") if folder not in directory]
+        [os.mkdir(folder) for folder in ("cache", "saves") if folder not in directory]
         try:
             self.token = AUTH["discord_token"]
         except KeyError:
@@ -327,17 +327,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         </div>
         <script src="{self.webserver}/static/swiper.min.js"></script>
         <script src="{self.webserver}/static/pagination.js"></script>
-        <!-- 
-        
-        </body> 
-        
-        -->
     </body>
-    <!-- 
-        
-        </body> 
-        
-        -->
 </html>"""
         with open("misc/index.html", "w", encoding="utf-8") as f:
             f.write(html)
