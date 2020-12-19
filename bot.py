@@ -106,6 +106,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.status_iter = xrand(3)
         self.curr_state = azero(3)
         self.ip = None
+        self.webserver = None
         self.embed_senders = cdict()
         # Assign bot cache to global variables for convenience
         globals().update(self.cache)
@@ -3156,7 +3157,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     self.data.dailies.progress_quests(user, "invite")
             emb.description += (
                 f"!\nMy default prefix is `{self.prefix}`, which can be changed as desired on a per-server basis. Mentioning me also serves as an alias for all prefixes.\n"
-                + f"For more information, use the `{self.prefix}help` command, and my source code is available at {self.github} for those who are interested.\n"
+                + f"For more information, use the `{self.prefix}help` command, "
+                + f"I have a website at [`{self.webserver}`]({self.webserver}), " if self.webserver else ""
+                + f"and my source code is available at [`{self.github}`]({self.github}) for those who are interested.\n"
                 + "Pleased to be at your service 🙂"
             )
             if not m.guild_permissions.administrator:
