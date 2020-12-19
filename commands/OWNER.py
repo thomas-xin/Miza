@@ -430,6 +430,7 @@ class UpdateUserColours(Database):
 
 class UpdateChannelCache(Database):
     name = "channel_cache"
+    channel = True
 
     async def get(self, channel):
         c_id = verify_id(channel)

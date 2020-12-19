@@ -64,9 +64,9 @@ while not os.path.exists(sd):
     print("Bot started with PID \033[1;34;40m" + str(proc.pid) + "\033[1;37;40m.")
     time.sleep(12)
     try:
+        alive = True
         if proc.is_running():
             print("\033[1;32;40mHeartbeat started\033[1;37;40m.")
-            alive = True
             while alive:
                 if not os.path.exists(hb):
                     if os.path.exists(hb_ack):
@@ -86,7 +86,7 @@ while not os.path.exists(sd):
                         alive = False
                         break
                 if os.path.exists(hb):
-                    alive = False
+                    break
             for child in proc.children():
                 try:
                     child.kill()
@@ -106,7 +106,10 @@ while not os.path.exists(sd):
             print("\033[1;31;40mBot crashed 16 times in a row. Waiting 5 minutes before trying again.\033[1;37;40m")
             time.sleep(300)
             att = 0
-        print("\033[1;31;40mBot failed to acknowledge heartbeat signal, restarting...\033[1;37;40m")
+        if alive:
+            print("\033[1;31;40mBot failed to acknowledge heartbeat signal, restarting...\033[1;37;40m")
+        else:
+            print("\033[1;31;40mBot sent restart signal, advancing...\033[1;37;40m")
     except KeyboardInterrupt:
         raise
     except:

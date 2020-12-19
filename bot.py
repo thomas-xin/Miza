@@ -371,8 +371,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             # Database keys may be user, guild, or channel IDs
                             if getattr(obj, "user", None):
                                 d = await self.fetch_user(key)
+                            if getattr(obj, "channel", None):
+                                d = await self.fetch_channel(key)
                             else:
-                                if not data[key] and not started:
+                                tester = await create_future(data.__getitem__, key)
+                                if not tester and not started:
                                     raise LookupError
                                 with suppress(KeyError):
                                     d = self.cache.guilds[key]
@@ -1897,6 +1900,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if getattr(u, "update", None) is not None:
                     if u.update(force=True):
                         saved.append(i)
+                        time.sleep(0.05)
         if not self.closed and hasattr(self, "total_bytes"):
             with tracebacksuppressor:
                 s = "{'net_bytes': " + str(self.total_bytes) + "}"
@@ -2763,7 +2767,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         print("Heartbeat Loop initiated.")
         with tracebacksuppressor:
             while not self.closed:
-                d = await delayed_coro(create_future(os.path.exists, self.heartbeat, priority=True), 1 / 3)
+                d = await delayed_coro(create_future(os.path.exists, self.heartbeat, priority=True), 1 / 12)
                 if d:
                     with tracebacksuppressor(FileNotFoundError, PermissionError):
                         await create_future(os.rename, self.heartbeat, self.heartbeat_ack, priority=True)

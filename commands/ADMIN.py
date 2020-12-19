@@ -1474,8 +1474,12 @@ class UpdateMessageCache(Database):
         async with self.save_sem:
             saving = dict(self.saving)
             self.saving.clear()
+            i = 0
             for fn, messages in saving.items():
                 await create_future(self.saves, fn, messages)
+                i += 1
+                if not i % 64 or len(messages) > 65536:
+                    await asyncio.sleep(0.1)
             open(self.files + "/-1", "wb").close()
             if len(saving) >= 8:
                 print(f"Message Database: {len(saving)} files updated.")

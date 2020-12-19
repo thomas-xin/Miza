@@ -1,11 +1,12 @@
 import os, time
 
 hb = "heartbeat.tmp"
+hb_ack = "heartbeat_ack.tmp"
 
 while True:
     if os.path.exists(hb):
         try:
-            os.remove(hb)
-        except FileNotFoundError:
+            os.rename(hb, hb_ack)
+        except (FileNotFoundError, PermissionError):
             pass
-    time.sleep(0.5)
+    time.sleep(0.25)

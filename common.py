@@ -468,6 +468,9 @@ class FileHashDict(collections.abc.MutableMapping):
             with self.sem:
                 with open(fn, "rb") as f:
                     s = f.read()
+            t = len(s) / 1048576
+            if t > 0.05:
+                time.sleep(t)
             data = BaseException
             with tracebacksuppressor:
                 data = select_and_loads(s, mode="unsafe")
@@ -475,6 +478,7 @@ class FileHashDict(collections.abc.MutableMapping):
                 for file in sorted(os.listdir("backup"), reverse=True):
                     with tracebacksuppressor:
                         z = zipfile.ZipFile("backup/" + file, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
+                        time.sleep(0.03)
                         s = z.open(fn).read()
                         z.close()
                         data = select_and_loads(s, mode="unsafe")
@@ -1894,9 +1898,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
             try:
                 self.data.__update__()
             except:
-                print(self)
-                print(self.data)
-                print_exc()
+                print(self, self.data, traceback.format_exc(), sep="\n", end="")
         else:
             if modified is None:
                 self.data.modified.update(self.data.keys())
