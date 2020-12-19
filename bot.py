@@ -1074,6 +1074,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
         return message
 
+    def insert_message(self, message):
+        self.data.channel_cache.data.setdefault(message.channel.id, alist()).insort(message.id)
+        self.data.channel_cache.update(message.channel.id)
+
     # Inserts a message into the bot cache, discarding existing ones if full.
     def add_message(self, message, files=True, cache=True):
         self.cache.messages[message.id] = message
@@ -1086,8 +1090,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if "message_cache" in self.data:
             self.data.message_cache.save_message(message)
         if cache and "channel_cache" in self.data:
-            self.data.channel_cache.data.setdefault(message.channel.id, alist()).insort(message.id)
-            self.data.channel_cache.update(message.channel.id)
+            create_future_ex(self.insert_message, message, priority=True)
         return message
 
     # Deletes a message from the bot cache.
