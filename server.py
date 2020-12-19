@@ -25,10 +25,6 @@ def on_error(ex):
         return flask.redirect("https://http.cat/502")
     return flask.redirect("https://http.cat/500")
 
-@app.route("/favicon.ico", methods=["GET"])
-def favicon():
-    return flask.send_file("misc/icon.ico")
-
 def find_file(path):
     # if no file name is inputted, return no content
     if not path:
@@ -61,6 +57,23 @@ def get_file_ex(path, filename):
     except FileNotFoundError:
         return flask.redirect("https://http.cat/404")
 
+
+MIMES = dict(
+    css="text/css",
+    json="application/json",
+    js="application/javascript",
+    ico="image/x-icon",
+    png="image/png",
+    jpg="image/jpeg",
+    gif="image/gif",
+    webp="image/webp",
+    mp3="audio/mpeg",
+    ogg="audio/vorbis",
+    opus="audio/opus",
+    wav="audio/wav",
+    mp4="video/mp4",
+)
+
 STATIC = {}
 
 def fetch_static(path):
@@ -71,11 +84,10 @@ def fetch_static(path):
             with open(f"misc/{path}", "rb") as f:
                 data = f.read()
             STATIC[path] = data
-        if path.endswith(".css"):
-            mime = "text/css"
-        elif path.endswith(".json"):
-            mime = "application/json"
-        else:
+        fmt = path.rsplit(".", 1)[-1].casefold()
+        try:
+            mime = MIMES[fmt]
+        except KeyError:
             mime = "text/html"
         return data, mime
     except:
@@ -95,13 +107,13 @@ def get_static_file(path):
 
 @app.route("/", methods=["GET", "POST"])
 def home():
-    try:
-        data, mime = fetch_static("index.html")
-        return flask.Response(data, mimetype=mime)
-    except EOFError:
-        return flask.redirect("https://http.cat/204")
-    except FileNotFoundError:
-        return flask.redirect("https://http.cat/404")
+    data, mime = fetch_static("index.html")
+    return flask.Response(data, mimetype=mime)
+
+@app.route("/favicon.ico", methods=["GET"])
+def favicon():
+    data, mime = fetch_static("icon.ico")
+    return flask.Response(data, mimetype=mime)
 
 timezones = {}
 @app.route("/timezone", methods=["GET", "POST"])

@@ -16,6 +16,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     github = "https://github.com/thomas-xin/Miza"
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
+    website_image = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de6t2dl-c2f19c79-ae94-4697-998b-ac9433d1c398.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTZ0MmRsLWMyZjE5Yzc5LWFlOTQtNDY5Ny05OThiLWFjOTQzM2QxYzM5OC5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.yRznZGXNmU1kP3s-zl9_RljyK-Df7GMcIbAOUME-OOM"
     heartbeat = "heartbeat.tmp"
     heartbeat_ack = "heartbeat_ack.tmp"
     restart = "restart.tmp"
@@ -271,7 +272,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             html = f"""<!DOCTYPE html>
 <html>
     <head>
-        <title>{description}</title>
+        <title>Miza</title>
+        <meta content="Miza" property="og:title">
+        <meta content="{description}" property="og:description">
+        <meta content="{self.webserver}" property="og:url">
+        <meta content="{self.website_image}" property="og:image">
+        <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
         <link rel="preconnect" href="https://fonts.gstatic.com">
         <link href="https://fonts.googleapis.com/css2?family=Balsamiq+Sans&amp;family=Pacifico&amp;display=swap" rel="stylesheet">
         <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
@@ -294,7 +300,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <div class="bigboi">
             <img
                 class="bgimg" 
-                src="https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de6t2dl-c2f19c79-ae94-4697-998b-ac9433d1c398.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTZ0MmRsLWMyZjE5Yzc5LWFlOTQtNDY5Ny05OThiLWFjOTQzM2QxYzM5OC5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.yRznZGXNmU1kP3s-zl9_RljyK-Df7GMcIbAOUME-OOM" 
+                src="{self.website_image}" 
             />
             <h2>What is Miza?</h2>
             <p>Miza is a multipurpose Discord bot designed around generally being useful. The premise for Miza is: "fuck it, other bots can do it. Miza should be able to do it too."</p> 
