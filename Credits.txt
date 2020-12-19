@@ -63,7 +63,8 @@ Brayconn (https://github.com/Brayconn)
 -Help with testing
 
 Hucario/IdiocyMan (https://github.com/hucario)
--Help with webserver CSS formatting
+-Help with main website design and scripting
+-Help with testing
 
 Gabriel Ravier (https://github.com/GabrielRavier)
 -Help with code style

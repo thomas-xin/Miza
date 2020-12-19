@@ -14,7 +14,7 @@ heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 # Main class containing all global bot data.
 class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collections.abc.Callable):
 
-    website = "https://github.com/thomas-xin/Miza"
+    github = "https://github.com/thomas-xin/Miza"
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
     heartbeat = "heartbeat.tmp"
     heartbeat_ack = "heartbeat_ack.tmp"
@@ -86,6 +86,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         except KeyError:
             self.owners = alist()
             print("WARNING: owner_id not found. Unable to locate owner.")
+        try:
+            discord_id = AUTH["discord_id"]
+            if not discord_id:
+                raise
+        except:
+            discord_id = None
+            print("WARNING: discord_id not found. Unable to automatically generate bot invites or slash commands.")
+        globals()["discord_id"] = discord_id
         # Initialize rest of bot variables
         self.proc = PROC
         self.guild_count = 0
@@ -226,7 +234,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         with sem:
                             aliases = command.slash if type(command.slash) is tuple else (command.__name__,)
                             for name in (full_prune(i) for i in aliases):
-                                description = lim_str(command.description.replace('⟨MIZA⟩', self.user.name).replace('⟨WEBSERVER⟩', f'http://{self.ip}/9801'), 100)
+                                description = lim_str(command.parse_description(), 100)
                                 options = self.command_options(command.usage)
                                 command_data = dict(name=name, description=description)
                                 if options:
@@ -254,7 +262,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 if not found:
                                     print(f"creating new slash command {command_data['name']}...")
                                     print(command_data)
-                                    create_future_ex(self.create_command, command_data)
+                                    create_future_ex(self.create_command, command_data, priority=True)
         time.sleep(3)
         for curr in commands:
             with tracebacksuppressor:
@@ -263,6 +271,75 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 resp = requests.delete(f"https://discord.com/api/v8/applications/{discord_id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                 if resp.status_code not in range(200, 400):
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
+
+    async def create_main_website(self):
+        print("Generating website html...")
+        with tracebacksuppressor:
+            resp = await Request("https://github.com/thomas-xin/Miza", aio=True)
+            description = resp[resp.index(b"<title>") + 7:resp.index(b"</title>")].split(b"/", 1)[-1].decode("utf-8", "replace")
+            html = f"""<!DOCTYPE html>
+<html>
+    <head>
+        <title>{description}</title>
+        <link rel="preconnect" href="https://fonts.gstatic.com">
+        <link href="https://fonts.googleapis.com/css2?family=Balsamiq+Sans&amp;family=Pacifico&amp;display=swap" rel="stylesheet">
+        <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
+        <link href="{self.webserver}/static/miza.css" rel="stylesheet">
+        <link rel="stylesheet" href="{self.webserver}/static/swiper.min.css">
+    </head>
+    <body>
+        <div class="hero">
+            <img class="hero-bg" src="https://i.imgur.com/LsNWQUJ.png">
+            <div class="hero-text">
+                <img src="{best_url(self.user)}" class="hero-image">
+                <h1 class="hero-text-text" data-upside-down-emoji-because-the-class-name="yea">Miza</h1>
+                <a class="buttonish" href="{self.invite}"><i class="bx bxs-plus-square"></i>Invite</a>
+                <div class="buttonsholder">
+                    <a class="buttonish" href="{self.github}"><i class="bx bxl-github"></i>Sauce</a>
+                    <a class="buttonish" href="https://discord.gg/cbKQKAr"><i class="bx bxl-discord"></i>Discord</a>
+                </div>
+            </div>
+        </div>
+        <div class="bigboi">
+            <img
+                class="bgimg" 
+                src="https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de6t2dl-c2f19c79-ae94-4697-998b-ac9433d1c398.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTZ0MmRsLWMyZjE5Yzc5LWFlOTQtNDY5Ny05OThiLWFjOTQzM2QxYzM5OC5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.yRznZGXNmU1kP3s-zl9_RljyK-Df7GMcIbAOUME-OOM" 
+            />
+            <h2>What is Miza?</h2>
+            <p>Miza is a multipurpose Discord bot designed around generally being useful. The premise for Miza is: "fuck it, other bots can do it. Miza should be able to do it too."</p> 
+            <h2>What can Miza do?</h2>
+            <p>Oh, just a few things:</p>"""
+        commands = set()
+        for command in bot.commands.values():
+            commands.update(command)
+        com_count = 0
+        for category in ("main", "string", "admin", "voice", "image", "fun"):
+            c = f'\n<div class="carouselRight swiper-container"><div class="swiper-wrapper">'
+            for command in self.categories[category]:
+                c += f'\n<div class="carouselItem swiper-slide"><h3>{command.__name__}</h3><p>{command.parse_description()}</p></div>'
+                com_count += 1
+            c += '\n</div><div class="swiper-pagination"></div><div class="swiper-button-prev"></div></div>'
+            html += c
+        html += f"<p>...and {len(commands) - com_count} more!</p>"
+        html += f"""			<h2>Why should I choose Miza over other Discord bots?</h2>
+            <p>no fuckn clue lmao<br>Veritatis suscipit architecto sed voluptas. Sit non rem iure doloribus explicabo qui temporibus. Harum unde porro autem aut. Voluptas dolores eaque expedita aut officiis.</p>
+        </div>
+        <script src="{self.webserver}/static/swiper.min.js"></script>
+        <script src="{self.webserver}/static/yea.js"></script>
+        <!-- 
+        
+        </body> 
+        
+        -->
+    </body>
+    <!-- 
+        
+        </body> 
+        
+        -->
+</html>"""
+        with open("misc/index.html", "w", encoding="utf-8") as f:
+            f.write(html)
 
     # Starts up client.
     def run(self):
@@ -1625,6 +1702,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def update_ip(self, ip):
         if regexp("^([0-9]{1,3}\\.){3}[0-9]{1,3}$").search(ip):
             self.ip = ip
+            self.webserver = f"http://{self.ip}:9801"
 
     # Gets the external IP address from api.ipify.org
     async def get_ip(self):
@@ -1971,8 +2049,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 u = await self.fetch_user(next(iter(self.owners)))
                                 n = u.name
                                 text = f"live to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {belongs(uni_str(n))} place!"
-                                activity = discord.Streaming(name=text, url=self.website)
-                                activity.game = self.website
+                                activity = discord.Streaming(name=text, url=self.github)
+                                activity.game = self.github
                                 if changed:
                                     print(repr(activity))
                                 # Status iterates through 3 possible choices
@@ -2964,6 +3042,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         async def on_ready():
             print("Successfully connected as " + str(self.user))
             self.mention = (user_mention(self.id), user_pc_mention(self.id))
+            if discord_id:
+                self.invite = f"https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord_id}&scope=bot%20applications.commands"
+            else:
+                self.invite = self.github
             with tracebacksuppressor:
                 futs = set()
                 futs.add(create_task(self.get_state()))
@@ -3021,6 +3103,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     # Load all webhooks from cached guilds.
                     futs = alist(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
                     futs.add(create_future(self.update_slash_commands, priority=True))
+                    futs.add(create_task(self.create_main_website()))
                     self.bot_ready = True
                     print("Bot ready.")
                     # Send bot_ready event to all databases.
@@ -3064,7 +3147,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     self.data.dailies.progress_quests(user, "invite")
             emb.description += (
                 f"!\nMy default prefix is `{self.prefix}`, which can be changed as desired on a per-server basis. Mentioning me also serves as an alias for all prefixes.\n"
-                + f"For more information, use the `{self.prefix}help` command, and my source code is available at {self.website} for those who are interested.\n"
+                + f"For more information, use the `{self.prefix}help` command, and my source code is available at {self.github} for those who are interested.\n"
                 + "Pleased to be at your service 🙂"
             )
             if not m.guild_permissions.administrator:
@@ -3498,7 +3581,7 @@ def as_file(file, filename=None, ext=None, rename=True):
             time.sleep(0.1)
     else:
         fn = file.rsplit("/", 1)[-1][1:].rsplit(".", 1)[0].split("~", 1)[0]
-    url = f"http://{miza.ip}:{PORT}/files/{fn}"
+    url = f"{bot.webserver}:{PORT}/files/{fn}"
     if filename:
         url += "/" + (str(file) if filename is None else filename.translate(filetrans))
     if ext and "." not in url:
@@ -3506,7 +3589,7 @@ def as_file(file, filename=None, ext=None, rename=True):
     return url
 
 def is_file(url):
-    start = f"http://{miza.ip}:{PORT}/files/"
+    start = f"{bot.webserver}:{PORT}/files/"
     if url.startswith(start):
         path = url[len(start):].split("/", 1)[0]
         fn = f"{IND}{path}"

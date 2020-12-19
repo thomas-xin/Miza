@@ -1790,6 +1790,8 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
     __str__ = lambda self: f"Command <{self.__name__}>"
     __call__ = lambda self, **void: None
 
+    parse_description = lambda self: self.description.replace('⟨MIZA⟩', self.bot.user.name).replace('⟨WEBSERVER⟩', self.bot.webserver)
+
     def unload(self):
         bot = self.bot
         for alias in self.alias:

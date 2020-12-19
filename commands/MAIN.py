@@ -7,14 +7,6 @@ except ModuleNotFoundError:
 
 print = PRINT
 
-try:
-    discord_id = AUTH["discord_id"]
-    if not discord_id:
-        raise
-except:
-    discord_id = None
-    print("WARNING: discord_id not found. Unable to automatically generate bot invites.")
-
 
 # Default and standard command categories to enable.
 default_commands = frozenset(("main", "string", "admin"))
@@ -77,7 +69,7 @@ class Help(Command):
                     if not a:
                         a = "[none]"
                     s = f"```ini\n[Aliases] {a}"
-                    s += f"\n[Effect] {com.description.replace('⟨MIZA⟩', bot.user.name).replace('⟨WEBSERVER⟩', f'http://{bot.ip}/9801')}"
+                    s += f"\n[Effect] {com.parse_description()}"
                     if v or len(found) <= 1:
                         s += f"\n[Usage] {prefix}{com.__name__} {com.usage}\n[Level] {com.min_display}"
                     s += "```"
@@ -777,8 +769,8 @@ class Info(Command):
                                 except ValueError:
                                     if joined:
                                         pos = len(ul) + 1
-                    if is_self and bot.website is not None:
-                        url2 = bot.website
+                    if is_self and bot.github is not None:
+                        url2 = bot.github
                     else:
                         url2 = url
                     colour = await self.bot.get_colour(u)
@@ -1059,8 +1051,8 @@ class Insights(Command):
                     #             except ValueError:
                     #                 if joined:
                     #                     pos = len(ul) + 1
-                    # if is_self and bot.website is not None:
-                    #     url2 = bot.website
+                    # if is_self and bot.github is not None:
+                    #     url2 = bot.github
                     # else:
                     #     url2 = url
                     # colour = await self.bot.get_colour(u)
@@ -1237,7 +1229,7 @@ class Status(Command):
         if not hasattr(bot, "bitrate"):
             return
         emb = discord.Embed(colour=rand_colour())
-        emb.set_author(name="Status", url=bot.website, icon_url=best_url(bot.user))
+        emb.set_author(name="Status", url=bot.github, icon_url=best_url(bot.user))
         emb.timestamp = utc_dt()
         if msg is None:
             active = bot.get_active()
@@ -1268,7 +1260,7 @@ class Status(Command):
             commands = set()
             for command in bot.commands.values():
                 commands.update(command)
-            emb.add_field(name="Code info", value=f"Code size\n[`{byte_scale(size[0])}B, {size[1]} lines`]({bot.website})\nCommand count\n[`{len(commands)}`](https://github.com/thomas-xin/Miza/wiki/Commands)")
+            emb.add_field(name="Code info", value=f"Code size\n[`{byte_scale(size[0])}B, {size[1]} lines`]({bot.github})\nCommand count\n[`{len(commands)}`](https://github.com/thomas-xin/Miza/wiki/Commands)")
         else:
             emb.description = msg
         func = channel.send
@@ -1295,11 +1287,9 @@ class Invite(Command):
     slash = True
     
     async def __call__(self, channel, message, **void):
-        if discord_id is None:
-            raise FileNotFoundError("Unable to locate bot's Client ID.")
         emb = discord.Embed(colour=rand_colour())
         emb.set_author(**get_author(self.bot.user))
-        emb.description = f"[**`My Github`**]({self.bot.website}) [**`My Website`**](http://{self.bot.ip}:9801) [**`My Invite`**](https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord_id}&scope=bot%20applications.commands)"
+        emb.description = f"[**`My Github`**]({self.bot.github}) [**`My Website`**]({self.bot.webserver}) [**`My Invite`**]({self.bot.invite})"
         if message.guild:
             with tracebacksuppressor:
                 member = message.guild.get_member(self.bot.id)

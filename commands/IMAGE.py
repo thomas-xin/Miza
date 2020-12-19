@@ -1246,7 +1246,7 @@ class ImagePool:
 
 
 class Cat(ImagePool, Command):
-    description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it. Be sure to check out ⟨WEBSERVER⟩/cats"
+    description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it. Be sure to check out ⟨WEBSERVER⟩/cats!"
     database = "cats"
     name = ["🐱", "Meow"]
     slash = True
@@ -1273,7 +1273,7 @@ class Cat(ImagePool, Command):
 
 
 class Dog(ImagePool, Command):
-    description = "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it. Be sure to check out ⟨WEBSERVER⟩/dogs"
+    description = "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it. Be sure to check out ⟨WEBSERVER⟩/dogs!"
     database = "dogs"
     name = ["🐶", "Woof"]
     slash = True

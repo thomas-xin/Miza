@@ -51,7 +51,7 @@ class Restart(Command):
             wait = await bot.eval_time(argv)
             await send_with_reply(channel, content="*Preparing to " + name + " in " + sec2time(wait) + "...*", reference=message)
             emb = discord.Embed(colour=discord.Colour(1))
-            emb.set_author(name=str(bot.user), url=bot.website, icon_url=best_url(bot.user))
+            emb.set_author(name=str(bot.user), url=bot.github, icon_url=best_url(bot.user))
             emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(wait)}, apologies for any inconvenience..."
             await bot.send_event("_announce_", embed=emb)
             save = create_task(bot.send_event("_save_", force=True))
@@ -84,9 +84,9 @@ class Restart(Command):
                 for fut in futs:
                     with suppress():
                         await fut
+                with tracebacksuppressor:
+                    bot.server.kill()
                 await save
-        with suppress():
-            bot.server.kill()
         with suppress():
             await client.close()
         if name.casefold() == "shutdown":
