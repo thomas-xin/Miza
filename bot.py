@@ -140,8 +140,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def start_webserver(self):
         if getattr(self, "server", None):
             self.server.kill()
-        self.server = psutil.Popen([python, "server.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        create_thread(stdread, self.server.stdout)
+        self.server = psutil.Popen([python, "server.py"], stderr=subprocess.PIPE)
+        # create_thread(stdread, self.server.stdout)
         create_thread(stdread, self.server.stderr)
 
     def command_options(self, usage, compare=False):
@@ -3525,7 +3525,7 @@ def stdread(buffer):
             if b == b"\n":
                 buf.seek(0)
                 print(buf.read().decode("utf-8", "replace"))
-                buf.seek(0)
+                buf = io.BytesIO()
             else:
                 buf.write(b)
 
