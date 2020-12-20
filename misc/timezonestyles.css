@@ -34,8 +34,8 @@ h3 {
     padding: 0.5em;
     border-radius: 9999999999px;
     font-weight: lighter;
-    background: #3f005f;
-    color: white;
+    background: #00003f;
+    color: green;
 }
 
 h1, h2, p {
@@ -51,7 +51,7 @@ a {
     padding: 0.5em 2em;
     display: inline-block;
     background: #bf7fff;
-    color: red;
+    color: black;
     text-decoration: none;
     font-size: 1.1rem;
     border-radius: 0.5em;
