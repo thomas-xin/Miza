@@ -5,7 +5,7 @@ html {
     display: flex;
     align-items: center;
     vertical-align: middle;
-    background: #3f005f;
+    background: #1f003f;
     color: cyan;
 }
 
@@ -34,8 +34,8 @@ h3 {
     padding: 0.5em;
     border-radius: 9999999999px;
     font-weight: lighter;
-    background: #00003f;
-    color: green;
+    background: #3f005f;
+    color: white;
 }
 
 h1, h2, p {
