@@ -2498,7 +2498,7 @@ class Queue(Command):
             embstr = ""
             currTime = startTime
             i = pos
-            maxlen = 48 - int(math.log10(len(q)))
+            maxlen = 48 - int(math.log10(len(q))) if q else 48
             while i < min(pos + 10, len(q)):
                 e = q[i]
                 space = int(math.log10(len(q))) - int(math.log10(max(1, i)))

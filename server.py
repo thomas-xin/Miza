@@ -130,11 +130,17 @@ def timezone():
         tz = data["timezone"]
         dt = datetime.datetime.now(pytz.timezone(tz))
         sys.stderr.write(ip + "\t" + str(dt) + "\t" + tz + "\n")
+        colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
         html = """<!DOCTYPE html>
 <html>
   <head>
     <meta charset=\"utf-8\">
-    <title>timezone page</title>  
+    <title>Timezones</title>
+    <meta content="Timezones" property="og:title">
+    <meta content="Find your current timezone here!" property="og:description">
+    <meta content=\"""" + flask.request.url + """\" property="og:url">
+    <meta content="https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de1q8ky-037a9e0a-debc-47a3-bb3c-217715f13f50.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTFxOGt5LTAzN2E5ZTBhLWRlYmMtNDdhMy1iYjNjLTIxNzcxNWYxM2Y1MC5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.lHV-a85lkq2WLXt5-ZXR5Gai9LBgF7-lhJCeRCMOZmI" property="og:image">
+    <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
     <link rel=\"stylesheet\" type=\"text/css\" href=\"/static/timezonestyles.css\" />
   </head>
   <body>

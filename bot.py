@@ -268,7 +268,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         print("Generating website html...")
         with tracebacksuppressor:
             resp = await Request("https://github.com/thomas-xin/Miza", aio=True)
-            description = resp[resp.index(b"<title>") + 7:resp.index(b"</title>")].split(b"/", 1)[-1].decode("utf-8", "replace")
+            description = resp[resp.index(b"<title>") + 7:resp.index(b"</title>")].split(b":", 1)[-1].decode("utf-8", "replace")
             html = f"""<!DOCTYPE html>
 <html>
     <head>
@@ -3599,7 +3599,7 @@ def as_file(file, filename=None, ext=None, rename=True):
             time.sleep(0.1)
     else:
         fn = file.rsplit("/", 1)[-1][1:].rsplit(".", 1)[0].split("~", 1)[0]
-    url = f"{bot.webserver}:{PORT}/files/{fn}"
+    url = f"{bot.webserver}/files/{fn}"
     if filename:
         url += "/" + (str(file) if filename is None else filename.translate(filetrans))
     if ext and "." not in url:
@@ -3607,7 +3607,7 @@ def as_file(file, filename=None, ext=None, rename=True):
     return url
 
 def is_file(url):
-    start = f"{bot.webserver}:{PORT}/files/"
+    start = f"{bot.webserver}/files/"
     if url.startswith(start):
         path = url[len(start):].split("/", 1)[0]
         fn = f"{IND}{path}"

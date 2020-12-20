@@ -5,6 +5,8 @@ html {
     display: flex;
     align-items: center;
     vertical-align: middle;
+    background: #3f005f;
+    color: cyan;
 }
 
 body {
@@ -26,13 +28,14 @@ div {
 h3 {
     margin-top: 0;
     margin-bottom: 0rem;
-    background: white;
     display: inline-block;
     position: relative;
     top: -1.3em;
     padding: 0.5em;
     border-radius: 9999999999px;
     font-weight: lighter;
+    background: #3f005f;
+    color: white;
 }
 
 h1, h2, p {
@@ -47,8 +50,8 @@ h2 {font-weight: lighter;font-size: 1.2rem;}
 a {
     padding: 0.5em 2em;
     display: inline-block;
-    background: #49bcff;
-    color: black;
+    background: #bf7fff;
+    color: red;
     text-decoration: none;
     font-size: 1.1rem;
     border-radius: 0.5em;

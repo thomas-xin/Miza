@@ -2086,9 +2086,10 @@ class UpdateUsers(Database):
         data = {"Command": Command}
         exec(
             f"class {self.bot.name.replace(' ', '')}(Command):"
-            +"\n\tno_parse = True"
-            +"\n\tasync def __call__(self, message, argv, flags, **void):"
-            +"\n\t\tawait self.bot.data.users._nocommand_(message, self.bot.user.mention + ' ' + argv, flags=flags, force=True)",
+            + "\n\tdescription = 'Serves as an alias for mentioning the bot.'"
+            + "\n\tno_parse = True"
+            + "\n\tasync def __call__(self, message, argv, flags, **void):"
+            + "\n\t\tawait self.bot.data.users._nocommand_(message, self.bot.user.mention + ' ' + argv, flags=flags, force=True)",
             data,
         )
         mod = __name__
