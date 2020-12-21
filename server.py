@@ -195,20 +195,33 @@ def command(content):
     resp = get_geo(ip)
     data = resp["data"]["geo"]
     tz = data["timezone"]
-    t = utc()
-    sys.__stderr__.write(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}")
+    t = int(utc() * 1000)
+    sys.__stderr__.write(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}\n")
     for i in range(360):
         if t in RESPONSES:
             return flask.Response(RESPONSES.pop(t), mimetype="application/json")
+        time.sleep(0.1)
     raise TimeoutError
 
 def bot_response():
+    sys.__stderr__.write("\x00Webserver pipe started.\n")
+    buf = io.StringIO()
     while True:
         try:
-            key, data = sys.stdin.readline().split("\x7f", 1)
-            while len(RESPONSES) >= 256:
-                RESPONSES.pop(next(iter(RESPONSES)), None)
-            RESPONSES[key] = data
+            b = sys.stdin.read(1)
+            if not b:
+                psutil.Process().kill()
+            if b == "\n":
+                buf.seek(0)
+                resp = buf.read()
+                key, data = resp.split("\x7f", 1)
+                sys.__stderr__.write("\x00" + resp)
+                while len(RESPONSES) >= 256:
+                    RESPONSES.pop(next(iter(RESPONSES)), None)
+                RESPONSES[int(key)] = data
+                buf = io.StringIO()
+            else:
+                buf.write(b)
         except:
             sys.__stderr__.write("\x00" + traceback.format_exc())
 

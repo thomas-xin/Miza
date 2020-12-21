@@ -345,7 +345,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             with suppress():
                 self.server.kill()
         self.server = psutil.Popen([python, "server.py"], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-        create_thread(webserver_communicate, self.server)
+        create_thread(webserver_communicate, self)
 
     # Starts up client.
     def run(self):
@@ -2420,11 +2420,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         return remaining
 
     async def process_http_command(self, t, name, nick, command, proc):
-        message = SimulatedMessage(self, command, t, name, nick)
-        response = await self.process_message(message, command, slash=True)
-        message.response.append(response)
-        out = json.dumps(list(message.response))
-        proc.stdin.write(f"{t}\x7f{out}".encode("utf-8"))
+        with tracebacksuppressor:
+            message = SimulatedMessage(self, command, t, name, nick)
+            await self.process_message(message, command, slash=True)
+            out = json.dumps(list(message.response))
+            resp = f"{t}\x7f{out}\n".encode("utf-8")
+            print(resp)
+            return await create_future(proc.stdin.write, resp)
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
@@ -3638,11 +3640,12 @@ def is_file(url):
                 return f"cache/{file}"
     return None
 
-def webserver_communicate(proc):
-    buffer = proc.stderr
+def webserver_communicate(bot):
+    buffer = bot.server.stderr
     with tracebacksuppressor:
         buf = io.BytesIO()
         while True:
+            proc = bot.server
             b = buffer.read(1)
             if not b:
                 break
@@ -3650,25 +3653,25 @@ def webserver_communicate(proc):
                 buf.seek(0)
                 s = buf.read().strip(b"\x00").decode("utf-8", "replace")
                 if s.startswith("~"):
-                    create_task(bot.process_http_command(*s[1:].split("\x7f", 3)), proc.stdin)
+                    create_task(bot.process_http_command(*s[1:].split("\x7f", 3), proc))
                 print(s)
                 buf = io.BytesIO()
             else:
                 buf.write(b)
 
-class SimulatedMessage(discord.abc.Snowflake):
+class SimulatedMessage:
 
     def __init__(self, bot, content, t, name, nick):
-        self.dt = utc_ft(t)
-        self.id = time_snowflake(dt)
+        self.created_at = utc_ft(int(t) / 1000)
+        self.id = time_snowflake(self.created_at)
         self.content = content
         self.author = self
         self.channel = self
         self.guild = self
         self.response = deque()
-        self.name = self.display_name = self.ip
+        self.name = self.display_name = name
         self.discriminator = str(xrand(10000))
-        self.nick = None
+        self.nick = nick
         self.mention = f"<@{self.id}>"
         self.recipient = bot.user
         self.channels = self.text_channels = self.voice_channels = [self]
@@ -3677,6 +3680,7 @@ class SimulatedMessage(discord.abc.Snowflake):
     avatar_url = icon_url = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de1q8lu-eae6a001-6463-4abe-b23c-fc32111c6499.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTFxOGx1LWVhZTZhMDAxLTY0NjMtNGFiZS1iMjNjLWZjMzIxMTFjNjQ5OS5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.eih2c_r4mgWKzZx88GKXOd_5FhCSMSbX5qXGpRUMIsE"
     roles = []
     emojis = []
+    mentions = []
     position = 0
     bot = False
     ghost = True
@@ -3704,6 +3708,7 @@ class SimulatedMessage(discord.abc.Snowflake):
         else:
             kwargs["file"] = as_file(file)
         self.response.append(kwargs)
+        return self
 
     async def history(self, *args, **kwargs):
         yield self
@@ -3711,6 +3716,7 @@ class SimulatedMessage(discord.abc.Snowflake):
     get_member = lambda self, *args: None
     edit = async_nop
     delete = async_nop
+    add_reaction = async_nop
     delete_messages = async_nop
     trigger_typing = async_nop
     webhooks = lambda self: []

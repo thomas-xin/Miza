@@ -1953,7 +1953,10 @@ class __logPrinter:
             else:
                 f = fn
             with closing(f):
-                f.write(b)
+                try:
+                    f.write(b)
+                except TypeError:
+                    f.write(b.decode("utf-8", "replace"))
         except:
             sys.__stdout__.write(traceback.format_exc())
     
