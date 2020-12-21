@@ -344,9 +344,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if getattr(self, "server", None):
             with suppress():
                 self.server.kill()
-        self.server = psutil.Popen([python, "server.py"], stderr=subprocess.PIPE)
-        # create_thread(stdread, self.server.stdout)
-        create_thread(stdread, self.server.stderr)
+        self.server = psutil.Popen([python, "server.py"], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        create_thread(webserver_communicate, self.server)
 
     # Starts up client.
     def run(self):
@@ -2142,7 +2141,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 comm = comm[len(prefix):].strip()
                 op = True
         else:
-            comm = msg[1:]
+            comm = msg
+            if comm and comm[0] == "/" or comm[0] == self.prefix:
+                comm = comm[1:]
             op = True
         # Respond to blacklisted users attempting to use a command, or when mentioned without a command.
         if (u_perm <= -inf and (op or self.id in (member.id for member in message.mentions))):
@@ -2418,6 +2419,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
         return remaining
 
+    async def process_http_command(self, t, name, nick, command, proc):
+        message = SimulatedMessage(self, command, t, name, nick)
+        response = await self.process_message(message, command, slash=True)
+        message.response.append(response)
+        out = json.dumps(list(message.response))
+        proc.stdin.write(f"{t}\x7f{out}".encode("utf-8"))
+
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
         user = self.GhostUser()
@@ -2481,16 +2489,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Sends a message to the target channel, using a random webhook from that channel.
     async def send_as_webhook(self, channel, *args, **kwargs):
-        w = await self.ensure_webhook(channel, bypass=True)
-        kwargs.pop("wait", None)
-        reacts = kwargs.pop("reacts", None)
-        try:
-            async with w.semaphore:
-                message = await w.send(*args, wait=True, **kwargs)
-        except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
-            w = await self.ensure_webhook(channel, force=True)
-            async with w.semaphore:
-                message = await w.send(*args, wait=True, **kwargs)
+        if hasattr(channel, "simulated"):
+            message = await channel.send(*args, **kwargs)
+        else:
+            w = await self.ensure_webhook(channel, bypass=True)
+            kwargs.pop("wait", None)
+            reacts = kwargs.pop("reacts", None)
+            try:
+                async with w.semaphore:
+                    message = await w.send(*args, wait=True, **kwargs)
+            except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
+                w = await self.ensure_webhook(channel, force=True)
+                async with w.semaphore:
+                    message = await w.send(*args, wait=True, **kwargs)
         await self.seen(self.user, channel.guild, event="message", count=len(kwargs.get("embeds", (None,))), raw=f"Sending a message, {channel.guild}")
         if reacts:
             for react in reacts:
@@ -2508,7 +2519,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             guild = getattr(sendable, "guild", None)
             # Determine whether to send embeds individually or as blocks of up to 10, based on whether it is possible to use webhooks
             single = False
-            if guild is None or hasattr(guild, "ghost") or len(embeds) == 1:
+            if guild is None or (not hasattr(guild, "simulated") and hasattr(guild, "ghost")) or len(embeds) == 1:
                 single = True
             else:
                 m = guild.me
@@ -2518,7 +2529,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 else:
                     if not m.guild_permissions.manage_webhooks:
                         single = True
-            if single or reference:
+            if single:
                 for emb in embeds:
                     async with delay(1 / 3):
                         if type(emb) is not discord.Embed:
@@ -3588,6 +3599,17 @@ def as_file(file, filename=None, ext=None, rename=True):
             if fi.startswith(f"{IND}{fn}~"):
                 fn += 1
         out = str(fn)
+    if type(file) is discord.File:
+        if type(file.fp) in (str, bytes):
+            rename = True
+            filename = file.filename or filename
+            file = file.fp
+            if type(file) is bytes:
+                file = file.decode("utf-8", "replace")
+        else:
+            file.fp.seek(0)
+            filename = file.filename or filename
+            file = file.read()
     if issubclass(type(file), bytes):
         with open(f"cache/{IND}{out}", "wb") as f:
             f.write(file)
@@ -3616,7 +3638,8 @@ def is_file(url):
                 return f"cache/{file}"
     return None
 
-def stdread(buffer):
+def webserver_communicate(proc):
+    buffer = proc.stderr
     with tracebacksuppressor:
         buf = io.BytesIO()
         while True:
@@ -3625,10 +3648,76 @@ def stdread(buffer):
                 break
             if b == b"\n":
                 buf.seek(0)
-                print(buf.read().decode("utf-8", "replace"))
+                s = buf.read().strip(b"\x00").decode("utf-8", "replace")
+                if s.startswith("~"):
+                    create_task(bot.process_http_command(*s[1:].split("\x7f", 3)), proc.stdin)
+                print(s)
                 buf = io.BytesIO()
             else:
                 buf.write(b)
+
+class SimulatedMessage(discord.abc.Snowflake):
+
+    def __init__(self, bot, content, t, name, nick):
+        self.dt = utc_ft(t)
+        self.id = time_snowflake(dt)
+        self.content = content
+        self.author = self
+        self.channel = self
+        self.guild = self
+        self.response = deque()
+        self.name = self.display_name = self.ip
+        self.discriminator = str(xrand(10000))
+        self.nick = None
+        self.mention = f"<@{self.id}>"
+        self.recipient = bot.user
+        self.channels = self.text_channels = self.voice_channels = [self]
+        self.members = [self, bot.user]
+
+    avatar_url = icon_url = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de1q8lu-eae6a001-6463-4abe-b23c-fc32111c6499.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTFxOGx1LWVhZTZhMDAxLTY0NjMtNGFiZS1iMjNjLWZjMzIxMTFjNjQ5OS5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.eih2c_r4mgWKzZx88GKXOd_5FhCSMSbX5qXGpRUMIsE"
+    roles = []
+    emojis = []
+    position = 0
+    bot = False
+    ghost = True
+    simulated = True
+    
+    async def send(self, *args, **kwargs):
+        if args:
+            kwargs["content"] = args[0]
+        try:
+            embed = kwargs.pop("embed")
+        except KeyError:
+            pass
+        else:
+            kwargs["embed"] = embed.to_dict()
+        try:
+            embeds = kwargs.pop("embeds")
+        except KeyError:
+            pass
+        else:
+            kwargs["embeds"] = [embed.to_dict() for embed in embeds]
+        try:
+            file = kwargs.pop("file")
+        except KeyError:
+            pass
+        else:
+            kwargs["file"] = as_file(file)
+        self.response.append(kwargs)
+    
+    async def history(self, *args, **kwargs):
+        yield self
+
+    get_member = lambda self, *args: None
+    edit = async_nop
+    delete = async_nop
+    delete_messages = async_nop
+    trigger_typing = async_nop
+    webhooks = lambda self: []
+    guild_permissions = discord.Permissions((1 << 32) - 1)
+    permissions_for = lambda self, member=None: guild_permissions
+    permissions_in = lambda self, channel=None: guild_permissions
+    invites = lambda self: exec("raise FileNotFoundError")
 
 
 # If this is the module being run and not imported, create a new Bot instance and run it.

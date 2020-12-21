@@ -501,8 +501,9 @@ class Info(Command):
             with suppress(AttributeError, KeyError):
                 emb.add_field(name="Region", value=str(g.region), inline=1)
                 emb.add_field(name="Nitro boosts", value=str(g.premium_subscription_count), inline=1)
-        emb.add_field(name="Text channels", value=str(len(g.text_channels)), inline=1)
-        emb.add_field(name="Voice channels", value=str(len(g.voice_channels)), inline=1)
+        with suppress(AttributeError):
+            emb.add_field(name="Text channels", value=str(len(g.text_channels)), inline=1)
+            emb.add_field(name="Voice channels", value=str(len(g.voice_channels)), inline=1)
         emb.add_field(name="Member count", value=str(g.member_count), inline=1)
         if pcount:
             emb.add_field(name="Post count", value=str(pcount), inline=1)

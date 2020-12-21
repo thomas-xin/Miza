@@ -7,13 +7,16 @@ PORT = 9801
 IND = ""
 
 
+sys.stderr = sys.stdout
+
 app = Flask(__name__)
+app.url_map.strict_slashes = False
 # app.use_x_sendfile = True
 
 
 @app.errorhandler(Exception)
 def on_error(ex):
-    sys.stderr.write(repr(ex) + "\n")
+    sys.__stderr__.write("\x00" + repr(ex) + "\n")
     # Redirect HTTP errors to http.cat, python exceptions go to code 500 (internal server error)
     if issubclass(type(ex), HTTPException):
         return flask.redirect(f"https://http.cat/{ex.code}")
@@ -24,6 +27,7 @@ def on_error(ex):
     if issubclass(type(ex), ConnectionError):
         return flask.redirect("https://http.cat/502")
     return flask.redirect("https://http.cat/500")
+
 
 def find_file(path):
     # if no file name is inputted, return no content
@@ -39,19 +43,27 @@ def find_file(path):
             return out
     raise FileNotFoundError
 
+@app.route("/file/<path>", methods=["GET"])
 @app.route("/files/<path>", methods=["GET"])
 def get_file(path):
     try:
-        return flask.send_file(find_file(path), as_attachment=bool(flask.request.args.get("download")))
+        mime = MIMES.get(path.rsplit(".", 1)[-1])
+        down = flask.request.args.get("download", "false")
+        download = down and down[0] not in "0fFnN"
+        return flask.send_file(find_file(path), as_attachment=down, mimetype=mime)
     except EOFError:
         return flask.redirect("https://http.cat/204")
     except FileNotFoundError:
         return flask.redirect("https://http.cat/404")
 
+@app.route("/file/<path>/<filename>", methods=["GET"])
 @app.route("/files/<path>/<filename>", methods=["GET"])
 def get_file_ex(path, filename):
     try:
-        return flask.send_file(find_file(path), as_attachment=bool(flask.request.args.get("download")), attachment_filename=filename)
+        mime = MIMES.get(filename.rsplit(".", 1)[-1])
+        down = flask.request.args.get("download", "false")
+        download = down and down[0] not in "0fFnN"
+        return flask.send_file(find_file(path), as_attachment=down, attachment_filename=filename, mimetype=mime)
     except EOFError:
         return flask.redirect("https://http.cat/204")
     except FileNotFoundError:
@@ -62,6 +74,8 @@ MIMES = dict(
     css="text/css",
     json="application/json",
     js="application/javascript",
+    txt="text/plain",
+    html="text/html",
     ico="image/x-icon",
     png="image/png",
     jpg="image/jpeg",
@@ -70,6 +84,7 @@ MIMES = dict(
     mp3="audio/mpeg",
     ogg="audio/vorbis",
     opus="audio/opus",
+    flac="audio/flac",
     wav="audio/wav",
     mp4="video/mp4",
 )
@@ -91,11 +106,10 @@ def fetch_static(path):
             mime = "text/html"
         return data, mime
     except:
-        sys.stderr.write(path + "\n")
-        traceback.print_exc()
+        sys.__stderr__.write("\x00" + path + "\n\x00" + traceback.format_exc())
         raise
 
-@app.route("/static/<path>", methods=["GET"])
+@app.route("/static/<string:path>", methods=["GET"])
 def get_static_file(path):
     try:
         data, mime = fetch_static(path)
@@ -115,21 +129,29 @@ def favicon():
     data, mime = fetch_static("icon.ico")
     return flask.Response(data, mimetype=mime)
 
-timezones = {}
+
+TZCACHE = {}
+
+def get_geo(ip):
+    try:
+        resp = TZCACHE[ip]
+    except KeyError:
+        url = f"https://tools.keycdn.com/geo.json?host={ip}"
+        resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}"}).json()
+        TZCACHE[resp["data"]["geo"]["ip"]] = resp
+    return resp
+
+
+@app.route("/time", methods=["GET", "POST"])
 @app.route("/timezone", methods=["GET", "POST"])
 def timezone():
     ip = flask.request.remote_addr
     try:
-        try:
-            resp = timezones[ip]
-        except KeyError:
-            url = f"https://tools.keycdn.com/geo.json?host={ip}"
-            resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}"}).json()
-            timezones[resp["data"]["geo"]["ip"]] = resp
+        resp = get_geo(ip)
         data = resp["data"]["geo"]
         tz = data["timezone"]
         dt = datetime.datetime.now(pytz.timezone(tz))
-        sys.stderr.write(ip + "\t" + str(dt) + "\t" + tz + "\n")
+        sys.__stderr__.write(ip + "\t" + str(dt) + "\t" + tz + "\n")
         colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
         html = """<!DOCTYPE html>
 <html>
@@ -157,11 +179,38 @@ def timezone():
         """
         return html
     except KeyError:
-        traceback.print_exc()
+        sys.__stderr__.write("\x00" + traceback.format_exc())
         return flask.redirect("https://http.cat/417")
     except:
-        traceback.print_exc()
+        sys.__stderr__.write("\x00" + traceback.format_exc())
         raise
+
+
+RESPONSES = {}
+
+@app.route("/command/<string:command>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
+@app.route("/commands/<string:command>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
+def command(content):
+    ip = flask.request.remote_addr
+    resp = get_geo(ip)
+    data = resp["data"]["geo"]
+    tz = data["timezone"]
+    t = utc()
+    sys.__stderr__.write(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}")
+    for i in range(360):
+        if t in RESPONSES:
+            return flask.Response(RESPONSES.pop(t), mimetype="application/json")
+    raise TimeoutError
+
+def bot_response():
+    while True:
+        try:
+            key, data = sys.stdin.readline().split("\x7f", 1)
+            while len(RESPONSES) >= 256:
+                RESPONSES.pop(next(iter(RESPONSES)), None)
+            RESPONSES[key] = data
+        except:
+            sys.__stderr__.write("\x00" + traceback.format_exc())
 
 
 cat_t = utc()
@@ -173,6 +222,7 @@ def get_cats():
     return cats
 cats = get_cats()
 
+@app.route("/cat", methods=["GET"])
 @app.route("/cats", methods=["GET"])
 def cat():
     global cats, cat_t
@@ -190,6 +240,7 @@ def get_dogs():
     return dogs
 dogs = get_dogs()
 
+@app.route("/dog", methods=["GET"])
 @app.route("/dogs", methods=["GET"])
 def dog():
     global dogs, dog_t
@@ -199,4 +250,5 @@ def dog():
 
 
 if __name__ == "__main__":
+    create_future_ex(bot_response)
     app.run("0.0.0.0", PORT)

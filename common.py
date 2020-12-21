@@ -721,7 +721,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
         sem = REPLY_SEM[channel.id]
     except KeyError:
         sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
-    if not reference or getattr(reference, "noref", None):
+    if not reference or getattr(reference, "noref", None) or getattr(channel, "simulated"):
         return await channel.send(content, embed=embed, tts=tts)
     if not issubclass(type(channel), discord.abc.GuildChannel) and not issubclass(type(channel), discord.abc.PrivateChannel):
         c = channel.dm_channel
