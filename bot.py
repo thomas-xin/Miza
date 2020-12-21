@@ -3704,7 +3704,7 @@ class SimulatedMessage(discord.abc.Snowflake):
         else:
             kwargs["file"] = as_file(file)
         self.response.append(kwargs)
-    
+
     async def history(self, *args, **kwargs):
         yield self
 
