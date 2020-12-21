@@ -188,8 +188,8 @@ def timezone():
 
 RESPONSES = {}
 
-@app.route("/command/<string:command>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
-@app.route("/commands/<string:command>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
+@app.route("/command/<string:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
+@app.route("/commands/<string:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 def command(content):
     ip = flask.request.remote_addr
     resp = get_geo(ip)
