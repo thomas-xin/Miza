@@ -1425,7 +1425,7 @@ class AudioDownloader:
                 token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=0.5))
                 self.spotify_header = {"authorization": f"Bearer {json.loads(token[:512])['accessToken']}"}
                 self.other_x += 1
-                resp = Request("https://keepv.id/")
+                resp = Request("https://keepv.id/", timeout=16)
                 search = b"<script>apikey='"
                 resp = resp[resp.rindex(search) + len(search):]
                 search = b";sid='"

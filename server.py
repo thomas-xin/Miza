@@ -50,7 +50,7 @@ def get_file(path):
         mime = MIMES.get(path.rsplit(".", 1)[-1])
         down = flask.request.args.get("download", "false")
         download = down and down[0] not in "0fFnN"
-        return flask.send_file(find_file(path), as_attachment=down, mimetype=mime)
+        return flask.send_file(find_file(path), as_attachment=download, mimetype=mime)
     except EOFError:
         return flask.redirect("https://http.cat/204")
     except FileNotFoundError:
@@ -63,7 +63,7 @@ def get_file_ex(path, filename):
         mime = MIMES.get(filename.rsplit(".", 1)[-1])
         down = flask.request.args.get("download", "false")
         download = down and down[0] not in "0fFnN"
-        return flask.send_file(find_file(path), as_attachment=down, attachment_filename=filename, mimetype=mime)
+        return flask.send_file(find_file(path), as_attachment=download, attachment_filename=filename, mimetype=mime)
     except EOFError:
         return flask.redirect("https://http.cat/204")
     except FileNotFoundError:
@@ -215,12 +215,13 @@ def bot_response():
                 buf.seek(0)
                 resp = buf.read()
                 key, data = resp.split("\x7f", 1)
-                sys.__stderr__.write("\x00" + resp)
+                sys.__stderr__.write("\x00" + resp + "\n")
                 while len(RESPONSES) >= 256:
                     RESPONSES.pop(next(iter(RESPONSES)), None)
                 RESPONSES[int(key)] = data
                 buf = io.StringIO()
             else:
+                sys.__stderr__.write("\x00" + b + "\n")
                 buf.write(b)
         except:
             sys.__stderr__.write("\x00" + traceback.format_exc())
