@@ -932,6 +932,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         else:
             medias = "video"
         for url in urls:
+            u = getattr(url, "url", None)
+            if u:
+                url = u
             if is_discord_message_link(url):
                 found = deque()
                 spl = url[url.index("channels/") + 9:].replace("?", "/").split("/", 2)

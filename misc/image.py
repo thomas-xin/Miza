@@ -274,9 +274,12 @@ def rainbow_gif(image, duration):
     if duration == 0:
         fps = 0
     else:
-        fps = round(256 / abs(duration))
+        fps = round(128 / abs(duration))
     rate = 2
     while fps > 48 and rate < 8:
+        fps >>= 1
+        rate <<= 1
+    while fps >= 64:
         fps >>= 1
         rate <<= 1
     if fps <= 0:
@@ -357,9 +360,12 @@ def spin_gif(image, duration):
     if duration == 0:
         fps = 0
     else:
-        fps = round(256 / abs(duration))
+        fps = round(128 / abs(duration))
     rate = 2
-    while fps > 48 and rate < 8:
+    while fps > 32 and rate < 8:
+        fps >>= 1
+        rate <<= 1
+    while fps >= 64:
         fps >>= 1
         rate <<= 1
     if fps <= 0:
@@ -1147,6 +1153,8 @@ def from_bytes(b, save=None):
     try:
         return Image.open(out)
     except PIL.UnidentifiedImageError:
+        if not b:
+            raise FileNotFoundError("image file not found")
         file_print(b[:1024])
         raise
 
@@ -1408,12 +1416,14 @@ def evalImg(url, operation, args):
                 frames = frameit()
             size = first.size
             out = "cache/" + str(ts) + ".gif"
-            command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(fps), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-"]
+            command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(fps), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-", "-gifflags", "-offsetting", "-an"]
             if new["count"] > 4096:
                 vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
             else:
                 vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=diff_mode=rectangle:alpha_threshold=128"
-            command.extend(["-gifflags", "-offsetting", "-an", "-vf", vf, "-loop", "0", out])
+            if vf:
+                command.extend(("-vf", vf))
+            command.extend(("-loop", "0", out))
             file_print(command)
             file_print(new["count"])
             proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

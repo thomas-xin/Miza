@@ -776,9 +776,9 @@ typing = lambda self: create_task(self.trigger_typing())
 
 
 # Finds the best URL for a discord object's icon.
-best_url = lambda obj: obj if type(obj) is str else (to_png(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if obj.proxy_url else obj.url))
+best_url = lambda obj: obj if type(obj) is str else (to_png(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if is_image(obj.proxy_url) else obj.url))
 # Finds the worst URL for a discord object's icon.
-worst_url = lambda obj: obj if type(obj) is str else (to_png_ex(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if obj.proxy_url else obj.url))
+worst_url = lambda obj: obj if type(obj) is str else (to_png_ex(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if is_image(obj.proxy_url) else obj.url))
 
 
 get_author = lambda user, u_id=None: cdict(name=f"{user}" + "" if not u_id else f" ({user.id})", icon_url=best_url(user), url=best_url(user))
