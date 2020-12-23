@@ -169,7 +169,7 @@ class Math(Command):
         if type(resp) is dict and "file" in resp:
             await channel.trigger_typing()
             fn = resp["file"]
-            f = discord.File(fn)
+            f = CompatFile(fn)
             await bot.send_with_file(channel, "", f, filename=fn, best=True)
             return
         answer = "\n".join(str(i) for i in resp)

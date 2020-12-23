@@ -3064,7 +3064,7 @@ class Dump(Command):
                 raise ArgumentError("Please input a file or URL to load.")
             async with discord.context_managers.Typing(channel):
                 resp, fn = await create_future(auds.get_dump, "x" in flags, js=True, timeout=18)
-                f = discord.File(io.BytesIO(resp), filename=fn)
+                f = CompatFile(io.BytesIO(resp), filename=fn)
             create_task(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f))
             return
         if not is_alone(auds, user) and perm < 1:

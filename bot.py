@@ -1035,7 +1035,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         size = 8388608
         with suppress(AttributeError):
             size = channel.guild.filesize_limit
-        if file and type(file) is not discord.File:
+        if file and not hasattr(file, "fp"):
             if type(file) is str:
                 if not os.path.exists(file):
                     raise FileNotFoundError(file)
@@ -1043,11 +1043,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 f = file
             else:
                 data  = file
-                file = discord.File(io.BytesIO(data), filename)
+                file = CompatFile(io.BytesIO(data), filename)
                 fsize = len(data)
         if fsize <= size:
-            if type(file) is not discord.File:
-                f2 = discord.File(file, filename)
+            if not hasattr(file, "fp"):
+                f2 = CompatFile(file, filename)
             else:
                 f2 = file
             if not filename:
@@ -1061,7 +1061,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         try:
             if fsize > size:
                 if not f:
-                    f = filename if filename and type(file) is not discord.File else data
+                    f = filename if filename and not hasattr(file, "fp") else data
                 if type(f) in (bytes, bytearray, memoryview):
                     f = f.decode("utf-8", "replace")
                 elif type(f) is not str:
@@ -1101,7 +1101,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         create_task(self.add_attachment(attachment))
         if "message_cache" in self.data:
             self.data.message_cache.save_message(message)
-        if cache and "channel_cache" in self.data:
+        if not getattr(message, "simulated", None) and cache and "channel_cache" in self.data:
             create_future_ex(self.insert_message, message, priority=True)
         return message
 
@@ -2392,7 +2392,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                         else:
                                             filemsg = "Response data:"
                                         b = io.BytesIO(response)
-                                        f = discord.File(b, filename="message.txt")
+                                        f = CompatFile(b, filename="message.txt")
                                         sent = await self.send_with_file(channel, filemsg, f)
                                 # Add targeted react if there is one
                                 if react and sent:
@@ -3610,17 +3610,18 @@ def as_file(file, filename=None, ext=None, rename=True):
             if fi.startswith(f"{IND}{fn}~"):
                 fn += 1
         out = str(fn)
-    if type(file) is discord.File:
-        if type(file.fp) in (str, bytes):
+    if hasattr(file, "fp"):
+        fp = getattr(file, "_fp", file.fp)
+        if type(fp) in (str, bytes):
             rename = True
             filename = file.filename or filename
-            file = file.fp
+            file = fp
             if type(file) is bytes:
                 file = file.decode("utf-8", "replace")
         else:
-            file.fp.seek(0)
+            fp.seek(0)
             filename = file.filename or filename
-            file = file.read()
+            file = fp.read()
     if issubclass(type(file), bytes):
         with open(f"cache/{IND}{out}", "wb") as f:
             f.write(file)
@@ -3670,6 +3671,7 @@ def webserver_communicate(bot):
 class SimulatedMessage:
 
     def __init__(self, bot, content, t, name, nick, recursive=True):
+        self._state = bot._state
         self.created_at = datetime.datetime.fromtimestamp(int(t) / 1000)
         self.id = time_snowflake(self.created_at, high=True)
         self.content = content
@@ -3677,6 +3679,7 @@ class SimulatedMessage:
         if recursive:
             author = self.__class__(bot, content, ip2int(name) + MIZA_EPOCH, name, nick, recursive=False)
             author.response = self.response
+            author.message = self
         else:
             author = self
         self.author = author
@@ -3685,17 +3688,21 @@ class SimulatedMessage:
         self.name = self.display_name = name
         self.discriminator = str(xrand(10000))
         self.nick = nick
+        self.owner_id = self.id
         self.mention = f"<@{self.id}>"
         self.recipient = author
         self.me = bot.user
         self.channels = self.text_channels = self.voice_channels = [author]
         self.members = [author, bot.user]
+        self.message = self
+        self.owner = self.author
 
     avatar_url = icon_url = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de1q8lu-eae6a001-6463-4abe-b23c-fc32111c6499.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTFxOGx1LWVhZTZhMDAxLTY0NjMtNGFiZS1iMjNjLWZjMzIxMTFjNjQ5OS5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.eih2c_r4mgWKzZx88GKXOd_5FhCSMSbX5qXGpRUMIsE"
     roles = []
     emojis = []
     mentions = []
     attachments = []
+    embeds = []
     position = 0
     bot = False
     ghost = True
@@ -3725,7 +3732,7 @@ class SimulatedMessage:
         except KeyError:
             pass
         else:
-            kwargs["file"] = as_file(file)
+            kwargs["file"] = await create_future(as_file, file)
         self.response.append(kwargs)
         return self
     

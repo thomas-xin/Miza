@@ -1718,7 +1718,7 @@ class UpdateFileLogs(Database):
                                 if b is None:
                                     with delay(1):
                                         b = self.bot.cache.attachments[a.id]
-                        fil = discord.File(io.BytesIO(b), filename=str(a).rsplit("/", 1)[-1])
+                        fil = CompatFile(io.BytesIO(b), filename=str(a).rsplit("/", 1)[-1])
                         fils.append(fil)
                     except:
                         msg.append(best_url(a))

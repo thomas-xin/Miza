@@ -327,7 +327,7 @@ class UpdateExec(Database):
                             result = await self.procFunc(message, proc, bot, term=f)
                             output = str(result)
                             if len(output) > 54000:
-                                f = discord.File(io.BytesIO(output.encode("utf-8")), filename="message.txt")
+                                f = CompatFile(io.BytesIO(output.encode("utf-8")), filename="message.txt")
                                 await bot.send_with_file(channel, "Response over 54,000 characters.", file=f)
                             elif len(output) > 1993:
                                 bot.send_as_embeds(channel, output, md=code_md)
@@ -402,7 +402,7 @@ class DownloadServer(Command):
                 for i, message in enumerate(messages, 1):
                     temp = ("\n\n" + message_repr(message, username=True)).encode("utf-8")
                     if len(temp) + len(b) > 8388608:
-                        await send(file=discord.File(io.BytesIO(b), filename=fn + ".txt"))
+                        await send(file=CompatFile(io.BytesIO(b), filename=fn + ".txt"))
                         fn += "_"
                         b = temp[2:]
                     else:
@@ -413,7 +413,7 @@ class DownloadServer(Command):
                     if not i & 8191:
                         await asyncio.sleep(0.2)
                 if b:
-                    await send(file=discord.File(io.BytesIO(b), filename=fn + ".txt"))
+                    await send(file=CompatFile(io.BytesIO(b), filename=fn + ".txt"))
 
             await self.bot.data.counts.getGuildHistory(guild, callback=callback)
         response = uni_str("Download Complete.")
@@ -458,8 +458,11 @@ class UpdateChannelCache(Database):
         try:
             messages = self.data[c_id]
         except KeyError:
+            if hasattr(channel, "simulated"):
+                yield channel.message
+                return
             messages = alist()
-            channel = await self.bot.fetch_sendable(c_id)
+            channel = await self.bot.fetch_messageable(c_id)
             async for message in channel.history(limit=None):
                 messages.appendleft(message.id)
                 self.bot.add_message(message, files=False, cache=False)

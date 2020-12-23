@@ -1390,6 +1390,60 @@ async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
             raise
 
 
+class open2(io.IOBase):
+
+    __slots__ = ("fp", "fn", "mode")
+
+    def __init__(self, fn, mode="rb"):
+        self.fp = None
+        self.fn = fn
+        self.mode = mode
+    
+    def __getattr__(self, k):
+        if k in self.__slots__:
+            return object.__getattribute__(self, k)
+        if self.fp is None:
+            self.fp = open(self.fn, self.mode)
+        return getattr(self.fp, k)
+
+class CompatFile:
+
+    def __init__(self, fp, filename=None, spoiler=False):
+        self.fp = self._fp = fp
+        if issubclass(type(fp), io.IOBase):
+            self.fp = fp
+            self._original_pos = fp.tell()
+            self._owner = False
+        else:
+            self.fp = open2(fp, "rb")
+            self._original_pos = 0
+            self._owner = True
+        self._closer = self.fp.close
+        self.fp.close = lambda: None
+        if filename is None:
+            if isinstance(fp, str):
+                _, self.filename = os.path.split(fp)
+            else:
+                self.filename = getattr(fp, 'name', None)
+        else:
+            self.filename = filename
+        if spoiler:
+            if self.filename is not None:
+                if not self.filename.startswith("SPOILER_"):
+                    self.filename = "SPOILER_" + self.filename
+            else:
+                self.filename = "SPOILER_" + "UNKNOWN"
+
+    def reset(self, seek=True):
+        if seek:
+            self.fp.seek(self._original_pos)
+
+    def close(self):
+        self.fp.close = self._closer
+        if self._owner:
+            self._closer()
+
+
 class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContextManager):
 
     BUF = 262144

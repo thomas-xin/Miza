@@ -792,7 +792,7 @@ class Colour(Command):
         with discord.context_managers.Typing(channel):
             resp = await process_image("from_colour", "$", [channels], user)
             fn = resp[0]
-            f = discord.File(fn, filename="colour.png")
+            f = CompatFile(fn, filename="colour.png")
         await bot.send_with_file(channel, msg, f, filename=fn, best=True)
 
 
@@ -846,7 +846,7 @@ class Average(Command):
             )
             resp = await process_image("from_colour", "$", [channels], user)
             fn = resp[0]
-            f = discord.File(fn, filename="colour.png")
+            f = CompatFile(fn, filename="colour.png")
         await bot.send_with_file(channel, msg, f, filename=fn, best=True)
         # return css_md("#" + bytes2hex(bytes(raw2colour(colour)), space=False))
 

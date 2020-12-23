@@ -316,7 +316,7 @@ class CS_hex2xml(Command):
         # This probably doesn't need to run concurrently
         data = await create_future(bytes, output, "utf-8", timeout=8)
         b = io.BytesIO(data)
-        f = discord.File(b, filename="patch.xml")
+        f = CompatFile(b, filename="patch.xml")
         create_task(bot.send_with_file(channel, "Patch successfully converted!", f))
 
 

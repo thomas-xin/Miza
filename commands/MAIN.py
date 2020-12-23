@@ -1197,7 +1197,7 @@ class Activity(Command):
         with discord.context_managers.Typing(channel):
             resp = await process_image("plt_special", "$", (data, str(user)), guild)
             fn = resp[0]
-            f = discord.File(fn, filename=f"{user.id}.png")
+            f = CompatFile(fn, filename=f"{user.id}.png")
         return dict(file=f, filename=fn, best=True)
 
 
