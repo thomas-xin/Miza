@@ -344,7 +344,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if getattr(self, "server", None):
             with suppress():
                 self.server.kill()
-        self.server = psutil.Popen([python, "server.py"], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.server = psutil.Popen([python, "server.py"], stderr=subprocess.PIPE)
         create_thread(webserver_communicate, self)
 
     # Starts up client.
@@ -2422,14 +2422,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
         return remaining
 
-    async def process_http_command(self, t, name, nick, command, proc):
+    async def process_http_command(self, t, name, nick, command):
         with tracebacksuppressor:
             message = SimulatedMessage(self, command, t, name, nick)
             await self.process_message(message, command, slash=True)
             out = json.dumps(list(message.response))
-            resp = f"{t}\x7f{out}\n".encode("utf-8")
-            await create_future(proc.stdin.write, resp)
-            print(resp)
+            url = f"http://127.0.0.1:{PORT}/commands/{t}"
+            resp = await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
+            print(t, out, resp, sep="\n")
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
@@ -3644,11 +3644,10 @@ def is_file(url):
     return None
 
 def webserver_communicate(bot):
-    buffer = bot.server.stderr
     with tracebacksuppressor:
         buf = io.BytesIO()
         while True:
-            proc = bot.server
+            buffer = bot.server.stderr
             b = buffer.read(1)
             if not b:
                 break
@@ -3656,7 +3655,7 @@ def webserver_communicate(bot):
                 buf.seek(0)
                 s = buf.read().strip(b"\x00").decode("utf-8", "replace")
                 if s.startswith("~"):
-                    create_task(bot.process_http_command(*s[1:].split("\x7f", 3), proc))
+                    create_task(bot.process_http_command(*s[1:].split("\x7f", 3)))
                 print(s)
                 buf = io.BytesIO()
             else:
@@ -3666,7 +3665,7 @@ class SimulatedMessage:
 
     def __init__(self, bot, content, t, name, nick, recursive=True):
         self.created_at = datetime.datetime.fromtimestamp(int(t) / 1000)
-        self.id = time_snowflake(self.created_at)
+        self.id = time_snowflake(self.created_at, high=True)
         self.content = content
         self.response = deque()
         if recursive:

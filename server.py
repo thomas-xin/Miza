@@ -171,7 +171,10 @@ def timezone():
       <h1>""" + str(dt) + """</h1>
       <h2>Detected timezone: """ + tz + """</h2>
       <p>
-        <a href=\"/timezone\">Refresh</a>
+        <a href=\"/time\">Refresh</a>
+      </p>
+      <p>
+        <a href=\"/\">Home</a>
       </p>
     </div>
   </body>
@@ -192,6 +195,14 @@ RESPONSES = {}
 @app.route("/commands/<string:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 def command(content):
     ip = flask.request.remote_addr
+    if ip == "127.0.0.1":
+        t = int(content)
+        j = flask.request.get_json(force=True)
+        while len(RESPONSES) >= 256:
+            RESPONSES.pop(next(iter(RESPONSES)), None)
+        RESPONSES[t] = j
+        sys.__stderr__.write("\x00" + str(j) + "\n")
+        return b"\xf0\x9f\x92\x9c"
     resp = get_geo(ip)
     data = resp["data"]["geo"]
     tz = data["timezone"]
@@ -199,32 +210,9 @@ def command(content):
     sys.__stderr__.write(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}\n")
     for i in range(360):
         if t in RESPONSES:
-            return flask.Response(RESPONSES.pop(t), mimetype="application/json")
+            return flask.Response(json.dumps(RESPONSES.pop(t)), mimetype="application/json")
         time.sleep(0.1)
     raise TimeoutError
-
-def bot_response():
-    sys.__stderr__.write("\x00Webserver pipe started.\n")
-    buf = io.StringIO()
-    while True:
-        try:
-            b = sys.stdin.read(1)
-            if not b:
-                psutil.Process().kill()
-            if b == "\n":
-                buf.seek(0)
-                resp = buf.read()
-                key, data = resp.split("\x7f", 1)
-                sys.__stderr__.write("\x00" + resp + "\n")
-                while len(RESPONSES) >= 256:
-                    RESPONSES.pop(next(iter(RESPONSES)), None)
-                RESPONSES[int(key)] = data
-                buf = io.StringIO()
-            else:
-                sys.__stderr__.write("\x00" + b + "\n")
-                buf.write(b)
-        except:
-            sys.__stderr__.write("\x00" + traceback.format_exc())
 
 
 cat_t = utc()
@@ -264,5 +252,4 @@ def dog():
 
 
 if __name__ == "__main__":
-    create_future_ex(bot_response)
     app.run("0.0.0.0", PORT)

@@ -43,6 +43,8 @@ id2ts = lambda id: ((id >> 22) + (id & 0xFFF) / 0x1000 + DISCORD_EPOCH) / 1000
 snowflake_time = lambda id: utc_ft(id2ts(id))
 snowflake_time_2 = lambda id: datetime.datetime.fromtimestamp(id2ts(id))
 
+ip2int = lambda ip: int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
+
 
 class EmptyContext(contextlib.AbstractContextManager):
     __enter__ = lambda self, *args: self
@@ -1049,9 +1051,6 @@ status_icon = {
     discord.Status.offline: "⚫",
 }
 status_order = tuple(status_text)
-
-
-ip2int = lambda ip: int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
 
 
 # Subprocess pool for resource-consuming operations.
