@@ -3694,6 +3694,7 @@ class SimulatedMessage:
     bot = False
     ghost = True
     simulated = True
+    __str__ = lambda self: self.name
     
     async def send(self, *args, **kwargs):
         if args:
