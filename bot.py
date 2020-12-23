@@ -1035,6 +1035,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         size = 8388608
         with suppress(AttributeError):
             size = channel.guild.filesize_limit
+        if getattr(channel, "simulated", None):
+            size = -1
         if file and not hasattr(file, "fp"):
             if type(file) is str:
                 if not os.path.exists(file):
@@ -1058,6 +1060,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             data = fp.read()
             fsize = len(data)
             fp.seek(0)
+            fp.clear()
         try:
             if fsize > size:
                 if not f:

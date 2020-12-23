@@ -1399,12 +1399,17 @@ class open2(io.IOBase):
         self.fn = fn
         self.mode = mode
     
-    def __getattr__(self, k):
-        if k in self.__slots__:
+    def __getattribute__(self, k):
+        if k in object.__getattribute__(self, "__slots__") or k == "clear":
             return object.__getattribute__(self, k)
         if self.fp is None:
             self.fp = open(self.fn, self.mode)
         return getattr(self.fp, k)
+
+    def clear(self):
+        with suppress():
+            self.fp.close()
+        self.fp = None
 
 class CompatFile:
 
@@ -1433,6 +1438,7 @@ class CompatFile:
                     self.filename = "SPOILER_" + self.filename
             else:
                 self.filename = "SPOILER_" + "UNKNOWN"
+        self.clear = getattr(self.fp, "clear", lambda self: None)
 
     def reset(self, seek=True):
         if seek:
