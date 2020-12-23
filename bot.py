@@ -2426,8 +2426,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     async def process_http_command(self, t, name, nick, command):
         with tracebacksuppressor:
             message = SimulatedMessage(self, command, t, name, nick)
+            self.cache.users[message.author.id] = message.author
             await self.process_message(message, command, slash=True)
-            await asyncio.sleep(0.1)
+            for i in range(240):
+                if message.response:
+                    break
+                await asyncio.sleep(0.1)
             out = json.dumps(list(message.response))
             url = f"http://127.0.0.1:{PORT}/commands/{t}"
             resp = await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
@@ -3682,7 +3686,8 @@ class SimulatedMessage:
         self.discriminator = str(xrand(10000))
         self.nick = nick
         self.mention = f"<@{self.id}>"
-        self.recipient = bot.user
+        self.recipient = author
+        self.me = bot.user
         self.channels = self.text_channels = self.voice_channels = [author]
         self.members = [author, bot.user]
 
@@ -3690,6 +3695,7 @@ class SimulatedMessage:
     roles = []
     emojis = []
     mentions = []
+    attachments = []
     position = 0
     bot = False
     ghost = True
@@ -3722,12 +3728,14 @@ class SimulatedMessage:
             kwargs["file"] = as_file(file)
         self.response.append(kwargs)
         return self
+    
+    async def edit(self, **kwargs):
+        self.response[-1].update(kwargs)
 
     async def history(self, *args, **kwargs):
         yield self
 
     get_member = lambda self, *args: None
-    edit = async_nop
     delete = async_nop
     add_reaction = async_nop
     delete_messages = async_nop

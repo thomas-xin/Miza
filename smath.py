@@ -3236,18 +3236,10 @@ def time_disp(s):
 # Converts a time interval represented using days:hours:minutes:seconds, to a value in seconds.
 def time_parse(ts):
     data = ts.split(":")
-    t = 0
-    mult = 1
-    while len(data):
-        t += float(data[-1]) * mult
-        data = data[:-1]
-        if mult <= 60:
-            mult *= 60
-        elif mult <= 3600:
-            mult *= 24
-        elif len(data):
-            raise TypeError("Too many time arguments.")
-    return t
+    if len(data) >= 5: 
+        raise TypeError("Too many time arguments.")
+    mults = (1, 60, 3600, 86400)
+    return round_min(sum(float(count) * mult for count, mult in zip(data, reversed(mults[:len(data)]))))
 
 def time_diff(t2, t1):
     out = ""
