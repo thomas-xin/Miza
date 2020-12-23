@@ -402,6 +402,8 @@ def to_circle(image):
     global CIRCLE_CACHE
     if str(image.mode) != "RGBA":
         image = to_square(image).convert("RGBA")
+    else:
+        image = to_square(image)
     try:
         image_map = CIRCLE_CACHE[image.size]
     except KeyError:
