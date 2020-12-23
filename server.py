@@ -207,11 +207,14 @@ def command(content):
     data = resp["data"]["geo"]
     tz = data["timezone"]
     t = int(utc() * 1000)
+    if " " not in content:
+        content += " "
     sys.__stderr__.write(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}\n")
-    for i in range(360):
+    time.sleep(0.1)
+    for i in range(720):
         if t in RESPONSES:
             return flask.Response(json.dumps(RESPONSES.pop(t)), mimetype="application/json")
-        time.sleep(0.1)
+        time.sleep(0.05)
     raise TimeoutError
 
 

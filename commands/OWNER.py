@@ -100,7 +100,28 @@ class Restart(Command):
 
 
 class Execute(Command):
-    name = ["Exec", "Eval"]
+    min_level = nan
+    description = "Executes a command as other user(s)."
+    usage = "<0:users>* <1:command>+"
+    multi = True
+
+    async def __call__(self, bot, user, message, guild, argl, args, argv, **void):
+        users = await bot.find_users(argl, args, user, guild, roles=True)
+        if not users:
+            raise LookupError("No results found.")
+        if args and args[0] == "as":
+            args.pop(0)
+        if args:
+            argv = " ".join(args)
+            for u in users:
+                fake_message = copy.copy(message)
+                fake_message.content = func2
+                fake_message.author = u
+                create_task(bot.process_message(fake_message, args))
+
+
+class Exec(Command):
+    name = ["Eval"]
     min_level = nan
     description = "Causes all messages by the bot owner in the current channel to be executed as python code on ⟨MIZA⟩."
     usage = "(enable|disable)? <type(virtual)>?"

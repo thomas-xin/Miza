@@ -312,9 +312,7 @@ class Loop(Command):
             elif iters > 256:
                 raise PermissionError("Must be owner to execute loop of more than 256 iterations.")
         func = func2 = " ".join(args[1:])
-        if func:
-            while func[0] == " ":
-                func = func[1:]
+        func = func.lstrip()
         if not isnan(perm):
             # Detects when an attempt is made to loop the loop command
             for n in self.name:

@@ -2087,7 +2087,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     # Processes a message, runs all necessary commands and bot events. May be called from another source.
     async def process_message(self, message, msg, edit=True, orig=None, loop=False, slash=False):
         if self.closed:
-            return
+            return 0
         cpy = msg
         # Get user, channel, guild that the message belongs to
         user = message.author
@@ -2156,12 +2156,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 "Sorry, you are currently not permitted to request my services.",
                 reacts="❎",
             ))
-            return
+            return 0
         if self.id in (member.id for member in message.mentions):
             try:
                 await self.send_event("_mention_", user=user, message=message, msg=msg, exc=True)
             except RuntimeError:
-                return
+                return 0
         remaining = 0
         run = False
         if op:
@@ -2173,7 +2173,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 # Parse message to find command.
                 i = len(comm)
                 for end in " ?-+\t\n":
-                    if end in comm:
+                    with suppress(ValueError):
                         i2 = comm.index(end)
                         if i2 < i:
                             i = i2
@@ -2183,238 +2183,239 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 # Multiple commands may have the same alias, run all of them
                 for command in bot.commands[command_check]:
                     # Make sure command is enabled, administrators bypass this
-                    if full_prune(command.catg) in enabled or admin:
-                        # argv is the raw parsed argument data
-                        argv = comm[i:].strip()
-                        run = True
-                        print(f"{getattr(guild, 'id', 0)}: {user} ({u_id}) issued command {msg}")
-                        req = command.min_level
-                        fut = None
-                        try:
-                            # Make sure server-only commands can only be run in servers.
-                            if guild is None:
-                                if getattr(command, "server_only", False):
-                                    raise ReferenceError("This command is only available in servers.")
-                            # Make sure target has permission to use the target command, rate limit the command if necessary.
-                            if u_perm is not nan:
-                                if not u_perm >= req:
-                                    raise command.perm_error(u_perm, req, "for command " + command_check)
-                                x = command.rate_limit
-                                if x:
-                                    if issubclass(type(x), collections.abc.Sequence):
-                                        x = x[not self.is_trusted(getattr(guild, "id", 0))]
-                                    remaining += x
-                                    d = command.used
-                                    t = d.get(u_id, -inf)
-                                    wait = utc() - t - x
-                                    if wait > -1:
-                                        if wait < 0:
-                                            w = max(0.2, -wait)
-                                            d[u_id] = max(t, utc()) + w
-                                            await asyncio.sleep(w)
-                                        if len(d) >= 4096:
-                                            d.pop(next(iter(d)))
-                                        d[u_id] = max(t, utc())
-                                    else:
-                                        raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
-                            flags = {}
-                            if loop:
-                                inc_dict(flags, h=1)
-                            if argv:
-                                # Commands by default always parse unicode fonts as regular text unless otherwise specified.
-                                if not hasattr(command, "no_parse"):
-                                    argv = unicode_prune(argv)
-                                argv = argv.strip()
-                                # Parse command flags (this is a bit of a mess)
-                                if hasattr(command, "flags"):
-                                    flaglist = command.flags
-                                    for q in "?-+":
-                                        if q in argv:
-                                            for char in flaglist:
-                                                flag = q + char
-                                                for r in (flag, flag.upper()):
-                                                    while len(argv) >= 4 and r in argv:
-                                                        found = False
-                                                        i = argv.index(r)
-                                                        if i == 0 or argv[i - 1] == " " or argv[i - 2] == q:
-                                                            with suppress(IndexError, KeyError):
-                                                                if argv[i + 2] == " " or argv[i + 2] == q:
-                                                                    argv = argv[:i] + argv[i + 2:]
-                                                                    add_dict(flags, {char: 1})
-                                                                    found = True
-                                                        if not found:
-                                                            break
-                                        if q in argv:
-                                            for char in flaglist:
-                                                flag = q + char
-                                                for r in (flag, flag.upper()):
-                                                    while len(argv) >= 2 and r in argv:
-                                                        found = False
-                                                        for check in (r + " ", " " + r):
-                                                            if check in argv:
-                                                                argv = argv.replace(check, "")
+                    if full_prune(command.catg) not in enabled and not admin:
+                        raise PermissionError("This command is not enabled here.")
+                    # argv is the raw parsed argument data
+                    argv = comm[i:].strip()
+                    run = True
+                    print(f"{getattr(guild, 'id', 0)}: {user} ({u_id}) issued command {msg}")
+                    req = command.min_level
+                    fut = None
+                    try:
+                        # Make sure server-only commands can only be run in servers.
+                        if guild is None:
+                            if getattr(command, "server_only", False):
+                                raise ReferenceError("This command is only available in servers.")
+                        # Make sure target has permission to use the target command, rate limit the command if necessary.
+                        if u_perm is not nan:
+                            if not u_perm >= req:
+                                raise command.perm_error(u_perm, req, "for command " + command_check)
+                            x = command.rate_limit
+                            if x:
+                                if issubclass(type(x), collections.abc.Sequence):
+                                    x = x[not self.is_trusted(getattr(guild, "id", 0))]
+                                remaining += x
+                                d = command.used
+                                t = d.get(u_id, -inf)
+                                wait = utc() - t - x
+                                if wait > -1:
+                                    if wait < 0:
+                                        w = max(0.2, -wait)
+                                        d[u_id] = max(t, utc()) + w
+                                        await asyncio.sleep(w)
+                                    if len(d) >= 4096:
+                                        d.pop(next(iter(d)))
+                                    d[u_id] = max(t, utc())
+                                else:
+                                    raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
+                        flags = {}
+                        if loop:
+                            inc_dict(flags, h=1)
+                        if argv:
+                            # Commands by default always parse unicode fonts as regular text unless otherwise specified.
+                            if not hasattr(command, "no_parse"):
+                                argv = unicode_prune(argv)
+                            argv = argv.strip()
+                            # Parse command flags (this is a bit of a mess)
+                            if hasattr(command, "flags"):
+                                flaglist = command.flags
+                                for q in "?-+":
+                                    if q in argv:
+                                        for char in flaglist:
+                                            flag = q + char
+                                            for r in (flag, flag.upper()):
+                                                while len(argv) >= 4 and r in argv:
+                                                    found = False
+                                                    i = argv.index(r)
+                                                    if i == 0 or argv[i - 1] == " " or argv[i - 2] == q:
+                                                        with suppress(IndexError, KeyError):
+                                                            if argv[i + 2] == " " or argv[i + 2] == q:
+                                                                argv = argv[:i] + argv[i + 2:]
                                                                 add_dict(flags, {char: 1})
                                                                 found = True
-                                                        if argv == r:
-                                                            argv = ""
+                                                    if not found:
+                                                        break
+                                    if q in argv:
+                                        for char in flaglist:
+                                            flag = q + char
+                                            for r in (flag, flag.upper()):
+                                                while len(argv) >= 2 and r in argv:
+                                                    found = False
+                                                    for check in (r + " ", " " + r):
+                                                        if check in argv:
+                                                            argv = argv.replace(check, "")
                                                             add_dict(flags, {char: 1})
                                                             found = True
-                                                        if not found:
-                                                            break
-                            if argv:
-                                argv = argv.strip()
-                            argl = None
-                            # args is a list of arguments parsed from argv, using shlex syntax when possible.
-                            if not argv:
-                                args = []
-                            else:
-                                args = None
-                                # Used as a goto lol
-                                with suppress(StopIteration):
-                                    if hasattr(command, "no_parse"):
-                                        raise StopIteration
-                                    brackets = {"<": ">", "(": ")", "[": "]", "{": "}"}
-                                    for x, y in brackets.items():
-                                        if x in argv and y in argv:
-                                            xi = argv.index(x)
-                                            yi = argv.rindex(y)
-                                            if xi < yi:
-                                                if hasattr(command, "multi"):
-                                                    argv2 = single_space((argv[:xi] + " " + argv[yi + 1:]).replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
-                                                    argv3 = single_space(argv[xi + 1:yi].replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
-                                                    try:
-                                                        argl = shlex.split(argv3)
-                                                    except ValueError:
-                                                        argl = argv3.split()
-                                                else:
-                                                    argv2 = single_space(argv[:xi].replace("\n", " ").replace("\t", " ") + " " + (argv[xi + 1:yi]).replace("\n", " ").replace(",", " ").replace("\t", " ") + " " + argv[yi + 1:].replace("\n", " ").replace("\t", " "))
+                                                    if argv == r:
+                                                        argv = ""
+                                                        add_dict(flags, {char: 1})
+                                                        found = True
+                                                    if not found:
+                                                        break
+                        if argv:
+                            argv = argv.strip()
+                        argl = None
+                        # args is a list of arguments parsed from argv, using shlex syntax when possible.
+                        if not argv:
+                            args = []
+                        else:
+                            args = None
+                            # Used as a goto lol
+                            with suppress(StopIteration):
+                                if hasattr(command, "no_parse"):
+                                    raise StopIteration
+                                brackets = {"<": ">", "(": ")", "[": "]", "{": "}"}
+                                for x, y in brackets.items():
+                                    if x in argv and y in argv:
+                                        xi = argv.index(x)
+                                        yi = argv.rindex(y)
+                                        if xi < yi:
+                                            if hasattr(command, "multi"):
+                                                argv2 = single_space((argv[:xi] + " " + argv[yi + 1:]).replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
+                                                argv3 = single_space(argv[xi + 1:yi].replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
                                                 try:
-                                                    args = shlex.split(argv2)
+                                                    argl = shlex.split(argv3)
                                                 except ValueError:
-                                                    args = argv2.split()
-                                                raise StopIteration
-                                if args is None:
-                                    argv2 = single_space(argv.replace("\n", " ").replace("\t", " "))
-                                    try:
-                                        args = shlex.split(argv2)
-                                    except ValueError:
-                                        args = argv2.split()
-                                if args and getattr(command, "flags", None):
-                                    if not ("a" in flags or "e" in flags or "d" in flags):
-                                        if "a" in command.flags and "e" in command.flags and "d" in command.flags:
-                                            if args[0].lower() in ("add", "enable", "set", "create", "append"):
-                                                args.pop(0)
-                                                inc_dict(flags, a=1)
-                                            elif args[0].lower() in ("rem", "disable", "remove", "unset", "delete"):
-                                                args.pop(0)
-                                                inc_dict(flags, d=1)
-                            # Assign "guild" as an object that mimics the discord.py guild if there is none
-                            if guild is None:
-                                guild = self.UserGuild(
-                                    user=user,
-                                    channel=channel,
-                                )
-                                channel = guild.channel
-                            # Automatically start typing if the command is time consuming
-                            tc = getattr(command, "time_consuming", False)
-                            if not loop and tc:
-                                fut = create_task(channel.trigger_typing())
-                            # Get maximum time allowed for command to process
-                            if user.id in bot.owners:
-                                timeout = None
-                            else:
-                                timeout = getattr(command, "_timeout_", 1) * bot.timeout
-                                if timeout >= inf:
-                                    timeout = None
-                            # Create a future to run the command
-                            future = create_future(
-                                command,                        # command is a callable object, may be async or not
-                                bot=bot,                        # for interfacing with bot's database
-                                argv=argv,                      # raw text argument
-                                args=args,                      # split text arguments
-                                argl=argl,                      # inputted array of arguments
-                                flags=flags,                    # special flags
-                                perm=u_perm,                    # permission level
-                                user=user,                      # user that invoked the command
-                                message=message,                # message data
-                                channel=channel,                # channel data
-                                guild=guild,                    # guild data
-                                name=command_check,             # alias the command was called as
-                                _timeout=timeout,               # timeout delay assigned to the command
-                                timeout=timeout,                # timeout delay for the whole function
-                            )
-                            # Add a callback to typing in the channel if the command takes too long
-                            if fut is None and not hasattr(command, "typing"):
-                                create_task(delayed_callback(future, 2, typing, channel))
-                            response = await future
-                            # Send bot event: user has executed command
-                            await self.send_event("_command_", user=user, command=command, loop=loop, message=message)
-                            # Process response to command if there is one
-                            if response is not None:
-                                if fut is not None:
-                                    await fut
-                                # Raise exceptions returned by the command
-                                if issubclass(type(response), Exception):
-                                    raise response
-                                elif bool(response) is not False:
-                                    # If 2-tuple returned, send as message-react pair
-                                    if type(response) is tuple and len(response) == 2:
-                                        response, react = response
-                                        if react == 1:
-                                            react = "❎"
-                                    else:
-                                        react = False
-                                    sent = None
-                                    # Process list as a sequence of messages to send
-                                    if type(response) is list:
-                                        for r in response:
-                                            async with delay(1 / 3):
-                                                create_task(channel.send(r))
-                                    # Process dict as kwargs for a message send
-                                    elif issubclass(type(response), collections.abc.Mapping):
-                                        if "file" in response:
-                                            sent = await self.send_with_file(channel, response.get("content", ""), **response)
-                                        else:
-                                            sent = await send_with_react(channel, reference=not loop and message, **response)
-                                    else:
-                                        if type(response) not in (str, bytes, bytearray):
-                                            response = str(response)
-                                        # Process everything else as a string
-                                        if type(response) is str and len(response) <= 2000:
-                                            sent = await send_with_react(channel, response, reference=not loop and message)
-                                            # sent = await channel.send(response)
-                                        else:
-                                            # Send a file if the message is too long
-                                            if type(response) is not bytes:
-                                                response = bytes(str(response), "utf-8")
-                                                filemsg = "Response too long for message."
+                                                    argl = argv3.split()
                                             else:
-                                                filemsg = "Response data:"
-                                            b = io.BytesIO(response)
-                                            f = discord.File(b, filename="message.txt")
-                                            sent = await self.send_with_file(channel, filemsg, f)
-                                    # Add targeted react if there is one
-                                    if react and sent:
-                                        await sent.add_reaction(react)
-                        # Represents any timeout error that occurs
-                        except (T0, T1, T2):
+                                                argv2 = single_space(argv[:xi].replace("\n", " ").replace("\t", " ") + " " + (argv[xi + 1:yi]).replace("\n", " ").replace(",", " ").replace("\t", " ") + " " + argv[yi + 1:].replace("\n", " ").replace("\t", " "))
+                                            try:
+                                                args = shlex.split(argv2)
+                                            except ValueError:
+                                                args = argv2.split()
+                                            raise StopIteration
+                            if args is None:
+                                argv2 = single_space(argv.replace("\n", " ").replace("\t", " "))
+                                try:
+                                    args = shlex.split(argv2)
+                                except ValueError:
+                                    args = argv2.split()
+                            if args and getattr(command, "flags", None):
+                                if not ("a" in flags or "e" in flags or "d" in flags):
+                                    if "a" in command.flags and "e" in command.flags and "d" in command.flags:
+                                        if args[0].lower() in ("add", "enable", "set", "create", "append"):
+                                            args.pop(0)
+                                            inc_dict(flags, a=1)
+                                        elif args[0].lower() in ("rem", "disable", "remove", "unset", "delete"):
+                                            args.pop(0)
+                                            inc_dict(flags, d=1)
+                        # Assign "guild" as an object that mimics the discord.py guild if there is none
+                        if guild is None:
+                            guild = self.UserGuild(
+                                user=user,
+                                channel=channel,
+                            )
+                            channel = guild.channel
+                        # Automatically start typing if the command is time consuming
+                        tc = getattr(command, "time_consuming", False)
+                        if not loop and tc:
+                            fut = create_task(channel.trigger_typing())
+                        # Get maximum time allowed for command to process
+                        if user.id in bot.owners:
+                            timeout = None
+                        else:
+                            timeout = getattr(command, "_timeout_", 1) * bot.timeout
+                            if timeout >= inf:
+                                timeout = None
+                        # Create a future to run the command
+                        future = create_future(
+                            command,                        # command is a callable object, may be async or not
+                            bot=bot,                        # for interfacing with bot's database
+                            argv=argv,                      # raw text argument
+                            args=args,                      # split text arguments
+                            argl=argl,                      # inputted array of arguments
+                            flags=flags,                    # special flags
+                            perm=u_perm,                    # permission level
+                            user=user,                      # user that invoked the command
+                            message=message,                # message data
+                            channel=channel,                # channel data
+                            guild=guild,                    # guild data
+                            name=command_check,             # alias the command was called as
+                            _timeout=timeout,               # timeout delay assigned to the command
+                            timeout=timeout,                # timeout delay for the whole function
+                        )
+                        # Add a callback to typing in the channel if the command takes too long
+                        if fut is None and not hasattr(command, "typing"):
+                            create_task(delayed_callback(future, 2, typing, channel))
+                        response = await future
+                        # Send bot event: user has executed command
+                        await self.send_event("_command_", user=user, command=command, loop=loop, message=message)
+                        # Process response to command if there is one
+                        if response is not None:
                             if fut is not None:
                                 await fut
-                            print(msg)
-                            raise TimeoutError("Request timed out.")
-                        except (ArgumentError, TooManyRequests) as ex:
-                            if fut is not None:
-                                await fut
-                            command.used.pop(u_id, None)
-                            create_task(send_exception(channel, ex, message))
-                            return
-                        # Represents all other errors
-                        except Exception as ex:
-                            if fut is not None:
-                                await fut
-                            command.used.pop(u_id, None)
-                            print_exc()
-                            create_task(send_exception(channel, ex, message))
+                            # Raise exceptions returned by the command
+                            if issubclass(type(response), Exception):
+                                raise response
+                            elif bool(response) is not False:
+                                # If 2-tuple returned, send as message-react pair
+                                if type(response) is tuple and len(response) == 2:
+                                    response, react = response
+                                    if react == 1:
+                                        react = "❎"
+                                else:
+                                    react = False
+                                sent = None
+                                # Process list as a sequence of messages to send
+                                if type(response) is list:
+                                    for r in response:
+                                        async with delay(1 / 3):
+                                            create_task(channel.send(r))
+                                # Process dict as kwargs for a message send
+                                elif issubclass(type(response), collections.abc.Mapping):
+                                    if "file" in response:
+                                        sent = await self.send_with_file(channel, response.get("content", ""), **response)
+                                    else:
+                                        sent = await send_with_react(channel, reference=not loop and message, **response)
+                                else:
+                                    if type(response) not in (str, bytes, bytearray):
+                                        response = str(response)
+                                    # Process everything else as a string
+                                    if type(response) is str and len(response) <= 2000:
+                                        sent = await send_with_react(channel, response, reference=not loop and message)
+                                        # sent = await channel.send(response)
+                                    else:
+                                        # Send a file if the message is too long
+                                        if type(response) is not bytes:
+                                            response = bytes(str(response), "utf-8")
+                                            filemsg = "Response too long for message."
+                                        else:
+                                            filemsg = "Response data:"
+                                        b = io.BytesIO(response)
+                                        f = discord.File(b, filename="message.txt")
+                                        sent = await self.send_with_file(channel, filemsg, f)
+                                # Add targeted react if there is one
+                                if react and sent:
+                                    await sent.add_reaction(react)
+                    # Represents any timeout error that occurs
+                    except (T0, T1, T2):
+                        if fut is not None:
+                            await fut
+                        print(msg)
+                        raise TimeoutError("Request timed out.")
+                    except (ArgumentError, TooManyRequests) as ex:
+                        if fut is not None:
+                            await fut
+                        command.used.pop(u_id, None)
+                        create_task(send_exception(channel, ex, message))
+                        return
+                    # Represents all other errors
+                    except Exception as ex:
+                        if fut is not None:
+                            await fut
+                        command.used.pop(u_id, None)
+                        print_exc()
+                        create_task(send_exception(channel, ex, message))
         # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
         if not run and u_id != bot.id:
             temp = to_alphanumeric(cpy).casefold()
@@ -2426,6 +2427,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         with tracebacksuppressor:
             message = SimulatedMessage(self, command, t, name, nick)
             await self.process_message(message, command, slash=True)
+            await asyncio.sleep(0.1)
             out = json.dumps(list(message.response))
             url = f"http://127.0.0.1:{PORT}/commands/{t}"
             resp = await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)

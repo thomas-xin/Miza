@@ -1788,7 +1788,7 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
         self.aliases.pop("", None)
         for a in self.aliases:
             if a in bot.commands:
-                bot.commands[a].append(self)
+                bot.commands[a].add(self)
             else:
                 bot.commands[a] = alist((self,))
         self.catg = catg
