@@ -475,6 +475,8 @@ class Info(Command):
         top = None
         if not hasattr(g, "ghost"):
             pcount = await bot.data.counts.getUserMessages(None, g)
+        else:
+            pcount = None
         if not hasattr(g, "ghost"):
             with suppress(AttributeError, KeyError):
                 # Top users by message counts

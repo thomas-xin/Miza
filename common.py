@@ -1411,7 +1411,7 @@ class open2(io.IOBase):
             self.fp.close()
         self.fp = None
 
-class CompatFile:
+class CompatFile(discord.File):
 
     def __init__(self, fp, filename=None, spoiler=False):
         self.fp = self._fp = fp
