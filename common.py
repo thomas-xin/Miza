@@ -35,8 +35,13 @@ url_parse = urllib.parse.quote_plus
 escape_markdown = discord.utils.escape_markdown
 escape_mentions = discord.utils.escape_mentions
 escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere").replace("<@&", "<@\xad&")
+
+DISCORD_EPOCH = 1420070400000
+MIZA_EPOCH = 1577797200000
 time_snowflake = discord.utils.time_snowflake
-snowflake_time = discord.utils.snowflake_time
+id2ts = lambda id: ((id >> 22) + (id & 0xFFF) / 0x1000 + DISCORD_EPOCH) / 1000
+snowflake_time = lambda id: utc_ft(id2ts(id))
+snowflake_time_2 = lambda id: datetime.datetime.fromtimestamp(id2ts(id))
 
 
 class EmptyContext(contextlib.AbstractContextManager):
@@ -722,7 +727,12 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
     except KeyError:
         sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
     if not reference or getattr(reference, "noref", None) or getattr(channel, "simulated", None):
-        return await channel.send(content, embed=embed, tts=tts)
+        fields = {}
+        if embed:
+            fields["embed"] = embed
+        if tts:
+            fields["tts"] = tts
+        return await channel.send(content, **fields)
     if not issubclass(type(channel), discord.abc.GuildChannel) and not issubclass(type(channel), discord.abc.PrivateChannel):
         c = channel.dm_channel
         if c is None:
@@ -992,11 +1002,12 @@ IMAGE_FORMS = {
     ".webp": True,
 }
 def is_image(url):
-    url = url.split("?", 1)[0]
-    if "." in url:
-        url = url[url.rindex("."):]
-        url = url.casefold()
-        return IMAGE_FORMS.get(url)
+    if url:
+        url = url.split("?", 1)[0]
+        if "." in url:
+            url = url[url.rindex("."):]
+            url = url.casefold()
+            return IMAGE_FORMS.get(url)
 
 VIDEO_FORMS = {
     ".webm": True,
@@ -1038,6 +1049,9 @@ status_icon = {
     discord.Status.offline: "⚫",
 }
 status_order = tuple(status_text)
+
+
+ip2int = lambda ip: int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
 
 
 # Subprocess pool for resource-consuming operations.

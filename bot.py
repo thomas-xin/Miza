@@ -247,7 +247,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
                                                 break
                                         else:
-                                            print(f"{curr['name']}'s slash command matches, ignoring...")
+                                            # print(f"{curr['name']}'s slash command matches, ignoring...")
                                             found = True
                                         commands.pop(i)
                                         break
@@ -2428,8 +2428,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             await self.process_message(message, command, slash=True)
             out = json.dumps(list(message.response))
             resp = f"{t}\x7f{out}\n".encode("utf-8")
+            await create_future(proc.stdin.write, resp)
             print(resp)
-            return await create_future(proc.stdin.write, resp)
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
@@ -3664,21 +3664,26 @@ def webserver_communicate(bot):
 
 class SimulatedMessage:
 
-    def __init__(self, bot, content, t, name, nick):
-        self.created_at = utc_ft(int(t) / 1000)
+    def __init__(self, bot, content, t, name, nick, recursive=True):
+        self.created_at = datetime.datetime.fromtimestamp(int(t) / 1000)
         self.id = time_snowflake(self.created_at)
         self.content = content
-        self.author = self
-        self.channel = self
-        self.guild = self
         self.response = deque()
+        if recursive:
+            author = self.__class__(bot, content, ip2int(name) * 1000 + MIZA_EPOCH, name, nick, recursive=False)
+            author.response = self.response
+        else:
+            author = self
+        self.author = author
+        self.channel = author
+        self.guild = author
         self.name = self.display_name = name
         self.discriminator = str(xrand(10000))
         self.nick = nick
         self.mention = f"<@{self.id}>"
         self.recipient = bot.user
-        self.channels = self.text_channels = self.voice_channels = [self]
-        self.members = [self, bot.user]
+        self.channels = self.text_channels = self.voice_channels = [author]
+        self.members = [author, bot.user]
 
     avatar_url = icon_url = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de1q8lu-eae6a001-6463-4abe-b23c-fc32111c6499.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTFxOGx1LWVhZTZhMDAxLTY0NjMtNGFiZS1iMjNjLWZjMzIxMTFjNjQ5OS5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.eih2c_r4mgWKzZx88GKXOd_5FhCSMSbX5qXGpRUMIsE"
     roles = []
@@ -3697,13 +3702,16 @@ class SimulatedMessage:
         except KeyError:
             pass
         else:
-            kwargs["embed"] = embed.to_dict()
+            if embed:
+                kwargs["embed"] = embed.to_dict()
         try:
             embeds = kwargs.pop("embeds")
         except KeyError:
             pass
         else:
-            kwargs["embeds"] = [embed.to_dict() for embed in embeds]
+            embeds = [embed.to_dict() for embed in embeds if embed]
+            if embeds:
+                kwargs["embeds"] = embeds
         try:
             file = kwargs.pop("file")
         except KeyError:
