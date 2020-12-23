@@ -3670,7 +3670,7 @@ class SimulatedMessage:
         self.content = content
         self.response = deque()
         if recursive:
-            author = self.__class__(bot, content, ip2int(name) * 1000 + MIZA_EPOCH, name, nick, recursive=False)
+            author = self.__class__(bot, content, ip2int(name) + MIZA_EPOCH, name, nick, recursive=False)
             author.response = self.response
         else:
             author = self
