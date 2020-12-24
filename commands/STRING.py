@@ -541,7 +541,7 @@ class Char2Emoj(Command):
 
 class Time(Command):
     name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T"]
-    description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user. Be sure to check out ⟨WEBSERVER⟩/timezone!"
+    description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user. Be sure to check out ⟨WEBSERVER⟩/time!"
     usage = "<offset_hours|user>?"
     slash = True
 
@@ -597,7 +597,7 @@ class Time(Command):
 
 
 class Timezone(Command):
-    description = "Shows the current time in a certain timezone. Be sure to check out ⟨WEBSERVER⟩/timezone!"
+    description = "Shows the current time in a certain timezone. Be sure to check out ⟨WEBSERVER⟩/time!"
     usage = "<timezone> <list{?l}>?"
     slash = True
 
@@ -606,7 +606,7 @@ class Timezone(Command):
             fields = deque()
             for k, v in COUNTRIES.items():
                 fields.append((k, ", ".join(v), False))
-            self.bot.send_as_embeds(channel, description=f"[Click here to find your timezone]({self.bot.webserver}/timezone)", title="Timezone list", fields=fields, author=get_author(self.bot.user), reference=message)
+            self.bot.send_as_embeds(channel, description=f"[Click here to find your timezone]({self.bot.webserver}/time)", title="Timezone list", fields=fields, author=get_author(self.bot.user), reference=message)
             return
         secs = as_timezone(argv)
         t = utc_dt() + datetime.timedelta(seconds=secs)

@@ -1817,11 +1817,10 @@ filetrans = "".maketrans(__filetrans)
 
 # Basic inheritable class for all bot commands.
 class Command(collections.abc.Hashable, collections.abc.Callable):
-    min_level = 0
-    rate_limit = 0
     description = ""
     usage = ""
-    slash = False
+    min_level = 0
+    rate_limit = 0
 
     def perm_error(self, perm, req=None, reason=None):
         if req is None:

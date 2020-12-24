@@ -109,10 +109,11 @@ def fetch_static(path):
         sys.__stderr__.write("\x00" + path + "\n\x00" + traceback.format_exc())
         raise
 
-@app.route("/static/<path:path>", methods=["GET"])
-def get_static_file(path):
+@app.route("/static/<filename>", methods=["GET"])
+@app.route("/static/<path:filename>", methods=["GET"])
+def get_static_file(filename):
     try:
-        data, mime = fetch_static(path)
+        data, mime = fetch_static(filename)
         return flask.Response(data, mimetype=mime)
     except EOFError:
         return flask.redirect("https://http.cat/204")
@@ -144,6 +145,7 @@ def get_geo(ip):
 
 @app.route("/time", methods=["GET", "POST"])
 @app.route("/timezone", methods=["GET", "POST"])
+@app.route("/timezones", methods=["GET", "POST"])
 def timezone():
     ip = flask.request.remote_addr
     try:

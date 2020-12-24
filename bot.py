@@ -222,7 +222,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         for catg in self.categories.values():
             for command in catg:
                 with tracebacksuppressor:
-                    if command.slash:
+                    if getattr(command, "slash", None):
                         with sem:
                             aliases = command.slash if type(command.slash) is tuple else (command.parse_name(),)
                             for name in (full_prune(i) for i in aliases):
@@ -265,8 +265,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
 
     async def create_main_website(self):
-        print("Generating website html...")
         with tracebacksuppressor:
+            print("Generating website html...")
             resp = await Request("https://github.com/thomas-xin/Miza", aio=True)
             description = resp[resp.index(b"<title>") + 7:resp.index(b"</title>")].split(b":", 1)[-1].decode("utf-8", "replace")
             html = f"""<!DOCTYPE html>
@@ -306,29 +306,29 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             <p>Miza is a multipurpose Discord bot designed around generally being useful. The premise for Miza is: "fuck it, other bots can do it. Miza should be able to do it too."</p> 
             <h2>What can Miza do?</h2>
             <p>Oh, just a few things:</p>"""
-        commands = set()
-        for command in bot.commands.values():
-            commands.update(command)
-        com_count = 0
-        for category in ("main", "string", "admin", "voice", "image", "fun"):
-            c = f'\n<div class="carouselRight swiper-container"><div class="swiper-wrapper">'
-            for command in self.categories[category]:
-                desc = command.parse_description()
-                with suppress(ValueError):
-                    i = desc.index("http")
-                    if "://" in desc[i + 4:i + 8]:
-                        url = desc[i:]
-                        for x in range(len(url)):
-                            if url[x] in " !":
-                                break
-                            x += 1
-                        desc = desc[:i] + f'<a href="{url[:x]}">{url[:x].rsplit("/", 1)[-1]}</a>' + url[x:]
-                c += f'\n<div class="carouselItem swiper-slide"><h3>{command.parse_name()}</h3><p>{desc}</p></div>'
-                com_count += 1
-            c += '</div><div class="swiper-pagination"></div></div>'
-            html += c
-        html += f"\n<p>...and {len(commands) - com_count} more!</p>"
-        html += f"""
+            commands = set()
+            for command in bot.commands.values():
+                commands.update(command)
+            com_count = 0
+            for category in ("main", "string", "admin", "voice", "image", "fun"):
+                c = f'\n<div class="carouselRight swiper-container"><div class="swiper-wrapper">'
+                for command in self.categories[category]:
+                    desc = command.parse_description()
+                    with suppress(ValueError):
+                        i = desc.index("http")
+                        if "://" in desc[i + 4:i + 8]:
+                            url = desc[i:]
+                            for x in range(len(url)):
+                                if url[x] in " !":
+                                    break
+                                x += 1
+                            desc = desc[:i] + f'<a href="{url[:x]}">{url[:x].rsplit("/", 1)[-1]}</a>' + url[x:]
+                    c += f'\n<div class="carouselItem swiper-slide"><h3>{command.parse_name()}</h3><p>{desc}</p></div>'
+                    com_count += 1
+                c += '</div><div class="swiper-pagination"></div></div>'
+                html += c
+            html += f"\n<p>...and {len(commands) - com_count} more!</p>"
+            html += f"""
 			<h2>Why should I choose Miza over other Discord bots?</h2>
             <p>no fuckn clue lmao<br>Veritatis suscipit architecto sed voluptas. Sit non rem iure doloribus explicabo qui temporibus. Harum unde porro autem aut. Voluptas dolores eaque expedita aut officiis.</p>
         </div>
@@ -336,8 +336,26 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <script src="{self.webserver}/static/pagination.js"></script>
     </body>
 </html>"""
-        with open("misc/index.html", "w", encoding="utf-8") as f:
-            f.write(html)
+            with open("misc/index.html", "w", encoding="utf-8") as f:
+                f.write(html)
+            print("Generating command json...")
+            j = {}
+            for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "OWNER", "NSFW", "MISC"):
+                k = j[category] = {}
+                for command in self.categories[category]:
+                    c = k[command.parse_name()] = dict(
+                        aliases=", ".join(n.strip("_") for n in command.alias),
+                        description=command.parse_description(),
+                        usage=command.usage,
+                        level=command.min_level,
+                        rate_limit=command.rate_limit,
+                        timeout=getattr(command, "_timeout_", 1) * self.timeout,
+                    )
+                    for attr in ("flags", "server_only", "slash"):
+                        with suppress(AttributeError):
+                            c[attr] = command.attr
+            with open("misc/help.json", "w", encoding="utf-8") as f:
+                f.write(json.dumps(j, indent=4))
         self.start_webserver()
     
     def start_webserver(self):
@@ -1095,6 +1113,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Inserts a message into the bot cache, discarding existing ones if full.
     def add_message(self, message, files=True, cache=True):
+        if self.closed:
+            return message
         self.cache.messages[message.id] = message
         self.limit_cache("messages")
         if message.author.id != self.id and files:
