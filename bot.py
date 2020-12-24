@@ -2430,13 +2430,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         with tracebacksuppressor:
             message = SimulatedMessage(self, command, t, name, nick)
             self.cache.users[message.author.id] = message.author
-            await self.process_message(message, command, slash=True)
-            for i in range(240):
+            after = await self.process_message(message, command, slash=True)
+            after += utc()
+            for i in range(3600):
                 if message.response:
                     break
                 await asyncio.sleep(0.1)
+            await self.react_callback(message, None, message.author)
             out = json.dumps(list(message.response))
-            url = f"http://127.0.0.1:{PORT}/commands/{t}"
+            url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
             resp = await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
             print(t, out, resp, sep="\n")
 

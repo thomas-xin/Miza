@@ -2169,9 +2169,9 @@ class AudioDownloader:
         if not stream:
             raise LookupError(f"No stream URLs found for {url}")
         args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-vn"]
-        if start != "None":
+        if str(start) != "None":
             args.extend(("-ss", start))
-        if end != "None":
+        if str(end) != "None":
             args.extend(("-to", end))
         args.extend(("-i", stream))
         if auds is not None:
@@ -3888,7 +3888,7 @@ class Download(Command):
         # Prioritize attachments in message
         for a in message.attachments:
             argv = a.url + " " + argv
-        direct = False
+        direct = getattr(message, "simulated", None)
         start = end = None
         # Attempt to download items in queue if no search query provided
         if not argv:
@@ -3954,6 +3954,30 @@ class Download(Command):
             res = res[:10]
             desc = f"Search results for {argv}:"
         a = flags.get("a", 0)
+        if getattr(message, "simulated", None):
+            try:
+                if a:
+                    auds = bot.data.audio.players[guild.id]
+                else:
+                    auds = None
+            except LookupError:
+                auds = None
+            f, out = await create_future(
+                ytdl.download_file,
+                res[0]["url"],
+                fmt=fmt,
+                start=start,
+                end=end,
+                auds=auds,
+                timeout=540,
+            )
+            return await bot.send_with_file(
+                channel=channel,
+                msg="",
+                file=f,
+                filename=out,
+                rename=False,
+            )
         desc += "\nDestination format: {." + fmt + "}"
         if start is not None or end is not None:
             desc += f"\nTrim: [{'-' if start is None else start} ~> {'-' if end is None else end}]"

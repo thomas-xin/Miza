@@ -56,8 +56,8 @@ def get_file(path):
     except FileNotFoundError:
         return flask.redirect("https://http.cat/404")
 
-@app.route("/file/<path>/<filename>", methods=["GET"])
-@app.route("/files/<path>/<filename>", methods=["GET"])
+@app.route("/file/<path>/<path:filename>", methods=["GET"])
+@app.route("/files/<path>/<path:filename>", methods=["GET"])
 def get_file_ex(path, filename):
     try:
         mime = MIMES.get(filename.rsplit(".", 1)[-1])
@@ -109,7 +109,7 @@ def fetch_static(path):
         sys.__stderr__.write("\x00" + path + "\n\x00" + traceback.format_exc())
         raise
 
-@app.route("/static/<string:path>", methods=["GET"])
+@app.route("/static/<path:path>", methods=["GET"])
 def get_static_file(path):
     try:
         data, mime = fetch_static(path)
@@ -191,13 +191,16 @@ def timezone():
 
 RESPONSES = {}
 
-@app.route("/command/<string:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
-@app.route("/commands/<string:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
+@app.route("/command/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
+@app.route("/commands/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 def command(content):
     ip = flask.request.remote_addr
     if ip == "127.0.0.1":
-        t = int(content)
+        t, after = content.split("\x7f", 1)
+        t = int(t)
+        after = float(after)
         j = flask.request.get_json(force=True)
+        j.insert(0, after)
         while len(RESPONSES) >= 256:
             RESPONSES.pop(next(iter(RESPONSES)), None)
         RESPONSES[t] = j
@@ -211,10 +214,18 @@ def command(content):
         content += " "
     sys.__stderr__.write(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}\n")
     time.sleep(0.1)
-    for i in range(720):
-        if t in RESPONSES:
-            return flask.Response(json.dumps(RESPONSES.pop(t)), mimetype="application/json")
-        time.sleep(0.05)
+    for i in range(7200):
+        try:
+            j = RESPONSES.pop(t)
+        except KeyError:
+            time.sleep(0.05)
+        else:
+            after = j.pop(0)
+            response = flask.Response(json.dumps(j), mimetype="application/json")
+            a = after - utc()
+            if a > 0:
+                response.headers["Retry-After"] = a
+            return response
     raise TimeoutError
 
 
@@ -252,6 +263,20 @@ def dog():
     if utc() - dog_t > 300:
         create_future_ex(get_dogs)
     return flask.redirect(choice(dogs))
+
+
+HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Server": "Miza",
+    "Vary": "Accept-Encoding",
+    "Accept-Ranges": "bytes",
+    "Access-Control-Allow-Origin": "*",
+}
+
+@app.after_request
+def custom_header(response):
+    response.headers.update(HEADERS)
+    return response
 
 
 if __name__ == "__main__":
