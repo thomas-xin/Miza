@@ -3656,22 +3656,24 @@ def is_file(url):
     return None
 
 def webserver_communicate(bot):
-    with tracebacksuppressor:
-        buf = io.BytesIO()
-        while True:
-            buffer = bot.server.stderr
-            b = buffer.read(1)
-            if not b:
-                break
-            if b == b"\n":
-                buf.seek(0)
-                s = buf.read().strip(b"\x00").decode("utf-8", "replace")
-                if s.startswith("~"):
-                    create_task(bot.process_http_command(*s[1:].split("\x7f", 3)))
-                print(s)
-                buf = io.BytesIO()
-            else:
-                buf.write(b)
+    while not bot.closed:
+        with tracebacksuppressor:
+            buf = io.BytesIO()
+            while True:
+                buffer = bot.server.stderr
+                b = buffer.read(1)
+                if not b:
+                    break
+                if b == b"\n":
+                    buf.seek(0)
+                    s = buf.read().strip(b"\x00").decode("utf-8", "replace")
+                    if s.startswith("~"):
+                        create_task(bot.process_http_command(*s[1:].split("\x7f", 3)))
+                    print(s)
+                    buf = io.BytesIO()
+                else:
+                    buf.write(b)
+            time.sleep(1)
 
 class SimulatedMessage:
 
