@@ -15,8 +15,10 @@ heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collections.abc.Callable):
 
     github = "https://github.com/thomas-xin/Miza"
+    raw_github = "https://raw.githubusercontent.com/thomas-xin/Miza"
+    rcc_invite = "https://discord.gg/cbKQKAr"
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
-    website_image = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de6t2dl-c2f19c79-ae94-4697-998b-ac9433d1c398.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTZ0MmRsLWMyZjE5Yzc5LWFlOTQtNDY5Ny05OThiLWFjOTQzM2QxYzM5OC5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.yRznZGXNmU1kP3s-zl9_RljyK-Df7GMcIbAOUME-OOM"
+    website_background = "https://i.imgur.com/LsNWQUJ.png"
     heartbeat = "heartbeat.tmp"
     heartbeat_ack = "heartbeat_ack.tmp"
     restart = "restart.tmp"
@@ -269,6 +271,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             print("Generating website html...")
             resp = await Request("https://github.com/thomas-xin/Miza", aio=True)
             description = resp[resp.index(b"<title>") + 7:resp.index(b"</title>")].split(b":", 1)[-1].decode("utf-8", "replace")
+            # <img src="{self.webserver}/static/avatar-rainbow.gif" class="hero-image">
             html = f"""<!DOCTYPE html>
 <html>
     <head>
@@ -276,34 +279,36 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <meta content="Miza" property="og:title">
         <meta content="{description}" property="og:description">
         <meta content="{self.webserver}" property="og:url">
-        <meta content="{self.website_image}" property="og:image">
+        <meta content="{self.raw_github}/master/misc/background-rainbow.gif" property="og:image">
         <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
         <link rel="preconnect" href="https://fonts.gstatic.com">
         <link href="https://fonts.googleapis.com/css2?family=Balsamiq+Sans&amp;family=Pacifico&amp;display=swap" rel="stylesheet">
         <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
-        <link href="{self.webserver}/static/miza.css" rel="stylesheet">
-        <link rel="stylesheet" href="{self.webserver}/static/swiper.min.css">
+        <link href="{self.raw_github}/master/misc/miza.css" rel="stylesheet">
+        <link rel="stylesheet" href="{self.raw_github}/master/misc/swiper.min.css">
     </head>
     <body>
         <div class="hero">
-            <img class="hero-bg" src="https://i.imgur.com/LsNWQUJ.png">
+            <img class="hero-bg" src="{self.website_background}">
             <div class="hero-text">
-                <img src="{self.webserver}/static/avatar-rainbow.gif" class="hero-image">
+                <img src="{self.raw_github}/master/misc/avatar-rainbow.gif" class="hero-image">
                 <h1 class="hero-text-text" data-upside-down-emoji-because-the-class-name="yea">Miza</h1>
                 <a class="buttonish" href="{self.invite}"><i class="bx bxs-plus-square"></i>Invite</a>
                 <div class="buttonsholder">
                     <a class="buttonish" href="{self.github}"><i class="bx bxl-github"></i>Sauce</a>
-                    <a class="buttonish" href="https://discord.gg/cbKQKAr"><i class="bx bxl-discord"></i>Discord</a>
+                    <a class="buttonish" href="{self.rcc_invite}"><i class="bx bxl-discord"></i>Discord</a>
                 </div>
             </div>
         </div>
         <div class="bigboi">
             <img
                 class="bgimg" 
-                src="{self.website_image}" 
+                src="{self.raw_github}/master/misc/background-rainbow.gif" 
             />
             <h2>What is Miza?</h2>
-            <p>Miza is a multipurpose Discord bot designed around generally being useful. The premise for Miza is: "fuck it, other bots can do it. Miza should be able to do it too."</p> 
+            <p>Miza is a multipurpose Discord bot, written in Python, fashioned after the character "Misery" from the platformer game Cave Story, and initially designed to help with Cave Story modding.<br>\
+She quickly branched out into all the areas you'd need in a Discord bot, and with her owner dedicated to improving her functionalities and capabilities even further, she never stops growing!<br>\
+Miza has plenty of original commands and features, with lots of optimization to provide a smooth, reliable and unique Discord experience, but the general premise for Miza is: "Fuck it, other bots can do it; Miza should be able to do it too 🙃"</p> 
             <h2>What can Miza do?</h2>
             <p>Oh, just a few things:</p>"""
             commands = set()
@@ -330,7 +335,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             html += f"\n<p>...and {len(commands) - com_count} more!</p>"
             html += f"""
 			<h2>Why should I choose Miza over other Discord bots?</h2>
-            <p>no fuckn clue lmao<br>Veritatis suscipit architecto sed voluptas. Sit non rem iure doloribus explicabo qui temporibus. Harum unde porro autem aut. Voluptas dolores eaque expedita aut officiis.</p>
+            <p>no fuckn clue lmao<br>\
+On a serious note, because Miza does most things you need.<br>\
+Miza doesn't just blend into the functionalities of any old Discord bot; she can do so much more with plenty of stability, at no cost to access some of the more advanced features you are not likely to see accessable for free on any bigger/more popular bot.<br>\
+Continuing on from the giant list of commands, Miza is supported by a webserver to handle files bigger than the Discord size limit, with various other features such as shifting messages to an embed if they breach the regular character limit, or sending embeds in a webhook to send a plethora at once if necessary, keeping things as clean as possible.<br>\
+Her creator introduces new features all the time, keeping up with the latest changes by Discord and often breaking away from what discord.py normally supports, while keeping compliant to the Discord TOS of course!<br>\
+For those of us who use Miza as a regular utility, we can safely say that she is an incredibly helpful Discord bot for all sorts of things, and is also very fun!</p>
         </div>
         <script src="{self.webserver}/static/swiper.min.js"></script>
         <script src="{self.webserver}/static/pagination.js"></script>
@@ -3663,14 +3673,14 @@ def as_file(file, filename=None, ext=None, rename=True):
     elif rename:
         while True:
             with suppress(PermissionError):
-                os.rename(file, f"cache/{IND}{out}~{filename.translate(filetrans)}")
+                os.rename(file, f"cache/{IND}{out}~{lim_str(filename.translate(filetrans), 64)}")
                 break
             time.sleep(0.1)
     else:
         fn = file.rsplit("/", 1)[-1][1:].rsplit(".", 1)[0].split("~", 1)[0]
     url = f"{bot.webserver}/files/{fn}"
     if filename:
-        url += "/" + (str(file) if filename is None else filename.translate(filetrans))
+        url += "/" + (str(file) if filename is None else lim_str(filename.translate(filetrans)), 64)
     if ext and "." not in url:
         url += "." + ext
     return url
