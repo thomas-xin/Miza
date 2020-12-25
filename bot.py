@@ -344,7 +344,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 k = j[category] = {}
                 for command in self.categories[category]:
                     c = k[command.parse_name()] = dict(
-                        aliases=", ".join(n.strip("_") for n in command.alias),
+                        aliases=[n.strip("_") for n in command.alias],
                         description=command.parse_description(),
                         usage=command.usage,
                         level=command.min_level,
@@ -416,19 +416,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     async def send_event(self, ev, *args, exc=False, **kwargs):
         if self.closed:
             return
-        ctx = emptyctx if exc else tracebacksuppressor
-        events = self.events.get(ev, ())
-        if len(events) == 1:
-            with ctx:
-                return await create_future(events[0](*args, **kwargs))
-            return
-        futs = [create_future(func(*args, **kwargs)) for func in events]
-        out = deque()
-        for fut in futs:
-            with ctx:
-                res = await fut
-                out.append(res)
-        return out
+        with tracebacksuppressor:
+            ctx = emptyctx if exc else tracebacksuppressor
+            events = self.events.get(ev, ())
+            if len(events) == 1:
+                with ctx:
+                    return await create_future(events[0](*args, **kwargs))
+                return
+            futs = [create_future(func(*args, **kwargs)) for func in events]
+            out = deque()
+            for fut in futs:
+                with ctx:
+                    res = await fut
+                    out.append(res)
+            return out
 
     # Gets the first accessable text channel in the target guild.
     async def get_first_sendable(self, guild, member):
@@ -2213,7 +2214,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     run = True
                     print(f"{getattr(guild, 'id', 0)}: {user} ({u_id}) issued command {msg}")
                     req = command.min_level
-                    fut = None
+                    fut = out_fut = None
                     try:
                         # Make sure server-only commands can only be run in servers.
                         if guild is None:
@@ -2430,7 +2431,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         if fut is not None:
                             await fut
                         command.used.pop(u_id, None)
-                        create_task(send_exception(channel, ex, message))
+                        out_fut = create_task(send_exception(channel, ex, message))
                         return
                     # Represents all other errors
                     except Exception as ex:
@@ -2438,7 +2439,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             await fut
                         command.used.pop(u_id, None)
                         print_exc()
-                        create_task(send_exception(channel, ex, message))
+                        out_fut = create_task(send_exception(channel, ex, message))
+                    if out_fut is not None and getattr(message, "simulated", None):
+                        await out_fut
         # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
         if not run and u_id != bot.id:
             temp = to_alphanumeric(cpy).casefold()
@@ -2559,12 +2562,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 single = True
             else:
                 m = guild.me
-                if m is None:
-                    m = self.user
-                    single = True
-                else:
-                    if not m.guild_permissions.manage_webhooks:
+                if not hasattr(guild, "simulated"):
+                    if m is None:
+                        m = self.user
                         single = True
+                    else:
+                        with suppress(AttributeError):
+                            if not m.guild_permissions.manage_webhooks:
+                                single = True
             if single:
                 for emb in embeds:
                     async with delay(1 / 3):
@@ -3325,8 +3330,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     argv = " ".join(i for i in args if i)
                     message.content = "/" + name + " " + argv
                     try:
-                        message.id = int(cdata["id"])
+                        message.id = int(d["id"])
                     except KeyError:
+                        print_exc()
                         message.id = time_snowflake(dt)
                     mdata = d.get("member")
                     if not mdata:
@@ -3349,7 +3355,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         if channel is None:
                             channel = await self.get_dm(author)
                     message.channel = channel
-                    message.slash = True
+                    message.slash = d["token"]
                     message.noref = True
                     return await self.process_message(message, message.content, slash=True)
 
@@ -3712,9 +3718,9 @@ class SimulatedMessage:
         self.author = author
         self.channel = author
         self.guild = author
-        self.name = self.display_name = name
+        self.name = name
         self.discriminator = str(xrand(10000))
-        self.nick = nick
+        self.nick = self.display_name = nick
         self.owner_id = self.id
         self.mention = f"<@{self.id}>"
         self.recipient = author

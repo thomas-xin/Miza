@@ -22,7 +22,7 @@ def on_error(ex):
         return flask.redirect(f"https://http.cat/{ex.code}")
     if issubclass(type(ex), FileNotFoundError):
         return flask.redirect("https://http.cat/404")
-    if issubclass(type(ex), TimeoutError):
+    if issubclass(type(ex), TimeoutError) or issubclass(type(ex), concurrent.futures.TimeoutError):
         return flask.redirect("https://http.cat/504")
     if issubclass(type(ex), ConnectionError):
         return flask.redirect("https://http.cat/502")
@@ -202,10 +202,7 @@ def command(content):
         t = int(t)
         after = float(after)
         j = flask.request.get_json(force=True)
-        j.insert(0, after)
-        while len(RESPONSES) >= 256:
-            RESPONSES.pop(next(iter(RESPONSES)), None)
-        RESPONSES[t] = j
+        RESPONSES[t].set_result((j, after))
         sys.__stderr__.write("\x00" + str(j) + "\n")
         return b"\xf0\x9f\x92\x9c"
     resp = get_geo(ip)
@@ -214,21 +211,15 @@ def command(content):
     t = int(utc() * 1000)
     if " " not in content:
         content += " "
+    RESPONSES[t] = fut = concurrent.futures.Future()
     sys.__stderr__.write(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}\n")
-    time.sleep(0.1)
-    for i in range(7200):
-        try:
-            j = RESPONSES.pop(t)
-        except KeyError:
-            time.sleep(0.05)
-        else:
-            after = j.pop(0)
-            response = flask.Response(json.dumps(j), mimetype="application/json")
-            a = after - utc()
-            if a > 0:
-                response.headers["Retry-After"] = a
-            return response
-    raise TimeoutError
+    j, after = fut.result(timeout=420)
+    RESPONSES.pop(t, None)
+    response = flask.Response(json.dumps(j), mimetype="application/json")
+    a = after - utc()
+    if a > 0:
+        response.headers["Retry-After"] = a
+    return response
 
 
 cat_t = utc()

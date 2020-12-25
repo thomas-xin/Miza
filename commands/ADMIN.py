@@ -1441,7 +1441,7 @@ class UpdateMessageCache(Database):
                     attachments=attachments,
                     embeds=embeds,
                     edited_timestamp=str(message._edited_timestamp) if message._edited_timestamp else "",
-                    type=message.type.value,
+                    type=getattr(message.type, "value", message.type),
                     pinned=message.pinned,
                     flags=message.flags.value,
                     mention_everyone=message.mention_everyone,

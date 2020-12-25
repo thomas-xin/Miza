@@ -728,45 +728,68 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
         sem = REPLY_SEM[channel.id]
     except KeyError:
         sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
-    if not reference or getattr(reference, "noref", None) or getattr(channel, "simulated", None):
-        fields = {}
-        if embed:
-            fields["embed"] = embed
-        if tts:
-            fields["tts"] = tts
-        return await channel.send(content, **fields)
-    if not issubclass(type(channel), discord.abc.GuildChannel) and not issubclass(type(channel), discord.abc.PrivateChannel):
-        c = channel.dm_channel
-        if c is None:
-            c = await channel.create_dm()
-        channel = c
-    data = dict(
-        content=content,
-        message_reference=dict(message_id=str(verify_id(reference))),
-        allowed_mentions=dict(parse=["users", "roles", "everyone"], replied_user=mention)
-    )
-    if embed is not None:
-        data["embed"] = embed.to_dict()
-    if tts is not None:
-        data["tts"] = tts
+    if getattr(reference, "slash", None) and not embed:
+        # try:
+        #     discord_id = AUTH['discord_id']
+        # except KeyError:
+        #     url = f"https://discord.com/api/v8/interactions/{reference.id}/{reference.slash}/callback"
+        # else:
+        #     url = f"https://discord.com/api/v8/webhooks/{discord_id}/{reference.slash}"
+        url = f"https://discord.com/api/v8/interactions/{reference.id}/{reference.slash}/callback"
+        data = dict(
+            type=4,
+            data=dict(
+                flags=64,
+                content=content,
+            ),
+        )
+    else:
+        url = f"https://discord.com/api/v8/channels/{channel.id}/messages"
+        if not reference or getattr(reference, "noref", None) or getattr(channel, "simulated", None):
+            fields = {}
+            if embed:
+                fields["embed"] = embed
+            if tts:
+                fields["tts"] = tts
+            return await channel.send(content, **fields)
+        if not issubclass(type(channel), discord.abc.GuildChannel) and not issubclass(type(channel), discord.abc.PrivateChannel):
+            c = channel.dm_channel
+            if c is None:
+                c = await channel.create_dm()
+            channel = c
+        data = dict(
+            content=content,
+            message_reference=dict(message_id=str(verify_id(reference))),
+            allowed_mentions=dict(parse=["users", "roles", "everyone"], replied_user=mention)
+        )
+        if embed is not None:
+            data["embed"] = embed.to_dict()
+        if tts is not None:
+            data["tts"] = tts
     body = json.dumps(data)
     exc = RuntimeError
     for i in range(xrand(12, 17)):
         try:
             async with sem:
                 resp = await Request.aio_call(
-                    f"https://discord.com/api/v8/channels/{channel.id}/messages",
+                    url,
                     method="post",
                     data=body,
                     headers={"Content-Type": "application/json", "authorization": f"Bot {channel._state.http.token}"},
+                    decode=False,
                     files=None,
-                    decode=False
                 )
             return discord.Message(state=channel._state, channel=channel, data=eval_json(resp))
         except Exception as ex:
             exc = ex
-            if ex.args and "400" in str(ex.args[0]):
-                break
+            if ex.args and "400" in str(ex.args[0]) or "401" in str(ex.args[0]) or "403" in str(ex.args[0]) or "404" in str(ex.args[0]):
+                print_exc()
+                fields = {}
+                if embed:
+                    fields["embed"] = embed
+                if tts:
+                    fields["tts"] = tts
+                return await channel.send(content, **fields)
         await asyncio.sleep(i + 1)
     raise exc
 

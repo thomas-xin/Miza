@@ -1400,7 +1400,7 @@ def evalImg(url, operation, args):
         if not frames:
             raise EOFError("No image output detected.")
         elif new["count"] == 1:
-            new = frames[0]
+            new = next(iter(frames))
         else:
             fps = 1000 * new["count"] / duration
             if issubclass(type(frames), collections.abc.Sequence):

@@ -102,6 +102,8 @@ class Hello(Command):
             bot.data.dailies.progress_quests(user, "talk")
         if argv:
             user = await bot.fetch_user_member(argv, guild)
+        elif bot.is_owner(user):
+            return "👋"
         if name in ("bye", "cya", "goodbye"):
             start = choice("Bye", "Cya", "Goodbye")
         else:
@@ -110,7 +112,7 @@ class Hello(Command):
         if name in ("bye", "cya", "goodbye"):
             end = choice("", "See you soon!", "Have a good one!", "Later!", "Talk to you again sometime!", "Was nice talking to you!")
         else:
-            end = choice("", "How are you?", "Can I help you?", "What can I do for you today?", "Nice to see you!", "Always good to see you!")
+            end = choice("", "How are you?", "Can I help you?", "What can I do for you today?", "Nice to see you!", "Great to see you!", "Always good to see you!")
         out = "👋 " + start + ", `" + middle + "`!"
         if end:
             out += " " + end
@@ -681,10 +683,11 @@ class Info(Command):
                         st.append("Bot 🤖")
                     if u.id == guild.owner_id and not hasattr(guild, "ghost"):
                         st.append("Server owner 👑")
-                    dname = getattr(member, "nick", None)
                     if member:
+                        dname = getattr(member, "nick", None)
                         joined = getattr(u, "joined_at", None)
                     else:
+                        dname = getattr(user, "nick", None)
                         joined = None
                     created = u.created_at
                     activity = "\n".join(activity_repr(i) for i in getattr(u, "activities", ()))
