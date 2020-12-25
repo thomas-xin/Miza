@@ -5,9 +5,10 @@ html {
     display: flex;
     align-items: center;
     vertical-align: top;
-    background: #1f003f;
-    text-shadow: 1px 1px 1px 1px rgba(1,1,1,0.5);
-    color: cyan;
+    background: #1f0f3f;
+    text-shadow: -1px 0 #7fffff, 0 1px #7fffff, 1px 0 #7fffff, 0 -1px #7fffff;
+    font-weight: 700;
+    color: #00bfbf;
 }
 
 body {
@@ -18,12 +19,13 @@ body {
 }
 
 div {
+    background: black;
     padding: 5em;
     border-radius: 2em;
     box-shadow: 0px 0px 15px 15px rgba(0,0,0,0.3);
-    font-family: system-ui, "comic sans ms";
+    font-family: "Comic Sans MS", sans-serif;
     padding-top: 0;
-    padding-bottom: 0;
+    padding-bottom: 0em;
 }
 
 h3 {
@@ -31,12 +33,13 @@ h3 {
     margin-bottom: 0rem;
     display: inline-block;
     position: relative;
-    top: -1.3em;
+    top: -1em;
     padding: 0.5em;
     border-radius: 9999999999px;
-    font-weight: lighter;
-    background: #1f003f;
-    color: white;
+    text-shadow: -1px 0 #ffff00, 0 1px #ffff00, 1px 0 #ffff00, 0 -1px #ffff00;
+    font-weight: 400;
+    background: #bfbf00;
+    color: #3f0000;
 }
 
 h1, h2, p {
@@ -47,7 +50,7 @@ h1, h2, p {
 }
 
 h2 {
-    font-weight: lighter;
+    font-weight: 600;
     font-size: 1.3rem;
 }
 
@@ -55,7 +58,8 @@ a {
     padding: 0.5em 2em;
     display: inline-block;
     background: #bf7fff;
-    color: black;
+    color: #3f1f7f;
+    text-shadow: -2px 0 #ffbfff, 0 2px #ffbfff, 2px 0 #ffbfff, 0 -2px #ffbfff;
     text-decoration: none;
     font-size: 1.1rem;
     border-radius: 0.5em;
