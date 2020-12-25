@@ -274,8 +274,8 @@ def rainbow_gif(image, duration):
     if duration == 0:
         fps = 0
     else:
-        fps = round(128 / abs(duration))
-    rate = 2
+        fps = round(256 / abs(duration))
+    rate = 1
     while fps > 48 and rate < 8:
         fps >>= 1
         rate <<= 1
@@ -360,8 +360,8 @@ def spin_gif(image, duration):
     if duration == 0:
         fps = 0
     else:
-        fps = round(128 / abs(duration))
-    rate = 2
+        fps = round(256 / abs(duration))
+    rate = 1
     while fps > 32 and rate < 8:
         fps >>= 1
         rate <<= 1

@@ -288,7 +288,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <div class="hero">
             <img class="hero-bg" src="https://i.imgur.com/LsNWQUJ.png">
             <div class="hero-text">
-                <img src="{best_url(self.user)}" class="hero-image">
+                <img src="{self.webserver}/static/avatar-rainbow.gif" class="hero-image">
                 <h1 class="hero-text-text" data-upside-down-emoji-because-the-class-name="yea">Miza</h1>
                 <a class="buttonish" href="{self.invite}"><i class="bx bxs-plus-square"></i>Invite</a>
                 <div class="buttonsholder">

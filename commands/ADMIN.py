@@ -1368,7 +1368,9 @@ class UpdateMessageCache(Database):
             return self.loaded[fn]
         path = self.files + "/" + str(fn)
         if not os.path.exists(path):
-            return
+            path += "\x7f"
+            if not os.path.exists(path):
+                return
         found = {}
         self.loaded[fn] = found
         bot = self.bot
@@ -1466,8 +1468,7 @@ class UpdateMessageCache(Database):
         out = data = pickle.dumps(list(saved.values()))
         if len(data) > 32768:
             out = bytes2zip(data)
-        with open(path, "wb") as f:
-            f.write(out)
+        safe_save(path, out)
         return len(saved)
 
     async def _save_(self, **void):

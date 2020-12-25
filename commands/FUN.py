@@ -652,7 +652,7 @@ class Daily(Command):
 
 class UpdateDailies(Database):
     name = "dailies"
-    user = True
+    no_delete = True
 
     def __load__(self, **void):
         self.typing = {}

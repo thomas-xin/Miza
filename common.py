@@ -471,31 +471,30 @@ class FileHashDict(collections.abc.MutableMapping):
         with suppress(KeyError):
             return self.data[k]
         fn = self.key_path(k)
-        if os.path.exists(fn):
-            with self.sem:
-                with open(fn, "rb") as f:
-                    s = f.read()
-            t = len(s) / 1048576
-            if t > 0.05:
-                time.sleep(t)
-            data = BaseException
-            with tracebacksuppressor:
-                data = select_and_loads(s, mode="unsafe")
-            if data is BaseException:
-                for file in sorted(os.listdir("backup"), reverse=True):
-                    with tracebacksuppressor:
-                        z = zipfile.ZipFile("backup/" + file, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
-                        time.sleep(0.03)
-                        s = z.open(fn).read()
-                        z.close()
-                        data = select_and_loads(s, mode="unsafe")
-                        print(f"Successfully recovered backup of {fn} from {file}.")
-                        break
-            if data is BaseException:
-                raise BaseException(k)
-            self.data[k] = data
-            return data
-        raise KeyError(k)
+        if not os.path.exists(fn):
+            fn += "\x7f"
+            if not os.path.exists(fn):
+                raise KeyError(k)
+        with self.sem:
+            with open(fn, "rb") as f:
+                s = f.read()
+        data = BaseException
+        with tracebacksuppressor:
+            data = select_and_loads(s, mode="unsafe")
+        if data is BaseException:
+            for file in sorted(os.listdir("backup"), reverse=True):
+                with tracebacksuppressor:
+                    z = zipfile.ZipFile("backup/" + file, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
+                    time.sleep(0.03)
+                    s = z.open(fn).read()
+                    z.close()
+                    data = select_and_loads(s, mode="unsafe")
+                    print(f"Successfully recovered backup of {fn} from {file}.")
+                    break
+        if data is BaseException:
+            raise BaseException(k)
+        self.data[k] = data
+        return data
 
     def __setitem__(self, k, v):
         with suppress(ValueError):
@@ -571,9 +570,9 @@ class FileHashDict(collections.abc.MutableMapping):
             except KeyError:
                 self.deleted.add(k)
                 continue
+            s = select_and_dumps(d, mode="unsafe")
             with self.sem:
-                with open(fn, "wb") as f:
-                    f.write(select_and_dumps(d, mode="unsafe"))
+                safe_save(fn, s)
         deleted = frozenset(self.deleted)
         if deleted:
             self.iter = None
@@ -584,6 +583,23 @@ class FileHashDict(collections.abc.MutableMapping):
         while len(self.data) > 1048576:
             self.data.pop(next(iter(self.data)), None)
         return modified.union(deleted)
+
+
+def safe_save(fn, s):
+    if os.path.exists(fn):
+        with open(fn + "\x7f", "wb") as f:
+            f.write(s)
+        if os.path.exists(fn + "\x7f\x7f"):
+            with tracebacksuppressor:
+                os.remove(fn + "\x7f\x7f")
+    if not os.path.exists(fn + "\x7f\x7f"):
+        os.rename(fn, fn + "\x7f\x7f")
+        os.rename(fn + "\x7f", fn)
+        if os.path.exists(fn + "\x7f\x7f"):
+            create_future_ex(os.remove, fn + "\x7f\x7f", priority=True)
+    else:
+        with open(fn, "wb") as f:
+            f.write(s)
 
 
 # Decodes HTML encoded characters in a string.

@@ -9,7 +9,7 @@ IND = ""
 
 sys.stderr = sys.stdout
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path="/static")
 app.url_map.strict_slashes = False
 # app.use_x_sendfile = True
 
