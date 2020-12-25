@@ -1371,6 +1371,7 @@ async def _await_fut(fut, ret):
     ret.set_result(out)
     return ret
 
+# Blocking call that waits for a single asyncio future to complete, do *not* call from main asyncio loop
 def await_fut(fut, timeout=None):
     ret = concurrent.futures.Future()
     create_task(_await_fut(fut, ret))

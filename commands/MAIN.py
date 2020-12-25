@@ -92,7 +92,7 @@ class Help(Command):
 
 
 class Hello(Command):
-    name = ["👋", "Hi", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
+    name = ["👋", "Hi", "Hi!", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
     description = "Sends a greeting message. Useful for checking whether the bot is online."
     usage = "<user>?"
     slash = True
