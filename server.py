@@ -168,25 +168,28 @@ def timezone():
     <link rel="stylesheet" type="text/css" href="/static/timezonestyles.css" />
   </head>
   <style>
-    body {
-      background-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif');
-      background-repeat: no-repeat;
-      background-attachment: fixed;
-      background-size: cover;
-    }
+  img {
+    border: 10px solid transparent;
+    padding: 15px;
+    border-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/border.gif') 30 round;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
   </style>
   <body>
     <div>
       <h3>Estimated time:</h3>
       <h1>""" + str(dt) + """</h1>
       <h2>Detected timezone: """ + tz + """</h2>
-      <p>
+      <p class="align_left">
         <a href="/time">Refresh</a>
       </p>
-      <p>
+      <p class="align_right">
         <a href="/">Home</a>
       </p>
     </div>
+  <img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" alt="Miza-Sky" style="width:25%;height:25%;">
   </body>
 </html>
         """

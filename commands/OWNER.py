@@ -111,16 +111,18 @@ class Execute(Command):
     multi = True
 
     async def __call__(self, bot, user, message, guild, argl, args, argv, **void):
+        if args and args[0] == "as":
+            args.pop(0)
         users = await bot.find_users(argl, args, user, guild, roles=True)
         if not users:
             raise LookupError("No results found.")
-        if args and args[0] == "as":
+        if args and args[0] == "run":
             args.pop(0)
         if args:
             argv = " ".join(args)
             for u in users:
                 fake_message = copy.copy(message)
-                fake_message.content = func2
+                fake_message.content = argv
                 fake_message.author = u
                 create_task(bot.process_message(fake_message, args))
 
