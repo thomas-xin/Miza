@@ -158,25 +158,33 @@ def timezone():
         html = """<!DOCTYPE html>
 <html>
   <head>
-    <meta charset=\"utf-8\">
+    <meta charset="utf-8">
     <title>Timezones</title>
     <meta content="Timezones" property="og:title">
     <meta content="Find your current timezone here!" property="og:description">
     <meta content=\"""" + flask.request.url + """\" property="og:url">
     <meta content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" property="og:image">
     <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
-    <link rel=\"stylesheet\" type=\"text/css\" href=\"/static/timezonestyles.css\" />
+    <link rel="stylesheet" type="text/css" href="/static/timezonestyles.css" />
   </head>
+  <style>
+    body {
+      background-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif');
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      background-size: cover;
+    }
+  </style>
   <body>
     <div>
       <h3>Estimated time:</h3>
       <h1>""" + str(dt) + """</h1>
       <h2>Detected timezone: """ + tz + """</h2>
       <p>
-        <a href=\"/time\">Refresh</a>
+        <a href="/time">Refresh</a>
       </p>
       <p>
-        <a href=\"/\">Home</a>
+        <a href="/">Home</a>
       </p>
     </div>
   </body>

@@ -306,9 +306,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 src="{self.raw_github}/master/misc/background-rainbow.gif" 
             />
             <h2>What is Miza?</h2>
-            <p>Miza is a multipurpose Discord bot, written in Python, fashioned after the character "Misery" from the platformer game Cave Story, and initially designed to help with Cave Story modding.<br>\
-She quickly branched out into all the areas you'd need in a Discord bot, and with her owner dedicated to improving her functionalities and capabilities even further, she never stops growing!<br>\
-Miza has plenty of original commands and features, with lots of optimization to provide a smooth, reliable and unique Discord experience, but the general premise for Miza is: "Fuck it, other bots can do it; Miza should be able to do it too 🙃"</p> 
+            <p>Miza is a multipurpose Discord bot, written in Python, fashioned after the character "Misery" from the platformer game Cave Story, and initially designed to help with Cave Story modding.<br><br>\
+She quickly branched out into all the areas you'd need in a Discord bot, and with her owner dedicated to improving her functionalities and capabilities even further, she never stops growing!<br><br>\
+Miza has plenty of original commands and features, with lots of optimization to provide a smooth, reliable and unique Discord experience, but the general premise for Miza is: "Fuck it, other bots can do it; Miza should be able to do it too" 🙃</p> 
             <h2>What can Miza do?</h2>
             <p>Oh, just a few things:</p>"""
             commands = set()
@@ -335,11 +335,11 @@ Miza has plenty of original commands and features, with lots of optimization to 
             html += f"\n<p>...and {len(commands) - com_count} more!</p>"
             html += f"""
 			<h2>Why should I choose Miza over other Discord bots?</h2>
-            <p>no fuckn clue lmao<br>\
-On a serious note, because Miza does most things you need.<br>\
-Miza doesn't just blend into the functionalities of any old Discord bot; she can do so much more with plenty of stability, at no cost to access some of the more advanced features you are not likely to see accessable for free on any bigger/more popular bot.<br>\
-Continuing on from the giant list of commands, Miza is supported by a webserver to handle files bigger than the Discord size limit, with various other features such as shifting messages to an embed if they breach the regular character limit, or sending embeds in a webhook to send a plethora at once if necessary, keeping things as clean as possible.<br>\
-Her creator introduces new features all the time, keeping up with the latest changes by Discord and often breaking away from what discord.py normally supports, while keeping compliant to the Discord TOS of course!<br>\
+            <p>no fuckn clue lmao<br><br><br>\
+On a serious note, because Miza does most things you need.<br><br>\
+Miza doesn't just blend into the functionalities of any old Discord bot; she can do so much more with plenty of stability, at no cost to access some of the more advanced features you are not likely to see accessable for free on any bigger/more popular bot.<br><br>\
+Continuing on from the giant list of commands, Miza is supported by a webserver to handle files bigger than the Discord size limit, with various other features such as shifting messages to an embed if they breach the regular character limit, or sending embeds in a webhook to send a plethora at once if necessary, keeping things as clean as possible.<br><br>\
+Her creator introduces new features all the time, keeping up with the latest changes by Discord and often breaking away from what discord.py normally supports, while keeping compliant to the Discord TOS of course!<br><br>\
 For those of us who use Miza as a regular utility, we can safely say that she is an incredibly helpful Discord bot for all sorts of things, and is also very fun!</p>
         </div>
         <script src="{self.webserver}/static/swiper.min.js"></script>

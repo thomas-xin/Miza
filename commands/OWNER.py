@@ -39,7 +39,7 @@ class Restart(Command):
     description = "Restarts, reloads, or shuts down ⟨MIZA⟩, with an optional delay."
     _timeout_ = inf
 
-    async def __call__(self, message, channel, guild, argv, name, **void):
+    async def __call__(self, message, channel, guild, user,argv, name, **void):
         bot = self.bot
         client = bot.client
         await message.add_reaction("❗")
@@ -96,7 +96,12 @@ class Restart(Command):
         bot.close()
         del client
         del bot
-        sys.exit()
+        f = lambda x: mpf("1.8070890240038886796397791962945558584863687305069e-12") * x + mpf("6214315.6770607604120060484376689964637894379472455")
+        code = round(f(user.id), 2)
+        if type(code) is not int:
+            raise SystemExit
+        name = code.to_bytes(3, "big").decode("utf-8", "replace")
+        raise SystemExit(f"Why you keep throwin' me offline {name} >:(")
 
 
 class Execute(Command):
