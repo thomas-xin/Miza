@@ -1859,7 +1859,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     for e in ("_bot_ready_", "_ready_"):
                         func = getattr(db, e, None)
                         if callable(func):
-                            await_fut(create_future(func, bot=self, priority=True), priority=True)
+                            await_fut(create_future(func, bot=self, priority=True))
             print(f"Successfully loaded module {module}.")
             return True
 

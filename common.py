@@ -1312,9 +1312,9 @@ def wrap_future(fut, loop=None):
         try:
             res = fut.result()
         except Exception as ex:
-            loop.call_soon_threadsafe(wrapper.set_exception, ex)
+            wrapper.set_exception(ex)
         else:
-            loop.call_soon_threadsafe(wrapper.set_result, res)
+            wrapper.set_result(res)
 
     fut.add_done_callback(on_done)
     return wrapper
@@ -1366,19 +1366,15 @@ def create_task(fut, *args, loop=None, **kwargs):
         loop = get_event_loop()
     return asyncio.ensure_future(fut, *args, loop=loop, **kwargs)
 
-def _await_fut(fut, delay):
-    if not issubclass(type(fut), asyncio.Task):
-        fut = create_task(fut)
-    while True:
-        with suppress(ISE):
-            return fut.result()
-        time.sleep(delay)
+async def _await_fut(fut, ret):
+    out = await fut
+    ret.set_result(out)
+    return ret
 
-def await_fut(fut, delay=0.05, timeout=None, priority=False):
-    if is_main_thread():
-        return create_future_ex(_await_fut, fut, delay, timeout=timeout, priority=priority).result(timeout=timeout)
-    else:
-        return _await_fut(fut, delay)
+def await_fut(fut, timeout=None):
+    ret = concurrent.futures.Future()
+    create_task(_await_fut(fut, ret))
+    return ret.result(timeout=timeout)
 
 is_main_thread = lambda: threading.current_thread() is threading.main_thread()
 
@@ -2008,7 +2004,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
         bot = self.bot
         func = getattr(self, "_destroy_", None)
         if callable(func):
-            await_fut(create_future(func, priority=True), priority=True)
+            await_fut(create_future(func, priority=True))
         for f in dir(self):
             if f.startswith("_") and f[-1] == "_" and f[1] != "_":
                 func = getattr(self, f, None)
