@@ -169,7 +169,7 @@ def timezone():
   </head>
   <style>
   img {
-    padding-top: 3em;
+    margin-top: 32px;
     border: 10px solid transparent;
     padding: 0px;
     border-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/border.gif') 20% round;
