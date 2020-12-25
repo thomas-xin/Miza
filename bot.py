@@ -284,8 +284,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <link rel="preconnect" href="https://fonts.gstatic.com">
         <link href="https://fonts.googleapis.com/css2?family=Balsamiq+Sans&amp;family=Pacifico&amp;display=swap" rel="stylesheet">
         <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
-        <link href="{self.raw_github}/master/misc/miza.css" rel="stylesheet">
-        <link rel="stylesheet" href="{self.raw_github}/master/misc/swiper.min.css">
+        <link href="{self.webserver}/static/miza.css" rel="stylesheet">
+        <link rel="stylesheet" href="{self.webserver}/static/swiper.min.css">
     </head>
     <body>
         <div class="hero">
