@@ -1538,7 +1538,7 @@ class Reminder(Command):
         if keyed:
             # Schedule for an event from a user
             rem = cdict(
-                user=user.id,
+                user=remind_as.id,
                 msg=msg,
                 u_id=t,
                 t=inf,
@@ -1550,7 +1550,7 @@ class Reminder(Command):
         else:
             # Schedule for an event at a certain time
             rem = cdict(
-                user=user.id,
+                user=remind_as.id,
                 msg=msg,
                 t=t + ts,
             )
