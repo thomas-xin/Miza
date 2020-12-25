@@ -729,6 +729,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
     except KeyError:
         sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
     if getattr(reference, "slash", None) and not embed:
+        inter = True
         # try:
         #     discord_id = AUTH['discord_id']
         # except KeyError:
@@ -744,6 +745,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             ),
         )
     else:
+        inter = False
         url = f"https://discord.com/api/v8/channels/{channel.id}/messages"
         if not reference or getattr(reference, "noref", None) or getattr(channel, "simulated", None):
             fields = {}
@@ -771,6 +773,8 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
     for i in range(xrand(12, 17)):
         try:
             async with sem:
+                # if inter:
+                #     print(url, body)
                 resp = await Request.aio_call(
                     url,
                     method="post",
@@ -783,7 +787,10 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
         except Exception as ex:
             exc = ex
             if ex.args and "400" in str(ex.args[0]) or "401" in str(ex.args[0]) or "403" in str(ex.args[0]) or "404" in str(ex.args[0]):
-                print_exc()
+                if not inter:
+                    print_exc()
+                elif "404" in str(ex.args[0]):
+                    continue
                 fields = {}
                 if embed:
                     fields["embed"] = embed
@@ -825,10 +832,10 @@ find_users = lambda s: regexp("<@!?[0-9]+>").findall(s)
 
 
 def get_message_length(message):
-    return len(message.system_content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
+    return len(message.system_content or message.content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
 
 def get_message_words(message):
-    return len(message.system_content.split()) + sum(len(e.description.split()) if e.description else 0 + 2 * len(e.fields) if e.fields else 0 for e in message.embeds) + len(message.attachments)
+    return len((message.system_content or message.content).split()) + sum(len(e.description.split()) if e.description else 0 + 2 * len(e.fields) if e.fields else 0 for e in message.embeds) + len(message.attachments)
 
 # Returns a string representation of a message object.
 def message_repr(message, limit=1024, username=False):

@@ -2976,7 +2976,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             async def delete(self, *void1, **void2):
                 pass
 
-            __repr__ = lambda self: self.system_content if self.system_content else self.content
+            __repr__ = lambda self: self.system_content or self.content
             tts = False
             type = "default"
             nonce = False
