@@ -170,8 +170,8 @@ def timezone():
   <style>
   img {
     border: 10px solid transparent;
-    padding: 15px;
-    border-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/border.gif') 30 round;
+    padding: 0px;
+    border-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/border.gif') 20% round;
     display: block;
     margin-left: auto;
     margin-right: auto;
