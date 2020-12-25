@@ -2382,6 +2382,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             if issubclass(type(response), Exception):
                                 raise response
                             elif bool(response) is not False:
+                                if callable(getattr(command, "_callback_", None)):
+                                    if getattr(message, "slash", None):
+                                        message.slash = False
                                 # If 2-tuple returned, send as message-react pair
                                 if type(response) is tuple and len(response) == 2:
                                     response, react = response
@@ -2463,7 +2466,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             out = json.dumps(list(message.response))
             url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
             resp = await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
-            print(t, out, resp, sep="\n")
+            # print(t, out, resp, sep="\n")
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
@@ -2530,6 +2533,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     async def send_as_webhook(self, channel, *args, **kwargs):
         if hasattr(channel, "simulated"):
             message = await channel.send(*args, **kwargs)
+            reacts = kwargs.pop("reacts", None)
         else:
             w = await self.ensure_webhook(channel, bypass=True)
             kwargs.pop("wait", None)
