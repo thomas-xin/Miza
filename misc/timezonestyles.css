@@ -6,7 +6,7 @@ html {
     align-items: center;
     vertical-align: top;
     background: #1f003f;
-    text-shadow: -1px 0 black, 0 1px black, 1px 0 black, 0 -1px black;
+    text-shadow: 1px 1px 1px 1px rgba(0.75,0.5,1,0.5);
     color: cyan;
 }
 
@@ -23,7 +23,7 @@ div {
     box-shadow: 0px 0px 15px 15px rgba(0,0,0,0.3);
     font-family: system-ui, "comic sans ms";
     padding-top: 0;
-    padding-bottom: 3em;
+    padding-bottom: 0;
 }
 
 h3 {
