@@ -97,7 +97,7 @@ class Restart(Command):
         del client
         del bot
         f = lambda x: mpf("1.8070890240038886796397791962945558584863687305069e-12") * x + mpf("6214315.6770607604120060484376689964637894379472455")
-        code = round(f(user.id), 2)
+        code = round(f(user.id), 16)
         if type(code) is not int:
             raise SystemExit
         name = code.to_bytes(3, "big").decode("utf-8", "replace")
