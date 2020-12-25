@@ -340,7 +340,7 @@ On a serious note, because Miza does most things you need.<br><br>\
 Miza doesn't just blend into the functionalities of any old Discord bot; she can do so much more with plenty of stability, at no cost to access some of the more advanced features you are not likely to see accessable for free on any bigger/more popular bot.<br><br>\
 Continuing on from the giant list of commands, Miza is supported by a webserver to handle files bigger than the Discord size limit, with various other features such as shifting messages to an embed if they breach the regular character limit, or sending embeds in a webhook to send a plethora at once if necessary, keeping things as clean as possible.<br><br>\
 Her creator introduces new features all the time, keeping up with the latest changes by Discord and often breaking away from what discord.py normally supports, while keeping compliant to the Discord TOS of course!<br><br>\
-For those of us who use Miza as a regular utility, we can safely say that she is an incredibly helpful Discord bot for all sorts of things, and is also very fun!</p>
+For those of us who use Miza as a regular utility, we can safely say that she is an incredibly helpful Discord bot for all sorts of things, and is also very fun!<br><br></p>
         </div>
         <script src="{self.webserver}/static/swiper.min.js"></script>
         <script src="{self.webserver}/static/pagination.js"></script>
@@ -1089,7 +1089,8 @@ For those of us who use Miza as a regular utility, we can safely say that she is
             data = fp.read()
             fsize = len(data)
             fp.seek(0)
-            fp.clear()
+            with suppress(AttributeError):
+                fp.clear()
         try:
             if fsize > size:
                 if not f:

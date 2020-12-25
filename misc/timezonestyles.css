@@ -38,7 +38,7 @@ h3 {
     border-radius: 9999999999px;
     text-shadow: -1px 0 #ffff00, 0 1px #ffff00, 1px 0 #ffff00, 0 -1px #ffff00;
     font-weight: 400;
-    background: #bfbf00;
+    background-image: radial-gradient(ellipse at center, #bfbf00, #bfbf00 90%, #ffffff 100%);
     color: #3f0000;
 }
 

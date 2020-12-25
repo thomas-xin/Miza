@@ -22,11 +22,26 @@ def on_error(ex):
         return flask.redirect(f"https://http.cat/{ex.code}")
     if issubclass(type(ex), FileNotFoundError):
         return flask.redirect("https://http.cat/404")
+    if issubclass(type(ex), PermissionError):
+        return flask.redirect("https://http.cat/403")
     if issubclass(type(ex), TimeoutError) or issubclass(type(ex), concurrent.futures.TimeoutError):
         return flask.redirect("https://http.cat/504")
     if issubclass(type(ex), ConnectionError):
         return flask.redirect("https://http.cat/502")
     return flask.redirect("https://http.cat/500")
+
+
+STATIC = {}
+TZCACHE = {}
+RESPONSES = {}
+
+@app.route("/static", methods=["DELETE"])
+def clearcache():
+    ip = flask.request.remote_addr
+    if ip == "127.0.0.1":
+        STATIC.clear()
+        return b"\xf0\x9f\x92\x9c"
+    raise PermissionError
 
 
 def find_file(path):
@@ -89,8 +104,6 @@ MIMES = dict(
     mp4="video/mp4",
 )
 
-STATIC = {}
-
 def fetch_static(path):
     try:
         try:
@@ -130,8 +143,6 @@ def favicon():
     data, mime = fetch_static("icon.ico")
     return flask.Response(data, mimetype=mime)
 
-
-TZCACHE = {}
 
 def get_geo(ip):
     try:
@@ -203,8 +214,6 @@ def timezone():
         raise
 
 
-RESPONSES = {}
-
 @app.route("/command/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 @app.route("/commands/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 def command(content):
@@ -214,9 +223,10 @@ def command(content):
         t = int(t)
         after = float(after)
         j = flask.request.get_json(force=True)
-        RESPONSES[t].set_result((j, after))
-        sys.__stderr__.write("\x00" + str(j) + "\n")
-        return b"\xf0\x9f\x92\x9c"
+        if t in RESPONSES:
+            RESPONSES[t].set_result((j, after))
+            sys.__stderr__.write("\x00" + str(j) + "\n")
+            return b"\xf0\x9f\x92\x9c"
     resp = get_geo(ip)
     data = resp["data"]["geo"]
     tz = data["timezone"]

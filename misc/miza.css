@@ -138,7 +138,6 @@ img.bgimg {
 
 .carouselRight, .carouselLeft {
     margin-left: 0;
-    background: #36393f;
     min-height: 9rem;
     display: flex;
     flex-wrap: nowrap;
@@ -149,7 +148,7 @@ img.bgimg {
 }
 
 .carouselItem {
-    background: #202225;
+    background-image: linear-gradient(180deg, rgba(0,0,255,.5), rgba(255,0,255,.5), rgba(255,0,0,.5), rgba(255,255,0,.5), rgba(0,255,0,.5), rgba(0,255,255,.5), rgba(0,0,255,.5));
     border-radius: 0.5em;
     margin: 0.5em;
     box-sizing: border-box;
@@ -176,6 +175,7 @@ img.bgimg {
 }
 
 .carouselItem > p {
+    font-size: 0.9em;
     font-family: monospace;
     padding: 1em;
     box-sizing: border-box;

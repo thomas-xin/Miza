@@ -592,7 +592,7 @@ def safe_save(fn, s):
         if os.path.exists(fn + "\x7f\x7f"):
             with tracebacksuppressor:
                 os.remove(fn + "\x7f\x7f")
-    if not os.path.exists(fn + "\x7f\x7f"):
+    if os.path.exists(fn) and not os.path.exists(fn + "\x7f\x7f"):
         os.rename(fn, fn + "\x7f\x7f")
         os.rename(fn + "\x7f", fn)
         if os.path.exists(fn + "\x7f\x7f"):
