@@ -303,7 +303,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <div class="bigboi">
             <img
                 class="bgimg" 
-                src="{self.raw_github}/master/misc/background-rainbow.gif" 
+                src="{self.raw_github}/master/misc/moon.gif" 
             />
             <h2>What is Miza?</h2>
             <p>Miza is a multipurpose Discord bot, written in Python, fashioned after the character "Misery" from the platformer game Cave Story, and initially designed to help with Cave Story modding.<br><br>\

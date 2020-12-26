@@ -153,7 +153,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         if w != size[0]:
             vf += "scale=" + str(w) + ":-1:flags=lanczos,"
         vf += "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
-        command.extend([vf, "-loop", "0", "-r", str(fps), out])
+        command.extend([vf, "-loop", "0", "-framerate", str(fps), out])
         file_print(command)
         subprocess.check_output(command)
         if direct:
@@ -486,7 +486,7 @@ def scroll_gif(image, direction, duration, fps):
             temp = ImageChops.offset(image, xm, ym)
             yield temp
     
-    return dict(duration=1000 / fps * count, count=count, frames=scroll_gif_iterator(image))
+    return dict(duration=1000 * duration, count=count, frames=scroll_gif_iterator(image))
 
 
 def magik_gif2(image, cell_size, grid_distance, iterations):
@@ -512,6 +512,7 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
     size = list(max_size(*image.size, maxsize))
 
     def magik_gif_iterator(image):
+        ts = time.time_ns() // 1000
         for f in range(length * scale):
             np.random.seed(ts & 4294967295)
             image.seek(f % length)
@@ -547,7 +548,7 @@ def magik_gif(image, cell_size=7, grid_distance=23, iterations=1):
                 image = image.transform(image.size, Image.MESH, mesh, resample=Image.NEAREST)
             yield image
 
-    return dict(duration=2, count=32, frames=magik_gif_iterator(image))
+    return dict(duration=2000, count=32, frames=magik_gif_iterator(image))
 
 
 def quad_as_rect(quad):
@@ -1475,6 +1476,13 @@ def evalImg(url, operation, args):
         elif new["count"] == 1:
             new = next(iter(frames))
         else:
+            file_print(duration, new["count"])
+            out = "cache/" + str(ts) + ".gif"
+            # if new["count"] <= 1024:
+            #     it = iter(frames)
+            #     first = next(it)
+            #     first.save(out, save_all=True, append_images=it, include_color_table=True, disposal=2, interlace=True, optimize=True, transparency=0, duration=round(1000 * duration / new["count"]), loop=0)
+            #     return repr([out])
             fps = 1000 * new["count"] / duration
             if issubclass(type(frames), collections.abc.Sequence):
                 first = frames[0]
@@ -1490,9 +1498,8 @@ def evalImg(url, operation, args):
 
                 frames = frameit()
             size = first.size
-            out = "cache/" + str(ts) + ".gif"
-            command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-r", str(fps), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-", "-gifflags", "-offsetting", "-an"]
-            if new["count"] > 4096:
+            command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgba", "-video_size", "x".join(str(i) for i in size), "-i", "-", "-gifflags", "-offsetting", "-an"]
+            if new["count"] > 8192:
                 vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
             else:
                 vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=diff_mode=rectangle:alpha_threshold=128"
@@ -1500,7 +1507,6 @@ def evalImg(url, operation, args):
                 command.extend(("-vf", vf))
             command.extend(("-loop", "0", out))
             file_print(command)
-            file_print(new["count"])
             proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             for frame in frames:
                 if issubclass(type(frame), Image.Image):
