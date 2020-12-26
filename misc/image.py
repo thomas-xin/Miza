@@ -268,7 +268,6 @@ def rainbow_gif(image, duration):
         image.seek(0)
     else:
         return rainbow_gif2(image, duration)
-    ts = time.time_ns() // 1000
     image = resize_max(image, 960, resample=Image.HAMMING)
     size = list(image.size)
     if duration == 0:
@@ -354,7 +353,6 @@ def spin_gif(image, duration):
         image.seek(0)
     else:
         return spin_gif2(image, duration)
-    ts = time.time_ns() // 1000
     maxsize = 960
     size = list(image.size)
     if duration == 0:
@@ -414,6 +412,83 @@ def to_circle(image):
     return ImageChops.multiply(image, image_map)
 
 
+DIRECTIONS = dict(
+    left=0,
+    up=1,
+    right=2,
+    down=3,
+    l=0,
+    u=1,
+    r=2,
+    d=3,
+)
+DIRECTIONS.update({
+    "0": 0,
+    "1": 1,
+    "2": 2,
+    "3": 3,
+})
+
+def scroll_gif2(image, direction, duration):
+    total = 0
+    for f in range(2147483647):
+        try:
+            image.seek(f)
+        except EOFError:
+            break
+        fps = max(image.info.get("duration", 0), 1 / 60)
+        total += fps
+    count = f
+    
+    def scroll_gif_iterator(image):
+        if direction & 1:
+            y = (direction & 2) - 1
+            x = 0
+        else:
+            x = (direction & 2) - 1
+            y = 0
+        for i in range(count):
+            image.seek(i)
+            temp = resize_max(image, 960, resample=Image.HAMMING)
+            if i:
+                xm = round(x * temp.width / duration / fps * i)
+                ym = round(y * temp.height / duration / fps * i)
+                temp = ImageChops.offset(temp, xm, ym)
+            yield temp
+    
+    return dict(duration=total, count=count, frames=scroll_gif_iterator(image))
+
+def scroll_gif(image, direction, duration, fps):
+    try:
+        direction = DIRECTIONS[direction.casefold()]
+    except KeyError:
+        raise TypeError(f"Invalid direction {direction}")
+    try:
+        image.seek(1)
+    except EOFError:
+        image.seek(0)
+    else:
+        return scroll_gif2(image, direction, duration)
+    image = resize_max(image, 960, resample=Image.HAMMING)
+    count = round(duration * fps)
+
+    def scroll_gif_iterator(image):
+        yield image
+        if direction & 1:
+            y = (direction & 2) - 1
+            x = 0
+        else:
+            x = (direction & 2) - 1
+            y = 0
+        for i in range(1, count):
+            xm = round(x * image.width / count * i)
+            ym = round(y * image.height / count * i)
+            temp = ImageChops.offset(image, xm, ym)
+            yield temp
+    
+    return dict(duration=1000 / fps * count, count=count, frames=scroll_gif_iterator(image))
+
+
 def magik_gif2(image, cell_size, grid_distance, iterations):
     total = 0
     for f in range(2147483648):
@@ -435,7 +510,6 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
         loops = 1 if loops >= 0 else -1
     maxsize = 960
     size = list(max_size(*image.size, maxsize))
-    ts = time.time_ns() // 1000
 
     def magik_gif_iterator(image):
         for f in range(length * scale):
@@ -461,7 +535,6 @@ def magik_gif(image, cell_size=7, grid_distance=23, iterations=1):
         image.seek(0)
     else:
         return magik_gif2(image, cell_size, grid_distance, iterations)
-    ts = time.time_ns() // 1000
     image = resize_max(image, 960, resample=Image.HAMMING)
 
     def magik_gif_iterator(image):

@@ -3195,7 +3195,7 @@ class AudioSettings(Command):
         "24/7": "stay",
         "♻": "reset",
     }
-    rate_limit = (0.5, 6)
+    rate_limit = (0.5, 5)
 
     def __init__(self, *args):
         self.alias = list(self.aliasMap) + list(self.aliasExt)[1:]

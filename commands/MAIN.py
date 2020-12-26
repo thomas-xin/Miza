@@ -687,7 +687,7 @@ class Info(Command):
                         dname = getattr(member, "nick", None)
                         joined = getattr(u, "joined_at", None)
                     else:
-                        dname = getattr(user, "nick", None)
+                        dname = getattr(u, "nick", None)
                         joined = None
                     created = u.created_at
                     activity = "\n".join(activity_repr(i) for i in getattr(u, "activities", ()))

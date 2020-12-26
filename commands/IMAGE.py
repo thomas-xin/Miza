@@ -869,6 +869,73 @@ class Rainbow(Command):
         await bot.send_with_file(message.channel, "", fn, filename=name)
 
 
+class Scroll(Command):
+    name = ["Parallax", "Roll", "Offset", "ScrollGIF"]
+    description = "Creates a .gif image from repeatedly shifting supplied image in a specified direction."
+    usage = "<0:url> <1:direction(left)>? <2:duration(2)>? <3:fps(25)>?"
+    no_parse = True
+    rate_limit = (5, 11)
+    _timeout_ = 4
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
+        try:
+            if message.attachments:
+                args = [best_url(a) for a in message.attachments] + args
+                argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
+            if not args:
+                raise ArgumentError("Please input an image by URL or attachment.")
+            url = args.pop(0)
+            urls = await bot.follow_url(url, best=True, allow=True, limit=1)
+            if not urls:
+                urls = await bot.follow_to_image(argv)
+                if not urls:
+                    urls = await bot.follow_to_image(url)
+                    if not urls:
+                        raise ArgumentError("Please input an image by URL or attachment.")
+            url = urls[0]
+        except ArgumentError:
+            url = None
+            async for message in bot.data.channel_cache.get(message.channel.id):
+                if message.attachments:
+                    url = best_url(best_url(message.attachments[-1]))
+                    break
+            if url is None:
+                raise ArgumentError("Please input an image by URL or attachment.")
+        if args:
+            direction = args.pop(0)
+        else:
+            direction = "LEFT"
+        if args:
+            duration = await bot.eval_math(args.pop(0), user)
+        else:
+            duration = 2
+        if args:
+            fps = await bot.eval_math(" ".join(args), user)
+            fps = round(fps)
+            if fps <= 0:
+                raise ValueError("FPS value must be positive.")
+            elif fps > 64:
+                raise OverflowError("Maximum FPS value is 64.")
+        else:
+            fps = 25
+        try:
+            name = url[url.rindex("/") + 1:]
+            if not name:
+                raise ValueError
+            if "." in name:
+                name = name[:name.rindex(".")]
+        except ValueError:
+            name = "unknown"
+        if not name.endswith(".gif"):
+            name += ".gif"
+        with discord.context_managers.Typing(channel):
+            # -gif signals to image subprocess that the output is always a .gif image
+            resp = await process_image(url, "scroll_gif", [direction, duration, fps, "-gif"], user, timeout=_timeout)
+            fn = resp[0]
+        await bot.send_with_file(message.channel, "", fn, filename=name)
+
+
 class Spin(Command):
     name = ["SpinGIF"]
     description = "Creates a .gif image from repeatedly rotating supplied image."

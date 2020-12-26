@@ -1894,8 +1894,8 @@ For those of us who use Miza as a regular utility, we can safely say that she is
             return True
 
     def reload(self, mod=None):
+        sub_kill()
         if not mod:
-            sub_kill()
             modload = deque()
             files = [i for i in os.listdir("commands") if is_code(i)]
             for f in files:
@@ -2315,20 +2315,22 @@ For those of us who use Miza as a regular utility, we can safely say that she is
                                         xi = argv.index(x)
                                         yi = argv.rindex(y)
                                         if xi < yi:
-                                            if hasattr(command, "multi"):
-                                                argv2 = single_space((argv[:xi] + " " + argv[yi + 1:]).replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
-                                                argv3 = single_space(argv[xi + 1:yi].replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
+                                            middle = argv[xi + 1:yi]
+                                            if len(middle.split(None, 1)) > 1 or "," in middle:
+                                                if hasattr(command, "multi"):
+                                                    argv2 = single_space((argv[:xi] + " " + argv[yi + 1:]).replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
+                                                    argv3 = single_space(middle.replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
+                                                    try:
+                                                        argl = shlex.split(argv3)
+                                                    except ValueError:
+                                                        argl = argv3.split()
+                                                else:
+                                                    argv2 = single_space(argv[:xi].replace("\n", " ").replace("\t", " ") + " " + (middle[xi + 1:yi]).replace("\n", " ").replace(",", " ").replace("\t", " ") + " " + argv[yi + 1:].replace("\n", " ").replace("\t", " "))
                                                 try:
-                                                    argl = shlex.split(argv3)
+                                                    args = shlex.split(argv2)
                                                 except ValueError:
-                                                    argl = argv3.split()
-                                            else:
-                                                argv2 = single_space(argv[:xi].replace("\n", " ").replace("\t", " ") + " " + (argv[xi + 1:yi]).replace("\n", " ").replace(",", " ").replace("\t", " ") + " " + argv[yi + 1:].replace("\n", " ").replace("\t", " "))
-                                            try:
-                                                args = shlex.split(argv2)
-                                            except ValueError:
-                                                args = argv2.split()
-                                            raise StopIteration
+                                                    args = argv2.split()
+                                                raise StopIteration
                             if args is None:
                                 argv2 = single_space(argv.replace("\n", " ").replace("\t", " "))
                                 try:
@@ -3681,7 +3683,7 @@ def as_file(file, filename=None, ext=None, rename=True):
         fn = file.rsplit("/", 1)[-1][1:].rsplit(".", 1)[0].split("~", 1)[0]
     url = f"{bot.webserver}/files/{fn}"
     if filename:
-        url += "/" + (str(file) if filename is None else lim_str(filename.translate(filetrans)), 64)
+        url += "/" + (str(file) if filename is None else lim_str(filename.translate(filetrans), 64))
     if ext and "." not in url:
         url += "." + ext
     return url
