@@ -157,12 +157,6 @@ def upload_file():
 <html>
 <head>
 <style>
-body {
-  background-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/spiral.gif');
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-  background-size: cover;
-}
 h1 {text-align: center;}
 p {text-align: center;}
 img {
@@ -173,8 +167,8 @@ img {
 }
 </style>
 </head>
-<body>
-<h1>File uploaded successfully!</h1>
+<body style="background-color:black;">
+<h1 style="color:white;">File uploaded successfully!</h1>
 <p><a href=\"""" + href + f"""\">{url}</a></p>
 <img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">
 </body>
@@ -203,7 +197,7 @@ def upload():
     </style>
     <body>
         <form action="/upload_file" method="POST" enctype="multipart/form-data">
-            <input type="file" name="file" />
+            <input style="color:white;" type="file" name="file" />
             <input type="submit"/>
         </form>
     </body>
