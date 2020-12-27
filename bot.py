@@ -3642,7 +3642,7 @@ def userIter4(x):
 
 
 PORT = 9801
-IND = ""
+IND = "\x7f"
 
 def update_file_cache(files=None):
     if files is None:

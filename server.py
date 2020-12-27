@@ -5,7 +5,7 @@ import werkzeug
 from werkzeug.exceptions import HTTPException
 
 PORT = 9801
-IND = ""
+IND = "\x7f"
 
 
 sys.stderr = sys.stdout
@@ -150,12 +150,19 @@ def upload_file():
     f = flask.request.files["file"]
     ts = time.time_ns() // 1000
     fn = f.filename
-    f.save(f"\x7f{ts}~{fn}")
-    url = f"{flask.request.host}/files/{ts}/{fn}"
+    f.save(f"cache/{IND}{ts}~{fn}")
+    href = f"/files/{ts}/{fn}"
+    url = f"{flask.request.host}{href}"
     return """<!DOCTYPE html>
 <html>
 <head>
 <style>
+body {
+  background-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/spiral.gif');
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: cover;
+}
 h1 {text-align: center;}
 p {text-align: center;}
 img {
@@ -168,7 +175,7 @@ img {
 </head>
 <body>
 <h1>File uploaded successfully!</h1>
-<p><a href=\"""" + url + f"""\">{url}</a></p>
+<p><a href=\"""" + href + f"""\">{url}</a></p>
 <img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">
 </body>
 </html>"""
@@ -178,16 +185,24 @@ def upload():
     colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
     return f"""<html>
     <head>
-    <meta charset="utf-8">
-    <title>Files</title>
-    <meta content="Files" property="og:title">
-    <meta content="Upload a file here!" property="og:description">
-    <meta content=\"""" + flask.request.url + """\" property="og:url">
-    <meta content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" property="og:image">
-    <meta content="#""" + colour + f"""\" data-react-helmet="true" name="theme-color">
+        <meta charset="utf-8">
+        <title>Files</title>
+        <meta content="Files" property="og:title">
+        <meta content="Upload a file here!" property="og:description">
+        <meta content=\"""" + flask.request.url + """\" property="og:url">
+        <meta content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" property="og:image">
+        <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
     </head>
+    <style>
+        body {
+            background-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/spiral.gif');
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-size: cover;
+        }
+    </style>
     <body>
-        <form action="{flask.request.host}/upload_file" method="POST" enctype="multipart/form-data">
+        <form action="/upload_file" method="POST" enctype="multipart/form-data">
             <input type="file" name="file" />
             <input type="submit"/>
         </form>
