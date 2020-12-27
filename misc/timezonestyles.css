@@ -6,7 +6,7 @@ html {
     align-items: center;
     vertical-align: top;
     background: #1f0f3f;
-    text-shadow: -1px 0 #7fffff, 0 1px #7fffff, 1px 0 #7fffff, 0 -1px #7fffff;
+    /*! text-shadow: -1px 0 #7fffff, 0 1px #7fffff, 1px 0 #7fffff, 0 -1px #7fffff; */
     font-weight: 700;
     color: #00bfbf;
 }
@@ -72,7 +72,24 @@ p {
 
 .align_left {
     float: left;
+    text-align: right;
 }
 .align_right {
     float: right;
+    text-align: left;
 }
+
+.align_left, .align_right {
+    width: 48%;
+}
+
+
+  img {
+    margin-top: 32px;
+    border: 16px solid transparent;
+    padding: -4px;
+    border-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/border.gif') 33.333333333333% stretch;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }

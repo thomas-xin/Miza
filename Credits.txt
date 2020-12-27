@@ -55,7 +55,7 @@ https://y2mate.guru/en8/
 MISC:
 
 smudgedpasta (https://github.com/smudgedpasta)
--Created art for the bot's profile picture and coin animation
+-Created art for the bot's profile picture, coin animation, and website
 -Help with testing
 
 Brayconn (https://github.com/Brayconn)

@@ -1,6 +1,7 @@
 from common import *
 import flask
 from flask import Flask
+import werkzeug
 from werkzeug.exceptions import HTTPException
 
 PORT = 9801
@@ -144,6 +145,56 @@ def favicon():
     return flask.Response(data, mimetype=mime)
 
 
+@app.route("/upload_file", methods=["GET", "POST"])
+def upload_file():
+    f = flask.request.files["file"]
+    ts = time.time_ns() // 1000
+    fn = f.filename
+    f.save(f"\x7f{ts}~{fn}")
+    url = f"{flask.request.host}/files/{ts}/{fn}"
+    return """<!DOCTYPE html>
+<html>
+<head>
+<style>
+h1 {text-align: center;}
+p {text-align: center;}
+img {
+    margin-top: 32px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+</style>
+</head>
+<body>
+<h1>File uploaded successfully!</h1>
+<p><a href=\"""" + url + f"""\">{url}</a></p>
+<img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">
+</body>
+</html>"""
+
+@app.route("/upload", methods=["GET", "POST"])
+def upload():
+    colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
+    return f"""<html>
+    <head>
+    <meta charset="utf-8">
+    <title>Files</title>
+    <meta content="Files" property="og:title">
+    <meta content="Upload a file here!" property="og:description">
+    <meta content=\"""" + flask.request.url + """\" property="og:url">
+    <meta content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" property="og:image">
+    <meta content="#""" + colour + f"""\" data-react-helmet="true" name="theme-color">
+    </head>
+    <body>
+        <form action="{flask.request.host}/upload_file" method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" />
+            <input type="submit"/>
+        </form>
+    </body>
+</html>"""
+
+
 def get_geo(ip):
     try:
         resp = TZCACHE[ip]
@@ -152,7 +203,6 @@ def get_geo(ip):
         resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}"}).json()
         TZCACHE[resp["data"]["geo"]["ip"]] = resp
     return resp
-
 
 @app.route("/time", methods=["GET", "POST"])
 @app.route("/timezone", methods=["GET", "POST"])
@@ -178,17 +228,6 @@ def timezone():
     <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
     <link rel="stylesheet" type="text/css" href="/static/timezonestyles.css" />
   </head>
-  <style>
-  img {
-    margin-top: 32px;
-    border: 16px solid transparent;
-    padding: -4px;
-    border-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/border.gif') 33.333333333333% stretch;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-  }
-  </style>
   <body>
     <div>
       <h3>Estimated time:</h3>
@@ -201,7 +240,7 @@ def timezone():
         <a href="/">Home</a>
       </p>
     </div>
-  <img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" alt="Miza-Sky" style="width:25%;height:25%;">
+  <img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" alt="Miza-Sky" style="width:14.2857%;height:14.2857%;">
   </body>
 </html>
         """

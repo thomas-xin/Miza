@@ -2458,6 +2458,8 @@ For those of us who use Miza as a regular utility, we can safely say that she is
                         out_fut = create_task(send_exception(channel, ex, message))
                     if out_fut is not None and getattr(message, "simulated", None):
                         await out_fut
+            else:
+                return -1
         # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
         if not run and u_id != bot.id:
             temp = to_alphanumeric(cpy).casefold()
@@ -2470,13 +2472,16 @@ For those of us who use Miza as a regular utility, we can safely say that she is
             message = SimulatedMessage(self, command, t, name, nick)
             self.cache.users[message.author.id] = message.author
             after = await self.process_message(message, command, slash=True)
-            after += utc()
-            for i in range(3600):
-                if message.response:
-                    break
-                await asyncio.sleep(0.1)
-            await self.react_callback(message, None, message.author)
-            out = json.dumps(list(message.response))
+            if after != -1:
+                after += utc()
+                for i in range(3600):
+                    if message.response:
+                        break
+                    await asyncio.sleep(0.1)
+                await self.react_callback(message, None, message.author)
+                out = json.dumps(list(message.response))
+            else:
+                out = "[]"
             url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
             resp = await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
             # print(t, out, resp, sep="\n")
