@@ -3238,7 +3238,7 @@ For those of us who use Miza as a regular utility, we can safely say that she is
             emb.description += (
                 f"!\nMy default prefix is `{self.prefix}`, which can be changed as desired on a per-server basis. Mentioning me also serves as an alias for all prefixes.\n"
                 + f"For more information, use the `{self.prefix}help` command, "
-                + f"I have a website at [`{self.webserver}`]({self.webserver}), " if self.webserver else ""
+                + (f"I have a website at [`{self.webserver}`]({self.webserver}), " if self.webserver else "")
                 + f"and my source code is available at [`{self.github}`]({self.github}) for those who are interested.\n"
                 + "Pleased to be at your service 🙂"
             )

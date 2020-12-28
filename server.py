@@ -147,12 +147,14 @@ def favicon():
 
 @app.route("/upload_file", methods=["GET", "POST"])
 def upload_file():
+    ip = flask.request.remote_addr
     f = flask.request.files["file"]
     ts = time.time_ns() // 1000
     fn = f.filename
     f.save(f"cache/{IND}{ts}~{fn}")
     href = f"/files/{ts}/{fn}"
     url = f"{flask.request.host}{href}"
+    sys.__stderr__.write(ip + "\t" + fn + "\t" + url + "\n")
     return """<!DOCTYPE html>
 <html>
 <head>
@@ -176,6 +178,8 @@ img {
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
+    ip = flask.request.remote_addr
+    sys.__stderr__.write(ip + "/upload\n")
     colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
     return f"""<html>
     <head>
