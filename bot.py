@@ -357,7 +357,7 @@ For those of us who use Miza as a regular utility, we can safely say that she is
                         aliases=[n.strip("_") for n in command.alias],
                         description=command.parse_description(),
                         usage=command.usage,
-                        level=command.min_level,
+                        level=str(command.min_level),
                         rate_limit=command.rate_limit,
                         timeout=getattr(command, "_timeout_", 1) * self.timeout,
                     )
@@ -3775,14 +3775,16 @@ class SimulatedMessage:
         except KeyError:
             pass
         else:
-            if embed:
-                kwargs["embed"] = embed.to_dict()
+            if embed is not None:
+                e = embed.to_dict()
+                if e:
+                    kwargs["embed"] = e
         try:
             embeds = kwargs.pop("embeds")
         except KeyError:
             pass
         else:
-            embeds = [embed.to_dict() for embed in embeds if embed]
+            embeds = [e for e in (embed.to_dict() for embed in embeds if embed is not None) if e]
             if embeds:
                 kwargs["embeds"] = embeds
         try:
