@@ -2228,7 +2228,7 @@ For those of us who use Miza as a regular utility, we can safely say that she is
                     fut = out_fut = None
                     try:
                         # Make sure server-only commands can only be run in servers.
-                        if guild is None:
+                        if guild is None or getattr(guild, "ghost", None):
                             if getattr(command, "server_only", False):
                                 raise ReferenceError("This command is only available in servers.")
                         # Make sure target has permission to use the target command, rate limit the command if necessary.
@@ -2448,7 +2448,7 @@ For those of us who use Miza as a regular utility, we can safely say that she is
                             await fut
                         command.used.pop(u_id, None)
                         out_fut = create_task(send_exception(channel, ex, message))
-                        return
+                        return remaining
                     # Represents all other errors
                     except Exception as ex:
                         if fut is not None:
@@ -2458,7 +2458,7 @@ For those of us who use Miza as a regular utility, we can safely say that she is
                         out_fut = create_task(send_exception(channel, ex, message))
                     if out_fut is not None and getattr(message, "simulated", None):
                         await out_fut
-            else:
+            elif getattr(message, "simulated", None):
                 return -1
         # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
         if not run and u_id != bot.id:
@@ -2473,7 +2473,10 @@ For those of us who use Miza as a regular utility, we can safely say that she is
             self.cache.users[message.author.id] = message.author
             after = await self.process_message(message, command, slash=True)
             if after != -1:
-                after += utc()
+                if after is not None:
+                    after += utc()
+                else:
+                    after = 0
                 for i in range(3600):
                     if message.response:
                         break

@@ -124,7 +124,10 @@ def get_best_audio(entry):
         vcodec = fmt.get("vcodec", "none")
         if vcodec not in (None, "none"):
             q -= 1
-        if not fmt["url"].startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
+        u = fmt["url"]
+        if type(u) is bytes:
+            u = u.decode("utf-8", "replace")
+        if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
             replace = False
         if q > best or replace:
             best = q

@@ -1530,8 +1530,8 @@ class Reminder(Command):
                 msg = bold(css_md(msg))
             else:
                 msg = bold(ini_md(msg))
-        elif len(msg) > 1024:
-            raise OverflowError(f"Input message too long ({len(msg)} > 1024).")
+        elif len(msg) > 2048:
+            raise OverflowError(f"Input message too long ({len(msg)} > 2048).")
         username = str(remind_as)
         url = best_url(remind_as)
         ts = utc()
