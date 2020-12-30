@@ -1,4 +1,4 @@
-# Miza
+# [Miza](http://27.33.133.250:9801)
 Welcome to Miza, a multipurpose Discord bot created by [Thomas Xin](https://github.com/thomas-xin). Writing this README is [smudgedpasta](https://github.com/smudgedpasta), Miza's secondary bot owner! :3 ~~I can't speak for the code as much as I can help explain the functionality, so I'll keep things worded simply for everyone to understand...~~
 
 ![Miza](https://cdn.discordapp.com/attachments/688253918890688521/777456623555051521/image0.png)
