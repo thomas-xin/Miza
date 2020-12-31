@@ -1336,8 +1336,8 @@ class Muffin(Command):
     def __call__(self, **void):
         return "Muffin time :D 🧁🧁🧁"
                            
-class Rainbow(Command):
-    name=["Laser", "Beam"]
+class Laser(Command):
+    name=["Beam"]
     description = "Creates a rainbow laser."
                            
     def __call__(self, **void):
