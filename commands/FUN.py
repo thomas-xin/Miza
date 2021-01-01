@@ -1335,9 +1335,10 @@ class Muffin(Command):
     
     def __call__(self, **void):
         return "Muffin time :D 🧁🧁🧁"
-                           
+
+               
 class Laser(Command):
-    name=["Beam"]
+    name = ["Beam"]
     description = "Creates a rainbow laser."
                            
     def __call__(self, **void):

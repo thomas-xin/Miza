@@ -599,7 +599,6 @@ class Time(Command):
 class Timezone(Command):
     description = "Shows the current time in a certain timezone. Be sure to check out ⟨WEBSERVER⟩/time!"
     usage = "<timezone> <list{?l}>?"
-    slash = True
 
     async def __call__(self, channel, argv, message, **void):
         if argv.startswith("-l") or argv.startswith("list"):

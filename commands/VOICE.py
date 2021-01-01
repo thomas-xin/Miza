@@ -3884,6 +3884,7 @@ class Download(Command):
     flags = "avtz"
     rate_limit = (7, 16)
     typing = True
+    slash = True
 
     async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
         if name in ("af", "audiofilter"):
