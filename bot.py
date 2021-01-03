@@ -286,32 +286,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
         <link href="{self.webserver}/static/miza.css" rel="stylesheet">
         <link rel="stylesheet" href="{self.webserver}/static/swiper.min.css">
-    </head>""" + """
-    <style>
-        a:link {
-        color: #ffff00;
-        background-color: transparent;
-        text-decoration: none;
-        }
-
-        a:visited {
-        color: #ffff00;
-        background-color: transparent;
-        text-decoration: none;
-        }
-
-        a:hover {
-        color: #ff0000;
-        background-color: transparent;
-        text-decoration: underline;
-        }
-
-        a:active {
-        color: #00ff00;
-        background-color: transparent;
-        text-decoration: underline;
-        }
-    </style>""" + f"""
+    </head>
     <body>
         <div class="hero">
             <img class="hero-bg" src="{self.website_background}">

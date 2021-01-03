@@ -70,6 +70,26 @@ img.hero-image {
     box-shadow: 0 0 5px 0 white;
 }
 
+a:link {
+    color: #ffff00;
+    text-decoration: none;
+}
+
+a:visited {
+    color: #ffff00;
+    text-decoration: none;
+}
+
+a:hover {
+    color: #ff0000;
+    text-decoration: underline;
+}
+
+a:active {
+    color: #00ff00;
+    text-decoration: underline;
+}
+
 a.buttonish {
     display: block;
     color: white;
@@ -143,8 +163,8 @@ img.bgimg {
     flex-wrap: nowrap;
     overflow-x: hidden;
     box-sizing: border-box;
-	position: relative;
-	width: 100%;
+    position: relative;
+    width: 100%;
 }
 
 .carouselItem {
