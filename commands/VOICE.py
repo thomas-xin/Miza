@@ -1248,7 +1248,7 @@ class AudioFile:
         if not is_finite(stats.pitch * stats.speed):
             raise OverflowError("Speed setting out of range.")
         # Construct FFmpeg options
-        options = auds.construct_options(full=False)
+        options = auds.construct_options(full=self.live)
         if options or auds.reverse or pos or auds.stats.bitrate != 1966.08 or self.live:
             args = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
             if pos and not self.live:
