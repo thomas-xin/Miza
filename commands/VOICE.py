@@ -1251,7 +1251,7 @@ class AudioFile:
         options = auds.construct_options(full=False)
         if options or auds.reverse or pos or auds.stats.bitrate != 1966.08 or self.live:
             args = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
-            if pos:
+            if pos and not self.live:
                 arg = "-to" if auds.reverse else "-ss"
                 args += [arg, str(pos)]
             args.append("-i")
