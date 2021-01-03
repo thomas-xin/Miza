@@ -2617,9 +2617,13 @@ For those of us who use Miza as a regular utility, we can safely say that she is
             for emb in embeds:
                 if type(emb) is not discord.Embed:
                     emb = discord.Embed.from_dict(emb)
+                if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
+                    await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=best_url(m), reacts=reacts)
+                    embs.clear()
                 embs.append(emb)
                 reacts = None
-            await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=best_url(m), reacts=reacts)
+            if embs:
+                await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=best_url(m), reacts=reacts)
 
     # Adds embeds to the embed sender, waiting for the next update event.
     def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None):
