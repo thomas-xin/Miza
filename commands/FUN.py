@@ -258,7 +258,7 @@ class Text2048(Command):
             for react in self.directions.a:
                 r = self.directions.a[react]
                 if r == -2 or (r == -1 and mode & 1) or r >= 0 and r >> 1 < len(size):
-                    create_task(message.add_reaction(react.decode("utf-8")))
+                    create_task(message.add_reaction(as_str(react)))
             g = ND2048(*size, flags=mode)
             data = g.serialize()
             score = 0
@@ -343,7 +343,7 @@ class Text2048(Command):
                 emb.set_author(name="@everyone", icon_url=bot.discord_icon)
             else:
                 emb.set_author(**get_author(u))
-            content = "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + data.decode("utf-8") + "\nPlaying 2048...```*"
+            content = "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + as_str(data) + "\nPlaying 2048...```*"
             emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
             fscore = g.score()
             if score is not None:
@@ -469,7 +469,7 @@ class SlotMachine(Command):
         if len(spl) < 3:
             spl.append(0)
         u_id, bet, skip = spl
-        if reaction is None or reaction.decode("utf-8", "replace") == "⤵️":
+        if reaction is None or as_str(reaction) == "⤵️":
             if reaction is None:
                 create_task(message.add_reaction("⤵️"))
                 user = await bot.fetch_user(u_id)
@@ -632,7 +632,7 @@ class Daily(Command):
     async def _callback_(self, bot, user, reaction, message, perm, vals, **void):
         if reaction is None:
             return
-        if reaction.decode("utf-8", "replace") != "✅":
+        if as_str(reaction) != "✅":
             return
         u_id = vals
         if str(user.id) != u_id:
@@ -787,7 +787,7 @@ class Wallet(Command):
         if utc() - ts > 86400:
             self.join_cache.pop(message.id, None)
             return
-        if reaction is None or reaction.decode("utf-8", "replace") != "✅":
+        if reaction is None or as_str(reaction) != "✅":
             return
         cache = set_dict(self.join_cache, message.id, set())
         if len(cache) > 256:
@@ -838,7 +838,7 @@ class Shop(Command):
         raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
 
     async def _callback_(self, bot, message, reaction, user, vals, **void):
-        if reaction is None or reaction.decode("utf-8", "replace") != "✅":
+        if reaction is None or as_str(reaction) != "✅":
             return
         u_id, item = vals.split("_", 1)
         u_id = int(u_id)
@@ -1158,7 +1158,7 @@ class Mimic(Command):
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
-                create_task(message.add_reaction(react.decode("utf-8")))
+                create_task(message.add_reaction(as_str(react)))
                 await asyncio.sleep(0.5)
 
 

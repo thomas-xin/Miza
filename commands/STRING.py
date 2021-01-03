@@ -212,32 +212,7 @@ class Hex2Uni(Command):
         if not argv:
             raise ArgumentError("Input string is empty.")
         b = hex2bytes(argv.replace("0x", "").replace(" ", ""))
-        return fix_md(b.decode("utf-8", "replace"))
-
-
-# class Uni2Bin(Command):
-#     name = ["U2B", "BinEncode"]
-#     description = "Converts unicode text to binary numbers."
-#     usage = "<string>"
-#     no_parse = True
-
-#     def __call__(self, argv, **void):
-#         if not argv:
-#             raise ArgumentError("Input string is empty.")
-#         b = bytes(argv, "utf-8")
-#         return fix_md(bytes2hex(b))
-
-
-# class Bin2Uni(Command):
-#     name = ["B2U", "BinDecode"]
-#     description = "Converts binary numbers to unicode text."
-#     usage = "<string>"
-
-#     def __call__(self, argv, **void):
-#         if not argv:
-#             raise ArgumentError("Input string is empty.")
-#         b = hex2bytes(argv.replace("0x", "").replace(" ", ""))
-#         return fix_md(b.decode("utf-8", "replace"))
+        return fix_md(as_str(b))
 
 
 class ID2Time(Command):
@@ -654,7 +629,7 @@ class Follow(Command):
                 temp = await self.bot.follow_url(url, allow=True)
             else:
                 data = await self.bot.get_request(url)
-                temp = find_urls(data.decode("utf-8", "replace"))
+                temp = find_urls(as_str(data))
             out.update(temp)
         if not out:
             raise FileNotFoundError("No valid URLs detected.")

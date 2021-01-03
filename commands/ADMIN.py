@@ -323,7 +323,7 @@ class Mute(Command):
         if reaction is None:
             for react in self.directions:
                 async with delay(0.5):
-                    create_task(message.add_reaction(react.decode("utf-8")))
+                    create_task(message.add_reaction(as_str(react)))
 
 
 class Ban(Command):
@@ -542,7 +542,7 @@ class Ban(Command):
         if reaction is None:
             for react in self.directions:
                 async with delay(0.5):
-                    create_task(message.add_reaction(react.decode("utf-8")))
+                    create_task(message.add_reaction(as_str(react)))
 
 
 class RoleGiver(Command):

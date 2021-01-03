@@ -70,7 +70,7 @@ closing = contextlib.closing
 repeat = itertools.repeat
 
 
-print_exc = lambda: sys.stdout.write(traceback.format_exc())
+print_exc = lambda *args: sys.stdout.write(("\n".join(as_str(i) for i in args) + "\n" if args else "") + traceback.format_exc())
 
 class Dummy(BaseException):
     __slots__ = ()
@@ -115,7 +115,7 @@ eval_const = {
 }
 
 # Not completely safe, but much safer than regular eval
-safe_eval = lambda s: eval((s.decode("utf-8", "replace") if type(s) is bytes else str(s)).replace("__", ""), {}, eval_const)
+safe_eval = lambda s: eval(as_str(s).replace("__", ""), {}, eval_const)
 
 null = None
 i = I = j = J = 1j
@@ -145,6 +145,13 @@ true, false = True, False
 
 nop = lambda *void1, **void2: None
 nofunc = lambda arg, *void1, **void2: arg
+
+capwords = lambda s, spl=None: (" " if spl is None else spl).join(w.capitalize() for w in s.split(spl))
+
+def as_str(s):
+    if type(s) in (bytes, bytearray, memoryview):
+        return bytes(s).decode("utf-8", "replace")
+    return str(s)
 
 
 def choice(*args):
@@ -3359,8 +3366,7 @@ def regexp(s, flags=0):
     global RE
     if issubclass(type(s), re.Pattern):
         return s
-    elif type(s) is not str:
-        s = s.decode("utf-8", "replace")
+    s = as_str(s)
     t = (s, flags)
     try:
         return RE[t]
@@ -3584,7 +3590,7 @@ def bytes2hex(b, space=True):
     return b.hex().upper()
 
 # Converts a hex string to a bytes object.
-hex2bytes = lambda b: bytes.fromhex(b if type(b) is str else b.decode("utf-8", "replace"))
+hex2bytes = lambda b: bytes.fromhex(as_str(b))
 
 # Converts a bytes object to a base64 string.
 def bytes2b64(b, alt_char_set=False):
@@ -3610,7 +3616,7 @@ else:
     randbytes = lambda size: (np.random.random_sample(size) * 256).astype(np.uint8).tobytes()
 
 # SHA256 operations: base64 and base16.
-shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).replace(b"/", b"-").decode("utf-8", "replace")
+shash = lambda s: as_str(base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).replace(b"/", b"-"))
 hhash = lambda s: bytes2hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
 ihash = lambda s: int.from_bytes(hashlib.sha256(s.encode("utf-8")).digest(), "little") % 4294967296 - 2147483648
 

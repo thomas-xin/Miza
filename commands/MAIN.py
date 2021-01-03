@@ -284,7 +284,7 @@ class Prefix(Command):
 
 class Loop(Command):
     time_consuming = 3
-    _timeout_ = 8
+    _timeout_ = 12
     name = ["For", "Rep", "While"]
     min_level = 1
     min_display = "1+"
@@ -334,6 +334,8 @@ class Loop(Command):
         fake_message = copy.copy(message)
         fake_message.content = func2
         for i in range(iters):
+            if getattr(bot.cache.messages[message.id], "deleted", None):
+                break
             loop = i < iters - 1
             t = utc()
             # Calls process_message with the argument containing the looped command.
@@ -1326,7 +1328,12 @@ class Reminder(Command):
     async def __call__(self, argv, name, message, flags, bot, user, guild, perm, **void):
         msg = message.content
         argv2 = argv
-        argv = msg[msg.casefold().index(name) + len(name):].strip(" ").strip("\n")
+        try:
+            msg = msg[msg.casefold().index(name) + len(name):]
+        except ValueError:
+            print_exc(msg)
+            msg = msg.casefold().split(None, 1)[-1]
+        argv = msg.strip(" ").strip("\n")
         try:
             args = shlex.split(argv)
         except ValueError:
@@ -1639,7 +1646,7 @@ class Reminder(Command):
         if reaction is None:
             for react in self.directions:
                 async with delay(0.5):
-                    create_task(message.add_reaction(react.decode("utf-8")))
+                    create_task(message.add_reaction(as_str(react)))
 
 
 class UpdateUrgentReminders(Database):

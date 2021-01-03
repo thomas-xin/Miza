@@ -298,7 +298,7 @@ with tracebacksuppressor:
     enc_key = AUTH["encryption_key"]
 
 if not enc_key:
-    enc_key = AUTH["encryption_key"] = base64.b64encode(randbytes(32)).decode("utf-8", "replace")
+    enc_key = AUTH["encryption_key"] = as_str(base64.b64encode(randbytes(32)))
     try:
         s = json.dumps(AUTH, indent=4)
     except:
@@ -425,7 +425,7 @@ class FileHashDict(collections.abc.MutableMapping):
     __repr__ = lambda self: self.__class__.__name__ + "(" + str(self.full) + ")"
     __call__ = lambda self, k: self.__getitem__(k)
     __len__ = lambda self: len(self.keys())
-    __contains__ = lambda self, k: k in self.data or k in self.keys()
+    __contains__ = lambda self, k: (k in self.data or k in self.keys()) and k not in self.deleted
     __eq__ = lambda self, other: self.data == other
     __ne__ = lambda self, other: self.data != other
 
@@ -457,7 +457,13 @@ class FileHashDict(collections.abc.MutableMapping):
 
     def values(self):
         for k in self.keys():
-            yield self[k]
+            with suppress(KeyError):
+                yield self[k]
+
+    def items(self):
+        for k in self.keys():
+            with suppress(KeyError):
+                yield (k, self[k])
 
     def __iter__(self):
         return iter(self.keys())
@@ -1258,8 +1264,7 @@ def evalEX(exc):
     try:
         ex = eval(exc)
     except NameError:
-        if type(exc) is bytes:
-            exc = exc.decode("utf-8", "replace")
+        exc = as_str(exc)
         s = exc[exc.index("(") + 1:exc.index(")")]
         with suppress(TypeError, SyntaxError, ValueError):
             s = ast.literal_eval(s)
@@ -1563,6 +1568,8 @@ class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContext
             x = self[i]
             if x:
                 yield x
+            else:
+                break
             i += 1
 
     def __getattr__(self, k):
@@ -1597,6 +1604,40 @@ class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContext
                     self.high += self.BUF
         return self.buffer.get(k, b"")
 
+
+class Stream(io.IOBase):
+
+    BUF = 262144
+    resp = None
+
+    def __init__(self, url):
+        self.url = url
+        self.buflen = 0
+        self.buf = io.BytesIO()
+        self.reset()
+        self.refill()
+
+    def reset(self):
+        if self.resp:
+            with suppress():
+                self.resp.close()
+        self.resp = requests.get(url, stream=True)
+        self.iter = self.resp.iter_content(self.BUF)
+
+    def refill(self):
+        att = 0
+        while self.buflen < self.BUF * 4:
+            try:
+                self.buf.write(next(self.iter))
+            except StopIteration:
+                return
+            except:
+                if att > 16:
+                    raise
+                att += 1
+                self.reset()
+
+
 # Manages both sync and async get requests.
 class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, collections.abc.Callable):
 
@@ -1614,10 +1655,10 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             async with getattr(self.session, method)(url, headers=headers, data=data) as resp:
                 if resp.status >= 400:
                     data = await resp.read()
-                    raise ConnectionError(f"Error {resp.status}", data.decode("utf-8", "replace"))
+                    raise ConnectionError(f"Error {resp.status}", url, as_str(data))
                 data = await resp.read()
                 if decode:
-                    return data.decode("utf-8", "replace")
+                    return as_str(data)
                 return data
 
     def __call__(self, url, headers={}, files=None, data=None, raw=False, timeout=8, method="get", decode=False, bypass=True, aio=False):
@@ -1631,13 +1672,13 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         with self.semaphore:
             with getattr(requests, method)(url, headers=headers, files=files, data=data, stream=True, timeout=timeout) as resp:
                 if resp.status_code >= 400:
-                    raise ConnectionError(f"Error {resp.status_code}", resp.text)
+                    raise ConnectionError(f"Error {resp.status_code}", url, resp.text)
                 if raw:
                     data = resp.raw.read()
                 else:
                     data = resp.content
                 if decode:
-                    return data.decode("utf-8", "replace")
+                    return as_str(data)
                 return data
 
     def __exit__(self, *args):
@@ -1692,7 +1733,7 @@ TIMEZONES = cdict()
 def load_timezones():
     with tracebacksuppressor():
         with open("misc/timezones.txt", "rb") as f:
-            data = f.read().decode("utf-8", "replace")
+            data = as_str(f.read())
             for line in data.splitlines():
                 info = line.split("\t")
                 abb = info[0].casefold()
@@ -1734,7 +1775,7 @@ def as_timezone(tz):
 
 def timezone_repr(tz):
     if tz in ZONES:
-        return " ".join(w.capitalize() for w in tz.split())
+        return capwords(tz)
     return tz.upper()
 
 create_future_ex(load_timezones, priority=True)
@@ -2071,7 +2112,7 @@ class __logPrinter:
                 try:
                     f.write(b)
                 except TypeError:
-                    f.write(b.decode("utf-8", "replace"))
+                    f.write(as_str(b))
         except:
             sys.__stdout__.write(traceback.format_exc())
     
@@ -2127,7 +2168,7 @@ class __logPrinter:
         return sys.__stdout__.write(out)
 
     def write(self, *args, end="", **kwargs):
-        args2 = [arg if type(arg) is str else arg.decode("utf-8", "replace") for arg in args]
+        args2 = [as_str(arg) for arg in args]
         return self.__call__(*args2, end=end, **kwargs)
 
     read = lambda self, *args, **kwargs: bytes()

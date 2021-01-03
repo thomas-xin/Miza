@@ -69,7 +69,7 @@ def get_duration(filename):
             print_exc()
     if not resp:
         return None
-    s = resp.decode("utf-8", "replace")
+    s = as_str(resp)
     with tracebacksuppressor(ValueError):
         i = s.index("Duration: ")
         d = s[i + 10:]
@@ -107,7 +107,7 @@ def get_best_icon(entry):
 def get_best_audio(entry):
     with suppress(KeyError):
         return entry["stream"]
-    best = -1
+    best = -inf
     try:
         fmts = entry["formats"]
     except KeyError:
@@ -115,7 +115,7 @@ def get_best_audio(entry):
     try:
         url = entry["webpage_url"]
     except KeyError:
-        url = entry["url"]
+        url = entry.get("url")
     replace = True
     for fmt in fmts:
         q = fmt.get("abr", 0)
@@ -124,9 +124,7 @@ def get_best_audio(entry):
         vcodec = fmt.get("vcodec", "none")
         if vcodec not in (None, "none"):
             q -= 1
-        u = fmt["url"]
-        if type(u) is bytes:
-            u = u.decode("utf-8", "replace")
+        u = as_str(fmt["url"])
         if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
             replace = False
         if q > best or replace:
@@ -142,15 +140,17 @@ def get_best_audio(entry):
             while True:
                 search = b'<Representation id="'
                 resp = resp[resp.index(search) + len(search):]
-                f_id = resp[:resp.index(b'"')].decode("utf-8")
+                f_id = as_str(resp[:resp.index(b'"')])
                 search = b"><BaseURL>"
                 resp = resp[resp.index(search) + len(search):]
-                stream = resp[:resp.index(b'</BaseURL>')].decode("utf-8")
+                stream = as_str(resp[:resp.index(b'</BaseURL>')])
                 fmt = cdict(youtube_dl.extractor.youtube.YoutubeIE._formats[f_id])
                 fmt.url = stream
                 fmts.append(fmt)
         entry["formats"] = fmts
         return get_best_audio(entry)
+    if not url:
+        raise KeyError("URL not found.")
     return url
 
 
@@ -275,7 +275,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
             self.queue = AudioQueue()
             self.queue._init_(auds=self)
             self.semaphore = Semaphore(1, 4, rate_limit=1 / 8)
-            self.announcer = Semaphore(1, 2, rate_limit=1 / 3)
+            self.announcer = Semaphore(1, 1, rate_limit=1 / 3)
             if not bot.is_trusted(getattr(channel, "guild", None)):
                 self.queue.maxitems = 8192
             bot.data.audio.players[vc.guild.id] = self
@@ -476,8 +476,9 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
                                     cnt = c
                                     ch = channel
                         if ch:
-                            await_fut(vc.move_to(ch))
-                            self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"))
+                            with tracebacksuppressor(SemaphoreOverflowError):
+                                await_fut(vc.move_to(ch))
+                                self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"), sync=True)
         else:
             self.timeout = utc()
         if m.voice is not None:
@@ -1055,6 +1056,8 @@ def select_and_convert(stream):
 
 # Represents a cached audio file in opus format. Executes and references FFmpeg processes loading the file.
 class AudioFile:
+
+    live = False
     
     def __init__(self, fn, stream=None):
         self.file = fn
@@ -1076,9 +1079,14 @@ class AudioFile:
         classname = classname[classname.index("'") + 1:]
         return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>"
     
-    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None):
+    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False):
+        if live:
+            self.loading = self.buffered = self.loaded = True
+            self.live = self.stream = stream
+            self.proc = None
+            return self
         if self.loading and not force:
-            return
+            return self
         if stream is not None:
             self.stream = stream
         stream = self.stream
@@ -1089,7 +1097,7 @@ class AudioFile:
         cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
         if "https://cf-hls-media.sndcdn.com/" not in stream:
             with suppress():
-                fmt = subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream]).decode("utf-8", "replace").strip()
+                fmt = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream])).strip()
                 if fmt == "opus":
                     cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
         self.proc = None
@@ -1104,7 +1112,7 @@ class AudioFile:
             while fl < 4096:
                 with delay(0.1):
                     if not self.proc.is_running():
-                        err = self.proc.stderr.read().decode("utf-8", "replace")
+                        err = as_str(self.proc.stderr.read())
                         if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err or "Server returned 403 Forbidden" in err):
                             with tracebacksuppressor:
                                 if "https://cf-hls-media.sndcdn.com/" in stream:
@@ -1148,26 +1156,27 @@ class AudioFile:
 
     # Update event run on all cached files
     def update(self):
-        # Newly loaded files have their duration estimates copied to all queue entries containing them
-        if self.loaded:
-            if not self.wasfile:
-                dur = self.duration()
-                if dur is not None:
-                    for e in self.assign:
-                        e["duration"] = dur
-                    self.assign.clear()
-        # Check when file has been fully loaded
-        elif self.buffered and not self.proc.is_running():
-            if not self.loaded:
-                self.loaded = True
-                if not is_url(self.stream):
-                    retry(os.remove, self.stream, attempts=3, delay=0.5)
-                try:
-                    fl = os.path.getsize("cache/" + self.file)
-                except FileNotFoundError:
-                    fl = 0
-                # print(self.file, "loaded", fl)
-        # Touch file if file is currently in use
+        if not self.live:
+            # Newly loaded files have their duration estimates copied to all queue entries containing them
+            if self.loaded:
+                if not self.wasfile:
+                    dur = self.duration()
+                    if dur is not None:
+                        for e in self.assign:
+                            e["duration"] = dur
+                        self.assign.clear()
+            # Check when file has been fully loaded
+            elif self.buffered and not self.proc.is_running():
+                if not self.loaded:
+                    self.loaded = True
+                    if not is_url(self.stream):
+                        retry(os.remove, self.stream, attempts=3, delay=0.5)
+                    try:
+                        fl = os.path.getsize("cache/" + self.file)
+                    except FileNotFoundError:
+                        fl = 0
+                    # print(self.file, "loaded", fl)
+            # Touch file if file is currently in use
         if self.readers:
             self.ensure_time()
             return
@@ -1206,23 +1215,28 @@ class AudioFile:
     # Destroys the file object, killing associated FFmpeg process and removing from cache.
     def destroy(self):
         self.expired = True
-        if self.proc.is_running():
+        if self.proc and self.proc.is_running():
             with suppress():
                 self.proc.kill()
         with suppress():
             with self.semaphore:
-                retry(os.remove, "cache/" + self.file, attempts=8, delay=5, exc=(FileNotFoundError,))
+                if not self.live:
+                    retry(os.remove, "cache/" + self.file, attempts=8, delay=5, exc=(FileNotFoundError,))
                 # File is removed from cache data
                 ytdl.cache.pop(self.file, None)
                 # print(self.file, "deleted.")
 
     # Creates a reader, selecting from direct opus file, single piped FFmpeg, or double piped FFmpeg.
     def create_reader(self, pos=0, auds=None):
-        if not os.path.exists("cache/" + self.file):
-            t = utc()
-            while utc() - t < 10 and not self.stream:
-                time.sleep(0.1)
-            self.load(force=True)
+        if self.live:
+            source = self.live
+        else:
+            source = "cache/" + self.file
+            if not os.path.exists(source):
+                t = utc()
+                while utc() - t < 10 and not self.stream:
+                    time.sleep(0.1)
+                self.load(force=True)
         stats = auds.stats
         auds.reverse = stats.speed < 0
         if auds.speed < 0.005:
@@ -1235,7 +1249,7 @@ class AudioFile:
             raise OverflowError("Speed setting out of range.")
         # Construct FFmpeg options
         options = auds.construct_options(full=False)
-        if options or auds.reverse or pos or auds.stats.bitrate != 1966.08:
+        if options or auds.reverse or pos or auds.stats.bitrate != 1966.08 or self.live:
             args = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
             if pos:
                 arg = "-to" if auds.reverse else "-ss"
@@ -1244,7 +1258,7 @@ class AudioFile:
             if self.loaded:
                 buff = False
                 args.insert(1, "-nostdin")
-                args.append("cache/" + self.file)
+                args.append(source)
             else:
                 buff = True
                 args.append("pipe:0")
@@ -1260,7 +1274,9 @@ class AudioFile:
                 if options:
                     args.extend(options)
             else:
-                args.extend(("-f", "opus", "-c:a", "copy"))
+                args.extend(("-f", "opus"))
+                if not self.live:
+                    args.extend(("-c:a", "copy"))
             args.append("pipe:1")
             key = auds.vc.guild.id
             self.readers[key] = True
@@ -1280,7 +1296,7 @@ class AudioFile:
         return self.open()
 
     # Audio duration estimation: Get values from file if possible, otherwise URL
-    duration = lambda self: self.dur if getattr(self, "dur", None) is not None else set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded else get_duration(self.stream), ignore=True)
+    duration = lambda self: inf if self.live else self.dur if getattr(self, "dur", None) is not None else set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded else get_duration(self.stream), ignore=True)
 
 
 # Audio reader for fully loaded files. FFmpeg with single pipe for output.
@@ -1289,6 +1305,7 @@ class LoadedAudioReader(discord.AudioSource):
     def __init__(self, file, args, callback=None):
         self.closed = False
         self.advanced = False
+        self.args = args
         self.proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
         self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
         self.file = file
@@ -1299,11 +1316,17 @@ class LoadedAudioReader(discord.AudioSource):
         if self.buffer:
             b, self.buffer = self.buffer, None
             return b
-        return next(self.packet_iter)
+        for att in range(16):
+            try:
+                return next(self.packet_iter)
+            except OSError:
+                self.proc = psutil.Popen(self.args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+                self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
     
     def start(self):
         self.buffer = None
-        self.buffer = self.read()
+        with tracebacksuppressor():
+            self.buffer = self.read()
         return self
 
     def close(self, *void1, **void2):
@@ -1361,7 +1384,8 @@ class BufferedAudioReader(discord.AudioSource):
         # Run loading loop in parallel thread obviously
         create_future_ex(self.run, timeout=86400)
         self.buffer = None
-        self.buffer = self.read()
+        with tracebacksuppressor():
+            self.buffer = self.read()
         return self
 
     def close(self):
@@ -1433,7 +1457,7 @@ class AudioDownloader:
                 resp = resp[resp.rindex(search) + len(search):]
                 search = b";sid='"
                 resp = resp[resp.index(search) + len(search):]
-                self.keepvid_token = resp[:resp.index(b"';</script>")].decode("utf-8", "replace")
+                self.keepvid_token = as_str(resp[:resp.index(b"';</script>")])
 
     # Gets data from yt-download.org, keepv.id, or y2mate.guru, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def extract_backup(self, url):
@@ -1451,12 +1475,12 @@ class AudioDownloader:
             resp = Request(yt_url, timeout=12)
             search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
             resp = resp[resp.index(search) + len(search):]
-            thumbnail = resp[:resp.index(b'"')].decode("utf-8", "replace")
+            thumbnail = as_str(resp[:resp.index(b'"')])
             search = b'<h2 class="text-lg text-teal-600 font-bold m-2 text-center">'
             resp = resp[resp.index(search) + len(search):]
-            title = html_decode(resp[:resp.index(b"</h2>")].decode("utf-8", "replace"))
+            title = html_decode(as_str(resp[:resp.index(b"</h2>")]))
             resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp3/192'.encode("utf-8")) + 9:]
-            stream = resp[:resp.index(b'"')].decode("utf-8", "replace")
+            stream = as_str(resp[:resp.index(b'"')])
             resp = resp[:resp.index(b"</a>")]
             search = b'<div class="text-shadow-1">'
             fs = parse_fs(resp[resp.rindex(search) + len(search):resp.rindex(b"</div>")])
@@ -1490,10 +1514,10 @@ class AudioDownloader:
             )
             search = b'<h2 class="mb-3">'
             resp = resp[resp.index(search) + len(search):]
-            title = html_decode(resp[:resp.index(b"</h3>")].decode("utf-8", "replace"))
+            title = html_decode(as_str(resp[:resp.index(b"</h3>")]))
             search = b'<img src="'
             resp = resp[resp.index(search) + len(search):]
-            thumbnail = resp[:resp.index(b'"')].decode("utf-8", "replace")
+            thumbnail = as_str(resp[:resp.index(b'"')])
             entry = {
                 "formats": [],
                 "thumbnail": thumbnail,
@@ -1505,7 +1529,7 @@ class AudioDownloader:
                 resp = resp[resp.index(search) + len(search):]
                 search = b"Duration: "
                 resp = resp[resp.index(search) + len(search):]
-                entry["duration"] = dur = time_parse(resp[:resp.index(b"<br><br>")].decode("utf-8", "replace"))
+                entry["duration"] = dur = time_parse(as_str(resp[:resp.index(b"<br><br>")]))
             search = b"</a></td></tr></tbody></table><h3>Audio</h3>"
             resp = resp[resp.index(search) + len(search):]
             with suppress(ValueError):
@@ -1716,7 +1740,7 @@ class AudioDownloader:
             if type(ex) is not youtube_dl.DownloadError or self.ydl_errors(s):
                 try:
                     entries = self.extract_backup(url)
-                except youtube_dl.DownloadError:
+                except (TypeError, youtube_dl.DownloadError):
                     raise FileNotFoundError("Unable to fetch audio data.")
             else:
                 raise
@@ -1754,13 +1778,13 @@ class AudioDownloader:
                 if is_url(url):
                     try:
                         return self.extract_backup(url)
-                    except youtube_dl.DownloadError:
+                    except (TypeError, youtube_dl.DownloadError):
                         raise FileNotFoundError("Unable to fetch audio data.")
             raise
 
     # Extracts info from a URL or search, adjusting accordingly.
     def extract_info(self, item, count=1, search=False, mode=None):
-        if mode or search and not item.startswith("ytsearch:") and not is_url(item):
+        if (mode or search) and not item.startswith("ytsearch:") and not is_url(item):
             if count == 1:
                 c = ""
             else:
@@ -1901,14 +1925,24 @@ class AudioDownloader:
                     if force or len(entries) <= 1:
                         for entry in entries:
                             # Extract full data if playlist only contains 1 item
-                            data = self.extract_from(entry["url"])
-                            temp = {
-                                "name": data["title"],
-                                "url": data["webpage_url"],
-                                "duration": float(data["duration"]),
-                                "stream": get_best_audio(resp),
-                                "icon": get_best_icon(resp),
-                            }
+                            try:
+                                data = self.extract_from(entry["url"])
+                            except KeyError:
+                                temp = {
+                                    "name": resp["title"],
+                                    "url": resp["webpage_url"],
+                                    "duration": inf,
+                                    "stream": get_best_audio(entry),
+                                    "icon": get_best_icon(entry),
+                                }
+                            else:
+                                temp = {
+                                    "name": data["title"],
+                                    "url": data["webpage_url"],
+                                    "duration": float(data["duration"]),
+                                    "stream": get_best_audio(resp),
+                                    "icon": get_best_icon(resp),
+                                }
                             output.append(cdict(temp))
                     else:
                         for i, entry in enumerate(entries):
@@ -2140,7 +2174,7 @@ class AudioDownloader:
                 stream = entry.get("stream")
                 if stream in (None, "none"):
                     raise FileNotFoundError("Unable to locate appropriate file stream.")
-            f.load(stream, check_fmt=entry.get("duration") is None, webpage_url=entry["url"])
+            f.load(stream, check_fmt=entry.get("duration") is None, webpage_url=entry["url"], live=entry.get("duration") and not entry["duration"] < inf)
             # Assign file duration estimate to queue entry
             f.assign.append(entry)
             entry["stream"] = stream
@@ -2265,7 +2299,7 @@ class AudioDownloader:
                 i.update(it)
             except:
                 i.url = ""
-                print_exc()
+                print_exc(item)
                 return False
         return True
 
@@ -2550,7 +2584,7 @@ class Queue(Command):
         if reaction is None:
             for react in self.directions:
                 async with delay(0.5):
-                    create_task(message.add_reaction(react.decode("utf-8")))
+                    create_task(message.add_reaction(as_str(react)))
 
 
 class Playlist(Command):
@@ -2676,7 +2710,7 @@ class Playlist(Command):
         if reaction is None:
             for react in self.directions:
                 async with delay(0.5):
-                    create_task(message.add_reaction(react.decode("utf-8")))
+                    create_task(message.add_reaction(as_str(react)))
         
 
 class Connect(Command):
@@ -3462,6 +3496,204 @@ class VoiceNuke(Command):
             return italics(css_md(f"Successfully removed all users from voice channels in {sqr_md(guild)}.")), 1
 
 
+class Radio(Command):
+    name = ["FM"]
+    description = "Searches for a radio station livestream on http://worldradiomap.com that can be played on ⟨MIZA⟩."
+    usage = "<0:country>? <2:state>? <1:city>?"
+    rate_limit = (2, 6)
+    slash = True
+    countries = fcdict()
+
+    def country_repr(self, c):
+        out = io.StringIO()
+        start = None
+        for w in c.split("_"):
+            if len(w) > 1:
+                if start:
+                    out.write("_")
+                if len(w) > 3 or not start:
+                    if len(w) < 3:
+                        out.write(w.upper())
+                    else:
+                        out.write(w.capitalize())
+                else:
+                    out.write(w.lower())
+            else:
+                out.write(w.upper())
+            start = True
+        out.seek(0)
+        return out.read().strip("_")
+
+    def get_countries(self):
+        with tracebacksuppressor:
+            resp = Request("http://worldradiomap.com", timeout=24)
+            search = b'<option value="selector/_blank.htm">- Select a country -</option>'
+            resp = resp[resp.index(search) + len(search):]
+            resp = resp[:resp.index(b"</select>")]
+            with suppress(ValueError):
+                while True:
+                    search = b'<option value="'
+                    resp = resp[resp.index(search) + len(search):]
+                    search = b'">'
+                    href = as_str(resp[:resp.index(search)])
+                    if not href.startswith("http"):
+                        href = "http://worldradiomap.com/" + href.lstrip("/")
+                    if href.endswith(".htm"):
+                        href = href[:-4]
+                    resp = resp[resp.index(search) + len(search):]
+                    country = single_space(as_str(resp[:resp.index(b"</option>")]).replace(".", " ")).replace(" ", "_")
+                    try:
+                        self.countries[country].url = href
+                    except KeyError:
+                        self.countries[country] = cdict(url=href, cities=fcdict(), states=False)
+                    data = self.countries[country]
+                    alias = href.rsplit("/", 1)[-1].split("_", 1)[-1]
+                    self.countries[alias] = data
+
+                    def get_cities(country):
+                        resp = Request(country.url, decode=True)
+                        search = '<img src="'
+                        resp = resp[resp.index(search) + len(search):]
+                        icon, resp = resp.split('"', 1)
+                        icon = icon.replace("../", "http://worldradiomap.com/")
+                        country.icon = icon
+                        search = '<option selected value="_blank.htm">- Select a city -</option>'
+                        try:
+                            resp = resp[resp.index(search) + len(search):]
+                        except ValueError:
+                            search = '<option selected value="_blank.htm">- State -</option>'
+                            resp = resp[resp.index(search) + len(search):]
+                            country.states = True
+                            with suppress(ValueError):
+                                while True:
+                                    search = '<option value="'
+                                    resp = resp[resp.index(search) + len(search):]
+                                    search = '">'
+                                    href = as_str(resp[:resp.index(search)])
+                                    if not href.startswith("http"):
+                                        href = "http://worldradiomap.com/selector/" + href
+                                    if href.endswith(".htm"):
+                                        href = href[:-4]
+                                    search = "<!--"
+                                    resp = resp[resp.index(search) + len(search):]
+                                    city = single_space(resp[:resp.index("-->")].replace(".", " ")).replace(" ", "_")
+                                    country.cities[city] = cdict(url=href, cities=fcdict(), icon=icon, states=False, get_cities=get_cities)
+                        else:
+                            resp = resp[:resp.index("</select>")]
+                            with suppress(ValueError):
+                                while True:
+                                    search = '<option value="'
+                                    resp = resp[resp.index(search) + len(search):]
+                                    search = '">'
+                                    href = as_str(resp[:resp.index(search)])
+                                    if href.startswith("../"):
+                                        href = "http://worldradiomap.com/" + href[3:]
+                                    if href.endswith(".htm"):
+                                        href = href[:-4]
+                                    resp = resp[resp.index(search) + len(search):]
+                                    city = single_space(resp[:resp.index("</option>")].replace(".", " ")).replace(" ", "_")
+                                    country.cities[city] = href
+                        return country
+                    
+                    data.get_cities = get_cities
+
+        return self.countries
+
+    async def __call__(self, bot, channel, message, args, **void):
+        if not self.countries:
+            await create_future(self.get_countries)
+        path = deque()
+        if not args:
+            fields = msdict()
+            for country in self.countries:
+                if len(country) > 2:
+                    fields.add(country[0].upper(), self.country_repr(country))
+            return bot.send_as_embeds(channel, title="Available countries", fields={k: "\n".join(v) for k, v in fields.items()}, author=get_author(bot.user), reference=message)
+        c = args.pop(0)
+        if c not in self.countries:
+            await create_future(self.get_countries)
+            if c not in self.countries:
+                raise LookupError(f"Country {c} not found.")
+        path.append(c)
+        country = self.countries[c]
+        if not country.cities:
+            await create_future(country.get_cities, country)
+        if not args:
+            fields = msdict()
+            desc = deque()
+            for city in country.cities:
+                desc.append(self.country_repr(city))
+            t = "states" if country.states else "cities"
+            return bot.send_as_embeds(channel, title=f"Available {t} in {self.country_repr(c)}", thumbnail=country.icon, description="\n".join(desc), author=get_author(bot.user), reference=message)
+        c = args.pop(0)
+        if c not in country.cities:
+            await create_future(country.get_cities, country)
+            if c not in country.cities:
+                raise LookupError(f"City/State {c} not found.")
+        path.append(c)
+        city = country.cities[c]
+        if type(city) is not str:
+            state = city
+            if not state.cities:
+                await create_future(state.get_cities, state)
+            if not args:
+                fields = msdict()
+                desc = deque()
+                for city in state.cities:
+                    desc.append(self.country_repr(city))
+                return bot.send_as_embeds(channel, title=f"Available cities in {self.country_repr(c)}", thumbnail=country.icon, description="\n".join(desc), author=get_author(bot.user), reference=message)
+            c = args.pop(0)
+            if c not in state.cities:
+                await create_future(state.get_cities, state)
+                if c not in state.cities:
+                    raise LookupError(f"City {c} not found.")
+            path.append(c)
+            city = state.cities[c]
+        resp = await Request(city, aio=True)
+        title = "Radio stations in " + ", ".join(self.country_repr(c) for c in reversed(path)) + ", by frequency (MHz)"
+        fields = deque()
+        search = b"<div class=exp>Click on the radio station name to listen online"
+        resp = as_str(resp[resp.index(search) + len(search):resp.index(b"</p></div><!--end rightcontent-->")])
+        for section in resp.split("<td class=tr31><b>")[1:]:
+            scale = section[section.index("</b>,") + 5:section.index("Hz</td>")].upper()
+            coeff = 0.000001
+            if "M" in scale:
+                coeff = 1
+            elif "K" in scale:
+                coeff = 0.001
+            with tracebacksuppressor:
+                while True:
+                    search = "<td class=freq>"
+                    search2 = "<td class=dxfreq>"
+                    i = j = inf
+                    with suppress(ValueError):
+                        i = section.index(search) + len(search)
+                    with suppress(ValueError):
+                        j = section.index(search2) + len(search2)
+                    if i > j:
+                        i = j
+                    if type(i) is not int:
+                        break
+                    section = section[i:]
+                    freq = round_min(round(float(section[:section.index("<")].replace("&nbsp;", "").strip()) * coeff, 6))
+                    field = [freq, ""]
+                    curr, section = section.split("</tr>", 1)
+                    for station in regexp('(?:<td class=(?:dx)?fsta2?>|\s{2,})<a href="').split(curr)[1:]:
+                        if field[1]:
+                            field[1] += "\n"
+                        href, station = station.split('"', 1)
+                        if not href.startswith("http"):
+                            href = "http://worldradiomap.com/" + href.lstrip("/")
+                            if href.endswith(".htm"):
+                                href = href[:-4]
+                        search = "class=station>"
+                        station = station[station.index(search) + len(search):]
+                        name = station[:station.index("<")]
+                        field[1] += f"[{name.strip()}]({href.strip()})"
+                    fields.append(field)
+        return bot.send_as_embeds(channel, title=title, thumbnail=country.icon, fields=sorted(fields), author=get_author(bot.user), reference=message)
+
+
 # This whole thing is a mess, I can't be bothered cleaning this up lol
 class Player(Command):
     server_only = True
@@ -3490,7 +3722,6 @@ class Player(Command):
     usage = "<enable{?e}|disable{?d}|controllable{?c}>*"
     flags = "cdez"
     rate_limit = (2, 7)
-    slash = True
 
     async def showCurr(self, auds):
         q = auds.queue
@@ -3613,7 +3844,7 @@ class Player(Command):
         if reaction is None and auds.player.type:
             for b in self.buttons:
                 async with delay(0.5):
-                    create_task(message.add_reaction(b.decode("utf-8")))
+                    create_task(message.add_reaction(as_str(b)))
         else:
             if not auds.player.type:
                 emoji = bytes()
@@ -3990,7 +4221,7 @@ class Download(Command):
         desc += "```*"
         # Encode URL list into bytes and then custom base64 representation, hide in code box header
         url_bytes = bytes(repr([e["url"] for e in res]), "utf-8")
-        url_enc = bytes2b64(url_bytes, True).decode("utf-8", "replace")
+        url_enc = as_str(bytes2b64(url_bytes, True))
         vals = f"{user.id}_{len(res)}_{fmt}_{int(bool(a))}_{start}_{end}"
         msg = "*```" + "\n" * ("z" in flags) + "callback-voice-download-" + vals + "-" + url_enc + "\n" + desc
         emb = discord.Embed(colour=rand_colour())
@@ -4014,7 +4245,7 @@ class Download(Command):
             # Add reaction numbers corresponding to search results for selection
             for i in range(len(res)):
                 async with delay(0.5):
-                    create_task(sent.add_reaction(str(i) + b"\xef\xb8\x8f\xe2\x83\xa3".decode("utf-8")))
+                    create_task(sent.add_reaction(str(i) + as_str(b"\xef\xb8\x8f\xe2\x83\xa3")))
         # await sent.add_reaction("❎")
 
     async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, argv, user, **void):
@@ -4027,10 +4258,10 @@ class Download(Command):
             if b"\xef\xb8\x8f\xe2\x83\xa3" in reaction:
                 async with ExceptionSender(channel):
                     # Make sure selected index is valid
-                    num = int(reaction.decode("utf-8")[0])
+                    num = int(as_str(reaction)[0])
                     if num <= int(spl[1]):
                         # Reconstruct list of URLs from hidden encoded data
-                        data = ast.literal_eval(b642bytes(argv, True).decode("utf-8", "replace"))
+                        data = ast.literal_eval(as_str(b642bytes(argv, True)))
                         url = data[num]
                         # Perform all these tasks asynchronously to save time
                         with discord.context_managers.Typing(channel):

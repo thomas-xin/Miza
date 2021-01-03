@@ -189,7 +189,7 @@ class IMG(Command):
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
-                create_task(message.add_reaction(react.decode("utf-8")))
+                create_task(message.add_reaction(as_str(react)))
                 await asyncio.sleep(0.5)
 
 
@@ -303,7 +303,7 @@ class React(Command):
         create_task(message.edit(content=None, embed=emb))
         if reaction is None:
             for react in self.directions:
-                create_task(message.add_reaction(react.decode("utf-8")))
+                create_task(message.add_reaction(as_str(react)))
                 await asyncio.sleep(0.5)
 
 

@@ -207,7 +207,7 @@ neko_tags = {
     "les": True,
     "wallpaper": True,
     "lewdk": True,
-    "ngif": False,
+    "ngif": True,
     "tickle": False,
     "lewd": True,
     "feed": False,
@@ -256,7 +256,7 @@ neko_tags = {
     "goose": False,
     "baka": False,
     "cat": False,
-    "gif": False,
+    "gif": True,
     "woof": False,
     "404": 2,
 }

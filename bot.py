@@ -270,7 +270,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         with tracebacksuppressor:
             print("Generating website html...")
             resp = await Request("https://github.com/thomas-xin/Miza", aio=True)
-            description = resp[resp.index(b"<title>") + 7:resp.index(b"</title>")].split(b":", 1)[-1].decode("utf-8", "replace")
+            description = as_str(resp[resp.index(b"<title>") + 7:resp.index(b"</title>")].split(b":", 1)[-1])
             # <img src="{self.webserver}/static/avatar-rainbow.gif" class="hero-image">
             html = f"""<!DOCTYPE html>
 <html>
@@ -877,7 +877,7 @@ For those of us who use Miza as a regular utility, we can safely say that she is
             if guild is not None:
                 emoji = await guild.fetch_emoji(e_id)
             else:
-                raise discord.NotFound("Emoji not found.")
+                raise LookupError("Emoji not found.")
         self.cache.emojis[e_id] = emoji
         self.limit_cache("emojis")
         return emoji
@@ -1096,7 +1096,7 @@ For those of us who use Miza as a regular utility, we can safely say that she is
                 if not f:
                     f = filename if filename and not hasattr(file, "fp") else data
                 if type(f) in (bytes, bytearray, memoryview):
-                    f = f.decode("utf-8", "replace")
+                    f = as_str(f)
                 elif type(f) is not str:
                     f = str(f)
                 if "." in f:
@@ -2566,6 +2566,14 @@ For those of us who use Miza as a regular utility, we can safely say that she is
                 w = await self.ensure_webhook(channel, force=True)
                 async with w.semaphore:
                     message = await w.send(*args, wait=True, **kwargs)
+            except discord.HTTPException as ex:
+                if "400 Bad Request" in repr(ex):
+                    if "embeds" in kwargs:
+                        print(sum(len(e) for e in kwargs["embeds"]))
+                        for embed in kwargs["embeds"]:
+                            print(embed.to_dict())
+                    print(args, kwargs)
+                raise
         await self.seen(self.user, channel.guild, event="message", count=len(kwargs.get("embeds", (None,))), raw=f"Sending a message, {channel.guild}")
         if reacts:
             for react in reacts:
@@ -2647,10 +2655,7 @@ For those of us who use Miza as a regular utility, we can safely say that she is
             if emb.colour:
                 colour = colorsys.rgb_to_hsv(alist(raw2colour(emb.colour)) / 255)[0] * 1536
         if description is not None and type(description) is not str:
-            if type(description) in (bytes, bytearray):
-                description = description.decode("utf-8", "replace")
-            else:
-                description = str(description)
+            description = as_str(description)
         if not description and not fields and not thumbnail and not image and not images:
             return
         return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts, reference))
@@ -2764,6 +2769,8 @@ For those of us who use Miza as a regular utility, we can safely say that she is
             embeds = self.embed_senders[s_id]
             embs = deque()
             for emb in embeds:
+                if type(emb) is not discord.Embed:
+                    emb = discord.Embed.from_dict(emb)
                 # Send embeds in groups of up to 10, up to 6000 characters
                 if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
                     break
@@ -3036,6 +3043,16 @@ For those of us who use Miza as a regular utility, we can safely say that she is
             ack = delete
             ghost = True
 
+        class ExtendedMessage:
+
+            def __init__(self, message):
+                self.message = message
+
+            def __getattr__(self, k):
+                with suppress(AttributeError):
+                    return object.__getattribute__(self, k)
+                return getattr(object.__getattribute__(self, "message"), k)
+
         class LoadedMessage(discord.Message):
             pass
 
@@ -3122,6 +3139,7 @@ For those of us who use Miza as a regular utility, we can safely say that she is
         bot.UserGuild = UserGuild
         bot.GhostUser = GhostUser
         bot.GhostMessage = GhostMessage
+        bot.ExtendedMessage = ExtendedMessage
         bot.LoadedMessage = LoadedMessage
         bot.CachedMessage = CachedMessage
         bot.MessageCache = MessageCache
@@ -3468,6 +3486,7 @@ For those of us who use Miza as a regular utility, we can safely say that she is
                         message.guild = None
                     message.id = payload.message_id
                     message.author = await self.fetch_user(self.deleted_user)
+            self.add_message(self.ExtendedMessage(message))
             guild = message.guild
             if guild:
                 await self.send_event("_delete_", message=message)
@@ -3498,7 +3517,7 @@ For those of us who use Miza as a regular utility, we can safely say that she is
                         message.id = m_id
                         message.author = await self.fetch_user(self.deleted_user)
                     messages.add(message)
-            messages = sorted(messages, key=lambda m: m.id)
+            messages = sorted((self.add_message(self.ExtendedMessage(message)) for message in messages), key=lambda m: m.id)
             await self.send_event("_bulk_delete_", messages=messages)
             for message in messages:
                 guild = getattr(message, "guild", None)
@@ -3673,7 +3692,7 @@ def as_file(file, filename=None, ext=None, rename=True):
             filename = file.filename or filename
             file = fp
             if type(file) is bytes:
-                file = file.decode("utf-8", "replace")
+                file = as_str(file)
         else:
             fp.seek(0)
             filename = file.filename or filename
@@ -3717,7 +3736,7 @@ def webserver_communicate(bot):
                     break
                 if b == b"\n":
                     buf.seek(0)
-                    s = buf.read().strip(b"\x00").decode("utf-8", "replace")
+                    s = as_str(buf.read().strip(b"\x00"))
                     if s.startswith("~"):
                         create_task(bot.process_http_command(*s[1:].split("\x7f", 3)))
                     print(s)
