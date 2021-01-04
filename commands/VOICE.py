@@ -1554,8 +1554,7 @@ class AudioDownloader:
             excs.append(ex)
         try:
             self.other_x += 1
-            resp = Request("https://y2mate.guru/api/convert", decode=True, data={"url": webpage_url}, method="POST", timeout=12)
-            data = eval_json(resp)
+            data = Request("https://y2mate.guru/api/convert", data={"url": webpage_url}, method="POST", json=True, timeout=12)
             meta = data["meta"]
             entry = {
                 "formats": [
@@ -1585,8 +1584,7 @@ class AudioDownloader:
     def get_spotify_part(self, url):
         out = deque()
         self.spotify_x += 1
-        resp = Request(url, headers=self.spotify_header)
-        d = eval_json(resp)
+        d = Request(url, headers=self.spotify_header, json=True)
         with suppress(KeyError):
             d = d["tracks"]
         try:
@@ -1628,8 +1626,7 @@ class AudioDownloader:
     def get_youtube_part(self, url):
         out = deque()
         self.youtube_x += 1
-        resp = Request(url)
-        d = eval_json(resp)
+        d = Request(url, json=True)
         items = d["items"]
         total = d.get("pageInfo", {}).get("totalResults", 0)
         for item in items:

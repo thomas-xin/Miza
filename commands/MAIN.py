@@ -2036,16 +2036,16 @@ class UpdateFlavour(Database):
             with tracebacksuppressor:
                 if self.data.get(x) and len(self.data[x]) > 64 and xrand(2):
                     return choice(self.data[x])
-                data = await Request("https://www.affirmations.dev/", aio=True)
-                text = eval_json(data)["affirmation"].replace("`", "")
+                data = await Request("https://www.affirmations.dev/", json=True, aio=True)
+                text = data["affirmation"].replace("`", "")
                 out = f"\nAffirmation: `{text}`"
         elif i == 3:
             x = "geek_jokes"
             with tracebacksuppressor:
                 if self.data.get(x) and len(self.data[x]) > 64 and xrand(2):
                     return choice(self.data[x])
-                data = await Request("https://geek-jokes.sameerkumar.website/api", aio=True)
-                text = eval_json(data).replace("`", "")
+                data = await Request("https://geek-jokes.sameerkumar.website/api", json=True, aio=True)
+                text = data.replace("`", "")
                 out = f"\nGeek joke: `{text}`"
         else:
             x = "useless_facts"
@@ -2053,8 +2053,8 @@ class UpdateFlavour(Database):
                 if self.data.get(x) and len(self.data[x]) > 256 and xrand(2):
                     return choice(self.data[x])
                 if len(useless) < 128 and (not useless or random.random() > 0.75):
-                    data = await Request("https://www.uselessfacts.net/api/posts?d=" + str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date()), aio=True)
-                    factlist = [fact["title"].replace("`", "") for fact in eval_json(data) if "title" in fact]
+                    data = await Request("https://www.uselessfacts.net/api/posts?d=" + str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date()), json=True, aio=True)
+                    factlist = [fact["title"].replace("`", "") for fact in data if "title" in fact]
                     random.shuffle(factlist)
                     useless.clear()
                     for text in factlist:
@@ -2255,6 +2255,11 @@ class UpdateUsers(Database):
         self.data.get(user.id, EMPTY).pop("last_mention", None)
         if not loop:
             self.add_xp(user, getattr(command, "xp", xrand(6, 14)))
+
+    async def react_sparkle(self, message):
+        bot = self.bot
+        react = await bot.data.emojis.get("sparkles.gif")
+        return await message.add_reaction(react)
     
     def _send_(self, message, **void):
         user = message.author
@@ -2275,7 +2280,7 @@ class UpdateUsers(Database):
         if not xrand(1000):
             self.add_diamonds(user, points)
             points *= 1000
-            create_task(message.add_reaction("✨"))
+            create_task(self.react_sparkle(message))
             print(f"{user} has triggered the rare message bonus in {message.guild}!")
         else:
             self.add_gold(user, points)

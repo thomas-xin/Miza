@@ -1321,10 +1321,9 @@ class Cat(ImagePool, Command):
             x = 2
         if x:
             if x == 1 and alexflipnote_key:
-                resp = await Request("https://api.alexflipnote.dev/cats", headers={"Authorization": alexflipnote_key}, aio=True)
+                d = await Request("https://api.alexflipnote.dev/cats", headers={"Authorization": alexflipnote_key}, json=True, aio=True)
             else:
-                resp = await Request("https://api.thecatapi.com/v1/images/search", aio=True)
-            d = eval_json(resp)
+                d = await Request("https://api.thecatapi.com/v1/images/search", json=True, aio=True)
             if type(d) is list:
                 d = choice(d)
             url = d["file" if x == 1 and alexflipnote_key else "url"]
@@ -1348,10 +1347,9 @@ class Dog(ImagePool, Command):
             x = 2
         if x:
             if x == 1 and alexflipnote_key:
-                resp = await Request("https://api.alexflipnote.dev/dogs", headers={"Authorization": alexflipnote_key}, aio=True)
+                d = await Request("https://api.alexflipnote.dev/dogs", headers={"Authorization": alexflipnote_key}, json=True, aio=True)
             else:
-                resp = await Request("https://dog.ceo/api/breeds/image/random", aio=True)
-            d = eval_json(resp)
+                d = await Request("https://dog.ceo/api/breeds/image/random", json=True, aio=True)
             if type(d) is list:
                 d = choice(d)
             url = d["file" if x == 1 and alexflipnote_key else "message"]

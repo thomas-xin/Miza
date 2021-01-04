@@ -806,7 +806,7 @@ class Shop(Command):
     products = cdict(
         upgradeserver=cdict(
             name="Upgrade Server",
-            cost=[360, 34560],
+            cost=[240, 30720],
             description="Upgrades the server's privilege level, granting access to all command categories and reducing command cooldown.",
         ),
     )
@@ -857,8 +857,8 @@ class Shop(Command):
                 if product.name == "Upgrade Server":
                     if bot.is_trusted(guild):
                         return "```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers."
-                    bot.data.users.add_diamonds(-product.cost[0])
-                    bot.data.users.add_gold(-product.cost[-1])
+                    bot.data.users.add_diamonds(user, -product.cost[0])
+                    bot.data.users.add_gold(user, -product.cost[-1])
                     bot.data.trusted[guild.id] = True
                     return f"```{sqr_md(guild)} has been successfully elevated from 0 to 1 privilege level.```"
                 raise NotImplementedError("Target item has not yet been implemented.")

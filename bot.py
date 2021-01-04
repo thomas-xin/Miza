@@ -1229,7 +1229,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             caches = self.cache.values()
         for c in caches:
             while len(c) > limit:
-                c.pop(next(iter(c)))
+                with suppress(RuntimeError):
+                    c.pop(next(iter(c)))
     
     # Updates bot cache from the discord.py client cache.
     def update_from_client(self):
@@ -2023,7 +2024,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if not msg.startswith(check):
                     return
             while len(self.react_sem) > 65536:
-                self.react_sem.pop(next(iter(self.react_sem)))
+                with suppress(RuntimeError):
+                    self.react_sem.pop(next(iter(self.react_sem)))
             while utc() - self.react_sem.get(message.id, 0) < 30:
                 # Ignore if more than 2 reactions already queued for target message
                 if self.react_sem.get(message.id, 0) - utc() > 1:
@@ -2256,7 +2258,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                         d[u_id] = max(t, utc()) + w
                                         await asyncio.sleep(w)
                                     if len(d) >= 4096:
-                                        d.pop(next(iter(d)))
+                                        with suppress(RuntimeError):
+                                            d.pop(next(iter(d)))
                                     d[u_id] = max(t, utc())
                                 else:
                                     raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")

@@ -806,8 +806,7 @@ class Urban(Command):
             + argv.replace(" ", "%20")
         )
         with discord.context_managers.Typing(channel):
-            s = await Request(url, headers=self.header, timeout=_timeout, aio=True)
-            d = eval_json(s)
+            d = await Request(url, headers=self.header, timeout=_timeout, json=True, aio=True)
             l = d["list"]
             if not l:
                 raise LookupError(f"No results for {argv}.")

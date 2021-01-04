@@ -864,40 +864,74 @@ class UpdateDeviantArt(Database):
         base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?limit=24&username="
         attempts, successes = 0, 0
         for content, user in conts.items():
-            # "all" galleries require different URL options
-            if type(content) is str:
-                f_id = "&all_folder=true&mode=oldest"
-            else:
-                f_id = "&folderid=" + str(content)
-            items = {}
             with tracebacksuppressor:
-                url = base + user + f_id + "&offset="
-                for i in range(0, 13824, 24):
-                    req = url + str(i)
-                    # print(req)
-                    attempts += 1
-                    resp = await Request(req, timeout=16, aio=True)
-                    d = eval_json(resp)
-                    # Parse output from DA API
-                    for res in d["results"]:
-                        deviation = res["deviation"]
-                        media = deviation["media"]
-                        prettyName = media["prettyName"]
-                        orig = media["baseUri"]
-                        extra = ""
-                        token = "?token=" + media["token"][0]
-                        # Attempt to find largest available format for media
-                        for t in reversed(media["types"]):
-                            if t["t"].casefold() == "fullview":
-                                if "c" in t:
-                                    extra = "/" + t["c"].replace("<prettyName>", prettyName)
-                                    break
-                        image_url = orig + extra + token
-                        items[deviation["deviationId"]] = (deviation["url"], image_url, deviation["author"]["username"], deviation["author"]["usericon"])
-                    successes += 1
-                    if not d.get("hasMore", None):
-                        break
-                found[content] = items
+                # "all" galleries require different URL options
+                if type(content) is str:
+                    f_id = "&all_folder=true&mode=oldest"
+                else:
+                    f_id = "&folderid=" + str(content)
+                url = base + user + f_id
+                maxitems = 2147483647
+                r = 0
+                t = utc()
+                found = {}
+                futs = deque()
+                page = 24
+                with suppress(StopIteration):
+                    for i in range(2 + int(math.log2(maxitems / page))):
+                        curr = 1 << i
+                        search = url + f"&offset={curr * page}&limit={page}"
+                        futs.append((curr, create_task(Request(search, json=True, aio=True))))
+                        if i & 1:
+                            for x, fut in futs:
+                                resp = await fut
+                                if resp.get("results"):
+                                    found[x] = resp
+                                if not resp.get("hasMore"):
+                                    curr = x
+                                    raise StopIteration
+                        r += 1
+                check = 1 << max(0, i - 2)
+                while check > 4:
+                    x = curr - check
+                    search = url + f"&offset={x * page}&limit={page}"
+                    resp = await Request(search, json=True, aio=True)
+                    if resp.get("results"):
+                        found[x] = resp
+                    r += 1
+                    if not resp.get("hasMore"):
+                        curr = x
+                    check >>= 1
+                futs = deque()
+                for i in range(curr + 1):
+                    if i not in found:
+                        search = url + f"&offset={i * page}&limit={page}"
+                        futs.append((i, create_task(Request(search, json=True, aio=True))))
+                        r += 1
+                for x, fut in futs:
+                    resp = await fut
+                    if resp.get("results"):
+                        found[x] = resp
+                results = alist()
+                for i, resp in found.items():
+                    results.extend(resp.get("results", ()))
+                items = {}
+                for res in results:
+                    deviation = res["deviation"]
+                    media = deviation["media"]
+                    prettyName = media["prettyName"]
+                    orig = media["baseUri"]
+                    extra = ""
+                    token = "?token=" + media["token"][0]
+                    # Attempt to find largest available format for media
+                    for t in reversed(media["types"]):
+                        if t["t"].casefold() == "fullview":
+                            if "c" in t:
+                                extra = "/" + t["c"].replace("<prettyName>", prettyName)
+                                break
+                    image_url = orig + extra + token
+                    items[deviation["deviationId"]] = (deviation["url"], image_url, deviation["author"]["username"], deviation["author"]["usericon"])
+                    found[content] = items
         # if attempts:
         #     print(successes, "of", attempts, "DeviantArt requests executed successfully.")
         for c_id in tuple(self.data):

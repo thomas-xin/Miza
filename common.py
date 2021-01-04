@@ -1648,7 +1648,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         self.session = aiohttp.ClientSession(loop=eloop)
         self.semaphore = Semaphore(512, 256, delay=0.25)
 
-    async def aio_call(self, url, headers, files, data, method, decode):
+    async def aio_call(self, url, headers, files, data, method, decode=False, json=False):
         if files is not None:
             raise NotImplementedError("Unable to send multipart files asynchronously.")
         async with self.semaphore:
@@ -1656,23 +1656,27 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                 if resp.status >= 400:
                     data = await resp.read()
                     raise ConnectionError(f"Error {resp.status}", url, as_str(data))
+                if json:
+                    return await resp.json()
                 data = await resp.read()
                 if decode:
                     return as_str(data)
                 return data
 
-    def __call__(self, url, headers={}, files=None, data=None, raw=False, timeout=8, method="get", decode=False, bypass=True, aio=False):
+    def __call__(self, url, headers={}, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, aio=False):
         if bypass:
             if "user-agent" not in headers:
                 headers["User-Agent"] = f"Mozilla/5.{xrand(1, 10)}"
             headers["DNT"] = "1"
         method = method.casefold()
         if aio:
-            return create_task(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode), timeout=timeout))
+            return create_task(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode, json), timeout=timeout))
         with self.semaphore:
             with getattr(requests, method)(url, headers=headers, files=files, data=data, stream=True, timeout=timeout) as resp:
                 if resp.status_code >= 400:
                     raise ConnectionError(f"Error {resp.status_code}", url, resp.text)
+                if json:
+                    return resp.json()
                 if raw:
                     data = resp.raw.read()
                 else:
