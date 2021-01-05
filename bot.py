@@ -3763,12 +3763,12 @@ class SimulatedMessage:
 
     def __init__(self, bot, content, t, name, nick, recursive=True):
         self._state = bot._state
-        self.created_at = datetime.datetime.fromtimestamp(int(t) / 1000)
+        self.created_at = datetime.datetime.fromtimestamp(int(t) / 1e6)
         self.id = time_snowflake(self.created_at, high=True)
         self.content = content
         self.response = deque()
         if recursive:
-            author = self.__class__(bot, content, ip2int(name) + MIZA_EPOCH, name, nick, recursive=False)
+            author = self.__class__(bot, content, (ip2int(name) + MIZA_EPOCH) * 1000, name, nick, recursive=False)
             author.response = self.response
             author.message = self
         else:

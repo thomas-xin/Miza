@@ -872,12 +872,14 @@ class UpdateDeviantArt(Database):
                 else:
                     f_id = "&folderid=" + str(content)
                 url = base + user + f_id
+                # New binary search algorithm to improve search time for entire galleries
                 maxitems = 2147483647
                 r = 0
                 t = utc()
                 found = {}
                 futs = deque()
                 page = 24
+                # Begin with quaternary search (powers of 4) to estimate lowest power of 2 greater than or equal to gallery page count
                 with suppress(StopIteration):
                     for i in range(2 + int(math.log2(maxitems / page))):
                         curr = 1 << i
@@ -892,6 +894,7 @@ class UpdateDeviantArt(Database):
                                     curr = x
                                     raise StopIteration
                         r += 1
+                # Once the end has been reached, use binary search to estimate the page count again, being off by at most 8 pages
                 check = 1 << max(0, i - 2)
                 while check > 4:
                     x = curr - check
@@ -913,6 +916,7 @@ class UpdateDeviantArt(Database):
                     resp = await fut
                     if resp.get("results"):
                         found[x] = resp
+                # Collect all page results into a single list
                 results = alist()
                 for resp in found.values():
                     results.extend(resp.get("results", ()))

@@ -283,7 +283,7 @@ def command(content):
     resp = get_geo(ip)
     data = resp["data"]["geo"]
     tz = data["timezone"]
-    t = int(utc() * 1000)
+    t = ts_us()
     if " " not in content:
         content += " "
     RESPONSES[t] = fut = concurrent.futures.Future()

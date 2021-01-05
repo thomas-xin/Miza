@@ -1031,7 +1031,7 @@ __strans = "".maketrans(__smap)
 verify_search = lambda f: strip_acc(single_space(f.strip().translate(__strans)))
 # This reminds me of Perl - Smudge
 find_urls = lambda url: regexp("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+").findall(url)
-is_url = lambda url: regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$").findall(url)
+is_url = lambda url: regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+$").findall(url)
 is_discord_url = lambda url: regexp("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/").findall(url)
 is_tenor_url = lambda url: regexp("^https?:\\/\\/tenor.com(?:\\/view)?/[a-zA-Z0-9\\-_]+-[0-9]+").findall(url)
 is_imgur_url = lambda url: regexp("^https?:\\/\\/(?:[a-z]\\.)?imgur.com/[a-zA-Z0-9\\-_]+").findall(url)
@@ -1401,6 +1401,8 @@ async def _await_fut(fut, ret):
 
 # Blocking call that waits for a single asyncio future to complete, do *not* call from main asyncio loop
 def await_fut(fut, timeout=None):
+    if is_main_thread():
+        raise RuntimeError("This function must not be called from the main thread's asyncio loop.")
     ret = concurrent.futures.Future()
     create_task(_await_fut(fut, ret))
     return ret.result(timeout=timeout)
