@@ -1,0 +1,236 @@
+body {
+	background: white;
+	color: black;
+	scroll-behavior: smooth;
+	scroll-padding-top: 5rem;
+}
+
+#root {
+	display: flex;
+	align-items: stretch;
+	flex-direction: row;
+}
+
+.sidebar {
+	height: 100vh;
+	min-width: 400px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	position: sticky;
+	top: 0;
+	bottom: 0;
+	padding: 1rem;
+	box-shadow: -5px -5px 5px 5px rgb(0, 0, 0);
+	padding-left: 2rem;
+}
+
+main {
+	padding: 2rem;
+	width: calc(100vw - 420px);
+}
+
+main div h2::before {
+	content: "~";
+}
+
+.sidebar li::marker {
+	content: "";
+}
+
+.sidebar a {
+	color: inherit;
+}
+
+.sidebarCategory {
+	font-size: 1.5em;
+	font-family: Whitney;
+	font-weight: 600;
+	margin-top: 1em;
+}
+
+.sidebar li:not(.sidebarCategory) a::before {
+	content: "~";
+}
+.sidebar li {
+	height: 1.2em;
+}
+
+.command {
+	box-shadow: 0 0 5px 0 #00000085;
+	border-radius: 0.5rem;
+	padding: 1em;
+	margin-bottom: 2em;
+	position: relative;
+	padding-right: 5rem;
+}
+.command h2 {
+	font-size: 2em;
+	font-family: Whitney;
+	font-weight: 600;
+	margin-bottom: 0.5rem;
+}
+.command p {
+	font-size: 1.2rem;
+}
+.categoryHead {
+	font-size: 4em;
+	font-weight: 600;
+	margin: 2rem 0;
+	margin-top: 3rem;
+	text-transform: lowercase;
+}
+main a {
+	color: inherit;
+	text-decoration: underline;
+	text-decoration-color: rgba(0,0,0,0);
+	transition: text-decoration-color 150ms;
+}
+main a:hover {
+
+	text-decoration-color: rgba(0,0,0,0.3);
+	}
+.search {
+	width: 100%;
+	background: white;
+	color: inherit;
+	border: none;
+	border-radius: 0.5em;
+	font-size: 1.3em;
+	box-shadow: 0 0 5px 0 rgba(0,0,0,0.8);
+	margin: 0;
+	margin-top: 1rem;
+	padding: 0.5rem 1rem;
+}
+.searchHolder {
+	position: sticky;
+	top: 0rem;
+	background: white;
+	margin: 0 -1rem;
+	padding: 0 1rem;
+	z-index: 3;
+}
+main > h1 {
+	font-size: 5em;
+	margin-left: -0.05em; 
+	/* Character has padding in font, so I have to account for it to make things line up. */
+}
+main > h2 {
+	font-size: 1.3em;
+	margin-bottom: 0.3em;
+	/* Avoid clipping of letters that stretch down. */
+}
+
+a.back {
+	color: var(--text-link);
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.run {
+	position: absolute;
+	right: 0.5rem;
+	background: #7bff7b;
+	z-index: 2;
+	width: 3rem;
+	height: 3rem;
+	top: calc(50% - 1.5rem);
+	border-radius: 100%;
+	font-size: 2.2rem;
+	text-align: center;
+	line-height: 1.25em;
+	color: #353535;
+	padding-left: 0.1em;
+	text-decoration: none;
+	opacity: 0;
+	transition: opacity 150ms;
+}
+
+.command a.run:hover {
+	opacity: 1;
+	text-decoration: none;
+}
+
+.command:hover .run {
+	opacity: 0.3;
+}
+
+.command.active {
+	animation: yeahThatOne 1s;
+}
+ul > li > a.active {
+	color: #009fff;
+	font-weight: 600;
+}
+
+@keyframes yeahThatOne {
+	0% {
+		background: #00dbff88;
+	}
+	100% {
+		background: transparent;
+	}
+}
+
+.markup {
+	color: black;
+}
+
+.aliases {
+	font-family: monospace;
+	font-weight: 600;
+	box-shadow: 0.5em 12px 5px -11px #0000004d;
+	padding-bottom: 0.5em;
+	margin-bottom: 1em;
+	margin-left: -1em;
+	padding-left: 1em;
+}
+
+.command div.usage {
+	font-family: monospace;
+	font-size: 0.8em;
+	line-height: 1.2em;
+	margin-top: 0.5em;
+}
+
+.labeledInput {
+	display: flex;
+	align-items: center;
+	flex-direction: row;
+	font-size: 1em;
+}
+.labeledInput input[type="checkbox"]::before {
+	content: "✔";
+	font-size: 1.4em;
+	display: block;
+	width: 100%;
+	text-align: center;
+}
+.labeledInput input[type="checkbox"]:checked {
+	box-shadow: 0 0 1px 0 black;
+	color: black;
+}
+.labeledInput input[type="checkbox"]:not(:checked):hover {
+	box-shadow: 0 0 2px 0 black;
+}
+.labeledInput input[type="checkbox"]:active {
+	transform: translateY(1px);
+}
+.labeledInput input[type="checkbox"] {
+	background: none;
+	appearance: none;
+	width: 1.5em;
+	height: 1.5em;
+	border-radius: 0.3em;
+	box-shadow: 0 0 1px 0 #00000087;
+	display: flex;
+	align-items: center;
+	color: transparent;
+	transition: color 150ms, box-shadow 150ms, transform 150ms;
+	font-size: 1em;
+	cursor: pointer;
+}
+.labeledInput label {
+	user-select: none;
+	font-size: 1em;
+	margin-left: 0.5em;
+}

@@ -347,6 +347,7 @@ Use the <a href="{self.invite}">bot invite link</a> to invite her, and you will 
 The default prefix for a command is a ~ (tilde) character, followed by the name of the command (case-insensitive, with underscores optionally omitted), for example ~Hello, ~hello, or ~HELLO<br><br>\
 Commands may or may not require arguments, or input text after the command name. Some commands are able to take input from attached files or URL links (including Discord message links).<br>\
 To check the method of input for a particular command, use the ~Help command with said command's name as an argument.<br><br>\
+Optionally, most of miza's commands may be easily viewed and tested on the <a href="{self.webserver}/mizatlas">command atlas</a>.<br><br>\
 For any further questions or issues, read the documentation on <a href="{self.github}">GitHub</a>, or join the <a href="{self.rcc_invite}">Support Server</a>!
         </div>
         <script src="{self.webserver}/static/swiper.min.js"></script>
