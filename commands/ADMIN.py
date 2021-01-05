@@ -1442,7 +1442,7 @@ class UpdateMessageCache(Database):
                     reactions=reactions,
                     attachments=attachments,
                     embeds=embeds,
-                    edited_timestamp=str(message._edited_timestamp) if message._edited_timestamp else "",
+                    edited_timestamp=str(message._edited_timestamp) if getattr(message, "_edited_timestamp", None) else "",
                     type=getattr(message.type, "value", message.type),
                     pinned=message.pinned,
                     flags=message.flags.value,

@@ -2256,10 +2256,10 @@ class UpdateUsers(Database):
         if not loop:
             self.add_xp(user, getattr(command, "xp", xrand(6, 14)))
 
-    # async def react_sparkle(self, message):
-    #     bot = self.bot
-    #     react = await bot.data.emojis.get("sparkles.gif")
-    #     return await message.add_reaction(react)
+    async def react_sparkle(self, message):
+        bot = self.bot
+        react = await create_future(bot.data.emojis.get, "sparkles.gif")
+        return await message.add_reaction(react)
     
     def _send_(self, message, **void):
         user = message.author
@@ -2280,8 +2280,8 @@ class UpdateUsers(Database):
         if not xrand(1000):
             self.add_diamonds(user, points)
             points *= 1000
-            create_task(message.add_reaction("✨"))
-            # create_task(self.react_sparkle(message))
+            # create_task(message.add_reaction("✨"))
+            create_task(self.react_sparkle(message))
             print(f"{user} has triggered the rare message bonus in {message.guild}!")
         else:
             self.add_gold(user, points)
