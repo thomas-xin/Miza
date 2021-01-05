@@ -36,6 +36,7 @@ STATIC = {}
 TZCACHE = {}
 RESPONSES = {}
 
+
 @app.route("/static", methods=["DELETE"])
 def clearcache():
     ip = flask.request.remote_addr

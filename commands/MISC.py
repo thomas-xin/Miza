@@ -849,6 +849,7 @@ class UpdateDeviantArt(Database):
                         entries.pop(i)
                         self.update(c_id)
         except:
+            print(found)
             print_exc()
         else:
             bot.send_embeds(channel, embs)
@@ -860,7 +861,7 @@ class UpdateDeviantArt(Database):
             return
         self.time = inf
         conts = {i: a[i]["user"] for a in tuple(self.data.values()) for i in a}
-        found = {}
+        total = {}
         base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?limit=24&username="
         attempts, successes = 0, 0
         for content, user in conts.items():
@@ -913,7 +914,7 @@ class UpdateDeviantArt(Database):
                     if resp.get("results"):
                         found[x] = resp
                 results = alist()
-                for i, resp in found.items():
+                for resp in found.values():
                     results.extend(resp.get("results", ()))
                 items = {}
                 for res in results:
@@ -931,9 +932,9 @@ class UpdateDeviantArt(Database):
                                 break
                     image_url = orig + extra + token
                     items[deviation["deviationId"]] = (deviation["url"], image_url, deviation["author"]["username"], deviation["author"]["usericon"])
-                    found[content] = items
+                total[content] = items
         # if attempts:
         #     print(successes, "of", attempts, "DeviantArt requests executed successfully.")
         for c_id in tuple(self.data):
-            create_task(self.processPart(found, c_id))
+            create_task(self.processPart(total, c_id))
         self.time = utc()
