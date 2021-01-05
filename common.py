@@ -983,14 +983,14 @@ def to_png(url):
         url = str(url)
     if url.endswith("?size=1024"):
         url = url[:-10] + "?size=4096"
-    return url.replace(".webp", ".png")
+    return url.replace("/cdn.discordapp.com/", "/media.discordapp.net/").replace(".webp", ".png")
 
 def to_png_ex(url):
     if type(url) is not str:
         url = str(url)
     if url.endswith("?size=1024"):
         url = url[:-10] + "?size=256"
-    return url.replace(".webp", ".png")
+    return url.replace("/cdn.discordapp.com/", "/media.discordapp.net/").replace(".webp", ".png")
 
 
 # A translator to stip all characters from mentions.
