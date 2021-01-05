@@ -126,25 +126,28 @@ def clearcache():
 
 @app.route("/mizatlas/<path:filename>", methods=["GET"])
 def atlas(filename):
-    if filename == "run":
-        content = flask.request.args.get("command", "")
-        ip = flask.request.remote_addr
-        resp = get_geo(ip)
-        data = resp["data"]["geo"]
-        tz = data["timezone"]
-        t = ts_us()
-        if " " not in content:
-            content += " "
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        sys.__stderr__.write(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}\n")
-        j, after = fut.result(timeout=420)
-        RESPONSES.pop(t, None)
-        response = flask.Response(json.dumps(j), mimetype="application/json")
-        a = after - utc()
-        if a > 0:
-            response.headers["Retry-After"] = a
-        return response
-    data, mime = fetch_static("mizatlas/" + filename)
+    # if filename == "run":
+    #     content = flask.request.args.get("command", "")
+    #     ip = flask.request.remote_addr
+    #     resp = get_geo(ip)
+    #     data = resp["data"]["geo"]
+    #     tz = data["timezone"]
+    #     t = ts_us()
+    #     if " " not in content:
+    #         content += " "
+    #     RESPONSES[t] = fut = concurrent.futures.Future()
+    #     sys.__stderr__.write(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}\n")
+    #     j, after = fut.result(timeout=420)
+    #     RESPONSES.pop(t, None)
+    #     response = flask.Response(json.dumps(j), mimetype="application/json")
+    #     a = after - utc()
+    #     if a > 0:
+    #         response.headers["Retry-After"] = a
+    #     return response
+    try:
+        data, mime = fetch_static("mizatlas/" + filename)
+    except FileNotFoundError:
+        data, mime = fetch_static("mizatlas/index.html")
     return flask.Response(data, mimetype=mime)
 
 @app.route("/mizatlas", methods=["GET"])
