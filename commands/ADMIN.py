@@ -1392,6 +1392,8 @@ class UpdateMessageCache(Database):
             if type(data) is not dict:
                 data = {m["id"]: m for m in data}
             self.raws[fn] = data
+            if raw:
+                print(f"{len(data)} messages temporarily read from {fn}")
         if not raw:
             bot = self.bot
             i = 0
@@ -1407,7 +1409,6 @@ class UpdateMessageCache(Database):
                     time.sleep(0.1)
             print(f"{len(data)} messages successfully loaded from {fn}")
             return found
-        print(f"{len(data)} messages temporarily read from {fn}")
 
     def load_message(self, m_id):
         fn = self.get_fn(m_id)

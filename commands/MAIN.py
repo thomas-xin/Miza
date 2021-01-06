@@ -1877,9 +1877,15 @@ class UpdateMessageCount(Database):
             try:
                 add_message = self.bot.add_message
                 out = deque()
-                async for m in history:
-                    add_message(m)
-                    out.append(m)
+                if after is None:
+                    async for m in history:
+                        add_message(m)
+                        out.append(m)
+                else:
+                    async for m in history:
+                        if getattr(m, "created_at", None) and m.created_at > after:
+                            add_message(m)
+                            out.append(m)
                 return list(out)
             except discord.Forbidden:
                 return []
