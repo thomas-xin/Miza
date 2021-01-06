@@ -2126,7 +2126,39 @@ def to_frac(num, limit=2147483647):
 
 
 gcd = math.gcd
-lcm = lcm2 = math.lcm
+
+if sys.version_info[1] >= 9:
+    lcm = lcm2 = math.lcm
+else:
+    # Computes the lowest common multiple of two numbers.
+    def lcm2(x, y=1):
+        if x != y:
+            x = abs(x)
+            y = abs(y)
+            i = True
+            if x != int(x):
+                i = False
+                x = to_frac(x)[0]
+            if y != int(y):
+                i = False
+                y = to_frac(y)[0]
+            if i:
+                return x * y // gcd(x, y)
+            else:
+                return to_frac(x / y)[0]
+        return x
+
+    # Computes the lowest common multiple of numbers in an arbitrary amount of inputs.
+    def lcm(*x):
+        try:
+            while True:
+                x = [i for j in x for i in j]
+        except:
+            if 0 in x:
+                raise ValueError("Cannot find LCM of zero.")
+            while len(x) > 1:
+                x = [lcm2(x[i], x[-i - 1]) for i in range(ceil(len(x) / 2))]
+        return x[-1]
 
 def lcmRange(x):
     primes = generate_primes(1, x, -1)
