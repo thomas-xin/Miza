@@ -2228,7 +2228,7 @@ class AudioDownloader:
                     raise RuntimeError(*ex.args, resp.stderr)
                 raise ex
             # Re-estimate duration if file was successfully converted from org
-            args[8] = new
+            args[args.index("-i") + 1] = new
             try:
                 resp = subprocess.run(args)
                 resp.check_returncode()

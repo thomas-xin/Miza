@@ -103,7 +103,7 @@ main a:hover {
 }
 .searchHolder {
 	position: sticky;
-	top: 0rem;
+	top: 0;
 	background: white;
 	margin: 0 -1rem;
 	padding: 0 1rem;
@@ -233,4 +233,72 @@ ul > li > a.active {
 	user-select: none;
 	font-size: 1em;
 	margin-left: 0.5em;
+}
+.censored {
+    background: linear-gradient(45deg, #000000, #3e3e3e);
+    background-size: 400% 400%;
+
+	animation: bgyea 3s ease infinite;
+	
+
+    color: transparent;
+    width: max-content;
+    border-radius: 10px;
+    user-select: none;
+    min-width: 50px;
+}
+
+li.censored {
+    width: max-content;
+	margin-bottom: 2px;
+	animation: opacbrrrr 4s infinite;
+}
+
+.aliases.censored {
+    margin-left: 0;
+    width: max-content;
+}
+
+.categoryHead > .censored {
+	animation: opacbrrrr 4s infinite;
+}
+
+.censored.transIn {
+	animation: bgyea 2s ease infinite, transIn 2s infinite, opacbrrrr 4s infinite;
+}
+.transIn {
+	animation: transIn 2s infinite, opacbrrrr 4s infinite;
+}
+
+@keyframes opacbrrrr {
+	0% {
+		opacity: 0.3;
+	}
+	50% {
+		opacity: 0.9;
+	}
+	100% {
+		opacity: 0.3;
+	}
+}
+
+@keyframes transIn {
+	10% {
+		transform: translateY(2px); 
+	}
+	20% {
+		transform: translateY(-2px); 
+	}
+	30% {
+		transform: translateY(0); 
+	} 
+	100% {
+		transform: translateY(0);
+	}
+}
+
+@keyframes bgyea {
+    0%{background-position:0% 50%}
+    50%{background-position:100% 50%}
+    100%{background-position:0% 50%}
 }

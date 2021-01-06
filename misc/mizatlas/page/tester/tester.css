@@ -42,6 +42,7 @@ h1 {
 
 .output {
 	height: 0;
+	min-width: 400px;
 	overflow: hidden;
 	transition: height 1s;
 	margin-top: 2rem;
@@ -53,7 +54,6 @@ h1 {
 	flex-direction: row;
 	align-items: center;
 	width: max-content;
-	height: ;
 }
 .inputWrapper {
 	position: relative;
@@ -66,7 +66,7 @@ h1 {
 	font-weight: 500;
 	border: none;
 	padding: 0.5rem 2rem;
-	box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.44);
+	box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.44);
 	border-radius: 100vw;
 	height: 1.8em;
 }
@@ -79,9 +79,9 @@ button.greeny {
 	color: #000;
 	font-family: Whitney;
 	font-size: 1.4rem;
-	padding: 0px 2rem;
+	padding: 0 2rem;
 	border-radius: 100vw;
-	box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.44);
+	box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.44);
 	font-weight: 500;
 	cursor: pointer;
 	will-change: transform;

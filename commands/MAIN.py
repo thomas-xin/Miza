@@ -1266,7 +1266,11 @@ class Status(Command):
             commands = set()
             for command in bot.commands.values():
                 commands.update(command)
-            emb.add_field(name="Code info", value=f"Code size\n[`{byte_scale(size[0])}B, {size[1]} lines`]({bot.github})\nCommand count\n[`{len(commands)}`](https://github.com/thomas-xin/Miza/wiki/Commands)")
+            code_info = (
+                f"Code size\n[`{byte_scale(size[0])}B, {size[1]} lines`]({bot.github})\nCommand count\n[`{len(commands)}`](https://github.com/thomas-xin/Miza/wiki/Commands)\n"
+                + f"Website URL\n[`{bot.webserver}`]({bot.webserver})"
+            )
+            emb.add_field(name="Code info", value=code_info)
         else:
             emb.description = msg
         func = channel.send
