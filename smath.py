@@ -96,6 +96,12 @@ mp.dps = 128
 math.round = round
 
 mpf = mpmath.mpf
+mpf.__floordiv__ = lambda x, y: int(x / y)
+mpf.__rfloordiv__ = lambda y, x: int(x / y)
+mpf.__lshift__ = lambda x, y: x * (1 << y if type(y) is int else 2 ** y)
+mpf.__rshift__ = lambda x, y: x // (1 << y if type(y) is int else 2 ** y)
+mpf.__rlshift__ = lambda y, x: x * (1 << y if type(y) is int else 2 ** y)
+mpf.__rrshift__ = lambda y, x: x * (1 << y if type(y) is int else 2 ** y)
 mpc = mpmath.mpc
 Mat = mat = matrix = mpmath.matrix
 
@@ -1715,6 +1721,13 @@ def isqrt(x):
             c = d
             d = (c + x // c) >> 1
     return c
+
+
+_divmod = divmod
+def divmod(x, y):
+    with suppress(TypeError):
+        return _divmod(x, y)
+    return x // y, x % y
 
 
 # Rounds a number to a certain amount of decimal places.

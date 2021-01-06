@@ -3678,7 +3678,7 @@ def userIter4(x):
         yield to_alphanumeric(x.nick).replace(" ", "").casefold()
 
 
-PORT = 9801
+PORT = AUTH.get("webserver_port", 9801)
 IND = "\x7f"
 
 def update_file_cache(files=None):

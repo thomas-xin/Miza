@@ -315,7 +315,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         with self.semaphore:
             lim = 1024
             q = [copy_entry(item) for item in self.queue.verify()]
-            s = {k: (v if type(v) is not mpf else int(v) if abs(int(v)) >= (1 << 32) else float(v)) for k, v in self.stats.items()}
+            s = {k: (v if not issubclass(type(v), mpf) else int(v) if abs(int(v)) >= (1 << 32) else float(v)) for k, v in self.stats.items()}
             d = {
                 "stats": s,
                 "queue": q,

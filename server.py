@@ -4,7 +4,7 @@ from flask import Flask
 import werkzeug
 from werkzeug.exceptions import HTTPException
 
-PORT = 9801
+PORT = AUTH.get("webserver_port", 9801)
 IND = "\x7f"
 
 
