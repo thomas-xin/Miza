@@ -1461,7 +1461,7 @@ class UpdateMessageCache(Database):
                     edited_timestamp=str(message._edited_timestamp) if getattr(message, "_edited_timestamp", None) else "",
                     type=getattr(message.type, "value", message.type),
                     pinned=message.pinned,
-                    flags=message.flags.value,
+                    flags=message.flags.value if message.flags else 0,
                     mention_everyone=message.mention_everyone,
                     content=message.content,
                     channel=message.channel.id,

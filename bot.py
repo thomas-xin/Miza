@@ -1074,6 +1074,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             size = channel.guild.filesize_limit
         if getattr(channel, "simulated", None):
             size = -1
+        data = file
         if file and not hasattr(file, "fp"):
             if type(file) is str:
                 if not os.path.exists(file):
@@ -1102,16 +1103,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         try:
             if fsize > size:
                 if not f:
-                    f = filename if filename and not hasattr(file, "fp") else data
-                if type(f) in (bytes, bytearray, memoryview):
+                    f = filename if filename and not hasattr(file, "fp") else getattr(file, "_fp", None) or data
+                if type(f) is not str:
                     f = as_str(f)
-                elif type(f) is not str:
-                    f = str(f)
                 if "." in f:
                     ext = f.rsplit(".", 1)[-1]
                 else:
                     ext = None
-                url = await create_future(as_file, f, filename=filename, ext=ext, rename=rename)
+                url = await create_future(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
                 message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + url + "\n" + url + "?download=true")
             else:
                 message = await channel.send(msg, file=file)

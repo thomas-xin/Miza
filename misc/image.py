@@ -7,6 +7,7 @@ from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhanc
 from zipfile import ZipFile
 import matplotlib.pyplot as plt
 
+mpf = float
 deque = collections.deque
 suppress = contextlib.suppress
 
