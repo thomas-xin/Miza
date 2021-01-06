@@ -2208,7 +2208,7 @@ class AudioDownloader:
         if str(end) != "None":
             args.extend(("-to", end))
         else:
-            args.extend(("-to", 86400))
+            args.extend(("-to", "86400"))
         args.extend(("-i", stream))
         if auds is not None:
             args.extend(auds.construct_options(full=True))
