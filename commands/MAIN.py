@@ -82,8 +82,8 @@ class Help(Command):
             # Display main help page in an embed
             colour = discord.Colour(help_colours[None])
             description = (
-                "Please enter a command category to display usable commands,\nor see "
-                + "[Commands](https://github.com/thomas-xin/Miza/wiki/Commands) for full command list."
+                "Please enter a command category to display usable commands,\nor visit "
+                + f"[mizatlas]({bot.webserver}/mizatlas) for a full command list and tester."
             )
             if bot.categories:
                 s = bold(ini_md(' '.join((sqr_md(c) for c in help_colours if c in bot.categories))))
