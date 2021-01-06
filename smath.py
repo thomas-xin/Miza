@@ -91,7 +91,7 @@ deque = collections.deque
 
 random.seed(random.randint(0, (1 << 32) - 1) - time.time_ns())
 mp = mpmath.mp
-mp.dps = 64
+mp.dps = 128
 
 math.round = round
 
@@ -266,6 +266,12 @@ def sort(it, key=None, reverse=False):
             return it
         except TypeError:
             raise TypeError(f"Sorting {type(it)} is not supported.")
+
+
+# s = "class Real(mpf):"
+# for op in ("add", "sub", "mul", "truediv", "floordiv", "mod", "divmod", "pow"):
+#     s += f"\n\t__{op}__=lambda self, x: super().__{op}__(mpf(x))"
+# exec(s)
 
 
 def exclusive_range(range, *excluded):
@@ -2106,43 +2112,8 @@ def to_frac(num, limit=2147483647):
     return frac
 
 
-# Computes the greatest common denominator of two numbers.
-def gcd(x, y=1):
-    if y != 1:
-        while y > 0:
-            x, y = y, x % y
-        return x
-    return x
-
-# Computes the lowest common multiple of two numbers.
-def lcm2(x, y=1):
-    if x != y:
-        x = abs(x)
-        y = abs(y)
-        i = True
-        if x != int(x):
-            i = False
-            x = to_frac(x)[0]
-        if y != int(y):
-            i = False
-            y = to_frac(y)[0]
-        if i:
-            return x * y // gcd(x, y)
-        else:
-            return to_frac(x / y)[0]
-    return x
-
-# Computes the lowest common multiple of numbers in an arbitrary amount of inputs.
-def lcm(*x):
-    try:
-        while True:
-            x = [i for j in x for i in j]
-    except:
-        if 0 in x:
-            raise ValueError("Cannot find LCM of zero.")
-        while len(x) > 1:
-            x = [lcm2(x[i], x[-i - 1]) for i in range(ceil(len(x) / 2))]
-    return x[-1]
+gcd = math.gcd
+lcm = lcm2 = math.lcm
 
 def lcmRange(x):
     primes = generate_primes(1, x, -1)

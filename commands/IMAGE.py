@@ -1169,7 +1169,7 @@ class Fill(Command):
         with discord.context_managers.Typing(channel):
             if is_numeric(args[-1]):
                 value = await bot.eval_math(args.pop(-1), user)
-                if type(value) is float:
+                if type(value) is not int:
                     if abs(value) <= 1:
                         value = round(value * 255)
                     else:

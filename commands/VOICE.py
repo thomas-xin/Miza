@@ -240,7 +240,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         "compressor": 0,
         "chorus": 0,
         "resample": 0,
-        "bitrate": 1966.08,
+        "bitrate": mpf("1966.08"),
         "loop": False,
         "repeat": False,
         "shuffle": False,
@@ -315,7 +315,7 @@ class CustomAudio(discord.AudioSource, collections.abc.Hashable):
         with self.semaphore:
             lim = 1024
             q = [copy_entry(item) for item in self.queue.verify()]
-            s = dict(self.stats)
+            s = {k: (v if type(v) is not mpf else int(v) if abs(int(v)) >= (1 << 32) else float(v)) for k, v in self.stats.items()}
             d = {
                 "stats": s,
                 "queue": q,
@@ -2885,7 +2885,7 @@ class Skip(Command):
                 raise ArgumentError("Too many arguments for range input.")
             elif len(l) > 2:
                 num = await bot.eval_math(l[0], user)
-                it = int(round(float(num)))
+                it = int(round(num))
             if l[0]:
                 num = await bot.eval_math(l[0], user)
                 if num > count:
@@ -3140,7 +3140,7 @@ class Dump(Command):
                 if k in "loop repeat shuffle quiet stay":
                     d["stats"][k] = bool(d["stats"][k])
                 else:
-                    d["stats"][k] = float(d["stats"][k])
+                    d["stats"][k] = mpf(d["stats"][k])
         if "a" not in flags:
             # Basic dump, replaces current queue
             if auds.queue:
@@ -3290,12 +3290,12 @@ class AudioSettings(Command):
             if len(ops) == 1:
                 op = ops[0]
             else:
-                key = lambda x: (round(x * 100, 9), x)[type(x) is bool]
+                key = lambda x: x if type(x) is bool else round_min(100 * x)
                 d = dict(auds.stats)
                 d.pop("position", None)
                 return f"Current audio settings for **{escape_markdown(guild.name)}**:\n{ini_md(iter2str(d, key=key))}"
             orig = auds.stats[op]
-            num = round(100 * orig, 9)
+            num = round_min(100 * orig)
             return css_md(f"Current audio {op} setting in {sqr_md(guild)}: [{num}].")
         if not is_alone(auds, user) and perm < 1:
             raise self.perm_error(perm, 1, "to modify audio settings while other users are in voice")
@@ -3338,10 +3338,9 @@ class AudioSettings(Command):
                 argv = str(val)
             # Values should be scaled by 100 to indicate percentage
             origStats = auds.stats
-            orig = round(origStats[op] * 100, 9)
+            orig = round_min(origStats[op] * 100)
             num = await bot.eval_math(argv, user, orig)
-            val = round_min(float(num / 100))
-            new = round(num, 9)
+            new = val = round_min(num / 100)
             if op in "loop repeat shuffle quiet stay":
                 origStats[op] = new = bool(val)
                 orig = bool(orig)

@@ -1569,7 +1569,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     _op = at
             num = await self.eval_math(expr, obj, op=False)
             if _op is not None:
-                num = getattr(float(default), _op)(num)
+                num = getattr(mpf(default), _op)(num)
             return num
         f = expr.strip()
         try:
@@ -1583,11 +1583,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     r = [False]
                 else:
                     try:
-                        r = [float(f)]
+                        r = [mpf(f)]
                     except:
                         r = [ast.literal_eval(f)]
         except (ValueError, TypeError, SyntaxError):
-            r = await self.solve_math(f, obj, 64, 0)
+            r = await self.solve_math(f, obj, 128, 0)
         x = r[0]
         with suppress(TypeError):
             while True:
@@ -1596,7 +1596,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 x = tuple(x)[0]
         if type(x) is str and x.isnumeric():
             return int(x)
-        return round_min(float(x))
+        return round_min(mpf(x))
 
     # Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
     async def solve_math(self, f, obj=None, prec=128, r=False, timeout=12, variables=None):
