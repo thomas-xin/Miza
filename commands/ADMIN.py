@@ -1363,37 +1363,51 @@ class UpdateMessageCache(Database):
     def get_fn(self, m_id):
         return  m_id // 10 ** 14
 
-    def load_file(self, fn):
-        with suppress(KeyError):
-            return self.loaded[fn]
-        path = self.files + "/" + str(fn)
-        if not os.path.exists(path):
-            path += "\x7f"
+    def load_file(self, fn, raw=False):
+        if not raw:
+            with suppress(KeyError):
+                return self.loaded[fn]
+        if not raw:
+            found = {}
+            self.loaded[fn] = found
+        try:
+            data = self.raws[fn]
+        except KeyError:
+            while len(self.loaded) > 1024:
+                with suppress(RuntimeError):
+                    self.loaded.pop(next(iter(self.loaded)))
+            while len(self.raws) > 1024:
+                with suppress(RuntimeError):
+                    self.loaded.pop(next(iter(self.raws)))
+            path = self.files + "/" + str(fn)
             if not os.path.exists(path):
-                return
-        found = {}
-        self.loaded[fn] = found
-        bot = self.bot
-        with open(path, "rb") as f:
-            out = zipped = f.read()
-        with tracebacksuppressor(zipfile.BadZipFile):
-            out = zip2bytes(zipped)
-        data = pickle.loads(out)
-        i = 0
-        for m in data:
-            try:
-                message = bot.CachedMessage(m)
-            except:
-                print(m)
-                print_exc()
-            m_id = m["id"]
-            self.raws.setdefault(fn, {})[m_id] = m
-            bot.cache.messages[m_id] = found[m_id] = message
-            i += 1
-            if not i & 2047:
-                time.sleep(0.1)
-        print(f"{len(data)} messages successfully loaded from {fn}")
-        return found
+                path += "\x7f"
+                if not os.path.exists(path):
+                    return
+            with open(path, "rb") as f:
+                out = zipped = f.read()
+            with tracebacksuppressor(zipfile.BadZipFile):
+                out = zip2bytes(zipped)
+            data = pickle.loads(out)
+            if type(data) is not dict:
+                data = {m["id"]: m for m in data}
+            self.raws[fn] = data
+        if not raw:
+            bot = self.bot
+            i = 0
+            for k, m in data.items():
+                try:
+                    message = bot.CachedMessage(m)
+                except:
+                    print(m)
+                    print_exc()
+                bot.cache.messages[k] = found[k] = message
+                i += 1
+                if not i & 2047:
+                    time.sleep(0.1)
+            print(f"{len(data)} messages successfully loaded from {fn}")
+            return found
+        print(f"{len(data)} messages temporarily read from {fn}")
 
     def load_message(self, m_id):
         fn = self.get_fn(m_id)
@@ -1413,9 +1427,10 @@ class UpdateMessageCache(Database):
         return message
 
     def saves(self, fn, messages):
-        self.load_file(fn)
+        self.load_file(fn, raw=True)
         bot = self.bot
-        self.loaded.setdefault(fn, {}).update(messages)
+        if fn in self.loaded:
+            self.loaded[fn].update(messages)
         saved = self.raws.setdefault(fn, {})
         for i, message in enumerate(tuple(messages.values()), 1):
             if type(message) is bot.CachedMessage:
@@ -1465,7 +1480,7 @@ class UpdateMessageCache(Database):
         if not saved:
             if os.path.exists(path):
                 return os.remove(path)
-        out = data = pickle.dumps(list(saved.values()))
+        out = data = pickle.dumps(saved)
         if len(data) > 32768:
             out = bytes2zip(data)
         safe_save(path, out)

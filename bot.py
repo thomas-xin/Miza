@@ -366,8 +366,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         description=command.parse_description(),
                         usage=command.usage,
                         level=str(command.min_level),
-                        rate_limit=command.rate_limit,
-                        timeout=getattr(command, "_timeout_", 1) * self.timeout,
+                        rate_limit=str(command.rate_limit),
+                        timeout=str(getattr(command, "_timeout_", 1) * self.timeout),
                     )
                     for attr in ("flags", "server_only", "slash"):
                         with suppress(AttributeError):
