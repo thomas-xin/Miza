@@ -3340,7 +3340,8 @@ class AudioSettings(Command):
             origStats = auds.stats
             orig = round_min(origStats[op] * 100)
             num = await bot.eval_math(argv, user, orig)
-            new = val = round_min(num / 100)
+            new = round_min(num)
+            val = round_min(num / 100)
             if op in "loop repeat shuffle quiet stay":
                 origStats[op] = new = bool(val)
                 orig = bool(orig)
