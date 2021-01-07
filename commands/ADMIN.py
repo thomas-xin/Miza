@@ -104,6 +104,7 @@ class Purge(Command):
 
 class Mute(Command):
     server_only = True
+    _timeout_ = 16
     name = ["🔇", "Revoke", "Silence", "UnMute"]
     min_level = 3
     min_display = "3+"
@@ -328,6 +329,7 @@ class Mute(Command):
 
 class Ban(Command):
     server_only = True
+    _timeout_ = 16
     name = ["🔨", "Bans", "Unban"]
     min_level = 3
     min_display = "3+"
@@ -618,7 +620,7 @@ class AutoRole(Command):
     name = ["InstaRole"]
     min_level = 3
     min_display = "3+"
-    _timeout_ = 7
+    _timeout_ = 12
     description = "Causes any new user joining the server to automatically gain the targeted role. Input multiple roles to create a randomized role giver."
     usage = "<role>? <update_all{?x}>? <disable{?d}>?"
     flags = "aedx"
@@ -754,6 +756,7 @@ class RolePreserver(Command):
 
 class Lockdown(Command):
     server_only = True
+    _timeout_ = 16
     name = ["🔒", "☣️"]
     min_level = inf
     description = "Completely locks down the server by removing send message permissions for all users and revoking all invites."
@@ -786,7 +789,7 @@ class Lockdown(Command):
 
 class SaveChannel(Command):
     time_consuming = 1
-    _timeout_ = 10
+    _timeout_ = 16
     name = ["BackupChannel", "DownloadChannel"]
     min_level = 3
     description = "Saves a number of messages in a channel, as well as their contents, to a .txt file."
