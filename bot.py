@@ -1235,16 +1235,18 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     # Updates bot cache from the discord.py client cache.
     def update_from_client(self):
         self.cache.guilds.update(self._guilds)
-        self.cache.emojis.update(self._emojis)
-        self.cache.users.update(self._users)
         self.cache.channels.update(self._private_channels)
+        with delay(0.5):
+            self.cache.emojis.update(self._emojis)
+        with delay(0.5):
+            self.cache.users.update(self._users)
 
     # Updates bot cache from the discord.py guild objects.
     def update_from_guilds(self):
         self.update_usernames()
         for i, guild in enumerate(self.guilds, 1):
             members = self.cache.members
-            members.update({k: v for k, v in guild._members.items() if k not in members})
+            members.update(t for t in guild._members.items() if t[0] not in members)
             self.cache.channels.update(guild._channels)
             self.cache.roles.update(guild._roles)
             if not i & 127:
@@ -1256,11 +1258,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 file = "cache/" + attachments.popleft()
                 if os.path.exists(file):
                     os.remove(file)
-        attachments = {k: v for k, v in self.cache.attachments.items() if type(v) is bytes}
+        attachments = {t for t in self.cache.attachments.items() if type(t[-1]) is bytes}
         while len(attachments) > 512:
             a_id = next(iter(attachments))
             self.cache.attachments[a_id] = a_id
-            attachments.pop(a_id)
+            attachments.discard(a_id)
 
     def update_usernames(self):
         self.usernames = {str(user): user for user in self.cache.users.values()}
@@ -2228,7 +2230,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 for command in bot.commands[command_check]:
                     # Make sure command is enabled, administrators bypass this
                     if full_prune(command.catg) not in enabled and not admin:
-                        raise PermissionError("This command is not enabled here.")
+                        raise PermissionError(f"This command is not enabled here. Use {prefix}ec to view or modify the list of enabled commands")
                     # argv is the raw parsed argument data
                     argv = comm[i:].strip()
                     run = True
@@ -2823,20 +2825,21 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         while not self.closed:
             async with delay(1):
                 async with tracebacksuppressor:
-                    net = await create_future(psutil.net_io_counters)
-                    net_bytes = net.bytes_sent + net.bytes_recv
-                    if not hasattr(self, "net_bytes"):
-                        self.net_bytes = deque(maxlen=3)
-                        self.start_bytes = 0
-                        if os.path.exists("saves/status.json"):
-                            with tracebacksuppressor:
-                                with open("saves/status.json", "rb") as f:
-                                    data = await create_future(f.read)
-                                    status = eval(data)
-                                self.start_bytes = max(0, status["net_bytes"] - net_bytes)
-                    self.net_bytes.append(net_bytes)
-                    self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes)
-                    self.total_bytes = self.net_bytes[-1] + self.start_bytes
+                    with MemoryTimer("update_bytes"):
+                        net = await create_future(psutil.net_io_counters)
+                        net_bytes = net.bytes_sent + net.bytes_recv
+                        if not hasattr(self, "net_bytes"):
+                            self.net_bytes = deque(maxlen=3)
+                            self.start_bytes = 0
+                            if os.path.exists("saves/status.json"):
+                                with tracebacksuppressor:
+                                    with open("saves/status.json", "rb") as f:
+                                        data = await create_future(f.read)
+                                        status = eval(data)
+                                    self.start_bytes = max(0, status["net_bytes"] - net_bytes)
+                        self.net_bytes.append(net_bytes)
+                        self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes)
+                        self.total_bytes = self.net_bytes[-1] + self.start_bytes
                     try:
                         self.api_latency = requests.get("https://discord.com/api/v8").elapsed.total_seconds()
                     except:
@@ -2849,23 +2852,31 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         while not self.closed:
             async with delay(frand(2) + 2):
                 async with tracebacksuppressor:
-                    await self.handle_update()
-                    await create_future(self.update_from_client, priority=True)
+                    with MemoryTimer("handle_update"):
+                        await self.handle_update()
 
     # The slowest update loop that runs once a minute. Used for slow operations, such as the bot database autosave event.
     async def minute_loop(self):
         while not self.closed:
             async with delay(60):
                 async with tracebacksuppressor:
-                    await create_future(self.update, priority=True)
+                    with MemoryTimer("update"):
+                        await create_future(self.update, priority=True)
                     await asyncio.sleep(1)
-                    await create_future(self.update_from_guilds, priority=True)
+                    with MemoryTimer("update_from_guilds"):
+                        await create_future(self.update_from_guilds, priority=True)
                     await asyncio.sleep(1)
-                    await create_future(update_file_cache, priority=True)
+                    with MemoryTimer("update_from_client"):
+                        await create_future(self.update_from_client, priority=True)
                     await asyncio.sleep(1)
-                    await self.get_disk()
+                    with MemoryTimer("update_file_cache"):
+                        await create_future(update_file_cache, priority=True)
                     await asyncio.sleep(1)
-                await self.send_event("_minute_loop_")
+                    with MemoryTimer("get_disk"):
+                        await self.get_disk()
+                    await asyncio.sleep(1)
+                with MemoryTimer("minute_loop"):
+                    await self.send_event("_minute_loop_")
 
     # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
     async def heartbeat_loop(self):

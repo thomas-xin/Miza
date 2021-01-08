@@ -218,6 +218,39 @@ class delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextMa
             await asyncio.sleep(remaining)
 
 
+# A context manager that monitors the amount of time taken for a designated section of code.
+class MemoryTimer(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+
+    timers = cdict()
+
+    @classmethod
+    def list(cls):
+        return "\n".join(str(name) + ": " + str(duration) for duration, name in sorted(((mean(v), k) for k, v in cls.timers.items()), reverse=True))
+
+    def __init__(self, name=None):
+        self.name = name
+        self.start = utc()
+
+    def __call__(self):
+        return self.exit()
+    
+    def __exit__(self, *args):
+        taken = utc() - self.start
+        try:
+            self.timers[self.name].append(taken)
+        except KeyError:
+            self.timers[self.name] = t = deque(maxlen=8)
+            t.append(taken)
+
+    async def __aexit__(self, *args):
+        taken = utc() - self.start
+        try:
+            self.timers[self.name].append(taken)
+        except KeyError:
+            self.timers[self.name] = t = deque(maxlen=8)
+            t.append(taken)
+
+
 # Repeatedly retries a synchronous operation, with optional break exceptions.
 def retry(func, *args, attempts=5, delay=1, exc=(), **kwargs):
     for i in range(attempts):
