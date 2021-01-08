@@ -737,7 +737,7 @@ def touch(file):
 
 
 def get_folder_size(path="."):
-    return sum(get_folder_size(f.path) if f.is_dir() else f.stat().st_size for f in os.scandir("cache"))
+    return sum(get_folder_size(f.path) if f.is_dir() else f.stat().st_size for f in os.scandir(path))
 
 
 # Checks if an object can be used in "await" operations.
