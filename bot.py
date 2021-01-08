@@ -1792,11 +1792,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 disk = await create_future(get_folder_size, "cache", priority=True)
                 disk += await create_future(get_folder_size, "saves", priority=True)
                 self.disk = disk
-                cache = os.listdir("cache")
-                for folder in os.listdir("saves"):
-                    if "." not in folder:
-                        cache += os.listdir("saves/" + folder)
-                self.file_count = len(cache)
+                self.file_count = len(os.listdir("cache"))
+                for t in os.walk("saves"):
+                    self.file_count += len(t[-1])
         return self.disk
 
     # Gets the status of the bot.
