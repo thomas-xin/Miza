@@ -2246,7 +2246,7 @@ class UpdateUsers(Database):
 
     # User seen, add event to activity database
     def _seen_(self, user, delay, event, count=1, raw=None, **void):
-        if issubclass(type(user), discord.abc.GuildChannel) or type(user) == discord.DMChannel:
+        if is_channel(user):
             u_id = "#" + str(user.id)
         else:
             u_id = user.id

@@ -768,6 +768,9 @@ async def recursive_coro(item):
     return item
 
 
+is_channel = lambda channel: issubclass(type(channel), discord.abc.GuildChannel) or issubclass(type(channel), discord.abc.PrivateChannel)
+
+
 REPLY_SEM = cdict()
 
 async def send_with_reply(channel, reference, content="", embed=None, tts=None, mention=False):
@@ -801,7 +804,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             if tts:
                 fields["tts"] = tts
             return await channel.send(content, **fields)
-        if not issubclass(type(channel), discord.abc.GuildChannel) and not issubclass(type(channel), discord.abc.PrivateChannel):
+        if not is_channel(channel):
             c = channel.dm_channel
             if c is None:
                 c = await channel.create_dm()

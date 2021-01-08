@@ -515,14 +515,27 @@ class Char2Emoj(Command):
 
 
 class Time(Command):
-    name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T"]
+    name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T", "EstimateTime", "EstimateTimezone"]
     description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user. Be sure to check out ⟨WEBSERVER⟩/time!"
     usage = "<offset_hours|user>?"
     slash = True
 
     async def __call__(self, name, channel, guild, argv, args, user, **void):
+        u = user
         s = 0
-        # Only check for timezones if the command was called with alias "t" or "time"
+        # Only check for timezones if the command was called with alias "estimate_time", "estimate_timezone", "t", or "time"
+        if "estimate" in name:
+            if argv:
+                try:
+                    if not argv.isnumeric():
+                        raise KeyError
+                    user = self.bot.cache.guilds[int(argv)]
+                except KeyError:
+                    try:
+                        user = self.bot.cache.channels[verify_id(argv)]
+                    except KeyError:
+                        user = await self.bot.fetch_user_member(argv, guild)
+            argv = None
         if args and name in "time":
             try:
                 i = None
@@ -548,7 +561,13 @@ class Time(Command):
         t = utc_dt()
         estimated = None
         if argv:
-            h = await self.bot.eval_math(argv, user)
+            h = await self.bot.eval_math(argv, u)
+        elif "estimate" in name:
+            if is_channel(user):
+                h = self.bot.data.users.estimate_timezone("#" + str(user.id))
+            else:
+                h = self.bot.data.users.estimate_timezone(user.id)
+            estimated = True
         elif name in "time":
             h = self.bot.data.users.get_timezone(user.id)
             if h is None:
@@ -591,12 +610,12 @@ class Timezone(Command):
 
 
 class TimeCalc(Command):
-    name = ["TimeDifference"]
-    description = "Computes the difference between two times, or the Unix timestamp of a datetime string."
-    usage = "<0:time1> <1:time2>?"
+    name = ["TimeDifference", "TimeDiff", "TimeSum", "TimeAdd"]
+    description = "Computes the sum or difference between two times, or the Unix timestamp of a datetime string."
+    usage = "<0:time1> [|,] <1:time2>?"
     no_parse = True
 
-    def __call__(self, argv, user, **void):
+    def __call__(self, argv, user, name, **void):
         if not argv:
             timestamps = [utc()]
         else:
@@ -609,8 +628,10 @@ class TimeCalc(Command):
             timestamps = [utc_ts(tzparse(t)) for t in spl]
         if len(timestamps) == 1:
             out = f"{round_min(timestamps[0])} ({datetime.datetime.utcfromtimestamp(timestamps[0])} UTC)"
-        else:
+        elif "sum" not in name and "add" not in name:
             out = time_diff(max(timestamps), min(timestamps))
+        else:
+            out = time_sum(*timestamps)
         return code_md(out)
 
 

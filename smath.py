@@ -3268,6 +3268,83 @@ def time_parse(ts):
     mults = (1, 60, 3600, 86400)
     return round_min(sum(float(count) * mult for count, mult in zip(data, reversed(mults[:len(data)]))))
 
+def time_sum(t2, t1):
+    out = ""
+    galactic_years = 0
+    millennia = 0
+    years = t2.year + t1.year
+    months = t2.month + t1.month
+    days = t2.day + t1.day
+    hours = getattr(t2, "hour", 0) + getattr(t1, "hour", 0)
+    minutes = getattr(t2, "minute", 0) + getattr(t1, "minute", 0)
+    seconds = round(getattr(t2, "second", 0) + getattr(t1, "second", 0) + (getattr(t2, "microsecond", 0) + getattr(t1, "microsecond", 0)) / 100000, 6)
+    while seconds >= 60:
+        minutes += 1
+        seconds -= 60
+    while minutes >= 60:
+        hours += 1
+        minutes -= 60
+    while hours >= 24:
+        days += 1
+        hours -= 24
+    md = month_days(t2.year, t2.month)
+    while days > md:
+        months += 1
+        days -= md
+    while months > 12:
+        years += 1
+        months -= 12
+    if abs(years) >= 1000:
+        millennia, years = divmod(years, 1000)
+    if abs(millennia) >= 226814:
+        galactic_years, millennia = divmod(millennia, 226814)
+    if galactic_years:
+        out += f"{galactic_years} galactic year"
+        if galactic_years != 1:
+            out += "s"
+        out += " "
+    if millennia:
+        out += f"{millennia} millenni"
+        if millennia != 1:
+            out += "a"
+        else:
+            out += "um"
+        out += " "
+    if years:
+        out += f"{years} year"
+        if years != 1:
+            out += "s"
+        out += " "
+    if months:
+        out += f"{months} month"
+        if months != 1:
+            out += "s"
+        out += " "
+    if days:
+        out += f"{days} day"
+        if days != 1:
+            out += "s"
+        out += " "
+    if hours:
+        out += f"{hours} hour"
+        if hours != 1:
+            out += "s"
+        out += " "
+    if minutes:
+        out += f"{minutes} minute"
+        if minutes != 1:
+            out += "s"
+        out += " "
+    if seconds or not out:
+        s = str(seconds)
+        if "." in s:
+            spl = s.split(".", 1)
+            s = spl[0] + "." + spl[1][:6].rstrip("0")
+        out += f"{s} second"
+        if seconds != 1:
+            out += "s"
+    return out.strip()
+
 def time_diff(t2, t1):
     out = ""
     galactic_years = 0
