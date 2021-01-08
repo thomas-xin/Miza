@@ -1251,7 +1251,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             self.cache.roles.update(guild._roles)
             if not i & 127:
                 time.sleep(0.2)
-        attachments = sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: os.path.getmtime("cache/" + file))
+        attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
         attachments = deque(attachments)
         while len(attachments) > 4096:
             with tracebacksuppressor:
@@ -1967,11 +1967,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             create_future_ex(self.clear_cache, priority=True)
             await_fut(self.send_event("_save_"))
             z = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-            for folder in os.listdir("saves"):
-                fp = "saves/" + folder
-                if os.path.isdir(fp):
-                    for file in os.listdir(fp):
-                        z.write(fp + "/" + file, fp + "/" + file)
+            for folder in os.scandir("saves"):
+                fp = folder.path
+                if folder.is_dir():
+                    for file in os.scandir(fp):
+                        z.write(file.path, file.path)
                 else:
                     z.write(fp, fp)
             z.close()
@@ -3197,7 +3197,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 futs.add(create_task(aretry(self.get_ip, delay=20)))
                 if not self.started:
                     self.started = True
-                    attachments = sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: os.path.getmtime("cache/" + file))
+                    attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
                     for file in attachments:
                         with tracebacksuppressor:
                             self.attachment_from_file(file)

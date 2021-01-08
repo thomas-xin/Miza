@@ -736,16 +736,8 @@ def touch(file):
         pass
 
 
-def get_folder_size(folder):
-    folder = folder.rstrip("/") + "/"
-    size = 0
-    for file in os.listdir(folder):
-        if os.path.isdir(folder + file):
-            size += get_folder_size(folder + file)
-        else:
-            with suppress(FileNotFoundError, PermissionError):
-                size += os.path.getsize(folder + file)
-    return size
+def get_folder_size(path="."):
+    return sum(get_folder_size(f.path) if f.is_dir() else f.stat().st_size for f in os.scandir("cache"))
 
 
 # Checks if an object can be used in "await" operations.

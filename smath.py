@@ -1406,6 +1406,10 @@ class cdict(dict):
 
     __slots__ = ()
 
+    @classmethod
+    def from_object(cls, obj):
+        return cls((a, getattr(obj, a, None)) for a in dir(obj))
+
     __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
     __repr__ = lambda self: f"{self.__class__.__name__}({super().__repr__() if super().__len__() else ''})"
     __str__ = lambda self: super().__repr__()
