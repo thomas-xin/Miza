@@ -53,21 +53,25 @@ def find_file(path):
             return out
     raise FileNotFoundError
 
+get_mime = lambda path: magic.from_file(path, mime=True)
+
 @app.route("/file/<path>", methods=["GET"])
 @app.route("/files/<path>", methods=["GET"])
 def get_file(path):
-    mime = MIMES.get(path.rsplit(".", 1)[-1])
+    p = find_file(path)
+    mime = get_mime(p)
     down = flask.request.args.get("download", "false")
     download = down and down[0] not in "0fFnN"
-    return flask.send_file(find_file(path), as_attachment=download, mimetype=mime)
+    return flask.send_file(p, as_attachment=download, mimetype=mime)
 
 @app.route("/file/<path>/<path:filename>", methods=["GET"])
 @app.route("/files/<path>/<path:filename>", methods=["GET"])
 def get_file_ex(path, filename):
-    mime = MIMES.get(filename.rsplit(".", 1)[-1])
+    p = find_file(path)
+    mime = get_mime(p)
     down = flask.request.args.get("download", "false")
     download = down and down[0] not in "0fFnN"
-    return flask.send_file(find_file(path), as_attachment=download, attachment_filename=filename, mimetype=mime)
+    return flask.send_file(p, as_attachment=download, attachment_filename=filename, mimetype=mime)
 
 
 MIMES = dict(
@@ -85,7 +89,7 @@ MIMES = dict(
     ogg="audio/ogg",
     opus="audio/opus",
     flac="audio/flac",
-    wav="audio/wav",
+    wav="audio/x-wav",
     mp4="video/mp4",
 )
 
