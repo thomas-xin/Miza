@@ -635,8 +635,129 @@ class TimeCalc(Command):
         return code_md(out)
 
 
+class FileType(Command):
+    name = ["📂", "Magic", "Mime", "Identify"]
+    description = "Detects the type, mime, and optionally details of an input file."
+    usage = "<url>*"
+    rate_limit = (2, 7)
+    mime = magic.Magic(mime=True, mime_encoding=True)
+
+    def probe(self, url):
+        command = ["ffprobe", "-hide_banner", url]
+        resp = None
+        for _ in loop(3):
+            try:
+                proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                fut = create_future_ex(proc.communicate, timeout=2)
+                res = fut.result(timeout=2)
+                resp = b"\n".join(res)
+                break
+            except:
+                with suppress():
+                    proc.kill()
+                print_exc()
+        if not resp:
+            raise RuntimeError
+        return as_str(resp)
+
+    def identify(self, url):
+        out = deque()
+        with requests.get(url, headers=Request.header(), stream=True) as resp:
+            head = resp.headers
+            it = resp.iter_content(65536)
+            data = next(it)
+        out.append(code_md(magic.from_buffer(data)))
+        mimedata = self.mime.from_buffer(data).replace("; ", "\n")
+        mime = mimedata.split("\n", 1)[0].split("/", 1)
+        if "Content-Length" in head:
+            mimedata += f"\nfilesize: {byte_scale(int(head['Content-Length']))}B"
+        out.append(fix_md(mimedata))
+        with tracebacksuppressor:
+            resp = self.probe(url)
+            if mime[0] == "image" and mime[1] != "gif":
+                search = "Video:"
+                spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).split(", ")
+                out.append(code_md(f"Codec: {spl[1]}\nSize: {spl[2].split(None, 1)[0]}"))
+            elif mime[0] == "video" or mime[1] == "gif":
+                search = "Duration:"
+                resp = resp[resp.index(search) + len(search):]
+                dur = time_disp(time_parse(resp[:resp.index(",")]), False)
+                search = "bitrate:"
+                resp = resp[resp.index(search) + len(search):]
+                bps = resp.split("\n", 1)[0].rstrip("b/s").casefold()
+                mult = 1
+                if bps.endswith("k"):
+                    mult *= 10 ** 3
+                elif bps.endswith("m"):
+                    mult *= 10 ** 6
+                elif bps.endswith("g"):
+                    mult *= 10 ** 9
+                bps = byte_scale(int(bps.split(None, 1)[0]) * mult) + "bps"
+                search = "Video:"
+                spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).split(", ")
+                s = f"Duration: {dur}\nBitrate: {bps}\nCodec: {spl[1]}\nSize: {spl[2].split(None, 1)[0]}"
+                for i in spl[3:]:
+                    if i.endswith(" fps"):
+                        s += f"\nFPS: {i[:-4]}"
+                        break
+                out.append(code_md(s))
+                search = "Audio:"
+                try:
+                    resp = resp[resp.index(search) + len(search):]
+                except ValueError:
+                    pass
+                else:
+                    spl = regexp(r"\([^)]+\)").sub("", resp.split("\n", 1)[0].strip()).split(", ")
+                    fmt = spl[0]
+                    sr = spl[1].split(None, 1)[0]
+                    s = f"Audio format: {fmt}\nAudio sample rate: {sr}"
+                    if len(spl) > 2:
+                        s += f"\nAudio channel: {spl[2]}"
+                        if len(spl) > 4:
+                            s += f"\nAudio bitrate: {spl[4]}"
+                    out.append(code_md(s))
+            elif mime[0] == "audio":
+                search = "Duration:"
+                resp = resp[resp.index(search) + len(search):]
+                dur = time_disp(time_parse(resp[:resp.index(",")]), False)
+                search = "bitrate:"
+                resp = resp[resp.index(search) + len(search):]
+                bps = resp.split("\n", 1)[0].rstrip("b/s").casefold()
+                mult = 1
+                if bps.endswith("k"):
+                    mult *= 10 ** 3
+                elif bps.endswith("m"):
+                    mult *= 10 ** 6
+                elif bps.endswith("g"):
+                    mult *= 10 ** 9
+                bps = byte_scale(int(bps.split(None, 1)[0]) * mult) + "bps"
+                search = "Audio:"
+                resp = resp[resp.index(search) + len(search):]
+                spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).split(", ")
+                s = f"Duration: {dur}\nBitrate: {bps}\nFormat: {spl[0]}\nSample rate: {spl[1].split(None, 1)[0]}"
+                if len(spl) > 2:
+                    s += f"\nChannel: {spl[2]}"
+                    if len(spl) > 4:
+                        s += f"\nBitrate: {spl[4]}"
+                out.append(code_md(s))
+        return "".join(out)
+
+    async def __call__(self, bot, channel, argv, user, message, **void):
+        argv += " ".join(best_url(a) for a in message.attachments)
+        urls = await bot.follow_url(argv, allow=True, images=False)
+        urls = set(urls)
+        names = [url.rsplit("/", 1)[-1] for url in urls]
+        futs = [create_future(self.identify, url) for url in urls]
+        fields = deque()
+        for name, fut in zip(names, futs):
+            resp = await fut
+            fields.append((name, resp))
+        title = f"{len(fields)} file{'s' if len(fields) != 1 else ''} identified"
+        await bot.send_as_embeds(channel, title=title, author=get_author(user), fields=sorted(fields))
+
+
 class Follow(Command):
-    name = ["🚶", "follow_url", "Redirect"]
+    name = ["🚶", "Follow_URL", "Redirect"]
     description = "Follows a discord message link and/or finds URLs in a string."
     usage = "<url>*"
     rate_limit = (1, 5)

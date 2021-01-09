@@ -1740,7 +1740,7 @@ class UpdateFileLogs(Database):
                         fil = CompatFile(io.BytesIO(b), filename=str(a).rsplit("/", 1)[-1])
                         fils.append(fil)
                     except:
-                        msg.append(best_url(a))
+                        msg.append(proxy_url(a))
                 colour = await self.bot.get_colour(message.author)
                 emb = discord.Embed(colour=colour)
                 emb.description = f"File{'s' if len(fils) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"

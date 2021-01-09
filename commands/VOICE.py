@@ -61,7 +61,7 @@ def get_duration(filename):
             proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             fut = create_future_ex(proc.communicate, timeout=2)
             res = fut.result(timeout=2)
-            resp = bytes().join(res)
+            resp = b"\n".join(res)
             break
         except:
             with suppress():
@@ -2429,9 +2429,7 @@ class Queue(Command):
 
     async def __call__(self, bot, user, perm, message, channel, guild, flags, name, argv, **void):
         # This command is a bit of a mess
-        if not argv:
-            if message.attachments:
-                argv = message.attachments[0].url
+        argv += " ".join(best_url(a) for a in message.attachments)
         if not argv:
             auds = await auto_join(guild, channel, user, bot)
             elapsed = auds.stats.position

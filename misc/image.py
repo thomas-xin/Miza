@@ -1233,7 +1233,7 @@ def from_bytes(b, save=None):
         if not b:
             raise FileNotFoundError("image file not found")
         out.seek(0)
-        raise TypeError(f"Filetype {magic.from_buffer(out.read())} is not supported.")
+        raise TypeError(f'Filetype "{magic.from_buffer(out.read(65536))}" is not supported.')
 
 
 class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContextManager):

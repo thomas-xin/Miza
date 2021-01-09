@@ -3237,10 +3237,13 @@ def month_days(year, month):
     return 31
 
 # Returns a representation of a time interval using days:hours:minutes:seconds.
-def time_disp(s):
+def time_disp(s, round=True):
     if not is_finite(s):
         return str(s)
-    s = round(s)
+    if round:
+        s = round(s)
+    else:
+        s = round_min(s)
     output = str(s % 60)
     if len(output) < 2:
         output = "0" + output
