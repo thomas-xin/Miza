@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib
+import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, magic
 import numpy as np
 import PIL
 from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
@@ -1232,8 +1232,8 @@ def from_bytes(b, save=None):
     except PIL.UnidentifiedImageError:
         if not b:
             raise FileNotFoundError("image file not found")
-        file_print(b[:1024])
-        raise
+        out.seek(0)
+        raise TypeError(f"Filetype {magic.from_buffer(out.read(4096))} is not supported.")
 
 
 class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContextManager):

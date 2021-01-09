@@ -154,6 +154,57 @@ def get_best_audio(entry):
     return url
 
 
+# Gets the best video file download link for a queue entry.
+def get_best_video(entry):
+    with suppress(KeyError):
+        return entry["stream"]
+    best = -inf
+    try:
+        fmts = entry["formats"]
+    except KeyError:
+        fmts = ()
+    try:
+        url = entry["webpage_url"]
+    except KeyError:
+        url = entry.get("url")
+    replace = True
+    for fmt in fmts:
+        q = fmt.get("height", 0)
+        if type(q) is not int:
+            q = 0
+        vcodec = fmt.get("vcodec", "none")
+        if vcodec in (None, "none"):
+            q -= 1
+        u = as_str(fmt["url"])
+        if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
+            replace = False
+        if q > best or replace:
+            best = q
+            url = fmt["url"]
+    if "dropbox.com" in url:
+        if "?dl=0" in url:
+            url = url.replace("?dl=0", "?dl=1")
+    if url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
+        resp = Request(url)
+        fmts = alist()
+        with suppress(ValueError, KeyError):
+            while True:
+                search = b'<Representation id="'
+                resp = resp[resp.index(search) + len(search):]
+                f_id = as_str(resp[:resp.index(b'"')])
+                search = b"><BaseURL>"
+                resp = resp[resp.index(search) + len(search):]
+                stream = as_str(resp[:resp.index(b'</BaseURL>')])
+                fmt = cdict(youtube_dl.extractor.youtube.YoutubeIE._formats[f_id])
+                fmt.url = stream
+                fmts.append(fmt)
+        entry["formats"] = fmts
+        return get_best_video(entry)
+    if not url:
+        raise KeyError("URL not found.")
+    return url
+
+
 # Joins a voice channel and returns the associated audio player.
 async def auto_join(guild, channel, user, bot, preparing=False, vc=None):
     if type(channel) in (str, int):
@@ -1460,7 +1511,7 @@ class AudioDownloader:
                 self.keepvid_token = as_str(resp[:resp.index(b"';</script>")])
 
     # Gets data from yt-download.org, keepv.id, or y2mate.guru, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
-    def extract_backup(self, url):
+    def extract_backup(self, url, video=False):
         url = verify_url(url)
         if is_url(url) and not is_youtube_url(url):
             raise TypeError("Not a youtube link.")
@@ -1471,8 +1522,12 @@ class AudioDownloader:
         resp = None
         try:
             yt_url = f"https://www.yt-download.org/file/mp3/{url}"
+            if video:
+                v_url = f"https://www.yt-download.org/file/mp4/{url}"
+                self.other_x += 1
+                fut = create_future_ex(Request, v_url, timeout=16)
             self.other_x += 1
-            resp = Request(yt_url, timeout=12)
+            resp = Request(yt_url, timeout=16)
             search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
             resp = resp[resp.index(search) + len(search):]
             thumbnail = as_str(resp[:resp.index(b'"')])
@@ -1497,6 +1552,23 @@ class AudioDownloader:
                 "title": title,
                 "webpage_url": webpage_url,
             }
+            if video:
+                with tracebacksuppressor:
+                    resp = fut.result()
+                    while True:
+                        try:
+                            resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp4/'.encode("utf-8")) + 9:]
+                            stream = as_str(resp[:resp.index(b'"')])
+                            search = b'<div class="text-shadow-1">'
+                            height = int(resp[resp.rindex(search) + len(search):resp.rindex(b"</div>")].strip().rstrip("p"))
+                        except ValueError:
+                            break
+                        else:
+                            entry["formats"].append(dict(
+                                abr=1,
+                                url=stream,
+                                height=height,
+                            ))
             print("Successfully resolved with yt-download.")
             return entry
         except Exception as ex:
@@ -1510,7 +1582,7 @@ class AudioDownloader:
                 headers={"Accept": "*/*", "Cookie": "PHPSESSID=" + self.keepvid_token, "X-Requested-With": "XMLHttpRequest"},
                 data=(("url", webpage_url), ("sid", self.keepvid_token)),
                 method="POST",
-                timeout=12,
+                timeout=16,
             )
             search = b'<h2 class="mb-3">'
             resp = resp[resp.index(search) + len(search):]
@@ -1530,20 +1602,25 @@ class AudioDownloader:
                 search = b"Duration: "
                 resp = resp[resp.index(search) + len(search):]
                 entry["duration"] = dur = time_parse(as_str(resp[:resp.index(b"<br><br>")]))
-            search = b"</a></td></tr></tbody></table><h3>Audio</h3>"
-            resp = resp[resp.index(search) + len(search):]
-            with suppress(ValueError):
-                while resp:
-                    search = b"""</td><td class='text-center'><span class="btn btn-sm btn-outline-"""
+            resp = resp[resp.index(b"<body>") + 6:]
+            while resp:
+                try:
+                    search = b"<tr><td>"
                     resp = resp[resp.index(search) + len(search):]
-                    search = b"</span></td><td class='text-center'>"
-                    resp = resp[resp.index(search) + len(search):]
-                    fs = parse_fs(resp[:resp.index(b"<")])
-                    abr = fs / dur * 8
-                    search = b'class="btn btn-sm btn-outline-primary shadow vdlbtn" href='
-                    resp = resp[resp.index(search) + len(search):]
-                    stream = resp[resp.index(b'"') + 1:resp.index(b'" download="')]
-                    entry["formats"].append(dict(abr=abr, url=stream))
+                except ValueError:
+                    break
+                fmt = as_str(resp[:resp.index(b"</td>")])
+                if not fmt:
+                    form = {}
+                elif "x" in fmt:
+                    form = dict(zip(("width", "height"), (int(i) for i in fmt.split("x", 1))))
+                else:
+                    form = dict(abr=int(fmt.casefold().rstrip("kmgbps")))
+                search = b' shadow vdlbtn" href="'
+                resp = resp[resp.index(search) + len(search):]
+                stream = resp[:resp.index(b'"')]
+                form["url"] = stream
+                entry["formats"].append(form)
             if not entry["formats"]:
                 raise FileNotFoundError
             print("Successfully resolved with keepv.id.")
@@ -1554,11 +1631,12 @@ class AudioDownloader:
             excs.append(ex)
         try:
             self.other_x += 1
-            data = Request("https://y2mate.guru/api/convert", data={"url": webpage_url}, method="POST", json=True, timeout=12)
+            data = Request("https://y2mate.guru/api/convert", data={"url": webpage_url}, method="POST", json=True, timeout=16)
             meta = data["meta"]
             entry = {
                 "formats": [
                     {
+                        "height": stream.get("height", 0),
                         "abr": stream.get("quality", 0),
                         "url": stream["url"],
                     } for stream in data["url"] if "url" in stream and stream.get("audio")
@@ -1925,22 +2003,24 @@ class AudioDownloader:
                             try:
                                 data = self.extract_from(entry["url"])
                             except KeyError:
-                                temp = {
+                                temp = cdict({
                                     "name": resp["title"],
                                     "url": resp["webpage_url"],
                                     "duration": inf,
                                     "stream": get_best_audio(entry),
                                     "icon": get_best_icon(entry),
-                                }
+                                    "video": get_best_video(entry),
+                                })
                             else:
-                                temp = {
+                                temp = cdict({
                                     "name": data["title"],
                                     "url": data["webpage_url"],
                                     "duration": float(data["duration"]),
                                     "stream": get_best_audio(resp),
                                     "icon": get_best_icon(resp),
-                                }
-                            output.append(cdict(temp))
+                                    "video": get_best_video(resp),
+                                })
+                            output.append(temp)
                     else:
                         for i, entry in enumerate(entries):
                             if not i:
@@ -1981,14 +2061,15 @@ class AudioDownloader:
                         dur = resp["duration"]
                     else:
                         dur = None
-                    temp = {
+                    temp = cdict({
                         "name": resp["title"],
                         "url": resp["webpage_url"],
                         "duration": dur,
                         "stream": get_best_audio(resp),
                         "icon": get_best_icon(resp),
-                    }
-                    output.append(cdict(temp))
+                        "video": get_best_video(resp),
+                    })
+                    output.append(temp)
             return output
         except:
             if force != "spotify":
@@ -2108,15 +2189,21 @@ class AudioDownloader:
                 return repr(ex)
 
     # Gets the stream URL of a queue entry, starting download when applicable.
-    def get_stream(self, entry, force=False, download=True, callback=None):
-        stream = entry.get("stream", None)
+    def get_stream(self, entry, video=False, force=False, download=True, callback=None):
+        if video:
+            stream = entry.get("video", None)
+        else:
+            stream = entry.get("stream", None)
         icon = entry.get("icon", None)
         # Use SHA-256 hash of URL to avoid filename conflicts
         h = shash(entry["url"])
         fn = h + ".opus"
         # Use cached file if one already exists
         if self.cache.get(fn) or not download:
-            entry["stream"] = stream
+            if video:
+                entry["video"] = stream
+            else:
+                entry["stream"] = stream
             entry["icon"] = icon
             # Files may have a callback set for when they are loaded
             if callback is not None:
@@ -2188,34 +2275,54 @@ class AudioDownloader:
             entry["url"] = ""
 
     # For ~download
-    def download_file(self, url, fmt="ogg", start=None, end=None, auds=None):
+    def download_file(self, url, fmt, start=None, end=None, auds=None):
         # Select a filename based on current time to avoid conflicts
         if fmt[:3] == "mid":
             mid = True
             fmt = "mp3"
         else:
             mid = False
+        videos = ("webm", "mkv", "f4v", "flv", "mov", "qt", "wmv", "mp4", "m4v", "mpv")
         info = self.extract(url)[0]
-        self.get_stream(info, force=True, download=False)
+        self.get_stream(info, video=fmt in videos, force=True, download=False)
         outf = f"{info['name']}.{fmt}"
-        fn = f"cache/{ts_us()}~" + outf.translate(filetrans)
+        ts = ts_us()
+        fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+        if fmt in videos:
+            video = info["video"]
+        else:
+            video = None
         stream = info["stream"]
         if not stream:
             raise LookupError(f"No stream URLs found for {url}")
-        args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-vn"]
+        args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y"]
+        if not video:
+            args.append("-vn")
         if str(start) != "None":
             args.extend(("-ss", start))
         if str(end) != "None":
             args.extend(("-to", end))
         else:
             args.extend(("-to", "86400"))
+        if video:
+            args.extend(("-i", video))
         args.extend(("-i", stream))
         if auds is not None:
             args.extend(auds.construct_options(full=True))
         br = 196608
         if auds and br > auds.stats.bitrate:
             br = max(4096, auds.stats.bitrate)
-        args.extend(("-ar", str(SAMPLE_RATE), "-b:a", str(br), "-f", fmt, fn))
+        if fmt in ("vox", "adpcm"):
+            args.extend(("-acodec", "adpcm_ms"))
+            fmt = "wav" if fmt == "adpcm" else "vox"
+            outf = f"{info['name']}.{fmt}"
+            fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+        elif fmt == "pcm":
+            fmt = "s16le"
+        if not video:
+            args.extend(("-ar", str(SAMPLE_RATE), "-b:a", str(br)))
+        args.extend(("-f", fmt, fn))
+        print(args)
         try:
             resp = subprocess.run(args)
             resp.check_returncode()
@@ -2288,6 +2395,7 @@ class AudioDownloader:
                     url=data["url"],
                     stream=get_best_audio(data),
                     icon=get_best_icon(data),
+                    video=get_best_video(data),
                 )]
                 try:
                     out[0].duration = data["duration"]
@@ -4110,13 +4218,14 @@ class Download(Command):
     _timeout_ = 20
     name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "ConvertORG", "Org2xm", "Convert"]
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
-    usage = "<0:search_links>* <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(ogg)>? <apply_settings{?a}|verbose_search{?v}>*"
+    usage = "<0:search_links>* <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <apply_settings{?a}|verbose_search{?v}>*"
     flags = "avtz"
     rate_limit = (7, 16)
     typing = True
     slash = True
 
     async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
+        fmt = default_fmt = "mp4" if name == "trim" else "mp3"
         if name in ("af", "audiofilter"):
             set_dict(flags, "a", 1)
         # Prioritize attachments in message
@@ -4131,7 +4240,7 @@ class Download(Command):
                 if not auds.queue:
                     raise EOFError
                 res = [{"name": e.name, "url": e.url} for e in auds.queue[:10]]
-                fmt = "ogg"
+                fmt = "mp3"
                 desc = f"Current items in queue for {guild}:"
             except:
                 raise IndexError("Queue not found. Please input a search term, URL, or file.")
@@ -4143,19 +4252,13 @@ class Download(Command):
                 except ValueError:
                     spl = argv.split(" ")
                 if len(spl) >= 1:
-                    fmt = spl[-1]
-                    if fmt.startswith("."):
-                        fmt = fmt[1:]
-                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "webm", "wav", "mid", "midi"):
-                        fmt = "ogg"
+                    fmt = spl[-1].lstrip(".")
+                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "vox", "adpcm", "pcm", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv"):
+                        fmt = default_fmt
                     else:
                         if spl[-2] in ("as", "to"):
                             spl.pop(-1)
                         argv = " ".join(spl[:-1])
-                else:
-                    fmt = "ogg"
-            else:
-                fmt = "ogg"
             if name == "trim" or "t" in flags:
                 argv, start, end = argv.rsplit(None, 2)
                 if start == "-":

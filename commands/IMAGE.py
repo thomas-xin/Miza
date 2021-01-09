@@ -50,11 +50,11 @@ def get_video(url, fps):
     except KeyError:
         fmts = ""
     for fmt in fmts:
-        q = fmt.get("width", 0)
+        q = fmt.get("height", 0)
         if type(q) is not int:
             q = 0
-        # Attempt to get as close to width 512 as possible for download
-        if abs(q - 512) < abs(best - 512):
+        # Attempt to get as close to 720p as possible for download
+        if abs(q - 720) < abs(best - 720):
             best = q
             url = fmt["url"]
             size = [fmt["width"], fmt["height"]]

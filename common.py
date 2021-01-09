@@ -20,6 +20,7 @@ with MultiThreadedImporter(globals()) as importer:
         "zipfile",
         "nacl",
         "shutil",
+        "magic",
     )
 
 PROC = psutil.Process()
@@ -1094,6 +1095,7 @@ def is_image(url):
 VIDEO_FORMS = {
     ".webm": True,
     ".mkv": True,
+    ".f4v": False
     ".flv": True,
     ".ogv": True,
     ".ogg": False,
@@ -1673,6 +1675,14 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
     session = None
     semaphore = emptyctx
+
+    @classmethod
+    def header(cls):
+        return {
+            "User-Agent": f"Mozilla/5.{xrand(1, 10)}",
+            "DNT": 1,
+        }
+    headers = header
 
     async def _init_(self):
         self.session = aiohttp.ClientSession(loop=eloop)
