@@ -434,20 +434,21 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     async def send_event(self, ev, *args, exc=False, **kwargs):
         if self.closed:
             return
-        with tracebacksuppressor:
-            ctx = emptyctx if exc else tracebacksuppressor
-            events = self.events.get(ev, ())
-            if len(events) == 1:
-                with ctx:
-                    return await create_future(events[0](*args, **kwargs))
-                return
-            futs = [create_future(func(*args, **kwargs)) for func in events]
-            out = deque()
-            for fut in futs:
-                with ctx:
-                    res = await fut
-                    out.append(res)
-            return out
+        with MemoryTimer(ev):
+            with tracebacksuppressor:
+                ctx = emptyctx if exc else tracebacksuppressor
+                events = self.events.get(ev, ())
+                if len(events) == 1:
+                    with ctx:
+                        return await create_future(events[0](*args, **kwargs))
+                    return
+                futs = [create_future(func(*args, **kwargs)) for func in events]
+                out = deque()
+                for fut in futs:
+                    with ctx:
+                        res = await fut
+                        out.append(res)
+                return out
 
     # Gets the first accessable text channel in the target guild.
     async def get_first_sendable(self, guild, member):
@@ -2873,8 +2874,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     with MemoryTimer("get_disk"):
                         await self.get_disk()
                     await asyncio.sleep(1)
-                with MemoryTimer("minute_loop"):
-                    await self.send_event("_minute_loop_")
+                await self.send_event("_minute_loop_")
 
     # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
     async def heartbeat_loop(self):

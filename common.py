@@ -1095,7 +1095,7 @@ def is_image(url):
 VIDEO_FORMS = {
     ".webm": True,
     ".mkv": True,
-    ".f4v": False
+    ".f4v": False,
     ".flv": True,
     ".ogv": True,
     ".ogg": False,
