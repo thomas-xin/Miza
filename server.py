@@ -59,18 +59,24 @@ get_mime = lambda path: magic.from_file(path, mime=True)
 @app.route("/files/<path>", methods=["GET"])
 def get_file(path):
     p = find_file(path)
-    mime = get_mime(p)
     down = flask.request.args.get("download", "false")
     download = down and down[0] not in "0fFnN"
+    if download:
+        mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
+    else:
+        mime = get_mime(p)
     return flask.send_file(p, as_attachment=download, mimetype=mime)
 
 @app.route("/file/<path>/<path:filename>", methods=["GET"])
 @app.route("/files/<path>/<path:filename>", methods=["GET"])
 def get_file_ex(path, filename):
     p = find_file(path)
-    mime = get_mime(p)
     down = flask.request.args.get("download", "false")
     download = down and down[0] not in "0fFnN"
+    if download:
+        mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
+    else:
+        mime = get_mime(p)
     return flask.send_file(p, as_attachment=download, attachment_filename=filename, mimetype=mime)
 
 
