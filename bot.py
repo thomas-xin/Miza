@@ -2673,7 +2673,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if description is not None and type(description) is not str:
             description = as_str(description)
         if not description and not fields and not thumbnail and not image and not images:
-            return
+            return fut_nop
         return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts, reference))
     
     async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None):
@@ -3000,9 +3000,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             __repr__ = lambda self: f"<Ghost User id={self.id} name='{self.name}' discriminator='{self.discriminator}' bot=False>"
             __str__ = lambda self: f"{self.name}#{self.discriminator}"
             system = False
-            history = lambda *void1, **void2: async_nop()
+            history = lambda *void1, **void2: fut_nop
             dm_channel = None
-            create_dm = lambda self: async_nop()
+            create_dm = lambda self: fut_nop
             relationship = None
             is_friend = lambda self: None
             is_blocked = lambda self: None

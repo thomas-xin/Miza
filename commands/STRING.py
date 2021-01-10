@@ -778,6 +778,8 @@ class Identify(Command):
         for name, fut in zip(names, futs):
             resp = await fut
             fields.append((name, resp))
+        if not fields:
+            raise FileNotFoundError("Please input a file by URL or attachment.")
         title = f"{len(fields)} file{'s' if len(fields) != 1 else ''} identified"
         await bot.send_as_embeds(channel, title=title, author=get_author(user), fields=sorted(fields))
 

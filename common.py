@@ -1445,6 +1445,9 @@ is_main_thread = lambda: threading.current_thread() is threading.main_thread()
 async def async_nop(*args, **kwargs):
     return
 
+fut_nop = asyncio.Future()
+fut_nop.set_result(None)
+
 async def delayed_coro(fut, duration=None):
     async with delay(duration):
         return await fut
