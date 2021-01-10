@@ -635,8 +635,8 @@ class TimeCalc(Command):
         return code_md(out)
 
 
-class FileType(Command):
-    name = ["📂", "Magic", "Mime", "Identify"]
+class Identify(Command):
+    name = ["📂", "Magic", "Mime", "FileType"]
     description = "Detects the type, mime, and optionally details of an input file."
     usage = "<url>*"
     rate_limit = (2, 7)
@@ -766,7 +766,7 @@ class FileType(Command):
         argv += " ".join(best_url(a) for a in message.attachments)
         urls = await bot.follow_url(argv, allow=True, images=False)
         urls = set(urls)
-        names = [url.rsplit("/", 1)[-1] for url in urls]
+        names = [url.rsplit("/", 1)[-1].rsplit("?", 1)[0] for url in urls]
         futs = [create_future(self.identify, url) for url in urls]
         fields = deque()
         for name, fut in zip(names, futs):
