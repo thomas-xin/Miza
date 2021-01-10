@@ -6,6 +6,7 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
     print("Authentication file not found. Generating empty template...")
     f = open("auth.json", "wb")
     d = {
+        "prefix": "~",
         "python_path": "",
         "webserver_port": 9801,
         "discord_id": "",

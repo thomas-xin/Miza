@@ -26,7 +26,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "attachments", "deleted", "banned")
     statuses = (discord.Status.online, discord.Status.idle, discord.Status.dnd)
     # Default command prefix
-    prefix = "~"
+    prefix = AUTH.get("prefix", "~")
     # This is a fixed ID apparently
     deleted_user = 456226577798135808
     _globals = globals()
@@ -360,7 +360,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             j = {}
             for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "OWNER", "NSFW", "MISC"):
                 k = j[category] = {}
-                for command in self.categories[category]:
+                for command in self.categories.get(category, ()):
                     c = k[command.parse_name()] = dict(
                         aliases=[n.strip("_") for n in command.alias],
                         description=command.parse_description(),
@@ -381,8 +381,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             with suppress():
                 self.server.kill()
         print("Starting webserver...")
-        self.server = psutil.Popen([python, "server.py"], stderr=subprocess.PIPE)
-        create_thread(webserver_communicate, self)
+        if os.path.exists("server.py") and PORT:
+            self.server = psutil.Popen([python, "server.py"], stderr=subprocess.PIPE)
+            create_thread(webserver_communicate, self)
+        else:
+            self.server = None
 
     # Starts up client.
     def run(self):
@@ -3135,7 +3138,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             def __getitem__(self, k):
                 with suppress(KeyError):
                     return self.data[k]
-                return bot.data.message_cache.load_message(k)
+                if "message_cache" in bot.data:
+                    return bot.data.message_cache.load_message(k)
+                raise KeyError(k)
 
             def __setitem__(self, k, v):
                 bot.add_message(v)

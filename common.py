@@ -806,7 +806,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             if tts:
                 fields["tts"] = tts
             return await channel.send(content, **fields)
-        if not is_channel(channel):
+        if getattr(channel, "dm_channel", None):
             c = channel.dm_channel
             if c is None:
                 c = await channel.create_dm()
