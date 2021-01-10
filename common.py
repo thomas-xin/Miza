@@ -539,6 +539,7 @@ class FileHashDict(collections.abc.MutableMapping):
     def __setitem__(self, k, v):
         with suppress(ValueError):
             k = int(k)
+        self.deleted.discard(k)
         self.data[k] = v
         self.modified.add(k)
 

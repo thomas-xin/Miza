@@ -10,6 +10,18 @@ IND = "\x7f"
 
 sys.stderr = sys.stdout
 
+def send(*args, escape=True):
+    try:
+        s = " ".join(str(i) for i in args)
+        if escape:
+            s = "\x00" + s
+        if s:
+            if s[-1] != "\n":
+                s += "\n"
+            sys.__stderr__.write(s)
+    except OSError:
+        psutil.Process().kill()
+
 app = Flask(__name__, static_url_path="/static")
 app.url_map.strict_slashes = False
 # app.use_x_sendfile = True
@@ -17,7 +29,7 @@ app.url_map.strict_slashes = False
 
 @app.errorhandler(Exception)
 def on_error(ex):
-    sys.__stderr__.write("\x00" + repr(ex) + "\n")
+    send(repr(ex))
     # Redirect HTTP errors to http.cat, python exceptions go to code 500 (internal server error)
     if issubclass(type(ex), HTTPException):
         return flask.redirect(f"https://http.cat/{ex.code}")
@@ -49,8 +61,7 @@ def find_file(path):
     for file in reversed(os.listdir("cache")):
         # file cache is stored as "{timestamp}~{name}", search for file via timestamp
         if file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
-            out = "cache/" + file
-            return out
+            return "cache/" + file
     raise FileNotFoundError
 
 get_mime = lambda path: magic.from_file(path, mime=True)
@@ -65,6 +76,7 @@ def get_file(path):
         mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
     else:
         mime = get_mime(p)
+    send(p, mime)
     return flask.send_file(p, as_attachment=download, mimetype=mime)
 
 @app.route("/file/<path>/<path:filename>", methods=["GET"])
@@ -77,6 +89,7 @@ def get_file_ex(path, filename):
         mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
     else:
         mime = get_mime(p)
+    send(p, mime)
     return flask.send_file(p, as_attachment=download, attachment_filename=filename, mimetype=mime)
 
 
@@ -116,13 +129,15 @@ def fetch_static(path):
             mime = "text/html"
         return data, mime
     except:
-        sys.__stderr__.write("\x00" + path + "\n\x00" + traceback.format_exc())
+        send(path)
+        send(traceback.format_exc())
         raise
 
 @app.route("/static/<filename>", methods=["GET"])
 @app.route("/static/<path:filename>", methods=["GET"])
 def get_static_file(filename):
     data, mime = fetch_static(filename)
+    send("static/" + filename, mime)
     return flask.Response(data, mimetype=mime)
 
 @app.route("/static", methods=["DELETE"])
@@ -130,6 +145,7 @@ def clearcache():
     ip = flask.request.remote_addr
     if ip == "127.0.0.1":
         STATIC.clear()
+        send("Webserver cache cleared.")
         return b"\xf0\x9f\x92\x9c"
     raise PermissionError
 
@@ -158,11 +174,13 @@ def atlas(filename):
         data, mime = fetch_static("mizatlas/" + filename)
     except FileNotFoundError:
         data, mime = fetch_static("mizatlas/index.html")
+    send("mizatlas/" + filename, mime)
     return flask.Response(data, mimetype=mime)
 
 @app.route("/mizatlas", methods=["GET"])
 def mizatlas():
     data, mime = fetch_static("mizatlas/index.html")
+    send("mizatlas/index.html", mime)
     return flask.Response(data, mimetype=mime)
 #     return f"""<!DOCTYPE html>
 # <html lang="en">
@@ -192,11 +210,13 @@ def mizatlas():
 @app.route("/", methods=["GET", "POST"])
 def home():
     data, mime = fetch_static("index.html")
+    send("index.html", mime)
     return flask.Response(data, mimetype=mime)
 
 @app.route("/favicon.ico", methods=["GET"])
 def favicon():
     data, mime = fetch_static("icon.ico")
+    send("icon.ico", mime)
     return flask.Response(data, mimetype=mime)
 
 
@@ -209,7 +229,7 @@ def upload_file():
     f.save(f"cache/{IND}{ts}~{fn}")
     href = f"/files/{ts}/{fn}"
     url = f"{flask.request.host}{href}"
-    sys.__stderr__.write(ip + "\t" + fn + "\t" + url + "\n")
+    send(ip + "\t" + fn + "\t" + url)
     return """<!DOCTYPE html>
 <html>
     <head>
@@ -254,7 +274,7 @@ def upload_file():
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
     ip = flask.request.remote_addr
-    sys.__stderr__.write(ip + "/upload\n")
+    send(ip + "/upload\n")
     colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
     return f"""<!DOCTYPE html>
 <html>
@@ -303,7 +323,7 @@ def timezone():
         data = resp["data"]["geo"]
         tz = data["timezone"]
         dt = datetime.datetime.now(pytz.timezone(tz))
-        sys.__stderr__.write(ip + "\t" + str(dt) + "\t" + tz + "\n")
+        send(ip + "\t" + str(dt) + "\t" + tz)
         colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
         html = """<!DOCTYPE html>
 <html>
@@ -335,10 +355,10 @@ def timezone():
         """
         return html
     except KeyError:
-        sys.__stderr__.write("\x00" + traceback.format_exc())
+        send(traceback.format_exc())
         return flask.redirect("https://http.cat/417")
     except:
-        sys.__stderr__.write("\x00" + traceback.format_exc())
+        send(traceback.format_exc())
         raise
 
 
@@ -353,7 +373,7 @@ def command(content):
         j = flask.request.get_json(force=True)
         if t in RESPONSES:
             RESPONSES[t].set_result((j, after))
-            sys.__stderr__.write("\x00" + str(j) + "\n")
+            send(j)
             return b"\xf0\x9f\x92\x9c"
     resp = get_geo(ip)
     data = resp["data"]["geo"]
@@ -362,7 +382,7 @@ def command(content):
     if " " not in content:
         content += " "
     RESPONSES[t] = fut = concurrent.futures.Future()
-    sys.__stderr__.write(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}\n")
+    send(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}", escape=False)
     j, after = fut.result(timeout=420)
     RESPONSES.pop(t, None)
     response = flask.Response(json.dumps(j), mimetype="application/json")
@@ -422,5 +442,17 @@ def custom_header(response):
     return response
 
 
+def ensure_parent(proc, parent):
+    while True:
+        if not parent.is_running():
+            proc.kill()
+        time.sleep(60)
+
 if __name__ == "__main__":
+    pid = os.getpid()
+    ppid = os.getppid()
+    send(f"Webserver starting on port {PORT}, with PID {pid} and parent PID {ppid}.")
+    proc = psutil.Process(pid)
+    parent = psutil.Process(ppid)
+    create_future_ex(ensure_parent, priority=True)
     app.run("0.0.0.0", PORT)

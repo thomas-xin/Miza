@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sympy, time, os, sys, subprocess, traceback, random, collections
+import sympy, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
 import matplotlib.pyplot as plt
@@ -587,7 +587,19 @@ def procResp(resp):
     return s.encode("utf-8")
 
 
+def ensure_parent(proc, parent):
+    while True:
+        if not parent.is_running():
+            proc.kill()
+        time.sleep(60)
+
 if __name__ == "__main__":
+    pid = os.getpid()
+    ppid = os.getppid()
+    proc = psutil.Process(pid)
+    parent = psutil.Process(ppid)
+    exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    exc.submit(ensure_parent)
     while True:
         try:
             args = eval(sys.stdin.readline()).decode("utf-8", "replace").strip().split("`")
