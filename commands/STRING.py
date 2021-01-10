@@ -707,13 +707,19 @@ class Identify(Command):
                 elif bps.endswith("g"):
                     mult = 10 ** 9
                 bps = byte_scale(int(bps.split(None, 1)[0]) * mult, ratio=1000) + "bps"
+                s = f"Duration: {dur}\nBitrate: {bps}"
                 search = "Video:"
-                spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).split(", ")
-                s = f"Duration: {dur}\nBitrate: {bps}\nCodec: {spl[1]}\nSize: {spl[2].split(None, 1)[0]}"
-                for i in spl[3:]:
-                    if i.endswith(" fps"):
-                        s += f"\nFPS: {i[:-4]}"
-                        break
+                try:
+                    resp = resp[resp.index(search) + len(search):]
+                except ValueError:
+                    pass
+                else:
+                    spl = regexp(r"\([^)]+\)").sub("", resp.split("\n", 1)[0].strip()).split(", ")
+                    s += f"\nCodec: {spl[1]}\nSize: {spl[2].split(None, 1)[0]}"
+                    for i in spl[3:]:
+                        if i.endswith(" fps"):
+                            s += f"\nFPS: {i[:-4]}"
+                            break
                 out.append(code_md(s))
                 search = "Audio:"
                 try:
