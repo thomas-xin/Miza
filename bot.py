@@ -360,7 +360,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             j = {}
             for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "OWNER", "NSFW", "MISC"):
                 k = j[category] = {}
-                for command in self.categories.get(category, ()):
+                for command in self.categories[category]:
                     c = k[command.parse_name()] = dict(
                         aliases=[n.strip("_") for n in command.alias],
                         description=command.parse_description(),
