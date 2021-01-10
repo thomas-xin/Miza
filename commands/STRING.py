@@ -663,15 +663,28 @@ class FileType(Command):
     def identify(self, url):
         out = deque()
         with requests.get(url, headers=Request.header(), stream=True) as resp:
-            head = resp.headers
-            it = resp.iter_content(65536)
+            head = fcdict(resp.headers)
+            it = resp.iter_content(262144)
             data = next(it)
         out.append(code_md(magic.from_buffer(data)))
         mimedata = self.mime.from_buffer(data).replace("; ", "\n")
         mime = mimedata.split("\n", 1)[0].split("/", 1)
+        if mime == ["text", "plain"]:
+            if "Content-Type" in head:
+                ctype = head["Content-Type"]
+                spl = ctype.split("/")
+                if spl[-1].casefold() != "octet-stream":
+                    mimedata = ctype + "\n" + mimedata.split("\n", 1)[-1]
+                    mime = spl
         mimedata = "mimetype: " + mimedata
         if "Content-Length" in head:
-            mimedata = f"filesize: {byte_scale(int(head['Content-Length']))}B\n" + mimedata
+            fs = head['Content-Length']
+        elif len(data) < 131072:
+            fs = len(data)
+        else:
+            fs = None
+        if fs is not None:
+            mimedata = f"filesize: {byte_scale(int(fs))}B\n" + mimedata
         out.append(fix_md(mimedata))
         with tracebacksuppressor:
             resp = self.probe(url)
