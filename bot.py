@@ -951,7 +951,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if "emojis" in self.data:
             return await create_future(self.data.emojis.create_progress_bar, length, ratio)
         position = min(length, round(length * ratio))
-        return "⬜" * position + "⬛" * length - position
+        return "⬜" * position + "⬛" * (length - position)
 
     # Finds URLs in a string, following any discord message links found.
     async def follow_url(self, url, it=None, best=False, preserve=True, images=True, allow=False, limit=None):
