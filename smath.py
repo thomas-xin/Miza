@@ -2392,7 +2392,7 @@ def num_parse(s):
     return out
 
 
-__scales = ("", "K", "M", "G", "T", "P", "E", "Z", "Y")
+__scales = ("", "k", "M", "G", "T", "P", "E", "Z", "Y")
 
 def byte_scale(n):
     e = 0
@@ -2401,7 +2401,7 @@ def byte_scale(n):
         e += 1
         if e >= len(__scales) - 1:
             break
-    return f"{round(n, 3)} {__scales[e]}"
+    return f"{round(n, 4)} {__scales[e]}"
 
 
 
@@ -3236,29 +3236,29 @@ def month_days(year, month):
         return 28
     return 31
 
+strnum = lambda num: str(round_min(num))
+
 # Returns a representation of a time interval using days:hours:minutes:seconds.
-def time_disp(s, round=True):
+def time_disp(s, rounded=True):
     if not is_finite(s):
         return str(s)
-    if round:
+    if rounded:
         s = round(s)
-    else:
-        s = round_min(s)
-    output = str(s % 60)
+    output = strnum(s % 60)
     if len(output) < 2:
         output = "0" + output
     if s >= 60:
-        temp = str((s // 60) % 60)
+        temp = strnum((s // 60) % 60)
         if len(temp) < 2 and s >= 3600:
             temp = "0" + temp
         output = temp + ":" + output
         if s >= 3600:
-            temp = str((s // 3600) % 24)
+            temp = strnum((s // 3600) % 24)
             if len(temp) < 2 and s >= 86400:
                 temp = "0" + temp
             output = temp + ":" + output
             if s >= 86400:
-                output = str(s // 86400) + ":" + output
+                output = strnum(s // 86400) + ":" + output
     else:
         output = "0:" + output
     return output

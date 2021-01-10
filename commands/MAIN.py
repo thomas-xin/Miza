@@ -1188,7 +1188,7 @@ class Activity(Command):
         u_id = None
         if argv:
             user = None
-            if not regexp("^<#[0-9]+>$").match(argv):
+            if "#" not in argv:
                 with suppress():
                     user = bot.cache.guilds[int(argv)]
             if user is None:
@@ -1385,7 +1385,6 @@ class Reminder(Command):
         # This parser is so unnecessarily long for what it does...
         keyed = False
         while True:
-            argv = argv.replace("tomorrow at", "at tomorrow").replace("today at", "at today").replace("yesterday at", "at yesterday")
             temp = argv.casefold()
             if name == "remind" and temp.startswith("me "):
                 argv = argv[3:]
@@ -1464,6 +1463,11 @@ class Reminder(Command):
                     spl = [argv[3:]]
                     msg = ""
                 if spl is not None:
+                    if len(spl) > 1:
+                        spl2 = spl[0].rsplit(None, 1)
+                        if spl2[-1] in ("today", "tomorrow", "yesterday"):
+                            spl[0] = "" if len(spl2) <= 1 else spl2[0]
+                            spl[-1] = "tomorrow " + spl[-1]
                     msg = " at ".join(spl[:-1])
                     t = utc_ts(tzparse(spl[-1])) - utc()
                     break

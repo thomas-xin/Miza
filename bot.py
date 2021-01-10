@@ -380,6 +380,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if getattr(self, "server", None):
             with suppress():
                 self.server.kill()
+        print("Starting webserver...")
         self.server = psutil.Popen([python, "server.py"], stderr=subprocess.PIPE)
         create_thread(webserver_communicate, self)
 

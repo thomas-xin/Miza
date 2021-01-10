@@ -769,7 +769,7 @@ async def recursive_coro(item):
     return item
 
 
-is_channel = lambda channel: issubclass(type(channel), discord.abc.GuildChannel) or issubclass(type(channel), discord.abc.PrivateChannel)
+is_channel = lambda channel: issubclass(type(channel), discord.abc.GuildChannel) or type(channel) is discord.abc.PrivateChannel
 
 
 REPLY_SEM = cdict()

@@ -669,8 +669,9 @@ class FileType(Command):
         out.append(code_md(magic.from_buffer(data)))
         mimedata = self.mime.from_buffer(data).replace("; ", "\n")
         mime = mimedata.split("\n", 1)[0].split("/", 1)
+        mimedata = "mimetype: " + mimedata
         if "Content-Length" in head:
-            mimedata += f"\nfilesize: {byte_scale(int(head['Content-Length']))}B"
+            mimedata = f"filesize: {byte_scale(int(head['Content-Length']))}B\n" + mimedata
         out.append(fix_md(mimedata))
         with tracebacksuppressor:
             resp = self.probe(url)
@@ -687,11 +688,11 @@ class FileType(Command):
                 bps = resp.split("\n", 1)[0].rstrip("b/s").casefold()
                 mult = 1
                 if bps.endswith("k"):
-                    mult *= 10 ** 3
+                    mult = 10 ** 3
                 elif bps.endswith("m"):
-                    mult *= 10 ** 6
+                    mult = 10 ** 6
                 elif bps.endswith("g"):
-                    mult *= 10 ** 9
+                    mult = 10 ** 9
                 bps = byte_scale(int(bps.split(None, 1)[0]) * mult) + "bps"
                 search = "Video:"
                 spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).split(", ")
@@ -714,31 +715,37 @@ class FileType(Command):
                     if len(spl) > 2:
                         s += f"\nAudio channel: {spl[2]}"
                         if len(spl) > 4:
-                            s += f"\nAudio bitrate: {spl[4]}"
+                            bps = spl[4].rstrip("b/s").casefold()
+                            mult = 1
+                            if bps.endswith("k"):
+                                mult = 10 ** 3
+                            elif bps.endswith("m"):
+                                mult = 10 ** 6
+                            elif bps.endswith("g"):
+                                mult = 10 ** 9
+                            bps = byte_scale(int(bps.split(None, 1)[0]) * mult) + "bps"
+                            s += f"\nAudio bitrate: {bps}"
                     out.append(code_md(s))
             elif mime[0] == "audio":
                 search = "Duration:"
                 resp = resp[resp.index(search) + len(search):]
                 dur = time_disp(time_parse(resp[:resp.index(",")]), False)
-                search = "bitrate:"
-                resp = resp[resp.index(search) + len(search):]
-                bps = resp.split("\n", 1)[0].rstrip("b/s").casefold()
-                mult = 1
-                if bps.endswith("k"):
-                    mult *= 10 ** 3
-                elif bps.endswith("m"):
-                    mult *= 10 ** 6
-                elif bps.endswith("g"):
-                    mult *= 10 ** 9
-                bps = byte_scale(int(bps.split(None, 1)[0]) * mult) + "bps"
                 search = "Audio:"
-                resp = resp[resp.index(search) + len(search):]
                 spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).split(", ")
-                s = f"Duration: {dur}\nBitrate: {bps}\nFormat: {spl[0]}\nSample rate: {spl[1].split(None, 1)[0]}"
+                s = f"Duration: {dur}\nFormat: {spl[0]}\nSample rate: {spl[1].split(None, 1)[0]}"
                 if len(spl) > 2:
                     s += f"\nChannel: {spl[2]}"
                     if len(spl) > 4:
-                        s += f"\nBitrate: {spl[4]}"
+                        bps = spl[4].rstrip("b/s").casefold()
+                        mult = 1
+                        if bps.endswith("k"):
+                            mult = 10 ** 3
+                        elif bps.endswith("m"):
+                            mult = 10 ** 6
+                        elif bps.endswith("g"):
+                            mult = 10 ** 9
+                        bps = byte_scale(int(bps.split(None, 1)[0]) * mult) + "bps"
+                        s += f"\nBitrate: {bps}"
                 out.append(code_md(s))
         return "".join(out)
 
