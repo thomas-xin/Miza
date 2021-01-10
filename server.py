@@ -222,12 +222,32 @@ def upload_file():
             margin-left: auto;
             margin-right: auto;
         }
+        a:link {
+            color: #ffff00;
+            text-decoration: none;
+        }
+
+        a:visited {
+            color: #ffff00;
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: #ff0000;
+            text-decoration: underline;
+        }
+
+        a:active {
+            color: #00ff00;
+            text-decoration: underline;
+        }
         </style>
     </head>
     <body style="background-color:black;">
         <h1 style="color:white;">File uploaded successfully!</h1>
         <p><a href=\"""" + href + f"""\">{url}</a></p>
         <img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">
+        <p><a href="{flask.request.host}/upload">Click here to upload another file!</a></p>
     </body>
 </html>"""
 

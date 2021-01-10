@@ -104,7 +104,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
             for _ in range(3):
                 try:
                     proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    fut = exc.submit(proc.communicate)
+                    fut = exc.submit(proc.communicate, timeout=12)
                     res = fut.result(timeout=12)
                     resp = bytes().join(res)
                     break

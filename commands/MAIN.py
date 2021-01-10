@@ -1314,6 +1314,14 @@ class Invite(Command):
         self.bot.send_embeds(channel, embed=emb, reference=message)
 
 
+class Upload(Command):
+    name = ["Filehost"]
+    description = "Sends a link to ⟨MIZA⟩'s webserver's upload page."
+    
+    def __call__(self, **void):
+        return self.bot.webserver + "/upload"
+
+
 class Reminder(Command):
     name = ["Announcement", "Announcements", "Announce", "RemindMe", "Reminders", "Remind"]
     description = "Sets a reminder for a certain date and time."

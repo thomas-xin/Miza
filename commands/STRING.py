@@ -706,7 +706,7 @@ class Identify(Command):
                     mult = 10 ** 6
                 elif bps.endswith("g"):
                     mult = 10 ** 9
-                bps = byte_scale(int(bps.split(None, 1)[0]) * mult) + "bps"
+                bps = byte_scale(int(bps.split(None, 1)[0]) * mult, ratio=1000) + "bps"
                 search = "Video:"
                 spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).split(", ")
                 s = f"Duration: {dur}\nBitrate: {bps}\nCodec: {spl[1]}\nSize: {spl[2].split(None, 1)[0]}"
@@ -736,7 +736,7 @@ class Identify(Command):
                                 mult = 10 ** 6
                             elif bps.endswith("g"):
                                 mult = 10 ** 9
-                            bps = byte_scale(int(bps.split(None, 1)[0]) * mult) + "bps"
+                            bps = byte_scale(int(bps.split(None, 1)[0]) * mult, ratio=1000) + "bps"
                             s += f"\nAudio bitrate: {bps}"
                     out.append(code_md(s))
             elif mime[0] == "audio":
@@ -757,7 +757,7 @@ class Identify(Command):
                             mult = 10 ** 6
                         elif bps.endswith("g"):
                             mult = 10 ** 9
-                        bps = byte_scale(int(bps.split(None, 1)[0]) * mult) + "bps"
+                        bps = byte_scale(int(bps.split(None, 1)[0]) * mult, ratio=1000) + "bps"
                         s += f"\nBitrate: {bps}"
                 out.append(code_md(s))
         return "".join(out)

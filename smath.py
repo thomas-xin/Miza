@@ -2394,10 +2394,10 @@ def num_parse(s):
 
 __scales = ("", "k", "M", "G", "T", "P", "E", "Z", "Y")
 
-def byte_scale(n):
+def byte_scale(n, ratio=1024):
     e = 0
-    while n > 1024:
-        n /= 1024
+    while n > ratio:
+        n /= ratio
         e += 1
         if e >= len(__scales) - 1:
             break
@@ -3236,7 +3236,7 @@ def month_days(year, month):
         return 28
     return 31
 
-strnum = lambda num: str(round_min(num))
+strnum = lambda num: str(round(num, 6))
 
 # Returns a representation of a time interval using days:hours:minutes:seconds.
 def time_disp(s, rounded=True):
