@@ -698,7 +698,7 @@ class Identify(Command):
                 dur = time_disp(time_parse(resp[:resp.index(",")]), False)
                 search = "bitrate:"
                 resp = resp[resp.index(search) + len(search):]
-                bps = resp.split("\n", 1)[0].rstrip("b/s").casefold()
+                bps = resp.split("\n", 1)[0].strip().rstrip("b/s").casefold()
                 mult = 1
                 if bps.endswith("k"):
                     mult = 10 ** 3
