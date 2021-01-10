@@ -247,7 +247,7 @@ def upload_file():
         <h1 style="color:white;">File uploaded successfully!</h1>
         <p><a href=\"""" + href + f"""\">{url}</a></p>
         <img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">
-        <p><a href="{flask.request.host}/upload">Click here to upload another file!</a></p>
+        <p><a href="/upload">Click here to upload another file!</a></p>
     </body>
 </html>"""
 

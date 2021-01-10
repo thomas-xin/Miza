@@ -1316,7 +1316,7 @@ class Invite(Command):
 
 class Upload(Command):
     name = ["Filehost"]
-    description = "Sends a link to ⟨MIZA⟩'s webserver's upload page."
+    description = "Sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/upload"
     
     def __call__(self, **void):
         return self.bot.webserver + "/upload"
