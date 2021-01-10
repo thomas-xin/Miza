@@ -1311,7 +1311,7 @@ class Invite(Command):
                     else:
                         invite = sorted(invites, key=lambda invite: (invite.max_age == 0, invite.max_uses - invite.uses != 0, len(invite.url)))[0]
                     emb.description += f" [**`Server Invite`**]({invite.url})"
-        self.bot.send_embeds(channel, embed=emb, reference=message, author=get_author(self.bot.user))
+        self.bot.send_as_embeds(channel, embed=emb, reference=message, author=get_author(self.bot.user))
 
 
 class Upload(Command):

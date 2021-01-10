@@ -3703,7 +3703,7 @@ def update_file_cache(files=None):
         ct = int(curr.rsplit(".", 1)[0].split("~", 1)[0])
         if ts_us() - ct > 86400:
             with tracebacksuppressor:
-                os.remove(IND + curr)
+                os.remove("cache/" + IND + curr)
                 print(curr, "deleted.")
                 update_file_cache(files)
 
