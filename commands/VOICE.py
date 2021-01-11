@@ -1108,6 +1108,7 @@ def select_and_convert(stream):
 # Represents a cached audio file in opus format. Executes and references FFmpeg processes loading the file.
 class AudioFile:
 
+    seekable = True
     live = False
     
     def __init__(self, fn, stream=None):
@@ -1130,10 +1131,11 @@ class AudioFile:
         classname = classname[classname.index("'") + 1:]
         return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>"
     
-    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False):
+    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True):
         if live:
             self.loading = self.buffered = self.loaded = True
             self.live = self.stream = stream
+            self.seekable = seekable
             self.proc = None
             return self
         if self.loading and not force:
@@ -1302,7 +1304,7 @@ class AudioFile:
         options = auds.construct_options(full=self.live)
         if options or auds.reverse or pos or auds.stats.bitrate != 1966.08 or self.live:
             args = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
-            if pos and not self.live:
+            if pos and self.seekable:
                 arg = "-to" if auds.reverse else "-ss"
                 args += [arg, str(pos)]
             args.append("-i")
@@ -1347,7 +1349,7 @@ class AudioFile:
         return self.open()
 
     # Audio duration estimation: Get values from file if possible, otherwise URL
-    duration = lambda self: inf if self.live else self.dur if getattr(self, "dur", None) is not None else set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded else get_duration(self.stream), ignore=True)
+    duration = lambda self: inf if not self.seekable else self.dur if getattr(self, "dur", None) is not None else set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded and not self.live else get_duration(self.stream), ignore=True)
 
 
 # Audio reader for fully loaded files. FFmpeg with single pipe for output.
@@ -2258,7 +2260,9 @@ class AudioDownloader:
                 stream = entry.get("stream")
                 if stream in (None, "none"):
                     raise FileNotFoundError("Unable to locate appropriate file stream.")
-            f.load(stream, check_fmt=entry.get("duration") is None, webpage_url=entry["url"], live=entry.get("duration") and not entry["duration"] < inf)
+            live = entry.get("duration") and not entry["duration"] <= 960
+            seekable = not entry.get("duration") or entry["duration"] < inf
+            f.load(stream, check_fmt=entry.get("duration") is None, webpage_url=entry["url"], live=live, seekable=seekable)
             # Assign file duration estimate to queue entry
             f.assign.append(entry)
             entry["stream"] = stream
