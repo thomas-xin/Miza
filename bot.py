@@ -2153,10 +2153,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                     audio_status = f"await client.change_presence(status=discord.Status."
                                     if status == discord.Status.invisible:
                                         status = discord.Status.idle
-                                        await create_future(self.audio.submit(audio_status + "online)"))
+                                        create_future_ex(self.audio.submit, audio_status + "online)")
                                     else:
                                         if status == discord.Status.online:
-                                            await create_future(self.audio.submit(audio_status + "dnd)"))
+                                            create_future_ex(self.audio.submit, audio_status + "dnd)")
                                 await self.change_presence(activity=activity, status=status)
                                 # Member update events are not sent through for the current user, so manually send a _seen_ event
                                 await self.seen(self.user, event="misc", raw="Changing their status")
