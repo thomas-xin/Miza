@@ -437,8 +437,8 @@ def scroll_gif2(image, direction, duration):
             image.seek(f)
         except EOFError:
             break
-        fps = max(image.info.get("duration", 0), 1 / 60)
-        total += fps
+        dur = max(image.info.get("duration", 0), 1 / 60)
+        total += dur
     count = f
     
     def scroll_gif_iterator(image):
@@ -452,8 +452,8 @@ def scroll_gif2(image, direction, duration):
             image.seek(i)
             temp = resize_max(image, 960, resample=Image.HAMMING)
             if i:
-                xm = round(x * temp.width / duration / fps * i)
-                ym = round(y * temp.height / duration / fps * i)
+                xm = round(x * temp.width / count * i)
+                ym = round(y * temp.height / count * i)
                 temp = ImageChops.offset(temp, xm, ym)
             yield temp
     
