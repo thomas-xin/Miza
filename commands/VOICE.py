@@ -2543,7 +2543,11 @@ class Connect(Command):
         if not vc_.permissions_for(guild.me).connect:
             raise ConnectionError("Insufficient permissions to connect to voice channel.")
         if vc_.permissions_for(guild.me).manage_channels:
-            bitrate = min(auds.stats.bitrate * 100, guild.bitrate_limit)
+            if guild.id in bot.data.audio.players:
+                br = round(auds.stats.bitrate * 100)
+            else:
+                br = 196608
+            bitrate = min(br, guild.bitrate_limit)
             if vc_.bitrate < bitrate:
                 await vc_.edit(bitrate=bitrate, reason="I deliver maximum quality audio only! :3")
         # Create audio source if none already exists
