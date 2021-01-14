@@ -2879,7 +2879,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes)
                         self.total_bytes = self.net_bytes[-1] + self.start_bytes
                     try:
-                        self.api_latency = requests.get("https://discord.com/api/v8").elapsed.total_seconds()
+                        resp = await create_future(requests.get, "https://discord.com/api/v8")
+                        self.api_latency = resp.elapsed.total_seconds()
                     except:
                         self.api_latency = inf
                         print_exc()
