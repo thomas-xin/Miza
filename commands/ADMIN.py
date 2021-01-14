@@ -1380,7 +1380,7 @@ class UpdateMessageCache(Database):
                     self.loaded.pop(next(iter(self.loaded)))
             while len(self.raws) > 1024:
                 with suppress(RuntimeError):
-                    self.loaded.pop(next(iter(self.raws)))
+                    self.raws.pop(next(iter(self.raws)))
             path = self.files + "/" + str(fn)
             if not os.path.exists(path):
                 path += "\x7f"

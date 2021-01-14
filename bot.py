@@ -18,13 +18,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     raw_github = "https://raw.githubusercontent.com/thomas-xin/Miza"
     rcc_invite = "https://discord.gg/cbKQKAr"
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
+    twitch_url = "https://www.twitch.tv/thomas_xin"
     website_background = "https://i.imgur.com/LsNWQUJ.png"
     heartbeat = "heartbeat.tmp"
     heartbeat_ack = "heartbeat_ack.tmp"
     restart = "restart.tmp"
     shutdown = "shutdown.tmp"
     caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "attachments", "deleted", "banned")
-    statuses = (discord.Status.online, discord.Status.idle, discord.Status.dnd)
+    statuses = (discord.Status.online, discord.Status.idle, discord.Status.dnd, discord.Streaming, discord.Status.invisible)
     # Default command prefix
     prefix = AUTH.get("prefix", "~")
     # This is a fixed ID apparently
@@ -106,10 +107,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.ready = False
         self.stat_timer = 0
         self.last_check = 0
-        self.status_iter = xrand(3)
-        self.curr_state = azero(3)
+        self.status_iter = xrand(4)
+        self.curr_state = azero(4)
         self.ip = None
+        self.server = None
         self.webserver = None
+        self.audio = None
         self.embed_senders = cdict()
         # Assign bot cache to global variables for convenience
         globals().update(self.cache)
@@ -123,14 +126,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     __exit__ = lambda self, *args, **kwargs: self.close()
 
     def __getattr__(self, key):
-        with suppress(AttributeError):
+        try:
             return object.__getattribute__(self, key)
+        except AttributeError:
+            pass
         this = self._connection
-        with suppress(AttributeError):
+        try:
             return getattr(this, key)
+        except AttributeError:
+            pass
         this = self.user
-        with suppress(AttributeError):
+        try:
             return getattr(this, key)
+        except AttributeError:
+            pass
         this = self.__getattribute__("proc")
         return getattr(this, key)
 
@@ -213,6 +222,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             discord_id = AUTH["discord_id"]
         except KeyError:
             return
+        if not AUTH.get("slash_commands"):
+            return
         print("Updating global slash commands...")
         with tracebacksuppressor:
             resp = requests.get(f"https://discord.com/api/v8/applications/{discord_id}/commands", headers=dict(Authorization="Bot " + self.token))
@@ -269,15 +280,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     async def create_main_website(self):
         with tracebacksuppressor:
             print("Generating website html...")
-            resp = await Request("https://github.com/thomas-xin/Miza", aio=True)
-            description = as_str(resp[resp.index(b"<title>") + 7:resp.index(b"</title>")].split(b":", 1)[-1])
+            # resp = await Request("https://github.com/thomas-xin/Miza", aio=True)
+            # description = as_str(resp[resp.index(b"<title>") + 7:resp.index(b"</title>")].split(b":", 1)[-1])
             # <img src="{self.webserver}/static/avatar-rainbow.gif" class="hero-image">
             html = f"""<!DOCTYPE html>
 <html>
     <head>
         <title>Miza</title>
         <meta content="Miza" property="og:title">
-        <meta content="{description}" property="og:description">
+        <meta content="A multipurpose Discord bot." property="og:description">
         <meta content="{self.webserver}" property="og:url">
         <meta content="{self.raw_github}/master/misc/background-rainbow.gif" property="og:image">
         <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
@@ -377,15 +388,25 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         self.start_webserver()
     
     def start_webserver(self):
-        if getattr(self, "server", None):
+        if self.server:
             with suppress():
                 self.server.kill()
-        print("Starting webserver...")
         if os.path.exists("server.py") and PORT:
+            print("Starting webserver...")
             self.server = psutil.Popen([python, "server.py"], stderr=subprocess.PIPE)
             create_thread(webserver_communicate, self)
         else:
             self.server = None
+
+    def start_audio_client(self):
+        if self.audio:
+            with suppress():
+                self.audio.kill()
+        if os.path.exists("audio_client.py"):
+            print("Starting audio client...")
+            self.audio = AudioClientInterface()
+        else:
+            self.audio = None
 
     # Starts up client.
     def run(self):
@@ -1913,8 +1934,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             files = [i for i in os.listdir("commands") if is_code(i)]
             for f in files:
                 modload.append(create_future_ex(self.get_module, f, priority=True))
+            create_future_ex(self.start_audio_client)
             create_task(self.create_main_website())
             return all(fut.result() for fut in modload)
+        if mod.casefold() == "voice":
+            create_future_ex(self.start_audio_client)
         create_task(self.create_main_website())
         return self.get_module(mod + ".py")
 
@@ -2108,20 +2132,31 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         guild_count = len(self.guilds)
                         changed = guild_count != self.guild_count
                         if changed or utc() > self.stat_timer:
-                            # Status changes every 12-21 seconds
-                            self.stat_timer = utc() + float(frand(5)) + 8
+                            # Status changes every 5~11 seconds
+                            self.stat_timer = utc() + float(frand(2)) + 5
                             self.guild_count = guild_count
-                            self.status_iter = (self.status_iter + 1) % 3
+                            self.status_iter = (self.status_iter + 1) % (len(self.statuses) - (not self.audio))
                             with suppress(discord.NotFound):
                                 u = await self.fetch_user(next(iter(self.owners)))
                                 n = u.name
                                 text = f"live to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {belongs(uni_str(n))} place!"
-                                activity = discord.Streaming(name=text, url=self.webserver)
-                                activity.game = self.github
+                                # Status iterates through 5 possible choices
+                                status = self.statuses[self.status_iter]
+                                if status is discord.Streaming:
+                                    activity = discord.Streaming(name=text, url=self.twitch_url)
+                                    status = discord.Status.dnd
+                                else:
+                                    activity = discord.Game(name=text)
                                 if changed:
                                     print(repr(activity))
-                                # Status iterates through 3 possible choices
-                                status = self.statuses[self.status_iter]
+                                if self.audio:
+                                    audio_status = f"await client.change_presence(status=discord.Status."
+                                    if status == discord.Status.invisible:
+                                        status = discord.Status.idle
+                                        await create_future(self.audio.submit(audio_status + "online)"))
+                                    else:
+                                        if status == discord.Status.online:
+                                            await create_future(self.audio.submit(audio_status + "dnd)"))
                                 await self.change_presence(activity=activity, status=status)
                                 # Member update events are not sent through for the current user, so manually send a _seen_ event
                                 await self.seen(self.user, event="misc", raw="Changing their status")
@@ -2941,8 +2976,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     return data
 
                 def __getattr__(self, key):
-                    with suppress(AttributeError):
+                    try:
                         return self.__getattribute__(key)
+                    except AttributeError:
+                        pass
                     return getattr(self.__getattribute__("channel"), key)
 
                 def fetch_message(self, id):
@@ -2975,8 +3012,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 return data
 
             def __getattr__(self, key):
-                with suppress(AttributeError):
+                try:
                     return self.__getattribute__(key)
+                except AttributeError:
+                    pass
                 return getattr(self.__getattribute__("channel"), key)
 
             filesize_limit = 8388608
@@ -3076,8 +3115,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 self.message = message
 
             def __getattr__(self, k):
-                with suppress(AttributeError):
+                try:
                     return object.__getattribute__(self, k)
+                except AttributeError:
+                    pass
                 return getattr(object.__getattribute__(self, "message"), k)
 
         class LoadedMessage(discord.Message):
@@ -3109,8 +3150,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
             def __getattr__(self, k):
                 if k in self.__slots__:
-                    with suppress(AttributeError):
+                    try:
                         return self.__getattribute__(k)
+                    except AttributeError:
+                        pass
                 d = self.__getattribute__("_data")
                 if k == "content":
                     return d["content"]
@@ -3172,10 +3215,77 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         bot.LoadedMessage = LoadedMessage
         bot.CachedMessage = CachedMessage
         bot.MessageCache = MessageCache
+
+    async def init_ready(self, futs):
+        self.started = True
+        attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
+        for file in attachments:
+            with tracebacksuppressor:
+                self.attachment_from_file(file)
+        print("Loading imported modules...")
+        # Wait until all modules have been loaded successfully
+        while self.modload:
+            fut = self.modload.popleft()
+            with tracebacksuppressor:
+                print(fut)
+                mod = await fut
+        print("Command aliases:")
+        print(self.commands.keys())
+        # Assign all bot database events to their corresponding keys.
+        for u in self.data.values():
+            for f in dir(u):
+                if f.startswith("_") and f[-1] == "_" and f[1] != "_":
+                    func = getattr(u, f, None)
+                    if callable(func):
+                        self.events.append(f, func)
+        print("Database events:")
+        print(self.events.keys())
+        for fut in futs:
+            await fut
+        await self.fetch_user(self.deleted_user)
+        # Set bot avatar if none has been set.
+        if not os.path.exists("misc/init.tmp"):
+            print("Setting bot avatar...")
+            f = await create_future(open, "misc/avatar.png", "rb", priority=True)
+            with closing(f):
+                b = await create_future(f.read, priority=True)
+            await self.user.edit(avatar=b)
+            await self.seen(self.user, event="misc", raw="Editing their profile")
+            touch("misc/init.tmp")
+        create_task(self.minute_loop())
+        create_task(self.slow_loop())
+        create_task(self.lazy_loop())
+        create_task(self.fast_loop())
+        print("Update loops initiated.")
+        # Load all webhooks from cached guilds.
+        futs = alist(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
+        futs.add(create_future(self.update_slash_commands, priority=True))
+        futs.add(create_task(self.create_main_website()))
+        futs.add(self.audio_client_start)
+        self.bot_ready = True
+        print("Bot ready.")
+        # Send bot_ready event to all databases.
+        await self.send_event("_bot_ready_", bot=self)
+        for fut in futs:
+            with tracebacksuppressor:
+                await fut
+        self.ready = True
+        # Send ready event to all databases.
+        print("Database ready.")
+        await self.send_event("_ready_", bot=self)
+        create_task(self.heartbeat_loop())
+        await create_future(self.heartbeat_proc.kill)
+        print("Initialization complete.")
     
     def set_client_events(self):
 
         print("Setting client events...")
+
+        @self.event
+        async def before_identify_hook(shard_id, initial=False):
+            if not getattr(self, "audio_client_start", None):
+                self.audio_client_start = create_future(self.start_audio_client)
+            return
 
         # The event called when the bot starts up.
         @self.event
@@ -3200,63 +3310,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 futs.add(create_future(self.update_from_guilds, priority=True))
                 futs.add(create_task(aretry(self.get_ip, delay=20)))
                 if not self.started:
-                    self.started = True
-                    attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
-                    for file in attachments:
-                        with tracebacksuppressor:
-                            self.attachment_from_file(file)
-                    print("Loading imported modules...")
-                    # Wait until all modules have been loaded successfully
-                    while self.modload:
-                        fut = self.modload.popleft()
-                        with tracebacksuppressor:
-                            print(fut)
-                            mod = await fut
-                    print("Command aliases:")
-                    print(self.commands.keys())
-                    # Assign all bot database events to their corresponding keys.
-                    for u in self.data.values():
-                        for f in dir(u):
-                            if f.startswith("_") and f[-1] == "_" and f[1] != "_":
-                                func = getattr(u, f, None)
-                                if callable(func):
-                                    self.events.append(f, func)
-                    print("Database events:")
-                    print(self.events.keys())
-                    for fut in futs:
-                        await fut
-                    await self.fetch_user(self.deleted_user)
-                    # Set bot avatar if none has been set.
-                    if not os.path.exists("misc/init.tmp"):
-                        print("Setting bot avatar...")
-                        f = await create_future(open, "misc/avatar.png", "rb", priority=True)
-                        with closing(f):
-                            b = await create_future(f.read, priority=True)
-                        await self.user.edit(avatar=b)
-                        await self.seen(self.user, event="misc", raw="Editing their profile")
-                        touch("misc/init.tmp")
-                    create_task(self.minute_loop())
-                    create_task(self.slow_loop())
-                    create_task(self.lazy_loop())
-                    create_task(self.fast_loop())
-                    print("Update loops initiated.")
-                    # Load all webhooks from cached guilds.
-                    futs = alist(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
-                    futs.add(create_future(self.update_slash_commands, priority=True))
-                    futs.add(create_task(self.create_main_website()))
-                    self.bot_ready = True
-                    print("Bot ready.")
-                    # Send bot_ready event to all databases.
-                    await self.send_event("_bot_ready_", bot=self)
-                    for fut in futs:
-                        with tracebacksuppressor:
-                            await fut
-                    self.ready = True
-                    # Send ready event to all databases.
-                    await self.send_event("_ready_", bot=self)
-                    create_task(self.heartbeat_loop())
-                    await create_future(self.heartbeat_proc.kill)
-                    print("Initialization complete.")
+                    create_task(self.init_ready(futs))
                 else:
                     for fut in futs:
                         await fut
@@ -3638,6 +3692,67 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             print(guild, "removed.")
 
 
+class AudioClientInterface:
+
+    clients = {}
+    returns = {}
+    written = False
+    
+    def __init__(self):
+        self.proc = psutil.Popen([python, "audio_client.py"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        create_thread(self.communicate)
+        self.fut = concurrent.futures.Future()
+
+    __bool__ = lambda self: self.written
+
+    @property
+    def players(self):
+        return bot.data.audio.players
+    
+    def submit(self, s, aio=False):
+        key = ts_us()
+        while key in self.returns:
+            key += 1
+        self.returns[key] = None
+        b = f"~{key}~".encode("utf-8") + (b"await " if aio else b"") + repr(as_str(s).encode("utf-8")).encode("utf-8") + b"\n"
+        # print(b)
+        self.returns[key] = concurrent.futures.Future()
+        self.fut.result()
+        self.proc.stdin.write(b)
+        self.proc.stdin.flush()
+        resp = self.returns[key].result(timeout=48)
+        self.returns.pop(key, None)
+        return resp
+
+    def communicate(self):
+        proc = self.proc
+        proc.stdin.write(b"~0~0\n")
+        proc.stdin.flush()
+        while True:
+            s = as_str(proc.stdout.readline()).rstrip()
+            if s:
+                if s == "~b'bot.audio.returns[0].set_result(0)'":
+                    break
+                print(s)
+        self.written = True
+        self.fut.set_result(self)
+        with tracebacksuppressor:
+            while not bot.closed and proc.is_running():
+                s = as_str(proc.stdout.readline()).rstrip()
+                if s:
+                    if s[0] == "~":
+                        c = as_str(eval(s[1:]))
+                        create_future_ex(exec_tb, c, bot._globals)
+                    else:
+                        print(s)
+
+    def kill(self):
+        if self.proc.is_running():
+            self.submit("await kill()")
+        with tracebacksuppressor(psutil.NoSuchProcess):
+            return self.proc.kill()
+
+
 # Queries for searching members
 # Order of priority:
 """
@@ -3757,22 +3872,14 @@ def is_file(url):
 def webserver_communicate(bot):
     while not bot.closed:
         with tracebacksuppressor:
-            buf = io.BytesIO()
             while True:
-                buffer = bot.server.stderr
-                b = buffer.read(1)
-                if not b:
-                    break
-                if b == b"\n":
-                    buf.seek(0)
-                    s = as_str(buf.read().strip(b"\x00"))
-                    if s.startswith("~"):
-                        create_task(bot.process_http_command(*s[1:].split("\x7f", 3)))
-                    print(s)
-                    buf = io.BytesIO()
-                else:
-                    buf.write(b)
+                b = bot.server.stderr.readline().lstrip(b"\x00")
+                s = as_str(b)
+                if s.startswith("~"):
+                    create_task(bot.process_http_command(*s[1:].split("\x7f", 3)))
+                print(s)
             time.sleep(1)
+
 
 class SimulatedMessage:
 
@@ -3862,6 +3969,51 @@ class SimulatedMessage:
     invites = lambda self: exec("raise FileNotFoundError")
 
 
+async def desktop_identify(self):
+    """Sends the IDENTIFY packet."""
+    print("Overriding with desktop status...")
+    payload = {
+        'op': self.IDENTIFY,
+        'd': {
+            'token': self.token,
+            'properties': {
+                '$os': 'Miza-OS',
+                '$browser': 'Discord Client',
+                '$device': 'Miza',
+                '$referrer': '',
+                '$referring_domain': ''
+            },
+            'compress': True,
+            'large_threshold': 250,
+            'guild_subscriptions': self._connection.guild_subscriptions,
+            'v': 3
+        }
+    }
+
+    if not self._connection.is_bot:
+        payload['d']['synced_guilds'] = []
+
+    if self.shard_id is not None and self.shard_count is not None:
+        payload['d']['shard'] = [self.shard_id, self.shard_count]
+
+    state = self._connection
+    if state._activity is not None or state._status is not None:
+        payload['d']['presence'] = {
+            'status': state._status,
+            'game': state._activity,
+            'since': 0,
+            'afk': False
+        }
+
+    if state._intents is not None:
+        payload['d']['intents'] = state._intents.value
+
+    await self.call_hooks('before_identify', self.shard_id, initial=self._initial_identify)
+    await self.send_as_json(payload)
+
+discord.gateway.DiscordWebSocket.identify = lambda self: desktop_identify(self)
+
+
 # If this is the module being run and not imported, create a new Bot instance and run it.
 if __name__ == "__main__":
     # Redirects all output to the main log manager (PRINT).
@@ -3873,6 +4025,7 @@ if __name__ == "__main__":
             print("Logging started.")
             proc_start()
             miza = bot = client = Bot()
+            miza.http.user_agent = "Miza"
             miza.miza = miza
             with miza:
                 miza.run()

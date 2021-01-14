@@ -328,12 +328,8 @@ custom list-like data structure that incorporates the functionality of numpy arr
     def waiting(self):
         func = self
         def call(self, *args, force=False, **kwargs):
-            if not force:
-                t = utc()
-                while self.block:
-                    time.sleep(0.001)
-                    if utc() - t > 1:
-                        raise TimeoutError("Request timed out.")
+            if not force and type(self.block) is concurrent.futures.Future:
+                self.block.result(timeout=1)
             return func(self, *args, **kwargs)
         return call
 
@@ -341,28 +337,30 @@ custom list-like data structure that incorporates the functionality of numpy arr
     def blocking(self):
         func = self
         def call(self, *args, force=False, **kwargs):
-            if not force:
-                t = utc()
-                while self.block:
-                    time.sleep(0.001)
-                    if utc() - t > 1:
-                        raise TimeoutError("Request timed out.")
-            self.block = True
+            if not force and type(self.block) is concurrent.futures.Future:
+                self.block.result(timeout=1)
+            self.block = concurrent.futures.Future()
             self.hash = None
             self.frozenset = None
             self.queries = 0
             try:
                 output = func(self, *args, **kwargs)
-                self.block = False
             except:
-                self.block = False
+                try:
+                    self.block.set_result(None)
+                except concurrent.futures.InvalidStateError:
+                    pass
                 raise
+            try:
+                self.block.set_result(None)
+            except concurrent.futures.InvalidStateError:
+                pass
             return output
         return call
 
     # Init takes arguments and casts to a deque if possible, else generates as a single value. Allocates space equal to 3 times the length of the input iterable.
     def __init__(self, *args, fromarray=False, **void):
-        self.block = True if not getattr(self, "block", None) else 2
+        self.block = concurrent.futures.Future()
         self.hash = None
         self.frozenset = None
         self.queries = 0
@@ -370,7 +368,10 @@ custom list-like data structure that incorporates the functionality of numpy arr
             self.offs = 0
             self.size = 0
             self.data = None
-            self.block = False
+            try:
+                self.block.set_result(None)
+            except concurrent.futures.InvalidStateError:
+                pass
             return
         elif len(args) == 1:
             iterable = args[0]
@@ -398,11 +399,36 @@ custom list-like data structure that incorporates the functionality of numpy arr
             self.offs = size // 3
             self.data = np.empty(size, dtype=object)
             self.view[:] = iterable
-        self.block = True if self.block >= 2 else False
+        try:
+            self.block.set_result(None)
+        except concurrent.futures.InvalidStateError:
+            pass
+
+    def __getstate__(self):
+        return self.data, self.offs, self.size
+
+    def __setstate__(self, s):
+        if type(s) is tuple:
+            if len(s) == 2:
+                if s[0] is None:
+                    for k, v in s[1].items():
+                        setattr(self, k, v)
+                    self.block = None
+                    return
+            elif len(s) == 3:
+                self.data, self.offs, self.size = s
+                self.hash = None
+                self.frozenset = None
+                self.queries = 0
+                self.block = None
+                return
+        raise TypeError("Unpickling failed:", s)
 
     def __getattr__(self, k):
-        with suppress(AttributeError):
+        try:
             return self.__getattribute__(k)
+        except AttributeError:
+            pass
         return getattr(self.__getattribute__("view"), k)
 
     def __dir__(self):
@@ -1411,14 +1437,16 @@ class cdict(dict):
         return cls((a, getattr(obj, a, None)) for a in dir(obj))
 
     __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
-    __repr__ = lambda self: f"{self.__class__.__name__}({super().__repr__() if super().__len__() else ''})"
+    __repr__ = lambda self: self.__class__.__name__ + ("((" + ",".join("(" + ",".join(repr(i) for i in item) + ")" for item in super().items()) + ("," if len(self) == 1 else "") + "))") if self else "()"
     __str__ = lambda self: super().__repr__()
     __iter__ = lambda self: iter(tuple(super().__iter__()))
     __call__ = lambda self, k: self.__getitem__(k)
 
     def __getattr__(self, k):
-        with suppress(AttributeError):
+        try:
             return self.__getattribute__(k)
+        except AttributeError:
+            pass
         if not k.startswith("__") or not k.endswith("__"):
             try:
                 return self.__getitem__(k)
@@ -1458,8 +1486,10 @@ class fcdict(cdict):
     __contains__ = lambda self, k: super().__contains__(k) or super().__contains__(full_prune(k))
 
     def __getattr__(self, k):
-        with suppress(AttributeError):
+        try:
             return self.__getattribute__(k)
+        except AttributeError:
+            pass
         if not k.startswith("__") or not k.endswith("__"):
             with suppress(KeyError):
                 return super().__getitem__(k)
@@ -3735,8 +3765,10 @@ class pickled(collections.abc.Callable):
         self.__str__ = obj.__str__
     
     def __getattr__(self, key):
-        with suppress(AttributeError):
+        try:
             return self.__getattribute__(key)
+        except AttributeError:
+            pass
         return getattr(self.__getattribute__("data"), key)
     
     def __dir__(self):

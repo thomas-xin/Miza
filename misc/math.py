@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sympy, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures
+import sympy, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures, pickle
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
 import matplotlib.pyplot as plt
@@ -591,7 +591,7 @@ def ensure_parent(proc, parent):
     while True:
         if not parent.is_running():
             proc.kill()
-        time.sleep(60)
+        time.sleep(12)
 
 if __name__ == "__main__":
     pid = os.getpid()
@@ -611,6 +611,6 @@ if __name__ == "__main__":
             sys.stdout.flush()
         except Exception as ex:
             # Exceptions are evaluated and handled by main process
-            sys.stdout.write(repr(ex) + "\n")
+            sys.stdout.write(f"pickle.loads({repr(pickle.dumps(ex))})\n")
             sys.stdout.flush()
         time.sleep(0.01)

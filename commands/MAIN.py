@@ -695,11 +695,24 @@ class Info(Command):
                     activity = "\n".join(activity_repr(i) for i in getattr(u, "activities", ()))
                     status = None
                     if getattr(u, "status", None):
+                        streaming = None
+                        for a in getattr(u, "activities", ()):
+                            if isinstance(a, discord.Streaming):
+                                if regexp(r"^https:\/\/\www\.twitch\.tv\/[^\s]+$").search(as_str(getattr(a, "url", None))):
+                                    streaming = True
+                                    break
                         # Show up to 3 different statuses based on the user's desktop, web and mobile status.
                         if not is_self:
-                            status_items = [(u.desktop_status, "🖥️"), (u.web_status, "🕸️"), (u.mobile_status, "📱")]
+                            status_items = ((u.desktop_status, "🖥️"), (u.web_status, "🕸️"), (u.mobile_status, "📱"))
                         else:
-                            status_items = [(bot.statuses[(i + bot.status_iter) % 3], x) for i, x in enumerate(("🖥️", "🕸️", "📱"))]
+                            s = bot.statuses[bot.status_iter]
+                            if s == discord.Status.invisible:
+                                status_items = ((discord.Status.idle, "🖥️"), (discord.Status.online, "📱"))
+                            else:
+                                if s == discord.Streaming:
+                                    s = discord.Status.dnd
+                                status_items = ((s, "🖥️"), (discord.Status.dnd, "📱"))
+                        #     status_items = [(bot.statuses[(i + bot.status_iter) % 3], x) for i, x in enumerate(("🖥️", "🕸️", "📱"))]
                         ordered = sorted(status_items, key=lambda x: status_order.index(x[0]))
                         for s, i in ordered:
                             if s == discord.Status.offline:
@@ -710,11 +723,17 @@ class Info(Command):
                             if not status:
                                 s_ = u.status
                                 if s != s_ and s == discord.Status.offline:
-                                    status = status_text[s_]  + " `" + status_icon[s_] + "❓"
+                                    if streaming:
+                                        status = "Streaming `🟣" + status_icon[s_] + "❓"
+                                    else:
+                                        status = status_text[s_]  + " `" + status_icon[s_] + "❓"
                                     if s not in (discord.Status.offline, discord.Status.invisible):
                                         status += icon
                                 else:
-                                    status = status_text[s] + " `" + icon
+                                    if streaming:
+                                        status = "Streaming `🟣" + icon
+                                    else:
+                                        status = status_text[s] + " `" + icon
                             if s not in (discord.Status.offline, discord.Status.invisible):
                                 if icon not in status:
                                     status += icon

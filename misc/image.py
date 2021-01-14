@@ -1539,7 +1539,7 @@ def ensure_parent(proc, parent):
     while True:
         if not parent.is_running():
             proc.kill()
-        time.sleep(60)
+        time.sleep(12)
 
 if __name__ == "__main__":
     pid = os.getpid()

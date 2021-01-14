@@ -4,26 +4,25 @@ from install_update import *
 # Makes sure an authentication file exists.
 if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
     print("Authentication file not found. Generating empty template...")
-    f = open("auth.json", "wb")
-    d = {
-        "prefix": "~",
-        "python_path": "",
-        "webserver_port": 9801,
-        "discord_id": "",
-        "discord_token": "",
-        "owner_id": [],
-        "google_api_key": "",
-        "rapidapi_key": "",
-        "genius_key": "",
-        "alexflipnote_key": "",
-        "papago_id": "",
-        "papago_secret": "",
-        "knack_id": "",
-        "knack_secret": "",
-    }
-    s = "{\n" + repr(d).replace(" ", "").replace("'", '"').replace(",", ",\n")[1:-1] + "\n}"
-    f.write(s.encode("utf-8"))
-    f.close()
+    with open("auth.json", "w", encoding="utf-8") as f:
+        d = {
+            "prefix": "~",
+            "python_path": "",
+            "slash_commands": True,
+            "webserver_port": 9801,
+            "discord_id": "",
+            "discord_token": "",
+            "owner_id": [],
+            "google_api_key": "",
+            "rapidapi_key": "",
+            "genius_key": "",
+            "alexflipnote_key": "",
+            "papago_id": "",
+            "papago_secret": "",
+            "knack_id": "",
+            "knack_secret": "",
+        }
+        json.dump(d, f, indent=4)
     input("auth.json generated. Please fill in discord_token and restart bot when done.")
     raise SystemExit
 
@@ -54,6 +53,7 @@ hb = "heartbeat.tmp"
 hb_ack = "heartbeat_ack.tmp"
 
 delete(sd)
+delete("log.txt")
 
 
 # Main watchdog loop.

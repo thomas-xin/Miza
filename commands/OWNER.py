@@ -86,6 +86,8 @@ class Restart(Command):
                         await fut
                 with tracebacksuppressor:
                     bot.server.kill()
+                with tracebacksuppressor:
+                    await create_future(bot.audio.kill)
                 await save
         with suppress():
             await client.close()

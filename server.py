@@ -8,8 +8,6 @@ PORT = AUTH.get("webserver_port", 9801)
 IND = "\x7f"
 
 
-sys.stderr = sys.stdout
-
 def send(*args, escape=True):
     try:
         s = " ".join(str(i) for i in args)
@@ -19,6 +17,7 @@ def send(*args, escape=True):
             if s[-1] != "\n":
                 s += "\n"
             sys.__stderr__.write(s)
+            sys.__stderr__.flush()
     except OSError:
         psutil.Process().kill()
 
@@ -446,13 +445,13 @@ def ensure_parent(proc, parent):
     while True:
         if not parent.is_running():
             proc.kill()
-        time.sleep(60)
+        time.sleep(6)
 
 if __name__ == "__main__":
     pid = os.getpid()
     ppid = os.getppid()
-    send(f"Webserver starting on port {PORT}, with PID {pid} and parent PID {ppid}.")
+    send(f"Webserver starting on port {PORT}, with PID {pid} and parent PID {ppid}...")
     proc = psutil.Process(pid)
     parent = psutil.Process(ppid)
-    create_future_ex(ensure_parent, priority=True)
+    create_thread(ensure_parent, proc, parent)
     app.run("0.0.0.0", PORT)

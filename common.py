@@ -333,13 +333,8 @@ with tracebacksuppressor:
 
 if not enc_key:
     enc_key = AUTH["encryption_key"] = as_str(base64.b64encode(randbytes(32)))
-    try:
-        s = json.dumps(AUTH, indent=4)
-    except:
-        print_exc()
-        s = repr(AUTH)
     with open("auth.json", "w", encoding="utf-8") as f:
-        f.write(s)
+        json.dump(AUTH, f, indent=4)
 
 enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
 
@@ -1315,6 +1310,8 @@ eloop = asyncio.get_event_loop()
 __setloop__ = lambda: asyncio.set_event_loop(eloop)
 
 
+ThreadPoolExecutor = concurrent.futures.ThreadPoolExecutor
+
 # Thread pool manager for multithreaded operations.
 class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 
@@ -1334,7 +1331,7 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
             self.pool_count = max(1, self.pool_count)
             self.thread_count = max(1, self.thread_count)
             while self.pool_count > len(self.pools):
-                self.pools.append(concurrent.futures.ThreadPoolExecutor(max_workers=self.thread_count, initializer=self.initializer))
+                self.pools.append(ThreadPoolExecutor(max_workers=self.thread_count, initializer=self.initializer))
             while self.pool_count < len(self.pools):
                 func = self.pools.popright().shutdown
                 self.pools[-1].submit(func, wait=True)
@@ -1373,9 +1370,9 @@ def wrap_future(fut, loop=None):
         try:
             res = fut.result()
         except Exception as ex:
-            wrapper.set_exception(ex)
+            loop.call_soon_threadsafe(wrapper.set_exception, ex)
         else:
-            wrapper.set_result(res)
+            loop.call_soon_threadsafe(wrapper.set_result, res)
 
     fut.add_done_callback(on_done)
     return wrapper
@@ -1474,6 +1471,11 @@ async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
     except:
         if exc:
             raise
+
+
+def exec_tb(s, *args, **kwargs):
+    with tracebacksuppressor:
+        exec(s, *args, **kwargs)
 
 
 class open2(io.IOBase):
@@ -2162,7 +2164,10 @@ class __logPrinter:
                 try:
                     f.write(b)
                 except TypeError:
-                    f.write(as_str(b))
+                    try:
+                        f.write(as_str(b))
+                    except ValueError:
+                        pass
         except:
             sys.__stdout__.write(traceback.format_exc())
     
