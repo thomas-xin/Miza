@@ -20,6 +20,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
     twitch_url = "https://www.twitch.tv/thomas_xin"
     website_background = "https://i.imgur.com/LsNWQUJ.png"
+    webserver = "https://mizabot.xyz"
     heartbeat = "heartbeat.tmp"
     heartbeat_ack = "heartbeat_ack.tmp"
     restart = "restart.tmp"
@@ -111,7 +112,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.curr_state = azero(4)
         self.ip = None
         self.server = None
-        self.webserver = None
         self.audio = None
         self.embed_senders = cdict()
         # Assign bot cache to global variables for convenience
@@ -1775,7 +1775,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     def update_ip(self, ip):
         if regexp("^([0-9]{1,3}\\.){3}[0-9]{1,3}$").search(ip):
             self.ip = ip
-            self.webserver = f"http://{self.ip}:9801"
+            # self.webserver = f"http://{self.ip}:9801"
 
     # Gets the external IP address from api.ipify.org
     async def get_ip(self):
