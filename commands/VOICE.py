@@ -327,7 +327,7 @@ class CustomAudio(collections.abc.Hashable):
 
     def __getattr__(self, key):
         if key in ("reverse", "speed", "epos", "pos"):
-            return self.__getattribute__(key)()
+            return self.__getattribute__("_" + key)()
         try:
             return self.__getattribute__(key)
         except AttributeError:
@@ -375,13 +375,14 @@ class CustomAudio(collections.abc.Hashable):
                 return json.dumps(d).encode("utf-8"), "dump.json"
             return d, None
 
-    def reverse(self):
+    def _reverse(self):
         return self.stats.speed < 0
 
-    def speed(self):
+    def _speed(self):
         return abs(self.stats.speed)
 
-    def epos(self):
+    def _epos(self):
+        self.fut.result(timeout=12)
         pos = self.acsi.pos
         if not pos[1] and self.queue:
             dur = e_dur(self.queue[0].get("duration"))
@@ -390,7 +391,7 @@ class CustomAudio(collections.abc.Hashable):
             return 0, 0
         return pos
 
-    def pos(self):
+    def _pos(self):
         return self.epos[0]
 
     def skip(self):
@@ -935,12 +936,19 @@ class AudioFileLink:
     def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True):
         if stream:
             self.stream = stream
-        self.streaming.set_result(stream)
+        try:
+            self.streaming.set_result(stream)
+        except concurrent.futures.InvalidStateError:
+            self.streaming = concurrent.futures.Future()
+            self.streaming.set_result(stream)
         self.live = live
         self.seekable = seekable
         self.webpage_url = webpage_url
         out = bot.audio.submit(f"cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable)) + ")")
-        self.readable.set_result(self)
+        try:
+            self.readable.set_result(self)
+        except concurrent.futures.InvalidStateError:
+            pass
         return out
 
     def create_reader(self, pos, auds=None):
@@ -1815,6 +1823,8 @@ class AudioDownloader:
 
     # Gets the stream URL of a queue entry, starting download when applicable.
     def get_stream(self, entry, video=False, force=False, download=True, callback=None):
+        if not entry.get("url"):
+            raise FileNotFoundError
         if video:
             stream = entry.get("video", None)
         else:

@@ -21,6 +21,12 @@ def send(*args, escape=True):
         sys.__stdout__.write(s)
         sys.__stdout__.flush()
 
+def request(s):
+    with tracebacksuppressor:
+        PORT = AUTH["webserver_port"]
+        token = AUTH["discord_token"]
+        return requests.get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}").json()["result"]
+
 def submit(s):
     b = "~" + repr(as_str(s).encode("utf-8")) + "\n"
     resp = sys.__stdout__.write(b)
@@ -293,15 +299,15 @@ class AudioFile:
                         if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err or "Server returned 403 Forbidden" in err):
                             with tracebacksuppressor:
                                 if "https://cf-hls-media.sndcdn.com/" in stream:
-                                    new_stream = submit(f"VOICE.get_best_audio(VOICE.ytdl.extract_from({repr(self.webpage_url)}))")
+                                    new_stream = request(f"VOICE.get_best_audio(VOICE.ytdl.extract_from({repr(self.webpage_url)}))")
                                 else:
-                                    new_stream = submit(f"VOICE.get_best_audio(VOICE.ytdl.extract_backup({repr(self.webpage_url)}))")
+                                    new_stream = request(f"VOICE.get_best_audio(VOICE.ytdl.extract_backup({repr(self.webpage_url)}))")
                                 print(err)
                                 return self.load(new_stream, check_fmt=False, force=True)
                         if check_fmt:
                             new = None
                             with suppress(ValueError):
-                                new = submit(f"VOICE.select_and_convert({repr(stream)})")
+                                new = request(f"VOICE.select_and_convert({repr(stream)})")
                             if new is not None:
                                 return self.load(new, check_fmt=False, force=True)
                         print(self.proc.args)

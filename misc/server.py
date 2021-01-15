@@ -368,6 +368,21 @@ def timezone():
         raise
 
 
+@app.route("/eval/<string:token>/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
+@app.route("/exec/<string:token>/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
+def execute(token, content):
+    if token != AUTH.get("discord_token"):
+        raise PermissionError
+    t = ts_us()
+    while t in RESPONSES:
+        t += 1
+    RESPONSES[t] = fut = concurrent.futures.Future()
+    send(f"!{t}\x7f{content}", escape=False)
+    j, after = fut.result()
+    RESPONSES.pop(t, None)
+    return j
+
+
 @app.route("/command/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 @app.route("/commands/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 def command(content):
@@ -384,9 +399,11 @@ def command(content):
     resp = get_geo(ip)
     data = resp["data"]["geo"]
     tz = data["timezone"]
-    t = ts_us()
     if " " not in content:
         content += " "
+    t = ts_us()
+    while t in RESPONSES:
+        t += 1
     RESPONSES[t] = fut = concurrent.futures.Future()
     send(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}", escape=False)
     j, after = fut.result(timeout=420)

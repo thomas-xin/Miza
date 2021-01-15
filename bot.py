@@ -2525,6 +2525,40 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
             resp = await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
             # print(t, out, resp, sep="\n")
+    
+    async def process_http_eval(self, t, proc):
+        glob = self._globals
+        with tracebacksuppressor:
+            code = None
+            with suppress(SyntaxError):
+                code = await create_future(compile, proc, "<webserver>", "eval", optimize=2, priority=True)
+            if code is None:
+                with suppress(SyntaxError):
+                    code = await create_future(compile, proc, "<webserver>", "exec", optimize=2, priority=True)
+                if code is None:
+                    _ = glob.get("_")
+                    defs = False
+                    lines = proc.splitlines()
+                    for line in lines:
+                        if line.startswith("def") or line.startswith("async def"):
+                            defs = True
+                    func = "async def _():\n\tlocals().update(globals())\n"
+                    func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
+                    func += "\n\tglobals().update(locals())"
+                    code2 = await create_future(compile, func, "<webserver>", "exec", optimize=2, priority=True)
+                    await create_future(eval, code2, glob, priority=True)
+                    output = await glob["_"]()
+                    glob["_"] = _
+            if code is not None:
+                output = await create_future(eval, code, glob, priority=True)
+            if output is not None:
+                glob["_"] = output
+            try:
+                out = json.dumps(dict(result=output))
+            except TypeError:
+                out = json.dumps(dict(result=repr(output)))
+            url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
+            resp = await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
@@ -3861,11 +3895,14 @@ def webserver_communicate(bot):
     while not bot.closed:
         with tracebacksuppressor:
             while True:
-                b = bot.server.stderr.readline().lstrip(b"\x00")
-                s = as_str(b)
-                if s.startswith("~"):
-                    create_task(bot.process_http_command(*s[1:].split("\x7f", 3)))
-                print(s)
+                b = bot.server.stderr.readline().lstrip(b"\x00").rstrip()
+                if b:
+                    s = as_str(b)
+                    print(s)
+                    if s[0] == "~":
+                        create_task(bot.process_http_command(*s[1:].split("\x7f", 3)))
+                    elif s[0] == "!":
+                        create_task(bot.process_http_eval(*s[1:].split("\x7f", 1)))
             time.sleep(1)
 
 
