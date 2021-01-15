@@ -447,8 +447,7 @@ def evalSym(f, prec=64, r=False, variables=None):
         env = _globals
     else:
         env = dict(_globals)
-        envd = eval(variables, {}, {})
-        envs = {k: sympy.sympify(v) for k, v in envd.items()}
+        envs = {k: sympy.sympify(v) for k, v in variables.items()}
         env.update(envs)
     if f.lower() == "help":
         lines = deque()
