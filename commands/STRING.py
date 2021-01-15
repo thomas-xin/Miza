@@ -1,7 +1,8 @@
 try:
     from common import *
 except ModuleNotFoundError:
-    import os
+    import os, sys
+    sys.path.append(os.path.abspath('..'))
     os.chdir("..")
     from common import *
 
@@ -164,7 +165,7 @@ class Math(Command):
                             break
                     if var is not None:
                         break
-        resp = await bot.solve_math(argv, user, p, r, timeout=24, variables=bot.data.variables.get(user.id))
+        resp = await bot.solve_math(argv, p, r, timeout=24, variables=bot.data.variables.get(user.id))
         # Determine whether output is a direct answer or a file
         if type(resp) is dict and "file" in resp:
             await channel.trigger_typing()
@@ -561,7 +562,7 @@ class Time(Command):
         t = utc_dt()
         estimated = None
         if argv:
-            h = await self.bot.eval_math(argv, u)
+            h = await self.bot.eval_math(argv)
         elif "estimate" in name:
             if is_channel(user):
                 h = self.bot.data.users.estimate_timezone("#" + str(user.id))
@@ -896,7 +897,7 @@ class Ask(Command):
                     for _info in bot.commands.info:
                         await _info(num, None, "info", guild, channel, bot, user, "")
                     return
-                resp = await bot.solve_math(f"factorize {num}", user, timeout=20)
+                resp = await bot.solve_math(f"factorize {num}", timeout=20)
                 factors = safe_eval(resp[0])
                 out = f"{num}'s factors are `{', '.join(str(i) for i in factors)}`. If you'd like more information, try {bot.get_prefix(guild)}math!"
         elif q.startswith("who's ") or q.startswith("whos ") or q.startswith("who is "):

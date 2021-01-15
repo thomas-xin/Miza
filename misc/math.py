@@ -13,17 +13,12 @@ deque = collections.deque
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
 
 
-# For debugging only
-def file_print(*args, sep=" ", end="\n", prefix="", file="log.txt", **void):
-    with open(file, "ab") as f:
-        f.write((str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix)).encode("utf-8"))
-
 def logging(func):
-    def call(self, *args, file="log.txt", **kwargs):
+    def call(self, *args, **kwargs):
         try:
             output = func(self, *args, **kwargs)
         except:
-            file_print(traceback.format_exc(), file=file)
+            print(traceback.format_exc(), end="")
             raise
         return output
     return call
@@ -581,10 +576,23 @@ def procResp(resp):
         plt.clf()
         s = "{'file':'" + fn + "'}\n"
     elif type(resp) is tuple:
-        s = str(list(resp))
+        s = list(resp)
     else:
-        s = str([convAns(i) for i in resp])
-    return s.encode("utf-8")
+        s = [convAns(i) for i in resp]
+    return s
+
+
+def evaluate(ts, args):
+    try:
+        resp = evalSym(*eval(eval(args)))
+        out = procResp(resp)
+        if len(out) > 8388608:
+            raise OverflowError("Output data too large.")
+    except Exception as ex:
+        sys.stdout.write(f"~PROC_RESP[{ts}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))\n")
+    else:
+        sys.stdout.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n")
+    sys.stdout.flush()
 
 
 def ensure_parent(proc, parent):
@@ -598,19 +606,11 @@ if __name__ == "__main__":
     ppid = os.getppid()
     proc = psutil.Process(pid)
     parent = psutil.Process(ppid)
-    exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    exc = concurrent.futures.ThreadPoolExecutor(max_workers=9)
     exc.submit(ensure_parent)
     while True:
-        try:
-            args = eval(sys.stdin.readline()).decode("utf-8", "replace").strip().split("`")
-            resp = evalSym(*args)
-            b = procResp(resp)
-            if len(b) > 8388608:
-                raise OverflowError("Output data too large.")
-            sys.stdout.write(repr(b) + "\n")
-            sys.stdout.flush()
-        except Exception as ex:
-            # Exceptions are evaluated and handled by main process
-            sys.stdout.write(f"pickle.loads({repr(pickle.dumps(ex))})\n")
-            sys.stdout.flush()
-        time.sleep(0.01)
+        argv = sys.stdin.readline().rstrip()
+        if argv:
+            if argv[0] == "~":
+                ts, args = argv[1:].split("~", 1)
+                exc.submit(evaluate, ts, args)

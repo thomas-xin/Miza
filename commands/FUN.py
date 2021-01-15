@@ -1,7 +1,8 @@
 try:
     from common import *
 except ModuleNotFoundError:
-    import os
+    import os, sys
+    sys.path.append(os.path.abspath('..'))
     os.chdir("..")
     from common import *
 
@@ -365,16 +366,16 @@ class Text2048(Command):
             size = [4, 4]
         else:
             if "x" in argv:
-                size = await recursive_coro([bot.eval_math(i, user) for i in argv.split("x")])
+                size = await recursive_coro([bot.eval_math(i) for i in argv.split("x")])
             else:
                 if len(args) > 1:
                     dims = args.pop(-1)
-                    dims = await bot.eval_math(dims, user)
+                    dims = await bot.eval_math(dims)
                 else:
                     dims = 2
                 if dims <= 0:
                     raise ValueError("Invalid amount of dimensions specified.")
-                width = await bot.eval_math(" ".join(args), user)
+                width = await bot.eval_math(" ".join(args))
                 size = list(repeat(width, dims))
         if len(size) > 8:
             raise OverflowError("Board size too large.")
@@ -451,7 +452,7 @@ class SlotMachine(Command):
         b1 = 5
         b2 = 50
         if argv:
-            bet = await self.bot.eval_math(argv, user)
+            bet = await self.bot.eval_math(argv)
             if bet < b1:
                 raise ValueError(f"Minimum bet is {b1} coins.")
             if bet > b2:
@@ -532,7 +533,7 @@ class Pay(Command):
         if target.id == bot.id:
             return "\u200bI appreciate the generosity, but I have enough already :3"
         if args:
-            amount = await bot.eval_math(" ".join(args), user)
+            amount = await bot.eval_math(" ".join(args))
         else:
             amount = 1
         if amount <= 0:

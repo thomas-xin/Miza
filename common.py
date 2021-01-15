@@ -1134,10 +1134,12 @@ status_order = tuple(status_text)
 
 
 # Subprocess pool for resource-consuming operations.
-SUBS = cdict(math=cdict(procs=alist(), busy=cdict()), image=cdict(procs=alist(), busy=cdict()))
+PROC_COUNT = cdict()
+PROCS = cdict()
+PROC_RESP = {}
 
 # Gets amount of processes running in pool.
-sub_count = lambda: sum(1 for ptype in SUBS.values() for proc in ptype.procs if proc.is_running())
+sub_count = lambda: sum(sum(1 for p in v if p.is_running()) for v in PROCS.values())
 
 def force_kill(proc):
     for child in proc.children(recursive=True):
@@ -1147,148 +1149,71 @@ def force_kill(proc):
     print(proc, "killed.")
     return proc.kill()
 
-# Kills all subprocesses in the pool, then restarts it.
-def sub_kill():
-    for ptype in SUBS.values():
-        for proc in ptype.procs:
-            with suppress(psutil.NoSuchProcess):
-                force_kill(proc)
-        ptype.procs.clear()
-        ptype.busy.clear()
-    proc_update()
-
-# Updates process pools once every 120 seconds.
-def proc_updater():
-    while True:
-        with delay(120):
-            proc_update()
-
-# Updates process pool by killing off processes when not necessary, and spawning new ones when required.
-def proc_update():
-    for pname, ptype in SUBS.items():
-        procs = ptype.procs
-        b = len(ptype.busy)
-        count = sum(1 for proc in procs if utc() >= proc.sem.last)
-        if count > 16:
-            return
-        if b + 1 > count:
-            if pname == "math":
-                proc = psutil.Popen(
-                    [python, "misc/math.py"],
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-            elif pname == "image":
-                proc = psutil.Popen(
-                    [python, "misc/image.py"],
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-            else:
-                raise TypeError(f"invalid subpool {pname}.")
-            proc.sem = Semaphore(1, 3)
-            print(proc)
-            procs.append(proc)
-        att = 0
-        while count >= b + 5:
-            found = False
-            for p, proc in enumerate(procs):
-                # Busy variable indicates when the last operation finished;
-                # processes that are idle longer than 1 hour are automatically terminated
-                if utc() - proc.sem.last > 3600:
-                    force_kill(proc)
-                    procs.pop(p)
-                    found = True
-                    count -= 1
-                    break
-            att += 1
-            if att >= 16 or not found:
-                break
-
+def proc_communicate(proc):
+    with tracebacksuppressor:
+        while proc.is_running():
+            s = as_str(proc.stdout.readline()).rstrip()
+            if s:
+                # print(s)
+                if s[0] == "~":
+                    c = as_str(eval(s[1:]))
+                    create_future_ex(exec_tb, c, globals())
+                else:
+                    print(s)
 
 def proc_start():
-    proc_exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    proc_exc.submit(proc_updater)
+    PROC_COUNT.math = 3
+    PROC_COUNT.image = 3
+    for k, v in PROC_COUNT.items():
+        PROCS[k] = [psutil.Popen(
+            [python, f"misc/{k}.py"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        ) for _ in loop(v)]
+        PROC_COUNT[k] = 0
+        for proc in PROCS[k]:
+            proc.sem = Semaphore(1, inf)
+            create_thread(proc_communicate, proc)
+
+def sub_submit(ptype, command, timeout=12):
+    ts = ts_us()
+    p = [i for i in PROCS[ptype] if not i.sem.is_busy()]
+    if not p:
+        proc = PROCS[ptype][PROC_COUNT[ptype]]
+        PROC_COUNT[ptype] = (PROC_COUNT[ptype] + 1) % len(PROCS[ptype])
+    else:
+        proc = p[0]
+    while ts in PROC_RESP:
+        ts += 1
+    PROC_RESP[ts] = concurrent.futures.Future()
+    s = f"~{ts}~{repr(as_str(command).encode('utf-8'))}\n".encode("utf-8")
+    # print(ts, proc, s)
+    with proc.sem:
+        proc.stdin.write(s)
+        proc.stdin.flush()
+        resp = PROC_RESP[ts].result(timeout=timeout)
+    PROC_RESP.pop(ts, None)
+    return resp
+
+def sub_kill(start=True):
+    for v in PROCS.items():
+        for p in v:
+            create_future_ex(force_kill, p, priority=True)
+    PROCS.clear()
+    if start:
+        return proc_start()
 
 
 # Sends an operation to the math subprocess pool.
-async def process_math(expr, prec=64, rat=False, key=None, timeout=12, variables=None):
-    if type(key) is not int:
-        if key is None:
-            key = random.random()
-        else:
-            key = verify_id(key)
-    procs, busy = SUBS.math.procs, SUBS.math.busy
-    sem = set_dict(busy, key, Semaphore(2, 3, delay=0.1))
-    async with sem:
-        with suppress(StopIteration):
-            while True:
-                for proc in procs:
-                    if utc() > proc.sem.last:
-                        raise StopIteration
-                await create_future(proc_update, priority=True)
-                await asyncio.sleep(0.5)
-        if variables:
-            args = (expr, prec, rat, variables)
-        else:
-            args = (expr, prec, rat)
-        d = repr(bytes("`".join(i if type(i) is str else str(i) for i in args), "utf-8")).encode("utf-8") + b"\n"
-        try:
-            async with proc.sem:
-                await create_future(proc_update, priority=True)
-                await create_future(proc.stdin.write, d)
-                await create_future(proc.stdin.flush, timeout=timeout)
-                resp = await create_future(proc.stdout.readline, timeout=timeout)
-        except (T0, T1, T2, OSError):
-            create_future_ex(force_kill, proc, priority=True)
-            procs.remove(proc)
-            busy.pop(key, None)
-            create_future_ex(proc_update, priority=True)
-            raise
-        busy.pop(key, None)
-        output = evalEX(evalEX(resp))
-        return output
+def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
+    return create_future(sub_submit, "math", (expr, prec, rat, variables), timeout=timeout)
 
 # Sends an operation to the image subprocess pool.
-async def process_image(image, operation, args, key=None, timeout=24):
-    if type(key) is not int:
-        if key is None:
-            key = random.random()
-        else:
-            key = verify_id(key)
-    procs, busy = SUBS.image.procs, SUBS.image.busy
-    sem = set_dict(busy, key, Semaphore(2, 3, delay=0.1))
-    async with sem:
-        with suppress(StopIteration):
-            while True:
-                for proc in procs:
-                    if utc() > proc.sem.last:
-                        raise StopIteration
-                await create_future(proc_update)
-                await asyncio.sleep(0.5)
-        d = repr(bytes("`".join(str(i) for i in (image, operation, args)), "utf-8")).encode("utf-8") + b"\n"
-        try:
-            async with proc.sem:
-                await create_future(proc_update, priority=True)
-                await create_future(proc.stdin.write, d)
-                await create_future(proc.stdin.flush, timeout=timeout)
-                resp = await create_future(proc.stdout.readline, timeout=timeout)
-        except (T0, T1, T2, OSError):
-            create_future_ex(force_kill, proc, priority=True)
-            procs.remove(proc)
-            busy.pop(key, None)
-            create_future_ex(proc_update, priority=True)
-            raise
-        busy.pop(key, None)
-        output = evalEX(evalEX(resp))
-        print(output)
-        return output
+def process_image(image, operation, args, timeout=24):
+    return create_future(sub_submit, "image", (image, operation, args), timeout=timeout)
 
 
-# Evaluates an an expression, raising it if it is an exception.
-def evalEX(exc):
+def evalex(exc):
     try:
         ex = eval(exc)
     except NameError:
@@ -1297,6 +1222,12 @@ def evalEX(exc):
         with suppress(TypeError, SyntaxError, ValueError):
             s = ast.literal_eval(s)
         ex = RuntimeError(s)
+    return ex
+
+# Evaluates an an expression, raising it if it is an exception.
+def evalEX(exc):
+    try:
+        ex = evalex(exc)
     except:
         print(exc)
         raise

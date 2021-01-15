@@ -1,7 +1,8 @@
 try:
     from common import *
 except ModuleNotFoundError:
-    import os
+    import os, sys
+    sys.path.append(os.path.abspath('..'))
     os.chdir("..")
     from common import *
 
@@ -87,7 +88,9 @@ class Restart(Command):
                 with tracebacksuppressor:
                     bot.server.kill()
                 with tracebacksuppressor:
-                    await create_future(bot.audio.kill)
+                    await create_future(bot.audio.kill, priority=True)
+                with tracebacksuppressor:
+                    await create_future(sub_kill, start=False, priority=True)
                 await save
         with suppress():
             await client.close()

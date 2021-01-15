@@ -17,17 +17,12 @@ CACHE = {}
 ANIM = False
 
 
-# For debugging only
-def file_print(*args, sep=" ", end="\n", prefix="", file="log.txt", **void):
-    with open(file, "ab") as f:
-        f.write((str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix)).encode("utf-8"))
-
 def logging(func):
-    def call(self, *args, file="log.txt", **kwargs):
+    def call(self, *args, **kwargs):
         try:
             output = func(self, *args, **kwargs)
         except:
-            file_print(traceback.format_exc(), file=file)
+            print(traceback.format_exc(), end="")
             raise
         return output
     return call
@@ -73,7 +68,7 @@ def get_request(url):
             fn = f"{fcache}/attachment_{a_id}.bin"
             if os.path.exists(fn):
                 with open(fn, "rb") as f:
-                    file_print(f"Attachment {a_id} loaded from cache.")
+                    print(f"Attachment {a_id} loaded from cache.")
                     return f.read()
     with requests.get(url, headers=header(), stream=True, timeout=12) as resp:
         return resp.content
@@ -155,7 +150,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
             vf += "scale=" + str(w) + ":-1:flags=lanczos,"
         vf += "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
         command.extend([vf, "-loop", "0", "-framerate", str(fps), out])
-        file_print(command)
+        print(command)
         subprocess.check_output(command)
         if direct:
             os.remove(fn)
@@ -181,7 +176,7 @@ def create_gif(in_type, args, delay):
         data = get_request(url)
         try:
             img = get_image(data, None)
-        except (PIL.UnidentifiedImageError, OverflowError):
+        except (PIL.UnidentifiedImageError, OverflowError, TypeError):
             if len(data) < 268435456:
                 video2img(data, maxsize, round(1000 / delay), out, data=data)
                 # $ symbol indicates to return directly
@@ -1394,7 +1389,7 @@ def get_image(url, out):
                 if os.path.exists(save):
                     with open(save, "rb") as f:
                         data = f.read()
-                    file_print(f"Emoji {save} successfully loaded from cache.")
+                    print(f"Emoji {save} successfully loaded from cache.")
             if data is None:
                 data = get_request(url)
             if len(data) > 8589934592:
@@ -1424,7 +1419,6 @@ def evalImg(url, operation, args):
     globals()["CURRENT_FRAME"] = 0
     ts = time.time_ns() // 1000
     out = "cache/" + str(ts) + ".png"
-    args = eval(args)
     if operation != "$":
         if args and args[-1] == "-raw":
             args.pop(-1)
@@ -1477,7 +1471,7 @@ def evalImg(url, operation, args):
         elif new["count"] == 1:
             new = next(iter(frames))
         else:
-            file_print(duration, new["count"])
+            print(duration, new["count"])
             out = "cache/" + str(ts) + ".gif"
             # if new["count"] <= 1024:
             #     it = iter(frames)
@@ -1507,7 +1501,7 @@ def evalImg(url, operation, args):
             if vf:
                 command.extend(("-vf", vf))
             command.extend(("-loop", "0", out))
-            file_print(command)
+            print(command)
             proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             for frame in frames:
                 if issubclass(type(frame), Image.Image):
@@ -1526,13 +1520,23 @@ def evalImg(url, operation, args):
                 time.sleep(0.02)
             proc.stdin.close()
             proc.wait()
-            return repr([out])
+            return [out]
     if issubclass(type(new), Image.Image):
         new.save(out, "png")
-        return repr([out])
+        return [out]
     elif type(new) is str and new.startswith("$"):
-        return repr([new[1:]])
-    return repr(str(new).encode("utf-8"))
+        return [new[1:]]
+    return new
+
+
+def evaluate(ts, args):
+    try:
+        out = evalImg(*eval(eval(args)))
+    except Exception as ex:
+        sys.stdout.write(f"~PROC_RESP[{ts}].set_exception(evalex({repr(repr(ex))}))\n")
+    else:
+        sys.stdout.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n")
+    sys.stdout.flush()
 
 
 def ensure_parent(proc, parent):
@@ -1546,21 +1550,16 @@ if __name__ == "__main__":
     ppid = os.getppid()
     proc = psutil.Process(pid)
     parent = psutil.Process(ppid)
-    exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    exc = concurrent.futures.ThreadPoolExecutor(max_workers=9)
     exc.submit(ensure_parent)
     while True:
-        try:
-            args = eval(sys.stdin.readline()).decode("utf-8", "replace").strip().split("`")
-            resp = evalImg(*args)
-            sys.stdout.write(repr(resp.encode("utf-8")) + "\n")
-            sys.stdout.flush()
-        except Exception as ex:
-            # Exceptions are evaluated and handled by main process
-            sys.stdout.write(repr(ex) + "\n")
-            sys.stdout.flush()
-        time.sleep(0.01)
-        if time.time() - start > 3600:
-            start = time.time()
-            for img in CACHE.values():
-                img.close()
-            CACHE.clear()
+        argv = sys.stdin.readline().rstrip()
+        if argv:
+            if argv[0] == "~":
+                ts, args = argv[1:].split("~", 1)
+                exc.submit(evaluate, ts, args)
+                while len(CACHE) > 32:
+                    try:
+                        CACHE.pop(next(iter(CACHE)))
+                    except RuntimeError:
+                        pass

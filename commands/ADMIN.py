@@ -1,7 +1,8 @@
 try:
     from common import *
 except ModuleNotFoundError:
-    import os
+    import os, sys
+    sys.path.append(os.path.abspath('..'))
     os.chdir("..")
     from common import *
 
@@ -24,7 +25,7 @@ class Purge(Command):
         # print(self, bot, args, argl, user, channel, name, flags, perm, guild, void)
         end = None
         if args:
-            count = await bot.eval_math(args.pop(-1), guild.id)
+            count = await bot.eval_math(args.pop(-1))
             if args and "r" in flags or "range" in name:
                 start = safe_eval(args.pop(-1))
                 end = count
@@ -185,7 +186,7 @@ class Mute(Command):
             if expr.startswith(op):
                 expr = expr[len(op):].strip()
                 _op = at
-        num = await bot.eval_time(expr, guild, op=False)
+        num = await bot.eval_time(expr, op=False)
         create_task(message.add_reaction("❗"))
         for user in users:
             p = bot.get_perms(user, guild)
@@ -410,7 +411,7 @@ class Ban(Command):
             if expr.startswith(op):
                 expr = expr[len(op):].strip()
                 _op = at
-        num = await bot.eval_time(expr, guild, op=False)
+        num = await bot.eval_time(expr, op=False)
         create_task(message.add_reaction("❗"))
         for user in users:
             p = bot.get_perms(user, guild)
@@ -634,7 +635,7 @@ class AutoRole(Command):
         if "d" in flags:
             assigned = data.get(guild.id, None)
             if argv and assigned:
-                i = await bot.eval_math(argv, guild)
+                i = await bot.eval_math(argv)
                 roles = assigned.pop(i)
                 removed = deque()
                 for r in roles:
@@ -800,7 +801,7 @@ class SaveChannel(Command):
         ch = channel
         if args:
             if len(args) >= 2:
-                num = await self.bot.eval_math(" ".join(args[1:]), guild)
+                num = await self.bot.eval_math(" ".join(args[1:]))
                 if not num <= 65536:
                     raise OverflowError("Maximum number of messages allowed is 65536.")
                 if num <= 0:

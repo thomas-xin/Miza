@@ -1,7 +1,8 @@
 try:
     from common import *
 except ModuleNotFoundError:
-    import os
+    import os, sys
+    sys.path.append(os.path.abspath('..'))
     os.chdir("..")
     from common import *
 
@@ -246,7 +247,7 @@ class CS_mem2flag(Command):
     async def __call__(self, bot, args, user, **void):
         if len(args) < 2:
             return css_md(_m2f(args[0], 1))
-        num = await bot.eval_math(" ".join(args[1:]), user)
+        num = await bot.eval_math(" ".join(args[1:]))
         return css_md(_m2f(args[0], num))
 
 

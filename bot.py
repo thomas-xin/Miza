@@ -391,9 +391,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if self.server:
             with suppress():
                 self.server.kill()
-        if os.path.exists("server.py") and PORT:
+        if os.path.exists("misc/server.py") and PORT:
             print("Starting webserver...")
-            self.server = psutil.Popen([python, "server.py"], stderr=subprocess.PIPE)
+            self.server = psutil.Popen([python, "server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE)
             create_thread(webserver_communicate, self)
         else:
             self.server = None
@@ -402,7 +402,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if self.audio:
             with suppress():
                 self.audio.kill()
-        if os.path.exists("audio_client.py"):
+        if os.path.exists("misc/audio.py"):
             print("Starting audio client...")
             self.audio = AudioClientInterface()
         else:
@@ -1586,7 +1586,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     }
 
     # Evaluates a math formula to a float value, using a math process from the subprocess pool when necessary.
-    async def eval_math(self, expr, obj=None, default=0, op=True):
+    async def eval_math(self, expr, default=0, op=True):
         if op:
             # Allow mathematical operations on a default value
             _op = None
@@ -1594,7 +1594,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if expr.startswith(op):
                     expr = expr[len(op):].strip()
                     _op = at
-            num = await self.eval_math(expr, obj, op=False)
+            num = await self.eval_math(expr, op=False)
             if _op is not None:
                 num = getattr(mpf(default), _op)(num)
             return num
@@ -1614,7 +1614,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     except:
                         r = [ast.literal_eval(f)]
         except (ValueError, TypeError, SyntaxError):
-            r = await self.solve_math(f, obj, 128, 0)
+            r = await self.solve_math(f, 128, 0)
         x = r[0]
         with suppress(TypeError):
             while True:
@@ -1626,21 +1626,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return round_min(mpf(x))
 
     # Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
-    async def solve_math(self, f, obj=None, prec=128, r=False, timeout=12, variables=None):
-        f = f.strip()
-        try:
-            if obj is None:
-                key = None
-            elif hasattr(obj, "ghost"):
-                key = self.deleted_user
-            else:
-                key = obj.id
-        except AttributeError:
-            key = int(obj)
-        # Bot owners have no semaphore limit
-        if self.is_owner(key):
-            key = None
-        return await process_math(f, int(prec), int(r), key, timeout=12, variables=variables)
+    def solve_math(self, f, prec=128, r=False, timeout=12, variables=None):
+        return process_math(f.strip(), int(prec), int(r), timeout=12, variables=variables)
 
     TimeChecks = {
         "galactic years": ("gy", "galactic year", "galactic years"),
@@ -1661,7 +1648,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     alphabet = frozenset("abcdefghijklmnopqrstuvwxyz")
 
     # Evaluates a time input, using a math process from the subprocess pool when necessary.
-    async def eval_time(self, expr, obj=None, default=0, op=True):
+    async def eval_time(self, expr, default=0, op=True):
         if op:
             # Allow mathematical operations on a default value
             _op = None
@@ -1669,7 +1656,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if expr.startswith(op):
                     expr = expr[len(op):].strip(" ")
                     _op = at
-            num = await self.eval_time(expr, obj, op=False)
+            num = await self.eval_time(expr, op=False)
             if _op is not None:
                 num = getattr(float(default), _op)(num)
             return num
@@ -1695,7 +1682,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     data = expr.split(":")
                     mult = 1
                     while len(data):
-                        t += await self.eval_math(data[-1], obj) * mult
+                        t += await self.eval_math(data[-1]) * mult
                         data = data[:-1]
                         if mult <= 60:
                             mult *= 60
@@ -1739,7 +1726,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                         if temp:
                                             f = f"{temp} {f}"
                                     else:
-                                        n = await self.eval_math(temp, obj)
+                                        n = await self.eval_math(temp)
                                     if tc == "weeks":
                                         add_dict(td, {"days": n * 7})
                                     elif tc in ("days", "hours", "minutes", "seconds"):
@@ -1754,9 +1741,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                 n = num_parse(temp[:i])
                                 temp = temp[i:].strip()
                                 if temp:
-                                    n = await self.eval_math(f"{n} {temp}", obj)
+                                    n = await self.eval_math(f"{n} {temp}")
                             else:
-                                n = await self.eval_math(temp, obj)
+                                n = await self.eval_math(temp)
                             t += n
                         t += td.get("seconds", 0)
                         t += td.get("minutes", 0) * 60
@@ -2879,7 +2866,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes)
                         self.total_bytes = self.net_bytes[-1] + self.start_bytes
                     try:
-                        resp = await create_future(requests.get, "https://discord.com/api/v8", priority=True)
+                        resp = await create_future(requests.head, "https://discord.com/api/v8", priority=True)
                         self.api_latency = resp.elapsed.total_seconds()
                     except:
                         self.api_latency = inf
@@ -3700,7 +3687,7 @@ class AudioClientInterface:
     written = False
     
     def __init__(self):
-        self.proc = psutil.Popen([python, "audio_client.py"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.proc = psutil.Popen([python, "audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         create_thread(self.communicate)
         self.fut = concurrent.futures.Future()
 
@@ -4024,12 +4011,14 @@ if __name__ == "__main__":
             PRINT.start()
             sys.stdout = sys.stderr = print = PRINT
             print("Logging started.")
-            proc_start()
+            create_future_ex(proc_start)
             miza = bot = client = Bot()
             miza.http.user_agent = "Miza"
             miza.miza = miza
             with miza:
                 miza.run()
             miza.server.kill()
+            miza.audio.kill()
+            sub_kill(start=False)
     print = _print
     sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__

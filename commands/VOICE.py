@@ -1,7 +1,8 @@
 try:
     from common import *
 except ModuleNotFoundError:
-    import os
+    import os, sys
+    sys.path.append(os.path.abspath('..'))
     os.chdir("..")
     from common import *
 
@@ -213,8 +214,7 @@ async def auto_join(guild, channel, user, bot, preparing=False, vc=None):
         auds = bot.data.audio.players[guild.id]
     except KeyError:
         raise LookupError("Unable to find voice channel.")
-    auds.channel = channel
-    auds.preparing = preparing
+    auds.text = channel
     return auds
 
 
@@ -338,6 +338,7 @@ class CustomAudio(collections.abc.Hashable):
             return getattr(self.__getattribute__("queue"), key)
         except AttributeError:
             pass
+        self.fut.result(timeout=12)
         return getattr(self.__getattribute__("acsi"), key)
 
     def __dir__(self):
@@ -382,7 +383,6 @@ class CustomAudio(collections.abc.Hashable):
     
     @property
     def epos(self):
-        self.fut.result()
         pos = self.acsi.pos
         if not pos[1] and self.queue:
             dur = e_dur(self.queue[0].get("duration"))
@@ -396,23 +396,19 @@ class CustomAudio(collections.abc.Hashable):
         return self.epos[0]
 
     def skip(self):
-        self.fut.result()
         self.acsi.skip()
 
     def clear_source(self):
-        self.fut.result()
         create_future_ex(self.acsi.clear_source)
         self.source = None
 
     def reset(self, start=True):
-        self.fut.result()
         self.acsi.clear()
         self.source = self.next = None
         if start:
             self.queue.update_load()
 
     def pause(self, unpause=False):
-        self.fut.result()
         if unpause and self.paused:
             self.paused = False
             self.acsi.resume()
@@ -422,7 +418,6 @@ class CustomAudio(collections.abc.Hashable):
             self.acsi.pause()
     
     def resume(self):
-        self.fut.result()
         if self.paused:
             self.paused = False
             self.acsi.resume()
@@ -430,14 +425,12 @@ class CustomAudio(collections.abc.Hashable):
 
     # Stops currently playing source, closing it if possible.
     def stop(self):
-        self.fut.result()
         self.acsi.stop()
         self.paused = True
         return self.reset(start=False)
 
     # Loads and plays a new audio source, with current settings and optional song init position.
     def play(self, source=None, pos=0, update=True):
-        self.fut.result()
         self.seek_pos = 0
         if source is not None:
             self.source = source
@@ -460,12 +453,10 @@ class CustomAudio(collections.abc.Hashable):
         with tracebacksuppressor:
             source.readable.result(timeout=12)
             src = source.create_reader(0, auds=self)
-            self.fut.result()
             self.acsi.enqueue(src, after=self.queue.advance)
 
     # Seeks current song position.
     def seek(self, pos):
-        self.fut.result()
         duration = self.epos[1]
         pos = max(0, pos)
         # Skip current song if position is out of range
@@ -484,8 +475,6 @@ class CustomAudio(collections.abc.Hashable):
 
     # Kills this audio player, stopping audio playback. Will cause bot to leave voice upon next update event.
     def kill(self, reason=None):
-        self.fut.result()
-        self.dead = None
         self.acsi.kill()
         self.bot.data.audio.players.pop(self.guild.id, None)
         with suppress(LookupError):
@@ -507,22 +496,21 @@ class CustomAudio(collections.abc.Hashable):
                 return
             # If idle for more than 10 seconds, attempt to find members in other voice channels
             elif self.timeout < utc() - 10:
-                if guild.afk_channel is not None:
-                    if guild.afk_channel.id != self.acsi.channel.id:
-                        await_fut(self.move_unmute(vc, guild.afk_channel))
-                    else:
-                        cnt = 0
-                        ch = None
-                        for channel in guild.voice_channels:
-                            if channel.id != guild.afk_channel.id:
-                                c = sum(1 for m in channel.members if not m.bot)
-                                if c > cnt:
-                                    cnt = c
-                                    ch = channel
-                        if ch:
-                            with tracebacksuppressor(SemaphoreOverflowError):
-                                await_fut(self.acsi.move_to(ch))
-                                self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"), sync=True)
+                if guild.afk_channel and (guild.afk_channel.id != self.acsi.channel.id and guild.afk_channel.permissions_for(guild.me).connect):
+                    await_fut(self.move_unmute(vc, guild.afk_channel))
+                else:
+                    cnt = 0
+                    ch = None
+                    for channel in guild.voice_channels:
+                        if channel.id != guild.afk_channel.id:
+                            c = sum(1 for m in channel.members if not m.bot)
+                            if c > cnt:
+                                cnt = c
+                                ch = channel
+                    if ch:
+                        with tracebacksuppressor(SemaphoreOverflowError):
+                            await_fut(self.acsi.move_to(ch))
+                            self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"), sync=True)
         else:
             self.timeout = utc()
         if m.voice is not None:
@@ -2362,7 +2350,7 @@ class Playlist(Command):
             )
         if "d" in flags:
             # Can only remove by index atm
-            i = await bot.eval_math(argv, guild.id)
+            i = await bot.eval_math(argv)
             temp = pl[i]
             pl.pop(i)
             update(guild.id)
@@ -2607,10 +2595,10 @@ class Skip(Command):
             if len(l) > 3:
                 raise ArgumentError("Too many arguments for range input.")
             elif len(l) > 2:
-                num = await bot.eval_math(l[0], user)
+                num = await bot.eval_math(l[0])
                 it = int(round(num))
             if l[0]:
-                num = await bot.eval_math(l[0], user)
+                num = await bot.eval_math(l[0])
                 if num > count:
                     num = count
                 else:
@@ -2619,7 +2607,7 @@ class Skip(Command):
             else:
                 left = 0
             if l[1]:
-                num = await bot.eval_math(l[1], user)
+                num = await bot.eval_math(l[1])
                 if num > count:
                     num = count
                 else:
@@ -2632,7 +2620,7 @@ class Skip(Command):
             # Accept multiple single indices
             elems = [0] * len(args)
             for i in range(len(args)):
-                elems[i] = await bot.eval_math(args[i], user)
+                elems[i] = await bot.eval_math(args[i])
         if not "f" in flags:
             valid = True
             for e in elems:
@@ -2769,7 +2757,7 @@ class Seek(Command):
             # ~seek takes an optional time input
             orig = auds.pos
             expr = argv
-            num = await bot.eval_time(expr, user, orig)
+            num = await bot.eval_time(expr, orig)
         pos = await create_future(auds.seek, num)
         if "h" not in flags:
             return italics(css_md(f"Successfully moved audio position to {sqr_md(sec2time(pos))}.")), 1
@@ -3018,7 +3006,7 @@ class AudioSettings(Command):
             # Values should be scaled by 100 to indicate percentage
             origStats = auds.stats
             orig = round_min(origStats[op] * 100)
-            num = await bot.eval_math(argv, user, orig)
+            num = await bot.eval_math(argv, orig)
             new = round_min(num)
             val = round_min(num / 100)
             if op in "loop repeat shuffle quiet stay":
@@ -3071,7 +3059,7 @@ class Rotate(Command):
         if not argv:
             amount = 1
         else:
-            amount = await bot.eval_math(argv, user)
+            amount = await bot.eval_math(argv)
         if len(auds.queue) > 1 and amount:
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to rotate queue while other users are in voice")
@@ -3834,11 +3822,11 @@ class Download(Command):
                 if start == "-":
                     start = None
                 else:
-                    start = await bot.eval_time(start, user)
+                    start = await bot.eval_time(start)
                 if end == "-":
                     end = None
                 else:
-                    end = await bot.eval_time(end, user)
+                    end = await bot.eval_time(end)
             argv = verify_search(argv)
             res = []
             # Input may be a URL or set of URLs, in which case we attempt to find the first one

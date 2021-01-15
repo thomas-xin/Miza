@@ -1,7 +1,8 @@
 try:
     from common import *
 except ModuleNotFoundError:
-    import os
+    import os, sys
+    sys.path.append(os.path.abspath('..'))
     os.chdir("..")
     from common import *
 
@@ -151,7 +152,7 @@ class Perms(Command):
                     raise self.perm_error(perm, m_perm, reason)
                 orig = t_perm
                 expr = " ".join(args)
-                num = await bot.eval_math(expr, user, orig)
+                num = await bot.eval_math(expr, orig)
                 c_perm = round_min(num)
                 if t_perm is nan or isnan(c_perm):
                     m_perm = nan
@@ -296,7 +297,7 @@ class Loop(Command):
         if not args:
             # Ah yes, I made this error specifically for people trying to use this command to loop songs 🙃
             raise ArgumentError("Please input loop iterations and target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioSettings command.")
-        num = await bot.eval_math(args[0], user)
+        num = await bot.eval_math(args[0])
         iters = round(num)
         # Bot owner bypasses restrictions
         if not isnan(perm):
@@ -1221,7 +1222,7 @@ class Activity(Command):
             u_id = user.id
         data = await create_future(bot.data.users.fetch_events, u_id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
         with discord.context_managers.Typing(channel):
-            resp = await process_image("plt_special", "$", (data, str(user)), guild)
+            resp = await process_image("plt_special", "$", (data, str(user)))
             fn = resp[0]
             f = CompatFile(fn, filename=f"{user.id}.png")
         return dict(file=f, filename=fn, best=True)
@@ -1383,7 +1384,7 @@ class Reminder(Command):
             if not argv:
                 i = 0
             else:
-                i = await bot.eval_math(argv2, user)
+                i = await bot.eval_math(argv2)
             i %= len(rems)
             x = rems.pop(i)
             if i == 0:
@@ -1481,7 +1482,7 @@ class Reminder(Command):
                     msg = ""
                 if spl is not None:
                     msg = " in ".join(spl[:-1])
-                    t = await bot.eval_time(spl[-1], user)
+                    t = await bot.eval_time(spl[-1])
                     break
             if foundkey.get("at"):
                 if " at " in argv:
@@ -1554,10 +1555,10 @@ class Reminder(Command):
                 i = match.start()
                 spl = [argv[:i], argv[i:]]
                 msg = spl[0]
-                t += await bot.eval_time(spl[1], user)
+                t += await bot.eval_time(spl[1])
                 break
             msg = " ".join(args[:-1])
-            t = await bot.eval_time(args[-1], user)
+            t = await bot.eval_time(args[-1])
             break
         if keyed:
             u = await bot.fetch_user_member(t, guild)
