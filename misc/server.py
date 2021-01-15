@@ -67,7 +67,7 @@ def find_file(path):
     for file in reversed(os.listdir("cache")):
         # file cache is stored as "{timestamp}~{name}", search for file via timestamp
         if file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
-            return "cache/" + file
+            return os.getcwd() + "/cache/" + file
     raise FileNotFoundError(path)
 
 get_mime = lambda path: magic.from_file(path, mime=True)
