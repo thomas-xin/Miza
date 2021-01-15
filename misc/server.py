@@ -372,7 +372,7 @@ def timezone():
 @app.route("/exec/<string:token>/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 def execute(token, content):
     if token != AUTH.get("discord_token"):
-        raise PermissionError
+        return flask.redirect("https://http.cat/401")
     t = ts_us()
     while t in RESPONSES:
         t += 1
