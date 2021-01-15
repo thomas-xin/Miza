@@ -2106,47 +2106,49 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         break
             self.react_sem.pop(message.id, None)
 
+    async def update_status(self):
+        with tracebacksuppressor:
+            guild_count = len(self.guilds)
+            changed = guild_count != self.guild_count
+            if changed or utc() > self.stat_timer:
+                # Status changes every 2 seconds
+                self.stat_timer = utc() + 1.5
+                self.guild_count = guild_count
+                self.status_iter = (self.status_iter + 1) % (len(self.statuses) - (not self.audio))
+                with suppress(discord.NotFound):
+                    u = await self.fetch_user(next(iter(self.owners)))
+                    n = u.name
+                    text = f"live to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {belongs(uni_str(n))} place!"
+                    # Status iterates through 5 possible choices
+                    status = self.statuses[self.status_iter]
+                    if status is discord.Streaming:
+                        activity = discord.Streaming(name=text, url=self.twitch_url)
+                        status = discord.Status.dnd
+                    else:
+                        activity = discord.Game(name=text)
+                    if changed:
+                        print(repr(activity))
+                    if self.audio:
+                        audio_status = f"await client.change_presence(status=discord.Status."
+                        if status == discord.Status.invisible:
+                            status = discord.Status.idle
+                            create_future_ex(self.audio.submit, audio_status + "online)")
+                        else:
+                            if status == discord.Status.online:
+                                create_future_ex(self.audio.submit, audio_status + "dnd)")
+                    await self.change_presence(activity=activity, status=status)
+                    # Member update events are not sent through for the current user, so manually send a _seen_ event
+                    await self.seen(self.user, event="misc", raw="Changing their status")
+
     # Handles all updates to the bot. Manages the bot's status and activity on discord, and updates all databases.
     async def handle_update(self, force=False):
-        if utc() - self.last_check > 0.5 or force:
+        if utc() - self.last_check > 2 or force:
             semaphore = self.semaphore if not force else emptyctx
             with suppress(SemaphoreOverflowError):
                 with semaphore:
                     self.last_check = utc()
                     if not force:
                         create_task(self.get_state())
-                    with tracebacksuppressor:
-                        guild_count = len(self.guilds)
-                        changed = guild_count != self.guild_count
-                        if changed or utc() > self.stat_timer:
-                            # Status changes every 5~11 seconds
-                            self.stat_timer = utc() + float(frand(2)) + 5
-                            self.guild_count = guild_count
-                            self.status_iter = (self.status_iter + 1) % (len(self.statuses) - (not self.audio))
-                            with suppress(discord.NotFound):
-                                u = await self.fetch_user(next(iter(self.owners)))
-                                n = u.name
-                                text = f"live to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {belongs(uni_str(n))} place!"
-                                # Status iterates through 5 possible choices
-                                status = self.statuses[self.status_iter]
-                                if status is discord.Streaming:
-                                    activity = discord.Streaming(name=text, url=self.twitch_url)
-                                    status = discord.Status.dnd
-                                else:
-                                    activity = discord.Game(name=text)
-                                if changed:
-                                    print(repr(activity))
-                                if self.audio:
-                                    audio_status = f"await client.change_presence(status=discord.Status."
-                                    if status == discord.Status.invisible:
-                                        status = discord.Status.idle
-                                        create_future_ex(self.audio.submit, audio_status + "online)")
-                                    else:
-                                        if status == discord.Status.online:
-                                            create_future_ex(self.audio.submit, audio_status + "dnd)")
-                                await self.change_presence(activity=activity, status=status)
-                                # Member update events are not sent through for the current user, so manually send a _seen_ event
-                                await self.seen(self.user, event="misc", raw="Changing their status")
                     if self.bot_ready:
                         # Update databases
                         for u in self.data.values():
@@ -2884,6 +2886,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         while not self.closed:
             async with delay(1):
                 async with tracebacksuppressor:
+                    create_task(self.update_status())
                     with MemoryTimer("update_bytes"):
                         net = await create_future(psutil.net_io_counters)
                         net_bytes = net.bytes_sent + net.bytes_recv
