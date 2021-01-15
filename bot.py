@@ -18,7 +18,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     raw_github = "https://raw.githubusercontent.com/thomas-xin/Miza"
     rcc_invite = "https://discord.gg/cbKQKAr"
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
-    twitch_url = "https://www.twitch.tv/thomas_xin"
+    twitch_url = "https://www.twitch.tv/-"
     website_background = "https://i.imgur.com/LsNWQUJ.png"
     webserver = "https://mizabot.xyz"
     heartbeat = "heartbeat.tmp"
