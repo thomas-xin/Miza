@@ -865,7 +865,7 @@ class Rainbow(Command):
         name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
         with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
-            resp = await process_image(url, "rainbow_gif", [value, "-gif"], user, timeout=_timeout)
+            resp = await process_image(url, "rainbow_gif", [value, "-gif"], timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(message.channel, "", fn, filename=name)
 
