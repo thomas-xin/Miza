@@ -262,7 +262,10 @@ class AudioFile:
             return self
         if stream is not None:
             self.stream = stream
-            self.streaming.set_result(stream)
+            try:
+                self.streaming.set_result(stream)
+            except concurrent.futures.InvalidStateError:
+                pass
         stream = self.stream
         if webpage_url is not None:
             self.webpage_url = webpage_url

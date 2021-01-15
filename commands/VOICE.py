@@ -326,6 +326,8 @@ class CustomAudio(collections.abc.Hashable):
     __hash__ = lambda self: self.guild.id
 
     def __getattr__(self, key):
+        if key in ("reverse", "speed", "epos", "pos"):
+            return self.__getattribute__(key)()
         try:
             return self.__getattribute__(key)
         except AttributeError:
@@ -373,15 +375,12 @@ class CustomAudio(collections.abc.Hashable):
                 return json.dumps(d).encode("utf-8"), "dump.json"
             return d, None
 
-    @property
     def reverse(self):
         return self.stats.speed < 0
 
-    @property
     def speed(self):
         return abs(self.stats.speed)
-    
-    @property
+
     def epos(self):
         pos = self.acsi.pos
         if not pos[1] and self.queue:
@@ -391,7 +390,6 @@ class CustomAudio(collections.abc.Hashable):
             return 0, 0
         return pos
 
-    @property
     def pos(self):
         return self.epos[0]
 
@@ -1846,7 +1844,7 @@ class AudioDownloader:
                     f.assign.append(entry)
                 # Touch file to indicate usage
                 f.ensure_time()
-                f.readable.result(timeout=12)
+                f.readable.result(timeout=16)
             if f or not force or not download:
                 return f
         # "none" indicates stream is currently loading
@@ -1886,7 +1884,11 @@ class AudioDownloader:
                     raise FileNotFoundError("Unable to locate appropriate file stream.")
             live = entry.get("duration") and not entry["duration"] <= 960
             seekable = not entry.get("duration") or entry["duration"] < inf
-            f.load(stream, check_fmt=entry.get("duration") is None, webpage_url=entry["url"], live=live, seekable=seekable)
+            try:
+                f.load(stream, check_fmt=entry.get("duration") is None, webpage_url=entry["url"], live=live, seekable=seekable)
+            except:
+                self.cache.pop(fn, None)
+                raise
             # Assign file duration estimate to queue entry
             f.assign.append(entry)
             entry["stream"] = stream
