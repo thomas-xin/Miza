@@ -1848,6 +1848,8 @@ class UpdateReminders(Database):
 # This database has caused so many rate limit issues
 class UpdateMessageCount(Database):
     name = "counts"
+    scanned = False
+    semaphore = Semaphore(20, 256, delay=12)
 
     def startCalculate(self, guild):
         self.data[guild.id] = {"counts": {}, "totals": {}, "words": {}, "oldest": {}}
@@ -1943,11 +1945,16 @@ class UpdateMessageCount(Database):
             return await create_future(callback, channel=channel, messages=messages)
         return messages
 
-    async def getGuildHistory(self, guild, limit=None, after=None, callback=None):
+    async def getGuildHistory(self, guild, limit=None, after=None, callback=None, single=False):
         lim = None if limit is None else ceil(limit / min(128, len(guild.text_channels)))
-        output = cdict({channel.id: create_task(self.getChannelHistory(channel, limit=lim, after=after, callback=callback)) for channel in guild.text_channels})
-        for k, v in output.items():
-            output[k] = await v
+        if single:
+            output = cdict()
+            for channel in guild.text_channels:
+                output[channel.id] = await self.getChannelHistory(channel, limit=lim, after=after, callback=callback)
+        else:
+            output = cdict((channel.id, create_task(self.getChannelHistory(channel, limit=lim, after=after, callback=callback))) for channel in guild.text_channels)
+            for k, v in output.items():
+                output[k] = await v
         return output
 
     async def getUserMessageCount(self, guild):
@@ -1956,7 +1963,7 @@ class UpdateMessageCount(Database):
         avgs = {}
         word = {}
         oldest = self.data[guild.id]["oldest"]
-        histories = await self.getGuildHistory(guild)
+        histories = await self.getGuildHistory(guild, single=True)
         for messages in histories.values():
             for i, message in enumerate(messages, 1):
                 u = message.author.id
@@ -1979,10 +1986,6 @@ class UpdateMessageCount(Database):
         self.update(guild.id)
         print("Completed", guild)
         print(self.data[guild.id])
-
-    def __load__(self):
-        self.scanned = False
-        self.semaphore = Semaphore(20, 256, delay=5)
 
     async def __call__(self):
         if self.scanned:

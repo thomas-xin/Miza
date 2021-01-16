@@ -1390,7 +1390,7 @@ class UpdateMessageCache(Database):
                 data = {m["id"]: m for m in data}
             self.raws[fn] = data
             if raw:
-                print(f"{len(data)} messages temporarily read from {fn}")
+                print(f"{len(data)} message{'s' if len(data) == 1 else ''} temporarily read from {fn}")
         if not raw:
             bot = self.bot
             i = 0
@@ -1404,7 +1404,7 @@ class UpdateMessageCache(Database):
                 i += 1
                 if not i & 2047:
                     time.sleep(0.1)
-            print(f"{len(data)} messages successfully loaded from {fn}")
+            print(f"{len(data)} message{'s' if len(data) == 1 else ''} successfully loaded from {fn}")
             return found
 
     def load_message(self, m_id):
@@ -1488,10 +1488,10 @@ class UpdateMessageCache(Database):
         async with self.save_sem:
             with suppress(AttributeError):
                 fut = create_task(self.bot.data.channel_cache.saves())
-            saving = dict(self.saving)
+            saving = deque(self.saving.items())
             self.saving.clear()
             i = 0
-            for fn, messages in saving.items():
+            for fn, messages in saving:
                 await create_future(self.saves, fn, messages)
                 i += 1
                 if not i % 64 or len(messages) > 65536:
