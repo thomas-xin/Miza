@@ -1986,6 +1986,7 @@ class UpdateMessageCount(Database):
         self.update(guild.id)
         print("Completed", guild)
         print(self.data[guild.id])
+        await create_future(self.update, force=True, priority=True)
 
     async def __call__(self):
         if self.scanned:
