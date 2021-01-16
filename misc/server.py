@@ -468,7 +468,7 @@ def custom_header(response):
 def ensure_parent(proc, parent):
     while True:
         if not parent.is_running():
-            proc.kill()
+            psutil.Process().kill()
         t = ts_us()
         while t in RESPONSES:
             t += 1

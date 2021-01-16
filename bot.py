@@ -1191,6 +1191,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if not os.path.exists(fn):
                 with open(fn, "wb") as f:
                     await create_future(f.write, data)
+            self.limit_cache("attachments", 256)
         return attachment
 
     def attachment_from_file(self, file):
@@ -1792,9 +1793,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     # Gets the CPU and memory usage of a process over a period of 1 second.
     async def get_proc_state(self, proc):
         with suppress(psutil.NoSuchProcess):
-            create_future_ex(proc.cpu_percent, priority=True)
-            await asyncio.sleep(1)
             c = await create_future(proc.cpu_percent, priority=True)
+            if not c:
+                await asyncio.sleep(1)
+                c = await create_future(proc.cpu_percent, priority=True)
             m = await create_future(proc.memory_percent, priority=True)
             return float(c), float(m)
         return 0, 0
@@ -1818,7 +1820,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         tasks = [self.get_proc_state(p) for p in procs]
         resp = await recursive_coro(tasks)
         stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
-        cpu = await create_future(psutil.cpu_count, priority=True)
+        cpu = await create_future(psutil.cpu_count, logical=False, priority=True)
         mem = await create_future(psutil.virtual_memory, priority=True)
         disk = self.disk
         # CPU is totalled across all cores

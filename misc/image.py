@@ -1542,7 +1542,7 @@ def evaluate(ts, args):
 def ensure_parent(proc, parent):
     while True:
         if not parent.is_running():
-            proc.kill()
+            psutil.Process().kill()
         print(f"~GC.__setitem__({proc.pid}, {len(gc.get_objects())})")
         time.sleep(12)
 

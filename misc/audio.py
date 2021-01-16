@@ -708,7 +708,7 @@ def ensure_parent(proc, parent):
     while True:
         if not parent.is_running():
             await_fut(kill())
-            proc.kill()
+            psutil.Process().kill()
         submit(f"GC.__setitem__({proc.pid}, {len(gc.get_objects())})")
         time.sleep(6)
 
