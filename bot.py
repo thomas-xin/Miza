@@ -45,7 +45,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         typing=True,
     )
 
-    def __init__(self, cache_size=4194304, timeout=24):
+    def __init__(self, cache_size=1048576, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
         self.start_time = utc()
         super().__init__(max_messages=256, heartbeat_timeout=60, guild_ready_timeout=5, intents=self.intents)
@@ -1153,13 +1153,15 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return message
 
     def insert_message(self, message):
-        self.data.channel_cache.data.setdefault(message.channel.id, alist()).insort(message.id)
-        self.data.channel_cache.update(message.channel.id)
+        self.data.channel_cache.add(message.channel.id, message.id)
 
     # Inserts a message into the bot cache, discarding existing ones if full.
     def add_message(self, message, files=True, cache=True):
         if self.closed:
             return message
+        if message.id not in self.cache.messages:
+            if not getattr(message, "simulated", None) and cache and "channel_cache" in self.data:
+                create_future_ex(self.insert_message, message, priority=True)
         self.cache.messages[message.id] = message
         self.limit_cache("messages")
         if message.author.id != self.id and files:
@@ -1167,10 +1169,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 for attachment in message.attachments:
                     if getattr(attachment, "size", inf) < 1048576:
                         create_task(self.add_attachment(attachment))
-        if "message_cache" in self.data:
+        if "message_cache" in self.data and not getattr(message, "simulated", None):
             self.data.message_cache.save_message(message)
-        if not getattr(message, "simulated", None) and cache and "channel_cache" in self.data:
-            create_future_ex(self.insert_message, message, priority=True)
         return message
 
     # Deletes a message from the bot cache.
@@ -1981,12 +1981,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             create_future_ex(self.clear_cache, priority=True)
             await_fut(self.send_event("_save_"))
             z = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-            for folder in os.scandir("saves"):
-                fp = folder.path
-                if folder.is_dir():
-                    for file in os.scandir(fp):
-                        z.write(file.path, file.path)
-                else:
+            for x, y, z in os.walk("saves"):
+                for f in z:
+                    fp = os.path.join(x, f)
                     z.write(fp, fp)
             z.close()
             print("Backup database created in", fn)
@@ -2089,6 +2086,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         timeout = getattr(f, "_timeout_", 1) * self.timeout
                         if timeout >= inf:
                             timeout = None
+                        elif self.is_trusted(message.guild):
+                            timeout *= 3
                         await asyncio.wait_for(
                             f._callback_(
                                 message=message,
@@ -2133,9 +2132,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         if status == discord.Status.invisible:
                             status = discord.Status.idle
                             create_future_ex(self.audio.submit, audio_status + "online)")
+                            await self.seen(self.user, event="misc", raw="Changing their status")
                         else:
                             if status == discord.Status.online:
                                 create_future_ex(self.audio.submit, audio_status + "dnd)")
+                            create_task(self.seen(self.user, event="misc", raw="Changing their status"))
                     await self.change_presence(activity=activity, status=status)
                     # Member update events are not sent through for the current user, so manually send a _seen_ event
                     await self.seen(self.user, event="misc", raw="Changing their status")
@@ -2403,6 +2404,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             timeout = getattr(command, "_timeout_", 1) * bot.timeout
                             if timeout >= inf:
                                 timeout = None
+                            elif self.is_trusted(message.guild):
+                                timeout *= 3
                         # Create a future to run the command
                         future = create_future(
                             command,                        # command is a callable object, may be async or not
@@ -2915,6 +2918,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         while not self.closed:
             async with delay(frand(2) + 2):
                 async with tracebacksuppressor:
+                    self.var_count = await create_future(var_count)
                     with MemoryTimer("handle_update"):
                         await self.handle_update()
 
@@ -2938,7 +2942,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     with MemoryTimer("get_disk"):
                         await self.get_disk()
                     await asyncio.sleep(1)
-                await self.send_event("_minute_loop_")
+                    await self.send_event("_minute_loop_")
 
     # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
     async def heartbeat_loop(self):

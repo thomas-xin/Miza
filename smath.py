@@ -329,7 +329,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         func = self
         def call(self, *args, force=False, **kwargs):
             if not force and type(self.block) is concurrent.futures.Future:
-                self.block.result(timeout=1)
+                self.block.result(timeout=12)
             return func(self, *args, **kwargs)
         return call
 
@@ -338,7 +338,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         func = self
         def call(self, *args, force=False, **kwargs):
             if not force and type(self.block) is concurrent.futures.Future:
-                self.block.result(timeout=1)
+                self.block.result(timeout=12)
             self.block = concurrent.futures.Future()
             self.hash = None
             self.frozenset = None
@@ -360,6 +360,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     # Init takes arguments and casts to a deque if possible, else generates as a single value. Allocates space equal to 3 times the length of the input iterable.
     def __init__(self, *args, fromarray=False, **void):
+        fut = getattr(self, "block", None)
         self.block = concurrent.futures.Future()
         self.hash = None
         self.frozenset = None
@@ -372,6 +373,11 @@ custom list-like data structure that incorporates the functionality of numpy arr
                 self.block.set_result(None)
             except concurrent.futures.InvalidStateError:
                 pass
+            if fut:
+                try:
+                    fut.set_result(None)
+                except concurrent.futures.InvalidStateError:
+                    pass
             return
         elif len(args) == 1:
             iterable = args[0]
@@ -399,10 +405,16 @@ custom list-like data structure that incorporates the functionality of numpy arr
             self.offs = size // 3
             self.data = np.empty(size, dtype=object)
             self.view[:] = iterable
-        try:
-            self.block.set_result(None)
-        except concurrent.futures.InvalidStateError:
-            pass
+        if not fut or fut.done():
+            try:
+                self.block.set_result(None)
+            except concurrent.futures.InvalidStateError:
+                pass
+            if fut:
+                try:
+                    fut.set_result(None)
+                except concurrent.futures.InvalidStateError:
+                    pass
 
     def __getstate__(self):
         return self.data, self.offs, self.size
@@ -1187,7 +1199,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     # Appends iterable at the start of the list, reallocating when necessary.
     @blocking
     def extendleft(self, value):
-        if self.data is None:
+        if self.data is None or not self.size:
             self.__init__(reversed(value))
             return self
         value = self.to_iterable(reversed(value), force=True)
@@ -1202,7 +1214,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     # Appends iterable at the end of the list, reallocating when necessary.
     @blocking
     def extend(self, value):
-        if self.data is None:
+        if self.data is None or not self.size:
             self.__init__(value)
             return self
         value = self.to_iterable(value, force=True)

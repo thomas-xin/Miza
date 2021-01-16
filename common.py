@@ -4,6 +4,7 @@ from smath import *
 with MultiThreadedImporter(globals()) as importer:
     importer.__import__(
         "os",
+        "gc",
         "importlib",
         "inspect",
         "tracemalloc",
@@ -1133,6 +1134,18 @@ status_icon = {
 status_order = tuple(status_text)
 
 
+GC = cdict()
+
+def var_count():
+    count = len(gc.get_objects())
+    for k, v in deque(GC.items()):
+        if not psutil.Process(k).is_running():
+            GC.pop(k, None)
+        else:
+            count += v
+    return count
+
+
 # Subprocess pool for resource-consuming operations.
 PROC_COUNT = cdict()
 PROCS = cdict()
@@ -1175,23 +1188,40 @@ def proc_start():
             proc.sem = Semaphore(1, inf)
             create_thread(proc_communicate, proc)
 
-def sub_submit(ptype, command, timeout=12):
-    ts = ts_us()
+def get_idle_proc(ptype):
     p = [i for i in PROCS[ptype] if not i.sem.is_busy()]
     if not p:
         proc = PROCS[ptype][PROC_COUNT[ptype]]
         PROC_COUNT[ptype] = (PROC_COUNT[ptype] + 1) % len(PROCS[ptype])
     else:
         proc = p[0]
+    return proc
+
+def sub_submit(ptype, command, timeout=12):
+    ts = ts_us()
+    proc = get_idle_proc(ptype)
     while ts in PROC_RESP:
         ts += 1
     PROC_RESP[ts] = concurrent.futures.Future()
     s = f"~{ts}~{repr(as_str(command).encode('utf-8'))}\n".encode("utf-8")
     # print(ts, proc, s)
     with proc.sem:
-        proc.stdin.write(s)
-        proc.stdin.flush()
-        resp = PROC_RESP[ts].result(timeout=timeout)
+        if not proc.is_running():
+            proc = get_idle_proc()
+        try:
+            proc.stdin.write(s)
+            proc.stdin.flush()
+            resp = PROC_RESP[ts].result(timeout=timeout)
+        except (BrokenPipeError, OSError, concurrent.futures.TimeoutError):
+            proc.kill()
+            proc2 = psutil.Popen(
+                proc.args,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+            )
+            proc2.sem = proc.sem
+            PROCS[ptype][PROCS[ptype].index(proc)] = proc2
+            raise
     PROC_RESP.pop(ts, None)
     return resp
 

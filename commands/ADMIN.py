@@ -1376,12 +1376,6 @@ class UpdateMessageCache(Database):
         try:
             data = self.raws[fn]
         except KeyError:
-            while len(self.loaded) > 1024:
-                with suppress(RuntimeError):
-                    self.loaded.pop(next(iter(self.loaded)))
-            while len(self.raws) > 1024:
-                with suppress(RuntimeError):
-                    self.raws.pop(next(iter(self.raws)))
             path = self.files + "/" + str(fn)
             if not os.path.exists(path):
                 path += "\x7f"
@@ -1492,6 +1486,8 @@ class UpdateMessageCache(Database):
 
     async def _save_(self, **void):
         async with self.save_sem:
+            with suppress(AttributeError):
+                fut = create_task(self.bot.data.channel_cache.saves())
             saving = dict(self.saving)
             self.saving.clear()
             i = 0
@@ -1501,8 +1497,15 @@ class UpdateMessageCache(Database):
                 if not i % 64 or len(messages) > 65536:
                     await asyncio.sleep(0.1)
             open(self.files + "/-1", "wb").close()
+            while len(self.loaded) > 512:
+                with suppress(RuntimeError):
+                    self.loaded.pop(next(iter(self.loaded)))
+            while len(self.raws) > 512:
+                with suppress(RuntimeError):
+                    self.raws.pop(next(iter(self.raws)))
             if len(saving) >= 8:
                 print(f"Message Database: {len(saving)} files updated.")
+            await fut
 
     getmtime = lambda self: utc_ft(os.path.getmtime(self.files + "/-1"))
 

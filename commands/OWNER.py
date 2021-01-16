@@ -461,15 +461,58 @@ class UpdateUserColours(Database):
         return raw
 
 
+get_fn = lambda m_id: m_id // 10 ** 15
+
 class UpdateChannelCache(Database):
     name = "channel_cache"
     channel = True
+    no_file = True
+    cached = {}
+    modified = {}
+    sem = Semaphore(1, inf)
+
+    def __load__(self, **void):
+        if not os.path.exists("saves/channel_cache"):
+            os.mkdir("saves/channel_cache")
+
+    def add(self, c_id, m_id):
+        with tracebacksuppressor:
+            with self.sem:
+                cached = self.cached
+                modified = self.modified
+                fn = get_fn(m_id)
+                if c_id not in cached:
+                    cached[c_id] = {}
+                    if not os.path.exists(f"saves/channel_cache/{c_id}"):
+                        os.mkdir(f"saves/channel_cache/{c_id}")
+                if fn not in cached[c_id]:
+                    cached[c_id][fn] = set()
+                    if os.path.exists(f"saves/channel_cache/{c_id}/{fn}"):
+                        with open(f"saves/channel_cache/{c_id}/{fn}", "rb") as f:
+                            b = f.read()
+                        cached[c_id][fn] = select_and_loads(b, mode="unsafe")
+                cached[c_id][fn].add(m_id % (10 ** 15))
+                if c_id not in modified:
+                    modified[c_id] = deque()
+                modified[c_id].append(fn)
+
+    async def saves(self):
+        async with self.sem:
+            for c_id, v in self.modified.items():
+                for fn in v:
+                    b = await create_future(select_and_dumps, self.cached[c_id][fn], mode="unsafe")
+                    with open(f"saves/channel_cache/{c_id}/{fn}", "wb") as f:
+                        await create_future(f.write, b)
+            self.modified.clear()
+            with suppress(StopIteration):
+                while sum(len(v) for v in self.cached.values()) > 128:
+                    with suppress(RuntimeError, IndexError, KeyError):
+                        cachef = self.cached[choice(self.cached)]
+                        cachef.pop(next(iter(cachef)))
 
     async def get(self, channel):
         c_id = verify_id(channel)
-        try:
-            messages = self.data[c_id]
-        except KeyError:
+        if not os.path.exists(f"saves/channel_cache/{c_id}"):
             if hasattr(channel, "simulated"):
                 yield channel.message
                 return
@@ -480,8 +523,14 @@ class UpdateChannelCache(Database):
                 self.bot.add_message(message, files=False, cache=False)
             self.data[channel.id] = messages
             self.update(channel.id)
-        for m in reversed(messages):
-            yield await self.bot.fetch_message(m, channel)
+        cached = self.cached.get(c_id, {})
+        for fn in reversed(os.listdir(f"saves/channel_cache/{c_id}")):
+            if fn not in cached:
+                with open(f"saves/channel_cache/{c_id}/{fn}", "rb") as f:
+                    b = f.read()
+                cached[fn] = select_and_loads(b, "unsafe")
+            for m in sorted(cached[fn], reverse=True):
+                yield await self.bot.fetch_message(m * 10 ** 15, channel)
 
 
 class Suspend(Command):

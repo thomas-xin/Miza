@@ -196,11 +196,12 @@ class AudioPlayer(discord.AudioSource):
             self.queue[0] = None
     
     def skip(self):
-        entry = self.queue.popleft()
-        create_future_ex(entry[0].close)
-        after = entry[1]
-        if callable(after):
-            create_future_ex(after)
+        if self.queue:
+            entry = self.queue.popleft()
+            create_future_ex(entry[0].close)
+            after = entry[1]
+            if callable(after):
+                create_future_ex(after)
     
     def clear(self):
         for entry in self.queue:
@@ -708,6 +709,7 @@ def ensure_parent(proc, parent):
         if not parent.is_running():
             await_fut(kill())
             proc.kill()
+        submit(f"GC.__setitem__({proc.pid}, {len(gc.get_objects())})")
         time.sleep(6)
 
 

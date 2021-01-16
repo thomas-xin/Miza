@@ -39,7 +39,7 @@ async def create_player(auds, p_type=0, verbose=False):
         "```" + "\n" * verbose + "callback-voice-player-" + str(int(bool(p_type)))
         + "\nInitializing virtual audio player...```"
     )
-    await auds.channel.send(text)
+    await auds.text.send(text)
     await auds.update_player()
 
 
@@ -333,10 +333,6 @@ class CustomAudio(collections.abc.Hashable):
         except AttributeError:
             pass
         try:
-            return getattr(self.__getattribute__("source"), key)
-        except (KeyError, AttributeError):
-            pass
-        try:
             return getattr(self.__getattribute__("queue"), key)
         except AttributeError:
             pass
@@ -345,10 +341,9 @@ class CustomAudio(collections.abc.Hashable):
 
     def __dir__(self):
         data = set(object.__dir__(self))
-        data.update(dir(self.source))
+        data.update(("reverse", "speed", "epos", "pos"))
         data.update(dir(self.acsi))
         data.update(dir(self.queue))
-        data.update(dir(self.channel))
         return data
 
     def has_options(self):
@@ -1927,7 +1922,8 @@ class AudioDownloader:
         self.get_stream(info, video=fmt in videos, force=True, download=False)
         outf = f"{info['name']}.{fmt}"
         ts = ts_us()
-        fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+        outft = outf.translate(filetrans)
+        fn = f"cache/\x7f{ts}~{outft}"
         if fmt in videos:
             video = info["video"]
         else:
@@ -1939,10 +1935,15 @@ class AudioDownloader:
         if not video:
             args.append("-vn")
         if str(start) != "None":
-            args.extend(("-ss", start))
-        if str(end) != "None":
-            args.extend(("-to", end))
+            start = round_min(float(start))
+            args.extend(("-ss", str(start)))
         else:
+            start = 0
+        if str(end) != "None":
+            end = round_min(min(float(end), 86400))
+            args.extend(("-to", str(end)))
+        else:
+            end = None
             args.extend(("-to", "86400"))
         if video:
             args.extend(("-i", video))
@@ -1990,6 +1991,29 @@ class AudioDownloader:
             if not is_url(new):
                 with suppress():
                     os.remove(new)
+        if end:
+            odur = end - start
+            if odur:
+                dur = get_duration(fn)
+                if dur < odur - 1:
+                    ts += 1
+                    fn, fn2 = f"cache/\x7f{ts}~{outft}", fn
+                    times = ceil(odur / dur)
+                    loopf = f"cache/{ts - 1}~loop.txt"
+                    with open(loopf, "w", encoding="utf-8") as f:
+                        f.write(f"file '{fn2.split('/', 1)[-1]}'\n" * times)
+                    args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-to", str(odur), "-f", "concat", "-safe", "0", "-i", loopf, "-c", "copy", fn]
+                    print(args)
+                    try:
+                        resp = subprocess.run(args)
+                        resp.check_returncode()
+                    except subprocess.CalledProcessError as ex:
+                        if resp.stderr:
+                            raise RuntimeError(*ex.args, resp.stderr)
+                        raise ex
+                    with suppress():
+                        os.remove(loopf)
+                        os.remove(fn2)
         if not mid:
             return fn, outf
         self.other_x += 1
@@ -2007,9 +2031,9 @@ class AudioDownloader:
         with suppress():
             os.remove(fn)
         self.other_x += 1
-        resp = Request(url, timeout=420)
+        resp = Request(url, timeout=720)
         self.other_x += 1
-        out = Request(f"https://cts.ofoct.com/get-file.php?type=get&genfpath=/tmp/{resp_fn}.mid", timeout=24)
+        out = Request(f"https://cts.ofoct.com/get-file.php?type=get&genfpath=/tmp/{resp_fn}.mid", timeout=32)
         return out, outf[:-4] + ".mid"
 
     # Extracts full data for a single entry. Uses cached results for optimization.
@@ -2535,7 +2559,7 @@ class Connect(Command):
                 auds = bot.data.audio.players[guild.id]
             except KeyError:
                 raise LookupError("Unable to find voice channel.")
-            auds.channel = channel
+            auds.text = channel
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to disconnect while other users are in voice")
             await create_future(auds.kill)
@@ -2583,7 +2607,7 @@ class Skip(Command):
         if guild.id not in bot.data.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.data.audio.players[guild.id]
-        auds.channel = message.channel
+        auds.text = message.channel
         # ~clear is an alias for ~skip -f inf
         if name.startswith("c"):
             argv = "inf"
@@ -3046,7 +3070,7 @@ class AudioSettings(Command):
                     # Attempt to adjust audio setting by re-initializing FFmpeg player
                     try:
                         await create_future(auds.play, auds.source, auds.pos, timeout=12)
-                    except (TimeoutError, asyncio.exceptions.TimeoutError, concurrent.futures._base.TimeoutError):
+                    except (TimeoutError, asyncio.exceptions.TimeoutError, concurrent.futures.TimeoutError):
                         if auds.source:
                             print(auds.args)
                         await create_future(auds.stop, timeout=18)
@@ -3785,7 +3809,7 @@ class Lyrics(Command):
 
 class Download(Command):
     time_consuming = True
-    _timeout_ = 20
+    _timeout_ = 75
     name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "ConvertORG", "Org2xm", "Convert"]
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
     usage = "<0:search_links>* <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <apply_settings{?a}|verbose_search{?v}>*"
@@ -3876,7 +3900,6 @@ class Download(Command):
                 start=start,
                 end=end,
                 auds=auds,
-                timeout=540,
             )
             return await bot.send_with_file(
                 channel=channel,
@@ -3958,7 +3981,6 @@ class Download(Command):
                                 start=start,
                                 end=end,
                                 auds=auds,
-                                timeout=540,
                             )
                             create_task(message.edit(
                                 content=css_md(f"Uploading {sqr_md(out)}..."),
