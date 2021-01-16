@@ -1139,10 +1139,11 @@ GC = cdict()
 def var_count():
     count = len(gc.get_objects())
     for k, v in deque(GC.items()):
-        if not psutil.Process(k).is_running():
-            GC.pop(k, None)
-        else:
-            count += v
+        with suppress(psutil.NoSuchProcess):
+            if not psutil.Process(k).is_running():
+                GC.pop(k, None)
+            else:
+                count += v
     return count
 
 
