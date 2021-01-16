@@ -1267,7 +1267,7 @@ class Status(Command):
             stats = bot.curr_state
 
             bot_info = (
-                f"Process count\n`{active[0]}`\nThread count\n`{active[1]}`\nCoroutine count\n`{active[2]}`\nVariable count\n`{bot.var_count}`\n"
+                f"Process count\n`{active[0]}`\nThread count\n`{active[1]}`\nCoroutine count\n`{active[2]}`\n"
                 + f"CPU usage\n`{round(stats[0], 3)}%`\nRAM usage\n`{byte_scale(stats[1])}B`\nDisk usage\n`{byte_scale(stats[2])}B`\nNetwork usage\n`{byte_scale(bot.bitrate)}bps`"
             )
             emb.add_field(name="Bot info", value=bot_info)

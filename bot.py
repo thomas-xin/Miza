@@ -2920,7 +2920,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         while not self.closed:
             async with delay(frand(2) + 2):
                 async with tracebacksuppressor:
-                    self.var_count = await create_future(var_count)
+                    # self.var_count = await create_future(var_count)
                     with MemoryTimer("handle_update"):
                         await self.handle_update()
 

@@ -4,7 +4,7 @@ from smath import *
 with MultiThreadedImporter(globals()) as importer:
     importer.__import__(
         "os",
-        "gc",
+        # "gc",
         "importlib",
         "inspect",
         "tracemalloc",
@@ -1134,17 +1134,17 @@ status_icon = {
 status_order = tuple(status_text)
 
 
-GC = cdict()
+# GC = cdict()
 
-def var_count():
-    count = len(gc.get_objects())
-    for k, v in deque(GC.items()):
-        with suppress(psutil.NoSuchProcess):
-            if not psutil.Process(k).is_running():
-                GC.pop(k, None)
-            else:
-                count += v
-    return count
+# def var_count():
+#     count = len(gc.get_objects())
+#     for k, v in deque(GC.items()):
+#         with suppress(psutil.NoSuchProcess):
+#             if not psutil.Process(k).is_running():
+#                 GC.pop(k, None)
+#             else:
+#                 count += v
+#     return count
 
 
 # Subprocess pool for resource-consuming operations.

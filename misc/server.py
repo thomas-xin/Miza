@@ -469,14 +469,14 @@ def ensure_parent(proc, parent):
     while True:
         if not parent.is_running():
             psutil.Process().kill()
-        t = ts_us()
-        while t in RESPONSES:
-            t += 1
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7f{content}", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
-        send(f"!{t}\x7fGC.__setitem__({proc.pid}, {len(gc.get_objects())})", escape=False)
+        # t = ts_us()
+        # while t in RESPONSES:
+        #     t += 1
+        # RESPONSES[t] = fut = concurrent.futures.Future()
+        # send(f"!{t}\x7f{content}", escape=False)
+        # j, after = fut.result()
+        # RESPONSES.pop(t, None)
+        # send(f"!{t}\x7fGC.__setitem__({proc.pid}, {len(gc.get_objects())})", escape=False)
         time.sleep(6)
 
 if __name__ == "__main__":

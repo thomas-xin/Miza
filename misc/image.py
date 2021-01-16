@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, magic, gc
+import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, magic #, gc
 import numpy as np
 import PIL
 from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
@@ -1543,7 +1543,7 @@ def ensure_parent(proc, parent):
     while True:
         if not parent.is_running():
             psutil.Process().kill()
-        print(f"~GC.__setitem__({proc.pid}, {len(gc.get_objects())})")
+        # print(f"~GC.__setitem__({proc.pid}, {len(gc.get_objects())})")
         time.sleep(12)
 
 if __name__ == "__main__":
