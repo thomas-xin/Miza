@@ -1915,12 +1915,12 @@ class UpdateMessageCount(Database):
                 out = deque()
                 if after is None:
                     async for m in history:
-                        add_message(m)
+                        add_message(m, files=False)
                         out.append(m)
                 else:
                     async for m in history:
                         if getattr(m, "created_at", None) and m.created_at > after:
-                            add_message(m)
+                            add_message(m, files=False)
                             out.append(m)
                 return list(out)
             except discord.Forbidden:
