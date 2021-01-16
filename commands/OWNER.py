@@ -510,8 +510,11 @@ class UpdateChannelCache(Database):
             with suppress(StopIteration):
                 while sum(len(v) for v in self.cached.values()) > 128:
                     with suppress(RuntimeError, IndexError, KeyError):
-                        cachef = self.cached[choice(self.cached)]
+                        k = choice(self.cached)
+                        cachef = self.cached[k]
                         cachef.pop(next(iter(cachef)))
+                        if not cachef:
+                            self.cached.pop(k)
 
     async def get(self, channel):
         c_id = verify_id(channel)
