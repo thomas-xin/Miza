@@ -498,6 +498,8 @@ class UpdateChannelCache(Database):
                 modified[c_id].append(fn)
 
     async def saves(self):
+        if self.sem.is_busy():
+            return
         async with self.sem:
             for c_id, v in self.modified.items():
                 for fn in v:
