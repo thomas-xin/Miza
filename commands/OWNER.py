@@ -490,7 +490,8 @@ class UpdateChannelCache(Database):
                     if os.path.exists(f"saves/channel_cache/{c_id}/{fn}"):
                         with open(f"saves/channel_cache/{c_id}/{fn}", "rb") as f:
                             b = f.read()
-                        cached[c_id][fn] = select_and_loads(b, mode="unsafe")
+                        if b:
+                            cached[c_id][fn] = select_and_loads(b, mode="unsafe")
                 cached[c_id][fn].add(m_id % (10 ** 15))
                 if c_id not in modified:
                     modified[c_id] = deque()
@@ -526,9 +527,11 @@ class UpdateChannelCache(Database):
         cached = self.cached.get(c_id, {})
         for fn in reversed(os.listdir(f"saves/channel_cache/{c_id}")):
             if fn not in cached:
+                cached[fn] = set()
                 with open(f"saves/channel_cache/{c_id}/{fn}", "rb") as f:
                     b = f.read()
-                cached[fn] = select_and_loads(b, "unsafe")
+                if b:
+                    cached[fn] = select_and_loads(b, "unsafe")
             for m in sorted(cached[fn], reverse=True):
                 yield await self.bot.fetch_message(m * 10 ** 15, channel)
 
