@@ -89,7 +89,7 @@ while not os.path.exists(sd):
                         break
                 if os.path.exists(hb):
                     break
-            for child in proc.children():
+            for child in proc.children(recursive=True):
                 try:
                     child.kill()
                 except:

@@ -1495,7 +1495,7 @@ class UpdateMessageCache(Database):
                 await create_future(self.saves, fn, messages)
                 i += 1
                 if not i % 64 or len(messages) > 65536:
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.2)
             open(self.files + "/-1", "wb").close()
             while len(self.loaded) > 512:
                 with suppress(RuntimeError):

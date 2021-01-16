@@ -1820,7 +1820,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         tasks = [self.get_proc_state(p) for p in procs]
         resp = await recursive_coro(tasks)
         stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
-        cpu = await create_future(psutil.cpu_count, logical=False, priority=True)
+        cpu = await create_future(psutil.cpu_count, logical=True, priority=True)
         mem = await create_future(psutil.virtual_memory, priority=True)
         disk = self.disk
         # CPU is totalled across all cores
