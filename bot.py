@@ -3230,7 +3230,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 c_id = self.channel.id
                 for element in data:
                     element["channel"] = self.channel.id
-                    message = bot.CachedMessage(data)
+                    message = bot.CachedMessage(element)
                     await self.messages.put(message)
         
         discord.iterators.HistoryIterator.fill_messages = lambda self: fill_messages(self)
