@@ -770,11 +770,11 @@ class Lockdown(Command):
         perm.send_messages = False
         async with ExceptionSender(channel):
             await role.edit(permissions=perm, reason="Server Lockdown.")
-    
+
     async def invLock(self, inv, channel):
         async with ExceptionSender(channel):
             await inv.delete(reason="Server Lockdown.")
-    
+
     async def __call__(self, guild, channel, flags, **void):
         if "f" not in flags:
             return self.bot.dangerous_command
@@ -1292,7 +1292,7 @@ class UpdateUserLogs(Database):
             if age < 86400 * 7:
                 emb.description += f"\n⚠️ Account is {time_diff(utc_dt(), user.created_at)} old. ⚠️"
             self.bot.send_embeds(channel, emb)
-    
+
     async def _leave_(self, user, **void):
         guild = getattr(user, "guild", None)
         if guild is not None and guild.id in self.data:
@@ -1540,7 +1540,7 @@ class UpdateMessageLogs(Database):
             lim = None
             await self.bot.data.counts.getGuildHistory(guild, lim, after=time, callback=self.callback)
         self.bot.data.message_cache.finished = True
-    
+
     def callback(self, messages, **void):
         create_future_ex(self.bot.update_from_client, priority=True)
         return messages

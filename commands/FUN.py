@@ -399,7 +399,7 @@ class Text2048(Command):
             mode |= 1
         return "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "\nStarting Game...```*"
 
-    
+
 class SlotMachine(Command):
     name = ["Slots"]
     description = "Plays a slot machine game. Costs gold to play, can yield gold and diamonds."
@@ -629,7 +629,7 @@ class Daily(Command):
             emb.add_field(name=field.name, value=f"{bar} `{int(field.progress)}/{field.required}`\nRewards: {rewards}", inline=False)
         message = await channel.send(embed=emb)
         create_task(message.add_reaction("✅"))
-    
+
     async def _callback_(self, bot, user, reaction, message, perm, vals, **void):
         if reaction is None:
             return
@@ -969,7 +969,7 @@ class Mimic(Command):
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = (1, 2)
-    
+
     async def __call__(self, bot, message, user, perm, flags, args, argv, **void):
         update = self.data.mimics.update
         mimicdb = bot.data.mimics
@@ -1328,19 +1328,19 @@ class UpdateMimics(Database):
                         if not i % 8191:
                             await asyncio.sleep(0.45)
                         i += 1
-                           
-                           
+
+
 class Muffin(Command):
     name=["Muffins", "🧁"]
     description = "Muffin time! What more is there to say? :D"
-    
+
     def __call__(self, **void):
         return "Muffin time :D 🧁🧁🧁"
 
-               
+
 class Laser(Command):
     name = ["Beam"]
     description = "Creates a rainbow laser."
-                           
+
     def __call__(self, **void):
         return ":white_large_square:       :white_large_square:    :white_large_square: :red_square: :orange_square: :yellow_square: :green_square: :blue_square: :purple_square:"

@@ -63,71 +63,92 @@ emptyctx = EmptyContext()
 # Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks.
 class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
-    __slots__ = ("limit", "buffer", "delay", "active", "passive", "last", "ratio")
+    __slots__ = ("limit", "buffer", "fut", "active", "passive", "rate_limit", "rate_bin")
 
     def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None, randomize_ratio=2):
         self.limit = limit
         self.buffer = buffer
-        self.delay = delay
         self.active = 0
         self.passive = 0
         self.rate_limit = rate_limit
-        self.rate_bin = alist()
-        self.last = utc()
-        self.ratio = randomize_ratio
+        self.rate_bin = deque()
+        self.fut = concurrent.futures.Future()
+        self.fut.set_result(None)
+
+    def _update_bin_after(self, t):
+        time.sleep(t)
+        self._update_bin()
 
     def _update_bin(self):
         while self.rate_bin and utc() - self.rate_bin[0] >= self.rate_limit:
             self.rate_bin.popleft()
+        if not self.rate_bin:
+            try:
+                self.fut.set_result(None)
+            except concurrent.futures.InvalidStateError:
+                pass
         return self.rate_bin
-    
+
+    def enter(self):
+        if self.rate_limit:
+            self.rate_bin.append(utc())
+        self.active += 1
+        if self.active >= self.limit and self.fut.done():
+            self.fut = concurrent.futures.Future()
+        return self
+
+    def check_overflow(self):
+        if self.passive >= self.buffer:
+            raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
+
     def __enter__(self):
-        self.last = utc()
         if self.is_busy():
-            if self.passive >= self.buffer:
-                raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
+            self.check_overflow()
             self.passive += 1
             while self.is_busy():
-                time.sleep(self.delay if not self.ratio else (random.random() * self.ratio + 1) * self.delay)
-                self._update_bin()
+                self.fut.result()
             self.passive -= 1
-        if self.rate_limit:
-            self.rate_bin.append(utc())
-        self.active += 1
-        return self
-    
-    async def __aenter__(self):
-        self.last = utc()
-        if self.is_busy():
-            if self.passive >= self.buffer:
-                raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
-            self.passive += 1
-            while self.is_busy():
-                await asyncio.sleep(self.delay)
-                self._update_bin()
-            self.passive -= 1
-        if self.rate_limit:
-            self.rate_bin.append(utc())
-        self.active += 1
-        return self
+        return self.enter()
 
     def __exit__(self, *args):
         self.active -= 1
-        self.last = utc()
+        if self.rate_bin:
+            t = self.rate_bin[0] + self.rate_limit - utc()
+            if t > 0:
+                create_future_ex(self._update_bin_after, t, priority=True)
+            else:
+                self._update_bin()
+        elif self.active < self.limit:
+            try:
+                self.fut.set_result(None)
+            except concurrent.futures.InvalidStateError:
+                pass
+
+    async def __aenter__(self):
+        if self.is_busy():
+            self.check_overflow()
+            self.passive += 1
+            while self.is_busy():
+                await wrap_future(self.fut)
+            self.passive -= 1
+        return self.enter()
 
     async def __aexit__(self, *args):
-        self.active -= 1
-        self.last = utc()
+        return self.__exit__()
+
+    def wait(self):
+        while self.is_busy():
+            self.fut.result()
 
     async def __call__(self):
-        while self.value >= self.limit:
-            await asyncio.sleep(self.delay)
+        while self.is_busy():
+            await wrap_future(self.fut)
 
     def is_active(self):
         return self.active or self.passive
 
     def is_busy(self):
-        return self.active >= self.limit or len(self._update_bin()) >= self.limit
+        return self.active >= self.limit or self.rate_limit and len(self._update_bin()) >= self.limit
 
     @property
     def busy(self):
@@ -142,7 +163,7 @@ class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.Abstract
 
     def __init__(self, *args, **kwargs):
         self.exceptions = args + tuple(kwargs.values())
-    
+
     def __exit__(self, exc_type, exc_value, exc_tb):
         if exc_type and exc_value:
             for exception in self.exceptions:
@@ -173,7 +194,7 @@ class ExceptionSender(contextlib.AbstractContextManager, contextlib.AbstractAsyn
         self.sendable = sendable
         self.reference = reference
         self.exceptions = args + tuple(kwargs.values())
-    
+
     def __exit__(self, exc_type, exc_value, exc_tb):
         if exc_type and exc_value:
             for exception in self.exceptions:
@@ -208,7 +229,7 @@ class delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextMa
 
     def __call__(self):
         return self.exit()
-    
+
     def __exit__(self, *args):
         remaining = self.duration - utc() + self.start
         if remaining > 0:
@@ -235,7 +256,7 @@ class MemoryTimer(contextlib.AbstractContextManager, contextlib.AbstractAsyncCon
 
     def __call__(self):
         return self.exit()
-    
+
     def __exit__(self, *args):
         taken = utc() - self.start
         try:
@@ -449,7 +470,7 @@ class FileHashDict(collections.abc.MutableMapping):
         if self.path and not os.path.exists(self.path):
             os.mkdir(self.path)
             self.iter = []
-    
+
     __hash__ = lambda self: lambda self: hash(self.path)
     __str__ = lambda self: self.__class__.__name__ + "(" + str(self.data) + ")"
     __repr__ = lambda self: self.__class__.__name__ + "(" + str(self.full) + ")"
@@ -1448,7 +1469,7 @@ class open2(io.IOBase):
         self.fp = None
         self.fn = fn
         self.mode = mode
-    
+
     def __getattribute__(self, k):
         if k in object.__getattribute__(self, "__slots__") or k == "clear":
             return object.__getattribute__(self, k)
@@ -2078,7 +2099,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
                 else:
                     self.data.modified.add(modified)
         return False
-    
+
     def unload(self):
         bot = self.bot
         func = getattr(self, "_destroy_", None)
@@ -2132,7 +2153,7 @@ class __logPrinter:
                         pass
         except:
             sys.__stdout__.write(traceback.format_exc())
-    
+
     def update_print(self):
         if self.file is None:
             return

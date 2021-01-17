@@ -97,7 +97,7 @@ class Hello(Command):
     description = "Sends a greeting message. Useful for checking whether the bot is online."
     usage = "<user>?"
     slash = True
-    
+
     async def __call__(self, bot, user, name, argv, guild, **void):
         if "dailies" in bot.data:
             bot.data.dailies.progress_quests(user, "talk")
@@ -1128,7 +1128,7 @@ class Profile(Command):
     rate_limit = 1
     no_parse = True
     slash = True
-    
+
     async def __call__(self, user, args, argv, flags, channel, guild, bot, **void):
         setting = None
         if not args:
@@ -1249,7 +1249,7 @@ class Status(Command):
         message = await channel.send(italics(code_md("Loading bot status...")))
         set_dict(bot.data.messages, channel.id, {})[message.id] = cdict(t=0, command="bot.commands.status[0]")
         bot.data.messages.update(channel.id)
-    
+
     async def _callback2_(self, channel, m_id=None, msg=None, **void):
         bot = self.bot
         if not hasattr(bot, "bitrate"):
@@ -1315,7 +1315,7 @@ class Invite(Command):
     name = ["Website", "BotInfo", "InviteLink"]
     description = "Sends a link to ⟨MIZA⟩'s homepage, github and invite code, as well as an invite link to the current server if applicable."
     slash = True
-    
+
     async def __call__(self, channel, message, **void):
         emb = discord.Embed(colour=rand_colour())
         emb.set_author(**get_author(self.bot.user))
@@ -1337,7 +1337,7 @@ class Invite(Command):
 class Upload(Command):
     name = ["Filehost"]
     description = "Sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/upload"
-    
+
     def __call__(self, **void):
         return self.bot.webserver + "/upload"
 
@@ -1868,7 +1868,7 @@ class UpdateMessageCount(Database):
                     return sum(c.values())
                 return c.get(user.id, 0)
         return "Calculating..."
-    
+
     def getUserGlobalMessageCount(self, user):
         count = 0
         for g_id in self.data:
@@ -2050,7 +2050,7 @@ class UpdateMessages(Database):
                             if t - v.t >= 1:
                                 v.t = t
                                 create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id))
-    
+
     async def _destroy_(self, **void):
         self.closed = True
         msg = "Offline 😔"
@@ -2306,7 +2306,7 @@ class UpdateUsers(Database):
         bot = self.bot
         react = await create_future(bot.data.emojis.get, "sparkles.gif")
         return await message.add_reaction(react)
-    
+
     def _send_(self, message, **void):
         user = message.author
         if user.id == self.bot.id or self.bot.get_perms(user, message.guild) <= -inf:
@@ -2370,12 +2370,12 @@ class UpdateUsers(Database):
         if is_finite(xp):
             return int((xp * 3 / 2000) ** (2 / 3)) + 1
         return xp
-    
+
     def xp_to_next(self, level):
         if is_finite(level):
             return ceil(math.sqrt(level - 1) * 1000)
         return level
-    
+
     def xp_required(self, level):
         if is_finite(level):
             return ceil((level - 1) ** 1.5 * 2000 / 3)
@@ -2391,7 +2391,7 @@ class UpdateUsers(Database):
             if "dailies" in self.bot.data:
                 self.bot.data.dailies.progress_quests(user, "xp", amount)
             self.update(user.id)
-    
+
     def add_gold(self, user, amount):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
             add_dict(set_dict(self.data, user.id, {}), {"gold": amount})

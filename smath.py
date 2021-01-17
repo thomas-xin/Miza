@@ -18,12 +18,12 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
     def __import__(self, *modules):
         for module in modules:
             self.out[module] = self.exc.submit(__import__, module)
-    
+
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
         if exc_type and exc_value:
             raise exc_value
-    
+
     def close(self):
         for k in tuple(self.out):
             self.out[k] = self.out[k].result()
@@ -755,7 +755,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         except (TypeError, ValueError):
             np.divide(iterable, np.power(2, arr), out=arr)
         return temp
-    
+
     __rand__ = __and__
     __rxor__ = __xor__
     __ror__ = __or__
@@ -1100,7 +1100,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @waiting
     def rindex(self, value, key=None, sorted=False):
         return self.search(value, key, sorted, force=True)[-1]
-    
+
     # Returns indices representing positions for all instances of the target found in list, using binary search when applicable.
     @waiting
     def search(self, value, key=None, sorted=False):
@@ -1156,7 +1156,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         if not pops:
             raise IndexError(f"{value} not found.")
         return pops
-    
+
     find = findall = search
 
     # Counts the amount of instances of the target within the list.
@@ -1267,7 +1267,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         if type(other) not in (set, frozenset):
             other = frozenset(other)
         return self.to_frozenset().isdisjoint(other)
-    
+
     @waiting
     def issubset(self, other):
         if type(other) not in (set, frozenset):
@@ -1279,7 +1279,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         if type(other) not in (set, frozenset):
             other = frozenset(other)
         return self.to_frozenset().issuperset(other)
-    
+
     @waiting
     def union(self, *others):
         args = deque()
@@ -1288,7 +1288,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
                 other = frozenset(other)
             args.append(other)
         return self.to_frozenset().union(*args)
-    
+
     @waiting
     def intersection(self, *others):
         args = deque()
@@ -1306,7 +1306,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
                 other = frozenset(other)
             args.append(other)
         return self.to_frozenset().difference(*args)
-    
+
     @waiting
     def symmetric_difference(self, other):
         if type(other) not in (set, frozenset):
@@ -1386,7 +1386,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @waiting
     def imag(self):
         return self.__class__(np.imag(self.view))
-    
+
     @waiting
     def float(self):
         return self.__class__(float(i.real) for i in self.view)
@@ -1406,13 +1406,13 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @waiting
     def mean(self):
         return np.mean(self.view)
-    
+
     @waiting
     def product(self):
         return np.prod(self.view)
-    
+
     prod = product
-        
+
     # Reallocates list.
     @blocking
     def reconstitute(self, data=None):
@@ -1660,7 +1660,7 @@ class demap(collections.abc.Mapping):
         with suppress(KeyError):
             return self.__getitem__(k)
         return v
-    
+
     def pop(self, k, v=None):
         with suppress(KeyError):
             temp = self.__getitem__(k)
@@ -1934,7 +1934,7 @@ def next6np(start=0):
 
 # Checks if a number is prime using multiple probability tests limited to O(log^2(n)) iterations.
 def is_prime(n):
-    
+
     def divisibility(n):
         t = min(n, 2 + ceil(log(n) ** 2))
         g = next6np()
@@ -3030,7 +3030,7 @@ class DynamicDT(datetime.datetime):
     def __str__(self):
         y = self.year_repr()
         return y + super().__str__()[4:]
-        
+
     def __repr__(self):
         return self.__class__.__name__ + "(" + ", ".join(str(i) for i in self.timetuple()[:6]) + (f", microsecond={self.microsecond}" if getattr(self, "microsecond", 0) else "") + ").set_offset(" + str(self.offset()) + ")"
 
@@ -3775,14 +3775,14 @@ class pickled(collections.abc.Callable):
         self.data = obj
         self.ignores = set(ignore)
         self.__str__ = obj.__str__
-    
+
     def __getattr__(self, key):
         try:
             return self.__getattribute__(key)
         except AttributeError:
             pass
         return getattr(self.__getattribute__("data"), key)
-    
+
     def __dir__(self):
         data = set(object.__dir__(self))
         data.update(dir(self.data))

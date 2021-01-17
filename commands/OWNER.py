@@ -397,7 +397,7 @@ class DownloadServer(Command):
     usage = "<server_id>?"
     flags = "f"
     _timeout_ = 512
-    
+
     async def __call__(self, bot, argv, flags, channel, guild, **void):
         if "f" not in flags:
             return bot.dangerous_command
@@ -477,25 +477,26 @@ class UpdateChannelCache(Database):
 
     def add(self, c_id, m_id):
         with tracebacksuppressor:
-            with self.sem:
-                cached = self.cached
-                modified = self.modified
-                fn = get_fn(m_id)
-                if c_id not in cached:
-                    cached[c_id] = {}
-                    if not os.path.exists(f"saves/channel_cache/{c_id}"):
-                        os.mkdir(f"saves/channel_cache/{c_id}")
-                if fn not in cached[c_id]:
-                    cached[c_id][fn] = set()
-                    if os.path.exists(f"saves/channel_cache/{c_id}/{fn}"):
-                        with open(f"saves/channel_cache/{c_id}/{fn}", "rb") as f:
-                            b = f.read()
-                        if b:
-                            cached[c_id][fn] = select_and_loads(b, mode="unsafe")
-                cached[c_id][fn].add(m_id % (10 ** 15))
-                if c_id not in modified:
-                    modified[c_id] = deque()
-                modified[c_id].append(fn)
+            while self.sem.is_busy():
+                self.sem.wait()
+            cached = self.cached
+            modified = self.modified
+            fn = get_fn(m_id)
+            if c_id not in cached:
+                cached[c_id] = {}
+                if not os.path.exists(f"saves/channel_cache/{c_id}"):
+                    os.mkdir(f"saves/channel_cache/{c_id}")
+            if fn not in cached[c_id]:
+                cached[c_id][fn] = set()
+                if os.path.exists(f"saves/channel_cache/{c_id}/{fn}"):
+                    with open(f"saves/channel_cache/{c_id}/{fn}", "rb") as f:
+                        b = f.read()
+                    if b:
+                        cached[c_id][fn] = select_and_loads(b, mode="unsafe")
+            cached[c_id][fn].add(m_id % (10 ** 15))
+            if c_id not in modified:
+                modified[c_id] = deque()
+            modified[c_id].append(fn)
 
     async def saves(self):
         if self.sem.is_busy():

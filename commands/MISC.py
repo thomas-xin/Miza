@@ -13,7 +13,7 @@ from prettytable import PrettyTable as ptable
 
 
 class DouClub:
-    
+
     def __init__(self, c_id, c_sec):
         self.id = c_id
         self.secret = c_sec
@@ -26,7 +26,7 @@ class DouClub:
             # print("Pulling Doukutsu Club...")
             self.data = self.knack.get("object_1")
             self.time = utc()
-    
+
     def update(self):
         if utc() - self.time > 720:
             create_future_ex(self.pull, timeout=60)
@@ -106,10 +106,10 @@ async def searchForums(query):
             curr[elem] = temp
         output.append(curr)
     return output
-    
+
 
 class SheetPull:
-    
+
     def __init__(self, url):
         self.url = url
         self.time = utc()

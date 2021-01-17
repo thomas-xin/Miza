@@ -125,11 +125,11 @@ if proc.is_running():
     except:
         traceback.print_exc()
     proc.kill()
-    
+
 delete(sd)
 delete(rs)
 delete(hb)
 delete(hb_ack)
-        
+
 print("Shutdown signal confirmed. Program will now terminate. ")
 raise SystemExit

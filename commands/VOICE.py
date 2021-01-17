@@ -410,7 +410,7 @@ class CustomAudio(collections.abc.Hashable):
         if not self.paused:
             self.paused = True
             self.acsi.pause()
-    
+
     def resume(self):
         if self.paused:
             self.paused = False
@@ -441,7 +441,7 @@ class CustomAudio(collections.abc.Hashable):
                     self.acsi.play(src, after=self.queue.advance)
         else:
             self.stop()
-    
+
     def enqueue(self, source):
         self.next = source
         with tracebacksuppressor:
@@ -670,7 +670,7 @@ class CustomAudio(collections.abc.Hashable):
 class AudioQueue(alist):
 
     maxitems = 262144
-        
+
     def _init_(self, auds):
         self.auds = auds
         self.bot = auds.bot
@@ -905,7 +905,7 @@ class AudioFileLink:
     seekable = True
     live = False
     dur = None
-    
+
     def __init__(self, fn, stream=None, wasfile=None):
         self.fn = self.file = fn
         self.stream = stream
@@ -977,7 +977,7 @@ class AudioFileLink:
                         e["duration"] = dur
                     self.assign.clear()
         return bot.audio.submit(f"cache['{self.fn}'].update()")
-    
+
     def destroy(self):
         bot.audio.submit(f"cache['{self.fn}'].destroy()")
         ytdl.cache.pop(self.fn, None)
@@ -997,7 +997,7 @@ class AudioClientSubInterface:
                 self.channel = bot.get_channel(c_id)
                 bot.audio.clients[guild.id] = self
                 return self
-    
+
     @classmethod
     def after(cls, key):
         cls.afters[key]()
@@ -1049,7 +1049,7 @@ class AudioClientSubInterface:
 
     async def connect(self, reconnect=True, timeout=60):
         return await create_future(bot.audio.submit, f"await AP.from_guild({self.guild.id}).connect(reconnect={reconnect}, timeout={timeout})")
-    
+
     async def disconnect(self, force=False):
         resp = await create_future(bot.audio.submit, f"await AP.from_guild({self.guild.id}).disconnect(force={force})")
         self.channel = None
@@ -1070,7 +1070,7 @@ for attr in ("skip", "stop", "pause", "resume", "clear_source", "clear", "kill",
 
 # Manages all audio searching and downloading.
 class AudioDownloader:
-    
+
     _globals = globals()
     ydl_opts = {
         # "verbose": 1,
@@ -1097,7 +1097,7 @@ class AudioDownloader:
         self.cache = cdict()
         self.searched = cdict()
         self.semaphore = Semaphore(4, 128, delay=0.25)
-    
+
     def __load__(self, **void):
         print("Initializing audio downloader keys...")
         fut = create_future_ex(self.update_dl)
@@ -1401,7 +1401,7 @@ class AudioDownloader:
             for fut in futs:
                 out.extend(fut.result()[0])
         return out
-    
+
     def ydl_errors(self, s):
         return not ("video unavailable" in s or "this video is not available" in s or "this video contains content from" in s or "this video has been removed" in s)
 
@@ -2418,7 +2418,7 @@ class Playlist(Command):
         update(guild.id)
         stuff = str(len(names)) + " items" if len(names) > 3 else ', '.join(names)
         return css_md(f"Added {sqr_md(stuff)} to the default playlist for {sqr_md(guild)}.")
-    
+
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_", 1)]
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
@@ -2474,7 +2474,7 @@ class Playlist(Command):
             for react in self.directions:
                 async with delay(0.5):
                     create_task(message.add_reaction(as_str(react)))
-        
+
 
 class Connect(Command):
     server_only = True
@@ -2871,7 +2871,7 @@ class Dump(Command):
             auds.stats.update(d["stats"])
             if "h" not in flags:
                 return italics(css_md(f"Successfully appended loaded data to queue for {sqr_md(guild)}.")), 1
-            
+
 
 class AudioSettings(Command):
     server_only = True
@@ -3294,7 +3294,7 @@ class Radio(Command):
                                     city = single_space(resp[:resp.index("</option>")].replace(".", " ")).replace(" ", "_")
                                     country.cities[city] = href
                         return country
-                    
+
                     data.get_cities = get_cities
 
         return self.countries

@@ -189,12 +189,12 @@ class AudioPlayer(discord.AudioSource):
         if len(self.queue) < 2:
             self.queue.append(None)
         self.queue[1] = (source, after)
-    
+
     def clear_source(self):
         if self.queue:
             self.queue[0][0].close()
             self.queue[0] = None
-    
+
     def skip(self):
         if self.queue:
             entry = self.queue.popleft()
@@ -202,7 +202,7 @@ class AudioPlayer(discord.AudioSource):
             after = entry[1]
             if callable(after):
                 create_future_ex(after)
-    
+
     def clear(self):
         for entry in self.queue:
             entry[0].close()
@@ -233,7 +233,7 @@ class AudioFile:
 
     seekable = True
     live = False
-    
+
     def __init__(self, fn, stream=None, wasfile=False):
         self.file = fn
         self.proc = None
@@ -257,7 +257,7 @@ class AudioFile:
         classname = str(self.__class__).replace("'>", "")
         classname = classname[classname.index("'") + 1:]
         return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>"
-    
+
     def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True):
         if live:
             self.loading = self.buffered = self.loaded = True
@@ -510,7 +510,7 @@ class LoadedAudioReader(discord.AudioSource):
         self.pos = 0
         self.key = key
         self.duration = file.duration
-    
+
     def read(self):
         if self.buffer:
             b, self.buffer = self.buffer, None
@@ -525,7 +525,7 @@ class LoadedAudioReader(discord.AudioSource):
             else:
                 self.pos += 1
                 return out
-    
+
     def start(self):
         self.buffer = None
         with tracebacksuppressor():
@@ -588,7 +588,7 @@ class BufferedAudioReader(discord.AudioSource):
                 time.sleep(0.1)
         self.full = True
         self.proc.stdin.close()
-    
+
     def start(self):
         # Run loading loop in parallel thread obviously
         create_future_ex(self.run, timeout=86400, priority=True)

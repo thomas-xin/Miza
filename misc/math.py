@@ -138,7 +138,7 @@ class Random(sympy.Basic):
             self.a = sgn * a + (1 - sgn) * b
             self.b = sgn * b + (1 - sgn) * a + 1
             self.isint = True
-    
+
     def evalf(self, prec):
         randfloat = sympy.Float(random.random(), dps=prec) / 2.7 ** (prec / 7 - random.random())
         temp = (sympy.Float(random.random(), dps=prec) / (randfloat + time.time() % 1)) % 1

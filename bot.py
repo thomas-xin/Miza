@@ -386,7 +386,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             with open("misc/help.json", "w", encoding="utf-8") as f:
                 f.write(json.dumps(j, indent=4))
         self.start_webserver()
-    
+
     def start_webserver(self):
         if self.server:
             with suppress():
@@ -915,7 +915,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         self.cache.emojis[e_id] = emoji
         self.limit_cache("emojis")
         return emoji
-    
+
     # Searches the bot database for a webhook mimic from ID.
     def get_mimic(self, m_id, user=None):
         if "mimics" in self.data:
@@ -1197,7 +1197,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     def attachment_from_file(self, file):
         a_id = int(file.split(".", 1)[0][11:])
         self.cache.attachments[a_id] = a_id
-    
+
     async def get_attachment(self, url):
         if is_discord_url(url) and "attachments/" in url[:64]:
             with suppress(ValueError):
@@ -1258,7 +1258,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             while len(c) > limit:
                 with suppress(RuntimeError):
                     c.pop(next(iter(c)))
-    
+
     # Updates bot cache from the discord.py client cache.
     def update_from_client(self):
         self.cache.guilds.update(self._guilds)
@@ -1352,7 +1352,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if isnan(perm):
             perm = -inf
         return perm
-    
+
     # Gets effective permission level for the target role in a certain guild, taking into account permission values.
     def get_role_perms(self, role, guild):
         if role.permissions.administrator:
@@ -1385,7 +1385,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         g_perm = set_dict(perms, guild.id, {})
         g_perm.update({u_id: round_min(value)})
         self.data.perms.update()
-    
+
     # Sets the permission value for a snowflake in a guild to a value.
     def remove_perms(self, user, guild):
         perms = self.data.perms
@@ -1406,7 +1406,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if b == a:
                 return False
         return True
-    
+
     # Checks whether a member's status was updated by themselves.
     def status_updated(self, before, after):
         if before.activity != after.activity:
@@ -1438,7 +1438,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             m_id = int(message)
         self.cache.deleted[m_id] = no_log + 2
         self.limit_cache("deleted", limit=4096)
-    
+
     # Silently deletes a message, bypassing logs.
     async def silent_delete(self, message, exc=False, no_log=False, delay=None):
         if delay:
@@ -1450,7 +1450,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             self.cache.deleted.pop(message.id, None)
             if exc:
                 raise
-    
+
     async def verified_ban(self, user, guild, reason=None):
         self.cache.banned[(guild.id, user.id)] = utc()
         try:
@@ -1460,7 +1460,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             raise
         self.cache.banned[(guild.id, user.id)] = utc()
         self.limit_cache("banned", 4096)
-    
+
     def recently_banned(self, user, guild, duration=20):
         return utc() - self.cache.banned.get((verify_id(guild), verify_id(user)), 0) < duration
 
@@ -1502,7 +1502,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return True
 
     dangerous_command = bold(css_md(uni_str('[WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. REPEAT COMMAND WITH "?f" FLAG TO CONFIRM.]')))
-    
+
     mmap = {
         "“": '"',
         "”": '"',
@@ -2532,7 +2532,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
             resp = await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
             # print(t, out, resp, sep="\n")
-    
+
     async def process_http_eval(self, t, proc):
         glob = self._globals
         with tracebacksuppressor:
@@ -2741,7 +2741,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if not description and not fields and not thumbnail and not image and not images:
             return fut_nop
         return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts, reference))
-    
+
     async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None):
         fin_col = col = None
         if colour is None:
@@ -3060,7 +3060,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
         # Represents a deleted/not found user.
         class GhostUser(discord.abc.Snowflake):
-            
+
             def __init__(self):
                 self.id = 0
                 self.name = "[USER DATA NOT FOUND]"
@@ -3080,7 +3080,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             is_friend = lambda self: None
             is_blocked = lambda self: None
             colour = color = discord.Colour(16777215)
-    
+
             @property
             def mention(self):
                 return f"<@{self.id}>"
@@ -3095,7 +3095,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         class GhostMessage(discord.abc.Snowflake):
 
             content = bold(css_md(uni_str("[MESSAGE DATA NOT FOUND]")))
-            
+
             def __init__(self):
                 self.author = bot.get_user(bot.deleted_user)
                 self.channel = None
@@ -3226,7 +3226,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             __len__ = data.__len__
             __str__ = lambda self: f"<MessageCache ({len(self)} items)>"
             __repr__ = data.__repr__
-            
+
             def __contains__(self, k):
                 with suppress(KeyError):
                     self[k]
@@ -3237,7 +3237,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             pop = data.pop
             popitem = data.popitem
             clear = data.clear
-            
+
 
         bot.UserGuild = UserGuild
         bot.GhostUser = GhostUser
@@ -3307,7 +3307,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         create_task(self.heartbeat_loop())
         await create_future(self.heartbeat_proc.kill)
         print("Initialization complete.")
-    
+
     def set_client_events(self):
 
         print("Setting client events...")
@@ -3728,7 +3728,7 @@ class AudioClientInterface:
     clients = {}
     returns = {}
     written = False
-    
+
     def __init__(self):
         self.proc = psutil.Popen([python, "audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         create_thread(self.communicate)
@@ -3739,7 +3739,7 @@ class AudioClientInterface:
     @property
     def players(self):
         return bot.data.audio.players
-    
+
     def submit(self, s, aio=False):
         key = ts_us()
         while key in self.returns:
@@ -3808,7 +3808,7 @@ Nickname (Substring alphanumeric match)
 
 def userQuery1(x):
     yield x
-    
+
 def userIter1(x):
     yield str(x)
 
@@ -3955,7 +3955,7 @@ class SimulatedMessage:
     ghost = True
     simulated = True
     __str__ = lambda self: self.name
-    
+
     async def send(self, *args, **kwargs):
         if args:
             kwargs["content"] = args[0]
@@ -3984,7 +3984,7 @@ class SimulatedMessage:
             kwargs["file"] = await create_future(as_file, file)
         self.response.append(kwargs)
         return self
-    
+
     async def edit(self, **kwargs):
         self.response[-1].update(kwargs)
 

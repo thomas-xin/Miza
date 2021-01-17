@@ -250,7 +250,7 @@ class React(Command):
         curr.append(a, str(emoji))
         following[guild.id] = mdict({i: curr[i] for i in sorted(curr)})
         return css_md(f"Added {sqr_md(a)} ➡️ {sqr_md(args[-1])} to the auto react list for {sqr_md(guild)}.")
-    
+
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_", 1)]
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
@@ -1412,7 +1412,7 @@ class UpdateImagePools(Database):
                     found.add(out)
                     self.update(key)
         data.uniq(sorted=None)
-    
+
     async def proc(self, key, func):
         with suppress(SemaphoreOverflowError):
             async with self.sem:

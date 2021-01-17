@@ -435,7 +435,7 @@ def scroll_gif2(image, direction, duration):
         dur = max(image.info.get("duration", 0), 1 / 60)
         total += dur
     count = f
-    
+
     def scroll_gif_iterator(image):
         if direction & 1:
             y = (direction & 2) - 1
@@ -451,7 +451,7 @@ def scroll_gif2(image, direction, duration):
                 ym = round(y * temp.height / count * i)
                 temp = ImageChops.offset(temp, xm, ym)
             yield temp
-    
+
     return dict(duration=total, count=count, frames=scroll_gif_iterator(image))
 
 def scroll_gif(image, direction, duration, fps):
@@ -481,7 +481,7 @@ def scroll_gif(image, direction, duration, fps):
             ym = round(y * image.height / count * i)
             temp = ImageChops.offset(image, xm, ym)
             yield temp
-    
+
     return dict(duration=1000 * duration, count=count, frames=scroll_gif_iterator(image))
 
 
@@ -1367,7 +1367,7 @@ class ImageSequence(Image.Image):
         if position >= len(self._images):
             raise EOFError
         self._position = position
-    
+
     def __getattr__(self, key):
         try:
             return self.__getattribute__(key)

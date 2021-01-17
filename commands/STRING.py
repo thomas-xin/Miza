@@ -791,7 +791,7 @@ class Follow(Command):
     usage = "<url>*"
     rate_limit = (1, 5)
     slash = True
-    
+
     async def __call__(self, channel, argv, message, **void):
         urls = find_urls(argv)
         out = set()
@@ -817,7 +817,7 @@ class Match(Command):
     usage = "<0:string1> <1:string2>?"
     rate_limit = (0.5, 2)
     no_parse = True
-    
+
     async def __call__(self, args, name, **void):
         if len(args) < 2:
             raise ArgumentError("Please enter two or more strings to match.")
