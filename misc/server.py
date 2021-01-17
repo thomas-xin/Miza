@@ -373,7 +373,7 @@ def timezone():
 def execute(token, content):
     if token != AUTH.get("discord_token"):
         return flask.redirect("https://http.cat/401")
-    content = flask.request.full_path.lstrip("/").split("/", 2)[-1]
+    content = urllib.parse.unquote(flask.request.full_path.rstrip("?").lstrip("/").split("/", 2)[-1])
     t = ts_us()
     while t in RESPONSES:
         t += 1
@@ -397,7 +397,7 @@ def command(content):
             RESPONSES[t].set_result((j, after))
             send(j)
             return b"\xf0\x9f\x92\x9c"
-    content = flask.request.full_path.lstrip("/").split("/", 1)[-1]
+    content = urllib.parse.unquote(flask.request.full_path.rstrip("?").lstrip("/").split("/", 1)[-1])
     resp = get_geo(ip)
     data = resp["data"]["geo"]
     tz = data["timezone"]
