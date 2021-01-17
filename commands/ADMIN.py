@@ -957,7 +957,7 @@ class UpdateMutes(Database):
                     if not channel.permissions_for(m).send_messages:
                         raise LookupError
                 except (LookupError, discord.Forbidden, discord.NotFound):
-                    channel = await self.bot.get_first_sendable(guild, m)
+                    channel = self.bot.get_first_sendable(guild, m)
                 try:
                     role = await self.bot.data.muteroles.get(guild)
                     member = guild.get_member(user.id)
@@ -1098,7 +1098,7 @@ class UpdateBans(Database):
                     if not channel.permissions_for(m).send_messages:
                         raise LookupError
                 except (LookupError, discord.Forbidden, discord.NotFound):
-                    channel = await self.bot.get_first_sendable(guild, m)
+                    channel = self.bot.get_first_sendable(guild, m)
                 try:
                     await guild.unban(user, reason="Temporary ban expired.")
                     text = italics(css_md(f"{sqr_md(user)} has been unbanned from {sqr_md(guild)}."))
@@ -1486,8 +1486,8 @@ class UpdateMessageCache(Database):
 
     async def _save_(self, **void):
         async with self.save_sem:
-            with suppress(AttributeError):
-                fut = create_task(self.bot.data.channel_cache.saves())
+            # with suppress(AttributeError):
+            #     fut = create_task(self.bot.data.channel_cache.saves())
             saving = deque(self.saving.items())
             self.saving.clear()
             i = 0
@@ -1505,7 +1505,7 @@ class UpdateMessageCache(Database):
                     self.raws.pop(next(iter(self.raws)))
             if len(saving) >= 8:
                 print(f"Message Database: {len(saving)} files updated.")
-            await fut
+            # await fut
 
     getmtime = lambda self: utc_ft(os.path.getmtime(self.files + "/-1"))
 

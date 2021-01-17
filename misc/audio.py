@@ -144,7 +144,9 @@ class AudioPlayer(discord.AudioSource):
         if k == "pos":
             if not self.queue or not self.queue[0]:
                 return 0, 0
-            return self.queue[0][0].pos / 50, self.queue[0][0].duration()
+            p = self.queue[0][0].pos / 50
+            d = self.queue[0][0].duration()
+            return min(p, d), d
         try:
             return getattr(self.vc, k)
         except AttributeError:
@@ -697,7 +699,7 @@ async def kill():
 
 @client.event
 async def before_identify_hook(shard_id, initial=False):
-    return
+    pass
 
 @client.event
 async def on_ready():

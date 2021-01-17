@@ -1295,16 +1295,16 @@ class Status(Command):
             emb.description = msg
         func = channel.send
         if m_id is not None:
-            with tracebacksuppressor:
+            with tracebacksuppressor(StopIteration):
                 message = bot.cache.messages.get(m_id)
                 if message is None:
                     message = await aretry(channel.fetch_message, m_id, attempts=6, delay=2, exc=(discord.NotFound, discord.Forbidden))
                 if message.id != channel.last_message_id:
-                    hist = await channel.history(limit=1).flatten()
-                    channel.last_message_id = hist[0].id
-                    if message.id != hist[0].id:
-                        create_task(bot.silent_delete(message))
-                        raise StopIteration
+                    async for message in bot.data.channel_cache.get(channel):
+                        if message.id != hist[0].id:
+                            create_task(bot.silent_delete(message))
+                            raise StopIteration
+                        break
                 func = lambda *args, **kwargs: message.edit(*args, content=None, **kwargs)
         message = await func(embed=emb)
         if m_id is not None and message is not None:
@@ -1326,7 +1326,7 @@ class Invite(Command):
                 if member.guild_permissions.create_instant_invite:
                     invites = await member.guild.invites()
                     if not invites:
-                        channel = await self.bot.get_first_sendable(member.guild, member)
+                        channel = self.bot.get_first_sendable(member.guild, member)
                         invite = await channel.create_invite(reason="Invite command")
                     else:
                         invite = sorted(invites, key=lambda invite: (invite.max_age == 0, invite.max_uses - invite.uses != 0, len(invite.url)))[0]
@@ -2413,12 +2413,13 @@ class UpdateUsers(Database):
         user = message.author
         if force or bot.is_mentioned(message, bot, message.guild):
             if user.bot:
-                async for m in self.bot.data.channel_cache.get(message.channel):
-                    user = m.author
-                    if bot.get_perms(user.id, message.guild) <= -inf:
-                        return
-                    if not user.bot:
-                        break
+                with suppress(AttributeError):
+                    async for m in self.bot.data.channel_cache.get(message.channel):
+                        user = m.author
+                        if bot.get_perms(user.id, message.guild) <= -inf:
+                            return
+                        if not user.bot:
+                            break
             send = lambda *args, **kwargs: send_with_reply(message.channel, not flags and message, *args, **kwargs)
             out = None
             count = self.data.get(user.id, EMPTY).get("last_talk", 0)

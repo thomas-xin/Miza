@@ -484,10 +484,12 @@ class CustomAudio(collections.abc.Hashable):
         else:
             cnt = sum(1 for m in self.acsi.channel.members if not m.bot)
         if not cnt:
-            # Timeout for leaving is 20 seconds
-            if self.timeout < utc() - 20:
-                self.dead = True
-                return
+            # Timeout for leaving is 120 seconds
+            if self.timeout < utc() - 120:
+                return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(self.guild)}: All channels empty. 🎵"))
+            perms = self.acsi.channel.permissions_for(guild.me)
+            if not perms.connect or not perms.speak:
+                return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(self.guild)}: No permission to connect/speak in {sqr_md(self.acsi.channel)}. 🎵"))
             # If idle for more than 10 seconds, attempt to find members in other voice channels
             elif self.timeout < utc() - 10:
                 if guild.afk_channel and (guild.afk_channel.id != self.acsi.channel.id and guild.afk_channel.permissions_for(guild.me).connect):
@@ -1047,8 +1049,8 @@ class AudioClientSubInterface:
             return bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}], after=lambda *args: submit('VOICE.ACSI.after({key})'))")
         return bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}])")
 
-    async def connect(self, reconnect=True, timeout=60):
-        return await create_future(bot.audio.submit, f"await AP.from_guild({self.guild.id}).connect(reconnect={reconnect}, timeout={timeout})")
+    def connect(self, reconnect=True, timeout=60):
+        return create_future(bot.audio.submit, f"await AP.from_guild({self.guild.id}).connect(reconnect={reconnect}, timeout={timeout})")
 
     async def disconnect(self, force=False):
         resp = await create_future(bot.audio.submit, f"await AP.from_guild({self.guild.id}).disconnect(force={force})")
@@ -2562,8 +2564,7 @@ class Connect(Command):
             auds.text = channel
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to disconnect while other users are in voice")
-            await create_future(auds.kill)
-            return
+            return await create_future(auds.kill)
         if not vc_.permissions_for(guild.me).connect:
             raise ConnectionError("Insufficient permissions to connect to voice channel.")
         if vc_.permissions_for(guild.me).manage_channels:
@@ -4007,7 +4008,7 @@ class UpdateAudio(Database):
 
     # Searches for and extracts incomplete queue entries
     async def research(self, auds):
-        with suppress(SemaphoreOverflowError):
+        if not auds.search_sem.busy():
             async with auds.search_sem:
                 searched = 0
                 q = auds.queue
@@ -4053,27 +4054,21 @@ class UpdateAudio(Database):
         with tracebacksuppressor(discord.Forbidden):
             await member.move_to(None)
 
-    async def update_vc(self, guild):
+    def update_vc(self, guild):
         m = guild.me
         if guild.id not in self.players:
             if m.voice is not None:
                 acsi = AudioClientSubInterface.from_guild(guild)
                 if acsi is not None:
-                    return await create_future(acsi.kill)
-                return await guild.change_voice_state(channel=None)
-            # if m.guild_permissions.move_members:
-            #     for c in guild.voice_channels:
-            #         for m in c.members:
-            #             if m.id == self.bot.id:
-            #                 await guild.change_voice_state(channel=None)
-            #                 if m.voice:
-            #                     return await self._dc(m)
+                    return create_future(acsi.kill)
+                return guild.change_voice_state(channel=None)
         else:
             if m.voice is not None:
                 perm = m.permissions_in(m.voice.channel)
                 if perm.mute_members and perm.deafen_members:
                     if m.voice.deaf or m.voice.mute or m.voice.afk:
-                        return await m.edit(mute=False, deafen=False)
+                        return m.edit(mute=False, deafen=False)
+        return emptyfut
 
     # Updates all voice clients
     async def __call__(self, guild=None, **void):

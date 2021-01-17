@@ -38,8 +38,8 @@ escape_markdown = discord.utils.escape_markdown
 escape_mentions = discord.utils.escape_mentions
 escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere").replace("<@&", "<@\xad&")
 
-DISCORD_EPOCH = 1420070400000
-MIZA_EPOCH = 1577797200000
+DISCORD_EPOCH = 1420070400000 # 1 Jan 2015
+MIZA_EPOCH = 1577797200000 # 1 Jan 2020
 time_snowflake = discord.utils.time_snowflake
 id2ts = lambda id: ((id >> 22) + (id & 0xFFF) / 0x1000 + DISCORD_EPOCH) / 1000
 snowflake_time = lambda id: utc_ft(id2ts(id))
@@ -47,15 +47,22 @@ snowflake_time_2 = lambda id: datetime.datetime.fromtimestamp(id2ts(id))
 
 ip2int = lambda ip: int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
 
+emptyfut = fut_nop = asyncio.Future()
+fut_nop.set_result(None)
+newfut = concurrent.futures.Future()
+newfut.set_result(None)
+
+def as_fut(obj):
+    fut = asyncio.Future()
+    eloop.call_soon_threadsafe(fut.set_result, obj)
+    return fut
+
 
 class EmptyContext(contextlib.AbstractContextManager):
     __enter__ = lambda self, *args: self
     __exit__ = lambda *args: None
-
-    async def __aenter__(self, *args):
-        pass
-    async def __aexit__(self, *args):
-        pass
+    __aenter__ = lambda self, *args: as_fut(self)
+    __aexit__ = lambda *args: emptyfut
 
 emptyctx = EmptyContext()
 
@@ -131,10 +138,12 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
             while self.is_busy():
                 await wrap_future(self.fut)
             self.passive -= 1
-        return self.enter()
+        self.enter()
+        return self
 
-    async def __aexit__(self, *args):
-        return self.__exit__()
+    def __aexit__(self, *args):
+        self.__exit__()
+        return emptyfut
 
     def wait(self):
         while self.is_busy():
@@ -175,8 +184,8 @@ class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.Abstract
                 print_exc()
         return True
 
-    async def __aexit__(self, *args):
-        return self.__exit__(*args)
+    def __aexit__(self, *args):
+        return as_fut(self.__exit__(*args))
 
     __call__ = lambda self, *args, **kwargs: self.__class__(*args, **kwargs)
 
@@ -265,13 +274,9 @@ class MemoryTimer(contextlib.AbstractContextManager, contextlib.AbstractAsyncCon
             self.timers[self.name] = t = deque(maxlen=8)
             t.append(taken)
 
-    async def __aexit__(self, *args):
-        taken = utc() - self.start
-        try:
-            self.timers[self.name].append(taken)
-        except KeyError:
-            self.timers[self.name] = t = deque(maxlen=8)
-            t.append(taken)
+    def __aexit__(self, *args):
+        self.__exit__()
+        return emptyfut
 
 
 # Repeatedly retries a synchronous operation, with optional break exceptions.
@@ -1423,11 +1428,7 @@ def await_fut(fut, timeout=None):
 is_main_thread = lambda: threading.current_thread() is threading.main_thread()
 
 # A dummy coroutine that returns None.
-async def async_nop(*args, **kwargs):
-    return
-
-fut_nop = asyncio.Future()
-fut_nop.set_result(None)
+async_nop = lambda *args, **kwargs: emptyfut
 
 async def delayed_coro(fut, duration=None):
     async with delay(duration):

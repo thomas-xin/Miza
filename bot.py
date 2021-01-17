@@ -476,7 +476,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 return out
 
     # Gets the first accessable text channel in the target guild.
-    async def get_first_sendable(self, guild, member):
+    def get_first_sendable(self, guild, member):
         if member is None:
             return guild.owner
         found = {}
@@ -538,17 +538,19 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return user
 
     # Fetches a user from ID, using the bot cache when possible.
-    async def fetch_user(self, u_id):
-        with suppress(KeyError):
-            return self.get_user(u_id)
-        u_id = verify_id(u_id)
-        if type(u_id) is not int:
-            raise TypeError(f"Invalid user identifier: {u_id}")
+    async def _fetch_user(self, u_id):
         async with self.user_semaphore:
             user = await super().fetch_user(u_id)
             self.cache.users[u_id] = user
             self.limit_cache("users")
             return user
+    def fetch_user(self, u_id):
+        with suppress(KeyError):
+            return as_fut(self.get_user(u_id))
+        u_id = verify_id(u_id)
+        if type(u_id) is not int:
+            raise TypeError(f"Invalid user identifier: {u_id}")
+        return self._fetch_user(u_id)
 
     async def auser2cache(self, u_id):
         with suppress(discord.NotFound):
@@ -835,28 +837,23 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return guild
 
     # Fetches a channel from ID, using the bot cache when possible.
-    async def fetch_channel(self, c_id):
+    async def _fetch_channel(self, c_id):
+        channel = await super().fetch_channel(c_id)
+        self.cache.channels[c_id] = channel
+        self.limit_cache("channels")
+        return channel
+    def fetch_channel(self, c_id):
         if type(c_id) is not int:
             try:
                 c_id = int(c_id)
             except (ValueError, TypeError):
                 raise TypeError(f"Invalid channel identifier: {c_id}")
         with suppress(KeyError):
-            return self.cache.channels[c_id]
-        channel = await super().fetch_channel(c_id)
-        self.cache.channels[c_id] = channel
-        self.limit_cache("channels")
-        return channel
+            return as_fut(self.cache.channels[c_id])
+        return self._fetch_channel(c_id)
 
     # Fetches a message from ID and channel, using the bot cache when possible.
-    async def fetch_message(self, m_id, channel=None):
-        if type(m_id) is not int:
-            try:
-                m_id = int(m_id)
-            except (ValueError, TypeError):
-                raise TypeError(f"Invalid message identifier: {m_id}")
-        with suppress(KeyError):
-            return self.cache.messages[m_id]
+    async def _fetch_message(self, m_id, channel=None):
         if "message_cache" in self.data:
             with suppress(KeyError):
                 return await create_future(self.data.message_cache.load_message, m_id)
@@ -869,6 +866,15 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if message is not None:
             self.add_message(message)
         return message
+    def fetch_message(self, m_id, channel=None):
+        if type(m_id) is not int:
+            try:
+                m_id = int(m_id)
+            except (ValueError, TypeError):
+                raise TypeError(f"Invalid message identifier: {m_id}")
+        with suppress(KeyError):
+            return as_fut(self.cache.messages[m_id])
+        return self._fetch_message(m_id, channel)
 
     # Fetches a role from ID and guild, using the bot cache when possible.
     async def fetch_role(self, r_id, guild):
@@ -968,11 +974,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 return f[max(f.keys())]
         raise LookupError("Unable to find suitable guild.")
 
-    async def create_progress_bar(self, length, ratio=0.5):
+    def create_progress_bar(self, length, ratio=0.5):
         if "emojis" in self.data:
-            return await create_future(self.data.emojis.create_progress_bar, length, ratio)
+            return create_future(self.data.emojis.create_progress_bar, length, ratio)
         position = min(length, round(length * ratio))
-        return "⬜" * position + "⬛" * (length - position)
+        return as_fut("⬜" * position + "⬛" * (length - position))
 
     # Finds URLs in a string, following any discord message links found.
     async def follow_url(self, url, it=None, best=False, preserve=True, images=True, allow=False, limit=None):
@@ -1152,8 +1158,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
         return message
 
-    def insert_message(self, message):
-        self.data.channel_cache.add(message.channel.id, message.id)
+    # def insert_message(self, message):
+    #     self.data.channel_cache.add(message.channel.id, message.id)
 
     # Inserts a message into the bot cache, discarding existing ones if full.
     def add_message(self, message, files=True, cache=True):
@@ -1163,8 +1169,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if not getattr(message, "simulated", None) and cache and "channel_cache" in self.data:
                 create_future_ex(self.insert_message, message, priority=True)
         self.cache.messages[message.id] = message
-        self.limit_cache("messages")
-        if message.author.id != self.id and files:
+        if ts_us() % 16 == 0:
+            self.limit_cache("messages")
+        if files and message.author.id != self.id:
             if (utc_dt() - message.created_at).total_seconds() < 7200:
                 for attachment in message.attachments:
                     if getattr(attachment, "size", inf) < 1048576:
@@ -1240,11 +1247,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             return data
         return await Request(url, aio=True)
 
-    async def get_colour(self, user):
+    def get_colour(self, user):
         if user is None:
-            return 16777214
+            return as_fut(16777214)
         url = worst_url(user)
-        return await self.data.colours.get(url)
+        return self.data.colours.get(url)
 
     # Limits a cache to a certain amount, discarding oldest entries first.
     def limit_cache(self, cache=None, limit=None):
@@ -2569,54 +2576,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
-        user = self.GhostUser()
-        user.id = w.id
-        user.name = w.name
-        user.display_name = w.name
-        user.joined_at = w.created_at
-        user.avatar = w.avatar
-        user.avatar_url = w.avatar_url
-        user.bot = True
-        user.send = w.send
-        user.dm_channel = w.channel
-        user.webhook = w
-        self.cache.users[w.id] = user
-        self.limit_cache("users")
-        if w.token:
-            webhooks = set_dict(self.cw_cache, w.channel.id, cdict())
-            webhooks[w.id] = user
-            user.semaphore = Semaphore(5, 256, delay=0.3, rate_limit=5)
-        return user
-
-    async def fetch_webhooks(self, guild):
-        member = guild.me
-        if member and member.guild_permissions.manage_webhooks:
-            return await aretry(guild.webhooks, attempts=3, delay=15, exc=(discord.Forbidden, discord.NotFound))
-        raise PermissionError
+        return self.data.webhooks.add(w)
 
     # Loads all webhooks in the target channel.
-    async def load_channel_webhooks(self, channel, force=False, bypass=False):
-        if channel.id in self.cw_cache and not force:
-            return self.cw_cache[channel.id].values()
-        async with self.guild_semaphore if not bypass else emptyctx:
-            self.cw_cache.pop(channel.id, None)
-            if not channel.permissions_for(channel.guild.me).manage_webhooks:
-                raise PermissionError("Not permitted to create webhooks in channel.")
-            webhooks = await aretry(channel.webhooks, attempts=5, delay=15, exc=(discord.Forbidden, discord.NotFound))
-        return [self.add_webhook(w) for w in webhooks]
-
-    # Loads all webhooks in the target guild.
-    async def load_guild_webhooks(self, guild):
-        with tracebacksuppressor:
-            try:
-                async with self.guild_semaphore:
-                    webhooks = await self.fetch_webhooks(guild)
-            except (PermissionError, discord.Forbidden, discord.NotFound):
-                for channel in guild.text_channels:
-                    with suppress(PermissionError, discord.Forbidden, discord.NotFound):
-                        await self.load_channel_webhooks(channel)
-            else:
-                return [self.add_webhook(w) for w in webhooks]
+    def load_channel_webhooks(self, channel, force=False, bypass=False):
+        return self.data.webhooks.get(channel, force=force, bypass=bypass)
 
     # Gets a valid webhook for the target channel, creating a new one when necessary.
     async def ensure_webhook(self, channel, force=False, bypass=False):
@@ -2964,7 +2928,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Deletes own messages if any of the "X" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot.
     async def check_to_delete(self, message, reaction, user):
-        if message.author.id == self.id or message.author.id in self.cw_cache.get(message.channel.id, ()):
+        if message.author.id == self.id or getattr(message, "webhook_id", None):
             with suppress(discord.NotFound):
                 u_perm = self.get_perms(user.id, message.guild)
                 check = False
@@ -3185,6 +3149,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         return self.__getattribute__(k)
                     except AttributeError:
                         pass
+                if k in ("simulated", "slash"):
+                    raise AttributeError
                 d = self.__getattribute__("_data")
                 if k == "content":
                     return d["content"]
@@ -3247,6 +3213,28 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         bot.CachedMessage = CachedMessage
         bot.MessageCache = MessageCache
 
+    def set_history(self):
+        bot = self
+
+        async def fill_messages(self):
+            if not getattr(self, "channel", None):
+                self.channel = await self.messageable._get_channel()
+            if self._get_retrieve():
+                data = await self._retrieve_messages(self.retrieve)
+                if len(data) < 100:
+                    self.limit = 0
+                if self.reverse:
+                    data = reversed(data)
+                if self._filter:
+                    data = filter(self._filter, data)
+                c_id = self.channel.id
+                for element in data:
+                    element["channel"] = self.channel.id
+                    message = bot.CachedMessage(data)
+                    await self.messages.put(message)
+        
+        discord.iterators.HistoryIterator.fill_messages = lambda self: fill_messages(self)
+
     async def init_ready(self, futs):
         self.started = True
         attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
@@ -3271,6 +3259,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         self.events.append(f, func)
         print("Database events:")
         print(self.events.keys())
+        self.set_history()
         for fut in futs:
             await fut
         await self.fetch_user(self.deleted_user)
@@ -3289,7 +3278,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         create_task(self.fast_loop())
         print("Update loops initiated.")
         # Load all webhooks from cached guilds.
-        futs = alist(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
+        # futs = alist(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
+        futs = alist()
         futs.add(create_future(self.update_slash_commands, priority=True))
         futs.add(create_task(self.create_main_website()))
         futs.add(self.audio_client_start)
@@ -3315,7 +3305,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         @self.event
         async def before_identify_hook(shard_id, initial=False):
             if not getattr(self, "audio_client_start", None):
-                self.audio_client_start = create_future(self.start_audio_client)
+                self.audio_client_start = create_future(self.start_audio_client, priority=True)
             return
 
         # The event called when the bot starts up.
@@ -3350,12 +3340,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         # Server join message
         @self.event
         async def on_guild_join(guild):
-            create_task(self.load_guild_webhooks(guild))
+            # create_task(self.load_guild_webhooks(guild))
             print(f"New server: {guild}")
             g = await self.fetch_guild(guild.id)
             m = guild.me
             await self.send_event("_join_", user=m, guild=g)
-            channel = await self.get_first_sendable(g, m)
+            channel = self.get_first_sendable(g, m)
             emb = discord.Embed(colour=discord.Colour(8364031))
             emb.set_author(**get_author(self.user))
             emb.description = f"```callback-fun-wallet-{utc()}-\nHi there!```I'm {self.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
@@ -3700,14 +3690,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         # Webhook update event: updates the bot's webhook cache if there are new webhooks.
         @self.event
         async def on_webhooks_update(channel):
-            if channel.guild.id in self._connection._guilds:
-                webhooks = await channel.webhooks()
-                for w in tuple(self.cw_cache.get(channel.id, {}).values()):
-                    if w not in webhooks:
-                        self.cw_cache[channel.id].pop(w.id)
-                        self.cache.users.pop(w.id)
-                for w in webhooks:
-                    self.add_webhook(w)
+            self.data.webhooks.pop(channel.id)
 
         # User ban event: calls _ban_ bot database event.
         @self.event
@@ -3985,8 +3968,9 @@ class SimulatedMessage:
         self.response.append(kwargs)
         return self
 
-    async def edit(self, **kwargs):
+    def edit(self, **kwargs):
         self.response[-1].update(kwargs)
+        return emptyfut
 
     async def history(self, *args, **kwargs):
         yield self

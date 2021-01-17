@@ -461,85 +461,157 @@ class UpdateUserColours(Database):
         return raw
 
 
-get_fn = lambda m_id: m_id // 10 ** 15
-
-class UpdateChannelCache(Database):
-    name = "channel_cache"
+class UpdateWebhooks(Database):
+    name = "webhooks"
     channel = True
-    no_file = True
-    cached = {}
-    modified = {}
-    sem = Semaphore(1, inf)
+    CID = collections.namedtuple("id", ["id"])
 
-    def __load__(self, **void):
-        if not os.path.exists("saves/channel_cache"):
-            os.mkdir("saves/channel_cache")
+    def from_dict(self, d, c_id):
+        d.url = f"https://discord.com/api/webhooks/{d.id}/{d.token}"
+        w = discord.Webhook.from_url(d.url, adapter=discord.AsyncWebhookAdapter(Request.session))
+        d.send = w.send
+        d.avatar_url = f"https://cdn.discordapp.com/avatars/{d.id}/{d.avatar}.png?size=1024"
+        d.channel = self.CID(id=c_id)
+        return self.add(d)
 
-    def add(self, c_id, m_id):
-        with tracebacksuppressor:
-            while self.sem.is_busy():
-                self.sem.wait()
-            cached = self.cached
-            modified = self.modified
-            fn = get_fn(m_id)
-            if c_id not in cached:
-                cached[c_id] = {}
-                if not os.path.exists(f"saves/channel_cache/{c_id}"):
-                    os.mkdir(f"saves/channel_cache/{c_id}")
-            if fn not in cached[c_id]:
-                cached[c_id][fn] = set()
-                if os.path.exists(f"saves/channel_cache/{c_id}/{fn}"):
-                    with open(f"saves/channel_cache/{c_id}/{fn}", "rb") as f:
-                        b = f.read()
-                    if b:
-                        cached[c_id][fn] = select_and_loads(b, mode="unsafe")
-            cached[c_id][fn].add(m_id % (10 ** 15))
-            if c_id not in modified:
-                modified[c_id] = deque()
-            modified[c_id].append(fn)
+    def to_dict(self, user):
+        return cdict(
+            id=user.id,
+            name=user.name,
+            created_at=user.created_at,
+            avatar=user.avatar,
+            token=user.token,
+        )
 
-    async def saves(self):
-        if self.sem.is_busy():
-            return
-        async with self.sem:
-            for c_id, v in self.modified.items():
-                for fn in v:
-                    b = await create_future(select_and_dumps, self.cached[c_id][fn], mode="unsafe")
-                    with open(f"saves/channel_cache/{c_id}/{fn}", "wb") as f:
-                        await create_future(f.write, b)
-            self.modified.clear()
-            with suppress(StopIteration):
-                while sum(len(v) for v in self.cached.values()) > 128:
-                    with suppress(RuntimeError, IndexError, KeyError):
-                        k = choice(self.cached)
-                        cachef = self.cached[k]
-                        cachef.pop(next(iter(cachef)))
-                        if not cachef:
-                            self.cached.pop(k)
+    def add(self, w):
+        user = self.bot.GhostUser()
+        user.id = w.id
+        user.name = w.name
+        user.display_name = w.name
+        user.joined_at = w.created_at
+        user.avatar = w.avatar
+        user.avatar_url = w.avatar_url
+        user.bot = True
+        user.send = w.send
+        user.dm_channel = getattr(w, "channel", None)
+        user.webhook = w
+        self.bot.cache.users[w.id] = user
+        if w.token:
+            webhooks = set_dict(self.data, w.channel.id, cdict())
+            webhooks[w.id] = self.to_dict(w)
+            user.semaphore = Semaphore(5, 256, delay=0.3, rate_limit=5)
+        return user
 
-    async def get(self, channel):
-        c_id = verify_id(channel)
-        if not os.path.exists(f"saves/channel_cache/{c_id}"):
-            if hasattr(channel, "simulated"):
-                yield channel.message
-                return
-            messages = alist()
-            channel = await self.bot.fetch_messageable(c_id)
-            async for message in channel.history(limit=None):
-                messages.appendleft(message.id)
-                self.bot.add_message(message, files=False, cache=False)
-            self.data[channel.id] = messages
-            self.update(channel.id)
-        cached = self.cached.get(c_id, {})
-        for fn in reversed(os.listdir(f"saves/channel_cache/{c_id}")):
-            if fn not in cached:
-                cached[fn] = set()
-                with open(f"saves/channel_cache/{c_id}/{fn}", "rb") as f:
-                    b = f.read()
-                if b:
-                    cached[fn] = select_and_loads(b, "unsafe")
-            for m in sorted(cached[fn], reverse=True):
-                yield await self.bot.fetch_message(m * 10 ** 15, channel)
+    async def get(self, channel, force=False, bypass=False):
+        guild = getattr(channel, "guild", None)
+        if not guild:
+            raise TypeError("DM channels cannot have webhooks.")
+        if channel.id in self.data and not force:
+            return [self.from_dict(w, channel.id) for w in self.data[channel.id].values()]
+        async with self.guild_semaphore if not bypass else emptyctx:
+            self.data.pop(channel.id, None)
+            if not channel.permissions_for(channel.guild.me).manage_webhooks:
+                raise PermissionError("Not permitted to create webhooks in channel.")
+            webhooks = None
+            if guild.me.guild_permissions.manage_webhooks:
+                with suppress(discord.Forbidden):
+                    webhooks = await guild.webhooks()
+            if webhooks is None:
+                webhooks = await aretry(channel.webhooks, attempts=5, delay=15, exc=(discord.Forbidden, discord.NotFound))
+        return [w for w in [self.add(w) for w in webhooks] if w.channel_id == channel.id]
+
+
+# get_fn = lambda m_id: m_id // 10 ** 15
+
+# class UpdateChannelCache(Database):
+#     name = "channel_cache"
+#     channel = True
+#     no_file = True
+#     cached = {}
+#     modified = {}
+#     sem = Semaphore(1, inf)
+
+#     def __load__(self, **void):
+#         if not os.path.exists("saves/channel_cache"):
+#             os.mkdir("saves/channel_cache")
+
+#     def add(self, c_id, m_id):
+#         return
+    
+#     def saves(self):
+#         return emptyfut
+
+#     async def get(self, channel):
+#         c_id = verify_id(channel)
+#         channel = await self.bot.fetch_channel(channel)
+#         async for message in channel.history(limit=None):
+#             yield message
+
+#     def add(self, c_id, m_id):
+#         with tracebacksuppressor:
+#             while self.sem.is_busy():
+#                 self.sem.wait()
+#             cached = self.cached
+#             modified = self.modified
+#             fn = get_fn(m_id)
+#             if c_id not in cached:
+#                 cached[c_id] = {}
+#                 if not os.path.exists(f"saves/channel_cache/{c_id}"):
+#                     os.mkdir(f"saves/channel_cache/{c_id}")
+#             if fn not in cached[c_id]:
+#                 cached[c_id][fn] = set()
+#                 if os.path.exists(f"saves/channel_cache/{c_id}/{fn}"):
+#                     with open(f"saves/channel_cache/{c_id}/{fn}", "rb") as f:
+#                         b = f.read()
+#                     if b:
+#                         cached[c_id][fn] = select_and_loads(b, mode="unsafe")
+#             cached[c_id][fn].add(m_id % (10 ** 15))
+#             if c_id not in modified:
+#                 modified[c_id] = deque()
+#             modified[c_id].append(fn)
+
+#     async def saves(self):
+#         if self.sem.is_busy():
+#             return
+#         async with self.sem:
+#             for c_id, v in self.modified.items():
+#                 for fn in v:
+#                     b = await create_future(select_and_dumps, self.cached[c_id][fn], mode="unsafe")
+#                     with open(f"saves/channel_cache/{c_id}/{fn}", "wb") as f:
+#                         await create_future(f.write, b)
+#             self.modified.clear()
+#             with suppress(StopIteration):
+#                 while sum(len(v) for v in self.cached.values()) > 128:
+#                     with suppress(RuntimeError, IndexError, KeyError):
+#                         k = choice(self.cached)
+#                         cachef = self.cached[k]
+#                         cachef.pop(next(iter(cachef)))
+#                         if not cachef:
+#                             self.cached.pop(k)
+
+#     async def get(self, channel):
+#         c_id = verify_id(channel)
+#         if not os.path.exists(f"saves/channel_cache/{c_id}"):
+#             if hasattr(channel, "simulated"):
+#                 yield channel.message
+#                 return
+#             messages = alist()
+#             channel = await self.bot.fetch_messageable(c_id)
+#             async for message in channel.history(limit=None):
+#                 messages.appendleft(message.id)
+#                 self.bot.add_message(message, files=False, cache=False)
+#             self.data[channel.id] = messages
+#             self.update(channel.id)
+#         cached = self.cached.get(c_id, {})
+#         for fn in reversed(os.listdir(f"saves/channel_cache/{c_id}")):
+#             if fn not in cached:
+#                 cached[fn] = set()
+#                 with open(f"saves/channel_cache/{c_id}/{fn}", "rb") as f:
+#                     b = f.read()
+#                 if b:
+#                     cached[fn] = select_and_loads(b, "unsafe")
+#             for m in sorted(cached[fn], reverse=True):
+#                 yield await self.bot.fetch_message(m * 10 ** 15, channel)
 
 
 class Suspend(Command):
