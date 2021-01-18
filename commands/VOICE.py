@@ -1949,6 +1949,10 @@ class AudioDownloader:
             args.extend(("-to", "86400"))
         if video:
             args.extend(("-i", video))
+            if start:
+                args.extend(("-ss", str(start)))
+            if end is not None:
+                args.extend(("-to", str(end)))
         args.extend(("-i", stream))
         if auds is not None:
             args.extend(auds.construct_options(full=True))

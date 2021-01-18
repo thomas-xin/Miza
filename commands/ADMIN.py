@@ -1395,6 +1395,8 @@ class UpdateMessageCache(Database):
             bot = self.bot
             i = 0
             for k, m in data.items():
+                if "channel" in m:
+                    m["channel_id"] = m.pop("channel")
                 try:
                     message = bot.CachedMessage(m)
                 except:
@@ -1436,9 +1438,9 @@ class UpdateMessageCache(Database):
                 if "author" not in m:
                     author = message.author
                     m["author"] = dict(id=author.id, s=str(author), avatar=author.avatar)
-                if "channel" not in m:
+                if "channel_id" not in m:
                     try:
-                        m["channel"] = message.channel.id
+                        m["channel_id"] = message.channel.id
                     except AttributeError:
                         continue
             else:
@@ -1461,7 +1463,7 @@ class UpdateMessageCache(Database):
                     flags=message.flags.value if message.flags else 0,
                     mention_everyone=message.mention_everyone,
                     content=message.content,
-                    channel=message.channel.id,
+                    channel_id=message.channel.id,
                 )
                 for reaction in message.reactions:
                     if not reaction.custom_emoji:
@@ -1494,15 +1496,21 @@ class UpdateMessageCache(Database):
             for fn, messages in saving:
                 await create_future(self.saves, fn, messages)
                 i += 1
-                if not i % 64 or len(messages) > 65536:
-                    await asyncio.sleep(0.2)
+                if not i & 3 or len(messages) > 65536:
+                    await asyncio.sleep(0.3)
             open(self.files + "/-1", "wb").close()
             while len(self.loaded) > 512:
                 with suppress(RuntimeError):
                     self.loaded.pop(next(iter(self.loaded)))
+                i += 1
+                if not i % 6:
+                    await asyncio.sleep(0.2)
             while len(self.raws) > 512:
                 with suppress(RuntimeError):
                     self.raws.pop(next(iter(self.raws)))
+                i += 1
+                if not i % 6:
+                    await asyncio.sleep(0.2)
             if len(saving) >= 8:
                 print(f"Message Database: {len(saving)} files updated.")
             # await fut

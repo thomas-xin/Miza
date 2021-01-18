@@ -1959,30 +1959,39 @@ class UpdateMessageCount(Database):
 
     async def getUserMessageCount(self, guild):
         print("Probing", guild)
-        data = {}
-        avgs = {}
+        count = {}
+        total = {}
         word = {}
         oldest = self.data[guild.id]["oldest"]
-        histories = await self.getGuildHistory(guild, single=True)
-        for messages in histories.values():
-            for i, message in enumerate(messages, 1):
-                u = message.author.id
-                orig_id = oldest.get(u)
-                if not orig_id or message.id < orig_id:
-                    oldest[u] = message.id
-                length = get_message_length(message)
-                words = get_message_words(message)
-                try:
-                    data[u] += 1
-                    avgs[u] += length
-                    word[u] += words
-                except KeyError:
-                    data[u] = 1
-                    avgs[u] = length
-                    word[u] = words
-                if not i & 8191:
-                    await asyncio.sleep(0.5)
-        add_dict(self.data[guild.id], {"counts": data, "totals": avgs, "words": word, 0: True})
+        i = 1
+        for channel in guild.text_channels:
+            while self.semaphore.is_busy():
+                await self.semaphore()
+            with tracebacksuppressor(discord.Forbidden, discord.NotFound):
+                async with self.semaphore:
+                    async for message in channel.history(limit=None, oldest_first=True):
+                        u = message.author.id
+                        orig_id = oldest.get(u)
+                        if not orig_id or message.id < orig_id:
+                            oldest[u] = message.id
+                        length = get_message_length(message)
+                        words = get_message_words(message)
+                        try:
+                            count[u] += 1
+                            total[u] += length
+                            word[u] += words
+                        except KeyError:
+                            count[u] = 1
+                            total[u] = length
+                            word[u] = words
+                        self.bot.add_message(message, files=False)
+        add_dict(self.data[guild.id], {"counts": count})
+        await asyncio.sleep(0.5)
+        add_dict(self.data[guild.id], {"totals": total})
+        await asyncio.sleep(0.5)
+        add_dict(self.data[guild.id], {"words": word})
+        await asyncio.sleep(0.5)
+        self.data[guild.id][0] = True
         self.update(guild.id)
         print("Completed", guild)
         print(self.data[guild.id])

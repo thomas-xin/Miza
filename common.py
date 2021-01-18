@@ -911,7 +911,7 @@ def get_message_length(message):
     return len(message.system_content or message.content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
 
 def get_message_words(message):
-    return len((message.system_content or message.content).split()) + sum(len(e.description.split()) if e.description else 0 + 2 * len(e.fields) if e.fields else 0 for e in message.embeds) + len(message.attachments)
+    return word_count(message.system_content or message.content) + sum(word_count(e.description) if e.description else sum(word_count(f.name) + word_count(f.value) for f in e.fields) if e.fields else 0 for e in message.embeds) + len(message.attachments)
 
 # Returns a string representation of a message object.
 def message_repr(message, limit=1024, username=False):
@@ -951,7 +951,7 @@ def activity_repr(activity):
 
 # Alphanumeric string regular expression.
 is_alphanumeric = lambda string: string.replace(" ", "").isalnum()
-to_alphanumeric = lambda string: single_space(regexp("[^a-z 0-9]", re.I).sub(" ", unicode_prune(string)))
+to_alphanumeric = lambda string: single_space(regexp("[^a-z 0-9]+", re.I).sub(" ", unicode_prune(string)))
 is_numeric = lambda string: regexp("[0-9]", re.I).search(string)
 
 

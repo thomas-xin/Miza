@@ -1165,9 +1165,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     def add_message(self, message, files=True, cache=True):
         if self.closed:
             return message
-        if message.id not in self.cache.messages:
-            if not getattr(message, "simulated", None) and cache and "channel_cache" in self.data:
-                create_future_ex(self.insert_message, message, priority=True)
+        # if message.id not in self.cache.messages:
+        #     if not getattr(message, "simulated", None) and cache and "channel_cache" in self.data:
+        #         create_future_ex(self.insert_message, message, priority=True)
         self.cache.messages[message.id] = message
         if ts_us() % 16 == 0:
             self.limit_cache("messages")
@@ -3121,7 +3121,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
         class CachedMessage(discord.abc.Snowflake):
 
-            __slots__ = ("_data", "id", "created_at", "author", "channel")
+            __slots__ = ("_data", "id", "created_at", "author", "channel_id")
 
             def __init__(self, data):
                 self._data = data
@@ -3136,9 +3136,19 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 channel = self.channel
                 author = self.author
                 d.pop("author", None)
-                d.pop("channel", None)
                 if "tts" not in d:
                     d["tts"] = False
+                try:
+                    ref = d["message_reference"]
+                    if ref:
+                        if "channel_id" not in ref:
+                            ref["channel_id"] = d["channel_id"]
+                        if "guild_id" not in ref:
+                            if hasattr(self.channel, "guild"):
+                                ref["guild_id"] = self.channel.guild.id
+                except KeyError:
+                    pass
+                d.pop("channel_id", None)
                 message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
                 message.author = author
                 return message
@@ -3155,7 +3165,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if k == "content":
                     return d["content"]
                 if k == "channel":
-                    return bot.cache.channels.get(int(d["channel"]))
+                    return bot.cache.channels.get(int(d["channel_id"]))
+                if k == "guild":
+                    return self.channel.guild
                 if k == "author":
                     self.author = bot.get_user(d["author"]["id"], replace=True)
                     guild = getattr(self.channel, "guild", None)
@@ -3164,6 +3176,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         if member is not None:
                             self.author = member
                     return self.author
+                if k == "type":
+                    return discord.enums.try_enum(discord.MessageType, d.get("type", 0))
+                if k == "attachments":
+                    return [discord.Attachment(data=a, state=bot._state) for a in d.get("attachments", ())]
+                if k == "embeds":
+                    return [discord.Embed.from_dict(a) for a in d.get("embeds", ())]
+                if k == "system_content" and not d.get("type"):
+                    return self.content
                 m = bot.cache.messages.get(d["id"])
                 if m is None or m is self or not issubclass(type(m), bot.LoadedMessage):
                     message = self.__copy__()
@@ -3228,9 +3248,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if self._filter:
                     data = filter(self._filter, data)
                 c_id = self.channel.id
+                CM = bot.CachedMessage
                 for element in data:
-                    element["channel"] = self.channel.id
-                    message = bot.CachedMessage(element)
+                    element["channel_id"] = c_id
+                    message = CM(element)
                     await self.messages.put(message)
         
         discord.iterators.HistoryIterator.fill_messages = lambda self: fill_messages(self)
