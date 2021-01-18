@@ -1505,12 +1505,13 @@ class UpdateMessageCache(Database):
                 i += 1
                 if not i % 6:
                     await asyncio.sleep(0.2)
-            while len(self.raws) > 512:
-                with suppress(RuntimeError):
-                    self.raws.pop(next(iter(self.raws)))
-                i += 1
-                if not i % 6:
-                    await asyncio.sleep(0.2)
+            if "counts" not in self.bot.data or not self.bot.data.counts.semaphore.is_busy():
+                while len(self.raws) > 512:
+                    with suppress(RuntimeError):
+                        self.raws.pop(next(iter(self.raws)))
+                    i += 1
+                    if not i % 6:
+                        await asyncio.sleep(0.2)
             if len(saving) >= 8:
                 print(f"Message Database: {len(saving)} files updated.")
             # await fut

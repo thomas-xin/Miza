@@ -1959,9 +1959,9 @@ class UpdateMessageCount(Database):
 
     async def getUserMessageCount(self, guild):
         print("Probing", guild)
-        count = {}
-        total = {}
-        word = {}
+        count = self.data[guild.id].setdefault("counts", {})
+        total = self.data[guild.id].setdefault("totals", {})
+        word = self.data[guild.id].setdefault("words", {})
         oldest = self.data[guild.id]["oldest"]
         i = 1
         for channel in guild.text_channels:
@@ -1985,11 +1985,6 @@ class UpdateMessageCount(Database):
                             total[u] = length
                             word[u] = words
                         self.bot.add_message(message, files=False)
-        add_dict(self.data[guild.id], {"counts": count})
-        await asyncio.sleep(0.5)
-        add_dict(self.data[guild.id], {"totals": total})
-        await asyncio.sleep(0.5)
-        add_dict(self.data[guild.id], {"words": word})
         await asyncio.sleep(0.5)
         self.data[guild.id][0] = True
         self.update(guild.id)
