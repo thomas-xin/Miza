@@ -477,29 +477,6 @@ class Info(Command):
         if g.description:
             d += code_md(g.description)
         emb.description = d
-        top = None
-        if not hasattr(g, "ghost"):
-            pcount = await bot.data.counts.getUserMessages(None, g)
-        else:
-            pcount = None
-        if not hasattr(g, "ghost"):
-            with suppress(AttributeError, KeyError):
-                # Top users by message counts
-                pavg = await bot.data.counts.getUserAverage(None, g)
-                users = deque()
-                us = await bot.data.counts.getGuildMessages(g)
-                if type(us) is str:
-                    top = us
-                else:
-                    ul = sorted(
-                        us,
-                        key=lambda k: us[k],
-                        reverse=True,
-                    )
-                    for i in range(min(32, flags.get("v", 0) * 5 + 5, len(us))):
-                        u_id = ul[i]
-                        users.append(f"{user_mention(u_id)}: {us[u_id]}")
-                    top = "\n".join(users)
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
         emb.add_field(name="Creation time", value=str(g.created_at) + "\n" + dyn_time_diff(utc_dt().timestamp(), g.created_at.timestamp()) + " ago", inline=1)
         if "v" in flags:
@@ -510,12 +487,6 @@ class Info(Command):
             emb.add_field(name="Text channels", value=str(len(g.text_channels)), inline=1)
             emb.add_field(name="Voice channels", value=str(len(g.voice_channels)), inline=1)
         emb.add_field(name="Member count", value=str(g.member_count), inline=1)
-        if pcount:
-            emb.add_field(name="Post count", value=str(pcount), inline=1)
-            if "v" in flags:
-                emb.add_field(name="Average post length", value=str(round(pavg, 9)), inline=1)
-        if top is not None:
-            emb.add_field(name="Top users", value=top, inline=0)
         return emb
 
     async def getMimicData(self, p, flags={}):
@@ -529,15 +500,6 @@ class Info(Command):
         if p.description:
             d += code_md(p.description)
         emb.description = d
-        pcnt = 0
-        with suppress(AttributeError, KeyError):
-            if "v" in flags:
-                ptot = p.total
-                pcnt = p.count
-                if not pcnt:
-                    pavg = 0
-                else:
-                    pavg = ptot / pcnt
         emb.add_field(name="Mimic ID", value=str(p.id), inline=0)
         emb.add_field(name="Name", value=str(p.name), inline=0)
         emb.add_field(name="Prefix", value=str(p.prefix), inline=1)
@@ -548,10 +510,6 @@ class Info(Command):
             age = (utc_dt() - ctime).total_seconds() / TIMEUNITS["year"]
             emb.add_field(name="Birthday", value=str(ctime), inline=1)
             emb.add_field(name="Age", value=str(round_min(round(age, 1))), inline=1)
-        if pcnt:
-            emb.add_field(name="Post count", value=str(pcnt), inline=1)
-            if "v" in flags:
-                emb.add_field(name="Average post length", value=str(round(pavg, 9)), inline=1)
         return emb
 
     async def __call__(self, argv, argl, name, guild, channel, bot, user, flags, **void):
@@ -748,9 +706,7 @@ class Info(Command):
                         role = ", ".join(rolelist)
                     else:
                         role = None
-                    coms = seen = msgs = avgs = gmsg = old = 0
-                    fav = None
-                    pos = None
+                    seen = None
                     zone = None
                     with suppress(LookupError):
                         ts = utc()
@@ -768,33 +724,6 @@ class Info(Command):
                                 zone = f"GMT+{tz}"
                             else:
                                 zone = f"GMT{tz}"
-                    with suppress(LookupError):
-                        old = bot.data.counts.get(guild.id, {})["oldest"][u.id]
-                        old = snowflake_time(old)
-                    if "v" in flags:
-                        with suppress(LookupError):
-                            if not hasattr(guild, "ghost"):
-                                gmsg = bot.data.counts.getUserGlobalMessageCount(u)
-                                msgs = await bot.data.counts.getUserMessages(u, guild)
-                    with suppress(LookupError):
-                        if not hasattr(guild, "ghost"):
-                            us = await bot.data.counts.getGuildMessages(guild)
-                            if type(us) is str:
-                                pos = us
-                            else:
-                                ul = sorted(
-                                    us,
-                                    key=lambda k: us[k],
-                                    reverse=True,
-                                )
-                                try:
-                                    i = ul.index(u.id)
-                                    while i >= 1 and us[ul[i - 1]] == us[ul[i]]:
-                                        i -= 1
-                                    pos = i + 1
-                                except ValueError:
-                                    if joined:
-                                        pos = len(ul) + 1
                     if is_self and bot.github is not None:
                         url2 = bot.github
                     else:
@@ -818,8 +747,6 @@ class Info(Command):
                     emb.add_field(name="Creation time", value=str(created) + "\n" + dyn_time_diff(utc_dt().timestamp(), created.timestamp()) + " ago", inline=1)
                     if joined:
                         emb.add_field(name="Join time", value=str(joined) + "\n" + dyn_time_diff(utc_dt().timestamp(), joined.timestamp()) + " ago", inline=1)
-                    if old:
-                        emb.add_field(name="Oldest post time", value=str(old) + "\n" + dyn_time_diff(utc_dt().timestamp(), old.timestamp()) + " ago", inline=1)
                     if status:
                         emb.add_field(name="Status", value=str(status), inline=1)
                     if zone:
@@ -828,10 +755,6 @@ class Info(Command):
                         emb.add_field(name="Last seen", value=str(seen), inline=1)
                     if dname:
                         emb.add_field(name="Nickname", value=dname, inline=1)
-                    if msgs:
-                        emb.add_field(name="Post count", value=str(msgs), inline=1)
-                    if pos:
-                        emb.add_field(name="Server rank", value=str(pos), inline=1)
                     if role:
                         emb.add_field(name=f"Roles ({len(rolelist)})", value=role, inline=0)
                     embs.add(emb)
@@ -1842,182 +1765,7 @@ class UpdateReminders(Database):
                     if not rems:
                         self.data.pop(u_id)
             with suppress(KeyError):
-                self.data.pop(s)
-
-
-# This database has caused so many rate limit issues
-class UpdateMessageCount(Database):
-    name = "counts"
-    scanned = False
-    semaphore = Semaphore(20, 256, delay=12)
-
-    def startCalculate(self, guild):
-        self.data[guild.id] = {"counts": {}, "totals": {}, "words": {}, "oldest": {}}
-        create_task(self.getUserMessageCount(guild))
-
-    async def getUserMessages(self, user, guild):
-        if self.scanned == -1:
-            if guild.id in self.data:
-                d = self.data[guild.id]
-                if type(d) is str:
-                    return d
-                elif 0 not in d:
-                    return "Calculating..."
-                c = d["counts"]
-                if user is None:
-                    return sum(c.values())
-                return c.get(user.id, 0)
-        return "Calculating..."
-
-    def getUserGlobalMessageCount(self, user):
-        count = 0
-        for g_id in self.data:
-            with suppress(TypeError):
-                c = self.data[g_id]["counts"]
-                if user.id in c:
-                    count += c[user.id]
-        return count
-
-    async def getUserAverage(self, user, guild):
-        if self.scanned == -1:
-            c_id = self.bot.id
-            if guild.id in self.data:
-                d = self.data[guild.id]
-                if type(d) is str:
-                    return d
-                elif 0 not in d:
-                    return "Calculating..."
-                t = d["totals"]
-                c = d["counts"]
-                if user is None:
-                    return sum(t.values()) / sum(c.values())
-                with suppress(ZeroDivisionError):
-                    return t.get(user.id, 0) / c.get(user.id, 1)
-                c.pop(user.id, None)
-                t.pop(user.id, None)
-                return 0
-        return "Calculating..."
-
-    async def getGuildMessages(self, guild):
-        if self.scanned == -1:
-            if guild.id in self.data:
-                with suppress(LookupError):
-                    return self.data[guild.id]["counts"]
-                return self.data[guild.id]
-        return "Calculating..."
-
-    # What are the rate limits for the message history calls?
-    async def getChannelHistory(self, channel, limit=None, after=None, callback=None):
-
-        async def delay_if_exc(channel):
-            t = utc()
-            history = channel.history(limit=limit, after=after, oldest_first=(limit is None))
-            try:
-                add_message = self.bot.add_message
-                out = deque()
-                if after is None:
-                    async for m in history:
-                        add_message(m, files=False)
-                        out.append(m)
-                else:
-                    async for m in history:
-                        if getattr(m, "created_at", None) and m.created_at > after:
-                            add_message(m, files=False)
-                            out.append(m)
-                return list(out)
-            except discord.Forbidden:
-                return []
-            except:
-                remaining = 20 - utc() + t
-                if remaining > 0:
-                    await asyncio.sleep(remaining)
-                raise
-
-        while True:
-            with tracebacksuppressor(SemaphoreOverflowError):
-                async with self.semaphore:
-                    messages = []
-                    # 16 attempts to download channel
-                    messages = await aretry(delay_if_exc, channel, attempts=16, delay=20)
-                    break
-            await asyncio.sleep(30)
-        if callback:
-            return await create_future(callback, channel=channel, messages=messages)
-        return messages
-
-    async def getGuildHistory(self, guild, limit=None, after=None, callback=None, single=False):
-        lim = None if limit is None else ceil(limit / min(128, len(guild.text_channels)))
-        if single:
-            output = cdict()
-            for channel in guild.text_channels:
-                output[channel.id] = await self.getChannelHistory(channel, limit=lim, after=after, callback=callback)
-        else:
-            output = cdict((channel.id, create_task(self.getChannelHistory(channel, limit=lim, after=after, callback=callback))) for channel in guild.text_channels)
-            for k, v in output.items():
-                output[k] = await v
-        return output
-
-    async def getUserMessageCount(self, guild):
-        print("Probing", guild)
-        count = self.data[guild.id].setdefault("counts", {})
-        total = self.data[guild.id].setdefault("totals", {})
-        word = self.data[guild.id].setdefault("words", {})
-        oldest = self.data[guild.id]["oldest"]
-        i = 1
-        for channel in guild.text_channels:
-            while self.semaphore.is_busy():
-                await self.semaphore()
-            with tracebacksuppressor(discord.Forbidden, discord.NotFound):
-                async with self.semaphore:
-                    async for message in channel.history(limit=None, oldest_first=True):
-                        u = message.author.id
-                        orig_id = oldest.get(u)
-                        if not orig_id or message.id < orig_id:
-                            oldest[u] = message.id
-                        length = get_message_length(message)
-                        words = get_message_words(message)
-                        try:
-                            count[u] += 1
-                            total[u] += length
-                            word[u] += words
-                        except KeyError:
-                            count[u] = 1
-                            total[u] = length
-                            word[u] = words
-                        self.bot.add_message(message, files=False)
-        await asyncio.sleep(0.5)
-        self.data[guild.id][0] = True
-        self.update(guild.id)
-        print("Completed", guild)
-        print(self.data[guild.id])
-        await create_future(self.update, force=True, priority=True)
-
-    async def __call__(self):
-        if self.scanned:
-            return
-        self.scanned = True
-        guilds = self.bot.guilds
-        for guild in sorted(guilds, key=lambda g: g.member_count, reverse=True):
-            if guild.id not in self.data or 0 not in self.data[guild.id]:
-                self.startCalculate(guild)
-        self.scanned = -1
-
-    # Add new messages to the post count database
-    def _send_(self, message, **void):
-        user = message.author
-        guild = message.guild
-        if self.scanned and guild.id not in self.data:
-            self.startCalculate(guild)
-        d = self.data[guild.id]
-        if type(d) is str:
-            return
-        if user.id not in set_dict(d, "oldest", {}):
-            d["oldest"][user.id] = message.id
-        count = d["counts"].get(user.id, 0) + 1
-        total = d["totals"].get(user.id, 0) + get_message_length(message)
-        d["totals"][user.id] = total
-        d["counts"][user.id] = count
-        self.update(guild.id)                
+                self.data.pop(s)      
 
 
 class UpdatePrefix(Database):

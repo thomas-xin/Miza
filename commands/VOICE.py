@@ -4012,7 +4012,7 @@ class UpdateAudio(Database):
 
     # Searches for and extracts incomplete queue entries
     async def research(self, auds):
-        if not auds.search_sem.busy():
+        if not auds.search_sem.is_busy():
             async with auds.search_sem:
                 searched = 0
                 q = auds.queue

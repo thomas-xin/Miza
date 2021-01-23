@@ -1176,7 +1176,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 for attachment in message.attachments:
                     if getattr(attachment, "size", inf) < 1048576:
                         create_task(self.add_attachment(attachment))
-        if "message_cache" in self.data and not getattr(message, "simulated", None):
+        if (utc_dt() - message.created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
             self.data.message_cache.save_message(message)
         return message
 
@@ -1989,12 +1989,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if not os.path.exists(fn):
             create_future_ex(self.clear_cache, priority=True)
             await_fut(self.send_event("_save_"))
-            z = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
+            zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
             for x, y, z in os.walk("saves"):
                 for f in z:
                     fp = os.path.join(x, f)
-                    z.write(fp, fp)
-            z.close()
+                    zf.write(fp, fp)
+            zf.close()
             print("Backup database created in", fn)
 
     async def as_rewards(self, diamonds, gold=Dummy):
@@ -2163,7 +2163,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         # Update databases
                         for u in self.data.values():
                             if not u._semaphore.busy:
-                                create_future(u, priority=True)
+                                trace(create_future(u, priority=True))
                             if not u._garbage_semaphore.busy:
                                 create_task(self.garbage_collect(u))
 

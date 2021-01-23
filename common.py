@@ -1037,14 +1037,16 @@ def to_png(url):
         url = str(url)
     if url.endswith("?size=1024"):
         url = url[:-10] + "?size=4096"
-    return url.replace("/cdn.discordapp.com/", "/media.discordapp.net/").replace(".webp", ".png")
+    if "/embed/" not in url[:48]:
+        url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
+    return url.replace(".webp", ".png")
 
 def to_png_ex(url):
     if type(url) is not str:
         url = str(url)
-    if url.endswith("?size=1024"):
-        url = url[:-10] + "?size=256"
-    return url.replace("/cdn.discordapp.com/", "/media.discordapp.net/").replace(".webp", ".png")
+    if "/embed/" not in url[:48]:
+        url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
+    return url.replace(".webp", ".png")
 
 
 # A translator to stip all characters from mentions.
@@ -1194,12 +1196,12 @@ def proc_communicate(proc):
         while proc.is_running():
             s = as_str(proc.stdout.readline()).rstrip()
             if s:
-                # print(s)
+                print(s)
                 if s[0] == "~":
                     c = as_str(eval(s[1:]))
                     create_future_ex(exec_tb, c, globals())
-                else:
-                    print(s)
+                # else:
+                #     print(s)
 
 def proc_start():
     PROC_COUNT.math = 3
@@ -1234,12 +1236,15 @@ def sub_submit(ptype, command, timeout=12):
     # print(ts, proc, s)
     with proc.sem:
         if not proc.is_running():
-            proc = get_idle_proc()
+            proc = get_idle_proc(ptype)
         try:
+            print(s)
             proc.stdin.write(s)
             proc.stdin.flush()
             resp = PROC_RESP[ts].result(timeout=timeout)
         except (BrokenPipeError, OSError, concurrent.futures.TimeoutError):
+            # print(proc, s)
+            print_exc()
             proc.kill()
             proc2 = psutil.Popen(
                 proc.args,
@@ -1385,9 +1390,9 @@ def create_future_ex(func, *args, timeout=None, priority=False, **kwargs):
 
 # Forces the operation to be a coroutine regardless of whether it is or not. Regular functions are executed in the thread pool.
 async def _create_future(obj, *args, loop, timeout, priority, **kwargs):
-    if asyncio.iscoroutinefunction(obj):
+    while asyncio.iscoroutinefunction(obj):
         obj = obj(*args, **kwargs)
-    elif callable(obj):
+    if callable(obj):
         if asyncio.iscoroutinefunction(obj.__call__) or not is_main_thread():
             obj = obj.__call__(*args, **kwargs)
         else:
@@ -1437,6 +1442,9 @@ async def delayed_coro(fut, duration=None):
 async def traceback_coro(fut, *args):
     with tracebacksuppressor(*args):
         return await fut
+
+def trace(fut, *args):
+    return create_task(traceback_coro(fut, *args))
 
 # A function that takes a coroutine, and calls a second function if it takes longer than the specified delay.
 async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):

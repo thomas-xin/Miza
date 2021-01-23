@@ -467,6 +467,7 @@ class UpdateWebhooks(Database):
     CID = collections.namedtuple("id", ["id"])
 
     def from_dict(self, d, c_id):
+        d = copy.copy(d)
         d.url = f"https://discord.com/api/webhooks/{d.id}/{d.token}"
         w = discord.Webhook.from_url(d.url, adapter=discord.AsyncWebhookAdapter(Request.session))
         d.send = w.send
@@ -485,6 +486,8 @@ class UpdateWebhooks(Database):
 
     def add(self, w):
         user = self.bot.GhostUser()
+        with suppress(AttributeError):
+            user.channel = w.channel
         user.id = w.id
         user.name = w.name
         user.display_name = w.name
@@ -518,7 +521,7 @@ class UpdateWebhooks(Database):
                     webhooks = await guild.webhooks()
             if webhooks is None:
                 webhooks = await aretry(channel.webhooks, attempts=5, delay=15, exc=(discord.Forbidden, discord.NotFound))
-        return [w for w in [self.add(w) for w in webhooks] if w.channel_id == channel.id]
+        return [w for w in [self.add(w) for w in webhooks] if w.channel.id == channel.id]
 
 
 # get_fn = lambda m_id: m_id // 10 ** 15

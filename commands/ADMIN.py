@@ -1039,8 +1039,9 @@ class UpdateMuteRoles(Database):
         self.data[guild.id] = role.id
         self.update(guild.id)
         for channel in guild.channels:
-            if not channel.permissions_synced:
-                await channel.set_permissions(target=role, overwrite=self.mute)
+            if channel.permissions_for(guild.me).manage_channels and not channel.permissions_synced:
+                with tracebacksuppressor:
+                    await channel.set_permissions(target=role, overwrite=self.mute)
         return role
 
     async def __call__(self):
@@ -1052,9 +1053,10 @@ class UpdateMuteRoles(Database):
                     self.data.pop(g_id)
                 role = await self.get(guild)
                 for channel in guild.channels:
-                    if not channel.permissions_synced:
+                    if channel.permissions_for(guild.me).manage_channels and not channel.permissions_synced:
                         if role not in channel.overwrites:
-                            await channel.set_permissions(target=role, overwrite=self.mute)
+                            with tracebacksuppressor:
+                                await channel.set_permissions(target=role, overwrite=self.mute)
 
 
 class UpdateBans(Database):
@@ -1357,7 +1359,8 @@ class UpdateMessageCache(Database):
     raws = {}
     loaded = {}
     saving = {}
-    save_sem = Semaphore(1, 1, 5, 30)
+    save_sem = Semaphore(1, 512, 5, 30)
+    search_sem = Semaphore(20, 512, rate_limit=5)
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -1487,6 +1490,8 @@ class UpdateMessageCache(Database):
         return len(saved)
 
     async def _save_(self, **void):
+        if self.save_sem.is_busy():
+            return
         async with self.save_sem:
             # with suppress(AttributeError):
             #     fut = create_task(self.bot.data.channel_cache.saves())
@@ -1498,14 +1503,13 @@ class UpdateMessageCache(Database):
                 i += 1
                 if not i & 3 or len(messages) > 65536:
                     await asyncio.sleep(0.3)
-            open(self.files + "/-1", "wb").close()
             while len(self.loaded) > 512:
                 with suppress(RuntimeError):
                     self.loaded.pop(next(iter(self.loaded)))
                 i += 1
                 if not i % 6:
                     await asyncio.sleep(0.2)
-            if "counts" not in self.bot.data or not self.bot.data.counts.semaphore.is_busy():
+            if not self.save_sem.is_busy():
                 while len(self.raws) > 512:
                     with suppress(RuntimeError):
                         self.raws.pop(next(iter(self.raws)))
@@ -1514,9 +1518,21 @@ class UpdateMessageCache(Database):
                         await asyncio.sleep(0.2)
             if len(saving) >= 8:
                 print(f"Message Database: {len(saving)} files updated.")
+            deleted = 0
+            limit = str(self.get_fn(time_snowflake(utc_dt() - datetime.timedelta(days=14))))
+            for f in os.listdir(self.files):
+                if f.isnumeric() and f < limit or f.endswith("\x7f"):
+                    with tracebacksuppressor(FileNotFoundError):
+                        os.remove(self.files + "/" + f)
+                        deleted += 1
+            if deleted >= 8:
+                print(f"Message Database: {deleted} files deleted.")
+            if os.path.exists(self.files + "/-1"):
+                self.setmtime()
             # await fut
 
-    getmtime = lambda self: utc_ft(os.path.getmtime(self.files + "/-1"))
+    getmtime = lambda self: os.path.getmtime(self.files + "/-1")
+    setmtime = lambda self: open(self.files + "/-1", "wb").close()
 
     async def _minute_loop_(self):
         await self._save_()
@@ -1524,10 +1540,8 @@ class UpdateMessageCache(Database):
 
 class UpdateMessageLogs(Database):
     name = "logM"
-
-    def __load__(self):
-        self.searched = False
-        self.dc = {}
+    searched = False
+    dc = {}
 
     async def __call__(self):
         for h in tuple(self.dc):
@@ -1537,18 +1551,31 @@ class UpdateMessageLogs(Database):
     async def _bot_ready_(self, **void):
         if not self.searched and len(self.bot.cache.messages) <= 65536:
             self.searched = True
-            time = None
+            t = None
             with tracebacksuppressor(FileNotFoundError):
-                time = self.bot.data.message_cache.getmtime()
-            if time is not None:
-                create_task(self.load_new_messages(time))
+                t = utc_ft(self.bot.data.message_cache.getmtime())
+            if t is None:
+                t = utc_dt() - datetime.timedelta(days=7)
+            create_task(self.load_new_messages(t))
 
-    async def load_new_messages(self, time):
-        for guild in self.bot.guilds:
-            # lim = floor(2097152 / len(self.bot.guilds))
-            lim = None
-            await self.bot.data.counts.getGuildHistory(guild, lim, after=time, callback=self.callback)
+    async def save_channel(self, channel, t=None):
+        async with self.bot.data.message_cache.save_sem:
+            async for message in channel.history(limit=None, after=t):
+                self.bot.add_message(message, files=False)
+
+    async def load_new_messages(self, t):
+        with tracebacksuppressor:
+            for guild in self.bot.guilds:
+                print("Probing", guild)
+                futs = deque()
+                for channel in guild.text_channels:
+                    if channel.permissions_for(guild.me).read_message_history:
+                        futs.append(create_task(self.save_channel(channel, t)))
+                for fut in futs:
+                    await fut
+                self.callback(None)
         self.bot.data.message_cache.finished = True
+        self.bot.data.message_cache.setmtime()
 
     def callback(self, messages, **void):
         create_future_ex(self.bot.update_from_client, priority=True)
