@@ -410,7 +410,7 @@ class Say(Command):
     def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        return argv
+        return fix_md(argv)
 
 
 # Char2Emoj, a simple script to convert a string into a block of text
