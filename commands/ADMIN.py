@@ -900,6 +900,30 @@ class FileLog(Command):
         return ini_md(f"File deletion logging is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
 
 
+# class StarBoard(Command):
+#     server_only = True
+#     min_level = 3
+#     description = "Causes ⟨MIZA⟩ to repost popular messages with a ⭐ reaction. Set to 0 to disable."
+#     usage = "<react_count>?"
+#     rate_limit = 1
+
+#     async def __call__(self, bot, flags, channel, guild, **void):
+#         data = bot.data.logF
+#         update = bot.data.logF.update
+#         if "e" in flags or "a" in flags:
+#             data[guild.id] = channel.id
+#             return italics(css_md(f"Enabled file deletion logging in {sqr_md(channel)} for {sqr_md(guild)}."))
+#         elif "d" in flags:
+#             if guild.id in data:
+#                 data.pop(guild.id)
+#             return italics(css_md(f"Disabled file deletion logging for {sqr_md(guild)}."))
+#         if guild.id in data:
+#             c_id = data[guild.id]
+#             channel = await bot.fetch_channel(c_id)
+#             return ini_md(f"File deletion logging for {sqr_md(guild)} is currently enabled in {sqr_md(channel)}.")
+#         return ini_md(f"File deletion logging is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
+
+
 # TODO: Stop being lazy and finish this damn command
 # class Welcomer(Command):
 #     server_only = True
@@ -1560,7 +1584,7 @@ class UpdateMessageLogs(Database):
 
     async def save_channel(self, channel, t=None):
         async with self.bot.data.message_cache.search_sem:
-            async for message in channel.history(limit=None, after=t):
+            async for message in channel.history(limit=32768, after=t, oldest_first=False):
                 self.bot.add_message(message, files=False)
 
     async def load_new_messages(self, t):

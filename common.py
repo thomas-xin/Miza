@@ -907,6 +907,22 @@ find_emojis = lambda s: regexp("<.?:[^<>:]+:[0-9]+>").findall(s)
 find_users = lambda s: regexp("<@!?[0-9]+>").findall(s)
 
 
+def get_last_image(message, embeds=True):
+    for a in reversed(message.attachments):
+        url = a.url
+        if is_image(url) is not None:
+            return url
+    if embeds:
+        for e in reversed(message.embeds):
+            if e.video:
+                return e.video.url
+            if e.image:
+                return e.image.url
+            if e.thumbnail:
+                return e.thumbnail.url
+    raise FileNotFoundError("Message has no image.")
+
+
 def get_message_length(message):
     return len(message.system_content or message.content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
 

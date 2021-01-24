@@ -247,7 +247,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 found = False
                                 for i, curr in enumerate(commands):
                                     if curr["name"] == name:
-                                        compare = self.command_options(command.usage, compare=True)
+                                        compare = self.command_options(command.usage)
                                         if curr["description"] != description or (compare and curr["options"] != compare or not compare and curr.get("options")):
                                             print(curr)
                                             print(f"{curr['name']}'s slash command does not match, removing...")
@@ -980,6 +980,24 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         position = min(length, round(length * ratio))
         return as_fut("⬜" * position + "⬛" * (length - position))
 
+    async def get_last_image(self, channel):
+        channel = self.in_cache(verify_id(channel))
+        if not is_channel(channel):
+            channel = await self.get_dm(channel)
+        if "channel_cache" in self.data:
+            async for message in self.data.channel_cache.get(channel.id):
+                try:
+                    return get_last_image(message)
+                except FileNotFoundError:
+                    pass
+        async for message in channel.history(limit=200):
+            self.add_message(message, files=False)
+            try:
+                return get_last_image(message)
+            except FileNotFoundError:
+                pass
+        raise FileNotFoundError("Image file not found.")
+
     # Finds URLs in a string, following any discord message links found.
     async def follow_url(self, url, it=None, best=False, preserve=True, images=True, allow=False, limit=None):
         if limit is not None and limit <= 0:
@@ -1165,10 +1183,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     def add_message(self, message, files=True, cache=True):
         if self.closed:
             return message
-        # if message.id not in self.cache.messages:
-        #     if not getattr(message, "simulated", None) and cache and "channel_cache" in self.data:
-        #         create_future_ex(self.insert_message, message, priority=True)
-        self.cache.messages[message.id] = message
+        if message.id not in self.cache.messages:
+            if not getattr(message, "simulated", None) and cache and "channel_cache" in self.data:
+                self.data.channel_cache.add(message.channel.id, message.id)
+            self.cache.messages[message.id] = message
         if ts_us() % 16 == 0:
             self.limit_cache("messages")
         if files and message.author.id != self.id:
@@ -2129,7 +2147,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 with suppress(discord.NotFound):
                     u = await self.fetch_user(next(iter(self.owners)))
                     n = u.name
-                    text = f"live on {self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {belongs(uni_str(n))} place!"
+                    text = f"{self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {belongs(uni_str(n))} place!"
                     # Status iterates through 5 possible choices
                     status = self.statuses[self.status_iter]
                     if status is discord.Streaming:
