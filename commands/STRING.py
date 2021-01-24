@@ -387,6 +387,8 @@ class AltCaps(Command):
     no_parse = True
 
     def __call__(self, argv, **void):
+        if not argv:
+            raise ArgumentError("Input string is empty.")
         i = argv[0].isupper()
         a = argv[i::2].casefold()
         b = argv[1 - i::2].upper()

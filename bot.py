@@ -1631,7 +1631,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 x = tuple(x)[0]
         if type(x) is str and x.isnumeric():
             return int(x)
-        return round_min(mpf(x))
+        x = round_min(mpf(x))
+        if type(x) is not int and len(str(x)) <= 16:
+            return float(x)
+        return x
 
     # Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
     def solve_math(self, f, prec=128, r=False, timeout=12, variables=None):

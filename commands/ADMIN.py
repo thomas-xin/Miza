@@ -1559,7 +1559,7 @@ class UpdateMessageLogs(Database):
             create_task(self.load_new_messages(t))
 
     async def save_channel(self, channel, t=None):
-        async with self.bot.data.message_cache.save_sem:
+        async with self.bot.data.message_cache.search_sem:
             async for message in channel.history(limit=None, after=t):
                 self.bot.add_message(message, files=False)
 

@@ -354,7 +354,7 @@ class CustomAudio(collections.abc.Hashable):
         with self.semaphore:
             lim = 1024
             q = [copy_entry(item) for item in self.queue.verify()]
-            s = {k: (v if not issubclass(type(v), mpf) else int(v) if abs(int(v)) >= (1 << 32) else float(v)) for k, v in self.stats.items()}
+            s = {k: (v if not isinstance(v, mpf) else str(v) if len(str(v)) > 16 else float(v)) for k, v in self.stats.items()}
             d = {
                 "stats": s,
                 "queue": q,
@@ -2856,11 +2856,13 @@ class Dump(Command):
             # Shuffle newly loaded dump if autoshuffle is on
             if auds.stats.shuffle:
                 shuffle(q)
-            for k in d["stats"]:
+            for k, v in deque(d["stats"].items()):
                 if k not in auds.stats:
-                    d["stats"].pop(k)
+                    d["stats"].pop(k, None)
                 if k in "loop repeat shuffle quiet stay":
-                    d["stats"][k] = bool(d["stats"][k])
+                    d["stats"][k] = bool(v)
+                elif isinstance(v, str):
+                    d["stats"][k] = mpf(v)
         if "a" not in flags:
             # Basic dump, replaces current queue
             if auds.queue:
