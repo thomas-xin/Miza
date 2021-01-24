@@ -1323,6 +1323,7 @@ class Reminder(Command):
                     for q in "?-+":
                         argv = argv.replace(q + c + " ", "").replace(" " + q + c, "")
         urgent = "u" in flags
+        recur = 60 if urgent else None
         remind_as = user
         # This parser is so unnecessarily long for what it does...
         keyed = False
@@ -1331,12 +1332,17 @@ class Reminder(Command):
             if name == "remind" and temp.startswith("me "):
                 argv = argv[3:]
                 temp = argv.casefold()
-            if temp.startswith("urgently ") or temp.startswith("urgent "):
-                argv = argv.split(" ", 1)[1]
+            if temp.startswith("every ") and " " in argv[6:]:
+                duration, argv = argv[6:].split(None, 1)
+                recur = await bot.eval_time(duration)
                 temp = argv.casefold()
+            elif temp.startswith("urgently ") or temp.startswith("urgent "):
+                argv = argv.split(None, 1)[1]
+                temp = argv.casefold()
+                recur = 60
                 urgent = True
             if temp.startswith("as ") and " " in argv[3:]:
-                query, argv = argv[3:].split(" ", 1)
+                query, argv = argv[3:].split(None, 1)
                 remind_as = await self.bot.fetch_user_member(query, guild)
                 temp = argv.casefold()
             if temp.startswith("to "):
@@ -1512,8 +1518,8 @@ class Reminder(Command):
                 t=t + ts,
             )
             rems.append(rem)
-        if urgent:
-            rem.urgent = True
+        if recur:
+            rem.recur = recur
         # Sort list of reminders
         bot.data.reminders[sendable.id] = sort(rems, key=lambda x: x["t"])
         with suppress(IndexError):
@@ -1531,6 +1537,8 @@ class Reminder(Command):
             out += f"announcement for {sqr_md(sendable)}"
         else:
             out += f"reminder for {sqr_md(sendable)}"
+        if not urgent and recur:
+            out += f" every {sqr_md(sec2time(recur))},"
         if keyed:
             out += f" upon next event from {sqr_md(user_mention(t))}"
         else:
@@ -1623,7 +1631,9 @@ class UpdateUrgentReminders(Database):
                         c_id = p[1]
                         m_id = p[2]
                         emb = p[3]
-                        p[0] = utc() + 60
+                        if len(p) < 4:
+                            p.append(60)
+                        p[0] = max(utc() + 1, p[0] + p[4])
                         channel = await self.bot.fetch_messageable(c_id)
                         message = await self.bot.fetch_message(m_id, channel)
                         for react in message.reactions:
@@ -1653,27 +1663,12 @@ class UpdateReminders(Database):
         # This exists so that checking next scheduled item is O(1)
         self.listed = alist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str and d[i]), key=lambda x: x[0]))
 
-    async def urgent_message(self, channel, embed):
+    async def recurrent_message(self, channel, embed, wait=60):
         t = utc()
         message = await channel.send(embed=embed)
         await message.add_reaction("✅")
-        self.bot.data.urgentreminders.data["listed"].insort([t + 60, channel.id, message.id, embed], key=lambda x: x)
+        self.bot.data.urgentreminders.data["listed"].insort([t + wait, channel.id, message.id, embed, wait], key=lambda x: x)
         self.bot.data.urgentreminders.update()
-        # await asyncio.sleep(t - utc() + 60)
-        # with suppress(StopIteration):
-        #     while True:
-        #         async with delay(60):
-        #             for react in self.bot.cache.messages[message.id].reactions:
-        #                 if str(react) == "✅":
-        #                     if react.count > 1:
-        #                         raise StopIteration
-        #                     async for u in react.users():
-        #                         if u.id != self.bot.id:
-        #                             raise StopIteration
-        #             fut = create_task(channel.send(embed=embed))
-        #             await self.bot.silent_delete(message)
-        #             message = await fut
-        #             await message.add_reaction("✅")
 
     # Fast call: runs many times per second
     async def _call_(self):
@@ -1714,10 +1709,10 @@ class UpdateReminders(Database):
             except KeyError:
                 u = x
             emb.set_author(**get_author(u))
-            if not x.get("urgent"):
+            if not x.get("recur"):
                 self.bot.send_embeds(ch, emb)
             else:
-                create_task(self.urgent_message(ch, emb))
+                create_task(self.recurrent_message(ch, emb, x.get("recur", 60)))
 
     # Seen event: runs when users perform discord actions
     async def _seen_(self, user, **void):
@@ -1742,10 +1737,10 @@ class UpdateReminders(Database):
                             except KeyError:
                                 u = cdict(x)
                             emb.set_author(**get_author(u))
-                            if not x.get("urgent"):
+                            if not x.get("recur"):
                                 self.bot.send_embeds(ch, emb)
                             else:
-                                create_task(self.urgent_message(ch, emb))
+                                create_task(self.recurrent_message(ch, emb, x.get("recur", 60)))
                             pops.add(len(rems) - i)
                         elif is_finite(x["t"]):
                             break
