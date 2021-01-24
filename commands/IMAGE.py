@@ -1293,18 +1293,6 @@ class Blend(Command):
         await bot.send_with_file(message.channel, "", fn, filename=name)
 
 
-class ImagePool:
-    usage = "<verbose{?v}>?"
-    flags = "v"
-    rate_limit = (0.1, 0.25)
-
-    async def __call__(self, bot, channel, flags, **void):
-        url = await bot.data.imagepools.get(self.database, self.fetch_one)
-        if "v" in flags:
-            return escape_everyone(url)
-        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
-
-
 class Cat(ImagePool, Command):
     description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it. Be sure to check out ⟨WEBSERVER⟩/cats!"
     database = "cats"
@@ -1414,14 +1402,15 @@ class UpdateImagePools(Database):
         data.uniq(sorted=None)
 
     async def proc(self, key, func):
-        with suppress(SemaphoreOverflowError):
-            async with self.sem:
-                data = set_dict(self.data, key, alist())
-                out = await func()
-                if out not in data:
-                    data.add(out)
-                    self.update(key)
-                return out
+        if self.sem.is_busy():
+            return
+        async with self.sem:
+            data = set_dict(self.data, key, alist())
+            out = await func()
+            if out not in data:
+                data.add(out)
+                self.update(key)
+            return out
 
     async def get(self, key, func, threshold=1024):
         if not self.loading.get(key):

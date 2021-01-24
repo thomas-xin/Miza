@@ -270,11 +270,16 @@ def is_nsfw(channel):
         return True
 
 
-class Neko(Command):
+class Neko(ImagePool, Command):
     description = "Pulls a random image from nekos.life and embeds it."
     usage = "<tags(neko)>? <verbose{?v}|random{?r}|list{?l}>?"
     flags = "lrv"
-    rate_limit = (0.5, 7)
+    rate_limit = (0.05, 4)
+    threshold = 512
+    database = "nekos"
+
+    def fetch_one(self):
+        return create_future(nekos.img, "neko")
 
     async def __call__(self, bot, args, argv, flags, message, channel, guild, **void):
         isNSFW = is_nsfw(channel)
@@ -301,7 +306,7 @@ class Neko(Command):
             selected.append(possible[xrand(len(possible))])
         if not selected:
             if not argv:
-                url = await create_future(nekos.img, "neko")
+                url = await super().__call__(bot, channel, flags)
             else:
                 raise LookupError(f"Search tag {argv} not found. Use {bot.get_prefix(guild)}neko list for list.")
         else:
@@ -316,6 +321,8 @@ class Neko(Command):
                 url = await create_future(nekos.cat)
             elif get == "404":
                 url = await create_future(nekos.img, "smallboobs")
+            elif get == "neko":
+                url = await super().__call__(bot, channel, flags)
             else:
                 url = await create_future(nekos.img, get)
         if "v" in flags:

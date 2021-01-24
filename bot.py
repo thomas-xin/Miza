@@ -1497,7 +1497,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             trusted = self.data.trusted
         except (AttributeError, KeyError):
             return False
-        return bool(trusted.get(verify_id(guild)))
+        return guild and bool(trusted.get(verify_id(guild)))
 
     # Checks if a user is blacklisted from the bot.
     def is_blacklisted(self, user):

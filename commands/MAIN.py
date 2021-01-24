@@ -303,15 +303,6 @@ class Loop(Command):
         if not isnan(perm):
             if iters > 32 and not bot.is_trusted(guild.id):
                 raise PermissionError(f"Elevated server priviliges required to execute loop of greater than 32 iterations.")
-            # Required level is 1/3 the amount of loops required, rounded up
-            scale = 3
-            limit = perm * scale
-            if iters > limit:
-                reason = (
-                    "to execute loop of " + str(iters)
-                    + " iterations"
-                )
-                raise self.perm_error(perm, ceil(iters / scale), reason)
             elif iters > 256:
                 raise PermissionError("Must be owner to execute loop of more than 256 iterations.")
         func = func2 = " ".join(args[1:])
@@ -648,7 +639,7 @@ class Info(Command):
                         dname = getattr(member, "nick", None)
                         joined = getattr(u, "joined_at", None)
                     else:
-                        dname = getattr(u, "nick", None)
+                        dname = getattr(u, "simulated", None) and getattr(u, "nick", None)
                         joined = None
                     created = u.created_at
                     activity = "\n".join(activity_repr(i) for i in getattr(u, "activities", ()))
