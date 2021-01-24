@@ -409,7 +409,7 @@ class Say(Command):
     
     def __call__(self, argv, **void):
         if not argv:
-            raise ArgumentError("Input string is empty.")
+            raise ArgumentError("bAcK sLaSh YoU tWo HuNdReD bEe")
         return fix_md(argv)
 
 
