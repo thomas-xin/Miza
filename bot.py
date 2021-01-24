@@ -2129,7 +2129,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 with suppress(discord.NotFound):
                     u = await self.fetch_user(next(iter(self.owners)))
                     n = u.name
-                    text = f"live to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {belongs(uni_str(n))} place!"
+                    text = f"live on {self.website}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {belongs(uni_str(n))} place!"
                     # Status iterates through 5 possible choices
                     status = self.statuses[self.status_iter]
                     if status is discord.Streaming:
