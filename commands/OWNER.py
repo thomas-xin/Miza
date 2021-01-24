@@ -533,7 +533,7 @@ class UpdateChannelCache(Database):
             yield channel.message
             return
         c_id = verify_id(channel)
-        for m_id in sorted(self.data.get(c_id, ())):
+        for m_id in sorted(self.data.get(c_id, ()), reverse=True):
             yield await self.bot.fetch_message(m_id, channel)
 
     def add(self, c_id, m_id):
