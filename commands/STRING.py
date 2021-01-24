@@ -402,6 +402,17 @@ class AltCaps(Command):
         return fix_md("".join(i[0] + i[1] for i in zip(a, b)) + c)
 
 
+class Say(Command):
+    description = "Repeats a message that the user provides."
+    usage = "<string>"
+    no_parse = True
+    
+    def __call__(self, argv, **void):
+        if not argv:
+            raise ArgumentError("Input string is empty.")
+        return message.content
+
+
 # Char2Emoj, a simple script to convert a string into a block of text
 def _c2e(string, em1, em2):
     chars = {
