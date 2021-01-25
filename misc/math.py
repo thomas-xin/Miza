@@ -587,10 +587,9 @@ def evaluate(ts, args):
         out = procResp(resp)
         if len(out) > 8388608:
             raise OverflowError("Output data too large.")
+        sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
     except Exception as ex:
-        sys.stdout.write(f"~PROC_RESP[{ts}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))\n")
-    else:
-        sys.stdout.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n")
+        sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))\n".encode("utf-8"))
     sys.stdout.flush()
 
 

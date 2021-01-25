@@ -1532,10 +1532,9 @@ def evalImg(url, operation, args):
 def evaluate(ts, args):
     try:
         out = evalImg(*eval(eval(args)))
+        sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
     except Exception as ex:
-        sys.stdout.write(f"~PROC_RESP[{ts}].set_exception(evalex({repr(repr(ex))}))\n")
-    else:
-        sys.stdout.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n")
+        sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception(evalex({repr(repr(ex))}))\n".encode("utf-8"))
     sys.stdout.flush()
 
 
