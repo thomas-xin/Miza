@@ -1919,23 +1919,48 @@ class AudioDownloader:
             fmt = "mp3"
         else:
             mid = False
-        videos = ("webm", "mkv", "f4v", "flv", "mov", "qt", "wmv", "mp4", "m4v", "mpv")
-        info = self.extract(url)[0]
-        self.get_stream(info, video=fmt in videos, force=True, download=False)
-        outf = f"{info['name']}.{fmt}"
-        ts = ts_us()
-        outft = outf.translate(filetrans)
-        fn = f"cache/\x7f{ts}~{outft}"
-        if fmt in videos:
-            video = info["video"]
+        videos = ("webm", "mkv", "f4v", "flv", "mov", "qt", "wmv", "mp4", "m4v", "mpv", "gif")
+        if type(url) is str:
+            urls = (url,)
         else:
-            video = None
-        stream = info["stream"]
-        if not stream:
+            urls = url
+        vst = deque()
+        ast = deque()
+        ts = ts_us()
+        outf = None
+        for url in urls:
+            info = self.extract(url)[0]
+            self.get_stream(info, video=fmt in videos, force=True, download=False)
+            if not outf:
+                outf = f"{info['name']}.{fmt}"
+                outft = outf.translate(filetrans)
+                fn = f"cache/\x7f{ts}~{outft}"
+            if vst or fmt in videos:
+                vst.append(info["video"])
+            ast.append(info["stream"])
+        if not ast and not vst:
             raise LookupError(f"No stream URLs found for {url}")
-        args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y"]
-        if not video:
+        args = alist(("ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y"))
+        if vst:
+            if len(vst) > 1:
+                vsc = "\n".join(f"file '{i}'" for i in vst)
+                vsf = f"cache/{ts}-video"
+                with open(vsf, "w", encoding="utf-8") as f:
+                    f.write(vsc)
+            else:
+                vsc = vst[0]
+        if len(ast) > 1:
+            asc = "\n".join(f"file '{i}'" for i in ast)
+            asf = f"cache/{ts}-audio"
+            with open(asf, "w", encoding="utf-8") as f:
+                f.write(asc)
+            args.extend(("-f", "concat", "-safe", "0", "-protocol_whitelist", "concat,tls,tcp,file,http,https"))
+        else:
+            asf = ast[0]
+        if not vst:
             args.append("-vn")
+        elif fmt == "gif":
+            args.append("-an")
         if str(start) != "None":
             start = round_min(float(start))
             args.extend(("-ss", str(start)))
@@ -1947,13 +1972,13 @@ class AudioDownloader:
         else:
             end = None
             args.extend(("-to", "86400"))
-        if video:
-            args.extend(("-i", video))
+        if vst:
+            args.extend(("-i", vsf))
             if start:
                 args.extend(("-ss", str(start)))
             if end is not None:
                 args.extend(("-to", str(end)))
-        args.extend(("-i", stream))
+        args.extend(("-i", asf))
         if auds is not None:
             args.extend(auds.construct_options(full=True))
         br = 196608
@@ -1970,7 +1995,7 @@ class AudioDownloader:
             br = round(br / 64000) * 64000
             if not br:
                 br = 64000
-        if not video:
+        if not vst:
             args.extend(("-ar", str(SAMPLE_RATE), "-b:a", str(br)))
         args.extend(("-f", fmt, fn))
         print(args)
@@ -1980,7 +2005,7 @@ class AudioDownloader:
         except subprocess.CalledProcessError as ex:
             # Attempt to convert file from org if FFmpeg failed
             try:
-                new = select_and_convert(stream)
+                new = select_and_convert(ast[0])
             except ValueError:
                 if resp.stderr:
                     raise RuntimeError(*ex.args, resp.stderr)
@@ -1997,6 +2022,11 @@ class AudioDownloader:
             if not is_url(new):
                 with suppress():
                     os.remove(new)
+        with tracebacksuppressor:
+            if len(ast) > 1:
+                os.remove(asf)
+            if len(vst) > 1:
+                os.remove(vsf)
         if end:
             odur = end - start
             if odur:
@@ -2005,10 +2035,20 @@ class AudioDownloader:
                     ts += 1
                     fn, fn2 = f"cache/\x7f{ts}~{outft}", fn
                     times = ceil(odur / dur)
+                    # if "|" not in fn2:
+                    #     loopf = None
+                    #     argi = f"concat:{((fn2 + '|') * times).rstrip('|')}"
+                    #     args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-protocol_whitelist", "concat,tls,tcp,file,http,https", "-to", str(odur), "-i", argi, "-c", "copy", fn]
+                    # else:
                     loopf = f"cache/{ts - 1}~loop.txt"
                     with open(loopf, "w", encoding="utf-8") as f:
                         f.write(f"file '{fn2.split('/', 1)[-1]}'\n" * times)
-                    args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-to", str(odur), "-f", "concat", "-safe", "0", "-i", loopf, "-c", "copy", fn]
+                    args = [
+                        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                        "-protocol_whitelist", "concat,tls,tcp,file,http,https",
+                        "-to", str(odur), "-f", "concat", "-safe", "0",
+                        "-i", loopf, "-c", "copy", fn
+                    ]
                     print(args)
                     try:
                         resp = subprocess.run(args)
@@ -2018,7 +2058,8 @@ class AudioDownloader:
                             raise RuntimeError(*ex.args, resp.stderr)
                         raise ex
                     with suppress():
-                        os.remove(loopf)
+                        if loopf:
+                            os.remove(loopf)
                         os.remove(fn2)
         if not mid:
             return fn, outf
@@ -3817,22 +3858,23 @@ class Lyrics(Command):
 class Download(Command):
     time_consuming = True
     _timeout_ = 75
-    name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "ConvertORG", "Org2xm", "Convert"]
+    name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "Concat", "Concatenate", "ConvertORG", "Org2xm", "Convert"]
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
-    usage = "<0:search_links>* <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <apply_settings{?a}|verbose_search{?v}>*"
-    flags = "avtz"
+    usage = "<0:search_links>* <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <concatenate{?c}|apply_settings{?a}|verbose_search{?v}>*"
+    flags = "avtzc"
     rate_limit = (7, 16)
     typing = True
     slash = True
 
     async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
-        fmt = default_fmt = "mp4" if name == "trim" else "mp3"
+        fmt = default_fmt = "mp3"
         if name in ("af", "audiofilter"):
             set_dict(flags, "a", 1)
         # Prioritize attachments in message
         for a in message.attachments:
             argv = a.url + " " + argv
         direct = getattr(message, "simulated", None)
+        concat = "concat" in name or "c" in flags
         start = end = None
         # Attempt to download items in queue if no search query provided
         if not argv:
@@ -3854,7 +3896,7 @@ class Download(Command):
                     spl = argv.split(" ")
                 if len(spl) >= 1:
                     fmt = spl[-1].lstrip(".")
-                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "vox", "adpcm", "pcm", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv"):
+                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "vox", "adpcm", "pcm", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif"):
                         fmt = default_fmt
                     else:
                         if spl[-2] in ("as", "to"):
@@ -3876,8 +3918,14 @@ class Download(Command):
             urls = await bot.follow_url(argv, allow=True, images=False)
             if urls:
                 direct = True
-                temp = await create_future(ytdl.extract, urls[0], timeout=120)
-                res.extend(temp)
+                if not concat:
+                    urls = urls[:1]
+                futs = deque()
+                for e in urls:
+                    futs.append(create_future(ytdl.extract, e, timeout=120))
+                for fut in futs:
+                    temp = await fut
+                    res.extend(temp)
             if not res:
                 # 2 youtube results per soundcloud result, increased with verbose flag
                 sc = min(4, flags.get("v", 0) + 1)
@@ -3892,29 +3940,33 @@ class Download(Command):
             res = res[:10]
             desc = f"Search results for {argv}:"
         a = flags.get("a", 0)
-        if getattr(message, "simulated", None):
-            try:
-                if a:
-                    auds = bot.data.audio.players[guild.id]
-                else:
+        if concat or direct:
+            entry = (e["url"] for e in res) if concat else res[0]["url"]
+            print(entry)
+            with discord.context_managers.Typing(channel):
+                try:
+                    if a:
+                        auds = bot.data.audio.players[guild.id]
+                    else:
+                        auds = None
+                except LookupError:
                     auds = None
-            except LookupError:
-                auds = None
-            f, out = await create_future(
-                ytdl.download_file,
-                res[0]["url"],
-                fmt=fmt,
-                start=start,
-                end=end,
-                auds=auds,
-            )
-            return await bot.send_with_file(
-                channel=channel,
-                msg="",
-                file=f,
-                filename=out,
-                rename=False,
-            )
+                f, out = await create_future(
+                    ytdl.download_file,
+                    entry,
+                    fmt=fmt,
+                    start=start,
+                    end=end,
+                    auds=auds,
+                )
+                create_task(bot.send_with_file(
+                    channel=channel,
+                    msg="",
+                    file=f,
+                    filename=out,
+                    rename=False,
+                ))
+                return
         desc += "\nDestination format: {." + fmt + "}"
         if start is not None or end is not None:
             desc += f"\nTrim: [{'-' if start is None else start} ~> {'-' if end is None else end}]"

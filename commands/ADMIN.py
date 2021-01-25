@@ -903,25 +903,22 @@ class FileLog(Command):
 # class StarBoard(Command):
 #     server_only = True
 #     min_level = 3
-#     description = "Causes ⟨MIZA⟩ to repost popular messages with a ⭐ reaction. Set to 0 to disable."
+#     description = "Causes ⟨MIZA⟩ to repost popular messages with ⭐ reactions, from the current server. Set to a negative number to disable."
 #     usage = "<react_count>?"
 #     rate_limit = 1
 
-#     async def __call__(self, bot, flags, channel, guild, **void):
-#         data = bot.data.logF
-#         update = bot.data.logF.update
-#         if "e" in flags or "a" in flags:
-#             data[guild.id] = channel.id
-#             return italics(css_md(f"Enabled file deletion logging in {sqr_md(channel)} for {sqr_md(guild)}."))
-#         elif "d" in flags:
-#             if guild.id in data:
-#                 data.pop(guild.id)
-#             return italics(css_md(f"Disabled file deletion logging for {sqr_md(guild)}."))
-#         if guild.id in data:
-#             c_id = data[guild.id]
-#             channel = await bot.fetch_channel(c_id)
-#             return ini_md(f"File deletion logging for {sqr_md(guild)} is currently enabled in {sqr_md(channel)}.")
-#         return ini_md(f"File deletion logging is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
+#     async def __call__(self, bot, argv, channel, guild, **void):
+#         data = bot.data.logS
+#         update = bot.data.logS.update
+#         if not argv:
+#             try:
+#                 c_id, count = data[guild.id]
+#             except KeyError:
+#                 return ini_md(f"Starboard reposting is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
+#         count = await bot.eval_math(argv)
+#         if count < 0:
+#             data.pop(guild.id, None)
+#             return italics(css_md(f"Disabled starboard reposting for {sqr_md(guild)}."))
 
 
 # TODO: Stop being lazy and finish this damn command
@@ -1600,6 +1597,7 @@ class UpdateMessageLogs(Database):
                 self.callback(None)
         self.bot.data.message_cache.finished = True
         self.bot.data.message_cache.setmtime()
+        print("Loading new messages completed.")
 
     def callback(self, messages, **void):
         create_future_ex(self.bot.update_from_client, priority=True)

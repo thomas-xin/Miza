@@ -3278,67 +3278,68 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         discord.iterators.HistoryIterator.fill_messages = lambda self: fill_messages(self)
 
     async def init_ready(self, futs):
-        self.started = True
-        attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
-        for file in attachments:
-            with tracebacksuppressor:
-                self.attachment_from_file(file)
-        print("Loading imported modules...")
-        # Wait until all modules have been loaded successfully
-        while self.modload:
-            fut = self.modload.popleft()
-            with tracebacksuppressor:
-                print(fut)
-                mod = await fut
-        print("Command aliases:")
-        print(self.commands.keys())
-        # Assign all bot database events to their corresponding keys.
-        for u in self.data.values():
-            for f in dir(u):
-                if f.startswith("_") and f[-1] == "_" and f[1] != "_":
-                    func = getattr(u, f, None)
-                    if callable(func):
-                        self.events.append(f, func)
-        print("Database events:")
-        print(self.events.keys())
-        self.set_history()
-        for fut in futs:
-            await fut
-        await self.fetch_user(self.deleted_user)
-        # Set bot avatar if none has been set.
-        if not os.path.exists("misc/init.tmp"):
-            print("Setting bot avatar...")
-            f = await create_future(open, "misc/avatar.png", "rb", priority=True)
-            with closing(f):
-                b = await create_future(f.read, priority=True)
-            await self.user.edit(avatar=b)
-            await self.seen(self.user, event="misc", raw="Editing their profile")
-            touch("misc/init.tmp")
-        create_task(self.minute_loop())
-        create_task(self.slow_loop())
-        create_task(self.lazy_loop())
-        create_task(self.fast_loop())
-        print("Update loops initiated.")
-        # Load all webhooks from cached guilds.
-        # futs = alist(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
-        futs = alist()
-        futs.add(create_future(self.update_slash_commands, priority=True))
-        futs.add(create_task(self.create_main_website()))
-        futs.add(self.audio_client_start)
-        self.bot_ready = True
-        print("Bot ready.")
-        # Send bot_ready event to all databases.
-        await self.send_event("_bot_ready_", bot=self)
-        for fut in futs:
-            with tracebacksuppressor:
+        with tracebacksuppressor:
+            self.started = True
+            attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
+            for file in attachments:
+                with tracebacksuppressor:
+                    self.attachment_from_file(file)
+            print("Loading imported modules...")
+            # Wait until all modules have been loaded successfully
+            while self.modload:
+                fut = self.modload.popleft()
+                with tracebacksuppressor:
+                    print(fut)
+                    mod = await fut
+            print("Command aliases:")
+            print(self.commands.keys())
+            # Assign all bot database events to their corresponding keys.
+            for u in self.data.values():
+                for f in dir(u):
+                    if f.startswith("_") and f[-1] == "_" and f[1] != "_":
+                        func = getattr(u, f, None)
+                        if callable(func):
+                            self.events.append(f, func)
+            print("Database events:")
+            print(self.events.keys())
+            self.set_history()
+            for fut in futs:
                 await fut
-        self.ready = True
-        # Send ready event to all databases.
-        print("Database ready.")
-        await self.send_event("_ready_", bot=self)
-        create_task(self.heartbeat_loop())
-        await create_future(self.heartbeat_proc.kill)
-        print("Initialization complete.")
+            await self.fetch_user(self.deleted_user)
+            # Set bot avatar if none has been set.
+            if not os.path.exists("misc/init.tmp"):
+                print("Setting bot avatar...")
+                f = await create_future(open, "misc/avatar.png", "rb", priority=True)
+                with closing(f):
+                    b = await create_future(f.read, priority=True)
+                await self.user.edit(avatar=b)
+                await self.seen(self.user, event="misc", raw="Editing their profile")
+                touch("misc/init.tmp")
+            create_task(self.minute_loop())
+            create_task(self.slow_loop())
+            create_task(self.lazy_loop())
+            create_task(self.fast_loop())
+            print("Update loops initiated.")
+            # Load all webhooks from cached guilds.
+            # futs = alist(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
+            futs = alist()
+            futs.add(create_future(self.update_slash_commands, priority=True))
+            futs.add(create_task(self.create_main_website()))
+            futs.add(self.audio_client_start)
+            self.bot_ready = True
+            print("Bot ready.")
+            # Send bot_ready event to all databases.
+            await self.send_event("_bot_ready_", bot=self)
+            for fut in futs:
+                with tracebacksuppressor:
+                    await fut
+            self.ready = True
+            # Send ready event to all databases.
+            print("Database ready.")
+            await self.send_event("_ready_", bot=self)
+            create_task(self.heartbeat_loop())
+            await create_future(self.heartbeat_proc.kill)
+            print("Initialization complete.")
 
     def set_client_events(self):
 

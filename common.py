@@ -1207,9 +1207,12 @@ def force_kill(proc):
     print(proc, "killed.")
     return proc.kill()
 
-def proc_communicate(proc):
-    with tracebacksuppressor:
-        while proc.is_running():
+def proc_communicate(k, i):
+    while True:
+        with tracebacksuppressor:
+            proc = PROCS[k][i]
+            while not proc.is_running():
+                time.sleep(0.8)
             s = as_str(proc.stdout.readline()).rstrip()
             if s:
                 print(s)
@@ -1229,9 +1232,9 @@ def proc_start():
             stdout=subprocess.PIPE,
         ) for _ in loop(v)]
         PROC_COUNT[k] = 0
-        for proc in PROCS[k]:
+        for i, proc in enumerate(PROCS[k]):
             proc.sem = Semaphore(1, inf)
-            create_thread(proc_communicate, proc)
+            create_thread(proc_communicate, k, i)
 
 def get_idle_proc(ptype):
     p = [i for i in PROCS[ptype] if not i.sem.is_busy()]

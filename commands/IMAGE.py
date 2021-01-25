@@ -1384,8 +1384,6 @@ class UpdateImagePools(Database):
         data.uniq(sorted=None)
 
     async def proc(self, key, func):
-        if self.sem.is_busy():
-            return
         async with self.sem:
             data = set_dict(self.data, key, alist())
             out = await func()
@@ -1405,7 +1403,8 @@ class UpdateImagePools(Database):
                 data.add(out)
                 self.update(key)
             return out
-        create_task(self.proc(key, func))
+        if not self.sem.is_busy():
+            create_task(self.proc(key, func))
         return choice(data)
 
 
