@@ -1214,8 +1214,8 @@ class Status(Command):
                 if message is None:
                     message = await aretry(channel.fetch_message, m_id, attempts=6, delay=2, exc=(discord.NotFound, discord.Forbidden))
                 if message.id != channel.last_message_id:
-                    async for message in bot.data.channel_cache.get(channel):
-                        if message.id != hist[0].id:
+                    async for m in bot.data.channel_cache.get(channel):
+                        if message.id != m.id:
                             create_task(bot.silent_delete(message))
                             raise StopIteration
                         break
