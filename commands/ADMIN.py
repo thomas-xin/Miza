@@ -921,6 +921,38 @@ class FileLog(Command):
 #             return italics(css_md(f"Disabled starboard reposting for {sqr_md(guild)}."))
 
 
+class Publish(Command):
+    server_only = True
+    name = ["News", "AutoPublish"]
+    min_level = 3
+    description = "Causes ⟨MIZA⟩ to automatically publish all posted messages in the current channel."
+    usage = "(enable|disable)? <force{?x}>?"
+    flags = "aedx"
+    rate_limit = 1
+
+    async def __call__(self, bot, flags, channel, guild, **void):
+        data = bot.data.publishers
+        update = bot.data.publishers.update
+        if "e" in flags or "a" in flags:
+            if channel.type != discord.ChannelType.news:
+                raise TypeError("This feature can only be used in announcement channels.")
+            if not channel.permissions_for(guild.me).manage_messages:
+                raise PermissionError("Manage messages permission required to publish messages in channel.")
+            data[channel.id] = 0
+            if "x" not in flags:
+                async for message in bot.data.channel_cache.get(channel):
+                    data[channel.id] = message.id
+                    break
+            return italics(css_md(f"Enabled automatic message publishing in {sqr_md(channel)} for {sqr_md(guild)}."))
+        elif "d" in flags:
+            if channel.id in data:
+                data.pop(channel.id)
+            return italics(css_md(f"Disabled automatic message publishing for {sqr_md(guild)}."))
+        if channel.id in data:
+            return ini_md(f"Automatic message publishing is currently enabled in {sqr_md(channel)}.")
+        return ini_md(f"Automatic message publishing is currently disabled in {sqr_md(channel)}. Use ?e to enable.")
+
+
 # TODO: Stop being lazy and finish this damn command
 # class Welcomer(Command):
 #     server_only = True
@@ -1811,6 +1843,22 @@ class UpdateFileLogs(Database):
                 else:
                     msg = "\n".join(msg)
                 await channel.send(msg, embed=emb, files=fils)
+
+
+class UpdatePublishers(Database):
+    name = "publishers"
+
+    async def _send_(self, message, **void):
+        if message.channel.id in self.data:
+            try:
+                if not message.channel.permissions_for(message.guild).manage_messages:
+                    raise PermissionError("Manage messages permission missing from channel.")
+                await message.publish()
+            except Exception as ex:
+                if "invalid message type" not in repr(ex).lower():
+                    self.data.pop(message.channel.id, None)
+                    print_exc()
+                    await send_exception(message.channel, ex)
 
 
 class UpdateRolegivers(Database):

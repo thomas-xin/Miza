@@ -3919,7 +3919,7 @@ class Download(Command):
             if urls:
                 direct = True
                 if not concat:
-                    urls = urls[:1]
+                    urls = (urls[0],)
                 futs = deque()
                 for e in urls:
                     futs.append(create_future(ytdl.extract, e, timeout=120))
