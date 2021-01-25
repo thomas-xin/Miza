@@ -1060,6 +1060,8 @@ def to_png(url):
 def to_png_ex(url):
     if type(url) is not str:
         url = str(url)
+    if url.endswith("?size=1024"):
+        url = url[:-10] + "?size=256"
     if "/embed/" not in url[:48]:
         url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
     return url.replace(".webp", ".png")
