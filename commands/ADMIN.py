@@ -903,22 +903,22 @@ class FileLog(Command):
 # class StarBoard(Command):
 #     server_only = True
 #     min_level = 3
-#     description = "Causes ⟨MIZA⟩ to repost popular messages with ⭐ reactions, from the current server. Set to a negative number to disable."
-#     usage = "<react_count>?"
+#     description = "Causes ⟨MIZA⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."
+#     usage = "<0:reaction> <1:react_count(1)>? <disable{?d}>?"
+#     flags = "d"
 #     rate_limit = 1
 
-#     async def __call__(self, bot, argv, channel, guild, **void):
-#         data = bot.data.logS
-#         update = bot.data.logS.update
-#         if not argv:
+#     async def __call__(self, bot, args, channel, guild, flags, **void):
+#         data = bot.data.starboards
+#         update = bot.data.starboards.update
+#         if not args:
 #             try:
-#                 c_id, count = data[guild.id]
+#                 e_id, count = data[channel.id]
 #             except KeyError:
-#                 return ini_md(f"Starboard reposting is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
-#         count = await bot.eval_math(argv)
-#         if count < 0:
-#             data.pop(guild.id, None)
-#             return italics(css_md(f"Disabled starboard reposting for {sqr_md(guild)}."))
+#                 return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel)}.")
+#         e_data = args.pop(0).strip("<>")
+#         e_id = verify_id(e_data.rsplit(":", 1)[-1])
+#         if args
 
 
 class Publish(Command):
@@ -1602,7 +1602,7 @@ class UpdateMessageLogs(Database):
                 self.dc.pop(h)
 
     async def _bot_ready_(self, **void):
-        if not self.searched and len(self.bot.cache.messages) <= 65536:
+        if not self.bot.ready and not self.searched and len(self.bot.cache.messages) <= 65536:
             self.searched = True
             t = None
             with tracebacksuppressor(FileNotFoundError):
@@ -1791,7 +1791,10 @@ class UpdateMessageLogs(Database):
             emb = discord.Embed(colour=0xFF00FF)
             emb.description = f"{init} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from** {channel_mention(messages[-1].channel.id)}:\n"
             for message in messages:
-                emb.description += f"\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}"
+                nextline = f"\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}"
+                if len(emb.description) + len(nextline) > 2048:
+                    break
+                emb.description += nextline
             embs = deque([emb])
             for message in messages:
                 u = message.author

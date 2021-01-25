@@ -3733,7 +3733,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         # Webhook update event: updates the bot's webhook cache if there are new webhooks.
         @self.event
         async def on_webhooks_update(channel):
-            self.data.webhooks.pop(channel.id)
+            self.data.webhooks.pop(channel.id, None)
 
         # User ban event: calls _ban_ bot database event.
         @self.event
