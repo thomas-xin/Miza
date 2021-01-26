@@ -979,7 +979,7 @@ def as_embed(message):
     for e in message.embeds:
         if len(emb.fields) >= 25:
             break
-        emb.add_field(name=e.title, value=e.description or e.url or "\u200b", inline=False)
+        emb.add_field(name=e.title or e.url or "\u200b", value=e.description or e.url or "\u200b", inline=False)
         for f in e.fields:
             if len(emb.fields) >= 25:
                 break

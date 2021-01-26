@@ -1415,7 +1415,7 @@ class UpdateImages(Database):
 class UpdateReacts(Database):
     name = "reacts"
 
-    async def _nocommand_(self, text, edit, orig, message, **void):
+    async def _nocommand2_(self, text, edit, orig, message, **void):
         if message.guild is None or not orig:
             return
         g_id = message.guild.id

@@ -2533,9 +2533,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             elif getattr(message, "simulated", None):
                 return -1
         # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
-        if not run and u_id != bot.id:
-            temp = to_alphanumeric(cpy).casefold()
-            await self.send_event("_nocommand_", text=temp, edit=edit, orig=orig, msg=msg, message=message, perm=u_perm)
+        if not run:
+            await self.send_event("_nocommand2_", message=message)
+            if u_id != bot.id:
+                temp = to_alphanumeric(cpy).casefold()
+                await self.send_event("_nocommand_", text=temp, edit=edit, orig=orig, msg=msg, message=message, perm=u_perm)
         # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
         return remaining
 

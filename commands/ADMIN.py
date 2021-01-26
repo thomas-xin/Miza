@@ -1940,7 +1940,7 @@ class UpdateFileLogs(Database):
 class UpdatePublishers(Database):
     name = "publishers"
 
-    async def _nocommand_(self, message, **void):
+    async def _nocommand2_(self, message, **void):
         if message.channel.id in self.data and not message.flags.crossposted and not message.flags.is_crossposted and not message.reference:
             try:
                 if not message.channel.permissions_for(message.guild).manage_messages:
@@ -1979,7 +1979,7 @@ class UpdateCrossposts(Database):
                                     create_task(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
                         self.stack.clear()
 
-    async def _nocommand_(self, message, **void):
+    async def _nocommand2_(self, message, **void):
         if message.channel.id in self.data and not message.flags.is_crossposted and "\u2009\u2009" not in message.author.name:
             with tracebacksuppressor:
                 embed = as_embed(message)
