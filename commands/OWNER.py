@@ -500,7 +500,7 @@ class UpdateWebhooks(Database):
         user.webhook = w
         try:
             sem = self.bot.cache.users[w.id].semaphore
-        except KeyError:
+        except (AttributeError, KeyError):
             sem = None
         self.bot.cache.users[w.id] = user
         if w.token:
