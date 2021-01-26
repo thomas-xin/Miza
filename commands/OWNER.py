@@ -498,11 +498,17 @@ class UpdateWebhooks(Database):
         user.send = w.send
         user.dm_channel = getattr(w, "channel", None)
         user.webhook = w
+        try:
+            sem = self.bot.cache.users[w.id].semaphore
+        except KeyError:
+            sem = None
         self.bot.cache.users[w.id] = user
         if w.token:
             webhooks = set_dict(self.data, w.channel.id, cdict())
             webhooks[w.id] = self.to_dict(w)
-            user.semaphore = Semaphore(5, 256, delay=0.3, rate_limit=5)
+            if sem is None:
+                sem = Semaphore(5, 256, rate_limit=5)
+            user.semaphore = sem
         return user
 
     async def get(self, channel, force=False, bypass=False):

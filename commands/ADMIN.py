@@ -270,7 +270,7 @@ class Mute(Command):
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_", 1)]
-        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+        if reaction not in (None, self.directions[-1]) and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
             return
@@ -490,7 +490,7 @@ class Ban(Command):
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_", 1)]
-        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+        if reaction not in (None, self.directions[-1]) and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
             return
@@ -921,6 +921,97 @@ class FileLog(Command):
 #         if args
 
 
+class Crosspost(Command):
+    server_only = True
+    name = ["Repost", "Subscribe"]
+    min_level = 3
+    description = "Causes ⟨MIZA⟩ to automatically crosspost all messages from the target channel, into the current channel."
+    usage = "<channel> <disable{?d}>?"
+    flags = "aed"
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    rate_limit = 1
+
+    async def __call__(self, bot, argv, flags, user, channel, guild, **void):
+        data = bot.data.crossposts
+        if "d" in flags:
+            for c_id, v in data.items():
+                try:
+                    v.pop(channel.id)
+                except KeyError:
+                    pass
+                else:
+                    data.update(c_id)
+            return italics(css_md(f"Disabled automatic message crossposting for {sqr_md(channel)}."))
+        if not argv:
+            return (
+                "*```" + "\n" * ("z" in flags) + "callback-admin-crosspost-"
+                + str(user.id) + "_0"
+                + "-\nLoading Crosspost database...```*"
+            )
+        target = await bot.fetch_channel(argv)
+        if not target.permissions_for(target.guild.me).read_messages or not target.permissions_for(target.guild.get_member(user.id)).read_messages:
+            raise PermissionError("Cannot follow channels without read message permissions.")
+        channels = data.setdefault(target.id, set())
+        channels.add(channel.id)
+        data.update(target.id)
+        return ini_md(f"Now crossposting all messages from {sqr_md(target)} to {sqr_md(channel)}.")
+
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, pos = [int(i) for i in vals.split("_", 1)]
+        if reaction not in (None, self.directions[-1]) and perm < 3:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        user = await bot.fetch_user(u_id)
+        data = bot.data.crossposts
+        curr = {k: sqr_md(bot.get_channel(k)) for k in sorted(c_id for c_id, v in data.items() if message.channel.id in v)}
+        page = 16
+        last = max(0, len(curr) - page)
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - page)
+            elif i == 2:
+                new = min(last, pos + page)
+            elif i == 3:
+                new = last
+            else:
+                new = pos
+            pos = new
+        content = message.content
+        if not content:
+            content = message.embeds[0].description
+        i = content.index("callback")
+        content = "*```" + "\n" * ("\n" in content[:i]) + (
+            "callback-admin-crosspost-"
+            + str(u_id) + "_" + str(pos)
+            + "-\n"
+        )
+        if not curr:
+            content += f"No currently assigned crosspost subscriptions for {str(guild).replace('`', '')}.```*"
+            msg = ""
+        else:
+            content += f"{len(curr)} crosspost subscriptions currently assigned for {str(guild).replace('`', '')}:```*"
+            msg = "```ini\n" + iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}) + "```"
+        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        emb = discord.Embed(
+            description=content + msg,
+            colour=colour,
+        )
+        emb.set_author(**get_author(user))
+        more = len(curr) - pos - page
+        if more > 0:
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
+        create_task(message.edit(content=None, embed=emb))
+        if reaction is None:
+            for react in self.directions:
+                create_task(message.add_reaction(as_str(react)))
+                await asyncio.sleep(0.5)
+
+
 class Publish(Command):
     server_only = True
     name = ["News", "AutoPublish"]
@@ -930,19 +1021,14 @@ class Publish(Command):
     flags = "aedx"
     rate_limit = 1
 
-    async def __call__(self, bot, flags, channel, guild, **void):
+    async def __call__(self, bot, flags, message, channel, guild, **void):
         data = bot.data.publishers
-        update = bot.data.publishers.update
         if "e" in flags or "a" in flags:
             if channel.type != discord.ChannelType.news:
                 raise TypeError("This feature can only be used in announcement channels.")
             if not channel.permissions_for(guild.me).manage_messages:
                 raise PermissionError("Manage messages permission required to publish messages in channel.")
-            data[channel.id] = 0
-            if "x" not in flags:
-                async for message in bot.data.channel_cache.get(channel):
-                    data[channel.id] = message.id
-                    break
+            data[channel.id] = 0 if "x" in flags else message.id
             return italics(css_md(f"Enabled automatic message publishing in {sqr_md(channel)} for {sqr_md(guild)}."))
         elif "d" in flags:
             if channel.id in data:
@@ -1733,10 +1819,10 @@ class UpdateMessageLogs(Database):
                                 init = user_mention(t.id)
             except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
-            emb = discord.Embed(colour=0xFF0000)
-            emb.set_author(name=name_id, icon_url=url, url=url)
-            emb.description = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
-            emb.description += message_repr(message, limit=2048 - len(emb.description))
+            emb = as_embed(message)
+            emb.colour = discord.Colour(0xFF0000)
+            action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
+            emb.description = lim_str(action + emb.description, 2048)
             self.bot.send_embeds(channel, emb)
 
     # Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
@@ -1797,11 +1883,8 @@ class UpdateMessageLogs(Database):
                 emb.description += nextline
             embs = deque([emb])
             for message in messages:
-                u = message.author
-                emb = discord.Embed(colour=0x7F007F)
-                emb.set_author(**get_author(u))
-                emb.description = message_repr(message, limit=2048)
-                embs.append(emb)
+                emb = as_embed(message)
+                emb.colour = discord.Colour(0x7F007F)
             self.bot.send_embeds(channel, embs)
 
 
@@ -1851,7 +1934,7 @@ class UpdateFileLogs(Database):
 class UpdatePublishers(Database):
     name = "publishers"
 
-    async def _send_(self, message, **void):
+    async def _nocommand_(self, message, **void):
         if message.channel.id in self.data:
             try:
                 if not message.channel.permissions_for(message.guild).manage_messages:
@@ -1862,6 +1945,24 @@ class UpdatePublishers(Database):
                     self.data.pop(message.channel.id, None)
                     print_exc()
                     await send_exception(message.channel, ex)
+
+
+class UpdateCrossposts(Database):
+    name = "crossposts"
+
+    async def _nocommand_(self, message, **void):
+        if message.channel.id in self.data and not message.flags.is_crossposted and "\u2009\u2009" not in message.author.name:
+            with tracebacksuppressor:
+                embed = as_embed(message)
+                col = await self.bot.get_colour(message.author)
+                embed.colour = discord.Colour(col)
+                for c_id in tuple(self.data[message.channel.id]):
+                    try:
+                        channel = await self.bot.fetch_channel(c_id)
+                    except:
+                        print_exc()
+                        self.data[message.channel.id].discard(c_id)
+                    create_task(self.bot.send_as_webhook(channel, embed=embed, username=message.guild.name + "\u2009\u2009#" + str(message.channel), avatar_url=to_png(message.guild.icon_url)))
 
 
 class UpdateRolegivers(Database):

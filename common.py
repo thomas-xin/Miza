@@ -953,6 +953,40 @@ def message_repr(message, limit=1024, username=False):
         data = css_md(uni_str("[EMPTY MESSAGE]"))
     return lim_str(data, limit)
 
+def as_embed(message):
+    emb = discord.Embed(description=message.content).set_author(**get_author(message.author))
+    urls = itertools.chain((e.url for e in message.embeds if e.url), (best_url(a) for a in message.attachments))
+    items = "\n".join(urls)
+    if items:
+        emb.description = lim_str(emb.description + "\n" + items, 2048)
+    image = None
+    for a in message.attachments:
+        url = a.url
+        if is_image(url) is not None:
+            image = url
+    if not image and message.embeds:
+        for e in message.embeds:
+            if e.image:
+                image = e.image.url
+            if e.thumbnail:
+                image = e.thumbnail.url
+    if image:
+        emb.url = image
+        emb.set_image(url=image)
+    for e in message.embeds:
+        if len(emb.fields) >= 25:
+            break
+        emb.add_field(name=e.title, value=e.description, inline=False)
+        for f in e.fields:
+            if len(emb.fields) >= 25:
+                break
+            emb.add_field(**f.to_dict())
+        if len(emb) >= 6000:
+            while len(emb) > 6000:
+                emb.remove_field(-1)
+            break
+    return emb
+
 exc_repr = lambda ex: lim_str(py_md(f"Error: {repr(ex).replace('`', '')}"), 2000)
 
 # Returns a string representation of an activity object.
@@ -1217,12 +1251,12 @@ def proc_communicate(k, i):
                 time.sleep(0.8)
             s = as_str(proc.stdout.readline()).rstrip()
             if s:
-                print(s)
+                # print(s)
                 if s[0] == "~":
                     c = as_str(eval(s[1:]))
                     create_future_ex(exec_tb, c, globals())
-                # else:
-                #     print(s)
+                else:
+                    print(s)
 
 def proc_start():
     PROC_COUNT.math = 3
@@ -1259,7 +1293,7 @@ def sub_submit(ptype, command, timeout=12):
         if not proc.is_running():
             proc = get_idle_proc(ptype)
         try:
-            print(s)
+            # print(s)
             proc.stdin.write(s)
             proc.stdin.flush()
             resp = PROC_RESP[ts].result(timeout=timeout)
