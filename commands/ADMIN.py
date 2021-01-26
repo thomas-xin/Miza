@@ -1941,7 +1941,7 @@ class UpdatePublishers(Database):
     name = "publishers"
 
     async def _nocommand_(self, message, **void):
-        if message.channel.id in self.data and not message.flags.crossposted and not message.flags.is_crossposted and not message.reference:
+        if message.channel.id in self.data and not message.flags.crossposted and not message.flags.is_crossposted and not message.reference and "\u2009\u2009" not in message.author.name:
             try:
                 if not message.channel.permissions_for(message.guild).manage_messages:
                     raise PermissionError("Manage messages permission missing from channel.")
