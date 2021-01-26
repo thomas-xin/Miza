@@ -934,6 +934,12 @@ class Crosspost(Command):
     async def __call__(self, bot, argv, flags, user, channel, guild, **void):
         data = bot.data.crossposts
         if "d" in flags:
+            if argv:
+                target = await bot.fetch_channel(argv)
+                if target.id in data:
+                    data[target.id].discard(channel.id)
+                data.update(target.id)
+                return italics(css_md(f"Disabled message crossposting from {sqr_md(target)} to {sqr_md(channel)}."))
             for c_id, v in data.items():
                 try:
                     v.remove(channel.id)
@@ -941,7 +947,7 @@ class Crosspost(Command):
                     pass
                 else:
                     data.update(c_id)
-            return italics(css_md(f"Disabled automatic message crossposting for {sqr_md(channel)}."))
+            return italics(css_md(f"Disabled all message crossposting for {sqr_md(channel)}."))
         if not argv:
             return (
                 "*```" + "\n" * ("z" in flags) + "callback-admin-crosspost-"
