@@ -221,6 +221,7 @@ class UpdateExec(Database):
 
     # Asynchronously evaluates Python code
     async def procFunc(self, message, proc, bot, term=0):
+        proc = as_str(proc)
         # Main terminal uses bot's global variables, virtual one uses a shallow copy per channel
         channel = message.channel
         if term & 1:

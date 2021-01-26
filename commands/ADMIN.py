@@ -936,7 +936,7 @@ class Crosspost(Command):
         if "d" in flags:
             for c_id, v in data.items():
                 try:
-                    v.pop(channel.id)
+                    v.remove(channel.id)
                 except KeyError:
                     pass
                 else:
