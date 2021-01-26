@@ -235,10 +235,12 @@ class UpdateExec(Database):
                     input=lambda *args, **kwargs: self._input(*args, channel=channel, **kwargs),
                     channel=channel,
                     guild=message.guild,
-                    user=message.author,
-                    message=message,
-                    auds=bot.data.audio.players.get(message.guild.id),
                 ))
+            glob.update(dict(
+                user=message.author,
+                message=message,
+                auds=bot.data.audio.players.get(message.guild.id),
+            ))
         if "\n" not in proc:
             if proc.startswith("await "):
                 proc = proc[6:]
