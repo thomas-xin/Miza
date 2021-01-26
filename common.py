@@ -956,9 +956,12 @@ def message_repr(message, limit=1024, username=False):
 def as_embed(message):
     emb = discord.Embed(description=message.content).set_author(**get_author(message.author))
     urls = itertools.chain((e.url for e in message.embeds if e.url), (best_url(a) for a in message.attachments))
-    items = "\n".join(urls)
+    items = list(urls)
     if items:
-        emb.description = lim_str(emb.description + "\n" + items, 2048)
+        if emb.description in items:
+            emb.description = lim_str("\n".join(items), 2048)
+        else:
+            emb.description = lim_str(emb.description + "\n" + "\n".join(items), 2048)
     image = None
     for a in message.attachments:
         url = a.url
@@ -976,7 +979,7 @@ def as_embed(message):
     for e in message.embeds:
         if len(emb.fields) >= 25:
             break
-        emb.add_field(name=e.title, value=e.description, inline=False)
+        emb.add_field(name=e.title, value=e.description or e.url or "\u200b", inline=False)
         for f in e.fields:
             if len(emb.fields) >= 25:
                 break
