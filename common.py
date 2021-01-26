@@ -984,10 +984,7 @@ def as_embed(message):
             if len(emb.fields) >= 25:
                 break
             if f:
-                try:
-                    emb.add_field(**f.to_dict())
-                except TypeError:
-                    pass
+                emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
         if len(emb) >= 6000:
             while len(emb) > 6000:
                 emb.remove_field(-1)
