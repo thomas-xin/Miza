@@ -991,10 +991,10 @@ class Crosspost(Command):
             + "-\n"
         )
         if not curr:
-            content += f"No currently assigned crosspost subscriptions for {str(guild).replace('`', '')}.```*"
+            content += f"No currently assigned crosspost subscriptions for #{str(channel).replace('`', '')}.```*"
             msg = ""
         else:
-            content += f"{len(curr)} crosspost subscriptions currently assigned for {str(guild).replace('`', '')}:```*"
+            content += f"{len(curr)} crosspost subscriptions currently assigned for #{str(channel).replace('`', '')}:```*"
             msg = "```ini\n" + iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}) + "```"
         colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
         emb = discord.Embed(
