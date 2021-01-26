@@ -949,7 +949,7 @@ class Crosspost(Command):
                 + "-\nLoading Crosspost database...```*"
             )
         target = await bot.fetch_channel(argv)
-        if not target.permissions_for(target.guild.me).read_messages or not target.permissions_for(target.guild.get_member(user.id)).read_messages:
+        if not target.guild.get_member(user.id) or not target.permissions_for(target.guild.me).read_messages or not target.permissions_for(target.guild.get_member(user.id)).read_messages:
             raise PermissionError("Cannot follow channels without read message permissions.")
         channels = data.setdefault(target.id, set())
         channels.add(channel.id)
@@ -1949,6 +1949,29 @@ class UpdatePublishers(Database):
 
 class UpdateCrossposts(Database):
     name = "crossposts"
+    stack = {}
+    sem = Semaphore(1, 0, rate_limit=1)
+
+    async def _call_(self):
+        if self.sem.is_busy():
+            return
+        if self.stack:
+            with tracebacksuppressor:
+                async with self.sem:
+                    async with delay(1):
+                        for c, s in self.stack.items():
+                            channel = self.bot.get_channel(c)
+                            for k, v in s.items():
+                                embs = deque()
+                                for emb in v:
+                                    if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
+                                        create_task(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
+                                        embs.clear()
+                                    embs.append(emb)
+                                    reacts = None
+                                if embs:
+                                    create_task(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
+                        self.stack.clear()
 
     async def _nocommand_(self, message, **void):
         if message.channel.id in self.data and not message.flags.is_crossposted and "\u2009\u2009" not in message.author.name:
@@ -1962,7 +1985,8 @@ class UpdateCrossposts(Database):
                     except:
                         print_exc()
                         self.data[message.channel.id].discard(c_id)
-                    create_task(self.bot.send_as_webhook(channel, embed=embed, username=message.guild.name + "\u2009\u2009#" + str(message.channel), avatar_url=to_png(message.guild.icon_url)))
+                    data = (message.guild.name + "\u2009\u2009#" + str(message.channel), to_png(message.guild.icon_url))
+                    self.stack.setdefault(channel.id, {}).setdefault(data, alist()).append(embed)
 
 
 class UpdateRolegivers(Database):
