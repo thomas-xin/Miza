@@ -357,10 +357,8 @@ class UpdateExec(Database):
             user = message.author
             if "dailies" in bot.data:
                 bot.data.dailies.progress_quests(user, "talk")
-            emb = discord.Embed(colour=discord.Colour(16777214))
+            emb = as_embed(message)
             emb.set_author(name=f"{user} ({user.id})", icon_url=best_url(user))
-            emb.description = message_repr(message)
-            invalid = deque()
             for c_id, flag in self.data.items():
                 if flag & 2:
                     channel = self.bot.cache.channels.get(c_id)
