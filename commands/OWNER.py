@@ -358,6 +358,8 @@ class UpdateExec(Database):
             if "dailies" in bot.data:
                 bot.data.dailies.progress_quests(user, "talk")
             emb = as_embed(message)
+            col = await bot.get_colour(user)
+            emb.colour = discord.Colour(col)
             emb.set_author(name=f"{user} ({user.id})", icon_url=best_url(user))
             for c_id, flag in self.data.items():
                 if flag & 2:
