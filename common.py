@@ -983,7 +983,11 @@ def as_embed(message):
         for f in e.fields:
             if len(emb.fields) >= 25:
                 break
-            emb.add_field(**f.to_dict())
+            if f:
+                try:
+                    emb.add_field(**f.to_dict())
+                except TypeError:
+                    pass
         if len(emb) >= 6000:
             while len(emb) > 6000:
                 emb.remove_field(-1)
