@@ -1261,6 +1261,7 @@ def proc_communicate(k, i):
                     create_future_ex(exec_tb, c, globals())
                 else:
                     print(s)
+        time.sleep(0.001)
 
 def proc_start():
     PROC_COUNT.math = 3

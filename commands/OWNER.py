@@ -105,7 +105,7 @@ class Restart(Command):
         code = round(f(user.id), 16)
         if type(code) is not int:
             raise SystemExit
-        name = as_str(code.to_bytes(3, "big"))
+        name = as_str(code.to_bytes(3, "little"))
         raise SystemExit(f"Why you keep throwin' me offline {name} >:(")
 
 
