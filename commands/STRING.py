@@ -36,7 +36,7 @@ class PapagoTrans:
         return output
 
 
-translators = {"Google Translate": Translator(["translate.google.com"])}
+translators = {"Google Translate": Translator(service_urls=["translate.google.com","translate.google.co.kr"])}
 
 try:
     translators["Papago"] = PapagoTrans(AUTH["papago_id"], AUTH["papago_secret"])
