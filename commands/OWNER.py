@@ -67,7 +67,7 @@ class Restart(Command):
         if save is None:
             save = create_task(bot.send_event("_save_", force=False))
         # Kill the audio player client
-        create_future_ex(bot.audio.kill, priority=True)
+        kill = create_future(bot.audio.kill, priority=True)
         async with delay(1):
             with discord.context_managers.Typing(channel):
                 # Call _destroy_ bot event to indicate to all databases the imminent shutdown
@@ -75,10 +75,10 @@ class Restart(Command):
                 # Save any database that has not already been autosaved
                 await create_future(bot.update, priority=True)
                 # Send the bot "offline"
-                await client.change_presence(status=discord.Status.invisible)
+                await bot.change_presence(status=discord.Status.invisible)
                 # Kill the webserver
                 with tracebacksuppressor:
-                    bot.server.kill()
+                    await create_future(bot.server.kill, priority=True)
                 # Kill all other subprocesses
                 with tracebacksuppressor:
                     await create_future(sub_kill, start=False, priority=True)
@@ -95,15 +95,15 @@ class Restart(Command):
                 for fut in futs:
                     with suppress():
                         await fut
+                await kill
                 await save
         with suppress():
-            await client.close()
+            create_task(bot.close())
         if name.casefold() == "shutdown":
             touch(bot.shutdown)
         else:
             touch(bot.restart)
         bot.close()
-        del client
         del bot
         f = lambda x: mpf("1.8070890240038886796397791962945558584863687305069e-12") * x + mpf("6214315.6770607604120060484376689964637894379472455")
         code = round(f(user.id), 16)

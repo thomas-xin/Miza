@@ -3807,7 +3807,8 @@ class AudioClientInterface:
 
     def kill(self):
         if self.proc.is_running():
-            self.submit("await kill()")
+            create_future_ex(self.submit, "await kill()")
+        time.sleep(1)
         with tracebacksuppressor(psutil.NoSuchProcess):
             return self.proc.kill()
 

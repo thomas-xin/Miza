@@ -8,7 +8,7 @@ except ModuleNotFoundError:
 
 print = PRINT
 
-from googletrans import Translator
+import pygoogletranslation
 
 
 # This is a bit of a mess
@@ -18,12 +18,12 @@ class PapagoTrans:
         self.id = c_id
         self.secret = c_sec
 
-    def translate(self, string, dest, source="en"):
-        if dest == source:
+    def translate(self, string, dest, src="en"):
+        if dest == src:
             raise ValueError("Source language is the same as destination.")
         url = "https://openapi.naver.com/v1/papago/n2mt"
         enc = verify_url(string)
-        url += "?source=" + source + "&target=" + dest + "&text=" + enc
+        url += "?source=" + src + "&target=" + dest + "&text=" + enc
         headers = {
             "X-Naver-Client-Id": self.id,
             "X-Naver-Client-Secret": self.secret,
@@ -36,7 +36,16 @@ class PapagoTrans:
         return output
 
 
-translators = {"Google Translate": Translator(service_urls=["translate.google.com","translate.google.co.kr"])}
+LANGS = {}
+def get_languages():
+    global LANGS
+    languages = translator.glanguage()
+    LANGS = fcdict((v.split("(", 1)[0].rstrip("( )").casefold(), k) for k, v in languages["sl"].items())
+
+
+translator = pygoogletranslation.Translator(retry=3, sleep=5)
+create_future_ex(get_languages)
+translators = {"Google Translate": translator}
 
 try:
     translators["Papago"] = PapagoTrans(AUTH["papago_id"], AUTH["papago_secret"])
@@ -54,13 +63,12 @@ except:
     print("WARNING: rapidapi_key not found. Unable to search Urban Dictionary.")
 
 
-def getTranslate(translator, string, dest, source):
-    try:
-        resp = translator.translate(string, dest, source)
-        return resp
-    except Exception as ex:
-        print_exc()
-        return ex
+def getTranslate(translator, string, dest, src):
+    if src:
+        resp = translator.translate(string, dest=dest, src=src)
+    else:
+        resp = translator.translate(string, dest=dest)
+    return resp
 
 
 class Translate(Command):
@@ -78,38 +86,45 @@ class Translate(Command):
             raise ArgumentError("Input string is empty.")
         dest = args[0]
         string = argv[len(dest):].strip()
+        with suppress(KeyError):
+            dest = LANGS[dest]
         with discord.context_managers.Typing(channel):
-            detected = await create_future(translators["Google Translate"].detect, string, timeout=20)
-            source = detected.lang
+            source = None
             trans = ["Google Translate", "Papago"]
             if "p" in flags:
                 trans = trans[::-1]
-            if "v" in flags:
-                count = 2
-                end = f"Detected language: {source}"
-            else:
-                count = 1
-                end = None
             used = None
             response = ""
-            print(string, dest, source)
+            count = ("v" in flags) + 1
             # Attempt to use all available translators if possible
-            for i in range(count):
-                for t in trans:
-                    try:
+            with suppress(StopIteration):
+                for i in range(count):
+                    for t in trans:
+                        # try:
+                        print(string, dest, source)
                         resp = await create_future(getTranslate, translators[t], string, dest, source, timeout=20)
                         try:
                             output = resp.text
                         except AttributeError:
                             output = resp
+                        with suppress(AttributeError):
+                            source = resp.src
                         if not used:
                             used = t
                         response += f"\n{output}"
-                        source, dest = dest, source
+                        if source and source.casefold() != "auto":
+                            source, dest = dest, source
+                        else:
+                            flags.pop("v", None)
+                            raise StopIteration
                         break
-                    except:
-                        if t == trans[-1] and i == count - 1:
-                            raise
+                        # except:
+                        #     if t == trans[-1] and i == count - 1:
+                        #         raise
+            if "v" in flags:
+                end = f"Detected language: {dest}"
+            else:
+                end = None
             if end:
                 footer = dict(text=f"{used}\n{end}")
             elif used:
