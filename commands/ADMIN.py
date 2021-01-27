@@ -1542,7 +1542,7 @@ class UpdateMessageCache(Database):
         if not raw:
             bot = self.bot
             i = 0
-            for k, m in data.items():
+            for k, m in deque(data.items()):
                 if "channel" in m:
                     m["channel_id"] = m.pop("channel")
                 try:
