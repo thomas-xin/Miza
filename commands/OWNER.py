@@ -66,6 +66,8 @@ class Restart(Command):
             PRINT.close()
         if save is None:
             save = create_task(bot.send_event("_save_", force=False))
+        # Kill the audio player client
+        create_future_ex(bot.audio.kill, priority=True)
         async with delay(1):
             with discord.context_managers.Typing(channel):
                 # Call _destroy_ bot event to indicate to all databases the imminent shutdown
@@ -77,9 +79,6 @@ class Restart(Command):
                 # Kill the webserver
                 with tracebacksuppressor:
                     bot.server.kill()
-                # Kill the audio player client
-                with tracebacksuppressor:
-                    await create_future(bot.audio.kill, priority=True)
                 # Kill all other subprocesses
                 with tracebacksuppressor:
                     await create_future(sub_kill, start=False, priority=True)
