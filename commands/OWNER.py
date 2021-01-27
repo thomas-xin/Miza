@@ -72,6 +72,17 @@ class Restart(Command):
                 await bot.send_event("_destroy_", shutdown=True)
                 # Save any database that has not already been autosaved
                 await create_future(bot.update, priority=True)
+                # Send the bot "offline"
+                await client.change_presence(status=discord.Status.invisible)
+                # Kill the webserver
+                with tracebacksuppressor:
+                    bot.server.kill()
+                # Kill the audio player client
+                with tracebacksuppressor:
+                    await create_future(bot.audio.kill, priority=True)
+                # Kill all other subprocesses
+                with tracebacksuppressor:
+                    await create_future(sub_kill, start=False, priority=True)
                 # Disconnect as many voice clients as possible
                 futs = deque()
                 for guild in client.guilds:
@@ -85,12 +96,6 @@ class Restart(Command):
                 for fut in futs:
                     with suppress():
                         await fut
-                with tracebacksuppressor:
-                    bot.server.kill()
-                with tracebacksuppressor:
-                    await create_future(bot.audio.kill, priority=True)
-                with tracebacksuppressor:
-                    await create_future(sub_kill, start=False, priority=True)
                 await save
         with suppress():
             await client.close()

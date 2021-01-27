@@ -690,6 +690,7 @@ discord.gateway.DiscordWebSocket.identify = lambda self: mobile_identify(self)
 
 async def kill():
     futs = deque()
+    await client.change_presence(status=discord.Status.invisible)
     for vc in client.voice_clients:
         futs.append(create_task(vc.disconnect(force=True)))
     for fut in futs:
