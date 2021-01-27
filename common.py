@@ -2236,29 +2236,32 @@ class __logPrinter:
         except:
             sys.__stdout__.write(traceback.format_exc())
 
+    def flush(self):
+        outfunc = lambda s: self.file_print(self.file, s)
+        enc = lambda x: bytes(x, "utf-8")
+        try:
+            for f in tuple(self.data):
+                if not self.data[f]:
+                    self.data.pop(f)
+                    continue
+                out = lim_str(self.data[f], 65536)
+                data = enc(self.data[f])
+                self.data[f] = ""
+                if self.funcs:
+                    [func(out) for func in self.funcs]
+                if f == self.file:
+                    outfunc(data)
+                else:
+                    self.file_print(f, data)
+        except:
+            sys.__stdout__.write(traceback.format_exc())
+
     def update_print(self):
         if self.file is None:
             return
-        outfunc = lambda s: self.file_print(self.file, s)
-        enc = lambda x: bytes(x, "utf-8")
         while True:
             with delay(1):
-                try:
-                    for f in tuple(self.data):
-                        if not self.data[f]:
-                            self.data.pop(f)
-                            continue
-                        out = lim_str(self.data[f], 65536)
-                        data = enc(self.data[f])
-                        self.data[f] = ""
-                        if self.funcs:
-                            [func(out) for func in self.funcs]
-                        if f == self.file:
-                            outfunc(data)
-                        else:
-                            self.file_print(f, data)
-                except:
-                    sys.__stdout__.write(traceback.format_exc())
+                self.flush()
             while not os.path.exists("common.py") or self.closed:
                 time.sleep(0.5)
 
@@ -2266,7 +2269,7 @@ class __logPrinter:
         out = str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)
         if not out:
             return
-        if args and type(args[0]) is str and args[0].startswith("WARNING:"):
+        if self.closed or args and type(args[0]) is str and args[0].startswith("WARNING:"):
             return sys.__stdout__.write(out)
         if file is None:
             file = self.file
@@ -2292,8 +2295,7 @@ class __logPrinter:
         return self.__call__(*args2, end=end, **kwargs)
 
     read = lambda self, *args, **kwargs: bytes()
-    flush = open = lambda self: (self, self.__setattr__("closed", False))[0]
-    close = lambda self: self.__setattr__("closed", True)
+    close = lambda self, force=False: self.__setattr__("closed", force)
     isatty = lambda self: False
 
 

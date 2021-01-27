@@ -928,6 +928,8 @@ class AudioFileLink:
             return object.__getattribute__(self, k)
         except AttributeError:
             pass
+        if not bot.audio:
+            raise AttributeError("Audio client not active.")
         return bot.audio.submit(f"cache['{self.fn}'].{k}")
 
     def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True):
@@ -1029,6 +1031,8 @@ class AudioClientSubInterface:
             return self.__getattribute__(k)
         except AttributeError:
             pass
+        if not bot.audio:
+            raise AttributeError("Audio client not active.")
         return bot.audio.submit(f"AP.from_guild({self.guild.id}).{k}")
 
     def enqueue(self, src, after=None):

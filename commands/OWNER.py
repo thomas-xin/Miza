@@ -62,27 +62,33 @@ class Restart(Command):
             await send_with_reply(channel, content="Shutting down... :wave:", reference=message)
         else:
             await send_with_reply(channel, content="Restarting... :wave:", reference=message)
-        with suppress(AttributeError):
-            PRINT.close()
         if save is None:
+            print("Saving message cache...")
             save = create_task(bot.send_event("_save_", force=False))
-        # Kill the audio player client
-        kill = create_future(bot.audio.kill, priority=True)
         async with delay(1):
             with discord.context_managers.Typing(channel):
                 # Call _destroy_ bot event to indicate to all databases the imminent shutdown
+                print("Destroying database memory...")
                 await bot.send_event("_destroy_", shutdown=True)
+                # Kill the audio player client
+                print("Shutting down audio client...")
+                kill = create_future(bot.audio.kill, priority=True)
                 # Save any database that has not already been autosaved
+                print("Saving all databases...")
                 await create_future(bot.update, priority=True)
                 # Send the bot "offline"
+                print("Going offline...")
                 await bot.change_presence(status=discord.Status.invisible)
-                # Kill the webserver
-                with tracebacksuppressor:
-                    await create_future(bot.server.kill, priority=True)
-                # Kill all other subprocesses
+                # Kill math and image subprocesses
+                print("Killing math and image subprocesses...")
                 with tracebacksuppressor:
                     await create_future(sub_kill, start=False, priority=True)
+                # Kill the webserver
+                print("Killing webserver...")
+                with tracebacksuppressor:
+                    await create_future(bot.server.kill, priority=True)
                 # Disconnect as many voice clients as possible
+                print("Disconnecting remaining voice clients...")
                 futs = deque()
                 for guild in client.guilds:
                     member = guild.get_member(client.user.id)
@@ -90,6 +96,10 @@ class Restart(Command):
                         voice = member.voice
                         if voice:
                             futs.append(create_task(member.move_to(None)))
+                print("Goodbye.")
+                with suppress(NameError, AttributeError):
+                    PRINT.flush()
+                    PRINT.close(force=True)
                 with tracebacksuppressor:
                     await create_future(retry, os.remove, "log.txt", attempts=8, delay=0.1)
                 for fut in futs:
@@ -98,12 +108,13 @@ class Restart(Command):
                 await kill
                 await save
         with suppress():
-            create_task(bot.close())
+            await bot.close()
         if name.casefold() == "shutdown":
             touch(bot.shutdown)
         else:
             touch(bot.restart)
         bot.close()
+        del client
         del bot
         f = lambda x: mpf("1.8070890240038886796397791962945558584863687305069e-12") * x + mpf("6214315.6770607604120060484376689964637894379472455")
         code = round(f(user.id), 16)
