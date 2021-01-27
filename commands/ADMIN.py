@@ -59,7 +59,7 @@ class Purge(Command):
                 if dt is None or after is None or dt > after:
                     async with bot.guild_semaphore:
                         async for m in channel.history(limit=lim, before=dt, after=after, oldest_first=False):
-                            bot.add_message(m)
+                            bot.add_message(m, force=True)
                             found = True
                             dt = m.created_at
                             if uset is None and m.author.bot or uset and m.author.id in uset:
@@ -72,7 +72,7 @@ class Purge(Command):
         else:
             async with bot.guild_semaphore:
                 async for m in channel.history(limit=None, before=cdict(id=end), after=cdict(id=start), oldest_first=False):
-                    bot.add_message(m)
+                    bot.add_message(m, force=True)
                     if uset is None and m.author.bot or uset and m.author.id in uset:
                         delD[m.id] = m
         if len(delD) >= 64 and "f" not in flags:
@@ -1706,7 +1706,7 @@ class UpdateMessageLogs(Database):
     async def save_channel(self, channel, t=None):
         async with self.bot.data.message_cache.search_sem:
             async for message in channel.history(limit=32768, after=t, oldest_first=False):
-                self.bot.add_message(message, files=False)
+                self.bot.add_message(message, files=False, force=True)
 
     async def load_new_messages(self, t):
         with tracebacksuppressor:
@@ -1737,11 +1737,10 @@ class UpdateMessageLogs(Database):
                 except (EOFError, discord.NotFound):
                     self.data.pop(guild.id)
                     return
-                u = message.author
-                emb = discord.Embed(colour=0x00FFFF)
-                emb.set_author(**get_author(u))
-                emb.description = f"**Slash command executed in** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
-                emb.description += message_repr(message, limit=2048 - len(emb.description))
+                emb = as_embed(message)
+                emb.colour = discord.Colour(0x00FFFF)
+                action = f"**Slash command executed in** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
+                emb.description = lim_str(action + emb.description, 2048)
                 self.bot.send_embeds(channel, emb)
 
     # Edit events are rather straightforward to log
@@ -1755,12 +1754,13 @@ class UpdateMessageLogs(Database):
                 except (EOFError, discord.NotFound):
                     self.data.pop(guild.id)
                     return
-                u = before.author
-                emb = discord.Embed(colour=0x0000FF)
-                emb.set_author(**get_author(u))
-                emb.description = f"**Message edited in** {channel_mention(after.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{after.channel.id}/{after.id}"
-                emb.add_field(name="Before", value=message_repr(before))
-                emb.add_field(name="After", value=message_repr(after))
+                emb = as_embed(after)
+                emb2 = as_embed(before)
+                emb.colour = discord.Colour(0x0000FF)
+                action = f"**Message edited in** {channel_mention(after.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{after.channel.id}/{after.id}"
+                emb.add_field(name="Before", value=emb2.description)
+                emb.add_field(name="After", value=emb.description)
+                emb.description = action
                 self.bot.send_embeds(channel, emb)
 
     # Delete events must attempt to find the user who deleted the message

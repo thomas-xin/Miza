@@ -864,7 +864,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             channel = await self.fetch_channel(channel)
         message = await channel.fetch_message(m_id)
         if message is not None:
-            self.add_message(message)
+            self.add_message(message, files=False, force=True)
         return message
     def fetch_message(self, m_id, channel=None):
         if type(m_id) is not int:
@@ -991,7 +991,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 except FileNotFoundError:
                     pass
         async for message in channel.history(limit=200):
-            self.add_message(message, files=False)
+            self.add_message(message, files=False, force=True)
             try:
                 return get_last_image(message)
             except FileNotFoundError:
@@ -1180,22 +1180,22 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     #     self.data.channel_cache.add(message.channel.id, message.id)
 
     # Inserts a message into the bot cache, discarding existing ones if full.
-    def add_message(self, message, files=True, cache=True):
+    def add_message(self, message, files=True, cache=True, force=False):
         if self.closed:
             return message
-        if message.id not in self.cache.messages:
+        if cache and message.id not in self.cache.messages or force:
             if not getattr(message, "simulated", None) and cache and "channel_cache" in self.data:
                 self.data.channel_cache.add(message.channel.id, message.id)
+            if files and message.author.id != self.id:
+                if (utc_dt() - message.created_at).total_seconds() < 7200:
+                    for attachment in message.attachments:
+                        if getattr(attachment, "size", inf) < 1048576:
+                            create_task(self.add_attachment(attachment))
             self.cache.messages[message.id] = message
+            if (utc_dt() - message.created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
+                self.data.message_cache.save_message(message)
         if ts_us() % 16 == 0:
             self.limit_cache("messages")
-        if files and message.author.id != self.id:
-            if (utc_dt() - message.created_at).total_seconds() < 7200:
-                for attachment in message.attachments:
-                    if getattr(attachment, "size", inf) < 1048576:
-                        create_task(self.add_attachment(attachment))
-        if (utc_dt() - message.created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
-            self.data.message_cache.save_message(message)
         return message
 
     # Deletes a message from the bot cache.
@@ -3226,7 +3226,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 raise KeyError(k)
 
             def __setitem__(self, k, v):
-                bot.add_message(v)
+                bot.add_message(v, force=True)
 
             __delitem__ = data.pop
             __bool__ = lambda self: bool(self.data)
@@ -3496,7 +3496,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         # Message send event: processes new message. calls _send_ and _seen_ bot database events.
         @self.event
         async def on_message(message):
-            self.add_message(message)
+            self.add_message(message, force=True)
             guild = message.guild
             if guild:
                 create_task(self.send_event("_send_", message=message))
@@ -3600,7 +3600,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     after._update(data)
             if after.channel is None:
                 after.channel = await self.fetch_channel(payload.channel_id)
-            self.add_message(after)
+            self.add_message(after, files=False, force=True)
             if raw or before.content != after.content:
                 if "users" in self.data:
                     self.data.users.add_xp(after.author, xrand(1, 4))
@@ -3635,7 +3635,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         message.guild = None
                     message.id = payload.message_id
                     message.author = await self.fetch_user(self.deleted_user)
-            self.add_message(self.ExtendedMessage(message))
+            self.add_message(self.ExtendedMessage(message), force=True)
             guild = message.guild
             if guild:
                 await self.send_event("_delete_", message=message)
@@ -3666,7 +3666,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         message.id = m_id
                         message.author = await self.fetch_user(self.deleted_user)
                     messages.add(message)
-            messages = sorted((self.add_message(self.ExtendedMessage(message)) for message in messages), key=lambda m: m.id)
+            messages = sorted((self.add_message(self.ExtendedMessage(message), force=True) for message in messages), key=lambda m: m.id)
             await self.send_event("_bulk_delete_", messages=messages)
             for message in messages:
                 guild = getattr(message, "guild", None)
