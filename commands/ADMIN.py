@@ -2100,6 +2100,7 @@ class UpdateStarboards(Database):
     async def _reaction_add_(self, message, react, count, **void):
         if message.guild and message.guild.id in self.data:
             req = self.data[message.guild.id].get(react, (inf,))[0]
+            print(react, count, req)
             if count >= req and count < req + 2:
                 if message.id not in self.data["triggered"]:
                     self.data["triggered"].add(message.id)
