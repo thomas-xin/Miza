@@ -900,25 +900,119 @@ class FileLog(Command):
         return ini_md(f"File deletion logging is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
 
 
-# class StarBoard(Command):
-#     server_only = True
-#     min_level = 3
-#     description = "Causes ⟨MIZA⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."
-#     usage = "<0:reaction> <1:react_count(1)>? <disable{?d}>?"
-#     flags = "d"
-#     rate_limit = 1
+class StarBoard(Command):
+    server_only = True
+    min_level = 2
+    description = "Causes ⟨MIZA⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."
+    usage = "<0:reaction> <1:react_count(1)>? <disable{?d}>?"
+    flags = "d"
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    rate_limit = 1
 
-#     async def __call__(self, bot, args, channel, guild, flags, **void):
-#         data = bot.data.starboards
-#         update = bot.data.starboards.update
-#         if not args:
-#             try:
-#                 e_id, count = data[channel.id]
-#             except KeyError:
-#                 return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel)}.")
-#         e_data = args.pop(0).strip("<>")
-#         e_id = verify_id(e_data.rsplit(":", 1)[-1])
-#         if args
+    async def __call__(self, bot, args, user, channel, guild, flags, **void):
+        data = bot.data.starboards
+        if "d" in flags:
+            if args:
+                e_data = " ".join(args)
+                try:
+                    e_id = int(e_data)
+                except:
+                    emoji = e_data
+                else:
+                    emoji = await bot.fetch_emoji(e_id)
+                emoji = str(emoji)
+                try:
+                    data[guild.id].pop(emoji)
+                except KeyError:
+                    pass
+                else:
+                    data.update(guild.id)
+                return italics(css_md(f"Disabled starboard trigger {sqr_md(emoji)} for {sqr_md(guild)}."))
+            for c_id, v in data.items():
+                data.pop(guild.id, None)
+            return italics(css_md(f"Disabled all starboard reposting for {sqr_md(guild)}."))
+        if not args:
+            return (
+                "*```" + "\n" * ("z" in flags) + "callback-admin-starboard-"
+                + str(user.id) + "_0"
+                + "-\nLoading Starboard database...```*"
+            )
+        if not args:
+            try:
+                e_id, count = data[channel.id]
+            except KeyError:
+                return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel)}.")
+        e_data = args.pop(0)
+        try:
+            e_id = int(e_data)
+        except:
+            emoji = e_data
+        else:
+            emoji = await bot.fetch_emoji(e_id)
+        emoji = str(emoji)
+        if args:
+            count = await bot.eval_math(" ".join(args))
+        else:
+            count = 1
+        boards = data.setdefault(guild.id, {})
+        boards[emoji] = (count, channel.id)
+        data.update(guild.id)
+        return ini_md(f"Successfully added starboard to {sqr_md(channel)}, with trigger {sqr_md(emoji)}: {sqr_md(count)}.")
+
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, pos = [int(i) for i in vals.split("_", 1)]
+        if reaction not in (None, self.directions[-1]) and perm < 3:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        user = await bot.fetch_user(u_id)
+        data = bot.data.starboards
+        curr = data.setdefault(guild.id, {})
+        page = 16
+        last = max(0, len(curr) - page)
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - page)
+            elif i == 2:
+                new = min(last, pos + page)
+            elif i == 3:
+                new = last
+            else:
+                new = pos
+            pos = new
+        content = message.content
+        if not content:
+            content = message.embeds[0].description
+        i = content.index("callback")
+        content = "*```" + "\n" * ("\n" in content[:i]) + (
+            "callback-admin-starboard-"
+            + str(u_id) + "_" + str(pos)
+            + "-\n"
+        )
+        if not curr:
+            content += f"No currently assigned starboard triggers for {str(guild).replace('`', '')}.```*"
+            msg = ""
+        else:
+            content += f"{len(curr)} starboard triggers currently assigned for {str(guild).replace('`', '')}:```*"
+            msg = "```ini\n" + iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}) + "```"
+        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        emb = discord.Embed(
+            description=content + msg,
+            colour=colour,
+        )
+        emb.set_author(**get_author(user))
+        more = len(curr) - pos - page
+        if more > 0:
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
+        create_task(message.edit(content=None, embed=emb))
+        if reaction is None:
+            for react in self.directions:
+                create_task(message.add_reaction(as_str(react)))
+                await asyncio.sleep(0.5)
 
 
 class Crosspost(Command):
@@ -1993,6 +2087,30 @@ class UpdateCrossposts(Database):
                         self.data[message.channel.id].discard(c_id)
                     data = (message.guild.name + "\u2009\u2009#" + str(message.channel), to_png(message.guild.icon_url))
                     self.stack.setdefault(channel.id, {}).setdefault(data, alist()).append(embed)
+
+
+class UpdateStarboards(Database):
+    name = "starboards"
+
+    def _bot_ready_(self, **void):
+        if "triggered" not in self.data:
+            self.data["triggered"] = set()
+
+    async def _reaction_add_(self, message, react, count, **void):
+        if message.guild and message.guild.id in self.data:
+            req = self.data[message.guild.id].get(react, (inf,))[0]
+            if count >= req and count < req + 2:
+                if message.id not in self.data["triggered"]:
+                    self.data["triggered"].add(message.id)
+                    with tracebacksuppressor(RuntimeError, KeyError):
+                        while len(self.data["triggered"]) > 4096:
+                            self.data["triggered"].discard(next(iter(self.data["triggered"])))
+                    with tracebacksuppressor:
+                        embed = as_embed(message)
+                        col = await self.bot.get_colour(message.author)
+                        embed.colour = discord.Colour(col)
+                        data = ("#" + str(message.channel), to_png(message.guild.icon_url))
+                        self.bot.data.crossposts.stack.setdefault(self.data[message.guild.id][react][1], {}).setdefault(data, alist()).append(embed)
 
 
 class UpdateRolegivers(Database):

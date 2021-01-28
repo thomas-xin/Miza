@@ -3256,7 +3256,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         bot.CachedMessage = CachedMessage
         bot.MessageCache = MessageCache
 
-    def set_history(self):
+    def monkey_patch(self):
         bot = self
 
         async def fill_messages(self):
@@ -3278,6 +3278,35 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     await self.messages.put(message)
         
         discord.iterators.HistoryIterator.fill_messages = lambda self: fill_messages(self)
+
+        def parse_message_reaction_add(self, data):
+            emoji = data["emoji"]
+            emoji_id = discord.utils._get_as_snowflake(emoji, "id")
+            emoji = discord.PartialEmoji.with_state(self, id=emoji_id, animated=emoji.get("animated", False), name=emoji["name"])
+            raw = discord.RawReactionActionEvent(data, emoji, "REACTION_ADD")
+
+            member_data = data.get("member")
+            if member_data:
+                guild = self._connection._get_guild(raw.guild_id)
+                raw.member = discord.Member(data=member_data, guild=guild, state=self._connection)
+            else:
+                raw.member = None
+            self.dispatch("raw_reaction_add", raw)
+            create_task(self.reaction_add())
+
+        discord.state.ConnectionState.parse_message_reaction_add = lambda self, data: parse_message_reaction_add(self, data)
+
+    async def reaction_add(self):
+        try:
+            channel = await self.fetch_channel(raw.channel_id)
+            user = await self.fetch_user(raw.user_id)
+            message = await self.fetch_message(raw.message_id, channel=channel)
+        except discord.NotFound:
+            pass
+        else:
+            emoji = self._upgrade_partial_emoji(raw.emoji)
+            reaction = message._add_reaction(data, emoji, user.id)
+            self.dispatch("reaction_add", reaction, user)
 
     async def init_ready(self, futs):
         with tracebacksuppressor:
@@ -3304,7 +3333,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             self.events.append(f, func)
             print("Database events:")
             print(self.events.keys())
-            self.set_history()
+            self.monkey_patch()
             for fut in futs:
                 await fut
             await self.fetch_user(self.deleted_user)
@@ -3429,6 +3458,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 message = await self.fetch_message(payload.message_id, channel=channel)
             except discord.NotFound:
                 return
+            emoji = self._upgrade_partial_emoji(payload.emoji)
             raw = "Adding a reaction"
             if getattr(channel, "guild", None) is not None:
                 raw += f", {channel.guild}"
@@ -3439,7 +3469,13 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     self.data.users.add_gold(user, xrand(1, 5))
                 if "dailies" in self.data:
                     self.data.dailies.progress_quests(user, "react")
-                reaction = str(payload.emoji)
+                reaction = str(emoji)
+                count = 1
+                for react in message.reactions:
+                    if str(react.emoji) == reaction:
+                        count = react.count
+                        break
+                await self.send_event("_reaction_add_", message=message, react=reaction, count=count)
                 await self.react_callback(message, reaction, user)
                 await self.check_to_delete(message, reaction, user)
 

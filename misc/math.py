@@ -562,7 +562,7 @@ def procResp(resp):
             fn = name
             resp[0].save(fn)
         plt.clf()
-        s = "{'file':'" + fn + "'}\n"
+        s = dict(file=fn)
     elif resp[0] == plt:
         ts = time.time_ns() // 1000
         name = f"{ts}.png"
@@ -573,7 +573,7 @@ def procResp(resp):
             fn = name
             plt.savefig(fn)
         plt.clf()
-        s = "{'file':'" + fn + "'}\n"
+        s = dict(file=fn)
     elif type(resp) is tuple:
         s = list(resp)
     else:

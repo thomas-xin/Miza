@@ -227,7 +227,7 @@ class React(Command):
                 + "-\nLoading React database...```*"
             )
         if "d" in flags:
-            a = unicode_prune(argv).casefold()
+            a = full_prune(args[0])
             if a in curr:
                 curr.pop(a)
                 update(guild.id)
@@ -245,11 +245,12 @@ class React(Command):
             emoji = args[-1]
         else:
             emoji = await bot.fetch_emoji(e_id)
+        emoji = str(emoji)
         # This reaction indicates that the emoji was valid
         await message.add_reaction(emoji)
-        curr.append(a, str(emoji))
+        curr.append(a, emoji)
         following[guild.id] = mdict({i: curr[i] for i in sorted(curr)})
-        return css_md(f"Added {sqr_md(a)} ➡️ {sqr_md(args[-1])} to the auto react list for {sqr_md(guild)}.")
+        return css_md(f"Added {sqr_md(a)} ➡️ {sqr_md(emoji)} to the auto react list for {sqr_md(guild)}.")
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_", 1)]
