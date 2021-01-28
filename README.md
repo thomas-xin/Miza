@@ -70,11 +70,21 @@ Make sure you have *ffmpeg* installed onto your computer and in your PATH (it do
 
 ![ffmpeg](https://cdn.discordapp.com/attachments/688253918890688521/777473182294474753/image0.png)
 
+- **Where does Miza log?**
+
+Miza logs up to three places: A *log.txt* (which the file gets refreshed upon restart), the console where you're running the code (we just use a *main.bat* file to run Miza through the Command Prompt on Windows usually, as none of Miza's subprocesses can run on Linux) and a log within Discord itself (which isn't hardcoded, you can enable it similarly to how I enabled the Python terminal above.)
+
+![Screenshot6](https://cdn.discordapp.com/attachments/727087981285998593/777554361769000960/Capture10.PNG)
+
+![Screenshot7](https://cdn.discordapp.com/attachments/727087981285998593/777554360859099146/Capture9.PNG)
+
+![Screenshot8](https://cdn.discordapp.com/attachments/727087981285998593/777554358095183893/Capture8.PNG)
+
+## [Support!](http://27.33.133.250:9801/)
+
 With that concludes the basic introduction of hosting Miza. The code is commented and explaining where everything is, so feel free to explore further to see what you can change, and if you have any questions, [Thomas Xin](https://github.com/thomas-xin) is your guy to ask!
 
 Miza has so much functionality, with so much to explore, with all the command categories being: **voice**, **fun**, **admin**, **image**, **string** and **main**. Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code optimization and fun to be had!
-
-## [Support!](http://27.33.133.250:9801/)
 
 [Read our Wiki!](https://github.com/thomas-xin/Miza/wiki)
 
