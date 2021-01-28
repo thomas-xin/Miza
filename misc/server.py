@@ -11,6 +11,7 @@ import werkzeug
 from werkzeug.exceptions import HTTPException
 
 
+HOST = "https://mizabot.xyz"
 PORT = AUTH.get("webserver_port", 9801)
 IND = "\x7f"
 
@@ -234,7 +235,7 @@ def upload_file():
     fn = f.filename
     f.save(f"cache/{IND}{ts}~{fn}")
     href = f"/files/{ts}/{fn}"
-    url = f"{flask.request.host}{href}"
+    url = f"{HOST}{href}"
     send(ip + "\t" + fn + "\t" + url)
     return """<!DOCTYPE html>
 <html>
