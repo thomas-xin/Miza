@@ -89,6 +89,8 @@ class Help(Command):
             if bot.categories:
                 s = bold(ini_md(' '.join((sqr_md(c) for c in help_colours if c in bot.categories))))
                 fields.append(dict(name="Command category list", value=s))
+        if not channel.permissions_for(guild.me).send_messages:
+            channel = await bot.get_dm(user)
         bot.send_as_embeds(channel, description, author=author, fields=fields, colour=colour, reacts="❎", reference=message)
 
 
