@@ -1,4 +1,4 @@
-# [Miza](http://27.33.133.250:9801)
+# [Miza](http://mizabot.xyz)
 Welcome to Miza, a multipurpose Discord bot created by [Thomas Xin](https://github.com/thomas-xin). Writing this README is [smudgedpasta](https://github.com/smudgedpasta), Miza's secondary bot owner! :3
 
 ![Miza](https://cdn.discordapp.com/attachments/688253918890688521/777456623555051521/image0.png)
@@ -9,8 +9,9 @@ Headings | Explinations
 ------------ | -------------
 Where can I find what? | Will talk you through where everything within the code files can be found!
 How do I use the code? | Will talk you through the basics of how to host the code, covering potential error-prone areas!
+Support! | Links to where you can find Miza and get support!
 
-## [Where can I find what?]()
+## [Where can I find what?](https://github.com/thomas-xin/Miza/tree/master/commands)
 
 First and foremost, the front folder here contains all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* funtionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection funtionaility can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, message/attachement caching, assigning variables of the Github Directory link, default bot prefix, etc...) As for where things are located...
 
@@ -73,10 +74,12 @@ With that concludes the basic introduction of hosting Miza. The code is commente
 
 Miza has so much functionality, with so much to explore, with all the command categories being: **voice**, **fun**, **admin**, **image**, **string** and **main**. Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code optimization and fun to be had!
 
+## [Support!](http://27.33.133.250:9801/)
+
 [Read our Wiki!](https://github.com/thomas-xin/Miza/wiki)
 
-[Check out our Website!](http://27.33.133.250:9801/)
+[Check out our Website!](http://mizabot.xyz)
 
-[View our Miza Atlas for a command tester and in-depth command list in the comforts of your browser!](http://27.33.133.250:9801/mizatlas)
+[View our Miza Atlas for a command tester and in-depth command list in the comforts of your browser!](http://mizabot.xyz/mizatlas)
 
 [Join our Discord Support Server!](https:/discord.gg//cbKQKAr)
