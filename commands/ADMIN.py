@@ -1988,7 +1988,7 @@ class UpdateMessageLogs(Database):
             for message in messages:
                 emb = as_embed(message)
                 emb.colour = discord.Colour(0x7F007F)
-                emb.created_at = message.created_at
+                emb.timestamp = message.created_at
                 embs.append(emb)
             self.bot.send_embeds(channel, embs)
 
