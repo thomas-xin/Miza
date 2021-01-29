@@ -1835,6 +1835,7 @@ class UpdateMessageLogs(Database):
                 emb.colour = discord.Colour(0x00FFFF)
                 action = f"**Slash command executed in** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
                 emb.description = lim_str(action + emb.description, 2048)
+                emb.timestamp = message.created_at
                 self.bot.send_embeds(channel, emb)
 
     # Edit events are rather straightforward to log
@@ -1855,6 +1856,7 @@ class UpdateMessageLogs(Database):
                 emb.add_field(name="Before", value=emb2.description)
                 emb.add_field(name="After", value=emb.description)
                 emb.description = action
+                emb.timestamp = before.edited_at or after.created_at
                 self.bot.send_embeds(channel, emb)
 
     # Delete events must attempt to find the user who deleted the message
@@ -1923,6 +1925,7 @@ class UpdateMessageLogs(Database):
             emb.colour = discord.Colour(0xFF0000)
             action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
             emb.description = lim_str(action + emb.description, 2048)
+            emb.timestamp = message.created_at
             self.bot.send_embeds(channel, emb)
 
     # Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
@@ -1985,6 +1988,7 @@ class UpdateMessageLogs(Database):
             for message in messages:
                 emb = as_embed(message)
                 emb.colour = discord.Colour(0x7F007F)
+                emb.created_at = message.created_at
                 embs.append(emb)
             self.bot.send_embeds(channel, embs)
 
