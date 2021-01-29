@@ -72,13 +72,15 @@ Make sure you have *ffmpeg* installed onto your computer and in your PATH (it do
 
 - **Where does Miza log?**
 
-Miza logs up to three places: A *log.txt* (which the file gets refreshed upon restart), the console where you're running the code (we just use a *main.bat* file to run Miza through the Command Prompt on Windows usually, as none of Miza's subprocesses can run on Linux) and a log within Discord itself (which isn't hardcoded, you can enable it similarly to how I enabled the Python terminal above.)
+Miza logs up to three places: A *log.txt* (which the file gets refreshed upon restart), the console where you're running the code (we just use a *main.bat* file to run Miza through the Command Prompt on Windows usually, as none of Miza's subprocesses can run on Linux) and a log within Discord itself (which isn't hardcoded, you can enable it as displayed below.)
 
-![Screenshot6](https://cdn.discordapp.com/attachments/727087981285998593/777554361769000960/Capture10.PNG)
+![Screenshot2](https://cdn.discordapp.com/attachments/727087981285998593/777554361769000960/Capture10.PNG)
 
-![Screenshot7](https://cdn.discordapp.com/attachments/727087981285998593/777554360859099146/Capture9.PNG)
+![Screenshot3](https://cdn.discordapp.com/attachments/727087981285998593/777554360859099146/Capture9.PNG)
 
-![Screenshot8](https://cdn.discordapp.com/attachments/727087981285998593/777554358095183893/Capture8.PNG)
+![Screenshot1](https://cdn.discordapp.com/attachments/688253918890688521/804652403445727272/unknown.png)
+
+![Screenshot4](https://cdn.discordapp.com/attachments/727087981285998593/777554358095183893/Capture8.PNG)
 
 ## [Support!](http://27.33.133.250:9801/)
 
