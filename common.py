@@ -980,8 +980,8 @@ def as_embed(message):
         if len(emb.fields) >= 25:
             break
         if not emb.description:
-            emb.title = e.title or e.url or None
-            emb.description = e.description or e.url or None
+            emb.title = e.title or e.url or discord.Embed.Empty
+            emb.description = e.description or e.url or discord.Embed.Empty
         else:
             emb.add_field(name=e.title or e.url or "\u200b", value=lim_str(e.description, 1024) or e.url or "\u200b", inline=False)
         for f in e.fields:
