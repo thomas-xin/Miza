@@ -24,6 +24,7 @@ def send(*args, escape=True):
         if s:
             if s[-1] != "\n":
                 s += "\n"
+            sys.stdout.write(s)
             sys.__stderr__.write(s)
             sys.__stderr__.flush()
     except OSError:
@@ -162,8 +163,7 @@ def atlas(filename):
     # if filename == "run":
     #     content = flask.request.args.get("command", "")
     #     ip = flask.request.remote_addr
-    #     resp = get_geo(ip)
-    #     data = resp["data"]["geo"]
+    #     data = get_geo(ip)
     #     tz = data["timezone"]
     #     t = ts_us()
     #     if " " not in content:
@@ -230,14 +230,22 @@ def favicon():
 @app.route("/upload_file", methods=["GET", "POST"])
 def upload_file():
     ip = flask.request.remote_addr
-    f = flask.request.files["file"]
+    files = flask.request.files.getlist("file")
+    if not files:
+        raise FileNotFoundError
     ts = time.time_ns() // 1000
-    fn = f.filename
-    f.save(f"cache/{IND}{ts}~{fn}")
-    href = f"/files/{ts}/{fn}"
-    url = f"{HOST}{href}"
-    send(ip + "\t" + fn + "\t" + url)
-    return """<!DOCTYPE html>
+    urls = deque()
+    futs = deque()
+    for file in files:
+        fn = file.filename
+        sfn = f"cache/{IND}{ts}~{fn}"
+        futs.append(create_future_ex(file.save, sfn))
+        href = f"/files/{ts}/{fn}"
+        url = f"{HOST}{href}"
+        urls.append((href, url))
+        send(ip + "\t" + fn + "\t" + url)
+        ts += 1
+    s = """<!DOCTYPE html>
 <html>
     <head>
         <style>
@@ -271,12 +279,17 @@ def upload_file():
         </style>
     </head>
     <body style="background-color:black;">
-        <h1 style="color:white;">File uploaded successfully!</h1>
-        <p><a href=\"""" + href + f"""\">{url}</a></p>
+        <h1 style="color:white;">Upload successful!</h1>"""
+    with tracebacksuppressor:
+        for fi, fut in zip(urls, futs):
+            fut.result()
+            s += f'\n<p><a href="{fi[0]}">{fi[1]}</a></p>'
+    s += """
         <img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">
         <p><a href="/upload">Click here to upload another file!</a></p>
     </body>
 </html>"""
+    return s
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
@@ -304,7 +317,7 @@ def upload():
     </style>
     <body>
         <form action="/upload_file" method="POST" enctype="multipart/form-data">
-            <input style="color:white;" type="file" name="file" />
+            <input style="color:white;" type="file" name="file" multiple/>
             <input type="submit"/>
         </form>
     </body>
@@ -315,9 +328,10 @@ def get_geo(ip):
     try:
         resp = TZCACHE[ip]
     except KeyError:
-        url = f"https://tools.keycdn.com/geo.json?host={ip}"
-        resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}"}).json()
-        TZCACHE[resp["data"]["geo"]["ip"]] = resp
+        url = f"http://ip-api.com/json/{ip}?fields=256"
+        resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}"})
+        resp.raise_for_status()
+        TZCACHE[ip] = resp = resp.json()
     return resp
 
 @app.route("/time", methods=["GET", "POST"])
@@ -326,8 +340,7 @@ def get_geo(ip):
 def timezone():
     ip = flask.request.remote_addr
     try:
-        resp = get_geo(ip)
-        data = resp["data"]["geo"]
+        data = get_geo(ip)
         tz = data["timezone"]
         dt = datetime.datetime.now(pytz.timezone(tz))
         send(ip + "\t" + str(dt) + "\t" + tz)
@@ -342,6 +355,7 @@ def timezone():
         <meta content=\"""" + flask.request.url + """\" property="og:url">
         <meta content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" property="og:image">
         <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
+        <meta http-equiv="refresh" content="5">
         <link rel="stylesheet" type="text/css" href="/static/timezonestyles.css" />
     </head>
     <body>
@@ -399,8 +413,7 @@ def command(content):
             send(j)
             return b"\xf0\x9f\x92\x9c"
     content = urllib.parse.unquote(flask.request.full_path.rstrip("?").lstrip("/").split("/", 1)[-1])
-    resp = get_geo(ip)
-    data = resp["data"]["geo"]
+    data = get_geo(ip)
     tz = data["timezone"]
     if " " not in content:
         content += " "

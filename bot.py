@@ -1655,8 +1655,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return x
 
     # Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
-    def solve_math(self, f, prec=128, r=False, timeout=12, variables=None):
-        return process_math(f.strip(), int(prec), int(r), timeout=12, variables=variables)
+    def solve_math(self, f, prec=128, r=False, timeout=16, variables=None):
+        return process_math(f.strip(), int(prec), int(r), timeout=timeout, variables=variables)
 
     TimeChecks = {
         "galactic years": ("gy", "galactic year", "galactic years"),
@@ -2428,7 +2428,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         if not loop and tc:
                             fut = create_task(channel.trigger_typing())
                         # Get maximum time allowed for command to process
-                        if user.id in bot.owners:
+                        if bot.is_owner(user):
                             timeout = None
                         else:
                             timeout = getattr(command, "_timeout_", 1) * bot.timeout

@@ -1952,7 +1952,7 @@ class AudioDownloader:
                 with open(vsf, "w", encoding="utf-8") as f:
                     f.write(vsc)
             else:
-                vsc = vst[0]
+                vsf = vsc = vst[0]
         if len(ast) > 1:
             asc = "\n".join(f"file '{i}'" for i in ast)
             asf = f"cache/{ts}-audio"
@@ -1960,7 +1960,7 @@ class AudioDownloader:
                 f.write(asc)
             args.extend(("-f", "concat", "-safe", "0", "-protocol_whitelist", "concat,tls,tcp,file,http,https"))
         else:
-            asf = ast[0]
+            asf = asc = ast[0]
         if not vst:
             args.append("-vn")
         elif fmt == "gif":

@@ -1290,7 +1290,7 @@ def get_idle_proc(ptype):
         proc = p[0]
     return proc
 
-def sub_submit(ptype, command, timeout=12):
+def sub_submit(ptype, command, _timeout=12):
     ts = ts_us()
     proc = get_idle_proc(ptype)
     while ts in PROC_RESP:
@@ -1305,7 +1305,7 @@ def sub_submit(ptype, command, timeout=12):
             # print(s)
             proc.stdin.write(s)
             proc.stdin.flush()
-            resp = PROC_RESP[ts].result(timeout=timeout)
+            resp = PROC_RESP[ts].result(timeout=_timeout)
         except (BrokenPipeError, OSError, concurrent.futures.TimeoutError):
             # print(proc, s)
             print_exc()
@@ -1332,11 +1332,11 @@ def sub_kill(start=True):
 
 # Sends an operation to the math subprocess pool.
 def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
-    return create_future(sub_submit, "math", (expr, prec, rat, variables), timeout=timeout)
+    return create_future(sub_submit, "math", (expr, prec, rat, variables), _timeout=timeout)
 
 # Sends an operation to the image subprocess pool.
 def process_image(image, operation, args, timeout=24):
-    return create_future(sub_submit, "image", (image, operation, args), timeout=timeout)
+    return create_future(sub_submit, "image", (image, operation, args), _timeout=timeout)
 
 
 def evalex(exc):
