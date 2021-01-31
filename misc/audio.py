@@ -145,7 +145,7 @@ class AudioPlayer(discord.AudioSource):
             if not self.queue or not self.queue[0]:
                 return 0, 0
             p = self.queue[0][0].pos / 50
-            d = self.queue[0][0].duration()
+            d = self.queue[0][0].duration() or inf
             return min(p, d), d
         try:
             return getattr(self.vc, k)
@@ -494,7 +494,7 @@ class AudioFile:
         return reader        
 
     # Audio duration estimation: Get values from file if possible, otherwise URL
-    duration = lambda self: inf if not self.seekable else self.dur if getattr(self, "dur", None) else set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded and not self.live else get_duration(self.stream), ignore=True)
+    duration = lambda self: inf if not self.seekable else getattr(self, "dur", None) or set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded and not self.live else get_duration(self.stream), ignore=True)
 
 
 # Audio reader for fully loaded files. FFmpeg with single pipe for output.

@@ -48,22 +48,20 @@ e_dur = lambda d: float(d) if type(d) is str else (d if d is not None else 300)
 
 
 # Runs ffprobe on a file or url, returning the duration if possible.
-def get_duration(filename):
+def _get_duration(filename, _timeout=12):
     command = ["ffprobe", "-hide_banner", filename]
     resp = None
-    for _ in loop(3):
-        try:
-            proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            fut = create_future_ex(proc.communicate, timeout=8)
-            res = fut.result(timeout=8)
-            resp = b"\n".join(res)
-            break
-        except:
-            with suppress():
-                proc.kill()
-            print_exc()
+    try:
+        proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        fut = create_future_ex(proc.communicate, timeout=_timeout)
+        res = fut.result(timeout=_timeout)
+        resp = b"\n".join(res)
+    except:
+        with suppress():
+            proc.kill()
+        print_exc()
     if not resp:
-        return None
+        return
     s = as_str(resp)
     with tracebacksuppressor(ValueError):
         i = s.index("Duration: ")
@@ -76,6 +74,30 @@ def get_duration(filename):
                     i = x
         dur = time_parse(d[:i])
         return dur
+
+def get_duration(filename):
+    dur = _get_duration(filename, 4)
+    if not dur and is_url(filename):
+        with requests.get(filename, headers=Request.header(), stream=True) as resp:
+            head = fcdict(resp.headers)
+            if "Content-Length" not in head:
+                return _get_duration(filename, 20)
+            it = resp.iter_content(65536)
+            data = next(it)
+        ident = str(magic.from_buffer(data))
+        try:
+            bitrate = inregexp("[0-9]+\\s.bps").findall(ident)[0].casefold()
+        except IndexError:
+            return _get_duration(filename, 16)
+        bps, key = bitrate.split(None, 1)
+        if key.startswith("k"):
+            bps *= 1e3
+        elif key.startswith("m"):
+            bps *= 1e6
+        elif key.startswith("g"):
+            bps *= 1e9
+        return (int(head["Content-Length"]) << 3) / bps
+    return dur
 
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -1893,6 +1915,8 @@ class AudioDownloader:
                 stream = entry.get("stream")
                 if stream in (None, "none"):
                     raise FileNotFoundError("Unable to locate appropriate file stream.")
+            if not entry.get("duration"):
+                entry["duration"] = get_duration(entry.stream)
             live = entry.get("duration") and not entry["duration"] <= 960
             seekable = not entry.get("duration") or entry["duration"] < inf
             try:
