@@ -269,7 +269,7 @@ def upload_file():
         futs.append(create_future_ex(file.save, sfn))
         href = f"/files/{ts}/{fn}"
         url = f"{HOST}{href}"
-        urls.append((href, url))
+        urls.append((href, url, sfn))
         send(ip + "\t" + fn + "\t" + url)
         ts += 1
     s = """<!DOCTYPE html>
@@ -312,6 +312,7 @@ def upload_file():
             fut.result()
             s += f'\n<p><a href="{fi[0]}">{fi[1]}</a></p>'
     s += f"""
+        <p style="color:cyan;">Total file size: {byte_scale(sum(os.path.getsize(f[2]) for f in urls))}B</p>
         <p style="color:orange;">Estimated file lifetime: {sec2time(utc() - est_time)}</p>
         <img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">
         <p><a href="/upload">Click here to upload another file!</a></p>
