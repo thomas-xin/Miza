@@ -169,7 +169,6 @@ def atlas(filename):
     #     if " " not in content:
     #         content += " "
     #     RESPONSES[t] = fut = concurrent.futures.Future()
-    #     sys.__stderr__.write(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}\n")
     #     j, after = fut.result(timeout=420)
     #     RESPONSES.pop(t, None)
     #     response = flask.Response(json.dumps(j), mimetype="application/json")
@@ -324,14 +323,24 @@ def upload():
 </html>"""
 
 
+geo_sem = Semaphore(90, 256, rate_limit=60)
+geo_count = 0
+
 def get_geo(ip):
+    global geo_count
     try:
         resp = TZCACHE[ip]
     except KeyError:
-        url = f"http://ip-api.com/json/{ip}?fields=256"
-        resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}"})
+        if geo_count & 1:
+            url = f"http://ip-api.com/json/{ip}?fields=256"
+        else:
+            url = f"https://pro.ip-api.com/json/{ip}?fields=256&key=test-demo-pro"
+        geo_count += 1
+        with geo_sem:
+            resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}", "Origin": "https://members.ip-api.com"})
         resp.raise_for_status()
         TZCACHE[ip] = resp = resp.json()
+        send(ip + "\t" + "\t".join(resp.values()))
     return resp
 
 @app.route("/time", methods=["GET", "POST"])
@@ -343,7 +352,6 @@ def timezone():
         data = get_geo(ip)
         tz = data["timezone"]
         dt = datetime.datetime.now(pytz.timezone(tz))
-        send(ip + "\t" + str(dt) + "\t" + tz)
         colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
         html = """<!DOCTYPE html>
 <html>
