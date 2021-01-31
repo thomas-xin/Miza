@@ -647,6 +647,17 @@ def invert(image):
         image.putalpha(A)
     return image
 
+def greyscale(image):
+    if str(image.mode) == "RGBA":
+        A = image.getchannel("A")
+        image = image.convert("RGB")
+    else:
+        A = None
+    image = ImageOps.grayscale(image)
+    if A is not None:
+        image.putalpha(A)
+    return image
+
 
 # Autodetect max image size, keeping aspect ratio
 def max_size(w, h, maxsize):

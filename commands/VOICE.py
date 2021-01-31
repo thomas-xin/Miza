@@ -4176,7 +4176,7 @@ class UpdateAudio(Database):
 
     def _announce_(self, *args, **kwargs):
         for auds in self.players.values():
-            auds.announce(*args, sync=False, **kwargs)
+            create_future_ex(auds.announce, *args, sync=False, **kwargs)
 
     # Stores all currently playing audio data to temporary database when bot shuts down
     async def _destroy_(self, **void):

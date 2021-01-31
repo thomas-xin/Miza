@@ -719,7 +719,7 @@ class GreyScale(Command):
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
         name, value, url = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "ImageOps.grayscale", [], timeout=_timeout)
+            resp = await process_image(url, "greyscale", [], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):

@@ -226,12 +226,40 @@ def favicon():
     return flask.Response(data, mimetype=mime)
 
 
+est_time = utc()
+est_last = -inf
+
+def estimate_life():
+    global est_time, est_last
+    with tracebacksuppressor:
+        hosted = sorted(int(f[1:].split("~", 1)[0]) / 1e6 for f in os.listdir("cache") if f.startswith(IND))
+        if not hosted:
+            est_last = -inf
+        ts = hosted[0]
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7fbot.storage_ratio", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        last = (utc() - ts) / j.get("result", 1)
+        send(last)
+        est_time = utc() - last
+        est_last = utc()
+
+estimate_life_after = lambda t: time.sleep(t) or estimate_life()
+
+create_future_ex(estimate_life_after, 10)
+
+
 @app.route("/upload_file", methods=["GET", "POST"])
 def upload_file():
+    global est_time
     ip = flask.request.remote_addr
-    files = flask.request.files.getlist("file")
+    files = [file for file in flask.request.files.getlist("file") if file.filename]
     if not files:
-        raise FileNotFoundError
+        raise EOFError
     ts = time.time_ns() // 1000
     urls = deque()
     futs = deque()
@@ -283,7 +311,8 @@ def upload_file():
         for fi, fut in zip(urls, futs):
             fut.result()
             s += f'\n<p><a href="{fi[0]}">{fi[1]}</a></p>'
-    s += """
+    s += f"""
+        <p style="color:orange;">Estimated file lifetime: {sec2time(utc() - est_time)}</p>
         <img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">
         <p><a href="/upload">Click here to upload another file!</a></p>
     </body>
@@ -292,9 +321,13 @@ def upload_file():
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
+    global est_last
     ip = flask.request.remote_addr
     send(ip + "/upload\n")
     colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
+    if utc() - est_last > 1800:
+        est_last = utc()
+        create_future_ex(estimate_life)
     return f"""<!DOCTYPE html>
 <html>
     <head>

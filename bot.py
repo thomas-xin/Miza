@@ -72,6 +72,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.user_semaphore = Semaphore(64, inf, delay=0.5, rate_limit=8)
         self.disk_semaphore = Semaphore(1, 1, delay=0.5)
         self.disk = 0
+        self.storage_ratio = 0
         self.file_count = 0
         print("Time:", datetime.datetime.now())
         print("Initializing...")
@@ -1835,9 +1836,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 disk = await create_future(get_folder_size, "cache", priority=True)
                 disk += await create_future(get_folder_size, "saves", priority=True)
                 self.disk = disk
-                self.file_count = len(os.listdir("cache"))
-                for t in os.walk("saves"):
-                    self.file_count += len(t[-1])
         return self.disk
 
     # Gets the status of the bot.
@@ -2595,6 +2593,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             except TypeError:
                 out = json.dumps(dict(result=repr(output)))
             url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
+            print(url, out)
             resp = await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
 
     # Adds a webhook to the bot's user and webhook cache.
@@ -3908,8 +3907,12 @@ IND = "\x7f"
 
 def update_file_cache(files=None):
     if files is None:
-        files = alist(sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND)))
-    if len(files) > 256:
+        files = sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND))
+    bot.file_count = len(files)
+    bot.storage_ratio = min(1, max(bot.file_count / 65536, bot.disk / (1 << 37)))
+    for t in os.walk("saves"):
+        bot.file_count += len(t[-1])
+    if bot.storage_ratio >= 1:
         curr = files.popleft()
         ct = int(curr.rsplit(".", 1)[0].split("~", 1)[0])
         if ts_us() - ct > 86400:
