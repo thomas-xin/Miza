@@ -1531,7 +1531,7 @@ def evalImg(url, operation, args):
 
 def evaluate(ts, args):
     try:
-        out = evalImg(*eval(eval(args)))
+        out = evalImg(*args)
         sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
     except Exception as ex:
         sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception(evalex({repr(repr(ex))}))\n".encode("utf-8"))
@@ -1556,8 +1556,16 @@ if __name__ == "__main__":
         argv = sys.stdin.readline().rstrip()
         if argv:
             if argv[0] == "~":
-                ts, args = argv[1:].split("~", 1)
-                exc.submit(evaluate, ts, args)
+                ts, s = argv[1:].split("~", 1)
+                try:
+                    args = eval(eval(s))
+                    if "$" in args and "plt_special" in args:
+                        evaluate(ts, args)
+                    else:
+                        exc.submit(evaluate, ts, args)
+                except Exception as ex:
+                    sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception(evalex({repr(repr(ex))}))\n".encode("utf-8"))
+                    sys.stdout.flush()
                 while len(CACHE) > 32:
                     try:
                         CACHE.pop(next(iter(CACHE)))
