@@ -76,28 +76,29 @@ def _get_duration(filename, _timeout=12):
         return dur
 
 def get_duration(filename):
-    dur = _get_duration(filename, 4)
-    if not dur and is_url(filename):
-        with requests.get(filename, headers=Request.header(), stream=True) as resp:
-            head = fcdict(resp.headers)
-            if "Content-Length" not in head:
-                return _get_duration(filename, 20)
-            it = resp.iter_content(65536)
-            data = next(it)
-        ident = str(magic.from_buffer(data))
-        try:
-            bitrate = inregexp("[0-9]+\\s.bps").findall(ident)[0].casefold()
-        except IndexError:
-            return _get_duration(filename, 16)
-        bps, key = bitrate.split(None, 1)
-        if key.startswith("k"):
-            bps *= 1e3
-        elif key.startswith("m"):
-            bps *= 1e6
-        elif key.startswith("g"):
-            bps *= 1e9
-        return (int(head["Content-Length"]) << 3) / bps
-    return dur
+    if filename:
+        dur = _get_duration(filename, 4)
+        if not dur and is_url(filename):
+            with requests.get(filename, headers=Request.header(), stream=True) as resp:
+                head = fcdict(resp.headers)
+                if "Content-Length" not in head:
+                    return _get_duration(filename, 20)
+                it = resp.iter_content(65536)
+                data = next(it)
+            ident = str(magic.from_buffer(data))
+            try:
+                bitrate = inregexp("[0-9]+\\s.bps").findall(ident)[0].casefold()
+            except IndexError:
+                return _get_duration(filename, 16)
+            bps, key = bitrate.split(None, 1)
+            if key.startswith("k"):
+                bps *= 1e3
+            elif key.startswith("m"):
+                bps *= 1e6
+            elif key.startswith("g"):
+                bps *= 1e9
+            return (int(head["Content-Length"]) << 3) / bps
+        return dur
 
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -1916,8 +1917,11 @@ class AudioDownloader:
                 if stream in (None, "none"):
                     raise FileNotFoundError("Unable to locate appropriate file stream.")
             if not entry.get("duration"):
-                entry["duration"] = get_duration(entry.stream)
-            live = entry.get("duration") and not entry["duration"] <= 960
+                entry["duration"] = get_duration(stream)
+            print(entry)
+            with suppress(KeyError):
+                self.searched[entry["url"]]["duration"] = entry["duration"]
+            live = not entry.get("duration") or not entry["duration"] <= 960
             seekable = not entry.get("duration") or entry["duration"] < inf
             try:
                 f.load(stream, check_fmt=entry.get("duration") is None, webpage_url=entry["url"], live=live, seekable=seekable)
