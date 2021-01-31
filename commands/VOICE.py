@@ -2137,8 +2137,8 @@ class Queue(Command):
     name = ["▶️", "P", "Q", "Play", "Enqueue"]
     alias = name + ["LS"]
     description = "Shows the music queue, or plays a song in voice."
-    usage = "<search_links>* <force{?f}|budge{?b}|verbose{?v}|hide{?h}>*"
-    flags = "hvfbz"
+    usage = "<search_links>* <force{?f}|budge{?b}|random{?r}|verbose{?v}|hide{?h}>*"
+    flags = "hvfbrz"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     _timeout_ = 2
@@ -2205,6 +2205,8 @@ class Queue(Command):
         # Raise exceptions returned by searches
         if type(resp) is str:
             raise evalEX(resp)
+        if "r" in flags:
+            resp = (choice(resp),)
         # Assign search results to queue entries
         added = deque()
         names = []
