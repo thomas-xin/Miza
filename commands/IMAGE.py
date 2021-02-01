@@ -1288,7 +1288,7 @@ class Blend(Command):
 class Cat(ImagePool, Command):
     description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it. Be sure to check out ⟨WEBSERVER⟩/cats!"
     database = "cats"
-    name = ["🐱", "Meow"]
+    name = ["🐱", "Meow", "Kitty", "Kitten"]
     slash = True
 
     async def fetch_one(self):
@@ -1314,7 +1314,7 @@ class Cat(ImagePool, Command):
 class Dog(ImagePool, Command):
     description = "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it. Be sure to check out ⟨WEBSERVER⟩/dogs!"
     database = "dogs"
-    name = ["🐶", "Woof"]
+    name = ["🐶", "Woof", "Doggy", "Doggo"]
     slash = True
 
     async def fetch_one(self):
