@@ -49,7 +49,7 @@ e_dur = lambda d: float(d) if type(d) is str else (d if d is not None else 300)
 
 # Runs ffprobe on a file or url, returning the duration if possible.
 def _get_duration(filename, _timeout=12):
-    command = subprocess.check_output([
+    command = (
         "ffprobe",
         "-v",
         "error",
@@ -59,8 +59,8 @@ def _get_duration(filename, _timeout=12):
         "stream=duration",
         "-of",
         "default=nokey=1:noprint_wrappers=1",
-        filename
-    ])
+        filename,
+    )
     resp = None
     try:
         proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
@@ -84,11 +84,13 @@ def get_duration(filename):
                 it = resp.iter_content(65536)
                 data = next(it)
             ident = str(magic.from_buffer(data))
+            print(head, ident, sep="\n")
             try:
                 bitrate = regexp("[0-9]+\\s.bps").findall(ident)[0].casefold()
             except IndexError:
                 return _get_duration(filename, 16)
             bps, key = bitrate.split(None, 1)
+            bps = float(bps)
             if key.startswith("k"):
                 bps *= 1e3
             elif key.startswith("m"):
@@ -2109,7 +2111,7 @@ class AudioDownloader:
         if end:
             odur = end - start
             if odur:
-                dur = get_duration(fn)
+                dur = e_dur(get_duration(fn))
                 if dur < odur - 1:
                     ts += 1
                     fn, fn2 = f"cache/\x7f{ts}~{outft}", fn
@@ -4166,6 +4168,8 @@ class UpdateAudio(Database):
                                 print_exc()
                                 break
                             e.pop("id", None)
+                        if "research" not in e and not e.get("duration") and "stream" in e:
+                            e["duration"] = await create_future(get_duration, e["stream"])
                         if not i & 7:
                             await asyncio.sleep(0.4)
 

@@ -1846,28 +1846,29 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Gets the status of the bot.
     async def get_state(self):
-        stats = azero(3)
-        procs = await create_future(self.proc.children, recursive=True, priority=True)
-        procs.append(self.proc)
-        tasks = [self.get_proc_state(p) for p in procs]
-        resp = await recursive_coro(tasks)
-        stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
-        cpu = await create_future(psutil.cpu_count, logical=True, priority=True)
-        mem = await create_future(psutil.virtual_memory, priority=True)
-        disk = self.disk
-        # CPU is totalled across all cores
-        stats[0] /= cpu
-        # Memory is in %
-        stats[1] *= mem.total / 100
-        stats[2] = disk
-        self.size2 = fcdict()
-        files = await create_future(os.listdir, "misc", priority=True)
-        for f in files:
-            path = "misc/" + f
-            if is_code(path):
-                self.size2[f] = line_count(path)
-        self.curr_state = stats
-        return stats
+        with tracebacksuppressor:
+            stats = azero(3)
+            procs = await create_future(self.proc.children, recursive=True, priority=True)
+            procs.append(self.proc)
+            tasks = [self.get_proc_state(p) for p in procs]
+            resp = await recursive_coro(tasks)
+            stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
+            cpu = await create_future(psutil.cpu_count, logical=True, priority=True)
+            mem = await create_future(psutil.virtual_memory, priority=True)
+            disk = self.disk
+            # CPU is totalled across all cores
+            stats[0] /= cpu
+            # Memory is in %
+            stats[1] *= mem.total / 100
+            stats[2] = disk
+            self.size2 = fcdict()
+            files = await create_future(os.listdir, "misc", priority=True)
+            for f in files:
+                path = "misc/" + f
+                if is_code(path):
+                    self.size2[f] = line_count(path)
+            self.curr_state = stats
+            return stats
 
     # Loads a module containing commands and databases by name.
     def get_module(self, module):

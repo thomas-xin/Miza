@@ -73,7 +73,7 @@ async def communicate():
 
 # Runs ffprobe on a file or url, returning the duration if possible.
 def _get_duration(filename, _timeout=12):
-    command = subprocess.check_output([
+    command = (
         "ffprobe",
         "-v",
         "error",
@@ -83,8 +83,8 @@ def _get_duration(filename, _timeout=12):
         "stream=duration",
         "-of",
         "default=nokey=1:noprint_wrappers=1",
-        filename
-    ])
+        filename,
+    )
     resp = None
     try:
         proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
@@ -108,11 +108,13 @@ def get_duration(filename):
                 it = resp.iter_content(65536)
                 data = next(it)
             ident = str(magic.from_buffer(data))
+            print(head, ident, sep="\n")
             try:
                 bitrate = regexp("[0-9]+\\s.bps").findall(ident)[0].casefold()
             except IndexError:
                 return _get_duration(filename, 16)
             bps, key = bitrate.split(None, 1)
+            bps = float(bps)
             if key.startswith("k"):
                 bps *= 1e3
             elif key.startswith("m"):
