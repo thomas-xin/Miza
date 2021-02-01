@@ -87,7 +87,7 @@ def get_duration(filename):
                 data = next(it)
             ident = str(magic.from_buffer(data))
             try:
-                bitrate = inregexp("[0-9]+\\s.bps").findall(ident)[0].casefold()
+                bitrate = regexp("[0-9]+\\s.bps").findall(ident)[0].casefold()
             except IndexError:
                 return _get_duration(filename, 16)
             bps, key = bitrate.split(None, 1)
@@ -2009,6 +2009,8 @@ class AudioDownloader:
                     codec = codec_map[url]
                 except KeyError:
                     codec = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                    if codec == "vorbis":
+                        codec = "ogg"
                     print(codec)
                     codec_map[url] = codec
                 add_dict(codecs, {codec: 1})
