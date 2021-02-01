@@ -98,34 +98,39 @@ def get_file(path, filename=None):
         mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
     else:
         mime = get_mime(p)
-    send(p, mime)
+    fn = p.rsplit('/', 1)[-1].split('~', 1)[-1]
+    send(p, fn, mime)
     if endpoint.endswith("view") and mime.startswith("image/"):
         if os.path.getsize(p) > 262144:
             if endpoint != "preview":
                 og_image = flask.request.host_url + "preview/" + orig_path
-                return f'''<!DOCTYPE html>
+                return f"""<!DOCTYPE html>
 <html>
-<meta content="{og_image}" property="og:image">
 <meta name="robots" content="noindex"><link rel="image_src" href="{og_image}">
+<meta property="og:image" itemprop="image" content="{og_image}">
+<meta property="og:url" content="{flask.request.host_url}view/{orig_path}">
 <meta property="og:image:width" content="1280">
-<meta http-equiv="refresh" content="0; URL={flask.request.host_url}files/{orig_path}" />
-</html>'''
+<meta property="og:type" content="website">
+<meta http-equiv="refresh" content="0; URL={flask.request.host_url}files/{orig_path}/{fn}" />
+</html>"""
             if prev_date != utc_dt().date():
                 PREVIEW.clear()
             elif path in PREVIEW:
-                p = PREVIEW[path]
+                p = os.getcwd() + "/cache/" + PREVIEW[path]
             else:
                 fmt = mime.rsplit('/', 1)[-1]
                 if fmt != "gif":
                     fmt = "png"
                 p2 = f"{path}~preview.{fmt}"
-                args = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", p, "-fs", "4194304", "-vf", "scale=320:-1", os.getcwd() + "/cache/" + p2]
-                send(args)
-                proc = psutil.Popen(args)
-                proc.wait()
-                PREVIEW[path] = p = p2
-            p = os.getcwd() + "/cache/" + p
-    return flask.send_file(p, as_attachment=download, attachment_filename=filename, mimetype=mime)
+                p3 = os.getcwd() + "/cache/" + p2
+                if not os.path.exists(p3):
+                    args = ["ffmpeg", "-n", "-hide_banner", "-loglevel", "error", "-i", p, "-fs", "4194304", "-vf", "scale=320:-1", p3]
+                    send(args)
+                    proc = psutil.Popen(args)
+                    proc.wait()
+                PREVIEW[path] = p2
+                p = p3
+    return flask.send_file(p, as_attachment=download, attachment_filename=filename or fn, mimetype=mime)
 
 
 def fetch_static(path):

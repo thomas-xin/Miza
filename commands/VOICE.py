@@ -1943,8 +1943,9 @@ class AudioDownloader:
             print_exc()
             entry["url"] = ""
 
+    codec_map = {}
     # For ~download
-    def download_file(self, url, fmt, start=None, end=None, auds=None):
+    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False):
         # Select a filename based on current time to avoid conflicts
         if fmt[:3] == "mid":
             mid = True
@@ -1958,7 +1959,8 @@ class AudioDownloader:
             urls = url
         vst = deque()
         ast = deque()
-        ts = ts_us()
+        if not ts:
+            ts = ts_us()
         outf = None
         for url in urls:
             info = self.extract(url)[0]
@@ -1975,15 +1977,51 @@ class AudioDownloader:
         args = alist(("ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y"))
         if vst:
             if len(vst) > 1:
+                codec_map = {}
+                codecs = {}
+                for url in vst:
+                    try:
+                        codec = codec_map[url]
+                    except KeyError:
+                        codec = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                        print(codec)
+                        codec_map[url] = codec
+                    add_dict(codecs, {codec: 1})
+                if len(codecs) > 1:
+                    maxcodec = max(codecs.values())
+                    selcodec = [k for k, v in codecs.items() if v >= maxcodec][0]
+                    t = ts
+                    for i, url in enumerate(vst):
+                        if codec_map[url] != selcodec:
+                            t += 1
+                            vst[i] = self.download_file(url, selcodec, auds=auds, ts=t)[0].rsplit("/", 1)[-1]
                 vsc = "\n".join(f"file '{i}'" for i in vst)
-                vsf = f"cache/{ts}-video"
+                vsf = f"cache/{ts}~video.concat"
                 with open(vsf, "w", encoding="utf-8") as f:
                     f.write(vsc)
             else:
                 vsf = vsc = vst[0]
         if len(ast) > 1:
+            codec_map = self.codec_map
+            codecs = {}
+            for url in ast:
+                try:
+                    codec = codec_map[url]
+                except KeyError:
+                    codec = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                    print(codec)
+                    codec_map[url] = codec
+                add_dict(codecs, {codec: 1})
+            if len(codecs) > 1:
+                maxcodec = max(codecs.values())
+                selcodec = [k for k, v in codecs.items() if v >= maxcodec][0]
+                t = ts
+                for i, url in enumerate(ast):
+                    if codec_map[url] != selcodec:
+                        t += 1
+                        ast[i] = self.download_file(url, selcodec, auds=auds, ts=t)[0].rsplit("/", 1)[-1]
             asc = "\n".join(f"file '{i}'" for i in ast)
-            asf = f"cache/{ts}-audio"
+            asf = f"cache/{ts}.concat"
             with open(asf, "w", encoding="utf-8") as f:
                 f.write(asc)
             args.extend(("-f", "concat", "-safe", "0", "-protocol_whitelist", "concat,tls,tcp,file,http,https"))
@@ -2027,9 +2065,14 @@ class AudioDownloader:
             br = round(br / 64000) * 64000
             if not br:
                 br = 64000
+        elif fmt == "aac":
+            fmt = "adts"
         if not vst:
             args.extend(("-ar", str(SAMPLE_RATE), "-b:a", str(br)))
-        args.extend(("-f", fmt, fn))
+        if copy:
+            args.extend(("-c", "copy", fn))
+        else:
+            args.extend(("-f", fmt, fn))
         print(args)
         try:
             resp = subprocess.run(args)
@@ -2054,11 +2097,11 @@ class AudioDownloader:
             if not is_url(new):
                 with suppress():
                     os.remove(new)
-        with tracebacksuppressor:
-            if len(ast) > 1:
-                os.remove(asf)
-            if len(vst) > 1:
-                os.remove(vsf)
+        # with tracebacksuppressor:
+        #     if len(ast) > 1:
+        #         os.remove(asf)
+        #     if len(vst) > 1:
+        #         os.remove(vsf)
         if end:
             odur = end - start
             if odur:
@@ -4234,7 +4277,7 @@ class UpdateAudio(Database):
             await asyncio.sleep(0.5)
         await wrap_future(bot.audio.fut)
         for file in os.listdir("cache"):
-            if file.endswith(".opus") and file not in ytdl.cache:
+            if file.endswith(".opus") and file[0] != "\x7f" and file not in ytdl.cache:
                 print("reinstating audio file", file)
                 ytdl.cache[file] = f = await create_future(AudioFileLink, file, "cache/" + file, wasfile=True)
         for k, v in self.data.items():
