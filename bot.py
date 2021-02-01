@@ -3967,11 +3967,11 @@ def as_file(file, filename=None, ext=None, rename=True):
         fn = as_str(base64.urlsafe_b64encode(fn.to_bytes(b, "big"))).rstrip("=")
     url1 = f"{bot.webserver}/view/~{fn}"
     url2 = f"{bot.webserver}/download/~{fn}"
-    if filename:
-        fn = "/" + (str(file) if filename is None else lim_str(filename, 64).translate(filetrans))
-        url1 += fn
-    if ext and "." not in url1:
-        url1 += "." + ext
+    # if filename:
+    #     fn = "/" + (str(file) if filename is None else lim_str(filename, 64).translate(filetrans))
+    #     url1 += fn
+    # if ext and "." not in url1:
+    #     url1 += "." + ext
     return url1, url2
 
 def is_file(url):

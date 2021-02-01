@@ -111,7 +111,7 @@ def get_file(path, filename=None):
 <meta property="og:url" content="{flask.request.host_url}view/{orig_path}">
 <meta property="og:image:width" content="1280">
 <meta property="og:type" content="website">
-<meta http-equiv="refresh" content="0; URL={flask.request.host_url}files/{orig_path}/{fn}" />
+<meta http-equiv="refresh" content="0; URL={flask.request.host_url}files/{orig_path}" />
 </html>"""
             if prev_date != utc_dt().date():
                 PREVIEW.clear()
