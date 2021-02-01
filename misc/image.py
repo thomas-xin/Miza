@@ -698,7 +698,7 @@ def resize_mult(image, x, y, operation):
     return resize_to(image, round(w), round(h), operation)
 
 def resize_to(image, w, h, operation="auto"):
-    if abs(w * h) > 16777216:
+    if abs(w * h) > 1073741824:
         raise OverflowError("Resulting image size too large.")
     if w == image.width and h == image.height:
         return image

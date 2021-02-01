@@ -3971,7 +3971,8 @@ class Download(Command):
                 res.extend(temp)
             if not res:
                 raise LookupError(f"No results for {argv}.")
-            res = res[:10]
+            if not concat:
+                res = res[:10]
             desc = f"Search results for {argv}:"
         a = flags.get("a", 0)
         if concat or direct:
@@ -4014,7 +4015,7 @@ class Download(Command):
         msg = "*```" + "\n" * ("z" in flags) + "callback-voice-download-" + vals + "-" + url_enc + "\n" + desc
         emb = discord.Embed(colour=rand_colour())
         emb.set_author(**get_author(user))
-        emb.description = "\n".join((f"`【{i}】` [{escape_markdown(e['name'])}]({ensure_url(e['url'])})" for i in range(len(res)) for e in [res[i]]))
+        emb.description = "\n".join(f"`【{i}】` [{escape_markdown(e['name'])}]({ensure_url(e['url'])})" for i, e in enumerate(res))
         sent = await send_with_reply(channel, message, msg, embed=emb)
         if direct:
             # Automatically proceed to download and convert immediately

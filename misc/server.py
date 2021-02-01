@@ -72,53 +72,61 @@ def find_file(path):
             return os.getcwd() + "/cache/" + file
     raise FileNotFoundError(path)
 
-get_mime = lambda path: magic.from_file(path, mime=True)
 
+PREVIEW = {}
+prev_date = utc_dt().date()
+
+@app.route("/preview/<path>", methods=["GET"])
+@app.route("/view/<path>", methods=["GET"])
 @app.route("/file/<path>", methods=["GET"])
 @app.route("/files/<path>", methods=["GET"])
-def get_file(path):
-    p = find_file(path)
-    down = flask.request.args.get("download", "false")
-    download = down and down[0] not in "0fFnN"
-    if download:
-        mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
-    else:
-        mime = get_mime(p)
-    send(p, mime)
-    return flask.send_file(p, as_attachment=download, mimetype=mime)
-
+@app.route("/download/<path>", methods=["GET"])
+@app.route("/preview/<path>/<path:filename>", methods=["GET"])
+@app.route("/view/<path>/<path:filename>", methods=["GET"])
 @app.route("/file/<path>/<path:filename>", methods=["GET"])
 @app.route("/files/<path>/<path:filename>", methods=["GET"])
-def get_file_ex(path, filename):
+@app.route("/download/<path>/<path:filename>", methods=["GET"])
+def get_file(path, filename=None):
+    orig_path = path
+    if path.startswith("~"):
+        path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
     p = find_file(path)
+    endpoint = flask.request.path[1:].split("/", 1)[0]
     down = flask.request.args.get("download", "false")
-    download = down and down[0] not in "0fFnN"
+    download = down and down[0] not in "0fFnN" or endpoint == "download"
     if download:
         mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
     else:
         mime = get_mime(p)
     send(p, mime)
+    if endpoint.endswith("view") and mime.startswith("image/"):
+        if os.path.getsize(p) > 262144:
+            if endpoint != "preview":
+                og_image = flask.request.host_url + "preview/" + orig_path
+                return f'''<!DOCTYPE html>
+<html>
+<meta content="{og_image}" property="og:image">
+<meta name="robots" content="noindex"><link rel="image_src" href="{og_image}">
+<meta property="og:image:width" content="1280">
+<meta http-equiv="refresh" content="0; URL={flask.request.host_url}files/{orig_path}" />
+</html>'''
+            if prev_date != utc_dt().date():
+                PREVIEW.clear()
+            elif path in PREVIEW:
+                p = PREVIEW[path]
+            else:
+                fmt = mime.rsplit('/', 1)[-1]
+                if fmt != "gif":
+                    fmt = "png"
+                p2 = f"{path}~preview.{fmt}"
+                args = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", p, "-fs", "4194304", "-vf", "scale=320:-1", os.getcwd() + "/cache/" + p2]
+                send(args)
+                proc = psutil.Popen(args)
+                proc.wait()
+                PREVIEW[path] = p = p2
+            p = os.getcwd() + "/cache/" + p
     return flask.send_file(p, as_attachment=download, attachment_filename=filename, mimetype=mime)
 
-
-MIMES = dict(
-    css="text/css",
-    json="application/json",
-    js="application/javascript",
-    txt="text/plain",
-    html="text/html",
-    ico="image/x-icon",
-    png="image/png",
-    jpg="image/jpeg",
-    gif="image/gif",
-    webp="image/webp",
-    mp3="audio/mpeg",
-    ogg="audio/ogg",
-    opus="audio/opus",
-    flac="audio/flac",
-    wav="audio/x-wav",
-    mp4="video/mp4",
-)
 
 def fetch_static(path):
     while path.startswith("../"):

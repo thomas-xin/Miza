@@ -1205,6 +1205,34 @@ def is_video(url):
         return VIDEO_FORMS.get(url)
 
 
+MIMES = dict(
+    css="text/css",
+    json="application/json",
+    js="application/javascript",
+    txt="text/plain",
+    html="text/html",
+    ico="image/x-icon",
+    png="image/png",
+    jpg="image/jpeg",
+    gif="image/gif",
+    webp="image/webp",
+    mp3="audio/mpeg",
+    ogg="audio/ogg",
+    opus="audio/opus",
+    flac="audio/flac",
+    wav="audio/x-wav",
+    mp4="video/mp4",
+)
+
+def get_mime(path):
+    mime = magic.from_file(path, mime=True)
+    if type(mime) == "text/plain":
+        mime2 = MIMES.get(path.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
+        if mime2.startswith("text/"):
+            return mime2
+    return mime
+
+
 status_text = {
     discord.Status.online: "Online",
     discord.Status.idle: "Idle",

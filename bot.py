@@ -1161,8 +1161,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     ext = f.rsplit(".", 1)[-1]
                 else:
                     ext = None
-                url = await create_future(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
-                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + url + "\n" + url + "?download=true")
+                urls = await create_future(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
+                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + urls[0] + "\n" + urls[1]) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
             else:
                 message = await channel.send(msg, file=file)
                 if filename is not None:
@@ -3946,26 +3946,38 @@ def as_file(file, filename=None, ext=None, rename=True):
     elif rename:
         while True:
             with suppress(PermissionError):
-                os.rename(file, f"cache/{IND}{out}~{lim_str(filename.translate(filetrans), 64)}")
+                os.rename(file, f"cache/{IND}{out}~{lim_str(filename, 64).translate(filetrans)}")
                 break
             time.sleep(0.1)
     else:
         fn = file.rsplit("/", 1)[-1][1:].rsplit(".", 1)[0].split("~", 1)[0]
-    url = f"{bot.webserver}/files/{fn}"
+    try:
+        fn = int(fn)
+    except ValueError:
+        pass
+    else:
+        b = fn.bit_length() + 7 >> 3
+        fn = as_str(base64.urlsafe_b64encode(fn.to_bytes(b, "big"))).rstrip("=")
+    url1 = f"{bot.webserver}/view/~{fn}"
+    url2 = f"{bot.webserver}/download/~{fn}"
     if filename:
-        url += "/" + (str(file) if filename is None else lim_str(filename.translate(filetrans), 64))
-    if ext and "." not in url:
-        url += "." + ext
-    return url
+        fn = "/" + (str(file) if filename is None else lim_str(filename, 64).translate(filetrans))
+        url1 += fn
+    if ext and "." not in url1:
+        url1 += "." + ext
+    return url1, url2
 
 def is_file(url):
-    start = f"{bot.webserver}/files/"
-    if url.startswith(start):
-        path = url[len(start):].split("/", 1)[0]
-        fn = f"{IND}{path}"
-        for file in os.listdir("cache"):
-            if file.rsplit(".", 1)[0].split("~", 1)[0][1:] == path:
-                return f"cache/{file}"
+    for start in (f"{bot.webserver}/", f"http://{bot.ip}:{PORT}/"):
+        if url.startswith(start):
+            u = url[len(start):]
+            endpoint = u.split("/", 1)[0]
+            if endpoint in ("view", "file", "files", "download"):
+                path = u.split("/", 2)[1].split("?", 1)[0]
+                fn = f"{IND}{path}"
+                for file in os.listdir("cache"):
+                    if file.rsplit(".", 1)[0].split("~", 1)[0][1:] == path:
+                        return f"cache/{file}"
     return None
 
 def webserver_communicate(bot):
@@ -4049,7 +4061,8 @@ class SimulatedMessage:
         except KeyError:
             pass
         else:
-            kwargs["file"] = await create_future(as_file, file)
+            f = await create_future(as_file, file)
+            kwargs["file"] = f[0]
         self.response.append(kwargs)
         return self
 
