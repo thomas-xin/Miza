@@ -36,10 +36,10 @@ h3 {
     top: -1em;
     padding: 0.5em;
     border-radius: 9999999999px;
-    text-shadow: -1px 0 #ffff00, 0 1px #ffff00, 1px 0 #ffff00, 0 -1px #ffff00;
+    background: #7f3fbf;
+    color: #3f007f;
+    text-shadow: -2px 0 #dfbfff, 0 2px #dfbfff, 2px 0 #dfbfff, 0 -2px #dfbfff;
     font-weight: 400;
-    background-image: radial-gradient(ellipse at center, #bfbf00, #bfbf00 90%, #ffffff 100%);
-    color: #3f0000;
 }
 
 h1, h2, p {
@@ -57,9 +57,9 @@ h2 {
 a {
     padding: 0.5em 2em;
     display: inline-block;
-    background: #bf7fff;
-    color: #3f1f7f;
-    text-shadow: -2px 0 #ffbfff, 0 2px #ffbfff, 2px 0 #ffbfff, 0 -2px #ffbfff;
+    background: #7f3fbf;
+    color: #3f007f;
+    text-shadow: -2px 0 #dfbfff, 0 2px #dfbfff, 2px 0 #dfbfff, 0 -2px #dfbfff;
     text-decoration: none;
     font-size: 1.1rem;
     border-radius: 0.5em;
