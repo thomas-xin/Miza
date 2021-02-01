@@ -2019,9 +2019,10 @@ class UpdateFileLogs(Database):
                             b = await a.read(use_cached=True)
                         else:
                             for i in range(30):
-                                if b is None:
-                                    with delay(1):
-                                        b = self.bot.cache.attachments[a.id]
+                                if b:
+                                    break
+                                with delay(1):
+                                    b = self.bot.cache.attachments[a.id]
                         fil = CompatFile(io.BytesIO(b), filename=str(a).rsplit("/", 1)[-1])
                         fils.append(fil)
                     except:
